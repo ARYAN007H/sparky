@@ -1229,17 +1229,34 @@ pub(crate) fn expect_schema_fields(schema: &ControllerSchema, fields: &[(&str, O
 
 #[cfg(test)]
 pub(crate) fn expect_schema_required_inputs(schema: &ControllerSchema, required: &[&str]) {
+    assert_eq!(
+        required_input_contract(schema, required),
+        Ok(()),
+        "{}.{} required inputs",
+        schema.namespace,
+        schema.function
+    );
+}
+
+#[cfg(test)]
+pub(crate) fn required_input_contract(
+    schema: &ControllerSchema,
+    required: &[&str],
+) -> Result<(), String> {
     let actual: Vec<_> = schema
         .inputs
         .iter()
         .filter(|field| field.required)
         .map(|field| field.name)
         .collect();
-    assert_eq!(
-        actual, required,
-        "{}.{} required inputs",
-        schema.namespace, schema.function
-    );
+    if actual == required {
+        Ok(())
+    } else {
+        Err(format!(
+            "{}.{} required inputs mismatch: expected {required:?}, got {actual:?}",
+            schema.namespace, schema.function
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -1280,11 +1297,14 @@ pub(crate) fn assert_schema_controller_parity(
     controllers: &[RegisteredController],
     known_function: &str,
 ) {
-    assert_eq!(
-        schemas.len(),
-        controllers.len(),
-        "schema/controller registration lists must stay in lockstep",
-    );
+    assert_eq!(schemas.len(), controllers.len(), "schema/controller count");
+    for (schema, controller) in schemas.iter().zip(controllers) {
+        assert_eq!(
+            schema.method_name(),
+            controller.schema.method_name(),
+            "schema/controller registration order diverged"
+        );
+    }
     assert!(
         schemas.iter().any(|s| s.function == known_function),
         "expected a `{known_function}` controller schema to be registered",
