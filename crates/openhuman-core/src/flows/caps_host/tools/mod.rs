@@ -32,8 +32,8 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::security::approval::ApprovalTurnContext;
 use crate::security::SecurityPolicy;
+use crate::security::approval::ApprovalTurnContext;
 
 use super::{EngineError, Result};
 
@@ -52,11 +52,7 @@ pub(crate) async fn classify_composio_action_for_tier(slug: &str) -> tinybox_bus
     crate::integrations::composio::flow_gate::classify_composio_action_for_tier(slug)
 }
 
-pub(crate) async fn is_curated_flow_tool(
-    ctx: &DispatchCtx,
-    config: &Config,
-    slug: &str,
-) -> bool {
+pub(crate) async fn is_curated_flow_tool(ctx: &DispatchCtx, config: &Config, slug: &str) -> bool {
     crate::integrations::composio::flow_gate::is_curated_flow_tool(ctx, config, slug).await
 }
 

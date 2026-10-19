@@ -5,8 +5,8 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tinyflows_bus::runs;
 
-use super::binding::CapsHostBinding;
 use super::agent::{AgentRunState, OpenHumanAgentRunner};
+use super::binding::CapsHostBinding;
 
 pub(crate) async fn run_agent(
     binding: Arc<CapsHostBinding>,
@@ -18,8 +18,7 @@ pub(crate) async fn run_agent(
     let progress = tokio::spawn(async move {
         while let Some(event) = progress_rx.recv().await {
             if let crate::agent::progress::AgentProgress::TurnCompleted {
-                stop: Some(stop),
-                ..
+                stop: Some(stop), ..
             } = &event
             {
                 progress_state.lock().await.turn_stop = Some(stop.clone());
@@ -156,19 +155,20 @@ fn progress_event(event: crate::agent::progress::AgentProgress) -> Option<(Strin
     use crate::agent::progress::AgentProgress;
     match event {
         AgentProgress::TurnStarted => Some(("turn_started".into(), "Agent turn started".into())),
-        AgentProgress::IterationStarted { iteration, .. } => Some((
-            "iteration_started".into(),
-            format!("Iteration {iteration}"),
-        )),
-        AgentProgress::ToolCallStarted { tool_name, .. } => Some((
-            "tool_call_started".into(),
-            format!("Calling {tool_name}"),
-        )),
+        AgentProgress::IterationStarted { iteration, .. } => {
+            Some(("iteration_started".into(), format!("Iteration {iteration}")))
+        }
+        AgentProgress::ToolCallStarted { tool_name, .. } => {
+            Some(("tool_call_started".into(), format!("Calling {tool_name}")))
+        }
         AgentProgress::ToolCallCompleted {
             tool_name, success, ..
         } => Some((
             "tool_call_completed".into(),
-            format!("{tool_name} {}", if success { "completed" } else { "failed" }),
+            format!(
+                "{tool_name} {}",
+                if success { "completed" } else { "failed" }
+            ),
         )),
         AgentProgress::TextDelta { delta, .. } if !delta.is_empty() => {
             Some(("text_delta".into(), delta))

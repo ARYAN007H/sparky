@@ -11,12 +11,12 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::*;
 use crate::config::Config;
 use crate::flows::agent_route::{
-    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
+    AgentRoute, harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref,
 };
 use crate::modules::tinyflows as module;
 
@@ -503,7 +503,8 @@ impl OpenHumanAgentRunner {
                 }
             };
 
-        self.format_agent_result(agent_ref, request, final_text).await
+        self.format_agent_result(agent_ref, request, final_text)
+            .await
     }
 
     /// Persona-shaping single-completion fallback for a custom

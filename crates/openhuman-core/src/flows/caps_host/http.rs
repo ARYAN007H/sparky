@@ -11,19 +11,21 @@
 
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::*;
 use crate::config::{Config, HttpRequestConfig};
-use crate::security::credentials::{HttpCredential, HttpCredentialsStore};
-use crate::security::SecurityPolicy;
-use crate::tools::http_request_tool;
 use crate::modules::tinyflows as module;
+use crate::security::SecurityPolicy;
+use crate::security::credentials::{HttpCredential, HttpCredentialsStore};
+use crate::tools::http_request_tool;
 use tinybox_bus::CommandClass;
 use tinytools::Tool as _;
 
-use super::{close_audit, enforce_current_node_tier_gate, enforce_node_tier_gate, gate_call_for_tier};
 use super::{EngineError, Result};
+use super::{
+    close_audit, enforce_current_node_tier_gate, enforce_node_tier_gate, gate_call_for_tier,
+};
 
 /// [`HttpClient`] adapter over `HttpRequestTool`
 /// (`tinytools_std::network::HttpRequestTool`, built by `tools/impl/network/host.rs`). Allowlist + DNS-rebind
@@ -63,7 +65,10 @@ pub(crate) fn resolve_http_credential(
     store: &HttpCredentialsStore,
     credential_name: Option<&str>,
 ) -> Result<Option<HttpCredential>> {
-    let Some(name) = credential_name.map(str::trim).filter(|name| !name.is_empty()) else {
+    let Some(name) = credential_name
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    else {
         return Ok(None);
     };
     match store.get(name) {

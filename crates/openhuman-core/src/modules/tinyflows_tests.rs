@@ -249,6 +249,9 @@ async fn single_callback_registration_unserves_when_its_guard_drops() {
         .await
         .expect("registration guard drop removes its interface");
     drop(context);
-    assert!(weak_context.upgrade().is_none(), "callback context is released");
+    assert!(
+        weak_context.upgrade().is_none(),
+        "callback context is released"
+    );
     assert!(proxy.call::<serde_json::Value>("Ping", ()).await.is_err());
 }

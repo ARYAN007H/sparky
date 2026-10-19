@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::Value;
 use tinyflows_bus::runs;
 
 use crate::security::credentials::HttpCredentialsStore;
@@ -22,8 +22,6 @@ impl CapsHostService {
     pub(crate) fn new(binding: Arc<CapsHostBinding>) -> Self {
         Self(binding)
     }
-
-
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
@@ -105,7 +103,10 @@ impl CapsHostService {
             .map_err(bus_error)
     }
 
-    async fn shell_run(&self, _request: runs::ShellRunRequest) -> tinybus::Result<runs::ShellRunOutcome> {
+    async fn shell_run(
+        &self,
+        _request: runs::ShellRunRequest,
+    ) -> tinybus::Result<runs::ShellRunOutcome> {
         Err(tinybus::Error::failed(
             "shell execution is disabled for workflow runs",
         ))
@@ -166,14 +167,15 @@ impl CapsHostService {
             .map_err(bus_error)
     }
 
-    async fn agent_run(&self, request: runs::AgentRunRequest) -> tinybus::Result<runs::AgentRunHandle> {
+    async fn agent_run(
+        &self,
+        request: runs::AgentRunRequest,
+    ) -> tinybus::Result<runs::AgentRunHandle> {
         let handle = uuid::Uuid::new_v4().simple().to_string();
-        let state = Arc::new(tokio::sync::Mutex::new(super::agent::AgentRunState::default()));
-        self.0
-            .agent_runs
-            .lock()
-            .await
-            .insert(handle.clone(), state);
+        let state = Arc::new(tokio::sync::Mutex::new(
+            super::agent::AgentRunState::default(),
+        ));
+        self.0.agent_runs.lock().await.insert(handle.clone(), state);
         let binding = Arc::clone(&self.0);
         tokio::spawn(async move {
             if let Err(error) = service_agent::run_agent(binding.clone(), request).await {
@@ -225,7 +227,8 @@ impl CapsHostService {
                     &binding.config.workspace_dir,
                 )
                 .map_err(|error| error.to_string())?;
-                let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+                let registry =
+                    crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
                 registry
                     .and_then(|registry| registry.get(&id).cloned())
                     .map(to_bus_agent_definition)
@@ -244,9 +247,17 @@ impl CapsHostService {
                     &binding.config.workspace_dir,
                 )
                 .map_err(|error| error.to_string())?;
-                let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+                let registry =
+                    crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
                 registry
-                    .map(|registry| registry.list().into_iter().cloned().map(to_bus_agent_definition).collect())
+                    .map(|registry| {
+                        registry
+                            .list()
+                            .into_iter()
+                            .cloned()
+                            .map(to_bus_agent_definition)
+                            .collect()
+                    })
                     .unwrap_or_else(|| Ok(Vec::new()))
             })
             .await
@@ -294,13 +305,9 @@ impl CapsHostService {
         Ok(runs::ApprovalOutcome::Pending)
     }
 
-    async fn approval_cancel(
-        &self,
-        _request: runs::ApprovalCancelRequest,
-    ) -> tinybus::Result<()> {
+    async fn approval_cancel(&self, _request: runs::ApprovalCancelRequest) -> tinybus::Result<()> {
         // Graph approval rows are module-owned; cancellation is represented
         // by the module's run lifecycle and does not cancel tool approvals.
         Ok(())
     }
 }
-

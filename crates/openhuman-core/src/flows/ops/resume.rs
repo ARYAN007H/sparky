@@ -1,5 +1,5 @@
 use super::*;
-use tinyflows_bus::runs::{ResumeRun, ResumeRunResponse};
+use tinyflows_bus::runs::ResumeRun;
 
 /// Ask TinyFlows to continue a parked workflow after a human approval
 /// decision. The module owns the persisted run snapshot, approval validation,
@@ -48,7 +48,8 @@ pub async fn flows_resume(
         rejections,
         timeout_ms: FLOW_RUN_TIMEOUT_SECS.saturating_mul(1_000),
     };
-    let resumed: ResumeRunResponse = crate::flows::runs_adapter::resume_run(
+    let resumed = crate::flows::runs_adapter::resume_and_wait(
+        ctx,
         config,
         request,
         bindings,
@@ -59,17 +60,17 @@ pub async fn flows_resume(
         target: "flows",
         flow_id,
         run_id = %resumed.run_id,
-        "[flows] flows_resume: module admitted the parked run"
+        status = %resumed.status,
+        pending_approvals = resumed.pending_approvals.len(),
+        "[flows] flows_resume: module run segment settled"
     );
     Ok(Outcome::single_log(
         json!({
-            "output": Value::Null,
-            "pending_approvals": Vec::<String>::new(),
+            "output": resumed.output,
+            "pending_approvals": resumed.pending_approvals,
             "thread_id": resumed.run_id,
-            "status": "running",
-            "resumed": true,
         }),
-        format!("flow resume started: {}", resumed.run_id),
+        format!("flow resume {}", resumed.status),
     ))
 }
 

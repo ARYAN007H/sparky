@@ -1,7 +1,7 @@
 //! One trusted `CapsHost` callback object for a single TinyFlows run.
 
-use std::{collections::HashMap, sync::Arc};
 use std::future::Future;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
@@ -37,11 +37,9 @@ impl CapsHostBinding {
     /// bus callback that runs on the module runtime.
     pub(crate) async fn within<F: Future>(&self, future: F) -> F::Output {
         match self.ctx.core() {
-            Some(context) => crate::core::runtime::CoreContext::scope(
-                Arc::clone(context),
-                future,
-            )
-            .await,
+            Some(context) => {
+                crate::core::runtime::CoreContext::scope(Arc::clone(context), future).await
+            }
             None => future.await,
         }
     }
@@ -65,9 +63,7 @@ pub(crate) async fn serve(
 ) -> Result<CapsHostRegistration, String> {
     let origin = crate::agent::turn_origin::AgentTurnOrigin::TrustedAutomation {
         job_id: flow_id.clone(),
-        source: crate::agent::turn_origin::TrustedAutomationSource::Workflow {
-            require_approval,
-        },
+        source: crate::agent::turn_origin::TrustedAutomationSource::Workflow { require_approval },
     };
     let ctx = ctx.with_turn_origin(origin);
     let security = Arc::new(crate::security::SecurityPolicy::from_config(

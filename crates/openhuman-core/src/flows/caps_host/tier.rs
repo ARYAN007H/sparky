@@ -5,8 +5,8 @@
 //! is allowed outright, needs a human, or is refused; the approval gate is what
 //! actually performs the round-trip when a human is needed.
 
-use serde_json::Value;
 use super::{EngineError, Result};
+use serde_json::Value;
 
 use crate::security::{GateDecision, SecurityPolicy};
 use tinybox_bus::CommandClass;

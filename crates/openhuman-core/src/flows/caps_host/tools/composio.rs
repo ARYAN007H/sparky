@@ -1,5 +1,6 @@
 //! Thin `tinyflows` adapter for the Composio-owned flow backend.
 
+use super::super::{EngineError, Result};
 use super::{ToolBackend, ToolCallCtx};
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
@@ -8,7 +9,6 @@ use crate::security::approval::ApprovalTurnContext;
 use crate::security::{GateDecision, SecurityPolicy};
 use async_trait::async_trait;
 use serde_json::Value;
-use super::super::{EngineError, Result};
 
 pub(crate) struct ComposioToolBackend;
 

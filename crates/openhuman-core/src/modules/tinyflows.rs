@@ -53,7 +53,7 @@ pub(crate) fn disabled_message() -> String {
 mod imp {
     #[cfg(not(test))]
     use super::MODULE_ID;
-    use super::{disabled_message, ServedObjectRegistration, HOST_BUS_NAME};
+    use super::{HOST_BUS_NAME, ServedObjectRegistration, disabled_message};
     use crate::config::Config;
     #[cfg(not(test))]
     use crate::modules::ops;
@@ -372,7 +372,7 @@ pub(crate) use imp::{
 
 #[cfg(not(feature = "modules"))]
 mod imp {
-    use super::{disabled_message, ServedObjectRegistration};
+    use super::{ServedObjectRegistration, disabled_message};
     use crate::config::Config;
 
     fn unavailable(config: &Config) -> String {

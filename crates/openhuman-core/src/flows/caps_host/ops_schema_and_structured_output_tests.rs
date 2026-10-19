@@ -6,10 +6,7 @@ use serde_json::json;
 fn raw_provider_models_override_the_role_default() {
     for raw in ["claude-opus-4", "deepseek-v4-pro"] {
         assert!(is_raw_passthrough_model(raw));
-        assert_eq!(
-            resolve_host_model(Some(raw), "chat-v1".to_owned()),
-            raw
-        );
+        assert_eq!(resolve_host_model(Some(raw), "chat-v1".to_owned()), raw);
     }
 }
 
@@ -21,10 +18,7 @@ fn managed_model_tiers_keep_the_provider_resolved_model() {
             "reasoning-v1"
         );
     }
-    assert_eq!(
-        resolve_host_model(None, "chat-v1".to_owned()),
-        "chat-v1"
-    );
+    assert_eq!(resolve_host_model(None, "chat-v1".to_owned()), "chat-v1");
     assert_eq!(
         resolve_host_model(Some("   "), "chat-v1".to_owned()),
         "chat-v1"

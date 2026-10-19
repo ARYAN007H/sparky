@@ -1,11 +1,11 @@
 //! Thin TinyFlows registration and error adapter for native OpenHuman tools.
 
+use super::super::{EngineError, Result};
 use async_trait::async_trait;
 use serde_json::Value;
 use tinybox_bus::CommandClass;
-use super::super::{EngineError, Result};
 
-use super::{ToolBackend, ToolCallCtx, NATIVE_TOOL_PREFIX};
+use super::{NATIVE_TOOL_PREFIX, ToolBackend, ToolCallCtx};
 
 pub(crate) struct NativeToolBackend;
 
