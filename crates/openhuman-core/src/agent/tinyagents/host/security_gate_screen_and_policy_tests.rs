@@ -217,6 +217,32 @@ async fn screen_input_redacts_credentials_without_changing_screening_policy() {
 }
 
 #[tokio::test]
+async fn screening_changes_only_the_new_user_row() {
+    let gate = gate(AutonomyLevel::Full);
+    let secret: String = [
+        's', 'k', '-', 'o', 'l', 'd', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+    ]
+    .into_iter()
+    .collect();
+    let old_user = format!("previously accepted text {secret}");
+    let current_user = format!("new user row {secret}");
+    let mut history = vec![Message::system("frozen prefix"), Message::user(&old_user)];
+    history.push(Message::user(&current_user));
+
+    let (screened, blocked) = gate.screen_new_user_row(&mut history).await.unwrap();
+
+    assert!(screened);
+    assert!(blocked.is_none());
+    assert_eq!(history[0].text(), "frozen prefix");
+    assert_eq!(history[1].text(), old_user);
+    assert!(!history[2].text().contains(&secret));
+    assert!(history[2]
+        .text()
+        .contains(&tinyinference_core::sanitize::scrub_credentials(&current_user)));
+}
+
+#[tokio::test]
 async fn tool_screening_preserves_host_confirmation_tokens() {
     let gate = gate(AutonomyLevel::Full);
     let token = "00000000-0000-4000-8000-000000000123";
