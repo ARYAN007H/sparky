@@ -207,3 +207,48 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
     );
     assert!(proxy.call::<serde_json::Value>("Ping", ()).await.is_err());
 }
+
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn single_callback_registration_unserves_when_its_guard_drops() {
+    use std::sync::Arc;
+
+    let path = format!(
+        "/ai/tinyhumans/openhuman/TestRegistration/{}",
+        uuid::Uuid::new_v4().simple()
+    );
+    let dropped = Arc::new(tokio::sync::Notify::new());
+    let context = Arc::new(());
+    let weak_context = Arc::downgrade(&context);
+    let registration = serve_registered(
+        path.clone(),
+        RegistrationProbe {
+            dropped: Arc::clone(&dropped),
+            context: Arc::clone(&context),
+        },
+    )
+    .await
+    .expect("single callback registration succeeds");
+
+    let runtime = super::super::runtime::runtime()
+        .await
+        .expect("module runtime exists");
+    let proxy = runtime
+        .connection()
+        .proxy(
+            HOST_BUS_NAME,
+            &path,
+            "ai.tinyhumans.openhuman.TestRegistration",
+        )
+        .expect("probe proxy");
+    assert!(proxy.call::<serde_json::Value>("Ping", ()).await.is_ok());
+
+    drop(registration);
+    let cleanup = dropped.notified();
+    tokio::time::timeout(std::time::Duration::from_secs(5), cleanup)
+        .await
+        .expect("registration guard drop removes its interface");
+    drop(context);
+    assert!(weak_context.upgrade().is_none(), "callback context is released");
+    assert!(proxy.call::<serde_json::Value>("Ping", ()).await.is_err());
+}

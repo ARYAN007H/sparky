@@ -5,7 +5,6 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tinyflows_bus::runs::{self, caps as members};
 
-use crate::config::Config;
 use crate::security::credentials::HttpCredentialsStore;
 
 use super::binding::CapsHostBinding;
@@ -344,17 +343,30 @@ impl CapsHostService {
 
     async fn approval_decide(
         &self,
-        _request: runs::ApprovalRequest,
+        request: runs::ApprovalRequest,
     ) -> tinybus::Result<runs::ApprovalOutcome> {
-        Err(tinybus::Error::failed(
-            "workflow approval callback is unavailable",
-        ))
+        if request
+            .run_id
+            .as_deref()
+            .is_some_and(|run_id| run_id != self.0.run_id.as_str())
+        {
+            return Err(tinybus::Error::failed(
+                "workflow approval request does not match its bound run",
+            ));
+        }
+        // The module owns graph approval rows and projects them through the
+        // durable run record. Repeated calls intentionally return Pending;
+        // the module retries this request after `Runs.ResumeRun` carries the
+        // human's node decision. Acting-tool approvals remain on ApprovalGate.
+        Ok(runs::ApprovalOutcome::Pending)
     }
 
     async fn approval_cancel(
         &self,
         _request: runs::ApprovalCancelRequest,
     ) -> tinybus::Result<()> {
+        // Graph approval rows are module-owned; cancellation is represented
+        // by the module's run lifecycle and does not cancel tool approvals.
         Ok(())
     }
 }
@@ -375,7 +387,6 @@ fn bus_error(error: impl std::fmt::Display) -> tinybus::Error {
 fn to_bus_agent_definition(
     definition: crate::agent::harness::host_definition::AgentDefinition,
 ) -> Result<runs::AgentDefinition, String> {
-    use crate::agent::harness::host_definition::AgentDefinitionExt;
     use tinyagents_definition::{ModelSpec, PromptSource, ToolScope};
 
     let instructions = match &definition.system_prompt {
@@ -399,7 +410,6 @@ fn to_bus_agent_definition(
             })
             .collect(),
     };
-    let _ = definition.prompt_fn();
     Ok(runs::AgentDefinition {
         id: definition.id.clone(),
         name: definition

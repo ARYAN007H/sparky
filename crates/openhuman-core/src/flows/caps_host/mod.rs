@@ -19,6 +19,7 @@ pub(crate) use http::{
     OpenHumanHttp, resolve_http_credential,
 };
 pub(crate) use llm::{OpenHumanLlm, resolve_host_model};
+pub(crate) use memory::OpenHumanMemory;
 pub(crate) use prompt::model_response_to_completion_value;
 pub(crate) use service::CapsHostService;
 pub(crate) use tools::OpenHumanTools;
