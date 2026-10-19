@@ -15,13 +15,10 @@ export function mergeChildEnv(parent, overrides) {
 }
 
 /** Isolated environment and working directory for the throwaway core process. */
-export function coreLaunchSpec(
-  parentEnv,
-  { repo, workspace, mockUrl, token, logLevel = "info" },
-) {
+export function coreLaunchSpec({ workspace, mockUrl, token, logLevel = "info" }) {
   return {
     cwd: workspace,
-    env: mergeChildEnv(parentEnv, {
+    env: {
       OPENHUMAN_WORKSPACE: workspace,
       OPENHUMAN_DOTENV_PATH: path.join(workspace, "empty.env"),
       OPENHUMAN_CORE_TOKEN: token,
@@ -33,7 +30,7 @@ export function coreLaunchSpec(
       OPENHUMAN_BACKEND_SESSION_TOKEN: null,
       OPENHUMAN_STORAGE_URL: null,
       RUST_LOG: logLevel,
-    }),
+    },
   };
 }
 

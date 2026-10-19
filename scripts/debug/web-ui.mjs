@@ -185,8 +185,7 @@ async function main() {
   await mockModule.startMockServer(mockPort);
   log(`mock backend   ${mockUrl}`);
 
-  const coreLaunch = coreLaunchSpec(process.env, {
-    repo,
+  const coreLaunch = coreLaunchSpec({
     workspace,
     mockUrl,
     token,
