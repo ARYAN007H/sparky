@@ -5,6 +5,7 @@ mod core;
 pub mod daemon;
 pub mod daemon_host;
 pub mod ops;
+pub use ops as rpc;
 mod restart;
 mod schemas;
 mod shutdown;

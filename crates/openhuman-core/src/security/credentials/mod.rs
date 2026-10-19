@@ -9,6 +9,7 @@ pub mod identity;
 pub mod jwt;
 pub mod openai_oauth;
 pub mod ops;
+pub use ops as rpc;
 pub mod profiles;
 pub mod responses;
 mod schemas;

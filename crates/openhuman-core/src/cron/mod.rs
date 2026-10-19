@@ -23,6 +23,7 @@ pub mod host_delivery;
 pub mod job_builder;
 pub mod limits;
 pub mod ops;
+pub use ops as rpc;
 pub mod origin;
 mod schemas;
 pub mod seed;

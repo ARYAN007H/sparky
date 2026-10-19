@@ -1,5 +1,6 @@
 mod core;
 pub mod ops;
+pub use ops as rpc;
 pub mod scheduler;
 mod schemas;
 mod types;

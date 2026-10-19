@@ -12,6 +12,7 @@ pub mod daemon;
 pub mod enrichers;
 pub mod migrations;
 pub mod ops;
+pub use ops as rpc;
 pub mod schema;
 mod schemas;
 pub mod tools;

@@ -2,6 +2,7 @@
 
 mod core;
 pub mod ops;
+pub use ops as rpc;
 mod schemas;
 pub mod tools;
 
