@@ -1811,14 +1811,12 @@ async fn worker_a_controller_schemas_are_fully_exposed() {
                 "openhuman.config_get_composio_trigger_settings",
                 "openhuman.config_get_dashboard_settings",
                 "openhuman.config_get_data_paths",
-                "openhuman.config_get_dictation_settings",
                 "openhuman.config_get_onboarding_completed",
                 "openhuman.config_get_privacy_mode",
                 "openhuman.config_get_runtime_flags",
                 "openhuman.config_get_sandbox_settings",
                 "openhuman.config_get_search_settings",
                 "openhuman.config_get_user_timezone",
-                "openhuman.config_get_voice_server_settings",
                 "openhuman.config_reset_local_data",
                 "openhuman.config_resolve_api_url",
                 "openhuman.config_set_browser_allow_all",
@@ -1831,7 +1829,6 @@ async fn worker_a_controller_schemas_are_fully_exposed() {
                 "openhuman.config_update_browser_settings",
                 "openhuman.config_update_composio_trigger_settings",
                 "openhuman.config_update_computer_settings",
-                "openhuman.config_update_dictation_settings",
                 "openhuman.config_update_local_ai_settings",
                 "openhuman.config_update_memory_settings",
                 "openhuman.config_update_model_settings",
@@ -1839,7 +1836,6 @@ async fn worker_a_controller_schemas_are_fully_exposed() {
                 "openhuman.config_update_sandbox_settings",
                 "openhuman.config_update_search_settings",
                 "openhuman.config_update_user_timezone",
-                "openhuman.config_update_voice_server_settings",
                 "openhuman.config_workspace_onboarding_flag_exists",
                 "openhuman.config_workspace_onboarding_flag_set",
             ],
@@ -2139,19 +2135,6 @@ async fn config_controller_mutations_round_trip_over_json_rpc() {
             }),
         ),
         (
-            10_009,
-            "openhuman.config_update_voice_server_settings",
-            json!({
-                "auto_start": false,
-                "hotkey": "Fn",
-                "activation_mode": "push",
-                "skip_cleanup": true,
-                "min_duration_secs": 0.25,
-                "silence_threshold": 0.01,
-                "custom_dictionary": ["OpenHuman", "WorkerA"]
-            }),
-        ),
-        (
             10_010,
             "openhuman.config_update_composio_trigger_settings",
             json!({
@@ -2202,7 +2185,6 @@ async fn config_controller_mutations_round_trip_over_json_rpc() {
         (10_103, "openhuman.config_get_dashboard_settings"),
         (10_104, "openhuman.config_agent_server_status"),
         (10_105, "openhuman.config_get_data_paths"),
-        (10_106, "openhuman.config_get_voice_server_settings"),
         (10_107, "openhuman.config_get_composio_trigger_settings"),
         (10_108, "openhuman.config_get_autonomy_settings"),
         (10_109, "openhuman.config_get_search_settings"),
@@ -2367,66 +2349,6 @@ async fn config_runtime_flags_settings_readbacks_and_validation_paths_are_exerci
         );
     }
 
-    ok(
-        &rpc(
-            &harness.rpc_base,
-            11_011,
-            "openhuman.config_update_dictation_settings",
-            json!({
-                "enabled": true,
-                "hotkey": "Ctrl+Space",
-                "activation_mode": "toggle",
-                "llm_refinement": false,
-                "streaming": true,
-                "streaming_interval_ms": 750
-            }),
-        )
-        .await,
-        "update_dictation_settings valid",
-    );
-    let dictation = rpc(
-        &harness.rpc_base,
-        11_012,
-        "openhuman.config_get_dictation_settings",
-        json!({}),
-    )
-    .await;
-    let dictation_payload = payload(&dictation, "get_dictation_settings");
-    assert_eq!(
-        dictation_payload
-            .get("activation_mode")
-            .and_then(Value::as_str),
-        Some("toggle")
-    );
-    assert_eq!(
-        dictation_payload
-            .get("streaming_interval_ms")
-            .and_then(Value::as_u64),
-        Some(750)
-    );
-
-    assert_error_contains(
-        &rpc(
-            &harness.rpc_base,
-            11_013,
-            "openhuman.config_update_dictation_settings",
-            json!({ "activation_mode": "hold" }),
-        )
-        .await,
-        "update_dictation_settings invalid activation",
-        "invalid activation_mode",
-    );
-    assert_error_contains(
-        &rpc(
-            &harness.rpc_base,
-            11_014,
-            "openhuman.config_update_voice_server_settings",
-            json!({ "activation_mode": "hold" }),
-        )
-        .await,
-        "update_voice_server_settings invalid activation",
-        "invalid activation_mode",
-    );
     assert_error_contains(
         &rpc(
             &harness.rpc_base,
@@ -2644,30 +2566,6 @@ async fn config_runtime_flags_settings_readbacks_and_validation_paths_are_exerci
             .count(),
         1,
         "reserved cloud providers already in config should be preserved once, not duplicated by echoed client payloads: {filtered_payload}"
-    );
-
-    ok(
-        &rpc(
-            &harness.rpc_base,
-            11_019,
-            "openhuman.config_update_voice_server_settings",
-            json!({
-                "min_duration_secs": -1.0,
-                "silence_threshold": -0.5
-            }),
-        )
-        .await,
-        "update_voice_server_settings clamps non-negative floats",
-    );
-    let config = rpc(&harness.rpc_base, 11_020, "openhuman.config_get", json!({})).await;
-    let config_payload = payload(&config, "config_get after clamps");
-    assert_eq!(
-        config_payload.pointer("/config/voice_server/min_duration_secs"),
-        Some(&json!(0.0))
-    );
-    assert_eq!(
-        config_payload.pointer("/config/voice_server/silence_threshold"),
-        Some(&json!(0.0))
     );
 
     harness.join.abort();
