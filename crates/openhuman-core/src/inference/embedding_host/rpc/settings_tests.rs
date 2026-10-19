@@ -56,16 +56,9 @@ async fn endpoint_only_custom_change_reports_persisted_provider_signature() {
     let (endpoint, server) = endpoint().await;
     let (tmp, ctx) = config_context("custom:http://127.0.0.1:1/v1".to_string()).await;
 
-    let outcome = update_settings(
-        &ctx,
-        None,
-        None,
-        None,
-        Some(endpoint.clone()),
-        None,
-    )
-    .await
-    .unwrap();
+    let outcome = update_settings(&ctx, None, None, None, Some(endpoint.clone()), None)
+        .await
+        .unwrap();
     let persisted = reloaded_config(&tmp).await;
     let expected = format_embedding_signature(
         &persisted.memory.embedding_provider,
@@ -73,7 +66,10 @@ async fn endpoint_only_custom_change_reports_persisted_provider_signature() {
         persisted.memory.embedding_dimensions,
     );
 
-    assert_eq!(persisted.memory.embedding_provider, format!("custom:{endpoint}"));
+    assert_eq!(
+        persisted.memory.embedding_provider,
+        format!("custom:{endpoint}")
+    );
     assert_eq!(outcome.value["signature_changed"], true);
     assert_eq!(outcome.value["new_signature"], expected);
     server.abort();
@@ -104,16 +100,9 @@ async fn auto_detected_dimensions_are_used_in_persisted_provider_signature() {
     let (endpoint, server) = endpoint().await;
     let (tmp, ctx) = config_context("custom:http://127.0.0.1:1/v1".to_string()).await;
 
-    let outcome = update_settings(
-        &ctx,
-        None,
-        None,
-        Some(8),
-        Some(endpoint.clone()),
-        None,
-    )
-    .await
-    .unwrap();
+    let outcome = update_settings(&ctx, None, None, Some(8), Some(endpoint.clone()), None)
+        .await
+        .unwrap();
     let persisted = reloaded_config(&tmp).await;
     let expected = format_embedding_signature(
         &persisted.memory.embedding_provider,
@@ -121,7 +110,10 @@ async fn auto_detected_dimensions_are_used_in_persisted_provider_signature() {
         persisted.memory.embedding_dimensions,
     );
 
-    assert_eq!(persisted.memory.embedding_provider, format!("custom:{endpoint}"));
+    assert_eq!(
+        persisted.memory.embedding_provider,
+        format!("custom:{endpoint}")
+    );
     assert_eq!(persisted.memory.embedding_dimensions, 4);
     assert_eq!(outcome.value["signature_changed"], true);
     assert_eq!(outcome.value["new_signature"], expected);
