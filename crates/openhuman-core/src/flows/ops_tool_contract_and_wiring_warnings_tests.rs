@@ -169,11 +169,10 @@ async fn graph_wiring_warnings_flags_a_downstream_binding_missing_the_data_prefi
         ]
     }));
     let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
-    eprintln!("native output: {warnings:?}");
     assert!(
         warnings.iter().any(|w| w.contains("item.json.data.ts")
             && w.contains("post")
-            && w.contains("wraps its payload in `data`")),
+            && w.contains("payload is wrapped in `data`")),
         "{warnings:?}"
     );
 }
@@ -301,11 +300,10 @@ async fn graph_wiring_warnings_flags_a_split_out_path_that_resolves_to_a_non_arr
         ]
     }));
     let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
-    eprintln!("native output: {warnings:?}");
     assert!(
         warnings
             .iter()
-            .any(|w| w.contains("split") && w.contains("does not name an array")),
+            .any(|w| w.contains("split") && w.contains("known non-array value there")),
         "{warnings:?}"
     );
 }
