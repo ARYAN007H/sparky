@@ -173,9 +173,9 @@ async fn parked_run_ttl_sweep_expires_stale_runs_but_spares_fresh_ones() {
     assert!(err.contains("not pending approval") || err.contains("no paused run"));
 }
 
-#[test]
-fn flows_validate_warns_on_unfired_webhook_trigger() {
-    let outcome = flows_validate(webhook_trigger_graph());
+#[tokio::test]
+async fn flows_validate_warns_on_unfired_webhook_trigger() {
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), webhook_trigger_graph()).await;
     assert!(outcome.value.valid, "a webhook graph is structurally valid");
     assert!(outcome.value.errors.is_empty());
     assert_eq!(
@@ -192,9 +192,9 @@ fn flows_validate_warns_on_unfired_webhook_trigger() {
     );
 }
 
-#[test]
-fn flows_validate_does_not_warn_on_schedule_trigger() {
-    let outcome = flows_validate(schedule_trigger_graph("0 9 * * *"));
+#[tokio::test]
+async fn flows_validate_does_not_warn_on_schedule_trigger() {
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), schedule_trigger_graph("0 9 * * *")).await;
     assert!(outcome.value.valid);
     assert!(
         outcome.value.warnings.is_empty(),
@@ -203,14 +203,14 @@ fn flows_validate_does_not_warn_on_schedule_trigger() {
     );
 }
 
-#[test]
-fn flows_validate_reports_error_for_graph_without_trigger() {
+#[tokio::test]
+async fn flows_validate_reports_error_for_graph_without_trigger() {
     let graph = json!({
         "name": "bad",
         "nodes": [ { "id": "a", "kind": "output_parser", "name": "A" } ],
         "edges": []
     });
-    let outcome = flows_validate(graph);
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), graph).await;
     assert!(!outcome.value.valid);
     assert_eq!(outcome.value.errors.len(), 1);
     assert!(outcome.value.errors[0].contains("trigger"));
@@ -220,8 +220,8 @@ fn flows_validate_reports_error_for_graph_without_trigger() {
     );
 }
 
-#[test]
-fn flows_validate_accumulates_every_structural_error() {
+#[tokio::test]
+async fn flows_validate_accumulates_every_structural_error() {
     // A graph with several independent problems: no trigger, a duplicate node
     // id, and a dangling edge. Multi-error validation must surface all of them
     // in one call (fail-fast would report only the first).
@@ -233,7 +233,7 @@ fn flows_validate_accumulates_every_structural_error() {
         ],
         "edges": [ { "from_node": "dup", "to_node": "ghost" } ]
     });
-    let outcome = flows_validate(graph);
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), graph).await;
     assert!(!outcome.value.valid);
     // errors[] and error_details[] must be 1:1.
     assert_eq!(
@@ -274,8 +274,8 @@ fn flows_validate_accumulates_every_structural_error() {
     assert_eq!(missing.node_id, None);
 }
 
-#[test]
-fn flows_validate_reports_unparseable_graph_as_single_error() {
+#[tokio::test]
+async fn flows_validate_reports_unparseable_graph_as_single_error() {
     // A pre-validation failure (an unknown node kind can't deserialize) is a
     // genuine single error, not a structural-error accumulation.
     let graph = json!({
@@ -283,7 +283,7 @@ fn flows_validate_reports_unparseable_graph_as_single_error() {
         "nodes": [ { "id": "a", "kind": "not_a_real_kind", "name": "A" } ],
         "edges": []
     });
-    let outcome = flows_validate(graph);
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), graph).await;
     assert!(!outcome.value.valid);
     assert_eq!(outcome.value.errors.len(), 1);
     assert_eq!(outcome.value.error_details.len(), 1);
