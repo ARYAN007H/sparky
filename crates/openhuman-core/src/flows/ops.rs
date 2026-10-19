@@ -64,6 +64,10 @@ use tinyflows_catalog::types::{
 };
 use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 
+// Keep the test-facing stage operation available at the domain's existing
+// internal path while the implementation lives under its owner module.
+pub(crate) use crate::flows::host_gates::validate_tool_contracts;
+
 /// Overall safety bound on a single `flows_run` / `flows_resume`. Individual
 /// capabilities have their own timeouts (HTTP, sandbox), but a hung LLM/tool
 /// call must never let the RPC block indefinitely — this caps the whole run.
