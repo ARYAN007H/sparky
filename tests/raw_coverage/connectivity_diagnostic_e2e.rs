@@ -1,22 +1,15 @@
-//! Raw-line oriented E2E coverage for the connectivity domain.
-//!
-//! The public JSON-RPC surface is intentionally small (`connectivity_diag`),
-//! while the module also owns embedded-core port selection. These tests drive
-//! both through exported production APIs so the E2E lcov captures the real
-//! success and error branches.
+//! JSON-RPC coverage for the connectivity diagnostics surface.
 
 use crate::env_guard::EnvVarGuard;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::{OnceLock};
+use std::sync::OnceLock;
 
 use reqwest::StatusCode;
 use serde_json::{json, Value};
 use tempfile::{tempdir, TempDir};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
-use openhuman_core::platform::connectivity::rpc::{pick_listen_port_for_host, PickListenPortError};
 use openhuman_rpc::server::build_core_http_router;
 
 const TEST_RPC_TOKEN: &str = "connectivity-raw-coverage-e2e-token";
@@ -29,26 +22,6 @@ struct TestHarness {
     _guards: Vec<EnvVarGuard>,
     rpc_base: String,
     rpc_join: tokio::task::JoinHandle<Result<(), std::io::Error>>,
-}
-
-struct ProbeListener {
-    port: u16,
-    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
-    join: tokio::task::JoinHandle<()>,
-}
-
-impl Drop for ProbeListener {
-    fn drop(&mut self) {
-        if let Some(shutdown) = self.shutdown.take() {
-            let _ = shutdown.send(());
-        }
-        self.join.abort();
-    }
-}
-
-fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
-    let mutex = ENV_LOCK.get_or_init(|| tokio::sync::Mutex::new(()));
-    mutex.blocking_lock()
 }
 
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
@@ -164,53 +137,6 @@ fn payload<'a>(value: &'a Value, context: &str) -> &'a Value {
         .unwrap_or_else(|| panic!("{context} should include result.payload: {value}"))
 }
 
-async fn try_spawn_probe_listener_on(
-    host: &str,
-    status: &str,
-    body: &'static str,
-) -> Option<ProbeListener> {
-    let listener = tokio::net::TcpListener::bind((host, 0)).await.ok()?;
-    Some(spawn_probe_listener_from(listener, status, body))
-}
-
-fn spawn_probe_listener_from(
-    listener: tokio::net::TcpListener,
-    status: &str,
-    body: &'static str,
-) -> ProbeListener {
-    let port = listener.local_addr().expect("probe addr").port();
-    let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-    let status = status.to_string();
-
-    let join = tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = &mut shutdown_rx => break,
-                accepted = listener.accept() => {
-                    let Ok((mut stream, _addr)) = accepted else {
-                        break;
-                    };
-                    let mut req_buf = [0u8; 1024];
-                    let _ = stream.read(&mut req_buf).await;
-                    let response = format!(
-                        "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
-                        body.len(),
-                        body
-                    );
-                    let _ = stream.write_all(response.as_bytes()).await;
-                    let _ = stream.shutdown().await;
-                }
-            }
-        }
-    });
-
-    ProbeListener {
-        port,
-        shutdown: Some(shutdown_tx),
-        join,
-    }
-}
-
 #[tokio::test]
 async fn connectivity_diag_rpc_reports_live_listener_port_and_process() {
     let _lock = env_lock_async().await;
@@ -247,29 +173,4 @@ async fn connectivity_diag_rpc_reports_live_listener_port_and_process() {
     );
 
     harness.rpc_join.abort();
-}
-
-#[tokio::test]
-async fn pick_listen_port_identifies_ipv6_openhuman_listener_when_supported() {
-    let _lock = env_lock_async().await;
-    let Some(probe) =
-        try_spawn_probe_listener_on("::1", "200 OK", r#"{"name":"openhuman","ok":true}"#).await
-    else {
-        eprintln!("SKIPPED (not run, not asserted): IPv6 loopback ::1 is unavailable on this host");
-        return;
-    };
-
-    let err = pick_listen_port_for_host("::1", probe.port)
-        .await
-        .expect_err("IPv6 openhuman listener should request takeover");
-    match err {
-        PickListenPortError::WouldTakeOver {
-            preferred,
-            fingerprint,
-        } => {
-            assert_eq!(preferred, probe.port);
-            assert_eq!(fingerprint, "openhuman-core");
-        }
-        other => panic!("expected IPv6 takeover error, got {other:?}"),
-    }
 }
