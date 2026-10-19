@@ -107,12 +107,16 @@ fn env_str(name: &str) -> Option<String> {
 /// The `OPENHUMAN_*` overrides for the harness ceilings, read from the process
 /// environment.
 fn env_overrides() -> TurnPolicyOverrides {
+    env_overrides_from(env_str)
+}
+
+fn env_overrides_from(mut read: impl FnMut(&str) -> Option<String>) -> TurnPolicyOverrides {
     TurnPolicyOverrides {
-        turn_timeout_secs: env_str("OPENHUMAN_AGENT_TURN_TIMEOUT_SECS"),
-        model_call_timeout_secs: env_str("OPENHUMAN_MODEL_CALL_TIMEOUT_SECS"),
-        stream_idle_timeout_secs: env_str("OPENHUMAN_STREAM_IDLE_TIMEOUT_SECS"),
-        stream_first_event_timeout_secs: env_str("OPENHUMAN_STREAM_FIRST_EVENT_TIMEOUT_SECS"),
-        max_consecutive_stream_idle_timeouts: env_str(
+        turn_timeout_secs: read("OPENHUMAN_AGENT_TURN_TIMEOUT_SECS"),
+        model_call_timeout_secs: read("OPENHUMAN_MODEL_CALL_TIMEOUT_SECS"),
+        stream_idle_timeout_secs: read("OPENHUMAN_STREAM_IDLE_TIMEOUT_SECS"),
+        stream_first_event_timeout_secs: read("OPENHUMAN_STREAM_FIRST_EVENT_TIMEOUT_SECS"),
+        max_consecutive_stream_idle_timeouts: read(
             "OPENHUMAN_MAX_CONSECUTIVE_STREAM_IDLE_TIMEOUTS",
         ),
     }
@@ -135,13 +139,29 @@ pub(crate) fn run_policy_for_provider(
     local_provider: bool,
     tool_call_cap: Option<usize>,
 ) -> RunPolicy {
+    run_policy_for_provider_with_overrides(
+        max_iterations,
+        response_cache_enabled,
+        local_provider,
+        tool_call_cap,
+        env_overrides(),
+    )
+}
+
+fn run_policy_for_provider_with_overrides(
+    max_iterations: usize,
+    response_cache_enabled: bool,
+    local_provider: bool,
+    tool_call_cap: Option<usize>,
+    overrides: TurnPolicyOverrides,
+) -> RunPolicy {
     run_policy(&TurnPolicyOptions {
         max_model_calls: max_iterations,
         max_tool_calls: tool_call_limit(max_iterations, tool_call_cap),
         max_depth: MAX_SPAWN_DEPTH,
         local_provider,
         response_cache_enabled,
-        overrides: env_overrides(),
+        overrides,
     })
 }
 
