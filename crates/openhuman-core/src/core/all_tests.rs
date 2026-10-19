@@ -126,7 +126,7 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
         );
         assert!(!schema.outputs.is_empty(), "{method} has no output fields");
 
-        if method == "openhuman.wallet_setup" {
+        if method == "wallet.setup" {
             assert_eq!(
                 required_fields_contract(schema, &["encryptedMnemonic"]),
                 Ok(()),
