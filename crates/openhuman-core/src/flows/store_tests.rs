@@ -52,7 +52,7 @@ fn catalog_clients_preserve_definition_revisions_and_suggestion_semantics() {
             false,
             Some(&flow.updated_at),
         ),
-        Err(FlowUpdateError::Conflict(_))
+        Err(BusUpdateError::VersionConflict { .. })
     ));
 
     let disabled = set_enabled(&config, &flow.id, false).unwrap();
