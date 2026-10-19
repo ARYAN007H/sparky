@@ -58,7 +58,12 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
   );
 
   let launch;
-  startCoreChild((...args) => (launch = args), "/private/openhuman-core", 18473, spec);
+  startCoreChild(
+    (...args) => (launch = args),
+    "/private/openhuman-core",
+    18473,
+    spec,
+  );
   assert.equal(launch[0], "core");
   assert.equal(launch[1], "/private/openhuman-core");
   assert.deepEqual(launch[2], ["serve", "--port", "18473"]);
@@ -111,11 +116,16 @@ test("parseArgs reads every flag", () => {
 test("parseArgs rejects unknown flags and missing values", () => {
   assert.throws(() => parseArgs(["--bogus"]), /unknown option: --bogus/);
   assert.throws(() => parseArgs(["--script"]), /--script requires a value/);
-  assert.throws(() => parseArgs(["--core", "--keep"]), /--core requires a value/);
+  assert.throws(
+    () => parseArgs(["--core", "--keep"]),
+    /--core requires a value/,
+  );
 });
 
 test("devConnectUrl carries the RPC URL and bearer in the fragment", () => {
-  const url = new URL(devConnectUrl("http://localhost:1420", "http://127.0.0.1:7788/rpc", "tok"));
+  const url = new URL(
+    devConnectUrl("http://localhost:1420", "http://127.0.0.1:7788/rpc", "tok"),
+  );
   assert.equal(url.pathname, "/__dev-connect");
   assert.equal(url.search, "");
   const fragment = new URLSearchParams(url.hash.slice(1));
@@ -130,17 +140,27 @@ test("runStamp is a sortable local timestamp", () => {
 test("freePort returns a port that can be bound", async () => {
   const port = await freePort();
   await new Promise((resolve, reject) => {
-    const srv = net.createServer().listen(port, "127.0.0.1", () => srv.close(resolve));
+    const srv = net
+      .createServer()
+      .listen(port, "127.0.0.1", () => srv.close(resolve));
     srv.on("error", reject);
   });
 });
 
 test("waitFor resolves once the probe passes and times out otherwise", async () => {
   let calls = 0;
-  await waitFor(async () => ++calls >= 3, { timeoutMs: 1000, intervalMs: 1, what: "x" });
+  await waitFor(async () => ++calls >= 3, {
+    timeoutMs: 1000,
+    intervalMs: 1,
+    what: "x",
+  });
   assert.equal(calls, 3);
   await assert.rejects(
-    waitFor(async () => false, { timeoutMs: 20, intervalMs: 5, what: "the thing" }),
+    waitFor(async () => false, {
+      timeoutMs: 20,
+      intervalMs: 5,
+      what: "the thing",
+    }),
     /timed out waiting for the thing/,
   );
 });

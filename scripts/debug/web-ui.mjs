@@ -33,7 +33,10 @@ import {
   waitFor,
 } from "./web-ui-lib.mjs";
 
-const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const repo = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const log = (...args) => console.log("[debug:web]", ...args);
 
 let opts;
@@ -66,7 +69,9 @@ async function shutdown(code) {
       process.kill(-child.pid, "SIGTERM");
       log(`sent SIGTERM to ${child.name} group ${child.pid}`);
     } catch (err) {
-      log(`group kill of ${child.name} failed (${err.code}); signalling the pid`);
+      log(
+        `group kill of ${child.name} failed (${err.code}); signalling the pid`,
+      );
       child.kill("SIGTERM");
     }
   }
@@ -85,7 +90,13 @@ function startChild(name, command, args, env, cwd = repo) {
   const largeStack = name === "core" && process.platform === "darwin";
   const launchCommand = largeStack ? "/bin/sh" : command;
   const launchArgs = largeStack
-    ? ["-c", 'ulimit -s 65520 || exit 1; exec "$@"', "debug-web-core", command, ...args]
+    ? [
+        "-c",
+        'ulimit -s 65520 || exit 1; exec "$@"',
+        "debug-web-core",
+        command,
+        ...args,
+      ]
     : args;
   const child = spawn(launchCommand, launchArgs, {
     cwd,
@@ -93,7 +104,7 @@ function startChild(name, command, args, env, cwd = repo) {
     stdio: ["ignore", out, out],
     detached: true,
   });
-  child.on("exit", status => {
+  child.on("exit", (status) => {
     if (!shuttingDown) {
       console.error(`[debug:web] ${name} exited (${status}); see ${name}.log`);
       void shutdown(1);
@@ -113,7 +124,15 @@ function resolveCore() {
   log("building openhuman-core (target/debug/openhuman-core is missing)…");
   const build = spawnSync(
     "cargo",
-    ["build", "--manifest-path", "Cargo.toml", "-p", "openhuman-cli", "--bin", "openhuman-core"],
+    [
+      "build",
+      "--manifest-path",
+      "Cargo.toml",
+      "-p",
+      "openhuman-cli",
+      "--bin",
+      "openhuman-core",
+    ],
     { cwd: repo, stdio: "inherit" },
   );
   if (build.status !== 0) throw new Error("cargo build failed");
@@ -160,7 +179,9 @@ async function main() {
   const emptyDotenv = path.join(workspace, "empty.env");
   fs.writeFileSync(emptyDotenv, "");
 
-  mockModule = await import(pathToFileURL(path.join(repo, "scripts/mock-api-core.mjs")));
+  mockModule = await import(
+    pathToFileURL(path.join(repo, "scripts/mock-api-core.mjs"))
+  );
   await mockModule.startMockServer(mockPort);
   log(`mock backend   ${mockUrl}`);
 
@@ -172,10 +193,13 @@ async function main() {
     logLevel: process.env.RUST_LOG ?? "info",
   });
   startCoreChild(startChild, core, corePort, coreLaunch);
-  await waitFor(async () => (await fetch(`http://127.0.0.1:${corePort}/health`)).ok, {
-    timeoutMs: 120_000,
-    what: "the core's /health",
-  });
+  await waitFor(
+    async () => (await fetch(`http://127.0.0.1:${corePort}/health`)).ok,
+    {
+      timeoutMs: 120_000,
+      what: "the core's /health",
+    },
+  );
   log(`core           ${rpcUrl} (workspace ${path.relative(repo, workspace)})`);
 
   startChild(
@@ -207,26 +231,36 @@ async function main() {
     handleSIGTERM: false,
     handleSIGHUP: false,
   });
-  const context = await browser.newContext({ viewport: { width: 1300, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width: 1300, height: 900 },
+  });
   const browserLog = fs.createWriteStream(path.join(logDir, "browser.log"));
   // Everything the run needs is on loopback. Abort the rest (analytics,
   // remote assets) so a scenario never reaches a real third-party service.
   await context.route(
-    url => !isLoopback(url),
-    route => {
-      browserLog.write(`[blocked] ${route.request().method()} ${route.request().url()}\n`);
+    (url) => !isLoopback(url),
+    (route) => {
+      browserLog.write(
+        `[blocked] ${route.request().method()} ${route.request().url()}\n`,
+      );
       return route.abort("blockedbyclient");
     },
   );
   const page = await context.newPage();
-  page.on("console", msg => browserLog.write(`[${msg.type()}] ${msg.text()}\n`));
-  page.on("pageerror", err => browserLog.write(`[pageerror] ${err.stack ?? err.message}\n`));
-  page.on("requestfailed", req =>
-    browserLog.write(`[requestfailed] ${req.method()} ${req.url()} ${req.failure()?.errorText}\n`),
+  page.on("console", (msg) =>
+    browserLog.write(`[${msg.type()}] ${msg.text()}\n`),
+  );
+  page.on("pageerror", (err) =>
+    browserLog.write(`[pageerror] ${err.stack ?? err.message}\n`),
+  );
+  page.on("requestfailed", (req) =>
+    browserLog.write(
+      `[requestfailed] ${req.method()} ${req.url()} ${req.failure()?.errorText}\n`,
+    ),
   );
   page.on("crash", () => browserLog.write("[crash] renderer crashed\n"));
 
-  const screenshot = async name => {
+  const screenshot = async (name) => {
     const file = path.join(logDir, `${name}.png`);
     await page.screenshot({ path: file, fullPage: true });
     return file;
@@ -244,7 +278,10 @@ async function main() {
   const rpc = async (method, params = {}) => {
     const res = await fetch(rpcUrl, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
     });
     const body = await res.json();
@@ -254,7 +291,10 @@ async function main() {
   const mock = {
     url: mockUrl,
     set: (key, value) =>
-      mockModule.setMockBehavior(key, typeof value === "string" ? value : JSON.stringify(value)),
+      mockModule.setMockBehavior(
+        key,
+        typeof value === "string" ? value : JSON.stringify(value),
+      ),
     reset: () => mockModule.resetMockBehavior(),
     requests: () => mockModule.getRequestLog(),
   };
@@ -262,16 +302,29 @@ async function main() {
 
   if (!opts.script) {
     log("ready — the stack stays up until Ctrl-C");
-    log(`open ${devConnectUrl(appOrigin, rpcUrl, token)} in any local browser to share this core`);
+    log(
+      `open ${devConnectUrl(appOrigin, rpcUrl, token)} in any local browser to share this core`,
+    );
     await new Promise(() => {});
   }
 
   const scriptPath = path.resolve(process.cwd(), opts.script);
   log(`running ${path.relative(repo, scriptPath)}`);
   const { default: run } = await import(pathToFileURL(scriptPath));
-  if (typeof run !== "function") throw new Error("--script must default-export a function");
+  if (typeof run !== "function")
+    throw new Error("--script must default-export a function");
   try {
-    await run({ page, context, browser, mock, rpc, urls, logDir, screenshot, log });
+    await run({
+      page,
+      context,
+      browser,
+      mock,
+      rpc,
+      urls,
+      logDir,
+      screenshot,
+      log,
+    });
   } catch (err) {
     await screenshot("failure").catch(() => {});
     throw err;
@@ -285,7 +338,7 @@ async function main() {
 
 main().then(
   () => shutdown(0),
-  async err => {
+  async (err) => {
     console.error(`[debug:web] ${err.stack ?? err.message}`);
     await shutdown(1);
   },

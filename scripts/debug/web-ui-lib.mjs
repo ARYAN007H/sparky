@@ -15,7 +15,10 @@ export function mergeChildEnv(parent, overrides) {
 }
 
 /** Isolated environment and working directory for the throwaway core process. */
-export function coreLaunchSpec(parentEnv, { repo, workspace, mockUrl, token, logLevel = "info" }) {
+export function coreLaunchSpec(
+  parentEnv,
+  { repo, workspace, mockUrl, token, logLevel = "info" },
+) {
   return {
     cwd: workspace,
     env: mergeChildEnv(parentEnv, {
@@ -132,7 +135,7 @@ export function freePort() {
 
 /** `YYYYMMDD-HHMMSS` in local time, for the per-run artifact directory. */
 export function runStamp(date = new Date()) {
-  const pad = n => String(n).padStart(2, "0");
+  const pad = (n) => String(n).padStart(2, "0");
   return (
     `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-` +
     `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
@@ -158,7 +161,7 @@ export async function waitFor(fn, { timeoutMs, intervalMs = 200, what }) {
       // not ready yet
     }
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
-    await new Promise(resolve => setTimeout(resolve, intervalMs));
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }
 
