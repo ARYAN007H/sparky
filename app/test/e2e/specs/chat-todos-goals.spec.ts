@@ -33,7 +33,7 @@ import {
   typeIntoComposer,
   waitForSocketConnected,
 } from '../helpers/chat-harness';
-import { clickTestId, textExists, waitForTestId } from '../helpers/element-helpers';
+import { clickSelector, clickTestId, textExists, waitForTestId } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
@@ -144,6 +144,25 @@ async function waitForGoalStatus(status: string, timeout = 45_000): Promise<void
   });
 }
 
+/** Completed task cards start collapsed, so expand before inspecting their rows. */
+async function expandChecklistIfCollapsed(): Promise<void> {
+  const expanded = (await browser.execute(() =>
+    document.querySelector('[data-testid="todo-checklist"] button')?.getAttribute('aria-expanded')
+  )) as string | null | undefined;
+  if (expanded === 'false') {
+    await clickSelector('[data-testid="todo-checklist"] button');
+  }
+  await browser.waitUntil(
+    async () =>
+      (await browser.execute(() =>
+        document
+          .querySelector('[data-testid="todo-checklist"] button')
+          ?.getAttribute('aria-expanded')
+      )) === 'true',
+    { timeout: 5_000, timeoutMsg: 'task checklist disclosure did not open' }
+  );
+}
+
 async function sendTurn(message: string) {
   await typeIntoComposer(message);
   expect(
@@ -241,11 +260,12 @@ describe('Chat todos and goals', () => {
   it('G1.4 — the final turn completes every item and marks the task card done', async () => {
     setMockBehavior('llmForcedResponses', JSON.stringify(TURN_3_RESPONSES));
     await sendTurn('finish it');
-    await waitForProgress(5, 5);
     await browser.waitUntil(async () => (await readGoal())?.status === 'done', {
       timeout: 45_000,
       timeoutMsg: `goal never turned complete; last: ${JSON.stringify(await readGoal())}`,
     });
+    await expandChecklistIfCollapsed();
+    await waitForProgress(5, 5);
 
     const items = await readChecklist();
     expect(items.map(([, status]) => status)).toEqual(['done', 'done', 'done', 'done', 'done']);
@@ -278,11 +298,12 @@ describe('Chat todos and goals', () => {
       timeoutMsg: 'never switched back to the first thread',
     });
 
-    await waitForProgress(5, 5);
     await browser.waitUntil(async () => (await readGoal())?.status === 'complete', {
       timeout: 30_000,
       timeoutMsg: `goal did not rehydrate; last: ${JSON.stringify(await readGoal())}`,
     });
+    await expandChecklistIfCollapsed();
+    await waitForProgress(5, 5);
     expect((await readGoal())?.objective).toBe(OBJECTIVE);
     console.log(`${LOG_PREFIX} G1.5: passed — both rehydrated after a thread switch`);
   });
