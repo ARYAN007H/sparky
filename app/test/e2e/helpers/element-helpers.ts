@@ -405,7 +405,7 @@ export async function waitForTestIdAtIndex(
   }
 
   const selector = testIdSelector(testId);
-  await browser.waitUntil(async () => (await browser.$$(selector)).length > index, {
+  await browser.waitUntil(async () => (await (await browser.$$(selector)).length) > index, {
     timeout,
     timeoutMsg: `data-testid="${testId}" index ${index} not found within ${timeout}ms`,
   });
@@ -417,7 +417,7 @@ export async function countTestId(testId: string): Promise<number> {
   if (!isTauriDriver()) {
     throw new Error(`countTestId is only supported on tauri-driver: ${testId}`);
   }
-  return (await browser.$$(testIdSelector(testId))).length;
+  return await (await browser.$$(testIdSelector(testId))).length;
 }
 
 /** Click an indexed repeated test-id control through the shared click path. */
