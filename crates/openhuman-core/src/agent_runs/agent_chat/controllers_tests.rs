@@ -51,10 +51,9 @@ fn inference_agent_chat_agent_id_defaults_to_none() {
     let without: InferenceAgentChatParams =
         serde_json::from_value(serde_json::json!({ "message": "hello" })).expect("decodes");
     assert!(without.agent_id.is_none());
-    let with: InferenceAgentChatParams = serde_json::from_value(
-        serde_json::json!({ "message": "hello", "agent_id": "alpha" }),
-    )
-    .expect("decodes with agent id");
+    let with: InferenceAgentChatParams =
+        serde_json::from_value(serde_json::json!({ "message": "hello", "agent_id": "alpha" }))
+            .expect("decodes with agent id");
     assert_eq!(with.agent_id.as_deref(), Some("alpha"));
 }
 
