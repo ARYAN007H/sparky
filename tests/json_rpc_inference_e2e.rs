@@ -904,7 +904,6 @@ async fn voice_test_provider_honours_validate_only_for_the_stt_workload() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// A `tool_call` arg reading a field the target agent's declared schema omits.
-#[cfg(feature = "flows")]
 fn graph_binding_to_undeclared_agent_field() -> Value {
     json!({
         "name": "undeclared-field",

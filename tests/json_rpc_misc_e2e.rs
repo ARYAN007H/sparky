@@ -1101,6 +1101,13 @@ async fn skills_uninstall_rpc_e2e() {
 /// fetch/preview paths require no network here: with no signed-in
 /// Composio session, `preview_filter` returns a clean JSON-RPC error
 /// rather than hanging.
+/// Task-sources CRUD + status + dry-run over JSON-RPC.
+///
+/// Exercises `openhuman.task_sources_{add,list,get,update,remove,status,
+/// list_tasks,preview_filter}` against an isolated HOME workspace. The
+/// fetch/preview paths require no network here: with no signed-in
+/// Composio session, `preview_filter` returns a clean JSON-RPC error
+/// rather than hanging.
 #[tokio::test]
 async fn json_rpc_task_sources_crud_and_status() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;

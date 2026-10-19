@@ -74,7 +74,6 @@ async fn json_rpc_legacy_provider_type_preserves_default_endpoint() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_config_update_browser_settings_persists_backend() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -154,7 +153,6 @@ async fn json_rpc_config_update_browser_settings_persists_backend() {
 }
 
 #[cfg(feature = "modules")]
-
 #[tokio::test]
 async fn json_rpc_reasoning_effort_persists_and_rejects_unknown_levels() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -231,7 +229,6 @@ async fn json_rpc_reasoning_effort_persists_and_rejects_unknown_levels() {
 
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_config_autonomy_settings_roundtrip() {
@@ -546,7 +543,6 @@ async fn json_rpc_config_agent_timeout_settings_roundtrip() {
 // 7788 becomes available again — matching the "repro gone" acceptance
 // criterion from issue #2617.
 
-
 #[tokio::test]
 async fn port_conflict_recovery_core_starts_on_fallback_port_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -635,11 +631,3 @@ async fn port_conflict_recovery_core_starts_on_fallback_port_e2e() {
     // Release the listener so the port is not held across tests.
     drop(after_drop.listener);
 }
-
-/// Task-sources CRUD + status + dry-run over JSON-RPC.
-///
-/// Exercises `openhuman.task_sources_{add,list,get,update,remove,status,
-/// list_tasks,preview_filter}` against an isolated HOME workspace. The
-/// fetch/preview paths require no network here: with no signed-in
-/// Composio session, `preview_filter` returns a clean JSON-RPC error
-/// rather than hanging.
