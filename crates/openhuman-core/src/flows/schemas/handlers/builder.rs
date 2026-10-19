@@ -193,7 +193,14 @@ pub(in crate::flows::schemas) fn handle_rollback(
             .filter(|s| !s.is_empty())
             .map(str::to_string);
         to_json(
-            ops::flows_rollback(&config, id.trim(), revision_id.trim(), expected_version).await?,
+            ops::flows_rollback_with_context(
+                &ctx,
+                &config,
+                id.trim(),
+                revision_id.trim(),
+                expected_version,
+            )
+            .await?,
         )
     })
 }

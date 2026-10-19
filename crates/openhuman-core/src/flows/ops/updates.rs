@@ -280,12 +280,30 @@ pub async fn flows_rollback(
     revision_id: &str,
     expected_version: Option<String>,
 ) -> Result<Outcome<Flow>, String> {
+    flows_rollback_with_context(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        id,
+        revision_id,
+        expected_version,
+    )
+    .await
+}
+
+pub(crate) async fn flows_rollback_with_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    id: &str,
+    revision_id: &str,
+    expected_version: Option<String>,
+) -> Result<Outcome<Flow>, String> {
     let rev = store::revision_by_id(config, id, revision_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("revision '{revision_id}' not found for flow '{id}'"))?;
 
     tracing::debug!(target: "flows", flow_id = %id, %revision_id, "[flows] flows_rollback: restoring prior revision");
-    flows_update(
+    flows_update_with_context(
+        ctx,
         config,
         id,
         Some(rev.name),
