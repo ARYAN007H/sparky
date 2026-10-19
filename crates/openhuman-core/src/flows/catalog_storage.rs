@@ -132,6 +132,8 @@ pub(crate) async fn register(
             )
             .await?;
             #[cfg(test)]
+            record_served(&path);
+            #[cfg(test)]
             pause_before_cache_insert(&path).await;
             let registration = Arc::new(CatalogStorageRegistration {
                 address: CallbackAddress {
@@ -154,15 +156,19 @@ async fn pause_before_cache_insert(path: &str) {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .remove(path);
     if let Some(gate) = gate {
-        REGISTRATION_SERVE_COUNTS
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .entry(path.to_owned())
-            .and_modify(|count| *count += 1)
-            .or_insert(1);
         let _ = gate.entered.send(());
         let _ = gate.release.await;
     }
+}
+
+#[cfg(test)]
+fn record_served(path: &str) {
+    REGISTRATION_SERVE_COUNTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .entry(path.to_owned())
+        .and_modify(|count| *count += 1)
+        .or_insert(1);
 }
 
 fn path_for(key: &RegistrationKey) -> String {
