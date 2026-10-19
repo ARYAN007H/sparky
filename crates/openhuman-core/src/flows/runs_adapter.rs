@@ -134,14 +134,13 @@ pub(crate) async fn start_run(
         0,
     );
     let receiver = session.subscribe();
-    session::insert(Arc::clone(&session))?;
+    let graph = serde_json::to_value(&flow.graph)
+        .map_err(|error| format!("encode workflow graph: {error}"))?;
     let proxy = match module::runs_proxy(config).await {
         Ok(proxy) => proxy,
-        Err(error) => {
-            session::remove(&session);
-            return Err(error);
-        }
+        Err(error) => return Err(error),
     };
+    session::insert(Arc::clone(&session))?;
     let request = StartRun {
         run_id: run_id.to_owned(),
         context: runs::RunContext {
@@ -154,8 +153,7 @@ pub(crate) async fn start_run(
         },
         caps_host: bindings.caps_host(),
         storage: bindings.storage(),
-        graph: serde_json::to_value(&flow.graph)
-            .map_err(|error| format!("encode workflow graph: {error}"))?,
+        graph,
         trigger_kind: bus_trigger(trigger),
         trigger_data: input,
         inputs,
@@ -167,7 +165,10 @@ pub(crate) async fn start_run(
     {
         Ok(started) => started,
         Err(error) => {
-            session::remove(&session);
+            match run_exists(config, bindings.storage(), run_id).await {
+                Ok(true) | Err(_) => session.start_polling(proxy),
+                Ok(false) => session::remove(&session),
+            }
             return Err(error.wire_message());
         }
     };
@@ -511,4 +512,23 @@ fn bus_trigger(trigger: FlowRunTrigger) -> runs::FlowRunTrigger {
         FlowRunTrigger::AppEvent => runs::FlowRunTrigger::AppEvent,
         FlowRunTrigger::Resume => runs::FlowRunTrigger::Resume,
     }
+}
+
+async fn run_exists(
+    config: &Config,
+    storage: tinyflows_bus::catalog::CatalogStorage,
+    run_id: &str,
+) -> Result<bool, String> {
+    let proxy = module::catalog_proxy(config).await?;
+    let run: Option<tinyflows_bus::catalog::FlowRun> = proxy
+        .call(
+            tinyflows_bus::catalog::members::GET_RUN,
+            (tinyflows_bus::catalog::RunIdRequest {
+                storage,
+                id: run_id.to_owned(),
+            },),
+        )
+        .await
+        .map_err(|error| error.wire_message())?;
+    Ok(run.is_some())
 }
