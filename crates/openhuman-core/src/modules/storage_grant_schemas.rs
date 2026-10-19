@@ -18,47 +18,63 @@
 //! importers write the module's v1 shapes and the owner's steps carry them
 //! forward (`ensure_migrated` in `storage_host`).
 
+use std::sync::Arc;
+
+use tinystoragedrivers::queue::QueueManifest;
+
 use super::storage_grants::StorageGrant;
 use crate::storage::schema::module_items;
 
 /// One module's row: its registry id, the schema owner that declares its
-/// storage, and secret prefixes the schema cannot name.
+/// storage, secret prefixes the schema cannot name, and the queue manifest the
+/// host declares for it (`None`: the module gets no `Queues` object).
 struct Row {
     module: &'static str,
     owner: &'static str,
     secrets: &'static [&'static str],
+    queues: QueueManifestSource,
 }
+
+/// Where a row's queue manifest comes from, read when the grant is built (at
+/// bind), so a manifest the host loads from configuration is current.
+pub(super) type QueueManifestSource = Option<fn() -> Option<Arc<QueueManifest>>>;
 
 const ROWS: [Row; 6] = [
     Row {
         module: tinychannels::MODULE_ID,
         owner: "channels",
         secrets: &[],
+        queues: None,
     },
     Row {
         module: tinymcp::MODULE_ID,
         owner: "mcp",
         secrets: &["mcp_client_env/", "mcp_cache_fingerprint_key"],
+        queues: None,
     },
     Row {
         module: tinyconnectors::MODULE_ID,
         owner: "connectors",
         secrets: &[],
+        queues: None,
     },
     Row {
         module: tinywallet::MODULE_ID,
         owner: "wallet",
         secrets: &[],
+        queues: None,
     },
     Row {
         module: tinybox::MODULE_ID,
         owner: "box",
         secrets: &[],
+        queues: None,
     },
     Row {
         module: tinyjuice::MODULE_ID,
         owner: "juice",
         secrets: &[],
+        queues: None,
     },
 ];
 
@@ -103,6 +119,7 @@ pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
         blob_prefixes: items.blobs,
         secret_prefixes,
         writable: true,
+        queues: row.queues.and_then(|source| source()),
     })
 }
 
