@@ -34,6 +34,9 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
         conversation: tinychannels_bus::ConversationRef {
             kind: tinychannels_bus::ConversationKind::Dm,
             id: "42".into(),
+            scope_id: Some("account-scope".into()),
+            thread_id: Some("topic-8".into()),
+            topic_id: Some("topic-8".into()),
             ..Default::default()
         },
         sender: tinychannels_bus::SenderRef {
@@ -42,10 +45,15 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
             ..Default::default()
         },
         text: "native Telegram inbound".into(),
+        access: tinychannels_bus::AccessContext {
+            dm_decision: tinychannels_bus::SenderDmDecision::Allow,
+            ..Default::default()
+        },
         parts: vec![tinychannels_bus::ContentPart::Text {
             text: "native Telegram inbound".into(),
             markdown_dialect: None,
         }],
+        raw: Some(serde_json::json!({ "providerMessageId": "10" })),
         ..Default::default()
     };
 
@@ -68,7 +76,15 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
     assert_eq!(received_envelope.conversation, envelope.conversation);
     assert_eq!(received_envelope.sender, envelope.sender);
     assert_eq!(received_envelope.message_id, envelope.message_id);
+    assert_eq!(received_envelope.reply_to_id, envelope.reply_to_id);
+    assert_eq!(
+        received_envelope.timestamp_unix_ms,
+        envelope.timestamp_unix_ms
+    );
     assert_eq!(received_envelope.text, envelope.text);
+    assert_eq!(received_envelope.parts, envelope.parts);
+    assert_eq!(received_envelope.access, envelope.access);
+    assert_eq!(received_envelope.raw, envelope.raw);
 }
 
 #[derive(Default)]
