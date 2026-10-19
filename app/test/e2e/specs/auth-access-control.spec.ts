@@ -260,6 +260,11 @@ describe('Auth & Access Control', () => {
   });
 
   it('second device token is accepted and processed', async () => {
+    // The WebView simulation dispatches auth deep links asynchronously. Move
+    // off Chat first so a subsequent redirect back to the authenticated chat
+    // route proves the handler finished; the persistent app shell alone is
+    // already visible before that work completes.
+    await navigateViaHash('/settings/account');
     clearRequestLog();
     await triggerAuthDeepLink('e2e-auth-device2-token');
 
@@ -278,12 +283,17 @@ describe('Auth & Access Control', () => {
       }
     );
 
+    await browser.waitUntil(
+      async () => (await browser.execute(() => window.location.hash)) === '#/chat',
+      {
+        timeout: 20_000,
+        interval: 250,
+        timeoutMsg: 'Timed out waiting for the completed auth handoff to return to Chat',
+      }
+    );
+
     const homeText = await waitForHomePage(15_000);
-    if (!homeText) {
-      await navigateToHome();
-    }
-    const finalHome = homeText || (await waitForHomePage(10_000));
-    expect(finalHome).not.toBeNull();
+    expect(homeText).not.toBeNull();
 
     const consumeCall = getRequestLog().find(
       r => r.method === 'POST' && r.url.includes('/auth/login-token/consume')
