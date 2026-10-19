@@ -17,6 +17,7 @@ pub(super) fn install(
         harness.push_middleware(Arc::new(
             StopHookMiddleware::new(model, hooks)
                 .with_metrics_seed(crate::agent::cost::turn_cost())
+                .with_halt_summary(halt_summary)
                 .with_stop_observer(move |report| {
                     tracing::warn!(
                         target: "stop_hooks",
@@ -25,22 +26,9 @@ pub(super) fn install(
                         model = %report.model,
                         "[stop_hooks] hook voted to stop the turn — pausing run: {}", report.reason
                     );
-                    record_halt_summary(&halt_summary, report);
                 }),
         ));
     }
-}
-
-fn record_halt_summary(
-    halt_summary: &tinyagents_harness::turn_outcome::HaltSummarySlot,
-    report: &tinyagents_hooks::stop::StopReport,
-) {
-    *halt_summary
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
-        "Stopping after {} model call(s): {}",
-        report.iteration, report.reason
-    ));
 }
 
 #[cfg(test)]
