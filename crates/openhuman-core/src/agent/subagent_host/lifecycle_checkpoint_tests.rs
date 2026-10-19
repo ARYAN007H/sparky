@@ -19,7 +19,10 @@ fn checkpoint_dir_key_is_stable_across_directory_creation() {
     std::fs::create_dir_all(&requested).expect("create checkpoint dir");
     let after = absolute_checkpoint_dir(requested);
 
-    assert_eq!(before, after, "key must not change when the directory appears");
+    assert_eq!(
+        before, after,
+        "key must not change when the directory appears"
+    );
     assert_eq!(after, std::fs::canonicalize(&after).expect("exists"));
 }
 

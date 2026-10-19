@@ -584,7 +584,9 @@ pub(super) fn shared_subagent_flight(
     // Key by the normalized root so every caller of one task, whether or not the
     // directory exists yet, reaches the same reservation.
     flights
-        .entry(checkpoint::absolute_checkpoint_dir(checkpoint_dir.to_path_buf()))
+        .entry(checkpoint::absolute_checkpoint_dir(
+            checkpoint_dir.to_path_buf(),
+        ))
         .or_default()
         .clone()
 }
