@@ -12239,12 +12239,7 @@ async fn json_rpc_retired_dictation_and_voice_server_methods_are_unknown() {
         (7404, "openhuman.config_update_voice_server_settings"),
     ] {
         let response = post_json_rpc(&rpc_base, id, method, json!({})).await;
-        let error = assert_jsonrpc_error(&response, method);
-        assert_eq!(
-            error["code"].as_i64(),
-            Some(-32601),
-            "retired method {method} must use JSON-RPC method-not-found: {error}"
-        );
+        assert_unknown_method(&response, method);
     }
 
     rpc_join.abort();
