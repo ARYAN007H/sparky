@@ -460,7 +460,7 @@ async fn native_progressive_output_event_validates_scope_without_observer() {
         HashMap::from([("telegram:bot-b".into(), adapter.clone() as Arc<dyn Channel>)]),
         HashMap::from([(
             "telegram:bot-b".into(),
-            adapter as Arc<dyn ProgressiveChannelTransport>,
+            adapter.clone() as Arc<dyn ProgressiveChannelTransport>,
         )]),
         None,
     );
