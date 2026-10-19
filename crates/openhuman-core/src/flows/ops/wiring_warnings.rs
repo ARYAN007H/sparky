@@ -7,17 +7,12 @@ pub(crate) async fn graph_wiring_warnings(
     context: &DispatchCtx,
     config: &Config,
     graph: &WorkflowGraph,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let graph = match serde_json::to_value(graph) {
         Ok(graph) => graph,
-        Err(error) => return vec![format!("wiring warnings could not serialize graph: {error}")],
+        Err(error) => return Err(format!("wiring warnings could not serialize graph: {error}")),
     };
-    wiring_warnings(context, config, graph)
-        .await
-        .unwrap_or_else(|error| {
-            tracing::warn!(target: "flows", %error, "[flows] TinyFlows wiring warnings failed");
-            Vec::new()
-        })
+    wiring_warnings(context, config, graph).await
 }
 
 /// Author-time WARNs for a portable Copilot graph payload.
