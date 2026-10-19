@@ -120,7 +120,8 @@ struct Running {
 impl Running {
     fn start(ctx: Arc<ChannelRuntimeContext>, config: InboundDebounceConfig) -> Self {
         let (tx, rx) = mpsc::channel(32);
-        let task = tokio::spawn(run_message_dispatch_loop(rx, ctx, 4, config));
+        let task = crate::core::runtime::DispatchCtx::ambient()
+            .spawn(run_message_dispatch_loop(rx, ctx, 4, config));
         Self {
             tx,
             task,
