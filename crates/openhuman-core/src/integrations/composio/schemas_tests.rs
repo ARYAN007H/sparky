@@ -1,7 +1,6 @@
 use super::*;
 use crate::core::all::{
     assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
-    expect_schema_required_inputs,
 };
 use serde_json::json;
 

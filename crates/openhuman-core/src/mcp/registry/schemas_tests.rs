@@ -16,9 +16,9 @@ fn registry_schema_contracts_are_preserved() {
     );
 
     let s = schemas("registry_search");
-    let schemas = all_controller_schemas();
-    assert_eq!(schemas.len(), 17);
-    let functions: Vec<_> = schemas.iter().map(|s| s.function).collect();
+    let catalog = all_controller_schemas();
+    assert_eq!(catalog.len(), 17);
+    let functions: Vec<_> = catalog.iter().map(|s| s.function).collect();
     for name in [
         "config_get",
         "config_set",
