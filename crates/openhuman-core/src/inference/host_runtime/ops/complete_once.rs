@@ -79,9 +79,7 @@ pub async fn complete_once_observed(
         std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
     >,
 ) -> Result<ModelResponse, String> {
-    if let Err(message) = validate_complete_once_request(&request) {
-        return Err(message);
-    }
+    validate_complete_once_request(&request)?;
     complete_once_controlled(endpoint, request, budget, observer, None)
         .await
         .map_err(|error| match error {

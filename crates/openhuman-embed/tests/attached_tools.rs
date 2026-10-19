@@ -316,24 +316,9 @@ fn attaching_before_first_turn_preserves_and_executes_native_tools() {
                 .and(path("/v1/chat/completions"))
                 .respond_with(NativeCall(std::sync::atomic::AtomicUsize::new(0)))
                 .mount(&provider).await;
-            let runtime_result = Runtime::builder()
+            let runtime = Runtime::builder()
                 .config(offline_config()).workspace(Workspace::Ephemeral)
-                .backend_url(backend.uri()).build().await;
-            if let Err(error) = &runtime_result {
-                let variant = match error {
-                    openhuman_embed::RuntimeError::Call(_) => "Call",
-                    openhuman_embed::RuntimeError::Build(_) => "Build",
-                    openhuman_embed::RuntimeError::Workspace { .. } => "Workspace",
-                    openhuman_embed::RuntimeError::AlreadyRunning => "AlreadyRunning",
-                    openhuman_embed::RuntimeError::Invalid(_) => "Invalid",
-                    openhuman_embed::RuntimeError::BlankApiKey => "BlankApiKey",
-                    openhuman_embed::RuntimeError::MissingFeature { .. } => "MissingFeature",
-                    openhuman_embed::RuntimeError::MissingStorageFeature { .. } => "MissingStorageFeature",
-                    openhuman_embed::RuntimeError::NoSessionStore => "NoSessionStore",
-                };
-                eprintln!("attached-tools test runtime build failed: {variant}");
-            }
-            let runtime = runtime_result.unwrap();
+                .backend_url(backend.uri()).build().await.unwrap();
             let agent = runtime.agent(AgentSpec::new("fresh-attached")
                 .provider(Provider::openai_compatible(format!("{}/v1",provider.uri()),"fixture").model("fixture"))
                 .definition(AgentDefinitionSpec::new().system_prompt("ORIGINAL_FRESH_HOST_PROMPT")
