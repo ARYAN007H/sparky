@@ -30,16 +30,32 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
       token: "test-core-token",
     },
   );
-  assert.equal(spec.cwd, "/private/run/workspace");
-  assert.equal(spec.env.OPENHUMAN_WORKSPACE, spec.cwd);
-  assert.equal(spec.env.OPENHUMAN_DOTENV_PATH, "/private/run/workspace/empty.env");
-  assert.equal(spec.env.BACKEND_URL, "http://127.0.0.1:18500");
-  assert.equal(spec.env.VITE_BACKEND_URL, "http://127.0.0.1:18500");
-  assert.equal(spec.env.OPENHUMAN_CORE_TOKEN, "test-core-token");
-  assert.equal(spec.env.OPENHUMAN_BACKEND_API_KEY, undefined);
-  assert.equal(spec.env.OPENHUMAN_BACKEND_SESSION_TOKEN, undefined);
-  assert.equal(spec.env.OPENHUMAN_STORAGE_URL, undefined);
-  assert.equal(spec.env.RUST_LOG, "info");
+  assert.deepEqual(
+    {
+      cwd: spec.cwd,
+      workspace: spec.env.OPENHUMAN_WORKSPACE,
+      dotenv: spec.env.OPENHUMAN_DOTENV_PATH,
+      backend: spec.env.BACKEND_URL,
+      viteBackend: spec.env.VITE_BACKEND_URL,
+      token: spec.env.OPENHUMAN_CORE_TOKEN,
+      apiKey: spec.env.OPENHUMAN_BACKEND_API_KEY,
+      sessionToken: spec.env.OPENHUMAN_BACKEND_SESSION_TOKEN,
+      storageUrl: spec.env.OPENHUMAN_STORAGE_URL,
+      logLevel: spec.env.RUST_LOG,
+    },
+    {
+      cwd: "/private/run/workspace",
+      workspace: "/private/run/workspace",
+      dotenv: "/private/run/workspace/empty.env",
+      backend: "http://127.0.0.1:18500",
+      viteBackend: "http://127.0.0.1:18500",
+      token: "test-core-token",
+      apiKey: undefined,
+      sessionToken: undefined,
+      storageUrl: undefined,
+      logLevel: "info",
+    },
+  );
 
   let launch;
   startCoreChild((...args) => (launch = args), "/private/openhuman-core", 18473, spec);
