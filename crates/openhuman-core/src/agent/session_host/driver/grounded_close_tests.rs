@@ -4,6 +4,34 @@ use std::sync::Arc;
 const RECORDS: &str = "\n- `list_directory` — ok\n  > three crates\n";
 const CLEAN_REPLY: &str = "The workspace holds three crates; the build is green.";
 
+fn classified_halt(note: &str, class: &str) -> TinyagentsTurnOutcome {
+    TinyagentsTurnOutcome {
+        deferred_terminal: None,
+        text: String::new(),
+        resolved_route: None,
+        history: Vec::new(),
+        conversation: Vec::new(),
+        model_calls: 1,
+        tool_calls: 1,
+        input_tokens: 0,
+        output_tokens: 0,
+        cached_input_tokens: 0,
+        cost: tinyagents_harness::cost::CostTally::default(),
+        early_exit_tool: None,
+        hit_cap: false,
+        wrap_up_injected: false,
+        truncated: false,
+        breaker_halt: Some(note.into()),
+        failure_cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+            class: class.into(),
+            operation: "search".into(),
+            summary: note.into(),
+        }),
+        tool_outcomes: vec![],
+        compaction: None,
+    }
+}
+
 #[test]
 fn classified_halt_returns_partial_work_without_provider_usage() {
     use tinyagents_harness::turn_outcome::ToolCallOutcome;
@@ -99,6 +127,34 @@ fn classified_halt_summary_uses_typed_cause_when_halt_copy_conflicts() {
         "the note's policy wording must not override the typed cause: {}",
         close.output
     );
+}
+
+#[test]
+fn classified_halt_summary_uses_typed_class_for_translated_notes() {
+    let note = "Interrompo aqui: bloqueado por política de segurança, orçamento esgotado.";
+    let cases = [
+        ("out_of_credits", "inference budget"),
+        ("provider_config", "configured correctly"),
+        ("transient", "temporary service issues"),
+        ("blocked_by_policy", "security settings"),
+    ];
+
+    for (class, expected_copy) in cases {
+        let outcome = classified_halt(note, class);
+        let close = classified_halt_close(&outcome)
+            .unwrap_or_else(|| panic!("typed `{class}` cause must close the turn"));
+        assert!(
+            close.output.contains(expected_copy),
+            "typed `{class}` cause must select its summary copy: {}",
+            close.output
+        );
+        assert!(
+            !close.output.contains("security settings") || class == "blocked_by_policy",
+            "translated prose must not override typed `{class}` cause: {}",
+            close.output
+        );
+        assert_eq!(close.usage.model_calls, 0);
+    }
 }
 
 /// The host adapter delegates generation and verification to TinyAgents while
