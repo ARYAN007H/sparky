@@ -227,7 +227,7 @@ Capability {
         name: "Inbound Event Queues",
         domain: "automation",
         category: CapabilityCategory::Automation,
-        description: "Composio triggers and agent webhooks are queued on this device before \
+        description: "Composio triggers and agent webhooks are queued before \
                       triage. A redelivered trigger is handled once, a flood is paced and \
                       folded into one digest, a triage that asks to wait is retried when it \
                       asked to instead of being dropped, and events that keep failing are \

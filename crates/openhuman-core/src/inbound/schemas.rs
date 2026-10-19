@@ -61,7 +61,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
             description: "List inbound events parked in the dead-letter queue.",
             inputs: vec![FieldSchema {
                 name: "limit",
-                ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
+                ty: TypeSchema::Option(Box::new(TypeSchema::BoundedU64 {
+                    min: 0,
+                    max: u64::from(u32::MAX),
+                })),
                 comment: "Maximum number of items (default 50, at most 500).",
                 required: false,
             }],

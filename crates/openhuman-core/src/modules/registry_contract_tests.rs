@@ -163,7 +163,12 @@ fn every_record_maps_to_a_real_component() {
                 || !cfg!(feature = "modules")
                 || matches!(
                     *id,
-                    "tinydocs" | "tinywallet" | "tinyvoice" | "tinyhosts" | "tinymemes"
+                    "tinydocs"
+                        | "tinywallet"
+                        | "tinyvoice"
+                        | "tinyhosts"
+                        | "tinymemes"
+                        | "tinyeventqueues"
                 ),
             "mapping for unknown module '{id}'"
         );

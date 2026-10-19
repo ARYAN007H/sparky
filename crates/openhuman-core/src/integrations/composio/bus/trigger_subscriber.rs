@@ -332,6 +332,7 @@ pub(super) fn triage_disabled() -> bool {
     )
 }
 
-#[cfg(test)]
+// The tests drive the linked `tinyeventqueues` module (`inbound::fixture`).
+#[cfg(all(test, feature = "inbound-queues"))]
 #[path = "trigger_subscriber_tests.rs"]
 mod tests;

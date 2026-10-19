@@ -101,8 +101,9 @@ fn resolve_texts(queues: &str, pipeline: &str, url: Option<&str>) -> Result<Reso
         serde_json::from_str(pipeline).map_err(|error| format!("pipeline.json: {error}"))?;
     let parsed: PipelineConfig = serde_json::from_value(pipeline_json.clone())
         .map_err(|error| format!("pipeline.json: {error}"))?;
-    let backend = QueueConfig::parse(url.unwrap_or("storage"))
-        .map_err(|error| format!("inbound.queue_url: {error}"))?;
+    let url = url.unwrap_or("storage");
+    refuse_plaintext_credentials(url)?;
+    let backend = QueueConfig::parse(url).map_err(|error| format!("inbound.queue_url: {error}"))?;
     Ok(Resolved {
         manifest: Arc::new(manifest),
         queues_json,
@@ -110,6 +111,21 @@ fn resolve_texts(queues: &str, pipeline: &str, url: Option<&str>) -> Result<Reso
         pipeline_json,
         backend,
     })
+}
+
+/// A broker URL that carries credentials must use TLS: `amqp://` sends the
+/// password (and every queued event) in the clear.
+fn refuse_plaintext_credentials(url: &str) -> Result<(), String> {
+    let Some(rest) = url.trim().strip_prefix("amqp://") else {
+        return Ok(());
+    };
+    let authority = rest.split('/').next().unwrap_or_default();
+    if authority.contains('@') {
+        return Err(
+            "inbound.queue_url: a broker URL with credentials must use amqps:// (TLS)".to_owned(),
+        );
+    }
+    Ok(())
 }
 
 /// The last resolution, read by the storage host's grant and by `Deliver`.

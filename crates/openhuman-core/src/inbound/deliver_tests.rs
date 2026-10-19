@@ -286,10 +286,8 @@ async fn the_default_deliverer_reads_attempts_from_the_configured_queues() {
 #[tokio::test]
 async fn a_failed_apply_is_retried_instead_of_acknowledged() {
     // The agent dispatch fails: the turn must stay recoverable.
-    let triage = ScriptedTriage::new([
-        decision(TriageAction::React),
-        decision(TriageAction::React),
-    ]);
+    let triage =
+        ScriptedTriage::new([decision(TriageAction::React), decision(TriageAction::React)]);
     triage.fail_next_applies(1);
     let deliverer = deliverer(&triage);
     let first = deliverer

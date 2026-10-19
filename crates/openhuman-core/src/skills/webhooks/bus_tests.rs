@@ -143,6 +143,7 @@ fn build_agent_response_sets_status_and_body() {
 // a webhook whose triage was `Deferred` became a "Triage deferred until …"
 // string and was never triaged again.
 
+#[cfg(feature = "inbound-queues")]
 mod inbound {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
