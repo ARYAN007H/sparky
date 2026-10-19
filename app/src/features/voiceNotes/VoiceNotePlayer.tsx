@@ -7,7 +7,7 @@
  * until asked.
  */
 import { PauseIcon, PlayIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { trackAnalyticsEvent } from '../../components/analytics';
 import Button from '../../components/ui/Button';
@@ -54,8 +54,10 @@ function VoiceNotePlayerBody({
   className,
 }: VoiceNotePlayerProps) {
   const { t } = useT();
+  const playbackOwner = useId();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const playbackRafRef = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
@@ -72,14 +74,22 @@ function VoiceNotePlayerBody({
         const frame = framesRef.current.find(item => atMs >= item.start_ms && atMs < item.end_ms);
         viseme = frame?.viseme ?? 'sil';
       }
-      window.dispatchEvent(new CustomEvent('voice-note-mascot', { detail: { active, viseme } }));
+      window.dispatchEvent(
+        new CustomEvent('voice-note-mascot', {
+          detail: { owner: playbackOwner, active, viseme },
+        })
+      );
     },
-    [mascotPlayback]
+    [mascotPlayback, playbackOwner]
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
   const release = useCallback(() => {
+    if (playbackRafRef.current !== null) {
+      window.cancelAnimationFrame(playbackRafRef.current);
+      playbackRafRef.current = null;
+    }
     audioRef.current?.pause();
     audioRef.current = null;
     publishMascot(false);
@@ -112,28 +122,47 @@ function VoiceNotePlayerBody({
       }
     }
     const audio = new window.Audio(url);
-    audio.addEventListener('timeupdate', () => {
+    const publishAtCurrentTime = () => {
       const atMs = audio.currentTime * 1000;
       setPositionMs(atMs);
-      publishMascot(true, atMs);
-    });
+      publishMascot(!audio.paused && !audio.ended, atMs);
+    };
+    const stopSampling = () => {
+      if (playbackRafRef.current !== null) {
+        window.cancelAnimationFrame(playbackRafRef.current);
+        playbackRafRef.current = null;
+      }
+    };
+    const sampleWhilePlaying = () => {
+      if (audio.paused || audio.ended) {
+        playbackRafRef.current = null;
+        return;
+      }
+      publishAtCurrentTime();
+      playbackRafRef.current = window.requestAnimationFrame(sampleWhilePlaying);
+    };
+    audio.addEventListener('timeupdate', publishAtCurrentTime);
     audio.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
         setLoadedMs(audio.duration * 1000);
       }
     });
     audio.addEventListener('ended', () => {
+      stopSampling();
       setPlaying(false);
       setPositionMs(0);
       publishMascot(false);
     });
     audio.addEventListener('pause', () => {
+      stopSampling();
       setPlaying(false);
       publishMascot(false);
     });
     audio.addEventListener('play', () => {
       setPlaying(true);
-      publishMascot(true, audio.currentTime * 1000);
+      publishAtCurrentTime();
+      stopSampling();
+      playbackRafRef.current = window.requestAnimationFrame(sampleWhilePlaying);
     });
     audioRef.current = audio;
     return audio;

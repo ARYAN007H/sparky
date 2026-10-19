@@ -80,10 +80,22 @@ function measure(el: HTMLElement | null): MascotBox | null {
  */
 const ChatMascotOverlay = () => {
   const [replayViseme, setReplayViseme] = useState<string | null>(null);
+  const replayOwnerRef = useRef<string | null>(null);
   useEffect(() => {
     const onPlayback = (event: Event) => {
-      const detail = (event as CustomEvent<{ active: boolean; viseme: string }>).detail;
-      setReplayViseme(detail?.active ? detail.viseme : null);
+      const detail = (event as CustomEvent<{
+        owner: string;
+        active: boolean;
+        viseme: string;
+      }>).detail;
+      if (!detail?.owner) return;
+      if (detail.active) {
+        replayOwnerRef.current = detail.owner;
+        setReplayViseme(detail.viseme);
+      } else if (replayOwnerRef.current === detail.owner) {
+        replayOwnerRef.current = null;
+        setReplayViseme(null);
+      }
     };
     window.addEventListener('voice-note-mascot', onPlayback);
     return () => window.removeEventListener('voice-note-mascot', onPlayback);
