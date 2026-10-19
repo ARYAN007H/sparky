@@ -172,7 +172,7 @@ describe('Chat harness — orchestrator → subagent flow', () => {
   });
 
   // TODO(#6389): orchestrator final synthesis is lost after the TinyAgents update.
-  it.skip('orchestrator delegates to researcher and produces the final canary', async function () {
+  it.skip('orchestrator delegates to researcher and produces the final canary', async function () { // https://github.com/tinyhumansai/openhuman/issues/6389
     this.timeout(90_000);
     await navigateViaHash('/chat');
     await browser.waitUntil(async () => await chatMounted(), {
@@ -254,7 +254,7 @@ describe('Chat harness — orchestrator → subagent flow', () => {
   });
 
   // TODO(#6389): this assertion depends on the skipped final-synthesis turn above.
-  it.skip('the mock LLM saw multiple chat-completions requests (parent + sub-agent)', async () => {
+  it.skip('the mock LLM saw multiple chat-completions requests (parent + sub-agent)', async () => { // https://github.com/tinyhumansai/openhuman/issues/6389
     const log = getRequestLog() as Array<{ method: string; url: string; body?: string }>;
     const llmHits = log.filter(
       r => r.method === 'POST' && r.url.includes('/openai/v1/chat/completions')
@@ -266,7 +266,7 @@ describe('Chat harness — orchestrator → subagent flow', () => {
   });
 
   // TODO(#6389): depends on the missing orchestrator final synthesis.
-  it.skip('persisted thread file records the final orchestrator text', async () => {
+  it.skip('persisted thread file records the final orchestrator text', async () => { // https://github.com/tinyhumansai/openhuman/issues/6389
     const threadId = await getSelectedThreadId();
     expect(typeof threadId).toBe('string');
     const relPath = `memory/conversations/threads/${hexEncodeThreadId(threadId as string)}.jsonl`;

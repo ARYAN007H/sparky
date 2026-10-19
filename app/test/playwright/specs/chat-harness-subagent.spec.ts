@@ -306,7 +306,7 @@ function formatDiagnostics(snapshot: DiagnosticsSnapshot): string {
 test.describe('Chat Harness - Subagent', () => {
   test.skip(
     true,
-    'background delivery is system-authored and cannot be deterministically keyword-scripted'
+    'background delivery is system-authored and cannot be deterministically keyword-scripted' // https://github.com/tinyhumansai/openhuman/issues/6389
   );
 
   // On any test failure, attach the harness state (mock request log, matched

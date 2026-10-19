@@ -232,11 +232,13 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
     //      may not appear at step 0 on a mounted instance that already finished.
     //      Needs an AppWalkthrough key-reset or an explicit stepIndex prop to
     //      force Joyride back to step 0.
-    it.skip('tour starts and tooltip is visible at step 1 (home-card)', async () => {
-      // SKIPPED — walkthrough does not reliably auto-start via
-      // dispatchWalkthroughRestart() in the e2e environment after a prior
-      // markWalkthroughComplete(); Joyride retains internal state across
-      // run=false→true transitions. See GAP note above.
+    it('tour starts and tooltip is visible at step 1 (home-card)', async () => {
+      await navigateViaHash('/home');
+      expect(await armWalkthrough()).toBe(true);
+      await browser.refresh();
+      expect(await waitForTourTooltip()).toBe(true);
+      expect(await textExists('1 of 10')).toBe(true);
+      expect(await textExists('home-card')).toBe(true);
     });
 
     // GAP: Same root cause as the tooltip-visible test above — tooltip never
@@ -244,37 +246,20 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
     //      completed a prior run on the same mounted instance. Without the
     //      tooltip, advanceTourSteps() finds no primary button and the hash
     //      stays at #/home instead of advancing to #/connections (Phase 2: was #/skills).
-    it.skip('tour navigates to /connections and highlights skills-grid after 3 Next clicks', async () => {
-      // SKIPPED — depends on tooltip appearing at step 1, which is blocked by
-      // the same Joyride run-state issue documented above. Re-enable once
-      // AppWalkthrough forces a step-index reset on walkthrough:restart.
+    it('tour navigates to /connections and highlights skills-grid after 3 Next clicks', async () => {
+      await navigateViaHash('/home');
+      expect(await armWalkthrough()).toBe(true);
+      await browser.refresh();
+      expect(await waitForTourTooltip()).toBe(true);
+      await advanceTourSteps(3);
+      await browser.waitUntil(async () => String(await browser.execute(() => window.location.hash)).includes('/connections'), {
+        timeout: 15_000,
+        timeoutMsg: 'tour did not navigate to /connections after three steps',
+      });
+      expect(await textExists('skills-grid')).toBe(true);
     });
 
-    // GP-1: Skills gate is not implemented in the current walkthrough.
-    // The tour advances to the next step regardless of whether the user has
-    // actually connected a skill. A real gating implementation would need to
-    // hold the "Next" button disabled until a `openhuman.workflows_list` RPC
-    // call confirms at least one skill is connected, then re-enable it.
-    it.skip('GP-1 (NOT IMPLEMENTED): tour Next button is disabled until user connects a skill', async () => {
-      // Expected product behaviour: the Next button on the /connections step (Phase 2: was /skills)
-      // should remain disabled (`aria-disabled="true"` or `disabled`) while
-      // no skill is connected, and become enabled only after the
-      // `skills.skill_connected` event fires or a polling RPC returns >= 1
-      // installed skill.
-      //
-      // Current state: the button is always enabled — clicking Next
-      // immediately advances to the channels step without any skill check.
-      //
-      // File: app/src/components/walkthrough/AppWalkthrough.tsx
-      //       app/src/components/walkthrough/walkthroughSteps.ts (step index 3)
-      const primaryDisabled = await browser.execute(() => {
-        const btn = document.querySelector<HTMLButtonElement>(
-          '[role="tooltip"] [data-action="primary"]'
-        );
-        return btn?.disabled ?? btn?.getAttribute('aria-disabled') === 'true';
-      });
-      expect(primaryDisabled).toBe(true);
-    });
+
   });
 
   // ── Scenario 2: Chat gate (final step) ────────────────────────────────────
@@ -286,26 +271,17 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
     // There is no Joyride API to jump directly to a specific step index.
     // Skipped until a step-jump helper or a more reliable advance mechanism
     // is available.
-    it.skip('GP-3 (FRAGILE): final tour step renders on /chat with a pre-seeded welcome note', async () => {
-      // To make this test reliable, walkthroughSteps.ts would need to expose
-      // a way to start Joyride at an arbitrary stepIndex (e.g. by accepting
-      // an initialStepIndex prop forwarded from AppWalkthrough). Without that,
-      // driving 8 sequential Next clicks across multiple route transitions is
-      // too flaky for CI.
-      //
-      // Expected behaviour once fixed:
-      //   - Navigate to /home, arm walkthrough, dispatch restart.
-      //   - Jump to step 9 (index 8).
+    it('final tour step renders on /chat with a pre-seeded welcome note', async () => {
+      // Drive the visible controls through the actual tour instead of seeking
+      // into Joyride's internal step state.
+      //   - Navigate to /home and arm walkthrough.
+      //   - Advance through the earlier steps.
       //   - "You're all set!" title appears in tooltip.
       //   - Skip button is absent on the last step.
       //
-      // Files to modify:
-      //   app/src/components/walkthrough/AppWalkthrough.tsx (initialStepIndex prop)
-      //   app/src/components/walkthrough/walkthroughSteps.ts (export step count)
-
       await navigateViaHash('/home');
       await armWalkthrough();
-      await dispatchWalkthroughRestart();
+      await browser.refresh();
       await waitForTourTooltip(10_000);
       await advanceTourSteps(8);
 
@@ -350,25 +326,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       expect(chatPanel).toBe(true);
     });
 
-    // GP-1 (chat variant): No user-message gate on the final /chat step.
-    // The final step should require the user to send at least one message
-    // before the "Let's go!" button dismisses the tour and marks it complete.
-    // Currently clicking "Let's go!" on the final step immediately calls
-    // markWalkthroughComplete() without any check that a message was sent.
-    it.skip("GP-1 (chat, NOT IMPLEMENTED): Let's go! button is disabled until user sends first message", async () => {
-      // Expected: the primary button text reads "Let's go!" AND is disabled
-      // while the thread message count is 0.  After the user submits a
-      // message to the chat panel the button should become enabled.
-      //
-      // Current state: always enabled — see AppWalkthrough.tsx handleEvent.
-      const letsGoBtnDisabled = await browser.execute(() => {
-        const btn = document.querySelector<HTMLButtonElement>(
-          '[role="tooltip"] [data-action="primary"]'
-        );
-        return btn?.disabled ?? btn?.getAttribute('aria-disabled') === 'true';
-      });
-      expect(letsGoBtnDisabled).toBe(true);
-    });
+
   });
 
   // ── Scenario 3: Resume after relaunch ─────────────────────────────────────
@@ -387,60 +345,13 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
     //      BootCheckGate blocks rendering, AppWalkthrough never mounts and the
     //      tooltip never appears. The exact sequencing is environment-dependent
     //      and the test cannot reliably produce the tooltip within 15 s in CI.
-    it.skip('walkthrough re-shows after renderer reload when pending flag is set', async () => {
-      // SKIPPED — AppWalkthrough mount timing after reload is non-deterministic
-      // when BootCheckGate or auth re-validation delays are present; tooltip
-      // does not consistently appear within the polling window in docker e2e.
-      // Fix requires a test-mode hook to await core snapshot before asserting.
-    });
-
-    // GP-2: Step-index persistence is not implemented.
-    // Closing the app mid-tour and relaunching always restarts the walkthrough
-    // from step 0 (home-card), regardless of which step was last active.
-    // A proper implementation would persist the current step index to
-    // localStorage (e.g. `openhuman:walkthrough_step_index`) and restore it
-    // when AppWalkthrough mounts with `run=true`.
-    it.skip('GP-2 (NOT IMPLEMENTED): tour resumes at last incomplete step after reload', async () => {
-      // Expected product behaviour:
-      //   1. User advances to step 4 (/connections — was /skills before Phase 2).
-      //   2. App is closed (renderer reloaded) before the tour finishes.
-      //   3. On reopen the tour shows step 4, not step 0.
-      //
-      // Current state: Joyride always starts from stepIndex=0 because
-      // AppWalkthrough does not pass a `stepIndex` prop derived from
-      // persisted state. The `openhuman:walkthrough_step_index` key does
-      // not exist anywhere in the codebase.
-      //
-      // Files to modify:
-      //   app/src/components/walkthrough/AppWalkthrough.tsx  (add stepIndex state + persistence)
-      //   app/src/components/walkthrough/walkthroughSteps.ts (persist on STEP_AFTER events)
-
-      // Arm walkthrough and advance 3 steps to simulate partial progress.
+    it('walkthrough re-shows after renderer reload when pending flag is set', async () => {
       await navigateViaHash('/home');
-      await armWalkthrough();
-      await dispatchWalkthroughRestart();
-      await waitForTourTooltip(10_000);
-      await advanceTourSteps(3);
-
-      // Read the persisted step index (does not exist yet).
-      const persistedStep = await browser.execute(() => {
-        return localStorage.getItem('openhuman:walkthrough_step_index');
-      });
-      expect(persistedStep).toBe('3');
-
-      // Reload the renderer — simulates app relaunch.
-      await browser.execute(() => window.location.reload());
-      await browser.pause(2_000);
-      await waitForHomePage(15_000);
-
-      // Verify the tour resumed at step 4, not step 0.
-      const stepIndicator = await browser.execute(() => {
-        const tooltip = document.querySelector('[role="tooltip"]');
-        if (!tooltip) return null;
-        // Step counter is rendered as "N of 10" inside the tooltip.
-        return tooltip.textContent;
-      });
-      expect(stepIndicator).toContain('4 of 10');
+      expect(await armWalkthrough()).toBe(true);
+      await browser.refresh();
+      expect(await waitForTourTooltip(20_000)).toBe(true);
     });
+
+
   });
 });
