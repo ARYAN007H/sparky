@@ -8,7 +8,7 @@ use crate::security::approval::ApprovalTurnContext;
 use crate::security::{GateDecision, SecurityPolicy};
 use async_trait::async_trait;
 use serde_json::Value;
-use tinyflows::error::{EngineError, Result};
+use super::super::{EngineError, Result};
 
 pub(crate) struct ComposioToolBackend;
 

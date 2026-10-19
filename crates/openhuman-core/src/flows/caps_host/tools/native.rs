@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use serde_json::Value;
 use tinybox_bus::CommandClass;
-use tinyflows::error::{EngineError, Result};
+use super::super::{EngineError, Result};
 
 use super::{ToolBackend, ToolCallCtx, NATIVE_TOOL_PREFIX};
 
