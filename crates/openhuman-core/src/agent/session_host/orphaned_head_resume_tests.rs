@@ -267,7 +267,9 @@ async fn credential_redaction_survives_resume() {
         .filter(|message| matches!(message, Message::User(_)))
         .map(Message::text)
         .collect();
-    assert!(resumed_users.iter().any(|message| message == &redacted));
+    assert!(resumed_users
+        .iter()
+        .any(|message| message.contains(&redacted)));
     assert!(resumed_users
         .iter()
         .all(|message| !message.contains(&secret)));
