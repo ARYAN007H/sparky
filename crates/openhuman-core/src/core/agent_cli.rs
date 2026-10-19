@@ -11,11 +11,9 @@
 //!   openhuman agent prompt-size [--agent <id>] [--workspace <path>] [--json] [-v]
 //!   openhuman agent list [--json] [-v]
 //!
-//! `dump-prompt` is the main tool: it renders the exact system prompt the
-//! context engine would hand to the LLM when that agent is spawned. The
-//! dump routes through [`OpenHumanSessionHost::from_config_for_agent`] and calls
-//! [`OpenHumanSessionHost::build_system_prompt`] on the live session, so the output is
-//! byte-identical to what the LLM sees on turn 1. Pass
+//! `dump-prompt` is the main tool: it renders the current-turn system prompt
+//! through the same prelude builder the runtime uses for a cold model request.
+//! Pass
 //! `--agent orchestrator` for the orchestrator prompt; otherwise pass
 //! any built-in or workspace-custom agent id (e.g. `planner`,
 //! `critic`).
