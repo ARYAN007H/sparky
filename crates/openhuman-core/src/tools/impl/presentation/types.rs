@@ -1,6 +1,7 @@
 //! Typed input / output / error contracts for the `generate_presentation` tool.
 
 use serde::{Deserialize, Serialize};
+use tinydocs_bus::spec::presentation::{PresentationSpec, SlideSpec};
 
 use crate::modules::documents::DocumentCallError;
 
@@ -164,9 +165,8 @@ impl From<DocumentCallError> for PresentationError {
     ///
     /// The structured `field` / `reason` pair does not survive the bus — an
     /// error crosses as a name plus a message — so an `InvalidInput` from the
-    /// module names `spec`. In practice this is rare: `validate_input` checks
-    /// the same limits before the call, so a deck that reaches the module has
-    /// already passed them.
+    /// module names `spec`; the host validates the resolved bus spec before it
+    /// starts artifact production.
     ///
     /// `exit_code` is `-1` because it always is: the field is a vestige of the
     /// python-pptx subprocess this path replaced in #2778, kept so the agent's
@@ -207,149 +207,78 @@ impl PresentationError {
     }
 }
 
-/// Validate the input early — before invoking the `ppt-rs` engine — so
-/// the agent gets a structured `InvalidInput` it can self-correct on
-/// instead of a generic engine error.
-pub(super) fn validate_input(input: &GeneratePresentationInput) -> Result<(), PresentationError> {
-    if input.title.trim().is_empty() {
-        return Err(PresentationError::InvalidInput {
-            field: "title".to_string(),
-            reason: "must not be empty".to_string(),
-        });
-    }
-    if input.title.chars().count() > MAX_TEXT_CHARS {
-        return Err(PresentationError::InvalidInput {
-            field: "title".to_string(),
-            reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
-        });
-    }
-    if let Some(author) = input.author.as_deref() {
-        if author.chars().count() > MAX_TEXT_CHARS {
-            return Err(PresentationError::InvalidInput {
-                field: "author".to_string(),
-                reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
-            });
+impl From<tinydocs_bus::Error> for PresentationError {
+    fn from(error: tinydocs_bus::Error) -> Self {
+        match error {
+            tinydocs_bus::Error::InvalidInput { field, reason } => {
+                Self::InvalidInput { field, reason }
+            }
+            other => Self::InvalidInput {
+                field: "spec".to_string(),
+                reason: other.to_string(),
+            },
         }
     }
-    if let Some(theme) = input.theme.as_deref() {
-        if theme.chars().count() > MAX_TEXT_CHARS {
-            return Err(PresentationError::InvalidInput {
-                field: "theme".to_string(),
-                reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
-            });
-        }
-    }
-    if input.slides.is_empty() {
-        return Err(PresentationError::InvalidInput {
-            field: "slides".to_string(),
-            reason: "must contain at least one slide".to_string(),
-        });
-    }
-    if input.slides.len() > MAX_SLIDES {
-        return Err(PresentationError::InvalidInput {
-            field: "slides".to_string(),
-            reason: format!("must contain ≤ {MAX_SLIDES} slides"),
-        });
-    }
-    let total_images: usize = input.slides.iter().map(|s| s.images.len()).sum();
-    if total_images > MAX_IMAGES_PER_DECK {
-        return Err(PresentationError::InvalidInput {
-            field: "slides[].images".to_string(),
-            reason: format!("deck must contain ≤ {MAX_IMAGES_PER_DECK} images total"),
-        });
-    }
-    for (i, slide) in input.slides.iter().enumerate() {
-        let has_title = !slide.title.trim().is_empty();
-        let has_body = slide
-            .body
-            .as_deref()
-            .map(|s| !s.trim().is_empty())
-            .unwrap_or(false);
-        // Reject whitespace-only bullets too: build_slides() trims and drops
-        // empty entries, so a slide with only ["   "] would render blank
-        // despite passing this "at least one of title/body/bullets" gate.
-        let has_bullets = slide.bullets.iter().any(|b| !b.trim().is_empty());
-        if !has_title && !has_body && !has_bullets {
-            return Err(PresentationError::InvalidInput {
-                field: format!("slides[{i}]"),
-                reason: "must have at least one of title / body / bullets".to_string(),
-            });
-        }
-        if slide.title.chars().count() > MAX_TEXT_CHARS {
-            return Err(PresentationError::InvalidInput {
-                field: format!("slides[{i}].title"),
-                reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
-            });
-        }
-        if let Some(body) = slide.body.as_deref() {
-            if body.chars().count() > MAX_TEXT_CHARS {
+}
+
+/// Reject empty host-owned image references before attempting to resolve them.
+/// The shared bus validator owns all content and image-field limits once the
+/// host has resolved usable image bytes.
+pub(super) fn validate_image_references(
+    input: &GeneratePresentationInput,
+) -> Result<(), PresentationError> {
+    for (slide_idx, slide) in input.slides.iter().enumerate() {
+        for (image_idx, image) in slide.images.iter().enumerate() {
+            let (field, value) = match &image.source {
+                SlideImageSource::Artifact { artifact_id } => (
+                    format!("slides[{slide_idx}].images[{image_idx}].source.artifact_id"),
+                    artifact_id,
+                ),
+                SlideImageSource::File { path } => (
+                    format!("slides[{slide_idx}].images[{image_idx}].source.path"),
+                    path,
+                ),
+            };
+            if value.trim().is_empty() {
                 return Err(PresentationError::InvalidInput {
-                    field: format!("slides[{i}].body"),
-                    reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
+                    field,
+                    reason: "must not be empty".to_string(),
                 });
-            }
-        }
-        if slide.bullets.len() > MAX_BULLETS_PER_SLIDE {
-            return Err(PresentationError::InvalidInput {
-                field: format!("slides[{i}].bullets"),
-                reason: format!("must contain ≤ {MAX_BULLETS_PER_SLIDE} bullets"),
-            });
-        }
-        for (b, bullet) in slide.bullets.iter().enumerate() {
-            if bullet.chars().count() > MAX_TEXT_CHARS {
-                return Err(PresentationError::InvalidInput {
-                    field: format!("slides[{i}].bullets[{b}]"),
-                    reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
-                });
-            }
-        }
-        if let Some(notes) = slide.speaker_notes.as_deref() {
-            if notes.chars().count() > MAX_TEXT_CHARS {
-                return Err(PresentationError::InvalidInput {
-                    field: format!("slides[{i}].speaker_notes"),
-                    reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
-                });
-            }
-        }
-        if slide.images.len() > MAX_IMAGES_PER_SLIDE {
-            return Err(PresentationError::InvalidInput {
-                field: format!("slides[{i}].images"),
-                reason: format!("must contain ≤ {MAX_IMAGES_PER_SLIDE} images"),
-            });
-        }
-        for (img_idx, image) in slide.images.iter().enumerate() {
-            // Cheap structural checks only — MIME, size, and decodability
-            // are validated at resolution time when the bytes are in hand
-            // (and a failure there is a skip-with-warning, not a hard
-            // reject). Here we only catch malformed specs the agent can
-            // self-correct without touching the filesystem.
-            match &image.source {
-                SlideImageSource::Artifact { artifact_id } => {
-                    if artifact_id.trim().is_empty() {
-                        return Err(PresentationError::InvalidInput {
-                            field: format!("slides[{i}].images[{img_idx}].source.artifact_id"),
-                            reason: "must not be empty".to_string(),
-                        });
-                    }
-                }
-                SlideImageSource::File { path } => {
-                    if path.trim().is_empty() {
-                        return Err(PresentationError::InvalidInput {
-                            field: format!("slides[{i}].images[{img_idx}].source.path"),
-                            reason: "must not be empty".to_string(),
-                        });
-                    }
-                }
-            }
-            if let Some(caption) = image.caption.as_deref() {
-                if caption.chars().count() > MAX_TEXT_CHARS {
-                    return Err(PresentationError::InvalidInput {
-                        field: format!("slides[{i}].images[{img_idx}].caption"),
-                        reason: format!("must be ≤ {MAX_TEXT_CHARS} chars"),
-                    });
-                }
             }
         }
     }
     Ok(())
+}
+
+/// Project tool input and host-resolved image bytes onto the owner bus contract.
+pub(super) fn to_bus_spec(
+    input: &GeneratePresentationInput,
+    resolved_images: &[Vec<tinydocs_bus::spec::SlideImage>],
+) -> Result<PresentationSpec, PresentationError> {
+    if input.slides.len() != resolved_images.len() {
+        return Err(PresentationError::InvalidInput {
+            field: "slides".to_string(),
+            reason: "resolved image count did not match slide count".to_string(),
+        });
+    }
+
+    let slides = input
+        .slides
+        .iter()
+        .zip(resolved_images)
+        .map(|(slide, images)| SlideSpec {
+            title: slide.title.clone(),
+            body: slide.body.clone(),
+            bullets: slide.bullets.clone(),
+            speaker_notes: slide.speaker_notes.clone(),
+            images: images.clone(),
+        })
+        .collect();
+
+    Ok(PresentationSpec {
+        title: input.title.clone(),
+        author: input.author.clone(),
+        theme: input.theme.clone(),
+        slides,
+    })
 }
