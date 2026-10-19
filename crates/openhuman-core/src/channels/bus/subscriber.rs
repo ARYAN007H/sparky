@@ -169,18 +169,17 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                                         pending.push(ProgressiveEvent::TextDelta(delta.clone()));
                                     }
                                 }
-                                crate::web_chat::WebChannelEvent::ToolCall { tool_name, .. } => {
-                                    if let Some(name) = tool_name {
-                                        pending.push(ProgressiveEvent::ToolCall(name.clone()));
-                                    }
-                                }
+                                crate::web_chat::WebChannelEvent::ToolCall {
+                                    tool_name: Some(name), ..
+                                } => pending.push(ProgressiveEvent::ToolCall(name.clone())),
+                                crate::web_chat::WebChannelEvent::ToolCall { .. } => {}
                                 crate::web_chat::WebChannelEvent::ToolResult {
-                                    tool_name, success, ..
-                                } => {
-                                    if let Some(name) = tool_name {
-                                        pending.push(ProgressiveEvent::ToolResult { tool_name: name.clone(), success: success.unwrap_or(true) });
-                                    }
-                                }
+                                    tool_name: Some(name), success, ..
+                                } => pending.push(ProgressiveEvent::ToolResult {
+                                    tool_name: name.clone(),
+                                    success: success.unwrap_or(true),
+                                }),
+                                crate::web_chat::WebChannelEvent::ToolResult { .. } => {}
                                 crate::web_chat::WebChannelEvent::ThinkingDelta { delta, .. } => {
                                     if let Some(delta) = delta.as_ref() {
                                         pending.push(ProgressiveEvent::ThinkingDelta(delta.clone()));
