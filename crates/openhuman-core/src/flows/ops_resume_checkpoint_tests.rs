@@ -2,7 +2,7 @@ use super::*;
 
 /// Rewrite a module-created run document only for the migration fixture below.
 /// All normal run setup and execution still go through the TinyFlows bus.
-fn update_parked_run_document_for_test(
+pub(super) fn update_parked_run_document_for_test(
     config: &Config,
     run_id: &str,
     update: impl FnOnce(&mut Value),
