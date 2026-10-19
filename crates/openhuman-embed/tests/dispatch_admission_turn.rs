@@ -9,10 +9,11 @@ use async_trait::async_trait;
 use openhuman_embed::budget::{
     DispatchRefusal, DispatchRefusalReason, PhysicalDispatchAdmission, PhysicalDispatchPermit,
 };
+use openhuman_embed::complete::ResponseFormat;
 use openhuman_embed::observe::{TurnObservation, TurnObserver};
 use openhuman_embed::providers::{ChatModel, ModelRequest, ModelResponse, Result};
 use openhuman_embed::{
-    Access, AgentDefinitionSpec, AgentSpec, CoreError, Provider, ResponseFormat, Runtime, Workspace,
+    Access, AgentDefinitionSpec, AgentSpec, CoreError, Provider, Runtime, Workspace,
 };
 use tinyinference_llm::usage::Usage;
 
