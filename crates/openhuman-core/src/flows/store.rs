@@ -119,8 +119,18 @@ fn test_seed_flow(config: &Config, flow: &Flow) -> Result<()> {
         expires_ms: None,
         created_ms: Some(created_ms),
     };
-    let _: catalog::CatalogStorageReply = call_catalog(config, catalog::storage::PUT, (request,))?;
-    Ok(())
+    match super::catalog_storage::call_test_storage::<catalog::CatalogStorageReply, _>(
+        config,
+        catalog::storage::PUT,
+        (request,),
+    )? {
+        catalog::CatalogStorageReply::Value { .. } => Ok(()),
+        catalog::CatalogStorageReply::Error { error } => Err(anyhow!(
+            "CatalogStorage fixture write failed ({}): {}",
+            error.kind,
+            error.message
+        )),
+    }
 }
 
 /// Duplicate a workflow through the module's Catalog contract.
