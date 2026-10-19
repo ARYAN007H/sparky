@@ -84,9 +84,14 @@ function startChild(name, command, args, env, cwd = repo) {
   const launchArgs = largeStack
     ? ["-c", 'ulimit -s 65520 || exit 1; exec "$@"', "debug-web-core", command, ...args]
     : args;
+  const childEnv = { ...process.env };
+  for (const [key, value] of Object.entries(env)) {
+    if (value === null) delete childEnv[key];
+    else childEnv[key] = value;
+  }
   const child = spawn(launchCommand, launchArgs, {
     cwd,
-    env: { ...process.env, ...env },
+    env: childEnv,
     stdio: ["ignore", out, out],
     detached: true,
   });
@@ -154,20 +159,32 @@ async function main() {
   const appOrigin = `http://localhost:${vitePort}`;
   const workspace = path.join(logDir, "workspace");
   fs.mkdirSync(workspace, { recursive: true });
+  const emptyDotenv = path.join(workspace, "empty.env");
+  fs.writeFileSync(emptyDotenv, "");
 
   mockModule = await import(pathToFileURL(path.join(repo, "scripts/mock-api-core.mjs")));
   await mockModule.startMockServer(mockPort);
   log(`mock backend   ${mockUrl}`);
 
-  startChild("core", core, ["serve", "--port", String(corePort)], {
-    OPENHUMAN_WORKSPACE: workspace,
-    OPENHUMAN_CORE_TOKEN: token,
-    BACKEND_URL: mockUrl,
-    VITE_BACKEND_URL: mockUrl,
-    OPENHUMAN_COMPOSIO_MODE: "disabled",
-    OPENHUMAN_SANDBOX: "off",
-    RUST_LOG: process.env.RUST_LOG ?? "info",
-  });
+  startChild(
+    "core",
+    core,
+    ["serve", "--port", String(corePort)],
+    {
+      OPENHUMAN_WORKSPACE: workspace,
+      OPENHUMAN_DOTENV_PATH: emptyDotenv,
+      OPENHUMAN_CORE_TOKEN: token,
+      BACKEND_URL: mockUrl,
+      VITE_BACKEND_URL: mockUrl,
+      OPENHUMAN_COMPOSIO_MODE: "disabled",
+      OPENHUMAN_SANDBOX: "off",
+      OPENHUMAN_BACKEND_API_KEY: null,
+      OPENHUMAN_BACKEND_SESSION_TOKEN: null,
+      OPENHUMAN_STORAGE_URL: null,
+      RUST_LOG: process.env.RUST_LOG ?? "info",
+    },
+    workspace,
+  );
   await waitFor(async () => (await fetch(`http://127.0.0.1:${corePort}/health`)).ok, {
     timeoutMs: 120_000,
     what: "the core's /health",
