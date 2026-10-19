@@ -433,3 +433,7 @@ pub async fn update_settings(
         )],
     ))
 }
+
+#[cfg(test)]
+#[path = "settings_tests.rs"]
+mod tests;
