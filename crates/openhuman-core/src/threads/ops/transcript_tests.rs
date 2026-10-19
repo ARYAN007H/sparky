@@ -122,6 +122,90 @@ async fn write_thread(ctx: &DispatchCtx) {
 }
 
 #[tokio::test]
+async fn transcript_projection_includes_voice_metadata_from_persisted_thread_rows() {
+    use crate::threads::store::{blocking, ConversationMessage, CreateConversationThread};
+    use serde_json::json;
+
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = ctx_for(dir.path(), None);
+    let workspace = dir.path().to_path_buf();
+    blocking::ensure_thread(
+        ctx.clone(),
+        workspace.clone(),
+        CreateConversationThread {
+            id: THREAD.into(),
+            title: "Voice notes".into(),
+            created_at: "2026-10-15T00:00:00Z".into(),
+            parent_thread_id: None,
+            labels: None,
+            personality_id: None,
+            working_dir: None,
+        },
+    )
+    .await
+    .unwrap();
+    for (id, content, sender, note_id) in [
+        ("user-voice", "hello", "user", "recording-1"),
+        ("assistant-voice", "hi there", "agent", "reply-1"),
+    ] {
+        blocking::append_message(
+            ctx.clone(),
+            workspace.clone(),
+            THREAD.into(),
+            ConversationMessage {
+                id: id.into(),
+                content: content.into(),
+                message_type: "text".into(),
+                extra_metadata: json!({"voiceNote": {"noteId": note_id, "durationMs": 5000}}),
+                sender: sender.into(),
+                created_at: "2026-10-15T00:00:02Z".into(),
+            },
+        )
+        .await
+        .unwrap();
+    }
+    write_thread(&ctx).await;
+
+    let page = transcript_get(
+        &ctx,
+        TranscriptGetRequest {
+            thread_id: THREAD.into(),
+            cursor: None,
+            limit: None,
+        },
+    )
+    .await
+    .unwrap()
+    .value
+    .data
+    .unwrap();
+    let user = page
+        .items
+        .iter()
+        .find_map(|item| match item {
+            tinyagents_session::transcript::view::DisplayItem::UserMessage {
+                content,
+                extra_metadata,
+                ..
+            } if content == "hello" => extra_metadata.as_ref(),
+            _ => None,
+        });
+    let assistant = page
+        .items
+        .iter()
+        .find_map(|item| match item {
+            tinyagents_session::transcript::view::DisplayItem::AssistantMessage {
+                content,
+                extra_metadata,
+                ..
+            } if content == "hi there" => extra_metadata.as_ref(),
+            _ => None,
+        });
+    assert_eq!(user.and_then(|value| value.pointer("/voiceNote/noteId")), Some(&json!("recording-1")));
+    assert_eq!(assistant.and_then(|value| value.pointer("/voiceNote/noteId")), Some(&json!("reply-1")));
+}
+
+#[tokio::test]
 async fn a_profiles_thread_is_read_from_its_own_store() {
     let dir = tempfile::tempdir().unwrap();
     let profile = ctx_for(dir.path(), Some("profile-t"));
