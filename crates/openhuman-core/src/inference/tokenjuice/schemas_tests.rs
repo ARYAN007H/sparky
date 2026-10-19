@@ -1,5 +1,15 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
 use crate::core::runtime::DispatchCtx;
+
+#[test]
+fn tokenjuice_schema_catalog_matches_registered_controllers() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "compress",
+    );
+}
 
 /* Module-backed behavior is covered by TinyJuice's loader E2E. */
 
