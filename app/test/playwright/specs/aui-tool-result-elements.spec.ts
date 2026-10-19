@@ -276,15 +276,23 @@ test.describe('assistant-ui tool-result elements', () => {
         ],
       })
     );
-    await scriptToolCall('AUI-TABLE-CASE', [
+    await setKeywordRules([
       {
-        name: 'composio_execute',
-        arguments: { tool: GITHUB_REPOSITORY_ACTION, arguments: { limit: 2 } },
+        keyword: 'AUI-TABLE-CASE',
+        toolCalls: [{ name: 'tool_search', arguments: { query: 'list GitHub repositories' } }],
+      },
+      {
+        keyword: '1 match(es)',
+        toolCalls: [{ name: GITHUB_REPOSITORY_ACTION, arguments: { limit: 2 } }],
       },
     ]);
+    await setMockBehavior('llmStreamChunkDelayMs', '10');
 
     await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
-    const card = await openToolCall(page, /composio_execute|repositor/i);
+    const card = await openToolCall(
+      page,
+      /GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER|repositor/i
+    );
 
     const table = card.locator('[data-slot="data-table"]').first();
     await expect(table).toBeVisible({ timeout: 20_000 });
