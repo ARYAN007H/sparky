@@ -17,7 +17,13 @@ import {
 } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
-import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
+import {
+  clearRequestLog,
+  getRequestLog,
+  setMockBehavior,
+  startMockServer,
+  stopMockServer,
+} from '../mock-server';
 
 const USER_ID = 'e2e-chat-voice-note';
 const TRANSCRIPT = 'Please remind me about the dentist';
@@ -66,6 +72,7 @@ describe('Chat voice notes', () => {
       ])
     );
     setMockBehavior('llmStreamScript', JSON.stringify([{ text: REPLY }, { finish: 'stop' }]));
+    clearRequestLog();
   });
 
   after(async () => {
@@ -124,6 +131,12 @@ describe('Chat voice notes', () => {
     await clickTestId('voice-note-send');
     await browser.waitUntil(async () => await textExists(TRANSCRIPT), { timeout: 20_000 });
     await waitForAssistantReplyContaining(REPLY, 60_000);
+    const audioRequests = getRequestLog().filter(request =>
+      ['/openai/v1/audio/transcriptions', '/openai/v1/audio/speech'].includes(request.url)
+    );
+    expect(audioRequests.map(request => request.url)).toEqual(
+      expect.arrayContaining(['/openai/v1/audio/transcriptions', '/openai/v1/audio/speech'])
+    );
     await browser.waitUntil(async () => (await countTestId('voice-note-player')) === 2, {
       timeout: 30_000,
     });
