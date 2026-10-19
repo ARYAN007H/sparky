@@ -1179,6 +1179,26 @@ async fn composio_controller_validation_rejects_malformed_params_over_rpc() {
             "{method} should reject malformed params with `{expected}`, got: {message}"
         );
     }
+
+    for (id, method, params, expected) in [
+        (74, "openhuman.composio_get_user_scopes", json!({}), "missing required param 'toolkit'"),
+        (75, "openhuman.composio_set_user_scopes", json!({}), "missing required param 'toolkit'"),
+    ] {
+        let response = rpc(&harness.rpc_base, id, method, params).await;
+        let message = err(&response, method)
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{method}: error must have a message: {response}"));
+        assert!(message.contains(expected), "{method}: {message}");
+    }
+
+    for (id, method) in [
+        (76, "openhuman.composio_list_connections"),
+        (77, "openhuman.composio_refresh_all_identities"),
+    ] {
+        let response = rpc(&harness.rpc_base, id, method, json!({})).await;
+        assert_registered_dispatch(&response, method);
+    }
 }
 
 fn assert_registered_dispatch(value: &Value, method: &str) {
