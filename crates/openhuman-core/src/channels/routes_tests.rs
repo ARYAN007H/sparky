@@ -136,16 +136,6 @@ async fn module_route_help_response(
 
 #[test]
 fn provider_alias_and_route_selection_round_trip() {
-    let first_provider = provider::list_providers()
-        .into_iter()
-        .next()
-        .expect("provider registry should not be empty");
-    assert_eq!(
-        resolve_provider_alias(first_provider.name, &provider_descriptors()).as_deref(),
-        Some(first_provider.name)
-    );
-    assert!(resolve_provider_alias("   ", &provider_descriptors()).is_none());
-
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let sender_key = "telegram_alice_reply";
     assert_eq!(
@@ -174,6 +164,49 @@ fn provider_alias_and_route_selection_round_trip() {
 
     set_route_selection(&ctx, sender_key, default_route_selection(&ctx));
     assert!(ctx.route_overrides.lock().unwrap().is_empty());
+}
+
+#[test]
+fn provider_descriptors_use_configured_slugs_and_keep_managed_aliases() {
+    use crate::config::schema::{AuthStyle, CloudProviderCreds};
+
+    let config = crate::config::Config {
+        cloud_providers: vec![
+            CloudProviderCreds {
+                id: "p_custom_a8c3f".into(),
+                slug: "custom-provider".into(),
+                label: "Custom Provider Label".into(),
+                endpoint: "https://inference.example.test/v1".into(),
+                auth_style: AuthStyle::Bearer,
+                default_model: None,
+            },
+            CloudProviderCreds {
+                id: "p_openhuman_managed".into(),
+                slug: "openhuman".into(),
+                label: "Managed Route".into(),
+                endpoint: "https://api.openhuman.ai/v1".into(),
+                auth_style: AuthStyle::OpenhumanJwt,
+                default_model: None,
+            },
+        ],
+        ..crate::config::Config::default()
+    };
+
+    let providers = provider_descriptors(&config);
+    assert_eq!(
+        providers.iter().map(|provider| provider.name.as_str()).collect::<Vec<_>>(),
+        ["custom-provider", "openhuman"]
+    );
+    assert_eq!(providers[0].aliases, Vec::<String>::new());
+    assert_eq!(
+        providers[1].aliases,
+        ["backend", "openhuman-backend"]
+    );
+    assert_eq!(
+        resolve_provider_alias("backend", &providers).as_deref(),
+        Some("openhuman")
+    );
+    assert!(resolve_provider_alias("p_custom_a8c3f", &providers).is_none());
 }
 
 #[cfg(feature = "modules")]

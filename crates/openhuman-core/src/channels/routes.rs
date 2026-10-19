@@ -2,19 +2,26 @@
 
 use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
 use super::{Channel, ChannelSendExt, SendMessage};
-use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
 use tinychannels_bus::module_control::{
     ChannelControlRequest, ChannelControlResult, ProviderDescriptor,
 };
 
-fn provider_descriptors() -> Vec<ProviderDescriptor> {
-    provider::list_providers()
+fn provider_descriptors(config: &crate::config::Config) -> Vec<ProviderDescriptor> {
+    config
+        .cloud_providers
+        .iter()
         .into_iter()
         .map(|provider| ProviderDescriptor {
-            name: provider.name.to_string(),
-            aliases: provider.aliases.iter().map(ToString::to_string).collect(),
+            name: provider.slug.clone(),
+            aliases: if provider.slug == crate::inference::provider::factory::PROVIDER_OPENHUMAN
+                || provider.auth_style == crate::config::schema::AuthStyle::OpenhumanJwt
+            {
+                vec!["backend".to_string(), "openhuman-backend".to_string()]
+            } else {
+                Vec::new()
+            },
         })
         .collect()
 }
@@ -181,7 +188,11 @@ pub(crate) async fn handle_runtime_command_if_needed(
                         model: current.model,
                     },
                     history_len,
-                    providers: provider_descriptors(),
+                    providers: ctx
+                        .config
+                        .as_deref()
+                        .map(provider_descriptors)
+                        .unwrap_or_default(),
                 },),
             )
             .await;
