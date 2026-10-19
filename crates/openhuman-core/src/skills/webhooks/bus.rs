@@ -147,7 +147,7 @@ impl EventHandler<DomainEvent> for WebhookRequestSubscriber {
                             ctx,
                             envelope,
                             correlation_id.clone(),
-                            Arc::new(crate::triage::LiveTriage),
+                            Arc::new(crate::triage::RemoteTriage),
                         );
                     }
                     // Return 202 Accepted immediately so the event handler

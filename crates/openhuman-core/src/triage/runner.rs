@@ -7,7 +7,7 @@
 //! direct paths (the Composio trigger subscriber and agent webhooks) and the
 //! inbound event queues' `Deliver` callback all go through this trait, so
 //! their behavior is testable without a model: tests script the outcomes, and
-//! production uses [`LiveTriage`].
+//! production uses [`RemoteTriage`].
 
 use async_trait::async_trait;
 
@@ -46,10 +46,10 @@ pub trait TriageRunner: Send + Sync {
 
 /// The production runner: [`run_triage`] and [`apply_decision`].
 #[derive(Debug, Clone, Copy, Default)]
-pub struct LiveTriage;
+pub struct RemoteTriage;
 
 #[async_trait]
-impl TriageRunner for LiveTriage {
+impl TriageRunner for RemoteTriage {
     async fn run(
         &self,
         ctx: &DispatchCtx,

@@ -8,7 +8,7 @@ use crate::core::events::DomainEvent;
 use crate::integrations::composio::trigger_history;
 use std::sync::Arc;
 
-use crate::triage::{LiveTriage, TriageOutcome, TriageRunner, TriggerEnvelope};
+use crate::triage::{RemoteTriage, TriageOutcome, TriageRunner, TriggerEnvelope};
 
 /// Env var that **disables** the triage pipeline. The pipeline is
 /// enabled by default; set to `1`/`true`/`yes` to opt out (e.g. for
@@ -192,7 +192,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
             ctx,
             config,
             envelope,
-            Arc::new(LiveTriage),
+            Arc::new(RemoteTriage),
             #[cfg(feature = "inbound-queues")]
             None,
         )

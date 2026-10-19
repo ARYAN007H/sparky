@@ -17,7 +17,7 @@ use tinyeventqueues_bus::{
 
 use super::deliver::Deliverer;
 use crate::core::runtime::DispatchCtx;
-use crate::triage::LiveTriage;
+use crate::triage::RemoteTriage;
 
 /// The served callback object.
 #[derive(Clone)]
@@ -64,7 +64,7 @@ pub(crate) async fn install(connection: &tinybus::Connection) -> tinybus::Result
             crate::config::schema::InboundConfig::default().triage_timeout_ms
         }
     };
-    let deliverer = Deliverer::new(Arc::new(LiveTriage), ctx, Duration::from_millis(timeout_ms));
+    let deliverer = Deliverer::new(Arc::new(RemoteTriage), ctx, Duration::from_millis(timeout_ms));
     connection
         .serve_at(
             ObjectPath::new(PATH)?,

@@ -48,4 +48,4 @@ pub use escalation::apply_decision;
 pub use evaluator::{run_triage, TriageOutcome, TriageResolutionPath, TriageRun};
 pub use origin::{local_trigger_origin, remote_trigger_origin};
 pub use routing::{build_local_provider_with_config, ResolvedProvider};
-pub use runner::{LiveTriage, TriageRunner};
+pub use runner::{RemoteTriage, TriageRunner};
