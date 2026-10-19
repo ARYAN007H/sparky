@@ -41,6 +41,7 @@ impl CoreContext {
             tool_groups: Default::default(),
             components: Default::default(),
             embedder_config: None,
+            latest_embedder_config: None,
             user_skill_roots: true,
             extensions: Default::default(),
             turn_origin: None,
