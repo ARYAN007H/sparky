@@ -5,11 +5,17 @@ use super::*;
 /// The host's in-flight subagent runs of one agent context.
 pub(super) type HostInFlightMap = AsyncMutex<HashMap<HostLifecycleKey, Arc<HostInFlight>>>;
 
+const CLASSIFIED_STOP_CAUSE_EXTENSION: &str = "openhuman.classified_stop_cause";
+
 pub(super) fn host_outcome_to_neutral(
     outcome: SubagentRunOutcome,
     definition: &crate::agent::harness::host_definition::AgentDefinition,
     options: &SubagentRunOptions,
 ) -> SubagentOutcome {
+    let failure_cause = match &outcome.status {
+        SubagentRunStatus::Incomplete { failure_cause, .. } => failure_cause.clone(),
+        _ => None,
+    };
     let status = match outcome.status {
         SubagentRunStatus::Completed => SubagentOutcomeKind::Completed,
         SubagentRunStatus::AwaitingUser { question, .. } => {
@@ -40,12 +46,12 @@ pub(super) fn host_outcome_to_neutral(
                 },
             })
         }
-        SubagentRunStatus::Incomplete { reason } => {
+        SubagentRunStatus::Incomplete { reason, .. } => {
             SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(reason))
         }
         SubagentRunStatus::Cancelled => SubagentOutcomeKind::Cancelled,
     };
-    SubagentOutcome {
+    let mut neutral = SubagentOutcome {
         task_id: outcome.task_id,
         output: outcome.output,
         history: outcome
@@ -82,5 +88,14 @@ pub(super) fn host_outcome_to_neutral(
             })
             .collect(),
         ..SubagentOutcome::cancelled(String::new())
+    };
+    if let Some(cause) = failure_cause {
+        // Keep only bounded machine identifiers in neutral durable metadata;
+        // the human-readable summary may contain private tool or URL details.
+        neutral.extensions.insert(
+            CLASSIFIED_STOP_CAUSE_EXTENSION.into(),
+            serde_json::json!({"class": cause.class, "operation": cause.operation}),
+        );
     }
+    neutral
 }
