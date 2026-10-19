@@ -136,9 +136,9 @@ impl ModuleChannelRuntime {
                         .any(|identity| identity.platform == channel)
             })
         };
-        let channels = infos
-            .iter()
-            .map(|info| {
+        let mut channels = HashMap::new();
+        let mut progressive = HashMap::new();
+        for info in &infos {
                 let channel = ModuleChannel {
                     name: info.name.clone(),
                     object: lease.object().clone(),
@@ -146,9 +146,16 @@ impl ModuleChannelRuntime {
                     relay: relay.clone(),
                     relay_fronted: relay_fronts(&info.name),
                 };
-                (info.name.clone(), Arc::new(channel) as Arc<dyn Channel>)
-            })
-            .collect();
+                let channel = Arc::new(channel);
+                channels.insert(info.name.clone(), channel.clone() as Arc<dyn Channel>);
+                progressive.insert(
+                    info.name.clone(),
+                    channel as Arc<dyn ProgressiveChannelTransport>,
+                );
+        }
+        progressive_channels
+            .set(Arc::new(progressive))
+            .map_err(|_| anyhow::anyhow!("progressive channel adapters were already initialized"))?;
         Ok(Self {
             client,
             lease,
