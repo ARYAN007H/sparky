@@ -200,20 +200,7 @@ impl OpenHumanCode {
 
         // Close out the approval audit with the run's success/failure (mirrors
         // OpenHumanTools/OpenHumanHttp).
-        if let Some(id) = audit_id {
-            if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
-                let exec = if outcome.is_ok() {
-                    crate::security::approval::ExecutionOutcome::Success
-                } else {
-                    crate::security::approval::ExecutionOutcome::Failure
-                };
-                gate.record_execution(
-                    &id,
-                    exec,
-                    outcome.as_ref().err().map(ToString::to_string).as_deref(),
-                );
-            }
-        }
+        close_audit(audit_id.as_deref(), &outcome);
 
         outcome
     }

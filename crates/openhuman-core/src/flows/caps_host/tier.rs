@@ -6,7 +6,7 @@
 //! actually performs the round-trip when a human is needed.
 
 use serde_json::Value;
-use tinyflows::error::{EngineError, Result};
+use super::{EngineError, Result};
 
 use crate::security::{GateDecision, SecurityPolicy};
 use tinybox_bus::CommandClass;
@@ -162,6 +162,28 @@ fn tier_config_error(_error: &str) -> EngineError {
     EngineError::Capability(format!(
         "{POLICY_BLOCKED_MARKER} flows autonomy tier could not be refreshed; refusing the node"
     ))
+}
+
+/// Finish the audit row opened by a gated capability after its side effect
+/// settles. Gate decisions without an audit id remain a no-op.
+pub(crate) fn close_audit<T, E: std::fmt::Display>(
+    audit_id: Option<&str>,
+    result: &std::result::Result<T, E>,
+) {
+    let Some(audit_id) = audit_id else {
+        return;
+    };
+    let Some(gate) = crate::security::approval::ApprovalGate::try_global() else {
+        return;
+    };
+    let (outcome, error) = match result {
+        Ok(_) => (crate::security::approval::ExecutionOutcome::Success, None),
+        Err(error) => (
+            crate::security::approval::ExecutionOutcome::Failure,
+            Some(error.to_string()),
+        ),
+    };
+    gate.record_execution(audit_id, outcome, error.as_deref());
 }
 
 fn stricter_tier(
