@@ -33,27 +33,25 @@
 
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[cfg(test)]
 use crate::agent::turn_origin;
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::flows::{
-    cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, forget_matching, remember_keyed,
-    FLOWS_TAG,
+    FLOWS_TAG, cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, forget_matching,
+    remember_keyed,
 };
 use crate::memory::types::{FetchParams, RecallParams};
-use crate::security::approval::{
-    redact_args, summarize_action, GateOutcome,
-};
 use crate::security::SecurityPolicy;
+use crate::security::approval::{GateOutcome, redact_args, summarize_action};
 use tinybox_bus::CommandClass;
-use tinymemory_api::wrap_untrusted_for_agent;
 use tinymemory_api::Error;
+use tinymemory_api::wrap_untrusted_for_agent;
 use tinymemory_api::{Hit, LearningKind, MemoryMeta, MetaFilter, SourceKind};
 
-use super::{enforce_current_node_tier_gate, gate_call_for_tier, EngineError, Result};
+use super::{EngineError, Result, enforce_current_node_tier_gate, gate_call_for_tier};
 
 /// Stable `tracing` grep prefix for every log line this adapter emits. Never
 /// logs memory *content* or PII — only operation names, scopes, resolved
@@ -445,5 +443,5 @@ fn passes_min_score(score: Option<f32>, min_score: Option<f64>) -> bool {
 }
 
 #[cfg(test)]
-#[path = "memory_adapter_tests.rs"]
+#[path = "memory_tests.rs"]
 mod tests;
