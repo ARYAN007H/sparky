@@ -50,7 +50,10 @@ async fn start_mock_servers() -> MockServers {
     let telegram_app = Router::new()
         .route("/botsession-restart-token/getUpdates", post(get_updates))
         .route("/botsession-restart-token/sendMessage", post(send_message))
-        .route("/botsession-restart-token/editMessageText", post(send_message))
+        .route(
+            "/botsession-restart-token/editMessageText",
+            post(send_message),
+        )
         .route("/botsession-restart-token/sendChatAction", post(ok))
         .route("/botsession-restart-token/getMe", post(get_me))
         .with_state(Arc::clone(&state));
@@ -81,11 +84,11 @@ async fn serve(app: Router) -> (String, JoinHandle<()>) {
     (format!("http://{address}"), task)
 }
 
-async fn get_updates(
-    State(state): State<Arc<MockState>>,
-    Json(body): Json<Value>,
-) -> Json<Value> {
-    let offset = body.get("offset").and_then(Value::as_i64).unwrap_or_default();
+async fn get_updates(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
+    let offset = body
+        .get("offset")
+        .and_then(Value::as_i64)
+        .unwrap_or_default();
     state
         .update_offsets
         .lock()
@@ -101,10 +104,7 @@ async fn get_updates(
     Json(json!({ "ok": true, "result": updates.iter().cloned().collect::<Vec<_>>() }))
 }
 
-async fn send_message(
-    State(state): State<Arc<MockState>>,
-    Json(body): Json<Value>,
-) -> Json<Value> {
+async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
     state
         .sent_messages
         .lock()
@@ -204,7 +204,10 @@ default_model = "session-model"
     // been established, while workspace state is independently pinned here.
     let parsed: openhuman_core::config::Config =
         toml::from_str(&config).expect("mock config matches the core schema");
-    assert_eq!(parsed.channels_config.telegram.as_ref().unwrap().bot_token, BOT_TOKEN);
+    assert_eq!(
+        parsed.channels_config.telegram.as_ref().unwrap().bot_token,
+        BOT_TOKEN
+    );
 }
 
 struct CoreProcess(Child);
@@ -216,7 +219,12 @@ impl Drop for CoreProcess {
     }
 }
 
-fn start_core(home: &Path, workspace: &Path, telegram: &str, log_path: &Path) -> (CoreProcess, String) {
+fn start_core(
+    home: &Path,
+    workspace: &Path,
+    telegram: &str,
+    log_path: &Path,
+) -> (CoreProcess, String) {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .expect("reserve core port")
         .local_addr()
@@ -276,12 +284,7 @@ async fn wait_healthy(base: &str, process: &mut CoreProcess, log_path: &Path) {
 
 async fn wait_for_completion(state: &MockState, count: usize) {
     wait_until("model request", || {
-        state
-            .completions
-            .lock()
-            .expect("model requests")
-            .len()
-            >= count
+        state.completions.lock().expect("model requests").len() >= count
     })
     .await;
     wait_until("final Telegram reply", || {
@@ -290,7 +293,11 @@ async fn wait_for_completion(state: &MockState, count: usize) {
             .lock()
             .expect("Telegram sent messages")
             .iter()
-            .any(|body| body["text"].as_str().is_some_and(|text| text.contains(&format!("mock reply {count}"))))
+            .any(|body| {
+                body["text"]
+                    .as_str()
+                    .is_some_and(|text| text.contains(&format!("mock reply {count}")))
+            })
     })
     .await;
 }
