@@ -81,7 +81,7 @@ pub async fn flows_update(
         graph_json,
         require_approval,
         expected_version,
-        disarm_automatic,
+        false,
     )
     .await
 }
@@ -94,7 +94,6 @@ pub(crate) async fn flows_update_with_context(
     graph_json: Option<Value>,
     require_approval: Option<bool>,
     expected_version: Option<String>,
-    disarm_automatic: bool,
 ) -> Result<Outcome<Flow>, String> {
     flows_update_inner(
         ctx,

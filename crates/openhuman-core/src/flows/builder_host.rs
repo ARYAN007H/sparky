@@ -85,7 +85,8 @@ impl FlowsHost {
                     wire!(ops::load_flow_graph(&config, &required::<String>(&payload, "id")?)?)
                 }
                 PortOperation::FlowsCreate => {
-                    wire!(ops::flows_create(
+                    wire!(ops::flows_create_with_context(
+                        &context,
                         &config,
                         required(&payload, "name")?,
                         required(&payload, "graph")?,
@@ -95,7 +96,8 @@ impl FlowsHost {
                     .value)
                 }
                 PortOperation::FlowsUpdate => {
-                    let outcome = ops::flows_update(
+                    let outcome = ops::flows_update_with_context(
+                        &context,
                         &config,
                         &required::<String>(&payload, "id")?,
                         optional_field(&payload, "name")?,

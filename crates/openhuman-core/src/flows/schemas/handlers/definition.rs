@@ -24,7 +24,7 @@ pub(in crate::flows::schemas) fn handle_create(
         {
             ops::strict_gate(&ctx, &config, &graph).await?;
         }
-        to_json(ops::flows_create(&config, name, graph, require_approval).await?)
+        to_json(ops::flows_create_with_context(&ctx, &config, name, graph, require_approval).await?)
     })
 }
 
@@ -130,7 +130,8 @@ pub(in crate::flows::schemas) fn handle_update(
             }
         }
         to_json(
-            ops::flows_update(
+            ops::flows_update_with_context(
+                &ctx,
                 &config,
                 id.trim(),
                 name,
