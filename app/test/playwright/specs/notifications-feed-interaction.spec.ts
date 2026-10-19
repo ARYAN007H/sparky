@@ -1,13 +1,6 @@
 /**
- * ⚠️ STILL SKIPPED — the seeding was restructured but has NOT been executed.
- *
- * Local test execution is currently forbidden by a standing fleet rule, so the
- * fix below is reasoned from source and verified by reading only. It is left
- * skipped rather than un-skipped-and-hoped: shipping an unrun spec as active is
- * how a red lane gets blamed on the wrong change. Un-skip on the first run that
- * can actually execute it.
- *
- * What is established, from three earlier runs against a live lane:
+ * The original skip captured a broken fixture, not a product limitation. The
+ * earlier runs established:
  *  - The persist blob format here is CORRECT. redux-persist stores each
  *    whitelisted field as its own JSON string inside the outer object, and a
  *    `localStorage` probe confirmed the app's own blob has exactly this shape.
@@ -175,7 +168,7 @@ async function openFeedWith(page: Page, items: SeedItem[]): Promise<void> {
 const feed = (page: Page) => page.getByTestId('system-events-section');
 const rows = (page: Page) => feed(page).getByTestId('notification-item');
 
-test.describe.skip('Notifications — the system-events feed renders what was stored', () => {
+test.describe('Notifications — the system-events feed renders what was stored', () => {
   test('shows every seeded item', async ({ page }) => {
     await openFeedWith(page, [
       item('n-agents-1', 'agents', 'Agent finished a task'),
@@ -198,7 +191,7 @@ test.describe.skip('Notifications — the system-events feed renders what was st
   });
 });
 
-test.describe.skip('Notifications — filtering is single-select and actually filters', () => {
+test.describe('Notifications — filtering is single-select and actually filters', () => {
   test('narrows the feed to one category and back', async ({ page }) => {
     await openFeedWith(page, [
       item('n-agents-1', 'agents', 'Agent finished a task'),
@@ -235,7 +228,7 @@ test.describe.skip('Notifications — filtering is single-select and actually fi
   });
 });
 
-test.describe.skip('Notifications — read state', () => {
+test.describe('Notifications — read state', () => {
   test('clicking an unread item marks it read and drops the unread count', async ({ page }) => {
     await openFeedWith(page, [
       item('n-agents-1', 'agents', 'Agent finished a task'),

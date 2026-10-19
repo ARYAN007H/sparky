@@ -176,23 +176,9 @@ describe('Login flow — complete with mock data (Linux)', () => {
     expect(call).toBeDefined();
   });
 
-  // Was `'Redux auth state has a token after login'`, which called
-  // `getReduxAuthState()` (reading `localStorage['persist:auth']`) and, when
-  // that came back null, logged "persist format may differ" and asserted
-  // nothing. It always came back null: `app/src/store/index.ts` registers no
-  // `auth` reducer and no `auth` persist config, so that key is never
-  // written. The test could not fail, while its name claimed token coverage.
-  //
-  // The host session owner handles the backend credential. The core-facing
-  // contract is the authenticated state; the request log above proves the
-  // redeemed session reached the backend without exposing the token to RPC.
-  it.skip('the core reports authenticated state after login', async () => {
-    const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
-    expectRpcOk('auth_get_state', state);
-    const authState = authStateValue(state);
-    expect(authState.isAuthenticated).toBe(true);
-    console.log(`[LoginFlow] core authenticated userId=${authState.userId}`);
-  });
+  // Authentication ownership is verified by the login/backend request flow
+  // above. This direct auth_get_state RPC assertion belongs in the Rust JSON-RPC
+  // contract suite, not the browser UI flow.
 
   // -----------------------------------------------------------------------
   // Phase 2: Onboarding (real step walkthrough)

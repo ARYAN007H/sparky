@@ -149,7 +149,9 @@ test.afterEach(async () => {
 // `page.route('**/rpc', ...)` and fulfils the RPCs itself, with zero
 // `callCoreRpc`. This suite is therefore the only spec exercising this surface
 // against a live core.
-test.describe.skip('Connector modal — focus containment', () => {
+test.describe.skip( // https://github.com/tinyhumansai/openhuman/issues/6398
+  'Connector modal — focus containment',
+  () => {
   // Precondition assertion, not mutation-proven: this survived BOTH the
   // trap-deletion mutation and removing the input's `autoFocus`, because Radix
   // moves focus in on open independently of either. Kept because a dialog that
@@ -186,9 +188,10 @@ test.describe.skip('Connector modal — focus containment', () => {
       ).toBe(true);
     }
   });
-});
+  }
+);
 
-test.describe.skip('Connector modal — Escape', () => {
+test.describe.skip('Connector modal — Escape', () => { // https://github.com/tinyhumansai/openhuman/issues/6398
   test('Escape closes the dialog', async ({ page }) => {
     const dialog = await openConnectDialog(page);
     await page.keyboard.press('Escape');
@@ -235,7 +238,7 @@ test.describe.skip('Connector modal — Escape', () => {
   });
 });
 
-test.describe.skip('Connector modal — accessible shape', () => {
+test.describe.skip('Connector modal — accessible shape', () => { // https://github.com/tinyhumansai/openhuman/issues/6398
   test('is a labelled modal dialog, not a bare overlay', async ({ page }) => {
     const dialog = await openConnectDialog(page);
     // A screen reader needs both of these to announce it as a dialog and read
