@@ -25,6 +25,7 @@ import {
   ensureSignedInChat,
   coreLaunchSpec,
   createCoreRpcClient,
+  isCoreAuthenticated,
   freePort,
   isLoopback,
   mergeChildEnv,
@@ -157,30 +158,13 @@ async function signIn(page, rpc, appOrigin) {
   await page.getByText("Welcome to OpenHuman").waitFor({ timeout: 120_000 });
   log("signing in through the GitHub provider button (mock backend)…");
   await page.getByRole("button", { name: "GitHub" }).click();
-  let lastAuthState;
-  try {
-    await waitFor(
-      async () => {
-        lastAuthState = await rpc("openhuman.auth_get_state");
-        return lastAuthState.isAuthenticated;
-      },
-      {
-        timeoutMs: 120_000,
-        what: "the core's authenticated state after mock sign-in",
-      },
-    );
-  } catch (error) {
-    const nested = lastAuthState?.result;
-    log(
-      `auth state diagnostic: ${JSON.stringify({
-        response_keys: Object.keys(lastAuthState ?? {}),
-        direct_is_authenticated: lastAuthState?.isAuthenticated === true,
-        result_keys: Object.keys(nested ?? {}),
-        nested_is_authenticated: nested?.isAuthenticated === true,
-      })}`,
-    );
-    throw error;
-  }
+  await waitFor(
+    async () => isCoreAuthenticated(await rpc("openhuman.auth_get_state")),
+    {
+      timeoutMs: 120_000,
+      what: "the core's authenticated state after mock sign-in",
+    },
+  );
   await ensureSignedInChat(page, appOrigin);
 }
 

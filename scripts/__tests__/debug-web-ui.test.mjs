@@ -9,12 +9,30 @@ import {
   ensureSignedInChat,
   mergeChildEnv,
   freePort,
+  isCoreAuthenticated,
   isLoopback,
   parseArgs,
   runStamp,
   startCoreChild,
   waitFor,
 } from "../debug/web-ui-lib.mjs";
+
+test("isCoreAuthenticated reads the logged auth result envelope", () => {
+  assert.equal(
+    isCoreAuthenticated({
+      logs: ["session state fetched"],
+      result: { isAuthenticated: true },
+    }),
+    true,
+  );
+  assert.equal(
+    isCoreAuthenticated({
+      logs: ["session state fetched"],
+      result: { isAuthenticated: false },
+    }),
+    false,
+  );
+});
 
 test("ensureSignedInChat opens the canonical chat route from an authenticated home", async () => {
   let visible = false;
