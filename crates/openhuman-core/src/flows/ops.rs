@@ -57,7 +57,7 @@ use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 /// Overall safety bound on a single `flows_run` / `flows_resume`. Individual
 /// capabilities have their own timeouts (HTTP, sandbox), but a hung LLM/tool
 /// call must never let the RPC block indefinitely — this caps the whole run.
-const FLOW_RUN_TIMEOUT_SECS: u64 = 600;
+const FLOW_RUN_TIMEOUT_SECS: u64 = crate::flows::runs_adapter::RUN_TIMEOUT_SECS;
 
 /// How long a run may sit parked at a human-in-the-loop approval gate
 /// (`pending_approval`) before the TTL sweep expires it to a terminal

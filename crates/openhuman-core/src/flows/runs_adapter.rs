@@ -20,7 +20,8 @@ use crate::flows::caps_host::{self, CapsHostRegistration};
 use crate::flows::catalog_storage::{self, CatalogStorageRegistration};
 use crate::modules::tinyflows as module;
 
-const RUN_TIMEOUT_MS: u64 = 600_000;
+pub(crate) const RUN_TIMEOUT_SECS: u64 = 600;
+const RUN_TIMEOUT_MS: u64 = RUN_TIMEOUT_SECS * 1_000;
 
 pub(crate) use session::{RunKey, RunSession};
 
