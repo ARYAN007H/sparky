@@ -61,7 +61,7 @@ impl JuiceFixture {
     }
 }
 
-async fn fixture() -> (tinybus::Proxy, Arc<Calls>) {
+async fn fixture() -> (tinybus::Proxy, Connection, Arc<Calls>) {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
     let service = Connection::connect(bus.connect().await.unwrap())
@@ -89,7 +89,7 @@ async fn fixture() -> (tinybus::Proxy, Arc<Calls>) {
             tinyjuice_bus::names::BUS_NAME,
         )
         .unwrap();
-    (proxy, calls)
+    (proxy, service, calls)
 }
 
 fn derived_context(base: &Arc<CoreContext>, config: Config) -> DispatchCtx {
@@ -167,7 +167,7 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
         derived_context(&base, configs[1].clone()),
     ];
 
-    let (proxy, calls) = fixture().await;
+    let (proxy, _service, calls) = fixture().await;
     let seen_configs = Arc::new(Mutex::new(Vec::new()));
     let client_fixture = module_stub::RpcClientFixture {
         proxy,
