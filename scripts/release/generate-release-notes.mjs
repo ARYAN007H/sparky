@@ -653,7 +653,7 @@ function formatHandleList(handles) {
   return `${names.slice(0, -1).join(', ')}, and ${names.at(-1)}`;
 }
 
-function groupPullRequestsByHighlight(pullRequests) {
+export function groupPullRequestsByHighlight(pullRequests) {
   const groups = [
     {
       title: '🎙️ Voice & hands-free control',
