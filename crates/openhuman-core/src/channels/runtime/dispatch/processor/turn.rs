@@ -25,6 +25,7 @@ use super::super::helpers::{
 use super::super::host_agent::{self, HostChannelTurn, HostRoute, run_host_agent_turn};
 use super::RuntimeChannelMessage;
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
+#[cfg(test)]
 use super::bus_turn::dispatch_bus_turn;
 
 pub(crate) async fn process_channel_message(
@@ -213,6 +214,7 @@ pub(crate) async fn process_channel_runtime_message(
     }
 
     let route = get_route_selection(ctx.as_ref(), &history_key);
+    #[cfg(test)]
     let active_turn_model_source = if ctx.config.is_none() {
         match get_or_create_turn_model_source(ctx.as_ref(), &route.provider).await {
             Ok(source) => Some(source),
@@ -260,9 +262,9 @@ pub(crate) async fn process_channel_runtime_message(
     let started_at = Instant::now();
 
     // The persisted TinyAgents transcript, bound below by `session_key`, is
-    // the sole history source. Only config-less unit fixtures retain the old
-    // graph path; production ingress never reads or mutates an in-memory
-    // per-sender transcript.
+    // the sole history source. The injected-model graph remains available to
+    // unit fixtures only; a production channel turn without a host config is
+    // refused rather than routed through a second execution graph.
 
     // Determine if this channel supports streaming draft updates
     let use_streaming = target_channel
@@ -458,6 +460,7 @@ pub(crate) async fn process_channel_runtime_message(
             let error = configured_agent_error.expect("checked configured-agent failure");
             Box::pin(async move { Err(anyhow::anyhow!(error)) })
         }
+        #[cfg(test)]
         None => {
             let system_prompt = ctx.system_prompt.current();
             let history = vec![
@@ -475,6 +478,12 @@ pub(crate) async fn process_channel_runtime_message(
                 approval,
             ))
         }
+        #[cfg(not(test))]
+        None => Box::pin(async {
+            Err(anyhow::anyhow!(
+                "channel turn has no configured host agent"
+            ))
+        }),
     };
     let llm_result =
         tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;
