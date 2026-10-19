@@ -31,19 +31,25 @@ need for a second generic protocol implementation.
 
 | Owner | Owns | Must not own |
 | --- | --- | --- |
-| `tinyhumans-sdk` | Socket.IO and Engine.IO framing, namespace connect acknowledgement and rejection, server-assigned namespace id, JSON/binary payload conversion, acknowledgement wire behavior, close/error events, bounded one-attempt connect, and redirect mechanics. Its public connection API must support a single-attempt mode so an embedding host can supervise reconnects. | OpenHuman status enums, its retry schedule, session-store reads, Sentry policy, or event-bus mapping. |
+| `tinyhumans-sdk` | Socket.IO and Engine.IO framing, namespace connect acknowledgement and rejection, server-assigned namespace id, JSON/binary payload conversion, acknowledgement wire behavior, close/error events, bounded one-attempt connect, redirect mechanics, and cancellation-safe ownership/termination of every SDK-created polling or reconnect task. | OpenHuman status enums, its retry schedule, session-store reads, Sentry policy, or event-bus mapping. |
 | `openhuman-tinyhumans` | The SDK adapter and registration in `register_all`; translates the SDK connection into the core's generic port contract. It enables the SDK `socket` feature explicitly because its Cargo dependency currently disables SDK defaults and therefore omits the socket module (`crates/openhuman-tinyhumans/Cargo.toml`). | OpenHuman's RPC schemas, `DomainEvent` types, or policy decisions about user-visible connection status. |
-| `openhuman-core` | The generic port contract and registry, `SocketManager` facade, consumer-facing RPC and event-bus routing, live credential-provider callback, lifecycle/reconnect policy, queue/ack waiter rules, status and diagnostics, and the existing consumer API. The connection driver calls only the registered port and knows no TinyHumans SDK types or hosted strings. | Socket.IO packet parsing, Engine.IO ping/pong, TinyHumans hostnames/routes, SDK imports, or an SDK workaround copied into core. |
+| `openhuman-core` | The generic port contract and registry, `SocketManager` facade, consumer-facing RPC and event-bus routing, live credential-provider callback, lifecycle/reconnect policy, queue/ack waiter rules, status and diagnostics, and the existing consumer API. The connection driver calls only the registered port and knows no TinyHumans SDK types or hosted strings. The port has an awaited, bounded close contract; account rebind waits for the old SDK session to terminate before opening the new credential identity. | Socket.IO packet parsing, Engine.IO ping/pong, TinyHumans hostnames/routes, SDK imports, or an SDK workaround copied into core. |
 
 The port is a connector plus a connected-session handle. The connector accepts
 the resolved endpoint and a credential for one attempt, and returns a handle
 that reports connected, rejected, transport-failed, and closed outcomes; the
 handle receives generic named payloads and supports emit, emit-with-ack, and
-intentional close. Keep the interface independent of `SocketConnection` types.
-Store it in the same generic extension/registry mechanism used by the other
-hosted providers, including the per-`CoreContext` path. A host with no socket
-connector retains today's hosted-free behavior: no auto-connect and a stable
-unavailable result for calls that require the hosted connection.
+intentional close. `close` is awaited and bounded, and the port contract
+guarantees that it does not return until the adapter's SDK session and every
+SDK-owned poll/reconnect task for that identity have stopped. Connector
+attempts are cancellation-safe too: dropping a timed-out attempt cannot leave a
+background task that authenticates later. Account rebind must finish closing
+the old handle before a new credential identity is connected. Keep the
+interface independent of `SocketConnection` types. Store it in the same
+generic extension/registry mechanism used by the other hosted providers,
+including the per-`CoreContext` path. A host with no socket connector retains
+today's hosted-free behavior: no auto-connect and a stable unavailable result
+for calls that require the hosted connection.
 
 `openhuman-tinyhumans::register_all` adds one idempotent socket registration.
 The public registry shape remains in core; the SDK adapter lives under
@@ -105,6 +111,17 @@ core port registration types may cross `openhuman-embed::__host` for use by
   shutdown rules. The SDK therefore needs a tested caller-selected
   single-attempt mode. The existing SDK convenience method may retain its
   reconnecting default for other SDK callers.
+- Cancellation and task ownership are also SDK requirements. In the locked
+  `rust_socketio 0.6.0`, `Client::poll_stream` spawns a detached task containing
+  a cloned client. The SDK wrapper retains no join handle, and
+  `SocketConnection::disconnect()` delegates to `Client::disconnect()` without
+  joining that task. Therefore, aborting OpenHuman's supervisor does not prove
+  the old credential-bearing SDK session has stopped. The SDK must make an
+  in-flight connect cancellation-safe and provide an explicit, bounded close
+  or abort-and-join operation that terminates every SDK-owned poll/reconnect
+  task. The generic core port must await that guarantee before shutdown,
+  timeout/retry, or identity rebind completes. Do not claim that aborting the
+  core task cleans up the SDK's detached task.
 - A successful Engine.IO WebSocket upgrade is not sufficient for OpenHuman to
   report `Connected`: the core currently waits for the Socket.IO namespace
   connect acknowledgement and treats its connect-error packet separately.
@@ -154,6 +171,7 @@ TinyHumans adapter smoke test through the SDK.
 | `ws_loop_dispatch_and_redirect_tests.rs`: `resolve_redirect_upgrades_http_to_ws_for_absolute_location`, `resolve_redirect_handles_relative_location_against_current_url`, `resolve_redirect_preserves_ws_and_wss_schemes_verbatim`, `resolve_redirect_rejects_unsupported_scheme`, `redirect_status_matches_only_followable_codes`, `extract_location_header_returns_value_when_present`, `extract_location_header_returns_none_when_missing`, `connect_with_redirects_fails_when_location_missing` (in `ws_loop_reconnect_tests.rs`) | Move to SDK redirect unit/fixture tests. Add a fixture test for bounded hop count, each supported status, relative resolution, scheme safety, and permanent-vs-temporary metadata. |
 | `ws_loop_reconnect_tests.rs`: `ws_loop_follows_301_to_working_backend` | Split: SDK fixture proves the redirected connection reaches namespace-ready; core port test proves 301/308 warning is one-shot, 302/307 is quiet, and reconnect uses the final endpoint. |
 | `ws_loop_deadline_tests.rs`: `connect_with_redirects_times_out_when_upgrade_never_answers`, `connect_timeout_is_not_tighter_than_a_handshake_read` | Move to SDK local-fixture tests for a silent upgrade and the configured deadline. Include a non-responsive namespace handshake case because the SDK must report namespace-ready/rejected, not just WebSocket upgrade. |
+| SDK-owned task lifecycle (new SDK tests) | Add local-fixture tests that block the upgrade/namespace handshake and close path, cancel an in-flight old-credential connection or rebind to a new identity, then release the old peer. Assert the canceled connection does not authenticate later, emit, deliver events, reconnect, or continue polling. Assert bounded close/abort joins every SDK-owned task. |
 | `ws_loop_dispatch_and_redirect_tests.rs`: `handle_eio_message_ping_sends_pong`, `handle_eio_message_pong_is_ignored`, `handle_eio_message_empty_is_noop`, `handle_eio_message_message_routes_to_sio_packet`, `handle_eio_message_close_and_noop_do_not_panic`, `handle_eio_message_unknown_packet_is_utf8_safe_at_preview_boundary` | Move protocol assertions to SDK integration tests for heartbeat, close, and named event delivery. Delete raw packet/log-preview cases after that contract is covered; there is no OpenHuman EIO parser afterward. |
 | `ws_loop_dispatch_and_redirect_tests.rs`: `parse_sio_ack_returns_id_and_single_payload_value`, `handle_sio_packet_ack_resolves_pending_ack`, `handle_sio_packet_connect_reack_updates_sid`, `handle_sio_packet_connect_reack_missing_sid_is_noop`, `handle_sio_packet_disconnect_flips_status_and_clears_sid`, `handle_sio_packet_connect_error_does_not_panic`, `handle_sio_packet_empty_is_noop`, `handle_sio_packet_unknown_type_is_noop`, `handle_sio_packet_unknown_type_is_utf8_safe_at_preview_boundary`, `handle_sio_packet_unparseable_event_is_utf8_safe_at_preview_boundary`, `handle_sio_packet_event_with_unparseable_payload_is_logged_only` | Move ACK/namespace/close/wire error behavior to SDK local-fixture tests. Delete tests whose sole assertion is behavior of the removed raw parser or its log truncation. Keep host assertions for how typed outcomes affect manager state. |
 | `ws_loop_dispatch_and_redirect_tests.rs`: `handle_sio_packet_event_dispatches_to_event_handler` | Split: SDK proves that a named event and its payload arrive intact; core event-handler test continues to prove that `ready` updates status and the supported domain event names publish the right `DomainEvent`. |
@@ -168,7 +186,7 @@ TinyHumans adapter smoke test through the SDK.
 | `ws_loop_dispatch_and_redirect_tests.rs`: `redirect_warning_is_recorded_once_and_pinned_to_first_hop`, `log_connection_failure_does_not_panic_below_threshold`, `log_connection_failure_does_not_panic_at_and_above_threshold`, `fail_escalate_threshold_is_five`, `sustained_outage_for_network_unreachable_classifies_as_expected`, `sustained_outage_for_tls_handshake_eof_classifies_as_expected`, `sustained_outage_for_actionable_server_error_does_not_classify` | Keep in core host-policy tests, with redirect outcome supplied by the port and the same expected-error classifier inputs. |
 | `event_handlers_tests.rs`: `parse_sio_event_accepts_bare_array`, `parse_sio_event_strips_ack_id_prefix`, `parse_sio_event_defaults_data_to_null_when_missing`, `parse_sio_event_returns_none_for_garbage`, `parse_sio_event_returns_none_when_first_element_is_not_string`, `parse_sio_event_returns_none_when_json_invalid` | Move payload argument conversion tests to SDK. Delete the OpenHuman raw-string parser. |
 | `event_handlers_tests.rs`: `base64_encode_round_trips_ascii`, `base64_encode_handles_empty_string`, `base64_encode_handles_json_body`, `handle_sio_event_ready_sets_connected`, `handle_sio_event_error_sets_error_status`, `handle_sio_event_debug_truncation_respects_utf8_boundary`, `handle_sio_event_unknown_event_is_noop_on_status`, `handle_sio_event_channel_message_missing_channel_is_dropped`, `handle_sio_event_channel_message_empty_text_is_dropped`, `handle_sio_event_payload_redacted_no_panic_on_multibyte_boundary` | Keep in core. These cover webhook response payload encoding, status/event policy, channel validation, and safe/redacted application logging, independent of the protocol library. |
-| `manager_tests.rs`: `connection_rejects_plaintext_remote_socket_before_starting_loop`, `new_manager_is_disconnected_with_no_sid`, `default_impl_matches_new`, `is_connected_tracks_status_transitions`, `get_state_reflects_stored_sid_and_status`, `get_state_surfaces_stored_error_to_callers`, `emit_without_connection_errors_without_panic`, `emit_while_connecting_errors_even_with_emit_channel_present`, `emit_when_connected_queues_the_encoded_event`, `emit_does_not_land_on_a_reconnects_pre_handshake_channel`, `emit_still_succeeds_after_server_error_on_live_connection`, `emit_cannot_send_past_a_concurrent_teardown_drain`, `emit_with_ack_without_connection_errors_without_waiting`, `emit_with_ack_uses_emit_queue_while_connecting`, `disconnect_on_fresh_manager_is_idempotent`, `a_timed_out_socket_loop_is_aborted_and_joined`, `identity_rebind_transactions_are_serialized`, `emit_state_change_is_safe_to_call_on_empty_shared`, `emit_server_event_is_safe_without_subscribers`, `set_webhook_router_populates_the_shared_slot`, `set_webhook_router_overwrites_previous_router`, `emit_after_disconnect_errors_not_connected`, `connect_rejects_empty_token_and_returns_err` | Keep in core as generic `SocketManager`/port tests. Preserve no-plaintext-remote rejection, disconnected/connected state, emit readiness and teardown serialization, ACK timeout/cancellation, idempotent stop, loop join deadline, identity rebind, event bridge safety, webhook-router attachment, and empty-token validation. Replace test-only assumptions about encoded SIO wire strings with fake-port calls. |
+| `manager_tests.rs`: `connection_rejects_plaintext_remote_socket_before_starting_loop`, `new_manager_is_disconnected_with_no_sid`, `default_impl_matches_new`, `is_connected_tracks_status_transitions`, `get_state_reflects_stored_sid_and_status`, `get_state_surfaces_stored_error_to_callers`, `emit_without_connection_errors_without_panic`, `emit_while_connecting_errors_even_with_emit_channel_present`, `emit_when_connected_queues_the_encoded_event`, `emit_does_not_land_on_a_reconnects_pre_handshake_channel`, `emit_still_succeeds_after_server_error_on_live_connection`, `emit_cannot_send_past_a_concurrent_teardown_drain`, `emit_with_ack_without_connection_errors_without_waiting`, `emit_with_ack_uses_emit_queue_while_connecting`, `disconnect_on_fresh_manager_is_idempotent`, `a_timed_out_socket_loop_is_aborted_and_joined`, `identity_rebind_transactions_are_serialized`, `emit_state_change_is_safe_to_call_on_empty_shared`, `emit_server_event_is_safe_without_subscribers`, `set_webhook_router_populates_the_shared_slot`, `set_webhook_router_overwrites_previous_router`, `emit_after_disconnect_errors_not_connected`, `connect_rejects_empty_token_and_returns_err` | Keep in core as generic `SocketManager`/port tests. Preserve no-plaintext-remote rejection, disconnected/connected state, emit readiness and teardown serialization, ACK timeout/cancellation, idempotent stop, manager supervisor join deadline, identity rebind, event bridge safety, webhook-router attachment, and empty-token validation. In particular, keep `a_timed_out_socket_loop_is_aborted_and_joined` as a host-supervisor guarantee; it is distinct from the SDK task termination tests above. Replace test-only assumptions about encoded SIO wire strings with fake-port calls. |
 | `ops_tests.rs`: `a_redundant_session_connect_reuses_the_live_socket`, `a_token_refreshed_mid_loop_updates_the_recorded_identity`, `a_session_connect_with_a_different_token_still_rebinds`, `is_live_for_is_scoped_to_url_and_token_and_cleared_on_disconnect`, `a_session_connect_during_the_boot_handshake_does_not_restart_it`, `a_connecting_status_with_no_live_loop_is_not_treated_as_serving` | Keep in core port tests with a fake connector that can pause before ready and count attempts. Preserve identity serialization and no duplicate live connection. |
 | `url_tests.rs`, `token_provider_tests.rs`, `types_tests.rs`, `schemas_tests.rs`, `platform/connectivity/rpc_tests.rs`, `services_tests.rs` | Keep and update only where the port changes. These pin endpoint safety/resolution, credential callback semantics, stable renderer event names, controller/RPC contract, connectivity diagnostics, and `ServiceSet::socketio` boot policy. |
 
@@ -216,6 +234,10 @@ known to be stale.
   appending another path or silently deriving a different host URL.
 - Bound DNS, TCP, TLS, WebSocket upgrade, and namespace-connect handshake
   waits; make the per-attempt deadline explicit and test a silent peer.
+- Make connect cancellation-safe and connection close bounded. Retain and
+  terminate every SDK-owned polling/reconnect task: canceling an in-flight
+  connect or closing a connected handle must not leave a detached client that
+  authenticates, reconnects, emits, delivers events, or polls after cancellation.
 - Follow at most three 301/302/307/308 redirects, including relative
   `Location` values. Return redirect status and original/final endpoint metadata
   to the caller. Reject unsupported schemes and remote plaintext downgrade
@@ -232,8 +254,11 @@ known to be stale.
 Use a local Socket.IO fixture. Cover ready and rejected namespace handshakes,
 silence at the upgrade and namespace handshake stages, redirects and redirect
 metadata (including the hop cap and relative location), single-attempt close
-without hidden reconnect, event payload delivery, and emit-with-ack. No test
-calls the production backend.
+without hidden reconnect, cancellation during a blocked connect, bounded close
+when the peer stalls, and rebind/cancel followed by releasing the old peer with
+assertions that no stale authentication/emits/events/reconnect/polling occur.
+Also cover event payload delivery and emit-with-ack. No test calls the
+production backend.
 
 ## Ownership
 
@@ -285,6 +310,15 @@ from `openhuman-tinyhumans::register_all`.
   generic fake-port tests as mapped in the design doc. Delete the handwritten
   frame parser, direct WebSocket protocol loop, and associated fixture helpers
   only after replacements pass.
+- Preserve `a_timed_out_socket_loop_is_aborted_and_joined` as the core
+  supervisor's own abort/join guarantee, separately from the SDK's guarantee
+  that its detached polling/reconnect work has terminated. Account rebind must
+  await bounded SDK close before connecting with the new identity.
+- Explicitly record this approved diagnostic tradeoff in the PR body: because
+  Engine.IO heartbeat handling moves into the SDK, the core's raw ping-count
+  diagnostic may be retired if the SDK exposes no equivalent generic
+  telemetry. Preserve connection age, outage duration, failed-attempt count,
+  and one-shot outage reporting so operators retain useful drop diagnostics.
 - Keep one SDK adapter integration test against a local fixture. Do not add
   external service calls or a host-side protocol workaround.
 
