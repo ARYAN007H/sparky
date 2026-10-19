@@ -146,7 +146,7 @@ pub(crate) async fn build_builder_proposal(
 
     let summary = tinyflows::summary::summarize(graph);
     let mut warnings = graph_trigger_warnings(graph);
-    warnings.extend(graph_wiring_warnings(config, graph).await);
+    warnings.extend(graph_wiring_warnings(ctx, config, graph).await);
     // Connector onboarding (Phase 5, item 18): tell the proposal card which
     // toolkits this graph needs and whether they're connected, so it can render
     // "Connect <toolkit>" CTAs instead of a bare gate error later.
