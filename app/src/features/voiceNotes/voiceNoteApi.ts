@@ -6,8 +6,8 @@
  * in its `extraMetadata.voiceNote`. Assistant spoken replies use the same
  * store, so one reader serves both directions.
  */
-import { callCoreRpc } from '../../services/coreRpcClient';
 import type { ContentPart } from '../../services/chatWire';
+import { callCoreRpc } from '../../services/coreRpcClient';
 import { openhumanVoiceTranscribeBytes } from '../../utils/tauriCommands/voice';
 
 /** `extraMetadata.voiceNote` as persisted on a thread row. */

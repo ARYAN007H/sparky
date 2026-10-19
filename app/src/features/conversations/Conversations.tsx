@@ -38,8 +38,8 @@ import type { VoiceNoteDraft } from '../../features/voiceNotes/useVoiceNoteRecor
 import {
   storeVoiceNote,
   transcribeVoiceNote,
-  voiceNoteContentPart,
   VOICE_NOTE_SOURCE,
+  voiceNoteContentPart,
   type VoiceNoteMeta,
 } from '../../features/voiceNotes/voiceNoteApi';
 import { VoiceNoteComposer } from '../../features/voiceNotes/VoiceNoteComposer';
