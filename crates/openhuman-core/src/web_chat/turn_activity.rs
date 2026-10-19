@@ -2,14 +2,12 @@
 //! guard stops it.
 //!
 //! The idle guard itself is TinyAgents' turn runner: it ends a turn that has
-//! been **silent with nothing in flight** for the idle window. Two inputs are
-//! this host's:
-//!
-//! * [`TurnActivity`] remembers the last step, so the stop reply can say where
-//!   the turn got stuck ([`StuckPoint`]), and the config and reply locale the
-//!   turn resolved, so it is written to the turn's own workspace.
-//! * TinyAgents' [`tinyagents_harness::turn_runner::WorkTracker`] folds generic
-//!   progress into the balanced work signals consumed by its idle guard.
+//! been **silent with nothing in flight** for the idle window. TinyAgents'
+//! [`tinyagents_harness::turn_runner::WorkTracker`] folds generic progress into
+//! the balanced work signals consumed by that guard. This host's
+//! [`TurnActivity`] separately remembers the last step, so a stop reply can say
+//! where the turn got stuck ([`StuckPoint`]), and retains the config and reply
+//! locale resolved for the turn so the reply is written to its own workspace.
 
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex};

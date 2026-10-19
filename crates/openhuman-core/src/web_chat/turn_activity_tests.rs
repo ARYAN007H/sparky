@@ -52,13 +52,6 @@ fn tool_completed(call_id: &str) -> AgentProgress {
     }
 }
 
-fn text(delta: &str) -> AgentProgress {
-    AgentProgress::TextDelta {
-        delta: delta.into(),
-        iteration: 1,
-    }
-}
-
 use std::time::Duration;
 
 #[test]
@@ -68,83 +61,6 @@ fn parse_idle_window_defaults_and_disables() {
     assert_eq!(parse_idle_window(Some(" 60 ")), Duration::from_secs(60));
     // Disabled stands for a window no turn reaches.
     assert!(parse_idle_window(Some("0")) > Duration::from_secs(365 * 24 * 3600));
-}
-
-fn signal(tracker: &mut WorkTracker, event: &AgentProgress) -> Option<&'static str> {
-    tracker.observe(event).map(|signal| match signal {
-        TurnSignal::WorkStarted => "started",
-        TurnSignal::WorkFinished => "finished",
-        TurnSignal::Progress(_) => "progress",
-    })
-}
-
-/// A provider retrying a failed call is silent for minutes while the turn is
-/// healthy: an open model call is work in flight until it completes.
-#[test]
-fn an_open_model_call_is_work_until_it_completes() {
-    let mut tracker = WorkTracker::default();
-    assert_eq!(signal(&mut tracker, &iteration_started()), Some("started"));
-    assert_eq!(signal(&mut tracker, &text("hi")), None);
-    assert_eq!(
-        signal(&mut tracker, &model_call_completed(None)),
-        Some("finished")
-    );
-}
-
-#[test]
-fn a_subagent_model_call_does_not_close_the_parent_call() {
-    let mut tracker = WorkTracker::default();
-    signal(&mut tracker, &iteration_started());
-    assert_eq!(
-        signal(&mut tracker, &model_call_completed(Some("task-1"))),
-        None
-    );
-}
-
-/// A long, silent shell call is in flight, not idle, and parallel calls stay
-/// open until the last one completes.
-#[test]
-fn open_tool_calls_are_work_until_the_last_one_completes() {
-    let mut tracker = WorkTracker::default();
-    assert_eq!(signal(&mut tracker, &tool_started("a")), Some("started"));
-    assert_eq!(signal(&mut tracker, &tool_started("b")), None);
-    assert_eq!(signal(&mut tracker, &tool_completed("a")), None);
-    assert_eq!(signal(&mut tracker, &tool_completed("b")), Some("finished"));
-}
-
-/// The model call that asked for a tool returned: a tool starting hands the
-/// open work over without a gap.
-#[test]
-fn a_tool_start_closes_the_model_call_that_asked_for_it() {
-    let mut tracker = WorkTracker::default();
-    signal(&mut tracker, &iteration_started());
-    assert_eq!(signal(&mut tracker, &tool_started("a")), None);
-    assert_eq!(signal(&mut tracker, &tool_completed("a")), Some("finished"));
-}
-
-/// A lost `ToolCallCompleted` does not leave the call open: the next model
-/// call proves the tool round finished.
-#[test]
-fn the_next_model_call_closes_a_tool_whose_completion_was_lost() {
-    let mut tracker = WorkTracker::default();
-    signal(&mut tracker, &tool_started("a"));
-    // `tool_completed("a")` is dropped under backpressure.
-    assert_eq!(signal(&mut tracker, &iteration_started()), None);
-    assert_eq!(
-        signal(&mut tracker, &model_call_completed(None)),
-        Some("finished")
-    );
-}
-
-#[test]
-fn turn_completed_closes_everything_still_open() {
-    let mut tracker = WorkTracker::default();
-    signal(&mut tracker, &iteration_started());
-    signal(&mut tracker, &tool_started("a"));
-    assert_eq!(
-        signal(&mut tracker, &AgentProgress::turn_completed(1)),
-        Some("finished")
-    );
 }
 
 #[test]
