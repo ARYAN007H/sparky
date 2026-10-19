@@ -55,8 +55,16 @@ impl ConfigContextOverlay {
     pub(crate) fn derive(parent: &Config, child: &Config) -> anyhow::Result<Arc<Self>> {
         let parent_anchor = parent.document_snapshot.lock().unwrap().anchor.clone();
         let child_anchor = child.document_snapshot.lock().unwrap().anchor.clone();
+        let same_source = match (&parent_anchor, &child_anchor) {
+            (Some(parent), Some(child)) => parent == child,
+            (None, None) => {
+                super::source::normalized_path(&parent.config_path)
+                    == super::source::normalized_path(&child.config_path)
+            }
+            _ => false,
+        };
         anyhow::ensure!(
-            parent_anchor == child_anchor,
+            same_source,
             "cannot derive config overrides from different persistence sources"
         );
         let inherited = parent.context_overlay.lock().unwrap().clone();
