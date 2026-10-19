@@ -8,6 +8,9 @@ use crate::tools::schemas::registry::tools_schemas;
 use serde_json::{json, Map};
 const BASE_CONTROLLERS: usize = 5;
 
+type InputContract = (&'static str, Option<bool>);
+type ToolSchemaContract = (&'static str, &'static [InputContract]);
+
 #[test]
 fn all_schemas_covers_the_base_surface() {
     assert_eq!(all_controller_schemas().len(), BASE_CONTROLLERS);
@@ -38,7 +41,7 @@ fn tools_schema_wire_contracts_are_preserved() {
         &all_registered_controllers(),
         "web_search",
     );
-    let contracts: &[(&str, &[(&str, Option<bool>)])] = &[
+    let contracts: &[ToolSchemaContract] = &[
         ("composio_execute", &[("action", Some(true))]),
         ("web_answer", &[("query", Some(true)), ("depth", None)]),
         ("web_contents", &[("urls", Some(true))]),
