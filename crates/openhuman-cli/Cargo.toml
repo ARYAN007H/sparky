@@ -429,6 +429,7 @@ default = [
     "modules",
     "jev",
     "tinymemes",
+    "inbound-queues",
     "storage-sqlite",
 ]
 # Every gate forwards to `openhuman-rpc` alone (chain: rpc -> tinyhumans ->
@@ -440,6 +441,7 @@ inference = ["openhuman-rpc/inference"]
 documents = ["openhuman-rpc/documents"]
 hosting = ["openhuman-rpc/hosting"]
 tinymemes = ["openhuman-rpc/tinymemes"]
+inbound-queues = ["openhuman-rpc/inbound-queues"]
 modules = ["openhuman-rpc/modules"]
 voice = ["openhuman-rpc/voice"]
 web3 = ["openhuman-rpc/web3"]
