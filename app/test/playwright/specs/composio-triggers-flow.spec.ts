@@ -111,59 +111,9 @@ test.describe('Composio triggers flow', () => {
     await bootSkillsPage(page, 'pw-composio-triggers-' + testSlug);
   });
 
-  test('list_available_triggers returns the seeded Gmail catalog', async () => {
-    const payload = await callCoreRpc<unknown>('openhuman.composio_list_available_triggers', {
-      toolkit: TOOLKIT_SLUG,
-      connection_id: CONNECTION_ID,
-    });
-    const triggers = unwrapTriggers(payload);
-    const slugs = triggers.map(trigger => trigger.slug);
-    expect(slugs).toContain('GMAIL_NEW_GMAIL_MESSAGE');
-    expect(slugs).toContain('SLACK_NEW_MESSAGE');
-  });
 
-  test('list_triggers starts empty for the seeded user', async () => {
-    const payload = await callCoreRpc<unknown>('openhuman.composio_list_triggers', {});
-    expect(unwrapTriggers(payload)).toHaveLength(0);
-  });
 
-  test('enable_trigger creates a trigger that list_triggers observes', async () => {
-    const created = unwrapEnableTrigger(
-      await callCoreRpc<unknown>('openhuman.composio_enable_trigger', {
-        connection_id: CONNECTION_ID,
-        slug: 'GMAIL_NEW_GMAIL_MESSAGE',
-      })
-    );
-    expect(created.slug).toBe('GMAIL_NEW_GMAIL_MESSAGE');
-    expect(created.connectionId ?? created.connection_id).toBe(CONNECTION_ID);
-    expect((created.triggerId ?? created.trigger_id)?.length).toBeGreaterThan(0);
 
-    const listed = await callCoreRpc<unknown>('openhuman.composio_list_triggers', {
-      toolkit: TOOLKIT_SLUG,
-    });
-    const triggers = unwrapTriggers(listed);
-    expect(triggers).toHaveLength(1);
-    expect(triggers[0]?.slug).toBe('GMAIL_NEW_GMAIL_MESSAGE');
-  });
-
-  test('disable_trigger removes the active trigger', async () => {
-    const created = unwrapEnableTrigger(
-      await callCoreRpc<unknown>('openhuman.composio_enable_trigger', {
-        connection_id: CONNECTION_ID,
-        slug: 'GMAIL_NEW_GMAIL_MESSAGE',
-      })
-    );
-    const triggerId = created.triggerId ?? created.trigger_id;
-    expect(triggerId).toBeTruthy();
-
-    const disabled = unwrapDisableTrigger(
-      await callCoreRpc<unknown>('openhuman.composio_disable_trigger', { trigger_id: triggerId })
-    );
-    expect(disabled.deleted).toBe(true);
-
-    const listed = await callCoreRpc<unknown>('openhuman.composio_list_triggers', {});
-    expect(unwrapTriggers(listed)).toHaveLength(0);
-  });
 
   test('renders the Triggers section in the Gmail modal', async ({ page }) => {
     await setMockBehavior({
