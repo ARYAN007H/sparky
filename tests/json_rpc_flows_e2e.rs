@@ -1857,7 +1857,6 @@ fn graph_binding_to_undeclared_agent_field() -> Value {
     })
 }
 
-
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn json_rpc_flows_strict_create_refuses_binding_to_undeclared_agent_field() {
