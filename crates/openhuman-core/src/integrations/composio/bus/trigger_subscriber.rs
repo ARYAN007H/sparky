@@ -6,10 +6,9 @@ use tinybus::EventHandler;
 
 use crate::core::events::DomainEvent;
 use crate::integrations::composio::trigger_history;
-use crate::security::turn_origin::with_origin;
-use crate::triage::{
-    apply_decision, remote_trigger_origin, run_triage, TriageOutcome, TriggerEnvelope,
-};
+use std::sync::Arc;
+
+use crate::triage::{LiveTriage, TriageOutcome, TriageRunner, TriggerEnvelope};
 
 /// Env var that **disables** the triage pipeline. The pipeline is
 /// enabled by default; set to `1`/`true`/`yes` to opt out (e.g. for
@@ -184,19 +183,83 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
             "[composio][triage] dispatching to triage::run_triage"
         );
 
-        // Spawn so the bus dispatch loop stays non-blocking — the
-        // triage turn is an LLM round-trip that may take seconds.
-        tokio::spawn(async move {
-            match run_triage(&ctx, &envelope).await {
+        // With the inbound event queues on, the trigger is queued: the module
+        // persists it, rejects a redelivery of the same trigger, paces a
+        // flood, and calls the host back (`Deliver`) to triage it, retrying a
+        // deferred triage then. Off or unavailable, triage runs directly.
+        let config = ctx.load_config().await.ok();
+        route_trigger(
+            ctx,
+            config,
+            envelope,
+            Arc::new(LiveTriage),
+            #[cfg(feature = "inbound-queues")]
+            None,
+        )
+        .await;
+    }
+}
+
+/// Where a trigger went.
+#[derive(Debug)]
+pub(super) enum Routed {
+    /// The inbound event queues own it.
+    Queued,
+    /// Triage runs directly, in this task.
+    Direct(tokio::task::JoinHandle<()>),
+}
+
+/// Hand `envelope` to the inbound event queues, or triage it directly.
+///
+/// `client` reaches the queues module (`None`: the configured module
+/// client). The direct path is the one triggers always took: triage in its
+/// own task, a decision applied under the remote-trigger origin.
+pub(super) async fn route_trigger(
+    ctx: DispatchCtx,
+    config: Option<crate::config::Config>,
+    envelope: TriggerEnvelope,
+    runner: Arc<dyn TriageRunner>,
+    #[cfg(feature = "inbound-queues")] client: Option<tinybus::module::ModuleClient>,
+) -> Routed {
+    #[cfg(feature = "inbound-queues")]
+    if let Some(config) = config.as_ref() {
+        match crate::inbound::events::composio(&envelope) {
+            Ok(event) => {
+                let client = client.unwrap_or_else(|| crate::modules::ops::client(config.clone()));
+                let offered = crate::inbound::route::offer(config, &client, event).await;
+                if offered.is_queued() {
+                    tracing::debug!(
+                        label = %envelope.display_label,
+                        "[composio][triage] handed to the inbound event queues"
+                    );
+                    return Routed::Queued;
+                }
+            }
+            Err(why) => tracing::info!(
+                label = %envelope.display_label,
+                reason = %why,
+                "[composio][triage] not queued; triaging directly"
+            ),
+        }
+    }
+    #[cfg(not(feature = "inbound-queues"))]
+    let _ = config;
+    Routed::Direct(triage_directly(ctx, envelope, runner))
+}
+
+/// Triage `envelope` in its own task and apply a decision: the direct path.
+pub(super) fn triage_directly(
+    ctx: DispatchCtx,
+    envelope: TriggerEnvelope,
+    runner: Arc<dyn TriageRunner>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+            match runner.run(&ctx, &envelope).await {
                 Ok(TriageOutcome::Decision(run)) => {
                     // Remote payload: a Composio trigger body is
-                    // attacker-influenceable, so the dispatch parks rather than
-                    // running on a trust root (#5634). Scoped here, inside the
-                    // spawned task, because `AGENT_TURN_ORIGIN` is a task-local
-                    // and does not cross `tokio::spawn`.
-                    let origin = remote_trigger_origin(&envelope);
-                    if let Err(e) = with_origin(origin, apply_decision(&ctx, run, &envelope)).await
-                    {
+                    // attacker-influenceable, so the runner applies the decision
+                    // under the remote-trigger origin (#5634), inside this task.
+                    if let Err(e) = runner.apply(&ctx, run, &envelope).await {
                         tracing::error!(
                             label = %envelope.display_label,
                             error = %e,
@@ -250,8 +313,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
                     );
                 }
             }
-        });
-    }
+        })
 }
 
 /// Returns `true` when `OPENHUMAN_TRIGGER_TRIAGE_DISABLED` is set to a
