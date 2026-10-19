@@ -385,6 +385,30 @@ fn child_activity_accumulates_output_and_failed_status_in_one_record() {
         state.apply_event(&ev(
             event,
             serde_json::json!({
+                "skill_id":"task","request_id":"turn","delta":delta,"message":"Timed out"
+            }),
+        ));
+    }
+    assert_eq!(state.entries().len(), 1);
+    let child = state.entries()[0].activity.as_ref().unwrap();
+    assert!(child.child);
+    assert_eq!(child.status, Status::Error);
+    assert_eq!(child.output, "partial");
+    assert!(child.details().contains("Timed out"));
+}
+
+#[test]
+fn child_thinking_delta_uses_nested_task_identity() {
+    let mut state = TranscriptState::new(CLIENT);
+    for (event, delta) in [
+        ("subagent_spawned", None),
+        ("subagent_text_delta", Some("partial")),
+        ("subagent_thinking_delta", Some("reasoning")),
+        ("subagent_failed", None),
+    ] {
+        state.apply_event(&ev(
+            event,
+            serde_json::json!({
                 "skill_id":null,"request_id":"turn","delta":delta,"message":"Timed out",
                 "subagent":{"task_id":"task"}
             }),
@@ -395,7 +419,6 @@ fn child_activity_accumulates_output_and_failed_status_in_one_record() {
     assert!(child.child);
     assert_eq!(child.status, Status::Error);
     assert_eq!(child.output, "partial");
-    assert!(child.details().contains("Timed out"));
 }
 
 #[test]
