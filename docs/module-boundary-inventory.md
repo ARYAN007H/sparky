@@ -536,8 +536,8 @@ Behaviour notes: a job's policy is read from the job document (an unreadable job
 the flows code stays compiled in. On the next core start it narrows
 `DomainSet::flows` (no flow trigger or run-digest subscribers, no boot
 reconcile), turns the `workflows` tool group off, and answers every `flows.*`
-RPC with `COMPONENT_DISABLED:flows`. `about_app` reports the `flows` and
-`workflow_runs` capability domains as disabled. TinyFlows is a plain library
+RPC with `COMPONENT_DISABLED:flows`. `about_app` reports the `flows` capability
+domain as disabled. TinyFlows is a plain library
 gitlink with no registry record, so `modules.list` has no row for it.
 
 Relation to `cron.enabled`: independent switches. With `flows = false` the
