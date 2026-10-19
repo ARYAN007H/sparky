@@ -132,7 +132,7 @@ path = "../../tests/storage_scope_e2e.rs"
 name = "native_channel_session_restart_e2e"
 path = "../../tests/native_channel_session_restart_e2e.rs"
 # Boots the CLI's real native Telegram listener via the compiled linked module.
-required-features = ["linked-modules"]
+required-features = ["linked-modules", "inference", "storage-sqlite"]
 
 [[test]]
 # Its own binary: two agents on one backend keep cron jobs and flows apart.

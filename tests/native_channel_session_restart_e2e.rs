@@ -266,6 +266,7 @@ fn start_core(
     home: &Path,
     workspace: &Path,
     telegram: &str,
+    inference: &str,
     log_path: &Path,
 ) -> (CoreProcess, String) {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
@@ -277,10 +278,13 @@ fn start_core(
     let stderr = stdout.try_clone().expect("clone core log handle");
     let child = Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
         .args(["serve", "--port", &port.to_string()])
+        .current_dir(home)
         .env("HOME", home)
         .env("USERPROFILE", home)
         .env("OPENHUMAN_WORKSPACE", workspace)
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
+        .env("BACKEND_URL", inference)
+        .env("OPENHUMAN_API_URL", inference)
         .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
         .env("OPENHUMAN_COMPONENT_CHANNELS", "1")
         .env("OPENHUMAN_MODULE_SOURCE", "linked")
@@ -388,7 +392,13 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
 
     // The first listener instance consumes one real native Telegram update.
     let (mut first, first_rpc) =
-        start_core(&home, &workspace, &mocks.telegram, &logs.join("first.log"));
+        start_core(
+            &home,
+            &workspace,
+            &mocks.telegram,
+            &mocks.inference,
+            &logs.join("first.log"),
+        );
     wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
     let first_pid = first.0.id();
     push_update(&mocks.state, 100, 10, FIRST_TEXT);
@@ -405,6 +415,11 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         model_saw_user_text(&first_request, FIRST_TEXT),
         "the first process must reach the model through native Telegram ingress: {}",
         serde_json::to_string_pretty(&first_request).unwrap()
+    );
+    assert_eq!(
+        mocks.state.completions.lock().expect("model requests").len(),
+        1,
+        "the first process must finish exactly one model turn before restart"
     );
     // Telegram only acknowledges a delivered update after the client advances
     // its polling offset; wait for that protocol step before stopping process 1.
@@ -425,7 +440,13 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     // distinct message in the same Telegram conversation.
     push_update(&mocks.state, 101, 11, SECOND_TEXT);
     let (mut second, second_rpc) =
-        start_core(&home, &workspace, &mocks.telegram, &logs.join("second.log"));
+        start_core(
+            &home,
+            &workspace,
+            &mocks.telegram,
+            &mocks.inference,
+            &logs.join("second.log"),
+        );
     assert_ne!(first_pid, second.0.id(), "restart must use a fresh process");
     wait_healthy(&second_rpc, &mut second, &logs.join("second.log")).await;
     wait_until("second model request", || {
@@ -445,9 +466,16 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         .lock()
         .expect("model requests")
         .clone();
+    assert_eq!(requests.len(), 2, "each Telegram update must reach the model once");
     assert!(
         model_saw_user_text(&requests[1], FIRST_TEXT),
         "the restarted process must resume the first Telegram turn in the exact second model request; got {}",
         serde_json::to_string_pretty(&requests[1]).unwrap()
     );
+    assert!(
+        model_saw_user_text(&requests[1], SECOND_TEXT),
+        "the resumed model request must include the current Telegram message too; got {}",
+        serde_json::to_string_pretty(&requests[1]).unwrap()
+    );
+    wait_for_completion(&mocks.state, 2).await;
 }
