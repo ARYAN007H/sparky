@@ -386,9 +386,10 @@ fn list_recent_decisions_returns_durable_audit_rows() {
     assert!(rows.iter().any(|row| {
         row.request_id == "approved" && row.decision == ApprovalDecision::ApproveOnce
     }));
-    assert!(rows
-        .iter()
-        .any(|row| row.request_id == "denied" && row.decision == ApprovalDecision::Deny));
+    assert!(
+        rows.iter()
+            .any(|row| row.request_id == "denied" && row.decision == ApprovalDecision::Deny)
+    );
     assert!(
         rows.iter().all(|row| !row.tool_name.is_empty()),
         "audit rows should retain tool metadata"
