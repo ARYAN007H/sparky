@@ -17,10 +17,9 @@ use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
     session_host::turn_checkpoint::{
-        self, build_deterministic_checkpoint, build_deterministic_final_summary,
-        build_deterministic_final_summary_with_cause, close_verification_prompt,
-        final_answer_instruction, harness_instruction_needles, render_tool_results,
-        results_from_tool_outcomes,
+        self, build_deterministic_checkpoint, build_deterministic_final_summary_with_cause,
+        close_verification_prompt, final_answer_instruction, harness_instruction_needles,
+        render_tool_results, results_from_tool_outcomes,
     },
     tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
