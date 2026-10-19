@@ -31,9 +31,9 @@ pub struct ConfigRuntimeState {
 impl Clone for ConfigRuntimeState {
     fn clone(&self) -> Self {
         Self {
-            document_snapshot: std::sync::Mutex::new(self.runtime_state.document_snapshot.lock().unwrap().clone()),
-            context_snapshot: self.runtime_state.context_snapshot.clone(),
-            context_overlay: std::sync::Mutex::new(self.runtime_state.context_overlay.lock().unwrap().clone()),
+            document_snapshot: std::sync::Mutex::new(self.document_snapshot.lock().unwrap().clone()),
+            context_snapshot: self.context_snapshot.clone(),
+            context_overlay: std::sync::Mutex::new(self.context_overlay.lock().unwrap().clone()),
         }
     }
 }
