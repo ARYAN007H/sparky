@@ -3951,7 +3951,10 @@ fn peel_logs_envelope(v: &Value) -> &Value {
 /// through the orchestrator's direct registry tools; its answer reaches the model.
 #[cfg(feature = "mcp")]
 #[test]
-#[cfg_attr(target_os = "linux", ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped.")]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped."
+)]
 fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry() {
     run_on_agent_stack(
         "agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry",
