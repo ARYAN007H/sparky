@@ -35,12 +35,6 @@ const FORCED_RESPONSES = [
   { content: `Found the content using both tools: ${CANARY_FINAL}` },
 ];
 
-interface MockRequest {
-  method: string;
-  url: string;
-  body?: string;
-}
-
 async function resetMock(): Promise<void> {
   await fetch(`${MOCK_ADMIN_BASE}/__admin/reset`, {
     method: 'POST',
@@ -55,22 +49,6 @@ async function setMockBehavior(key: string, value: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
   });
-}
-
-async function requests(): Promise<MockRequest[]> {
-  const response = await fetch(`${MOCK_ADMIN_BASE}/__admin/requests`);
-  const payload = (await response.json()) as { data?: MockRequest[] };
-  return Array.isArray(payload.data) ? payload.data : [];
-}
-
-function findToolInLlmLog(log: MockRequest[], toolName: string): boolean {
-  return log.some(
-    request =>
-      request.method === 'POST' &&
-      request.url.includes('/chat/completions') &&
-      typeof request.body === 'string' &&
-      request.body.includes(`"${toolName}"`)
-  );
 }
 
 async function openChat(page: Page): Promise<void> {
@@ -179,36 +157,14 @@ test.describe('Chat Multi Tool Round', () => {
     await sendMessage(page, PROMPT);
 
     await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible({ timeout: 50_000 });
-
     await expect
-      .poll(
-        async () => {
-          const names = await toolTimelineNames(page, threadId);
-          if (names.some(name => name.includes('web_fetch'))) return true;
-          return findToolInLlmLog(await requests(), 'web_fetch');
-        },
-        { timeout: 20_000 }
-      )
-      .toBe(true);
+      .poll(async () => toolTimelineNames(page, threadId), { timeout: 20_000 })
+      .toEqual(expect.arrayContaining([expect.stringContaining('web_fetch'), expect.stringContaining('web_search')]));
 
-    await expect
-      .poll(
-        async () => {
-          const names = await toolTimelineNames(page, threadId);
-          if (names.some(name => name.includes('web_search'))) return true;
-          return findToolInLlmLog(await requests(), 'web_search_tool');
-        },
-        { timeout: 20_000 }
-      )
-      .toBe(true);
-
-    await expect
-      .poll(async () => {
-        const log = await requests();
-        return log.filter(
-          entry => entry.method === 'POST' && entry.url.includes('/openai/v1/chat/completions')
-        ).length;
-      })
-      .toBeGreaterThanOrEqual(3);
+    const names = await toolTimelineNames(page, threadId);
+    const fetchIndex = names.findIndex(name => name.includes('web_fetch'));
+    const searchIndex = names.findIndex(name => name.includes('web_search'));
+    expect(fetchIndex).toBeGreaterThanOrEqual(0);
+    expect(searchIndex).toBeGreaterThan(fetchIndex);
   });
 });

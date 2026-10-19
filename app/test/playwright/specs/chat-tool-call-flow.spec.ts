@@ -27,12 +27,6 @@ const FORCED_RESPONSES = [
   { content: FINAL_RESPONSE },
 ];
 
-interface MockRequest {
-  method: string;
-  url: string;
-  body?: string;
-}
-
 async function resetMock(): Promise<void> {
   await fetch(`${MOCK_ADMIN_BASE}/__admin/reset`, {
     method: 'POST',
@@ -47,22 +41,6 @@ async function setMockBehavior(key: string, value: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
   });
-}
-
-async function requests(): Promise<MockRequest[]> {
-  const response = await fetch(`${MOCK_ADMIN_BASE}/__admin/requests`);
-  const payload = (await response.json()) as { data?: MockRequest[] };
-  return Array.isArray(payload.data) ? payload.data : [];
-}
-
-function findToolInLlmLog(log: MockRequest[], toolName: string): boolean {
-  return log.some(
-    request =>
-      request.method === 'POST' &&
-      request.url.includes('/chat/completions') &&
-      typeof request.body === 'string' &&
-      request.body.includes(`"${toolName}"`)
-  );
 }
 
 async function openChat(page: Page): Promise<void> {
@@ -201,24 +179,8 @@ test.describe('Chat Tool Call Flow', () => {
     await expect(toolCard.getByText('Input', { exact: true })).toBeVisible();
 
     await expect
-      .poll(
-        async () => {
-          const names = await toolTimelineNames(page, threadId);
-          if (names.some(name => name.includes('web_fetch'))) return true;
-          return findToolInLlmLog(await requests(), 'web_fetch');
-        },
-        { timeout: 20_000 }
-      )
-      .toBe(true);
-
-    await expect
-      .poll(async () => {
-        const log = await requests();
-        return log.filter(
-          entry => entry.method === 'POST' && entry.url.includes('/openai/v1/chat/completions')
-        ).length;
-      })
-      .toBeGreaterThanOrEqual(2);
+      .poll(async () => toolTimelineNames(page, threadId), { timeout: 20_000 })
+      .toEqual(expect.arrayContaining([expect.stringContaining('web_fetch')]));
 
     expect(threadId.length).toBeGreaterThan(0);
   });
