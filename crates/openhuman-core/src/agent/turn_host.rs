@@ -58,8 +58,16 @@ pub(crate) struct AgentTurnRequest {
     pub(crate) run_queue: Option<Arc<RunQueue<QueuedTurn>>>,
     pub(crate) cancellation: CancellationToken,
     pub(crate) turn_deadline: Option<Duration>,
-    pub(crate) workspace: Option<tinytools::WorkspaceDescriptor>,
+    pub(crate) workspace: WorkspaceBinding,
     pub(crate) host_env: HostTurnEnv,
+}
+
+/// Whether a caller leaves the session's configured workspace alone or
+/// explicitly resets/sets this turn's workspace.
+pub(crate) enum WorkspaceBinding {
+    Preserve,
+    Clear,
+    Set(tinytools::WorkspaceDescriptor),
 }
 
 /// Shared agent-domain execution port used by web and external-channel hosts.
@@ -80,13 +88,18 @@ impl AgentTurnHost {
         session.set_run_queue(request.run_queue);
         session.set_thread_id(request.thread_id);
         let mut host_env = request.host_env;
+        host_env.approval = request.approval.clone();
         host_env.cancellation = Some(request.cancellation);
         host_env.turn_deadline = request
             .turn_deadline
             .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now);
         session.set_host_env(host_env);
-        if let Some(workspace) = request.workspace {
-            session.set_workspace_descriptor(Some(workspace));
+        match request.workspace {
+            WorkspaceBinding::Preserve => {}
+            WorkspaceBinding::Clear => session.set_workspace_descriptor(None),
+            WorkspaceBinding::Set(workspace) => {
+                session.set_workspace_descriptor(Some(workspace));
+            }
         }
 
         // Keep the large agent future behind a pointer while the origin scope
