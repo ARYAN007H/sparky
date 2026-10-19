@@ -50,9 +50,9 @@ async fn graph_wiring_warnings_uses_the_probed_output_fields_when_schema_is_unkn
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &real_field).await.unwrap().is_empty(),
+        graph_wiring_warnings(&config, &real_field).await.is_empty(),
         "a probed-real field must not warn: {:?}",
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &real_field).await.unwrap()
+        graph_wiring_warnings(&config, &real_field).await
     );
 
     // A binding to a field the probe did NOT observe — flagged, using the
@@ -72,7 +72,7 @@ async fn graph_wiring_warnings_uses_the_probed_output_fields_when_schema_is_unkn
             { "from_node": "post", "to_node": "xform" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &fake_field).await.unwrap();
+    let warnings = graph_wiring_warnings(&config, &fake_field).await;
     assert!(
         warnings
             .iter()
