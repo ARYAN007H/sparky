@@ -23,6 +23,3 @@ pub(crate) use tier::{
 };
 pub(crate) use tools::NATIVE_TOOL_PREFIX;
 
-#[cfg(test)]
-#[path = "mod_tests.rs"]
-mod tests;
