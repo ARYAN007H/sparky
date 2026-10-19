@@ -194,14 +194,14 @@ fn provider_descriptors_use_configured_slugs_and_keep_managed_aliases() {
 
     let providers = provider_descriptors(&config);
     assert_eq!(
-        providers.iter().map(|provider| provider.name.as_str()).collect::<Vec<_>>(),
+        providers
+            .iter()
+            .map(|provider| provider.name.as_str())
+            .collect::<Vec<_>>(),
         ["custom-provider", "openhuman"]
     );
     assert_eq!(providers[0].aliases, Vec::<String>::new());
-    assert_eq!(
-        providers[1].aliases,
-        ["backend", "openhuman-backend"]
-    );
+    assert_eq!(providers[1].aliases, ["backend", "openhuman-backend"]);
     assert_eq!(
         resolve_provider_alias("backend", &providers).as_deref(),
         Some("openhuman")
@@ -379,19 +379,23 @@ async fn handle_runtime_command_routes_configured_provider_slug_and_alias() {
             thread_ts: None,
             sender_name: None,
         };
-        assert!(handle_runtime_command_if_needed(
-            &ctx,
-            &msg,
-            Some(&channel),
-            &conversation_history_key(&msg),
-        )
-        .await);
+        assert!(
+            handle_runtime_command_if_needed(
+                &ctx,
+                &msg,
+                Some(&channel),
+                &conversation_history_key(&msg),
+            )
+            .await
+        );
     }
 
     assert_eq!(get_route_selection(&ctx, key).provider, "openhuman");
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1, "the configured slug should be accepted");
-    assert!(sent[0].content.contains("Provider switched to `custom-route`"));
+    assert!(sent[0]
+        .content
+        .contains("Provider switched to `custom-route`"));
 }
 
 #[tokio::test]

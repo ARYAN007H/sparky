@@ -229,9 +229,11 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
         }),
         ..Config::default()
     };
-    let listing =
-        crate::inference::provider::models::list_configured_models_from_config("p_ephemeral", &config)
-            .await;
+    let listing = crate::inference::provider::models::list_configured_models_from_config(
+        "p_ephemeral",
+        &config,
+    )
+    .await;
     unregister_catalog(PROVIDER_OPENHUMAN);
     listing.unwrap();
     assert_eq!(seen.lock().unwrap().as_str(), "entry-key");

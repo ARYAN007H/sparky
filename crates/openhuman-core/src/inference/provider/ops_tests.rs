@@ -1,8 +1,12 @@
-use super::http_error::{api_error, is_backend_auth_failure, is_backend_error_code_owned, should_report_provider_http_failure};
-use super::models::{list_configured_models, list_configured_models_from_config, synthesize_local_runtime_entry};
-use super::openhuman_backend_model::PROVIDER_LABEL;
 use super::factory::INFERENCE_BACKEND_ID;
-use tinyinference_core::sanitize::{sanitize_api_error, MAX_API_ERROR_CHARS};
+use super::http_error::{
+    api_error, is_backend_auth_failure, is_backend_error_code_owned,
+    should_report_provider_http_failure,
+};
+use super::models::{
+    list_configured_models, list_configured_models_from_config, synthesize_local_runtime_entry,
+};
+use super::openhuman_backend_model::PROVIDER_LABEL;
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::config::Config;
 use crate::security::credentials::AuthService;
@@ -19,6 +23,7 @@ use std::sync::{
     Arc, Mutex,
 };
 use tempfile::TempDir;
+use tinyinference_core::sanitize::{sanitize_api_error, MAX_API_ERROR_CHARS};
 
 #[derive(Clone)]
 struct ModelProbeState {

@@ -19,9 +19,7 @@ mod factory;
 mod rpc;
 mod schemas;
 
-pub use cloud::{
-    UnavailableEmbeddingModel,
-};
+pub use cloud::UnavailableEmbeddingModel;
 pub use factory::{
     create_embedding_provider_for_chat, create_embedding_provider_with_config,
     create_embedding_provider_with_credentials, default_embedding_provider_for_chat,
