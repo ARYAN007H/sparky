@@ -79,6 +79,61 @@ fn structurally_valid_graph(value: Value) -> WorkflowGraph {
     graph
 }
 
+#[test]
+fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
+    const CHILD_ENV: &str = "OPENHUMAN_FLOWS_IMPORT_AUTHORING_CHILD";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "flows::ops::tests::flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD_ENV, "1")
+            .output()
+            .expect("run cold-process import test");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        print!("{stdout}");
+        eprint!("{stderr}");
+        let child_output = format!("{stdout}{stderr}");
+        assert!(
+            output.status.success(),
+            "cold-process import test failed:\n{child_output}"
+        );
+        assert!(
+            child_output.contains("running 1 test")
+                && child_output.contains("flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process ... ok")
+                && child_output.contains("1 passed; 0 failed"),
+            "child must prove exactly one test ran:\n{child_output}"
+        );
+        return;
+    }
+
+    assert_eq!(
+        crate::modules::state_of("tinyflows"),
+        crate::modules::ModuleState::Available,
+        "the isolated process must start with TinyFlows unloaded"
+    );
+    let result = flows_import(
+        json!({
+            "name": "constant import",
+            "nodes": [{"id":"trigger","kind":"trigger","name":"Trigger"}],
+            "edges": []
+        }),
+        Some("native".to_string()),
+    )
+    .expect("valid native graph imports")
+    .value;
+    assert_eq!(result.graph.name, "constant import");
+    assert_eq!(
+        crate::modules::state_of("tinyflows"),
+        crate::modules::ModuleState::Ready,
+        "public import must dispatch through the Authoring module"
+    );
+}
+
 /// A graph declaring `repo` (required) and `depth` (defaulted), whose single
 /// `transform` node copies both out via `=inputs.<name>`.
 fn parameterized_graph() -> Value {
