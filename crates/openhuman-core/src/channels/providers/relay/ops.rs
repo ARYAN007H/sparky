@@ -3,15 +3,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::channel::RelayChannel;
 use super::params::RelayInboundParams;
 use super::store::{self, Recorded};
 use crate::channels::context::MAX_CHANNEL_HISTORY;
 use crate::channels::runtime::{
-    PromptToolDescs, build_channel_turn_parts, prepare_runtime_limits,
-    process_channel_runtime_message, runtime_context,
+    build_channel_turn_parts, prepare_runtime_limits, process_channel_runtime_message,
+    runtime_context, PromptToolDescs,
 };
 use crate::config::Config;
 use crate::core::Outcome;
@@ -241,11 +241,29 @@ pub(crate) async fn run_relay_turn(
                 _ => unreachable!("prior_turns only returns user and assistant rows"),
             })
             .collect(),
-        Err(error) => tracing::warn!(
-            thread_id = %thread_id,
-            %error,
-            "[channels::relay] could not read the thread's history; running without it"
-        ),
+        Err(error) => {
+            tracing::warn!(
+                thread_id = %thread_id,
+                %error,
+                "[channels::relay] could not read the thread's history; refusing to start a session without it"
+            );
+            let reply =
+                "⚠️ This chat's history could not be loaded. Please send your message again.";
+            let _ = tinychannels_runtime::Channel::send(
+                channel.as_ref(),
+                &crate::channels::SendMessage::new(reply, &params.chat_id),
+            )
+            .await;
+            record(
+                &dispatch_ctx,
+                &workspace_dir,
+                &params,
+                &thread_id,
+                &channel.sent(),
+            )
+            .await;
+            return channel.sent();
+        }
     };
 
     tracing::debug!(
