@@ -266,17 +266,22 @@ async fn set_default_applies_to_the_live_proactive_handle() {
     );
 }
 
-
 fn channel_payload<'a>(value: &'a Value, context: &str) -> &'a Value {
-    value.pointer("/result/payload").or_else(|| value.pointer("/result/result"))
-        .unwrap_or_else(|| panic!("{context}: expected RPC payload, got {value}"))
+    let result = crate::rpc_harness::ok(value, context);
+    result
+        .get("data")
+        .or_else(|| result.get("result"))
+        .unwrap_or(result)
 }
 
 fn find_status_entry<'a>(entries: &'a [Value], channel: &str, auth_mode: &str) -> &'a Value {
-    entries.iter().find(|entry| {
-        entry.get("channel_id").and_then(Value::as_str) == Some(channel)
-            && entry.get("auth_mode").and_then(Value::as_str) == Some(auth_mode)
-    }).unwrap_or_else(|| panic!("missing status entry for {channel}/{auth_mode}: {entries:?}"))
+    entries
+        .iter()
+        .find(|entry| {
+            entry.get("channel_id").and_then(Value::as_str) == Some(channel)
+                && entry.get("auth_mode").and_then(Value::as_str) == Some(auth_mode)
+        })
+        .unwrap_or_else(|| panic!("missing status entry for {channel}/{auth_mode}: {entries:?}"))
 }
 
 #[tokio::test]
@@ -376,9 +381,10 @@ async fn channels_imessage_config_only_connection_reports_status_and_disconnects
         json!({ "channel": "imessage" }),
     )
     .await;
-    let disconnected_entries = channel_payload(&after_disconnect, "channels_status after disconnect")
-        .as_array()
-        .expect("status entries");
+    let disconnected_entries =
+        channel_payload(&after_disconnect, "channels_status after disconnect")
+            .as_array()
+            .expect("status entries");
     assert_eq!(
         find_status_entry(disconnected_entries, "imessage", "managed_dm")
             .get("connected")
@@ -386,4 +392,3 @@ async fn channels_imessage_config_only_connection_reports_status_and_disconnects
         Some(false)
     );
 }
-
