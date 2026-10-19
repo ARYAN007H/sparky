@@ -169,6 +169,313 @@ async fn observer_fires_once_per_call_on_success_and_error() {
     );
 }
 
+#[tokio::test]
+async fn logical_and_physical_observers_compose_across_completer_clones() {
+    let server = server_replying(body("hi", "stop")).await;
+    let logical = Arc::new(Recorder::default());
+    let physical = Arc::new(PhysicalRecorder::default());
+    let base = completer(&server).observer(logical.clone());
+    let with_physical = base.clone().physical_observer(physical.clone());
+
+    base.complete(CompletionRequest::new(
+        "base-model",
+        vec![ChatMessage::user("base")],
+    ))
+    .await
+    .unwrap();
+    with_physical
+        .complete(CompletionRequest::new(
+            "derived-model",
+            vec![ChatMessage::user("derived")],
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        *logical.0.lock().unwrap(),
+        vec![
+            (true, "base-model".to_string()),
+            (true, "derived-model".to_string()),
+        ]
+    );
+    assert_eq!(physical.0.lock().unwrap().len(), 1);
+}
+
+#[derive(Default)]
+struct PhysicalRecorder(
+    Arc<
+        Mutex<
+            Vec<(
+                tinyagents_harness::observability::PhysicalDispatchMetadata,
+                tinyagents_harness::observability::PhysicalDispatchOutcome,
+            )>,
+        >,
+    >,
+);
+
+struct PhysicalTerminal {
+    recorder: Arc<
+        Mutex<
+            Vec<(
+                tinyagents_harness::observability::PhysicalDispatchMetadata,
+                tinyagents_harness::observability::PhysicalDispatchOutcome,
+            )>,
+        >,
+    >,
+    metadata: tinyagents_harness::observability::PhysicalDispatchMetadata,
+}
+
+impl tinyagents_harness::observability::PhysicalDispatchTerminal for PhysicalTerminal {
+    fn on_terminal(
+        self: Box<Self>,
+        outcome: tinyagents_harness::observability::PhysicalDispatchOutcome,
+    ) {
+        self.recorder
+            .lock()
+            .unwrap()
+            .push((self.metadata.clone(), outcome));
+    }
+}
+
+impl tinyagents_harness::observability::PhysicalDispatchObserver for PhysicalRecorder {
+    fn on_start(
+        &self,
+        metadata: &tinyagents_harness::observability::PhysicalDispatchMetadata,
+    ) -> Box<dyn tinyagents_harness::observability::PhysicalDispatchTerminal> {
+        Box::new(PhysicalTerminal {
+            recorder: Arc::clone(&self.0),
+            metadata: metadata.clone(),
+        })
+    }
+}
+
+#[derive(Default)]
+struct TurnRecorder(Mutex<Vec<tinyagents_harness::observability::turn_observer::TurnObservation>>);
+
+impl tinyagents_harness::observability::turn_observer::Observer for TurnRecorder {
+    fn on_event(&self, event: &tinyagents_harness::observability::turn_observer::TurnObservation) {
+        self.0.lock().unwrap().push(event.clone());
+    }
+}
+
+#[tokio::test]
+async fn physical_observer_reports_content_free_provider_outcome() {
+    let server = server_replying(body("hi", "stop")).await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    completer(&server)
+        .physical_observer(recorder.clone())
+        .complete(CompletionRequest::new(
+            "requested-model",
+            vec![ChatMessage::user("private")],
+        ))
+        .await
+        .unwrap();
+
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events[0].0.requested_model.as_deref(),
+        Some("requested-model")
+    );
+    assert_eq!(
+        events[0].1.status,
+        tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
+    );
+    assert_eq!(events[0].1.usage.as_ref().unwrap().input_tokens, 100);
+    assert_eq!(
+        events[0].1.answered_model.as_deref(),
+        Some("vendor/answered")
+    );
+}
+
+#[tokio::test]
+async fn physical_observer_sees_the_buyer_charge_settled_by_the_budget() {
+    use tinyagents_harness::observability::turn_observer::{
+        with_observer, ObserverScope, TraceContent, TurnObservation,
+    };
+
+    let mut reply = body("hi", "stop");
+    reply["usage"]["buyer_cost_micro"] = json!(7);
+    let server = server_replying(reply).await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let ambient = Arc::new(TurnRecorder::default());
+    let scope = ObserverScope::new(ambient.clone(), TraceContent::MetadataOnly);
+    let budget = crate::budget::ModelBudget {
+        ledger: crate::budget::Budget::new(crate::budget::SpendLimits {
+            tokens: Some(10_000),
+            cost_micros: Some(1_000),
+        }),
+        call: crate::budget::CallBudget {
+            input_tokens: 5_000,
+            output_tokens: 1_000,
+            cost_micros: 1_000,
+        },
+    };
+
+    let response = with_observer(scope, async {
+        completer(&server)
+            .budget(budget.clone())
+            .physical_observer(recorder.clone())
+            .complete(CompletionRequest::new(
+                "budgeted-model",
+                vec![ChatMessage::user("private")],
+            ))
+            .await
+            .unwrap()
+    })
+    .await;
+
+    assert_eq!(response.usage.unwrap().cost_usd, Some(0.000007));
+    assert_eq!(budget.ledger.snapshot().spent.cost_micros, 7);
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].1.usage.as_ref().unwrap().cost_usd, Some(0.000007));
+    drop(events);
+    let ambient_events = ambient.0.lock().unwrap();
+    let dispatches = ambient_events
+        .iter()
+        .filter_map(|event| match event {
+            TurnObservation::ModelDispatch { usage, .. } => Some(usage),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(dispatches.len(), 1);
+    assert_eq!(dispatches[0].as_ref().unwrap().cost_usd, Some(0.000007));
+}
+
+#[tokio::test]
+async fn physical_observer_reports_no_dispatch_for_a_budget_refusal() {
+    let server = MockServer::start().await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let budget = crate::budget::ModelBudget {
+        ledger: crate::budget::Budget::new(crate::budget::SpendLimits {
+            tokens: Some(10_000),
+            cost_micros: Some(0),
+        }),
+        call: crate::budget::CallBudget {
+            input_tokens: 5_000,
+            output_tokens: 1_000,
+            cost_micros: 1,
+        },
+    };
+
+    let error = completer(&server)
+        .budget(budget)
+        .physical_observer(recorder.clone())
+        .complete(CompletionRequest::new(
+            "refused-model",
+            vec![ChatMessage::user("private")],
+        ))
+        .await
+        .expect_err("the zero-cost ledger refuses the positive reservation");
+
+    assert!(matches!(error, CoreError::BudgetExceeded { .. }));
+    assert!(recorder.0.lock().unwrap().is_empty());
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn physical_observer_keeps_completed_usage_when_a_repair_is_cancelled() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let server = MockServer::start().await;
+    let attempt = Arc::new(AtomicUsize::new(0));
+    let attempt_for_handler = Arc::clone(&attempt);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let current = attempt_for_handler.fetch_add(1, Ordering::SeqCst);
+            let mut reply = body(if current == 0 { "invalid" } else { "late" }, "stop");
+            reply["usage"]["buyer_cost_micro"] = json!(7);
+            let response = ResponseTemplate::new(200).set_body_json(reply);
+            if current == 0 {
+                response
+            } else {
+                response.set_delay(Duration::from_secs(10))
+            }
+        })
+        .mount(&server)
+        .await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let cancellation = crate::cancellation::Cancellation::default();
+    let request = CompletionRequest::new("cancel-model", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+    let complete = completer(&server)
+        .physical_observer(recorder.clone())
+        .cancellation(cancellation.clone());
+    let task = tokio::spawn(async move { complete.complete(request).await });
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if server.received_requests().await.unwrap().len() == 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("repair dispatch reached the delayed provider response");
+    cancellation.cancel().await;
+    assert!(matches!(
+        task.await.unwrap(),
+        Err(CoreError::Cancelled { .. })
+    ));
+
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(
+        events[0].1.status,
+        tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
+    );
+    assert_eq!(events[0].1.usage.as_ref().unwrap().cost_usd, Some(0.000007));
+    assert_eq!(
+        events[1].1.status,
+        tinyagents_harness::observability::PhysicalDispatchStatus::Cancelled
+    );
+}
+
+#[tokio::test]
+async fn physical_observer_reports_each_structured_repair_dispatch() {
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, "stop"))
+        })
+        .mount(&server)
+        .await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let request = CompletionRequest::new("repair-model", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+
+    completer(&server)
+        .physical_observer(recorder.clone())
+        .complete(request)
+        .await
+        .unwrap();
+
+    assert_eq!(*replies.lock().unwrap(), 2);
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 2);
+    assert!(events.iter().all(|(metadata, outcome)| {
+        metadata.requested_model.as_deref() == Some("repair-model")
+            && outcome.status
+                == tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
+            && outcome.usage.as_ref().unwrap().input_tokens == 100
+    }));
+}
+
 #[test]
 fn json_reply_tolerates_one_code_fence() {
     assert_eq!(

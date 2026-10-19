@@ -31,7 +31,17 @@ impl ModelBudget {
 
     /// Wrap the model with TinyAgents' shared physical-call budget engine.
     pub(crate) fn wrap(&self, model: Arc<dyn ChatModel<()>>) -> Arc<dyn ChatModel<()>> {
-        tinyagents_harness::cost::ModelBudget::new(self.ledger.clone(), self.call).wrap_model(model)
+        self.wrap_with_observer(model, None)
+    }
+
+    /// Wrap the model with budget accounting and an optional physical observer.
+    pub(crate) fn wrap_with_observer(
+        &self,
+        model: Arc<dyn ChatModel<()>>,
+        observer: Option<Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>>,
+    ) -> Arc<dyn ChatModel<()>> {
+        tinyagents_harness::cost::ModelBudget::new(self.ledger.clone(), self.call)
+            .wrap_model_with_observer(model, observer)
     }
 }
 
