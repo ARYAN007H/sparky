@@ -389,8 +389,8 @@ test.describe('assistant-ui tool-result elements', () => {
     await setMockBehavior('llmStreamChunkDelayMs', '10');
 
     await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
+    await waitForTurnCompletion(page, threadId);
     if (progress) {
-      await waitForTurnCompletion(page, threadId);
       console.log(
         '[epic235 tool progress]',
         JSON.stringify({
