@@ -29,7 +29,8 @@
     "tinysearch",
     "tinysearch-core",
     "cpal",
-    "tinyflows-module"
+    "tinyflows-module",
+    "tinyeventqueues"
   ],
   "implementationPrefixes": [
     "tinyjuice-",
@@ -110,6 +111,11 @@
       "name": "tinyflows-bus",
       "manifest": "vendor/tinyflows/crates/tinyflows-bus/Cargo.toml",
       "owner": "https://github.com/tinyhumansai/tinyflows"
+    },
+    {
+      "name": "tinyeventqueues-bus",
+      "manifest": "vendor/tinyeventqueues/crates/tinyeventqueues-bus/Cargo.toml",
+      "owner": "https://github.com/tinyhumansai/tinyeventqueues"
     }
   ],
   "linkedHost": {
