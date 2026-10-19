@@ -23,7 +23,7 @@ use super::super::helpers::{
     REPLY_LOG_TRUNCATE_CHARS, build_channel_context_block, log_worker_join_result,
     spawn_typing_task,
 };
-use super::super::host_agent::{self, HostChannelTurn, HostRoute, run_host_agent_turn, seed_rows};
+use super::super::host_agent::{self, HostChannelTurn, HostRoute, run_host_agent_turn};
 use super::RuntimeChannelMessage;
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::bus_turn::dispatch_bus_turn;
