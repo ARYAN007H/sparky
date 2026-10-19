@@ -114,22 +114,22 @@ fn clear_and_compact_sender_history_update_cached_messages() {
     }
 
     clear_sender_history(&ctx.conversation_histories, sender);
-    assert!(!ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .contains_key(sender));
+    assert!(
+        !ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .contains_key(sender)
+    );
 }
 
 #[tokio::test]
 async fn overflow_detection_covers_edge_cases() {
     let ctx = runtime_context();
-    assert!(is_context_window_overflow_error(
-        &ctx,
-        &anyhow::anyhow!("Maximum context length exceeded")
-    )
-    .await
-    .unwrap());
+    assert!(
+        is_context_window_overflow_error(&ctx, &anyhow::anyhow!("Maximum context length exceeded"))
+            .await
+            .unwrap()
+    );
     assert!(
         !is_context_window_overflow_error(&ctx, &anyhow::anyhow!("network timeout"))
             .await

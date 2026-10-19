@@ -1,19 +1,19 @@
 //! TinyChannels backend implementation for OpenHuman controller operations.
 
+use serde_json::Value;
 #[cfg(test)]
 use serde_json::json;
-use serde_json::Value;
 
 use crate::config::{ChannelsConfig, Config};
 use crate::core::Outcome;
 
 use super::ops;
+#[cfg(test)]
+use tinychannels_bus::SendMessage;
 use tinychannels_bus::controllers::{
     ChannelAuthMode, ChannelDisconnectResult, ChannelReactionResult, ChannelSendMessageResult,
     ChannelStatusEntry, ChannelThreadListResult, ChannelThreadResult,
 };
-#[cfg(test)]
-use tinychannels_bus::SendMessage;
 
 /// OpenHuman-owned implementation of the TinyChannels backend contract.
 #[derive(Debug, Clone)]

@@ -1,9 +1,9 @@
+use super::super::Channel;
 use super::super::context::{
-    conversation_history_key, ChannelRouteSelection, ChannelRuntimeContext,
-    CHANNEL_MESSAGE_TIMEOUT_SECS,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRouteSelection, ChannelRuntimeContext,
+    conversation_history_key,
 };
 use super::super::runtime::process_channel_message;
-use super::super::Channel;
 use super::common::{
     IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
     TelegramRecordingChannel, ToolCallingModel,

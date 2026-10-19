@@ -1,6 +1,6 @@
 //! Per-sender routing and runtime command handling.
 
-use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
+use super::context::{ChannelRouteSelection, ChannelRuntimeContext, clear_sender_history};
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
 use std::sync::Arc;

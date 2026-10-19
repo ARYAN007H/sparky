@@ -70,7 +70,9 @@ async fn bridge_reads_appends_trims_and_sends() {
         "42|cron:j:r1",
         "the send carries the run-specific idempotency key"
     );
-    assert!(send_to_channel("slack", "42", None, "hi", "k")
-        .await
-        .is_err());
+    assert!(
+        send_to_channel("slack", "42", None, "hi", "k")
+            .await
+            .is_err()
+    );
 }

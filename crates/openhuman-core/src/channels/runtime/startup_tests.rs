@@ -7,7 +7,7 @@
 //! (cloud) path is preserved for users who haven't picked a local /
 //! BYOK model, and the override path activates for those who have.
 
-use super::{resolve_chat_workload, ChatWorkloadResolution, RelayInboundMessageHandler};
+use super::{ChatWorkloadResolution, RelayInboundMessageHandler, resolve_chat_workload};
 use crate::config::Config;
 use tinychannels::relay::RelayInboundHandler;
 

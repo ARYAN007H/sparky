@@ -29,7 +29,7 @@ use tinychannels_bus as traits;
 pub(crate) mod posture;
 mod turn;
 
-pub(crate) use turn::{run_host_agent_turn, seed_rows, HostChannelTurn};
+pub(crate) use turn::{HostChannelTurn, run_host_agent_turn, seed_rows};
 
 /// What a channel's binding resolves to for one message.
 pub(crate) enum HostRoute {
