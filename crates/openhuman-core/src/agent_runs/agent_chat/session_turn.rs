@@ -3,7 +3,6 @@
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 use crate::core::Outcome;
-use crate::inference::provider as providers;
 
 use super::guards::{
     effective_agent_chat_origin, enforce_user_prompt_or_reject, grant_turn_cwd,
@@ -625,4 +624,8 @@ pub async fn agent_chat_reply_for(
     }
     Ok(AgentChatReply { text, hit_cap })
 }
+
+#[cfg(test)]
+#[path = "session_turn_tests.rs"]
+mod tests;
 
