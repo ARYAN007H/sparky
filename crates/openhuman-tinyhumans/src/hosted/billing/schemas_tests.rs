@@ -135,7 +135,7 @@ fn deserialize_update_card_params() {
     let params: Map<String, Value> =
         serde_json::from_value(json!({"paymentMethodId": "pm_1", "payload": {"default": true}}))
             .unwrap();
-    let result = deserialize_params::<UpdateCardParams>(params);
+    deserialize_params::<UpdateCardParams>(params).expect("valid card update");
 }
 
 #[test]
