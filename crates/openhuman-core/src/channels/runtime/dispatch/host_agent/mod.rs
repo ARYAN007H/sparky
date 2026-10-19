@@ -36,7 +36,6 @@ pub(crate) use turn::{HostChannelTurn, run_host_agent_turn};
 /// provider/model remain the channel's configured route.
 pub(crate) async fn configured_agent(
     ctx: &ChannelRuntimeContext,
-    channel: &str,
     route: &crate::channels::context::ChannelRouteSelection,
 ) -> Result<HostAgent, String> {
     let dispatch = ctx.dispatch_ctx();
@@ -47,11 +46,14 @@ pub(crate) async fn configured_agent(
             .await
             .map_err(|error| error.to_string())?,
     };
-    let scoping = super::routing::resolve_target_agent(channel).await;
-    let agent_id = scoping
-        .target_agent_id
-        .unwrap_or_else(|| "orchestrator".to_string());
-    config.chat_provider = Some(route.provider.clone());
+    let agent_id = "orchestrator";
+    config.chat_provider = Some(
+        if route.provider == crate::inference::provider::INFERENCE_BACKEND_ID {
+            crate::inference::provider::INFERENCE_BACKEND_ID.to_string()
+        } else {
+            format!("{}:{}", route.provider, route.model)
+        },
+    );
     config.default_model = Some(route.model.clone());
     config.default_temperature = ctx.temperature;
     config.multimodal_files = crate::config::MultimodalFileConfig::for_untrusted_channel_input();

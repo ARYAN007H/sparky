@@ -62,13 +62,9 @@ impl HostAgent {
         config: Config,
         agent_id: &str,
     ) -> anyhow::Result<Self> {
-        let definition = AgentDefinitionRegistry::current()
+        let definition = AgentDefinitionRegistry::load(&config.workspace_dir)
+            .ok()
             .and_then(|registry| registry.get(agent_id).cloned())
-            .or_else(|| {
-                AgentDefinitionRegistry::load(&config.workspace_dir)
-                    .ok()
-                    .and_then(|registry| registry.get(agent_id).cloned())
-            })
             .ok_or_else(|| anyhow::anyhow!("agent definition `{agent_id}` is unavailable"))?;
         let context = dispatch
             .core()

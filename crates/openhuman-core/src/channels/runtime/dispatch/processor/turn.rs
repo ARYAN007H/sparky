@@ -424,7 +424,7 @@ pub(crate) async fn process_channel_runtime_message(
     let selected_host = match bound_agent {
         Some(host) => Some(*host),
         None if ctx.config.is_some() => {
-            match host_agent::configured_agent(ctx.as_ref(), &msg.channel, &route).await {
+            match host_agent::configured_agent(ctx.as_ref(), &route).await {
                 Ok(host) => Some(host),
                 Err(error) => {
                     tracing::warn!(channel = %msg.channel, %error, "[dispatch] configured channel agent could not be built");
