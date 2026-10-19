@@ -123,7 +123,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 outcome: None,
             });
         }
-        context_mw.new_input_screened = screened_input;
         // The harness drops its `AgentRun` on an error.  Snapshot the exact
         // request boundary before assembling the graph so the error path can
         // persist only provider-accepted rounds, plus a display-only failure

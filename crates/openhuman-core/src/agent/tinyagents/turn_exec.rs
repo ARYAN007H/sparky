@@ -306,7 +306,6 @@ async fn drive_turn(
     // steers from moving the boundary and truncating persisted history on both
     // the parent (`session/turn/core.rs`) and subagent (`subagent_host`) paths.
     let request_base_len = input.len();
-    let screened_input = context_mw.new_input_screened;
 
     // Build the run context: an event sink feeds the progress/cost bridge, the
     // journal and the cap pauser; the driver's steering handle carries
@@ -646,11 +645,7 @@ async fn drive_turn(
             AgentTurnRequest::new(agent_id, parts.history),
             parts.run_context,
         )
-        .with_replayed_prefix(if screened_input {
-            request_base_len
-        } else {
-            request_base_len.saturating_sub(1)
-        }) // #6710: the new row was screened at the session persistence boundary
+        .with_replayed_prefix(request_base_len.saturating_sub(1))
         .with_runtime(InvocationRuntime::new(parts.harness));
         let state = ();
         // Both surfaces return the harness's typed `HostedError`, so a timeout,
