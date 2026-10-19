@@ -467,8 +467,7 @@ impl Config {
         if let Some(base) = overlay_base_after_save {
             let existing_overlay = { self.context_overlay.lock().unwrap().clone() };
             if let Some(overlay) = existing_overlay {
-                let mut advanced = (*overlay).clone();
-                advanced.base = base;
+                let advanced = overlay.with_base(base);
                 *self.context_overlay.lock().unwrap() = Some(std::sync::Arc::new(advanced));
             }
         }

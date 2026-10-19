@@ -26,6 +26,12 @@ impl std::fmt::Debug for ConfigContextOverlay {
 }
 
 impl ConfigContextOverlay {
+    pub(crate) fn with_base(&self, base: Value) -> Self {
+        let mut advanced = self.clone();
+        advanced.base = base;
+        advanced
+    }
+
     pub(crate) fn derive(parent: &Config, child: &Config) -> anyhow::Result<Arc<Self>> {
         let inherited = parent.context_overlay.lock().unwrap().clone();
         let (base, mut changes) = match inherited.as_ref() {
