@@ -5265,22 +5265,6 @@ async fn json_rpc_rejects_non_object_params_with_clear_error() {
     let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
     let mock_origin = format!("http://{}", mock_addr);
     write_min_config(&openhuman_home, &mock_origin);
-    for config_path in [
-        openhuman_home.join("config.toml"),
-        openhuman_home.join("users/local/config.toml"),
-    ] {
-        use std::io::Write as _;
-        let mut config = std::fs::OpenOptions::new()
-            .append(true)
-            .open(config_path)
-            .expect("open seeded config");
-        writeln!(
-            config,
-            "\n[[voice_providers]]\nslug = \"e2e-stt\"\nendpoint = \"http://127.0.0.1:9\""
-        )
-        .expect("append test STT provider");
-    }
-
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{}", rpc_addr);
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -8069,6 +8053,21 @@ async fn voice_stt_dispatch_reaches_handler_and_rejects_invalid_audio_structural
     let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
     let mock_origin = format!("http://{}", mock_addr);
     write_min_config(&openhuman_home, &mock_origin);
+    for config_path in [
+        openhuman_home.join("config.toml"),
+        openhuman_home.join("users/local/config.toml"),
+    ] {
+        use std::io::Write as _;
+        let mut config = std::fs::OpenOptions::new()
+            .append(true)
+            .open(config_path)
+            .expect("open seeded config");
+        writeln!(
+            config,
+            "\n[[voice_providers]]\nslug = \"e2e-stt\"\nendpoint = \"http://127.0.0.1:9\""
+        )
+        .expect("append test STT provider");
+    }
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{}", rpc_addr);
