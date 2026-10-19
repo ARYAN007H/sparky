@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Mega e2e flow — login + Gmail OAuth + Composio triggers in one Mac2 session.
+ * Mega e2e flow — login, account lifecycle, and thread behavior in one Mac2 session.
  *
  * Architecture (per design discussion 2026-05-12):
  *   - One Appium Mac2 session, one app launch — no per-scenario restarts.
@@ -8,7 +8,7 @@
  *       1. Deep links (`openhuman://auth?…`, `openhuman://oauth/success?…`) —
  *          Mac2 supports these natively via `macos: deepLink`.
  *       2. Mock backend behavior knobs and the in-process request log.
- *       3. Core JSON-RPC for state inspection and `composio_*` calls.
+ *       3. Core JSON-RPC for state inspection and selected local contracts.
  *   - Assertions read from the mock request log and RPC results — never from
  *     the CEF WebView accessibility tree (which exposes zero DOM to XCUITest).
  *   - Between scenarios, reset state in-app via `openhuman.config_reset_local_data`
@@ -21,7 +21,6 @@
  *   - Bypass login (deep-link `key=auth`): no consume call but session set
  *   - Connect Gmail via OAuth deep-link success path
  *   - OAuth error path is exercised by Scenario 5
- *   - Composio: list connections, enable trigger, list triggers, state mutates
  *   - Factory reset between scenarios (the real product flow)
  *
  * The smoke spec proved the driver+bundle work; this spec proves the *flows* work.
@@ -31,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { waitForApp } from '../helpers/app-helpers';
-import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
+import { callOpenhumanRpc } from '../helpers/core-rpc';
 import { triggerDeepLink } from '../helpers/deep-link-helpers';
 import { hasAppChrome } from '../helpers/element-helpers';
 import {
@@ -39,7 +38,6 @@ import {
   getRequestLog,
   resetMockBehavior,
   setMockBehavior,
-  setMockBehaviors,
   startMockServer,
   stopMockServer,
 } from '../mock-server';
@@ -54,13 +52,6 @@ const MOCK_URL = `http://127.0.0.1:${MOCK_PORT}`;
 function writeMockConfig(): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
   fs.writeFileSync(CONFIG_FILE, `api_url = "${MOCK_URL}"\n`, 'utf8');
-}
-
-function buildBypassJwt(userId: string): string {
-  const payload = Buffer.from(
-    JSON.stringify({ sub: userId, userId, exp: Math.floor(Date.now() / 1000) + 3600 })
-  ).toString('base64url');
-  return `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.${payload}.sig`;
 }
 
 async function waitForMockRequest(
@@ -239,16 +230,12 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
     }
   });
 
-  // Scenario 4 — Composio trigger RPC semantics are covered by the owning
-  // core tests (`composio_enable_trigger_via_mock` and related controller tests).
-  // This desktop mega-flow must keep its assertions on visible host behavior.
-
   // -------------------------------------------------------------------------
   // Scenario 5 — OAuth error path. Verifies the app handles the failure
   // deep link without crashing the session.
   // -------------------------------------------------------------------------
   it('Gmail OAuth: error deep link does not crash the session', async () => {
-    await resetEverything('after Scenario 4');
+    await resetEverything('before Gmail OAuth error scenario');
 
     await triggerDeepLink('openhuman://auth?token=mega-error-token');
     await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
@@ -448,14 +435,9 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Scenario 11 — Composio trigger + webhook roundtrip.
-  // Extends Scenario 4 with the webhook-side leg:
-  //   1. Enable a Composio trigger (already covered by Scenario 4).
-  //   2. Register a webhook echo tunnel so the core has a receiver.
-  // The old Composio/webhook leg asserted a direct mock HTTP POST and core RPC
-  // state, not a visible desktop flow. Composio trigger behavior is exercised
-  // in the core-owned tests; webhook ingress contract coverage belongs to its
-  // owning RPC tests. See #234 for narrowing mixed E2E specs to UI assertions.
+  // The removed Composio webhook leg asserted a direct mock POST and core RPC
+  // state rather than visible desktop behavior; #234 owns trimming such mixed
+  // E2E specs, and the remaining flow keeps its assertions on current surfaces.
 
   // -------------------------------------------------------------------------
   // Scenario 12 — update.version RPC contract.

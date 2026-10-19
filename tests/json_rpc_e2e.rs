@@ -3553,8 +3553,7 @@ async fn json_rpc_thread_generate_title_falls_back_when_provider_path_is_unavail
 
     assert_ne!(generated_title, original_title);
     assert_eq!(
-        generated_title,
-        "summarize latest five",
+        generated_title, "summarize latest five",
         "fallback title should be the 3-word shape derived from the first user message (filler stripped), got: {generated_title}"
     );
 
@@ -6473,7 +6472,9 @@ async fn json_rpc_wallet_solana_prepare_execute_round_trips() {
     );
     assert_eq!(
         exec_result.get("transactionHash").and_then(Value::as_str),
-        Some("5xS9pXmqVz8R1nuRZTfsdsAxBdBFmtnAtuYbCsmK5DYzGn5vR4VqWGmiR5McLnYx8oFqLdo62q4qiUZpQyR4Hkn3"),
+        Some(
+            "5xS9pXmqVz8R1nuRZTfsdsAxBdBFmtnAtuYbCsmK5DYzGn5vR4VqWGmiR5McLnYx8oFqLdo62q4qiUZpQyR4Hkn3"
+        ),
     );
 
     mock_join.abort();
@@ -8031,6 +8032,51 @@ async fn voice_status_returns_availability() {
         result.get("tts_available").and_then(Value::as_bool),
         Some(false),
         "tts should be unavailable without piper binary"
+    );
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
+#[tokio::test]
+async fn voice_stt_dispatch_reaches_handler_and_rejects_invalid_audio_structurally() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+    let _piper_guard = EnvVarGuard::unset("PIPER_BIN");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let response = post_json_rpc(
+        &rpc_base,
+        1,
+        "openhuman.voice_stt_dispatch",
+        json!({ "audio_base64": "not base64", "mime_type": "audio/wav" }),
+    )
+    .await;
+    let error = response
+        .get("error")
+        .map(Value::to_string)
+        .unwrap_or_default();
+    assert!(
+        !error.is_empty(),
+        "invalid audio must return a structured RPC error: {response}"
+    );
+    assert!(
+        !error.to_ascii_lowercase().contains("unknown method"),
+        "voice_stt_dispatch must reach its handler: {response}"
     );
 
     mock_join.abort();

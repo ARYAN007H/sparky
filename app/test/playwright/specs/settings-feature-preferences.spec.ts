@@ -283,19 +283,16 @@ test.describe('Settings - Feature Preferences', () => {
   });
 
   test('persists the custom mascot voice override on the voice panel', async ({ page }) => {
-    await openAuthenticatedRoute(page, 'pw-settings-mascot-voice', '/settings/voice');
+    await openAuthenticatedRoute(page, 'pw-settings-mascot-voice', '/settings/face');
 
     await expect(page.getByText('Mascot Voice')).toBeVisible();
-    const customVoiceOptionUnavailable =
-      (await page
-        .locator('[data-testid="mascot-voice-select"] option[value="__custom__"]')
-        .count()) === 0;
-    test.skip(customVoiceOptionUnavailable, 'option unavailable'); // https://github.com/tinyhumansai/openhuman/issues/1762
+    const customVoiceOption = page.locator(
+      '[data-testid="mascot-voice-select"] option[value="__custom__"]'
+    );
+    await expect(customVoiceOption).toHaveCount(1);
 
     await page.getByTestId('mascot-voice-select').selectOption('__custom__');
-    const customVoiceInputUnavailable =
-      (await page.getByTestId('mascot-voice-input').count()) === 0;
-    test.skip(customVoiceInputUnavailable, 'input unavailable'); // https://github.com/tinyhumansai/openhuman/issues/1762
+    await expect(page.getByTestId('mascot-voice-input')).toBeVisible();
 
     await page.getByTestId('mascot-voice-input').fill('voice-e2e-custom');
     await page.getByTestId('mascot-voice-save-paste').click();

@@ -83,6 +83,32 @@ test.describe('Voice mode integration', () => {
     await expect(page.getByTestId('chat-message-input')).toBeVisible();
   });
 
+  test('legacy Human route redirects to the shipped chat microphone composer', async ({ page }) => {
+    await page.goto('/#/human');
+    await expect(page).toHaveURL(/#\/chat$/);
+    await expect(page.getByRole('button', { name: 'Voice mode' })).toBeVisible();
+    await expect(page.getByTestId('chat-message-input')).toBeVisible();
+  });
+
+  test('mic failure never inserts a beep placeholder as a user message', async ({ page }) => {
+    try {
+      await switchChatIntoMicComposer(page);
+      await installGetUserMediaError(page, 'NotAllowedError');
+      const viewport = page.locator('[data-slot="aui_thread-viewport"]');
+      await expect(viewport).toBeVisible();
+      const userMessages = viewport.locator('[data-slot="aui_user-message-root"]');
+      const userMessageCount = await userMessages.count();
+      await page.getByRole('button', { name: 'Start recording' }).click();
+      await expect(page.locator('[data-chat-send-error-code="voice_transcription"]')).toBeVisible();
+
+      await expect(userMessages).toHaveCount(userMessageCount);
+      const messageText = (await userMessages.allTextContents()).join(' ');
+      expect(messageText).not.toMatch(/beep/i);
+    } finally {
+      await restoreGetUserMedia(page);
+    }
+  });
+
   test('permission-denied getUserMedia shows a specific voice-transcription error', async ({
     page,
   }) => {

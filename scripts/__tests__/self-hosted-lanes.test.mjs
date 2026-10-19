@@ -369,6 +369,32 @@ test("hosted matrix only spins up groups with active lanes", () => {
   assert.equal(pester.find((g) => g.group === "pester").container, "");
 });
 
+test("a browser-spec-only change runs the full-inventory skip guard without scripts area", () => {
+  const frontendOnly = buildPlan({
+    profile: "hosted",
+    areas: { ...NONE, frontend: true },
+  });
+  assert.equal(
+    frontendOnly.lanes
+      .find((lane) => lane.name === "frontend")
+      .checks.find((check) => check.name === "browser-test-skip-guard").run,
+    "node scripts/ci/check-browser-test-skips.mjs",
+  );
+  assert.equal(
+    frontendOnly.lanes.find((lane) => lane.name === "scripts-self-tests")
+      ?.active ?? false,
+    false,
+  );
+
+  const filters = fs.readFileSync(
+    path.join(repoRoot, ".github/ci-paths-filter.yml"),
+    "utf8",
+  );
+  const frontendFilter = filters.split("\nscripts:\n")[0];
+  assert.match(frontendFilter, /'app\/test\/\*\*'/);
+  assert.match(frontendFilter, /'scripts\/ci\/check-browser-test-skips\.mjs'/);
+});
+
 test("private lanes reuse checkout targets, preserve mold through RUSTFLAGS resets, and omit wrappers", () => {
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
   const rust = plan.lanes.filter((l) => l.heavy != null);

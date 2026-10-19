@@ -339,6 +339,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
             : "pnpm --filter openhuman-app lint",
         },
         {
+          name: "browser-test-skip-guard",
+          when: areas.frontend,
+          run: "node scripts/ci/check-browser-test-skips.mjs",
+        },
+        {
           name: "i18n",
           when: areas.i18n,
           needs: ["pnpm-install"],

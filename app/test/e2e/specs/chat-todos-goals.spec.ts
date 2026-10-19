@@ -16,7 +16,8 @@
  *   Turn 3: todo (all five completed) → goal_complete → text
  *
  * Verifies:
- *   G1.1 — the goal banner shows the objective and an "active" status
+ *   G1.1 — after the scripted turn settles, the task card shows the objective
+ *          and waiting status
  *   G1.2 — the checklist renders all five items with their statuses
  *   G1.3 — a later write moves the checklist on (3 of 5, fourth in progress)
  *   G1.4 — the final write completes every item and the banner turns complete
@@ -126,6 +127,13 @@ async function waitForProgress(completed: number, total: number, timeout = 45_00
   );
 }
 
+async function waitForGoalStatus(status: string, timeout = 45_000): Promise<void> {
+  await browser.waitUntil(async () => (await readGoal())?.status === status, {
+    timeout,
+    timeoutMsg: `task card never reached ${status}; last: ${JSON.stringify(await readGoal())}`,
+  });
+}
+
 async function sendTurn(message: string) {
   await typeIntoComposer(message);
   expect(
@@ -175,15 +183,17 @@ describe('Chat todos and goals', () => {
     await sendTurn('Write the v2 release notes, in five steps.');
 
     await waitForTestId('todo-checklist', 45_000);
+    await waitForGoalStatus('waiting');
     const goal = await readGoal();
     console.log(`${LOG_PREFIX} G1.1: task card — ${JSON.stringify(goal)}`);
     expect(goal?.objective).toBe(OBJECTIVE);
-    expect(['working', 'waiting']).toContain(goal?.status);
+    expect(goal?.status).toBe('waiting');
   });
 
   it('G1.2 — the checklist renders all five items with their statuses', async () => {
     await waitForTestId('todo-checklist', 45_000);
     await waitForProgress(0, 5);
+    await waitForGoalStatus('waiting');
 
     const items = await readChecklist();
     console.log(`${LOG_PREFIX} G1.2: items — ${JSON.stringify(items)}`);
@@ -191,7 +201,7 @@ describe('Chat todos and goals', () => {
       STEPS.map(step => expect.stringContaining(step))
     );
     expect(items.map(([, status]) => status)).toEqual([
-      'active',
+      'pending',
       'pending',
       'pending',
       'pending',
@@ -202,6 +212,7 @@ describe('Chat todos and goals', () => {
   it('G1.3 — a later write moves the checklist on', async () => {
     await sendTurn('continue');
     await waitForProgress(3, 5);
+    await waitForGoalStatus('waiting');
 
     const items = await readChecklist();
     console.log(`${LOG_PREFIX} G1.3: items — ${JSON.stringify(items)}`);
@@ -209,7 +220,7 @@ describe('Chat todos and goals', () => {
       'done',
       'done',
       'done',
-      'active',
+      'pending',
       'pending',
     ]);
     // The goal is untouched by a todo write.
