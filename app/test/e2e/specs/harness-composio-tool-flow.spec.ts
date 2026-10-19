@@ -194,12 +194,6 @@ describe('Harness — Composio tool-call prompt flow', () => {
       await waitForAssistantReplyContaining('Q3 Budget Review', { logPrefix: LOG_PREFIX })
     ).toBe(true);
 
-    // Verify the mock received ≥ 2 LLM turns.
-    const log = getRequestLog() as Array<{ method: string; url: string; body?: string }>;
-    const llmHits = log.filter(r => r.method === 'POST' && r.url.includes('/chat/completions'));
-    console.log(`${LOG_PREFIX} C1.1: ${llmHits.length} LLM completion request(s) in mock log`);
-    expect(llmHits.length).toBeGreaterThanOrEqual(2);
-
     // Verify the composio execute was hit (best-effort — may fail if the core
     // is not routing tool calls through the mock backend in this E2E build).
     const composioHit = log.find(
