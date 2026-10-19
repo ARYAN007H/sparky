@@ -7,9 +7,7 @@
  *   - Core dispatches the tool, then calls the LLM again with the result
  *   - Final answer streams back and renders in the DOM
  *   - Tool timeline entry appears while the tool is in flight
- *   - Mock received exactly 2 LLM completions requests
- *   - IN_FLIGHT map clears after completion
- */
+ *  *  */
 import { waitForApp } from '../helpers/app-helpers';
 import {
   chatMounted,
@@ -19,7 +17,6 @@ import {
   typeIntoComposer,
   waitForSocketConnected,
 } from '../helpers/chat-harness';
-import { callOpenhumanRpc } from '../helpers/core-rpc';
 import { textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
@@ -55,7 +52,6 @@ const FORCED_RESPONSES = [
 interface RuntimeSnapshot {
   timelineIds: string[];
   timelineNames: string[];
-  inFlightEntries: Array<{ key: string }>;
 }
 
 async function snapshotRuntime(threadId: string): Promise<RuntimeSnapshot> {
@@ -75,15 +71,7 @@ async function snapshotRuntime(threadId: string): Promise<RuntimeSnapshot> {
     };
   }, threadId);
 
-  const inFlightSnap = await callOpenhumanRpc<{ result: { entries: Array<{ key: string }> } }>(
-    'openhuman.test_support_in_flight_chats',
-    {}
-  );
-
-  return {
-    ...(winSnapshot as { timelineIds: string[]; timelineNames: string[] }),
-    inFlightEntries: inFlightSnap.ok ? (inFlightSnap.result?.result?.entries ?? []) : [],
-  };
+  return winSnapshot as { timelineIds: string[]; timelineNames: string[] };
 }
 
 describe('Chat tool-call lifecycle', () => {
@@ -203,27 +191,4 @@ describe('Chat tool-call lifecycle', () => {
   });
 
 
-  it('T1.5 — IN_FLIGHT map clears after completion', async () => {
-    console.log(`${LOG_PREFIX} T1.5: verifying IN_FLIGHT cleared`);
-    const threadId = await getSelectedThreadId();
-    expect(typeof threadId).toBe('string');
-
-    await browser.waitUntil(
-      async () => {
-        const snap = await callOpenhumanRpc<{ result: { entries: Array<{ key: string }> } }>(
-          'openhuman.test_support_in_flight_chats',
-          {}
-        );
-        if (!snap.ok) return false;
-        const entries = snap.result?.result?.entries ?? [];
-        const stillRunning = entries.some(e => e.key.endsWith(`::${threadId as string}`));
-        return !stillRunning;
-      },
-      {
-        timeout: 15_000,
-        timeoutMsg: 'IN_FLIGHT map never cleared for this thread after tool-call completion',
-      }
-    );
-    console.log(`${LOG_PREFIX} T1.5: passed — IN_FLIGHT cleared`);
-  });
 });

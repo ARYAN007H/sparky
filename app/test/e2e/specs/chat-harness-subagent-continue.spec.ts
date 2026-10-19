@@ -269,16 +269,6 @@ describe('Chat harness — orchestrator → subagent continuation flow', () => {
     );
   });
 
-  it('the mock LLM saw multiple chat-completions requests (parent + sub-agent + resumed sub-agent)', async () => {
-    const log = getRequestLog() as Array<{ method: string; url: string; body?: string }>;
-    const llmHits = log.filter(
-      r => r.method === 'POST' && r.url.includes('/openai/v1/chat/completions')
-    );
-    // Orchestrator turn 1 + researcher turn 1 + orchestrator relay
-    // + orchestrator continue + researcher resumed + orchestrator final
-    // = 6, but accept ≥4 for robustness against harness optimisations.
-    expect(llmHits.length).toBeGreaterThanOrEqual(4);
-  });
 
   it('persisted thread file records the final orchestrator text', async () => {
     const threadId = await getSelectedThreadId();

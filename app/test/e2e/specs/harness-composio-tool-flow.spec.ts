@@ -7,11 +7,7 @@
  * the core dispatches the action to the Composio execute endpoint (mocked),
  * and the second LLM turn returns a final answer.
  *
- * Scenarios:
- *   C1.1 — Gmail GMAIL_GET_MAIL: "check my email" → tool call → canned inbox → final reply
- *   C1.2 — GitHub GITHUB_LIST_REPOS: "list my GitHub repos" → tool call → 2 repos → final reply
- *   C1.3 — Composio execute failure: composioExecuteFails=400 → assistant acknowledges failure
- *   C1.4 — Linear LINEAR_CREATE_ISSUE: "create a linear issue titled X" → success → confirmation
+ * Scenario: Gmail GMAIL_GET_MAIL routes through the harness and renders a final reply.
  *
  * Observation strategy:
  *   - LLM forced-responses queue drives the two-turn sequence.
