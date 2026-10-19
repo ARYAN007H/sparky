@@ -1,6 +1,6 @@
 use super::*;
 
-use super::binding::CapsHostBinding;
+use super::binding::{AgentRunRegistry, CapsHostBinding};
 use crate::config::Config;
 use crate::core::runtime::{ComponentSet, CoreContext, DispatchCtx, DomainSet};
 use std::sync::Arc;
@@ -25,7 +25,7 @@ fn binding(ctx: DispatchCtx, temp: &TempDir) -> CapsHostBinding {
         )),
         approval: Default::default(),
         cancellation: tokio_util::sync::CancellationToken::new(),
-        agent_runs: tokio::sync::Mutex::new(std::collections::HashMap::new()),
+        agent_runs: tokio::sync::Mutex::new(AgentRunRegistry::default()),
     }
 }
 

@@ -116,9 +116,22 @@ pub(super) async fn prepare_flow_run(
     flow_id: &str,
     _inputs: &serde_json::Map<String, Value>,
 ) -> Result<PreparedFlowRun, String> {
-    let flow = store::get_flow(config, flow_id)
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| format!("flow '{flow_id}' not found"))?;
+    // Resolve the definition through the dispatch's captured CatalogStorage
+    // scope. `store::get_flow` is a synchronous ambient-scope convenience API
+    // and must not choose the acting identity for an explicitly dispatched run.
+    let catalog = crate::flows::catalog_storage::register(ctx, config).await?;
+    let proxy = crate::modules::tinyflows::catalog_proxy(config).await?;
+    let workflow: Option<tinyflows_bus::catalog::Workflow> = proxy
+        .call(
+            tinyflows_bus::catalog::members::GET_WORKFLOW,
+            (catalog.storage(), flow_id.to_owned()),
+        )
+        .await
+        .map_err(|error| error.wire_message())?;
+    let flow: Flow = store::roundtrip(
+        workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?,
+    )
+    .map_err(|error| format!("decode workflow for run: {error}"))?;
     let no_actionable_nodes = !graph_has_actionable_nodes(&flow.graph);
     if no_actionable_nodes {
         tracing::warn!(

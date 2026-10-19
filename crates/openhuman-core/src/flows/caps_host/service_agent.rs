@@ -83,7 +83,7 @@ pub(crate) async fn run_agent(
         });
     let result = tokio::select! {
         biased;
-        _ = cancellation.cancelled() => Err("workflow run was cancelled".to_owned()),
+        _ = cancellation.cancelled() => Err("agent run was cancelled".to_owned()),
         result = turn => result.map_err(|error| error.to_string()),
     };
     let _ = progress.await;
