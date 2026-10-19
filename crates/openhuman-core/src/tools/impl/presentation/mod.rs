@@ -2,9 +2,9 @@
 //! structured slide spec via the native-Rust [`engine`] module.
 //!
 //! Flow:
-//! 1. Validate the JSON-Schema input early (`types::validate_input`)
-//!    so the agent gets a structured `InvalidInput` it can self-correct
-//!    on instead of a low-level error.
+//! 1. Validate host-owned image references, resolve readable images, then
+//!    validate the resolved bus spec so the agent gets a structured
+//!    `InvalidInput` it can self-correct on before artifact production.
 //! 2. Start a [`Production`]: it reserves `<title>.pptx` in the files folder
 //!    (the card shows "generating…") and opens the versioned artifact — or,
 //!    with an `artifact_id` arg or a regenerate in scope, a new version of
@@ -47,11 +47,12 @@ mod types;
 #[path = "presentation_tests.rs"]
 mod tests;
 
-use crate::tools::implementations::document::format::spec::SlideImage;
+use tinydocs_bus::spec::SlideImage;
 
 use self::types::{
-    validate_input, GeneratePresentationInput, GeneratePresentationOutput, SlideImageRequest,
-    SlideImageSource, MAX_IMAGE_BYTES,
+    to_bus_spec, validate_image_references, GeneratePresentationInput,
+    GeneratePresentationOutput, PresentationError, SlideImageRequest, SlideImageSource,
+    MAX_IMAGE_BYTES,
 };
 
 /// Generation timeout. `ppt-rs` typically completes the full 64-slide
@@ -332,18 +333,10 @@ impl PresentationTool {
             }
         };
 
-        if let Err(err) = validate_input(&input) {
+        if let Err(err) = validate_image_references(&input) {
             tracing::debug!(target: "presentation", err = %err, "[presentation] validation rejected input");
             return Ok(ToolResult::error(err.to_string()));
         }
-
-        tracing::info!(
-            target: "presentation",
-            title_chars = input.title.chars().count(),
-            has_author = input.author.is_some(),
-            slide_count = input.slides.len(),
-            "[presentation] generation request accepted"
-        );
 
         // Resolve + validate per-slide images at the async boundary. A
         // bad image is skipped with a warning (partial success) rather
@@ -356,6 +349,23 @@ impl PresentationTool {
                 "[presentation] some images skipped with warnings"
             );
         }
+
+        let spec = match to_bus_spec(&input, &resolved_images) {
+            Ok(spec) => spec,
+            Err(err) => return Ok(ToolResult::error(err.to_string())),
+        };
+        if let Err(err) = spec.validate().map_err(PresentationError::from) {
+            tracing::debug!(target: "presentation", err = %err, "[presentation] validation rejected input");
+            return Ok(ToolResult::error(err.to_string()));
+        }
+
+        tracing::info!(
+            target: "presentation",
+            title_chars = input.title.chars().count(),
+            has_author = input.author.is_some(),
+            slide_count = input.slides.len(),
+            "[presentation] generation request accepted"
+        );
 
         // Reserve the file and open the artifact: a new one, or a new version
         // of `artifact_id` / the regenerate target (same id, same file,

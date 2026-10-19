@@ -178,7 +178,8 @@ fn resolved_presentation_uses_bus_validation_and_preserves_its_limit_error() {
             })
             .collect(),
     };
-    let spec = super::types::to_bus_spec(&input, vec![Vec::new(); input.slides.len()]);
+    let images = vec![Vec::new(); input.slides.len()];
+    let spec = super::types::to_bus_spec(&input, &images).expect("one image list per slide");
 
     let error = spec.validate().expect_err("the bus slide limit is enforced");
     let error = PresentationError::from(error);
@@ -388,7 +389,7 @@ async fn image_inspection_does_not_fall_back_when_modules_are_disabled() {
         }]
     }))
     .expect("parse presentation input");
-    validate_input(&input).expect("valid presentation input");
+    validate_image_references(&input).expect("valid host image reference");
 
     let (resolved, warnings) = tool.resolve_images(&input, &DispatchCtx::ambient()).await;
     assert!(resolved.iter().all(Vec::is_empty));
@@ -453,18 +454,23 @@ async fn execute_skips_missing_artifact_with_warning() {
 async fn execute_rejects_too_many_images_per_deck() {
     let ws = workspace();
     let tool = make_tool(ws.path());
-    // 9 images total across slides — exceeds the deck cap of 8. This is a
-    // hard validation reject (cheap structural check), not a skip.
+    let image_path = ws.path().join("one.png");
+    std::fs::write(&image_path, png_1x1()).expect("write valid image");
+    // Nine successfully resolved images exceed the bus deck cap of eight.
     let images: Vec<_> = (0..9)
-        .map(|i| json!({ "source": { "type": "artifact", "artifact_id": format!("a{i}") } }))
+        .map(|_| json!({ "source": { "type": "file", "path": image_path.to_string_lossy() } }))
         .collect();
     let args = json!({
         "title": "Deck",
         "slides": [{ "title": "Slide", "bullets": ["x"], "images": images }]
     });
     let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error, "9 images should be rejected outright");
-    assert!(result.text().contains("images"));
+    assert!(result.is_error, "9 resolved images should exceed the bus limit");
+    assert!(
+        result.text().contains("must contain ≤ 8 images total"),
+        "the tool should preserve the bus limit in its error: {}",
+        result.text()
+    );
 }
 
 #[test]
