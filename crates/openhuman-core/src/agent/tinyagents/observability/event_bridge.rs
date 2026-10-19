@@ -62,6 +62,10 @@ pub(crate) struct OpenhumanEventBridge {
     /// run-local ordered event sink, so `ModelStarted` brackets the following
     /// `UsageRecorded` and terminal model event synchronously.
     pub(super) supplemental_call_active: AtomicBool,
+    /// Set once the turn's start has been announced (`AgentProgress::TurnStarted`
+    /// on the first top-level `RunStarted`), so a retried or nested run cannot
+    /// announce the same turn twice.
+    pub(super) turn_announced: AtomicBool,
     /// `None` for a parent turn; `Some` to emit child-scoped `Subagent*` events.
     pub(super) scope: Option<SubagentScope>,
     /// The agent definition the run acts as (its memory identity's agent),
@@ -203,6 +207,7 @@ impl OpenhumanEventBridge {
             provider_id: provider_id.into(),
             max_iterations: max_iterations as u32,
             supplemental_call_active: AtomicBool::new(false),
+            turn_announced: AtomicBool::new(false),
             scope,
             definition: std::sync::OnceLock::new(),
             cursor,
