@@ -207,13 +207,19 @@ impl StopReasonKind {
             // used to fall through to `Generic` ("my tool calls were not
             // getting anywhere").
             "policy" | "blocked_by_policy" => Self::Policy,
+            "missing_program" => Self::MissingProgram,
             "unsupported" | "missing_app" => Self::MissingProgram,
             "not_found" | "missing_window" => Self::NotFound,
+            "invalid_calls" => Self::InvalidCalls,
             "validation" | "invalid_arguments" => Self::InvalidCalls,
             "unavailable" | "service_refused" => Self::Unavailable,
             "site_refused" => Self::SiteRefused,
+            "repeated_failure" => Self::RepeatedFailure,
+            "varied_failures" => Self::VariedFailures,
+            "repeating_step" => Self::RepeatingStep,
             "out_of_credits" => Self::OutOfCredits,
             "provider_config" => Self::ProviderConfig,
+            "missing_connection" => Self::MissingConnection,
             _ => Self::Generic,
         }
     }
