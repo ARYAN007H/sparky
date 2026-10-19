@@ -132,7 +132,7 @@ pub(crate) struct SessionTurnSidecar {
     pub duration: Option<Duration>,
     /// Typed host refusal captured before the neutral runtime's string error
     /// boundary. Read only by the same logical turn that populated it.
-    pub dispatch_refusal: Option<super::budget::DispatchRefusal>,
+    pub dispatch_refusal: Option<super::super::budget::DispatchRefusal>,
     pub tool_outcomes: Vec<ToolCallOutcome>,
     pub hit_cap: bool,
     pub wrap_up_injected: bool,
