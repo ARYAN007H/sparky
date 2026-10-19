@@ -32,6 +32,7 @@ import {
   memorySourcesList,
   memorySourcesRemove,
   memorySourcesSync,
+  memoryStatusError,
 } from './memoryApi';
 
 vi.mock('../coreRpcClient', () => ({ callCoreRpc: vi.fn() }));
@@ -193,12 +194,34 @@ describe('memoryErrorCode', () => {
     );
     expect(memoryErrorCode(new Error('UNAVAILABLE: timed out'))).toBe('UNAVAILABLE');
     expect(memoryErrorCode(new Error('PLAN_REQUIRED: not in the plan'))).toBe('PLAN_REQUIRED');
+    // A plan refusal that lost its structured code still names the backend's.
+    expect(
+      memoryErrorCode(
+        new Error('unauthorized: [MEMORY_PLAN_REQUIRED] memory API memory/scopes (HTTP 403)')
+      )
+    ).toBe('PLAN_REQUIRED');
   });
 
   it('returns null for an unrelated error', () => {
     expect(memoryErrorCode(new Error('boom'))).toBeNull();
     expect(memoryErrorCode({ data: { code: 'OTHER' } })).toBeNull();
     expect(memoryErrorCode(null)).toBeNull();
+  });
+});
+
+describe('memoryStatusError', () => {
+  const t = (key: string) => `t:${key}`;
+  it('shows a stored plan refusal as its translated explanation (#8081)', () => {
+    expect(
+      memoryStatusError(
+        "engine error: [MEMORY_PLAN_REQUIRED] memory API memory/scopes on api.tinyhumans.ai: memory is not included in this account's plan (HTTP 403 Forbidden)",
+        t
+      )
+    ).toBe('t:memory.error.planRequired');
+  });
+
+  it('shows any other stored error as stored', () => {
+    expect(memoryStatusError('unavailable: timed out', t)).toBe('unavailable: timed out');
   });
 });
 

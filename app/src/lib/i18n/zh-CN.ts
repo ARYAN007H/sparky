@@ -563,11 +563,12 @@ const messages: TranslationMap = {
   'memory.error.unavailable': '暂时无法连接记忆服务。已存储的内容不会丢失，请稍后重试。',
   'memory.outOfCredits.title': '额度已用完',
   'memory.outOfCredits.action': '充值',
-  'memory.error.planRequired': '你的套餐不包含记忆功能。升级套餐即可使用。',
-  'memory.planRequired.title': '不在你的套餐中',
-  'memory.planRequired.action': '升级',
+  'memory.error.planRequired':
+    '你当前的套餐不包含记忆功能，因此 OpenHuman 无法保存或查找它学到的内容。升级套餐即可开启记忆功能，也可以在设置中改用其他记忆选项。',
+  'memory.planRequired.title': '记忆功能不在你的套餐中',
+  'memory.planRequired.action': '查看套餐',
   'memoryPage.engine.builtin.planRequired':
-    '你的套餐不包含由 TinyHumans 托管的记忆功能。升级到 Basic 或 Pro 即可使用。',
+    '内置记忆需要 Basic 或 Pro 套餐。升级即可使用，也可以选择其他记忆选项。',
   'alerts.title': '通知',
   'alerts.empty': '暂无通知',
   'alerts.markAllRead': '全部标记为已读',

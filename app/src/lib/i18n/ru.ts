@@ -607,11 +607,11 @@ const messages: TranslationMap = {
   'memory.outOfCredits.title': 'Кредиты закончились',
   'memory.outOfCredits.action': 'Пополнить',
   'memory.error.planRequired':
-    'Память не входит в ваш тариф. Перейдите на более высокий тариф, чтобы пользоваться ею.',
-  'memory.planRequired.title': 'Не входит в ваш тариф',
-  'memory.planRequired.action': 'Улучшить тариф',
+    'Ваш текущий тариф не включает память, поэтому OpenHuman не может сохранять то, что узнаёт, и обращаться к этому. Перейдите на более высокий тариф, чтобы включить память, или выберите другой вариант памяти в настройках.',
+  'memory.planRequired.title': 'Память не входит в ваш тариф',
+  'memory.planRequired.action': 'Посмотреть тарифы',
   'memoryPage.engine.builtin.planRequired':
-    'Ваш тариф не включает память, размещённую в TinyHumans. Перейдите на Basic или Pro, чтобы пользоваться ею.',
+    'Для встроенной памяти нужен тариф Basic или Pro. Перейдите на него, чтобы пользоваться ею, или выберите другой вариант памяти.',
   'alerts.title': 'Оповещения',
   'alerts.empty': 'Оповещений пока нет',
   'alerts.markAllRead': 'Отметить всё прочитанным',

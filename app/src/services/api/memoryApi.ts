@@ -624,6 +624,8 @@ export function memoryErrorCode(err: unknown): MemoryErrorCode | null {
   }
   const message = (err as { message?: unknown }).message;
   if (typeof message === 'string') {
+    // A plan refusal that lost its structured code still names the backend's.
+    if (message.includes('_PLAN_REQUIRED]')) return 'PLAN_REQUIRED';
     const match =
       /^\s*(MEMORY_OFF|UNSUPPORTED|INVALID_REQUEST|UNAUTHORIZED|INSUFFICIENT_CREDITS|PLAN_REQUIRED|UNAVAILABLE|ENGINE)\b/.exec(
         message
@@ -677,6 +679,20 @@ export function isOutOfCreditsMessage(
 ): boolean {
   const key = REFUSAL_KEYS.INSUFFICIENT_CREDITS;
   return message !== null && key !== undefined && message === t(key);
+}
+
+/**
+ * A stored status error (a job, sync source, import, migration or backfill that
+ * stopped) for display. A plan refusal arrives as the engine's raw
+ * `[MEMORY_PLAN_REQUIRED] memory API …` text; it reads as its translated
+ * explanation instead (#8081). Anything else is shown as stored.
+ */
+export function memoryStatusError(
+  raw: string,
+  t: (key: string, fallback?: string) => string
+): string {
+  const key = REFUSAL_KEYS.PLAN_REQUIRED;
+  return key && raw.includes('_PLAN_REQUIRED]') ? t(key) : raw;
 }
 
 /**

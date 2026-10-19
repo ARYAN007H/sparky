@@ -56,8 +56,10 @@ describe('MemoryErrorAlert', () => {
     const alert = screen.getByTestId('alert');
     expect(alert).toHaveAttribute('data-kind', 'plan-required');
     expect(alert).toHaveAttribute('data-variant', 'warning');
-    expect(alert).toHaveTextContent('Not in your plan');
-    expect(alert).toHaveTextContent("Memory isn't included in your plan");
+    expect(alert).toHaveTextContent("Memory isn't part of your plan");
+    expect(alert).toHaveTextContent("Your current plan doesn't include memory");
+    expect(alert).toHaveTextContent('See plans');
+    expect(alert).not.toHaveTextContent('MEMORY_PLAN_REQUIRED');
     expect(alert).not.toHaveTextContent('HTTP 403');
     expect(screen.queryByTestId('memory-top-up')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('memory-upgrade'));

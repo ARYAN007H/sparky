@@ -617,11 +617,11 @@ const messages: TranslationMap = {
   'memory.outOfCredits.title': 'Sin créditos',
   'memory.outOfCredits.action': 'Recargar',
   'memory.error.planRequired':
-    'La memoria no está incluida en tu plan. Mejora tu plan para usarla.',
-  'memory.planRequired.title': 'No incluida en tu plan',
-  'memory.planRequired.action': 'Mejorar plan',
+    'Tu plan actual no incluye memoria, así que OpenHuman no puede guardar ni consultar lo que aprende. Mejora tu plan para activar la memoria, o cambia a otra opción de memoria en Configuración.',
+  'memory.planRequired.title': 'La memoria no forma parte de tu plan',
+  'memory.planRequired.action': 'Ver planes',
   'memoryPage.engine.builtin.planRequired':
-    'Tu plan no incluye la memoria alojada por TinyHumans. Mejora a Basic o Pro para usarla.',
+    'La memoria integrada requiere un plan Basic o Pro. Mejora tu plan para usarla, o elige otra de las opciones de memoria.',
   'alerts.title': 'Alertas',
   'alerts.empty': 'Sin alertas aún',
   'alerts.markAllRead': 'Marcar todo como leído',

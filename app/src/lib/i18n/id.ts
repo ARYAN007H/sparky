@@ -610,11 +610,11 @@ const messages: TranslationMap = {
   'memory.outOfCredits.title': 'Kredit habis',
   'memory.outOfCredits.action': 'Isi ulang',
   'memory.error.planRequired':
-    'Memori tidak termasuk dalam paket Anda. Tingkatkan paket Anda untuk menggunakannya.',
-  'memory.planRequired.title': 'Tidak termasuk dalam paket Anda',
-  'memory.planRequired.action': 'Tingkatkan',
+    'Paket Anda saat ini tidak mencakup memori, sehingga OpenHuman tidak dapat menyimpan atau mencari apa yang dipelajarinya. Tingkatkan paket untuk mengaktifkan memori, atau beralih ke opsi memori lain di Pengaturan.',
+  'memory.planRequired.title': 'Memori tidak termasuk dalam paket Anda',
+  'memory.planRequired.action': 'Lihat paket',
   'memoryPage.engine.builtin.planRequired':
-    'Paket Anda tidak termasuk memori yang di-hosting oleh TinyHumans. Tingkatkan ke Basic atau Pro untuk menggunakannya.',
+    'Memori bawaan memerlukan paket Basic atau Pro. Tingkatkan paket untuk menggunakannya, atau pilih salah satu opsi memori lainnya.',
   'alerts.title': 'Peringatan',
   'alerts.empty': 'Belum ada peringatan',
   'alerts.markAllRead': 'Tandai semua sudah dibaca',

@@ -4772,11 +4772,11 @@ const messages: TranslationMap = {
   'memory.outOfCredits.title': 'クレジット不足',
   'memory.outOfCredits.action': 'チャージする',
   'memory.error.planRequired':
-    'メモリーはご利用のプランに含まれていません。利用するにはプランをアップグレードしてください。',
-  'memory.planRequired.title': 'プランに含まれていません',
-  'memory.planRequired.action': 'アップグレード',
+    '現在のプランにはメモリが含まれていないため、OpenHuman は学んだことを保存したり参照したりできません。メモリを有効にするにはプランをアップグレードするか、設定で別のメモリオプションに切り替えてください。',
+  'memory.planRequired.title': 'メモリはご利用のプランに含まれていません',
+  'memory.planRequired.action': 'プランを見る',
   'memoryPage.engine.builtin.planRequired':
-    'ご利用のプランには TinyHumans がホストするメモリーが含まれていません。利用するには Basic または Pro にアップグレードしてください。',
+    '内蔵メモリには Basic または Pro プランが必要です。利用するにはアップグレードするか、ほかのメモリオプションを選んでください。',
   'onboarding.custom.search.skipForNow': '今はスキップ',
   'onboarding.custom.search.ready': 'Web検索の準備ができました。',
   'onboarding.custom.search.notReady':

@@ -253,12 +253,12 @@ describe('MemoryEngineTab', () => {
       const panel = pick('builtin');
       expect(within(panel).getByTestId('memory-engine-builtin-submit')).toBeDisabled();
       expect(within(panel).getByTestId('memory-engine-builtin-plan-required')).toHaveTextContent(
-        "Your plan doesn't include memory hosted by TinyHumans."
+        'Built-in memory needs a Basic or Pro plan.'
       );
       fireEvent.click(within(panel).getByTestId('memory-engine-builtin-submit'));
       expect(hoisted.engineSet).not.toHaveBeenCalled();
       expect(within(panel).getByTestId('memory-engine-builtin-upgrade')).toHaveTextContent(
-        'Upgrade'
+        'See plans'
       );
     });
 

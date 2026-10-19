@@ -594,11 +594,11 @@ const messages: TranslationMap = {
   'memory.outOfCredits.title': '크레딧 소진',
   'memory.outOfCredits.action': '충전하기',
   'memory.error.planRequired':
-    '메모리는 현재 요금제에 포함되어 있지 않습니다. 사용하려면 요금제를 업그레이드하세요.',
-  'memory.planRequired.title': '요금제에 포함되지 않음',
-  'memory.planRequired.action': '업그레이드',
+    '현재 요금제에는 메모리가 포함되어 있지 않아 OpenHuman이 학습한 내용을 저장하거나 찾아볼 수 없습니다. 메모리를 켜려면 요금제를 업그레이드하거나, 설정에서 다른 메모리 옵션으로 전환하세요.',
+  'memory.planRequired.title': '메모리는 현재 요금제에 포함되어 있지 않습니다',
+  'memory.planRequired.action': '요금제 보기',
   'memoryPage.engine.builtin.planRequired':
-    '현재 요금제에는 TinyHumans가 호스팅하는 메모리가 포함되어 있지 않습니다. 사용하려면 Basic 또는 Pro로 업그레이드하세요.',
+    '기본 제공 메모리는 Basic 또는 Pro 요금제가 필요합니다. 사용하려면 업그레이드하거나, 다른 메모리 옵션 중 하나를 선택하세요.',
   'alerts.title': '알림',
   'alerts.empty': '아직 알림이 없습니다',
   'alerts.markAllRead': '모두 읽음으로 표시',

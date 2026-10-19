@@ -71,7 +71,10 @@ describe('Memory tabs on a plan without memory (#8081)', () => {
 
       const prompt = await waitForTestId(alert, 20_000);
       expect(await prompt.getAttribute('data-kind')).toBe('plan-required');
-      expect(await prompt.getText()).toContain("Memory isn't included in your plan");
+      const text = await prompt.getText();
+      expect(text).toContain("Your current plan doesn't include memory");
+      // The engine's raw refusal never reaches the user.
+      expect(text).not.toContain('MEMORY_PLAN_REQUIRED');
       await waitForTestId('memory-upgrade', 5_000);
 
       // Still on the Memory page, not bounced to sign-in.

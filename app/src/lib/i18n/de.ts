@@ -621,11 +621,11 @@ const messages: TranslationMap = {
   'memory.outOfCredits.title': 'Kein Guthaben mehr',
   'memory.outOfCredits.action': 'Aufladen',
   'memory.error.planRequired':
-    'Memory ist in deinem Tarif nicht enthalten. Wechsle zu einem höheren Tarif, um es zu nutzen.',
-  'memory.planRequired.title': 'Nicht in deinem Tarif',
-  'memory.planRequired.action': 'Upgrade',
+    'Dein aktueller Tarif enthält kein Gedächtnis, daher kann OpenHuman nicht speichern oder nachschlagen, was es lernt. Wechsle zu einem höheren Tarif, um das Gedächtnis einzuschalten, oder wähle in den Einstellungen eine andere Gedächtnis-Option.',
+  'memory.planRequired.title': 'Gedächtnis ist nicht Teil deines Tarifs',
+  'memory.planRequired.action': 'Tarife ansehen',
   'memoryPage.engine.builtin.planRequired':
-    'Dein Tarif enthält kein von TinyHumans gehostetes Memory. Wechsle zu Basic oder Pro, um es zu nutzen.',
+    'Das integrierte Gedächtnis erfordert einen Basic- oder Pro-Tarif. Wechsle den Tarif, um es zu nutzen, oder wähle eine der anderen Gedächtnis-Optionen.',
   'alerts.title': 'Warnungen',
   'alerts.empty': 'Noch keine Benachrichtigungen',
   'alerts.markAllRead': 'Alle als gelesen markieren',
