@@ -266,6 +266,10 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
         .await
         .unwrap();
     later_external.default_model = Some("external-after-save".into());
+    later_external.memory.agent_id = Some("external-agent".into());
+    later_external.memory.root = Some("team:external".into());
+    later_external.mcp_client.enabled = true;
+    later_external.autonomy.enabled = false;
     later_external.save().await.unwrap();
     let later_conflict = CoreContext::scope(ctx.clone(), async {
         (controller.handler)(
@@ -293,7 +297,10 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
         after_later_conflict.memory.agent_id.as_deref(),
         Some("runtime-memory-agent")
     );
-    assert_eq!(after_later_conflict.memory.root.as_deref(), Some("team:runtime"));
+    assert_eq!(
+        after_later_conflict.memory.root.as_deref(),
+        Some("team:runtime")
+    );
     assert!(!after_later_conflict.mcp_client.enabled);
     assert!(after_later_conflict.autonomy.enabled);
     assert!(after_later_conflict.composio.host_credential.is_some());
