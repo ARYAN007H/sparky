@@ -423,6 +423,7 @@ async fn resolver_loads_saved_flow_graph_by_id() {
     let flow_id = flow.value.id.clone();
 
     let resolver = OpenHumanWorkflowResolver {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
         config: config.clone(),
     };
     let graph = resolver
@@ -439,7 +440,10 @@ async fn resolver_loads_saved_flow_graph_by_id() {
 async fn resolver_unknown_id_is_a_capability_error() {
     let tmp = tempfile::TempDir::new().unwrap();
     let config = Arc::new(resolver_test_config(&tmp));
-    let resolver = OpenHumanWorkflowResolver { config };
+    let resolver = OpenHumanWorkflowResolver {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config,
+    };
 
     let err = resolver
         .resolve("does-not-exist")
@@ -498,7 +502,10 @@ async fn resolver_rejects_an_engine_incompatible_saved_graph() {
     )
     .unwrap();
 
-    let error = OpenHumanWorkflowResolver { config }
+    let error = OpenHumanWorkflowResolver {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config,
+    }
         .resolve(&flow.id)
         .await
         .expect_err("resolver must reject an incompatible legacy child");

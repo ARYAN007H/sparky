@@ -13,7 +13,12 @@ async fn resolver_lookup_rejects_an_incompatible_saved_child() {
     )
     .unwrap();
 
-    let error = load_engine_compatible_flow_graph(&config, &child.id).await
+    let error = load_engine_compatible_flow_graph(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &child.id,
+    )
+    .await
         .expect_err("resolver lookup must reject an unsafe legacy child");
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
@@ -43,7 +48,12 @@ async fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
     )
     .unwrap();
 
-    let error = load_engine_compatible_flow_graph(&config, &child.id).await
+    let error = load_engine_compatible_flow_graph(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &child.id,
+    )
+    .await
         .expect_err("resolver lookup must reject an unsafe saved grandchild");
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
