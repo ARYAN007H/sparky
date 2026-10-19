@@ -218,6 +218,7 @@ impl CoreError {
             | CoreError::InsecureRoute { method, .. }
             | CoreError::InvalidRoute { method }
             | CoreError::AgentRemoved { method, .. }
+            | CoreError::DispatchAdmission { method, .. }
             | CoreError::TurnCancelled { method } => method,
         }
     }

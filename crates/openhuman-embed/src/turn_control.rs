@@ -437,6 +437,7 @@ impl Turn {
                 crate::error::CoreError::InsecureRoute { .. } => "insecure_route",
                 crate::error::CoreError::InvalidRoute { .. } => "invalid_route",
                 crate::error::CoreError::AgentRemoved { .. } => "agent_removed",
+                crate::error::CoreError::DispatchAdmission { .. } => "dispatch_admission",
             };
             log::debug!("[embed][agent] turn_failed session={session_id} kind={tag}");
         });
