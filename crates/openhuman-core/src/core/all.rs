@@ -288,6 +288,7 @@ fn extension_namespace_description(namespace: &str) -> Option<&'static str> {
 /// Returns a reference to the global CLI adapter registry.
 fn cli_adapters() -> &'static [RegisteredCliAdapter] {
     CLI_ADAPTERS.get_or_init(|| {
+        vec![
             // Bare `openhuman subsystems` prints the slot table; `openhuman
             // subsystems status` still routes through the generic namespace
             // dispatcher and prints JSON.
