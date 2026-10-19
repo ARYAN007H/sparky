@@ -1201,12 +1201,6 @@ async fn config_env_overlay_public_loader_applies_runtime_and_tool_overrides() {
         EnvVarGuard::set("OPENHUMAN_AUTO_UPDATE_INTERVAL_MINUTES", "1440"),
         EnvVarGuard::set("OPENHUMAN_AUTO_UPDATE_RESTART_STRATEGY", "supervisor"),
         EnvVarGuard::set("OPENHUMAN_AUTO_UPDATE_RPC_MUTATIONS_ENABLED", "false"),
-        EnvVarGuard::set("OPENHUMAN_DICTATION_ENABLED", "true"),
-        EnvVarGuard::set("OPENHUMAN_DICTATION_HOTKEY", "CmdOrCtrl+Shift+D"),
-        EnvVarGuard::set("OPENHUMAN_DICTATION_ACTIVATION_MODE", "toggle"),
-        EnvVarGuard::set("OPENHUMAN_DICTATION_LLM_REFINEMENT", "false"),
-        EnvVarGuard::set("OPENHUMAN_DICTATION_STREAMING", "false"),
-        EnvVarGuard::set("OPENHUMAN_DICTATION_STREAMING_INTERVAL_MS", "333"),
         EnvVarGuard::set("OPENHUMAN_CONTEXT_ENABLED", "false"),
         EnvVarGuard::set("OPENHUMAN_CONTEXT_MICROCOMPACT_ENABLED", "false"),
         EnvVarGuard::set("OPENHUMAN_CONTEXT_AUTOCOMPACT_ENABLED", "false"),
@@ -1262,15 +1256,6 @@ async fn config_env_overlay_public_loader_applies_runtime_and_tool_overrides() {
         UpdateRestartStrategy::Supervisor
     );
     assert!(!config.update.rpc_mutations_enabled);
-    assert!(config.dictation.enabled);
-    assert_eq!(config.dictation.hotkey, "CmdOrCtrl+Shift+D");
-    assert_eq!(
-        config.dictation.activation_mode,
-        DictationActivationMode::Toggle
-    );
-    assert!(!config.dictation.llm_refinement);
-    assert!(!config.dictation.streaming);
-    assert_eq!(config.dictation.streaming_interval_ms, 333);
     assert!(!config.context.enabled);
     assert!(!config.context.microcompact_enabled);
     assert!(!config.context.autocompact_enabled);
