@@ -480,7 +480,7 @@ pub fn all_tools_with_runtime(
         tools.push(Box::new(DelegateTool::new_with_options(
             delegate_agents,
             security.clone(),
-            crate::inference::provider::ProviderRuntimeOptions {
+            crate::tools::delegate::ProviderRuntimeOptions {
                 auth_profile_override: None,
                 openhuman_dir: root_config
                     .config_path

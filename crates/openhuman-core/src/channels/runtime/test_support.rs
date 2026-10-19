@@ -12,7 +12,7 @@ use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::inference::provider::ProviderRuntimeOptions;
+use crate::tools::delegate::ProviderRuntimeOptions;
 use crate::progress::AgentProgress;
 use anyhow::Result;
 use async_trait::async_trait;
