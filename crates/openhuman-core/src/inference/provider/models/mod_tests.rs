@@ -1,6 +1,7 @@
 use super::*;
-use catalog_listing::resolve_local_runtime_key;
+
 use crate::config::Config;
+use catalog_listing::resolve_local_runtime_key;
 
 #[test]
 fn omlx_key_falls_back_to_local_ai_api_key() {
