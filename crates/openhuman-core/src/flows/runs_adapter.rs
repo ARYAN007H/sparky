@@ -360,7 +360,10 @@ pub(crate) async fn cancel_run(
         )
         .await
         .map_err(|error| error.wire_message())?;
-    let was_in_flight = response.signalled && active.is_some();
+    let was_in_flight = response.signalled
+        && active
+            .as_ref()
+            .is_some_and(|session| session.is_live_actor());
     Ok((response.signalled, was_in_flight))
 }
 

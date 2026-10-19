@@ -183,6 +183,10 @@ impl RunSession {
         self.live_actor.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    pub(super) fn is_live_actor(&self) -> bool {
+        self.live_actor.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     pub(super) fn key(&self) -> RunKey {
         let bindings = self
             .bindings
