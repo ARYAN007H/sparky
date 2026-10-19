@@ -1,4 +1,4 @@
-//! Handlers for provider settings, model listing, provider testing, and server lifecycle.
+//! Handlers for provider settings, model listing, and provider testing.
 
 use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
@@ -10,8 +10,8 @@ use crate::voice::schemas::helpers::{
     validate_tts_provider,
 };
 use crate::voice::schemas::params::{
-    OverlaySttNotifyParams, OverlaySttState, SetProvidersParams, VoiceListModelsParams,
-    VoiceTestProviderParams, VoiceUpdateProviderSettingsParams,
+    SetProvidersParams, VoiceListModelsParams, VoiceTestProviderParams,
+    VoiceUpdateProviderSettingsParams,
 };
 
 // ---------------------------------------------------------------------------
@@ -418,10 +418,6 @@ pub(crate) fn handle_voice_test_provider(
         }
     })
 }
-
-// ---------------------------------------------------------------------------
-// Voice server lifecycle handlers
-// ---------------------------------------------------------------------------
 
 pub(crate) fn handle_voice_server_start(
     ctx: DispatchCtx,
