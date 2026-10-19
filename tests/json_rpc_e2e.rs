@@ -8258,7 +8258,12 @@ async fn credential_channel_describe_fields_are_wired_over_json_rpc_e2e() {
     let rpc_base = format!("http://{}", rpc_addr);
 
     for (id, channel, required_fields, optional_default) in [
-        (7004, "email", vec!["imap_host", "username", "password", "smtp_host"], Some(("smtp_tls", true))),
+        (
+            7004,
+            "email",
+            vec!["imap_host", "username", "password", "smtp_host"],
+            Some(("smtp_tls", true)),
+        ),
         (7005, "yuanbao", vec!["app_key", "app_secret"], None),
     ] {
         let response = post_json_rpc(
@@ -8278,7 +8283,11 @@ async fn credential_channel_describe_fields_are_wired_over_json_rpc_e2e() {
         let api_key = description
             .get("auth_modes")
             .and_then(Value::as_array)
-            .and_then(|modes| modes.iter().find(|mode| mode.get("mode").and_then(Value::as_str) == Some("api_key")))
+            .and_then(|modes| {
+                modes
+                    .iter()
+                    .find(|mode| mode.get("mode").and_then(Value::as_str) == Some("api_key"))
+            })
             .unwrap_or_else(|| panic!("{channel} has no api_key auth mode: {description}"));
         let fields = api_key
             .get("fields")
