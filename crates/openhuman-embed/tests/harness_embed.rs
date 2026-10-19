@@ -70,8 +70,8 @@ const STEP_BUDGET: std::time::Duration = std::time::Duration::from_secs(180);
 const RUNTIME_SHUTDOWN: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Runs `step` for at most `STEP_BUDGET`, failing with its `name` otherwise.
-async fn bounded<T>(name: &str, step: impl std::future::Future<Output = T>) -> T {
-    tokio::time::timeout(STEP_BUDGET, step)
+async fn bounded<T>(name: &str, step: impl std::future::IntoFuture<Output = T>) -> T {
+    tokio::time::timeout(STEP_BUDGET, step.into_future())
         .await
         .unwrap_or_else(|_| panic!("{name} did not finish within {STEP_BUDGET:?}"))
 }
