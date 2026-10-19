@@ -142,13 +142,6 @@ fn coding_agent_prompts_reference_action_sandbox_not_stale_workspace() {
         "guides/coding.md must reference the action sandbox or action_dir (see #3236)"
     );
 
-    let planner = include_str!("planner/prompt.md");
-    assert!(
-        !planner.contains("the workspace has code"),
-        "planner/prompt.md still says 'the workspace has code …' — \
-         use 'the project tree' or similar to avoid colliding with \
-         `Config.workspace_dir` (internal product state). See #3236."
-    );
 }
 
 #[test]
@@ -407,95 +400,9 @@ fn broad_agent_surfaces_expose_storage_transfer_not_lifecycle_tools() {
 }
 
 #[test]
-fn critic_is_read_only() {
-    let def = find("critic");
-    assert_eq!(def.sandbox_mode, SandboxMode::ReadOnly);
-    assert!(def.extensions.omit_safety_preamble);
-}
-
-/// Planner runs `composio_execute` so it can ground plans in real
-/// integration data, but it must stay strictly read-only — issue
-/// #685. `sandbox_mode = "read_only"` in `planner/agent.toml` is the
-/// runtime hook that activates the agent-level gate inside
-/// `ComposioExecuteTool::execute`; this test pins that contract so a
-/// future TOML edit that drops the sandbox mode can never silently
-/// turn the planner into a write-capable agent.
-#[test]
-fn planner_is_read_only_with_composio_meta_tools() {
-    let def = find("planner");
-    assert_eq!(
-        def.sandbox_mode,
-        SandboxMode::ReadOnly,
-        "planner.sandbox_mode must be read_only — gates Write/Admin composio actions",
-    );
-    match &def.tools {
-        ToolScope::Named(names) => {
-            for required in [
-                "composio_list_toolkits",
-                "composio_list_connections",
-                "composio_list_tools",
-                "composio_execute",
-            ] {
-                assert!(
-                    names.iter().any(|n| n == required),
-                    "planner tool list missing `{required}` — composio meta-tools must \
-                     all be present so the planner can inspect integrations under the \
-                     read-only sandbox gate",
-                );
-            }
-        }
-        other => panic!("planner must use Named tool scope, got {other:?}"),
-    }
-}
-
-/// The planner grounds plans in connected-MCP context the same way it
-/// grounds in Composio — but read-only. It must carry the MCP *discovery*
-/// tools (`status` / `installed_list` / `list_tools`, all
-/// `PermissionLevel::ReadOnly`) and must NOT carry `mcp_registry_tool_call`
-/// (no read-only gate exists for an arbitrary MCP tool call) nor the
-/// install/connect mutators. Execution stays with the orchestrator.
-#[test]
-fn planner_has_readonly_mcp_discovery_not_execute() {
-    let def = find("planner");
-    assert_eq!(def.sandbox_mode, SandboxMode::ReadOnly);
-    match &def.tools {
-        ToolScope::Named(names) => {
-            for required in [
-                "mcp_registry_status",
-                "mcp_registry_installed_list",
-                "mcp_registry_list_tools",
-            ] {
-                assert!(
-                    names.iter().any(|n| n == required),
-                    "planner needs read-only MCP discovery tool `{required}`"
-                );
-            }
-            for forbidden in [
-                "mcp_registry_tool_call",
-                "mcp_registry_connect",
-                "mcp_registry_install",
-                "mcp_registry_uninstall",
-            ] {
-                assert!(
-                    !names.iter().any(|n| n == forbidden),
-                    "planner must NOT have `{forbidden}` — it is read-only; MCP execution \
-                     belongs to the orchestrator"
-                );
-            }
-        }
-        other => panic!("planner must use Named tool scope, got {other:?}"),
-    }
-}
-
-/// The specialists the inline skills replaced must not come back as
-/// orchestrator delegates, and the ones kept for workflow runs must not
-/// become chat delegates.
-#[test]
-fn the_orchestrator_lists_no_replaced_or_workflow_only_specialist() {
+fn the_orchestrator_lists_no_replaced_specialist() {
     let orchestrator = find("orchestrator");
     for id in [
-        "planner",
-        "critic",
         "code_executor",
         "settings_agent",
         "scheduler_agent",
@@ -529,15 +436,6 @@ fn orchestrator_omits_removed_prompt_tools() {
         assert!(
             !tools.iter().any(|tool| tool == removed),
             "`{removed}` must not appear in the orchestrator tool list"
-        );
-    }
-    for removed in ["critic", "planner"] {
-        assert!(
-            !orchestrator
-                .subagents
-                .iter()
-                .any(|entry| matches!(entry, SubagentEntry::AgentId(id) if id == removed)),
-            "`{removed}` adds a delegate tool to the orchestrator prompt"
         );
     }
 }

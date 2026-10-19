@@ -271,22 +271,6 @@ fn morning_briefing_is_read_only() {
 }
 
 #[test]
-fn chatty_sub_agents_have_bounded_output() {
-    // critic results flow up verbatim. Without a cap the output is
-    // unbounded and bloats the caller's context (#4099), so it must carry
-    // the normal sub-agent cap so a long diff review can't leak unbounded
-    // text.
-    assert_eq!(
-        find("critic").max_result_chars,
-        Some(8000),
-        "critic output must be bounded so reviews don't leak unbounded text up"
-    );
-}
-
-/// R4 regression: `hint:vision` is deprecated (`vision-v1` silently falls
-/// back to the chat default on managed routes, with no error), so no
-/// built-in agent may still declare `ModelSpec::Hint("vision")`.
-#[test]
 fn no_builtin_agent_declares_the_deprecated_vision_hint() {
     for def in load_builtins().expect("built-ins load") {
         assert!(
