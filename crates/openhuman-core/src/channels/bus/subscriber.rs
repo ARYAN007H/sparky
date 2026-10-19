@@ -266,7 +266,10 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
         }
         }).await;
         if wait.is_err() {
-            tracing::error!("[channel-inbound] agent timed out after {}s", timeout.as_secs());
+            tracing::error!(
+                "[channel-inbound] agent timed out after {}s",
+                timeout.as_secs()
+            );
             let _ = reply.finalize("Sorry, the request timed out.").await;
         }
     }

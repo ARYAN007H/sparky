@@ -24,7 +24,8 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
             tokio::time::sleep(Duration::from_secs(100)).await;
             tx.send("progress").expect("event consumer remains active");
             tokio::time::sleep(Duration::from_secs(101)).await;
-            tx.send("terminal").expect("terminal consumer remains active");
+            tx.send("terminal")
+                .expect("terminal consumer remains active");
         };
         let (progress, ()) = tokio::join!(consumer, producer);
         progress
@@ -34,5 +35,8 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
         let _progress_count = event_loop.await;
     })
     .await;
-    assert!(result.is_ok(), "the live turn should reach its terminal event after 201 seconds");
+    assert!(
+        result.is_ok(),
+        "the live turn should reach its terminal event after 201 seconds"
+    );
 }
