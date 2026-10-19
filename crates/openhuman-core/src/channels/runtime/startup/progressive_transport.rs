@@ -227,14 +227,16 @@ fn receipt_matches_scope(
     channel: Option<&tinychannels_bus::ChannelRef>,
     conversation: Option<&tinychannels_bus::ConversationRef>,
 ) -> bool {
-    receipt.channel.as_ref().is_some_and(|receipt_channel| {
-        channel.is_some_and(|channel| receipt_channel == channel)
-    }) && receipt
-        .conversation
+    receipt
+        .channel
         .as_ref()
-        .is_some_and(|receipt_conversation| {
-            conversation.is_some_and(|conversation| receipt_conversation == conversation)
-        })
+        .is_some_and(|receipt_channel| channel.is_some_and(|channel| receipt_channel == channel))
+        && receipt
+            .conversation
+            .as_ref()
+            .is_some_and(|receipt_conversation| {
+                conversation.is_some_and(|conversation| receipt_conversation == conversation)
+            })
 }
 
 fn receipt_contains_message(receipt: &tinychannels_bus::channel::MessageReceipt, id: &str) -> bool {

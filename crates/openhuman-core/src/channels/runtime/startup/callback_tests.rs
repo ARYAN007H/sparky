@@ -520,7 +520,7 @@ async fn native_progressive_output_event_validates_scope_before_observer() {
 async fn native_progressive_callbacks_stop_after_channel_session_cancellation() {
     let observer = Arc::new(RecordingOutputObserver::default());
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
-    let (callback, _context) = callback_for_channels(
+    let (mut callback, _context) = callback_for_channels(
         HashMap::from([("telegram:bot-b".into(), adapter.clone() as Arc<dyn Channel>)]),
         HashMap::from([(
             "telegram:bot-b".into(),
@@ -529,6 +529,7 @@ async fn native_progressive_callbacks_stop_after_channel_session_cancellation() 
         Some(observer.clone() as Arc<dyn ProgressiveOutputObserver>),
     );
 
+    callback.cancellation = tokio_util::sync::CancellationToken::new();
     callback.cancellation.cancel();
     assert!(callback
         .dispatch_controller_backend(output_event_request(
@@ -539,4 +540,28 @@ async fn native_progressive_callbacks_stop_after_channel_session_cancellation() 
         .await
         .is_err());
     assert!(observer.seen.lock().await.is_empty());
+}
+
+#[tokio::test]
+async fn native_progressive_callbacks_fail_closed_after_transport_owner_drops() {
+    let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
+    let (callback, context) = callback_for_channels(
+        HashMap::from([("telegram:bot-b".into(), adapter.clone() as Arc<dyn Channel>)]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            adapter.clone() as Arc<dyn ProgressiveChannelTransport>,
+        )]),
+        None,
+    );
+    drop(context);
+    drop(adapter);
+
+    assert!(callback
+        .dispatch_controller_backend(output_event_request(
+            Some("telegram:bot-b"),
+            Some("chat-42"),
+            Some("turn-16"),
+        ))
+        .await
+        .is_err());
 }
