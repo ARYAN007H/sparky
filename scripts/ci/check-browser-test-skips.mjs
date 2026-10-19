@@ -11,14 +11,31 @@ const requireFromApp = createRequire(
 const ts = requireFromApp("typescript");
 const issueUrl = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+/;
 
-export function untrackedSkipLines(source) {
+function scriptKindFor(fileName) {
+  const extension = fileName.toLowerCase().slice(fileName.lastIndexOf("."));
+  if (extension === ".tsx") return ts.ScriptKind.TSX;
+  if (extension === ".jsx") return ts.ScriptKind.JSX;
+  if ([".js", ".mjs", ".cjs"].includes(extension)) return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
+export function untrackedSkipLines(source, fileName = "browser-spec.ts") {
   const sourceFile = ts.createSourceFile(
-    "browser-spec.tsx",
+    fileName,
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TSX,
+    scriptKindFor(fileName),
   );
+  if (sourceFile.parseDiagnostics.length > 0) {
+    const diagnostic = sourceFile.parseDiagnostics[0];
+    const location = diagnostic.start === undefined
+      ? ""
+      : ` at line ${sourceFile.getLineAndCharacterOfPosition(diagnostic.start).line + 1}`;
+    throw new Error(
+      `Could not parse ${fileName}${location}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`,
+    );
+  }
   const lines = source.split("\n");
   const failures = [];
 
@@ -63,7 +80,7 @@ if (
   }
   const failures = [];
   for (const file of files) {
-    const badLines = untrackedSkipLines(readFileSync(file, "utf8"));
+    const badLines = untrackedSkipLines(readFileSync(file, "utf8"), file);
     failures.push(...badLines.map((line) => `${file}:${line}`));
   }
   if (failures.length) {

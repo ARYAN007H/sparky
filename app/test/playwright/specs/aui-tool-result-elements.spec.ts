@@ -296,8 +296,14 @@ test.describe('assistant-ui tool-result elements', () => {
     ]);
 
     await sendTurn(page, threadId, 'AUI-DOC-CASE write up the infrastructure review');
-    const group = await openActivityGroup(page);
-    const card = group.locator('[data-slot="artifact-card"]').last();
+    // `generate_document` is registered as `display: standalone`; assistant-ui
+    // deliberately leaves it outside the normal activity disclosure group.
+    // Scope the element through its actual assistant-message content instead.
+    const artifactMessage = page
+      .locator('[data-slot="aui_assistant-message-content"]')
+      .filter({ has: page.locator('[data-slot="artifact-card"]') })
+      .last();
+    const card = artifactMessage.locator('[data-slot="artifact-card"]').last();
     await expect(card).toBeVisible({ timeout: 20_000 });
 
     // The point of this assertion. `DocumentArtifactCall` resolves the title as

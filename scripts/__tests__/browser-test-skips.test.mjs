@@ -59,3 +59,31 @@ test("ignores regex literals without letting their delimiters hide executable ca
     "4: this.skip();",
   ]);
 });
+
+test("parses TypeScript and TSX using each spec's actual language mode", () => {
+  const typescript = [
+    "const asserted = <number>other;",
+    "it.skip('unlinked after angle assertion');",
+    "const identity = <T>(value: T) => value;",
+    "test.skip('unlinked after generic arrow');",
+  ].join("\n");
+  const tsx = [
+    "const element = <section />;",
+    "describe.skip('unlinked after JSX');",
+  ].join("\n");
+
+  assert.deepEqual(untrackedSkipLines(typescript, "fixture.spec.ts"), [
+    "2: it.skip('unlinked after angle assertion');",
+    "4: test.skip('unlinked after generic arrow');",
+  ]);
+  assert.deepEqual(untrackedSkipLines(tsx, "fixture.spec.tsx"), [
+    "2: describe.skip('unlinked after JSX');",
+  ]);
+});
+
+test("fails closed when a browser spec cannot be parsed", () => {
+  assert.throws(
+    () => untrackedSkipLines("const = ;\ntest.skip('unlinked');", "broken.spec.ts"),
+    /Could not parse broken\.spec\.ts at line 1/,
+  );
+});
