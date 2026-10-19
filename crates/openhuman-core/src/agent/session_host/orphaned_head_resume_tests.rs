@@ -180,3 +180,87 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
         .iter()
         .any(|m| matches!(m, Message::Tool(t) if t.tool_call_id.starts_with("call_orphan"))));
 }
+
+#[test]
+fn credential_redaction_is_sent_and_persisted_across_session_resume() {
+    std::thread::Builder::new()
+        .stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .spawn(|| {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("test runtime")
+                .block_on(credential_redaction_survives_resume());
+        })
+        .expect("test thread")
+        .join()
+        .expect("test thread panicked");
+}
+
+async fn credential_redaction_survives_resume() {
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let root = tempfile::tempdir().expect("tempdir");
+    let locator = memory_locator();
+    let model = Arc::new(
+        tinyagents_harness::testkit::ScriptedModel::replies(vec!["first reply", "second reply"])
+            .with_profile(tinyinference_llm::model::ModelProfile {
+                tool_calling: true,
+                ..Default::default()
+            }),
+    );
+    let chat_model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = model.clone();
+    let new_host = || {
+        crate::agent::SessionHostBuilder::new()
+            .with_session_history_locator(Arc::clone(&locator))
+            .chat_model(chat_model.clone())
+            .tools(Vec::new())
+            .workspace_dir(root.path().join("workspace"))
+            .action_dir(root.path().to_path_buf())
+            .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
+            .build()
+            .expect("session build")
+    };
+    let secret: String = [
+        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+        'o', 'p',
+    ]
+    .into_iter()
+    .collect();
+    let original = format!("Use this synthetic credential: {secret}");
+    let redacted = tinyinference_core::sanitize::scrub_credentials(&original);
+
+    let mut host = new_host();
+    host.set_thread_id(Some("thread-credential-redaction"));
+    assert_eq!(host.turn(&original).await.unwrap(), "first reply");
+    drop(host);
+
+    let first_request = model.requests().into_iter().next().expect("first model call");
+    let first_user = first_request
+        .messages
+        .iter()
+        .find(|message| matches!(message, Message::User(_)))
+        .expect("user row sent to provider")
+        .text();
+    assert_eq!(first_user, redacted);
+    assert!(!first_user.contains(&secret));
+    let persisted = head_of(&locator, "thread-credential-redaction");
+    let persisted_json = serde_json::to_string(&persisted).expect("serialize transcript");
+    assert!(!persisted_json.contains(&secret));
+    assert!(persisted_json.contains(&redacted));
+
+    let mut resumed = new_host();
+    resumed.set_thread_id(Some("thread-credential-redaction"));
+    assert!(resumed.resume_bound_session().await.unwrap());
+    assert_eq!(resumed.turn("continue safely").await.unwrap(), "second reply");
+    let requests = model.requests();
+    let resumed_request = requests.last().expect("resumed model call");
+    let resumed_users: Vec<String> = resumed_request
+        .messages
+        .iter()
+        .filter(|message| matches!(message, Message::User(_)))
+        .map(Message::text)
+        .collect();
+    assert!(resumed_users.iter().any(|message| message == &redacted));
+    assert!(resumed_users.iter().all(|message| !message.contains(&secret)));
+}
