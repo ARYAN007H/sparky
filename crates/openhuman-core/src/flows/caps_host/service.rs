@@ -3,14 +3,14 @@
 use std::sync::Arc;
 
 use serde_json::{Value, json};
-use tinyflows_bus::runs::{self, caps as members};
+use tinyflows_bus::runs;
 
 use crate::security::credentials::HttpCredentialsStore;
 
 use super::binding::CapsHostBinding;
 use super::{
-    EngineError, OpenHumanAgentRunner, OpenHumanCode, OpenHumanHttp, OpenHumanLlm,
-    OpenHumanMemory, OpenHumanTools,
+    OpenHumanAgentRunner, OpenHumanCode, OpenHumanHttp, OpenHumanLlm, OpenHumanMemory,
+    OpenHumanTools,
 };
 
 pub(crate) struct CapsHostService(Arc<CapsHostBinding>);
