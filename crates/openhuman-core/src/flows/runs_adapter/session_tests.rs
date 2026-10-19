@@ -104,6 +104,18 @@ async fn private_agent_progress_advances_cursor_without_leaking_text_or_replayin
     assert_eq!(session.cursor(), 2);
     assert!(!session.consume(&finished, true).await);
 
+    for _ in 0..20 {
+        if collector
+            .finished
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(id, _)| id == &run_id)
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
     let mut terminal_events = collector.finished.lock().unwrap().clone();
     terminal_events.retain(|(id, _)| id == &run_id);
     assert_eq!(terminal_events, [(run_id, "completed".into())]);
