@@ -245,15 +245,16 @@ async fn stamped_channel_forget_isolated_to_the_configured_account() {
     )
     .await;
 
-    assert_eq!(
+    let (forgotten, queued) =
         CoreContext::scope(current_ctx.into_core().unwrap(), async {
-            clear_channel_memory(&current, "discord").await.unwrap()
+            let forgotten = clear_channel_memory(&current, "discord").await.unwrap();
+            let queued = crate::memory::deletion::pending(&current.workspace_dir);
+            (forgotten, queued)
         })
-        .await,
-        0
-    );
+        .await;
+    assert_eq!(forgotten, 0);
     assert_eq!(
-        crate::memory::deletion::pending(&current.workspace_dir),
+        queued,
         vec![crate::memory::deletion::PendingDeletion::Thread {
             thread_id: current_thread.clone()
         }]
