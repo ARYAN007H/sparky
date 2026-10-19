@@ -79,6 +79,20 @@ impl CatalogStorageRegistration {
 static REGISTRATIONS: LazyLock<tokio::sync::Mutex<HashMap<RegistrationKey, Arc<CatalogStorageRegistration>>>> =
     LazyLock::new(|| tokio::sync::Mutex::new(HashMap::new()));
 
+#[cfg(test)]
+struct RegistrationGate {
+    entered: tokio::sync::oneshot::Sender<()>,
+    release: tokio::sync::oneshot::Receiver<()>,
+}
+
+#[cfg(test)]
+static REGISTRATION_GATES: LazyLock<std::sync::Mutex<HashMap<String, RegistrationGate>>> =
+    LazyLock::new(Default::default);
+
+#[cfg(test)]
+static REGISTRATION_SERVE_COUNTS: LazyLock<std::sync::Mutex<HashMap<String, usize>>> =
+    LazyLock::new(Default::default);
+
 /// Register or retrieve the CatalogStorage callback for this dispatch's scope.
 ///
 /// Registration work runs on the process-lifetime module runtime. Cancelling
@@ -117,6 +131,8 @@ pub(crate) async fn register(
                 CatalogStoragePort { scope: documents },
             )
             .await?;
+            #[cfg(test)]
+            pause_before_cache_insert(&path).await;
             let registration = Arc::new(CatalogStorageRegistration {
                 address: CallbackAddress {
                     destination: module::HOST_BUS_NAME.to_owned(),
@@ -129,6 +145,24 @@ pub(crate) async fn register(
         })
         .await
         .map_err(|error| format!("CatalogStorage registration task did not finish: {error}"))?
+}
+
+#[cfg(test)]
+async fn pause_before_cache_insert(path: &str) {
+    let gate = REGISTRATION_GATES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .remove(path);
+    if let Some(gate) = gate {
+        REGISTRATION_SERVE_COUNTS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .entry(path.to_owned())
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+        let _ = gate.entered.send(());
+        let _ = gate.release.await;
+    }
 }
 
 fn path_for(key: &RegistrationKey) -> String {
@@ -174,6 +208,11 @@ const SHARED_COLLECTIONS: [&str; 4] = [
     "tsd.counters",
     "tsd.migrations",
 ];
+const GRAPH_COLLECTIONS: [&str; 3] = [
+    "graph.checkpoints",
+    "graph.threads",
+    "graph.writes",
+];
 const FLOW_KEY_PREFIX: &str = "flows/";
 const FLOW_MIGRATION_IDS: [&str; 6] = [
     "flows/flows.definitions/definitions_v2",
@@ -201,7 +240,9 @@ fn allowed_record(collection: &str, id: &str) -> Result<(), StorageError> {
             "record is outside the catalog migration progress keys",
         ));
     }
-    if SHARED_COLLECTIONS.contains(&collection) && !id.starts_with(FLOW_KEY_PREFIX) {
+    if (SHARED_COLLECTIONS.contains(&collection) || GRAPH_COLLECTIONS.contains(&collection))
+        && !id.starts_with(FLOW_KEY_PREFIX)
+    {
         return Err(StorageError::invalid_input(
             "record is outside the workflow catalog owner's keys",
         ));
@@ -340,7 +381,10 @@ impl CatalogStoragePort {
     async fn doc_query(&self, request: DocQueryRequest) -> BusResult<CatalogStorageReply> {
         let result = async {
             allowed_set(&request.collection)?;
-            let query: Query = decoded(encoded(request.query)?)?;
+            let mut query: Query = decoded(encoded(request.query)?)?;
+            if GRAPH_COLLECTIONS.contains(&request.collection.as_str()) {
+                query.filter = Filter::eq("ns", "flows").and(query.filter);
+            }
             let page: Page<Versioned<Value>> = self
                 .scope
                 .documents()?
@@ -375,7 +419,10 @@ impl CatalogStoragePort {
     ) -> BusResult<CatalogStorageReply> {
         let result = async {
             allowed_set(&request.collection)?;
-            let filter: Filter = decoded(encoded(request.filter)?)?;
+            let mut filter: Filter = decoded(encoded(request.filter)?)?;
+            if GRAPH_COLLECTIONS.contains(&request.collection.as_str()) {
+                filter = Filter::eq("ns", "flows").and(filter);
+            }
             self.scope
                 .documents()?
                 .delete_where(&request.collection, &filter)
