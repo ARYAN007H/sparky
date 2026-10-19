@@ -19,7 +19,6 @@ fn base() -> GenerateDocumentInput {
     }
 }
 
-
 #[test]
 fn tinydocs_invalid_input_keeps_its_field_and_reason() {
     // The structured pair is what the agent self-corrects on, so the

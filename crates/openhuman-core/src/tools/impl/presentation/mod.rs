@@ -50,9 +50,8 @@ mod tests;
 use tinydocs_bus::spec::SlideImage;
 
 use self::types::{
-    to_bus_spec, validate_image_references, GeneratePresentationInput,
-    GeneratePresentationOutput, PresentationError, SlideImageRequest, SlideImageSource,
-    MAX_IMAGE_BYTES,
+    to_bus_spec, validate_image_references, GeneratePresentationInput, GeneratePresentationOutput,
+    PresentationError, SlideImageRequest, SlideImageSource, MAX_IMAGE_BYTES,
 };
 
 /// Generation timeout. `ppt-rs` typically completes the full 64-slide

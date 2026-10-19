@@ -94,10 +94,6 @@ fn description_includes_router_rules() {
     assert!(desc.contains("document") || desc.contains("docx"));
 }
 
-
-
-
-
 #[tokio::test]
 async fn execute_rejects_too_many_sections() {
     let ws = workspace();
@@ -109,7 +105,9 @@ async fn execute_rejects_too_many_sections() {
     let result = tool.execute(args).await.expect("execute returns Ok");
     assert!(result.is_error);
     assert!(
-        result.text().contains(&format!("must contain ≤ {MAX_SECTIONS} sections")),
+        result
+            .text()
+            .contains(&format!("must contain ≤ {MAX_SECTIONS} sections")),
         "the tool should preserve the bus limit in its error: {}",
         result.text()
     );

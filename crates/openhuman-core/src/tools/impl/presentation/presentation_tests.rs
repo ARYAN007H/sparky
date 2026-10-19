@@ -99,10 +99,6 @@ fn description_includes_router_rules() {
     assert!(desc.contains("slides") || desc.contains("deck") || desc.contains("presentation"));
 }
 
-
-
-
-
 #[tokio::test]
 async fn execute_rejects_too_many_slides() {
     let ws = workspace();
@@ -140,7 +136,9 @@ fn resolved_presentation_uses_bus_validation_and_preserves_its_limit_error() {
     let images = vec![Vec::new(); input.slides.len()];
     let spec = super::types::to_bus_spec(&input, &images).expect("one image list per slide");
 
-    let error = spec.validate().expect_err("the bus slide limit is enforced");
+    let error = spec
+        .validate()
+        .expect_err("the bus slide limit is enforced");
     let error = PresentationError::from(error);
     match error {
         PresentationError::InvalidInput { field, reason } => {
@@ -433,7 +431,10 @@ async fn execute_rejects_too_many_images_per_deck() {
         "slides": [{ "title": "Slide", "bullets": ["x"], "images": images }]
     });
     let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error, "9 resolved images should exceed the bus limit");
+    assert!(
+        result.is_error,
+        "9 resolved images should exceed the bus limit"
+    );
     assert!(
         result.text().contains("must contain ≤ 8 images total"),
         "the tool should preserve the bus limit in its error: {}",
