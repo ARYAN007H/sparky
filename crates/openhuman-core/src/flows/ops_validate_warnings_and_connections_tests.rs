@@ -175,12 +175,7 @@ async fn parked_run_ttl_sweep_expires_stale_runs_but_spares_fresh_ones() {
 
 #[tokio::test]
 async fn flows_validate_warns_on_unfired_webhook_trigger() {
-    let outcome = flows_validate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &Config::default(),
-        webhook_trigger_graph(),
-    )
-    .await;
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), webhook_trigger_graph()).await;
     assert!(outcome.value.valid, "a webhook graph is structurally valid");
     assert!(outcome.value.errors.is_empty());
     assert_eq!(
@@ -199,12 +194,7 @@ async fn flows_validate_warns_on_unfired_webhook_trigger() {
 
 #[tokio::test]
 async fn flows_validate_does_not_warn_on_schedule_trigger() {
-    let outcome = flows_validate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &Config::default(),
-        schedule_trigger_graph("0 9 * * *"),
-    )
-    .await;
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), schedule_trigger_graph("0 9 * * *")).await;
     assert!(outcome.value.valid);
     assert!(
         outcome.value.warnings.is_empty(),
@@ -220,12 +210,7 @@ async fn flows_validate_reports_error_for_graph_without_trigger() {
         "nodes": [ { "id": "a", "kind": "output_parser", "name": "A" } ],
         "edges": []
     });
-    let outcome = flows_validate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &Config::default(),
-        graph,
-    )
-    .await;
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), graph).await;
     assert!(!outcome.value.valid);
     assert_eq!(outcome.value.errors.len(), 1);
     assert!(outcome.value.errors[0].contains("trigger"));
@@ -248,12 +233,7 @@ async fn flows_validate_accumulates_every_structural_error() {
         ],
         "edges": [ { "from_node": "dup", "to_node": "ghost" } ]
     });
-    let outcome = flows_validate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &Config::default(),
-        graph,
-    )
-    .await;
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), graph).await;
     assert!(!outcome.value.valid);
     // errors[] and error_details[] must be 1:1.
     assert_eq!(
@@ -303,12 +283,7 @@ async fn flows_validate_reports_unparseable_graph_as_single_error() {
         "nodes": [ { "id": "a", "kind": "not_a_real_kind", "name": "A" } ],
         "edges": []
     });
-    let outcome = flows_validate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &Config::default(),
-        graph,
-    )
-    .await;
+    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), graph).await;
     assert!(!outcome.value.valid);
     assert_eq!(outcome.value.errors.len(), 1);
     assert_eq!(outcome.value.error_details.len(), 1);

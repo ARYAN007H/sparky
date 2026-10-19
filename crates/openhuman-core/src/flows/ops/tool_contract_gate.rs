@@ -58,7 +58,7 @@ pub(crate) fn toolkit_has_curated_catalog(toolkit: &str) -> bool {
 
 pub(crate) async fn validate_tool_contracts(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
     use crate::integrations::composio::contract::validation::{
-        ToolContractNode, validate_tool_contract_nodes,
+        validate_tool_contract_nodes, ToolContractNode,
     };
 
     let nodes: Vec<_> = graph

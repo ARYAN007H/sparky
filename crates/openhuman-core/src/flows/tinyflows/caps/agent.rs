@@ -12,14 +12,14 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyflows::caps::*;
 use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
 use crate::flows::agent_route::{
-    AgentRoute, harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref,
+    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
 };
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected

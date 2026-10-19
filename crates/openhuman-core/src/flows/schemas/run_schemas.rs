@@ -1,8 +1,8 @@
 //! Schemas for executing saved flows and inspecting their run history.
 
 use super::{
-    ControllerSchema, FieldSchema, TypeSchema, id_input, run_detached_output_fields,
-    run_output_fields,
+    id_input, run_detached_output_fields, run_output_fields, ControllerSchema, FieldSchema,
+    TypeSchema,
 };
 
 /// Builds the schema for `function` when this group owns it.
@@ -11,7 +11,8 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
         "run" => Some(ControllerSchema {
             namespace: "flows",
             function: "run",
-            description: "Run a saved flow to completion (or until it pauses on a human-approval gate).",
+            description:
+                "Run a saved flow to completion (or until it pauses on a human-approval gate).",
             inputs: vec![
                 id_input("Identifier of the flow to run."),
                 FieldSchema {
@@ -89,7 +90,8 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
                 FieldSchema {
                     name: "thread_id",
                     ty: TypeSchema::String,
-                    comment: "The checkpoint thread id returned by `flows_run` / a prior `flows_resume`.",
+                    comment:
+                        "The checkpoint thread id returned by `flows_run` / a prior `flows_resume`.",
                     required: true,
                 },
                 FieldSchema {
@@ -144,13 +146,15 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
                         FieldSchema {
                             name: "cancelled",
                             ty: TypeSchema::Bool,
-                            comment: "True once the run is cancelled or its cancellation requested.",
+                            comment:
+                                "True once the run is cancelled or its cancellation requested.",
                             required: true,
                         },
                         FieldSchema {
                             name: "was_in_flight",
                             ty: TypeSchema::Bool,
-                            comment: "True when a live run task was signalled to abort; false when \
+                            comment:
+                                "True when a live run task was signalled to abort; false when \
                                       a parked/stale run row was settled directly.",
                             required: true,
                         },
@@ -222,9 +226,7 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
                           window. Never removes a running or pending_approval run. Pruning also \
                           happens automatically on every new run; this is an explicit on-demand \
                           sweep.",
-            inputs: vec![id_input(
-                "Identifier of the flow whose run history to prune.",
-            )],
+            inputs: vec![id_input("Identifier of the flow whose run history to prune.")],
             outputs: vec![FieldSchema {
                 name: "result",
                 ty: TypeSchema::Object {

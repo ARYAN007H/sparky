@@ -3,19 +3,17 @@ use super::*;
 fn insert_parked_run(config: &Config, flow_id: &str, run_id: &str) {
     let now = Utc::now().to_rfc3339();
     store::insert_flow_run(config, run_id, flow_id, run_id, &now).unwrap();
-    assert!(
-        store::finish_flow_run(
-            config,
-            run_id,
-            "pending_approval",
-            &now,
-            &[],
-            &["gate".into()],
-            None,
-            Some("parked-graph"),
-        )
-        .unwrap()
-    );
+    assert!(store::finish_flow_run(
+        config,
+        run_id,
+        "pending_approval",
+        &now,
+        &[],
+        &["gate".into()],
+        None,
+        Some("parked-graph"),
+    )
+    .unwrap());
 }
 
 async fn park_approval_flow(config: &Config, name: &str) -> (String, String, Vec<String>) {
@@ -219,19 +217,17 @@ async fn compatibility_refusal_does_not_settle_a_resume_claimed_after_its_snapsh
     let current_flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
     let hash = compute_graph_hash(&incompatible_graph, current_flow.require_approval).unwrap();
     let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
-    assert!(
-        store::finish_flow_run(
-            &config,
-            &run_id,
-            "pending_approval",
-            row.finished_at.as_deref().unwrap_or(&row.started_at),
-            &row.steps,
-            &pending,
-            None,
-            Some(&hash),
-        )
-        .unwrap()
-    );
+    assert!(store::finish_flow_run(
+        &config,
+        &run_id,
+        "pending_approval",
+        row.finished_at.as_deref().unwrap_or(&row.started_at),
+        &row.steps,
+        &pending,
+        None,
+        Some(&hash),
+    )
+    .unwrap());
     let summary_before = current_flow.last_status;
 
     let mut owner = None;

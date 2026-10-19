@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use tinybus::EventHandler;
 use tinyflows::model::TriggerKind;
 use tinyflows_catalog::Flow;
-use tokio::sync::{Mutex as AsyncMutex, mpsc};
+use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
 /// Reads `trigger_kind` from a flow's trigger node config, deserializing into
 /// `tinyflows::model::TriggerKind`. Returns `None` when the flow doesn't have

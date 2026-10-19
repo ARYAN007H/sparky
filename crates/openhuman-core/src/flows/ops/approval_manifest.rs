@@ -38,12 +38,7 @@ pub async fn compute_approval_manifest(
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Result<Vec<Value>, String> {
-    compute_approval_manifest_json(
-        ctx,
-        config,
-        serde_json::to_value(graph).map_err(|e| e.to_string())?,
-    )
-    .await
+    compute_approval_manifest_json(ctx, config, serde_json::to_value(graph).map_err(|e| e.to_string())?).await
 }
 
 async fn compute_approval_manifest_json(
@@ -51,9 +46,11 @@ async fn compute_approval_manifest_json(
     config: &Config,
     graph: Value,
 ) -> Result<Vec<Value>, String> {
-    let registration =
-        crate::flows::authoring_host::register(std::sync::Arc::new(config.clone()), ctx.clone())
-            .await?;
+    let registration = crate::flows::authoring_host::register(
+        std::sync::Arc::new(config.clone()),
+        ctx.clone(),
+    )
+    .await?;
     let proxy = crate::modules::tinyflows::catalog_proxy(config).await?;
     let entries: Vec<Value> = proxy
         .call(
@@ -100,10 +97,7 @@ pub async fn flows_approval_manifest(
                 .map_err(|e| e.to_string())?
                 .ok_or_else(|| format!("flow not found: {id}"))?;
             // `store::get_flow` already returns a migrated, deserialized graph.
-            (
-                serde_json::to_value(flow.graph).map_err(|e| e.to_string())?,
-                Some(id.to_string()),
-            )
+            (serde_json::to_value(flow.graph).map_err(|e| e.to_string())?, Some(id.to_string()))
         }
         (None, Some(graph_json)) => (graph_json, None),
         (None, None) => return Err("provide 'id' or 'graph'".to_string()),

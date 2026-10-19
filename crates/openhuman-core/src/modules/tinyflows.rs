@@ -53,7 +53,7 @@ pub(crate) fn disabled_message() -> String {
 mod imp {
     #[cfg(not(test))]
     use super::MODULE_ID;
-    use super::{HOST_BUS_NAME, ServedObjectRegistration, disabled_message};
+    use super::{disabled_message, ServedObjectRegistration, HOST_BUS_NAME};
     use crate::config::Config;
     #[cfg(not(test))]
     use crate::modules::ops;
@@ -131,11 +131,7 @@ mod imp {
             .map_err(|error| format!("the module bus is unavailable: {error}"))?;
         runtime
             .connection()
-            .proxy(
-                tinyflows_bus::BUS_NAME,
-                tinyflows_bus::OBJECT_PATH,
-                tinyflows_bus::INTERFACE,
-            )
+            .proxy(tinyflows_bus::BUS_NAME, tinyflows_bus::OBJECT_PATH, tinyflows_bus::INTERFACE)
             .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
             .map_err(|error| format!("the tinyflows authoring object is unreachable: {error}"))
     }
@@ -148,11 +144,7 @@ mod imp {
             .map_err(|error| format!("the module bus is unavailable: {error}"))?;
         runtime
             .connection()
-            .proxy(
-                tinyflows_bus::BUS_NAME,
-                tinyflows_bus::OBJECT_PATH,
-                tinyflows_bus::catalog::INTERFACE,
-            )
+            .proxy(tinyflows_bus::BUS_NAME, tinyflows_bus::OBJECT_PATH, tinyflows_bus::catalog::INTERFACE)
             .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
             .map_err(|error| format!("the tinyflows catalog object is unreachable: {error}"))
     }
@@ -304,13 +296,12 @@ mod fixture;
 pub(crate) use imp::serve_pair_after_first;
 #[cfg(feature = "modules")]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
-    serve_pair, unserve,
+    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve,
 };
 
 #[cfg(not(feature = "modules"))]
 mod imp {
-    use super::{ServedObjectRegistration, disabled_message};
+    use super::{disabled_message, ServedObjectRegistration};
     use crate::config::Config;
 
     fn unavailable(config: &Config) -> String {
@@ -366,8 +357,7 @@ mod imp {
 
 #[cfg(not(feature = "modules"))]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
-    serve_pair, unserve,
+    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve,
 };
 
 /// Whether the module can serve in this build and configuration (the switch

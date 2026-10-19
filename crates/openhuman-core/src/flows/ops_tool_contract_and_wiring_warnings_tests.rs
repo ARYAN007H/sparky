@@ -1,5 +1,5 @@
 use super::*;
-use crate::integrations::composio::catalog::{ToolContract, seed_live_catalog_cache};
+use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
 
 fn seeded_alias_contract() -> ToolContract {
     ToolContract {
@@ -121,8 +121,8 @@ async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
 /// (`notion`, not `slack`/`gmail`) since it seeds different `is_curated`
 /// content than every other test sharing those keys.
 #[tokio::test]
-async fn validate_tool_contracts_rejects_a_real_but_uncurated_action_on_a_statically_catalogued_toolkit()
- {
+async fn validate_tool_contracts_rejects_a_real_but_uncurated_action_on_a_statically_catalogued_toolkit(
+) {
     seed_live_catalog_cache(
         "notion",
         vec![ToolContract {
@@ -282,8 +282,8 @@ async fn validate_tool_contracts_skips_arg_name_check_when_input_schema_is_unkno
 }
 
 #[tokio::test]
-async fn validate_tool_contracts_allows_arbitrary_arg_names_when_schema_permits_additional_properties()
- {
+async fn validate_tool_contracts_allows_arbitrary_arg_names_when_schema_permits_additional_properties(
+) {
     seed_live_catalog_cache(
         "argschemaadditional",
         vec![ToolContract {

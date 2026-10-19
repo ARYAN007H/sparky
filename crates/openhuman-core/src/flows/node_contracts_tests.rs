@@ -15,17 +15,12 @@ async fn overlay_preserves_every_kind_from_the_catalog_bus() {
         .unwrap();
     assert_eq!(contracts.len(), NODE_KINDS.len());
     for kind in NODE_KINDS {
-        assert!(
-            contracts.iter().any(|contract| contract.kind == kind),
-            "missing {kind}"
-        );
+        assert!(contracts.iter().any(|contract| contract.kind == kind), "missing {kind}");
     }
-    assert!(
-        node_kind_contract(&crate::config::Config::default(), "not_a_kind")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(node_kind_contract(&crate::config::Config::default(), "not_a_kind")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -37,10 +32,7 @@ async fn memory_overlay_adds_flow_memory_coherence_facts_and_redirects_dedup_to_
     assert!(notes.contains("SAME per-flow memory namespace"), "{notes}");
     assert!(!notes.contains("Canonical dedupe pattern"), "{notes}");
     assert!(!notes.contains("item.json.found"), "{notes}");
-    assert!(
-        !notes.contains("deferred to a dedicated primitive"),
-        "{notes}"
-    );
+    assert!(!notes.contains("deferred to a dedicated primitive"), "{notes}");
     assert!(notes.contains("use a dedup node instead"), "{notes}");
 }
 

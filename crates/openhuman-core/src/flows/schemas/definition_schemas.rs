@@ -3,8 +3,8 @@
 //! approval/connection manifests derived from a graph.
 
 use super::{
-    ControllerSchema, FieldSchema, TypeSchema, expected_version_input, flow_connection_fields,
-    flow_output, id_input, require_approval_input, strict_input,
+    expected_version_input, flow_connection_fields, flow_output, id_input, require_approval_input,
+    strict_input, ControllerSchema, FieldSchema, TypeSchema,
 };
 
 /// Builds the schema for `function` when this group owns it.
@@ -24,7 +24,8 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
                 FieldSchema {
                     name: "graph",
                     ty: TypeSchema::Json,
-                    comment: "A tinyflows WorkflowGraph (nodes + edges); validated and migrated on save.",
+                    comment:
+                        "A tinyflows WorkflowGraph (nodes + edges); validated and migrated on save.",
                     required: true,
                 },
                 require_approval_input(),
@@ -287,7 +288,8 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
         "approval_manifest" => Some(ControllerSchema {
             namespace: "flows",
             function: "approval_manifest",
-            description: "Compute the approval manifest for a saved flow (by id) or a candidate graph: \
+            description:
+                "Compute the approval manifest for a saved flow (by id) or a candidate graph: \
                  every ApprovalGate permission a run will prompt for, joined against the flow's \
                  existing flow_tool_trust grants — the data behind the consolidated save+enable \
                  pre-authorization card. Entries carry kind approvable|blocked|dynamic|agent.",
@@ -309,7 +311,8 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
                 FieldSchema {
                     name: "entries",
                     ty: TypeSchema::Array(Box::new(TypeSchema::Json)),
-                    comment: "One per relevant node/tool: {kind: approvable|blocked|dynamic|agent, \
+                    comment:
+                        "One per relevant node/tool: {kind: approvable|blocked|dynamic|agent, \
                          node_id, tool_name?, label, class?}.",
                     required: true,
                 },
@@ -329,7 +332,8 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
                 FieldSchema {
                     name: "gate_installed",
                     ty: TypeSchema::Bool,
-                    comment: "False when the approval gate is disabled — nothing ever prompts, so \
+                    comment:
+                        "False when the approval gate is disabled — nothing ever prompts, so \
                          missing is empty by definition.",
                     required: true,
                 },

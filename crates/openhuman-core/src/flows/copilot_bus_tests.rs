@@ -205,11 +205,9 @@ async fn module_proposal_tool_uses_host_gates_without_persisting() {
     let proposal: Value = serde_json::from_str(&valid.output()).expect("proposal JSON");
     assert_eq!(proposal["type"], "workflow_proposal");
     assert_eq!(proposal["persisted"], false);
-    assert!(
-        crate::flows::ops::flows_list(&config)
-            .await
-            .expect("flow list")
-            .value
-            .is_empty()
-    );
+    assert!(crate::flows::ops::flows_list(&config)
+        .await
+        .expect("flow list")
+        .value
+        .is_empty());
 }

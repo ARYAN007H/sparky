@@ -1,8 +1,8 @@
 //! The tinyflows module linked into the test binary: the `static-link` build of
 //! `tinyflows-module`, attached once to the process-wide module host.
 
-use crate::config::Config;
 use crate::config::schema::ModuleSourceMode;
+use crate::config::Config;
 use crate::modules::{linked::register_linked, ops};
 use tokio::sync::OnceCell;
 

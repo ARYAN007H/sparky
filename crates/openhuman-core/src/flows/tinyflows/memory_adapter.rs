@@ -34,7 +34,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyflows::caps::MemoryProvider;
 use tinyflows::error::{EngineError, Result};
 
@@ -43,15 +43,15 @@ use crate::agent::turn_origin;
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::flows::{
-    FLOWS_TAG, cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, forget_matching,
-    remember_keyed,
+    cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, forget_matching, remember_keyed,
+    FLOWS_TAG,
 };
-use crate::memory::MemoryError;
 use crate::memory::types::{FetchParams, RecallParams};
-use crate::security::SecurityPolicy;
+use crate::memory::MemoryError;
 use crate::security::approval::{
-    ApprovalGate, ExecutionOutcome, GateOutcome, redact_args, summarize_action,
+    redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
 };
+use crate::security::SecurityPolicy;
 use tinybox_bus::CommandClass;
 use tinymemory_api::wrap_untrusted_for_agent;
 use tinymemory_api::{Hit, LearningKind, MemoryMeta, MetaFilter, SourceKind};

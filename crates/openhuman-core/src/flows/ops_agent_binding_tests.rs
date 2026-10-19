@@ -110,18 +110,14 @@ async fn agent_ref_unknown_is_rejected() {
 /// sees on rejection is this host's contract with it.
 #[tokio::test]
 async fn dynamic_agent_ref_is_rejected_during_structural_validation() {
-    let err = validate_and_migrate_graph(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &Config::default(),
-        json!({
-            "nodes": [
-                { "id": "t", "kind": "trigger", "name": "Manual" },
-                { "id": "a", "kind": "agent", "name": "Dynamic",
-                  "config": { "agent_ref": "=nodes.t.item.agent_choice", "prompt": "go" } }
-            ],
-            "edges": [ { "from_node": "t", "to_node": "a" } ]
-        }),
-    )
+    let err = validate_and_migrate_graph(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "a", "kind": "agent", "name": "Dynamic",
+              "config": { "agent_ref": "=nodes.t.item.agent_choice", "prompt": "go" } }
+        ],
+        "edges": [ { "from_node": "t", "to_node": "a" } ]
+    }))
     .await
     .expect_err("dynamic agent_ref must fail structural validation");
     assert!(

@@ -8,8 +8,8 @@ use super::*;
 /// silently returns the UI to that state with every other test still green.
 #[test]
 fn on_step_start_is_implemented_so_the_running_status_can_reach_the_canvas() {
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     // A probe observer whose `on_step_start` records that the *trait's*
     // dispatch reached an override rather than the blanket default.

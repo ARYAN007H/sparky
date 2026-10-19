@@ -33,10 +33,10 @@ use crate::core::events::DomainEvent;
 #[cfg(test)]
 use crate::flows::store;
 #[cfg(test)]
-use dedup_commit::{CommitTestHooks, flow_commit_lock};
+use dedup_commit::{flow_commit_lock, CommitTestHooks};
 #[cfg(test)]
 use run_digest::{
-    DIGEST_MAX_CHARS, digest_filter, enforce_retention_cap, render_run_digest, truncate_chars,
+    digest_filter, enforce_retention_cap, render_run_digest, truncate_chars, DIGEST_MAX_CHARS,
 };
 #[cfg(test)]
 use serde_json::Value;

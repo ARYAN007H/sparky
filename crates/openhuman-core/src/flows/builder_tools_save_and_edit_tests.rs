@@ -435,21 +435,17 @@ async fn get_node_kind_contract_tool_returns_contract_and_rejects_unknown() {
     assert!(!ok.is_error, "{}", ok.output());
     let parsed: Value = serde_json::from_str(&ok.output()).unwrap();
     assert_eq!(parsed["kind"], "tool_call");
-    assert!(
-        parsed["config_fields"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|f| f["name"] == "slug")
-    );
+    assert!(parsed["config_fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|f| f["name"] == "slug"));
     // Host overlay is present on the tool's output.
-    assert!(
-        parsed["notes"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|n| n.as_str().unwrap_or("").contains("Composio"))
-    );
+    assert!(parsed["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|n| n.as_str().unwrap_or("").contains("Composio")));
 
     let bad = tool.execute(json!({ "kind": "nope" })).await.unwrap();
     assert!(bad.is_error);

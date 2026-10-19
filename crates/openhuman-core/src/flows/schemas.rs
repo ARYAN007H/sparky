@@ -177,7 +177,8 @@ fn expected_version_input() -> FieldSchema {
     FieldSchema {
         name: "expected_version",
         ty: TypeSchema::Option(Box::new(TypeSchema::String)),
-        comment: "Optimistic-concurrency token: the flow's `updated_at` as last observed. If the \
+        comment:
+            "Optimistic-concurrency token: the flow's `updated_at` as last observed. If the \
                   flow has changed since, the write is refused with a structured version_conflict \
                   error carrying the current flow, instead of clobbering. Omit for last-write-wins.",
         required: false,

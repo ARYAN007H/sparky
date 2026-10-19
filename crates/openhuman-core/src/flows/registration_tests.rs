@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 /// The persisted catalogue is recorded in session transcripts
 /// (`session_host/recorded_tools.rs`), so every tool's name, description,

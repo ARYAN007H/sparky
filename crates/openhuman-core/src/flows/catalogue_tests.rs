@@ -123,11 +123,9 @@ fn a_disabled_flow_is_still_listed_and_says_it_is_paused() {
 
 #[test]
 fn an_enabled_flow_does_not_claim_to_be_disabled() {
-    assert!(
-        !entry_for(flow("Live", true, vec![]))
-            .description
-            .contains("disabled")
-    );
+    assert!(!entry_for(flow("Live", true, vec![]))
+        .description
+        .contains("disabled"));
 }
 
 #[test]

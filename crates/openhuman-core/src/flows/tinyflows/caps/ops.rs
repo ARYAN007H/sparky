@@ -16,9 +16,9 @@ pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::Value;
 #[cfg(test)]
 use serde_json::json;
+use serde_json::Value;
 use tinyflows::caps::*;
 use tinyflows::error::{EngineError, Result};
 #[cfg(test)]
@@ -30,11 +30,11 @@ use crate::config::HttpRequestConfig;
 #[cfg(test)]
 use crate::flows;
 #[cfg(test)]
-use crate::security::GateDecision;
-use crate::security::SecurityPolicy;
-#[cfg(test)]
 use crate::security::credentials::HttpCredential;
 use crate::security::credentials::HttpCredentialsStore;
+#[cfg(test)]
+use crate::security::GateDecision;
+use crate::security::SecurityPolicy;
 use tinybox_bus::CommandClass;
 
 use super::*;

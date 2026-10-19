@@ -65,7 +65,7 @@ pub(super) fn validate_connection_refs_against(
     connections: Option<&[FlowConnection]>,
 ) -> Vec<String> {
     use crate::integrations::composio::contract::validation::{
-        ConnectedAccountRef, ConnectionRefNode, validate_connection_refs as validate,
+        validate_connection_refs as validate, ConnectedAccountRef, ConnectionRefNode,
     };
 
     let nodes: Vec<_> = graph

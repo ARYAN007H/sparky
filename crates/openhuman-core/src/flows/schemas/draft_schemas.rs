@@ -2,8 +2,8 @@
 //! graph is promoted into a saved flow.
 
 use super::{
-    ControllerSchema, FieldSchema, TypeSchema, draft_output, flow_output, id_input,
-    require_approval_input,
+    draft_output, flow_output, id_input, require_approval_input, ControllerSchema, FieldSchema,
+    TypeSchema,
 };
 
 /// Builds the schema for `function` when this group owns it.
