@@ -90,7 +90,7 @@ fn put_result(response: PutWorkflowResponse) -> Result<Flow> {
     }
 }
 
-/// Save a workflow through the module's Catalog contract.
+/// Seed a caller-chosen id through CatalogStorage for host tests.
 #[cfg(test)]
 pub fn upsert_flow(config: &Config, flow: &Flow) -> Result<()> {
     test_seed_flow(config, flow)
@@ -163,7 +163,7 @@ pub fn create_flow(
     name: String,
     graph: tinyflows::model::WorkflowGraph,
     require_approval: bool,
-    _enabled: bool,
+    enabled: bool,
 ) -> Result<Flow> {
     let storage = super::catalog_storage::register_blocking(config)?;
     let request = PutWorkflowRequest::Create {
@@ -173,7 +173,12 @@ pub fn create_flow(
         require_approval,
     };
     let response: PutWorkflowResponse = call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
-    put_result(response)
+    let flow = put_result(response)?;
+    if !enabled && flow.enabled {
+        set_enabled(config, &flow.id, false)
+    } else {
+        Ok(flow)
+    }
 }
 
 /// Read one workflow by id.
