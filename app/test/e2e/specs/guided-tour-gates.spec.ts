@@ -172,7 +172,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       ).toBe(true);
     });
 
-    it('tour navigates to /connections and highlights skills-grid after 1 Next click', async () => {
+    it('tour opens the Apps tab and highlights skills-grid after 1 Next click', async () => {
       await navigateViaHash('/home');
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
@@ -180,7 +180,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       await advanceTourSteps(1);
       await browser.waitUntil(
         async () =>
-          String(await browser.execute(() => window.location.hash)).includes('/connections'),
+          String(await browser.execute(() => window.location.hash)).includes('/connections?tab=composio'),
         { timeout: 15_000, timeoutMsg: 'tour did not navigate to /connections after one step' }
       );
       expect(
@@ -208,7 +208,11 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       expect(await waitForTourTooltip(10_000)).toBe(true);
       await advanceTourSteps(6);
 
-      const hasLastStepTitle = await textExists("You're all set!");
+      const hasLastStepTitle = await browser.waitUntil(() => textExists("You're all set!"), {
+        timeout: 15_000,
+        interval: 250,
+        timeoutMsg: 'final walkthrough step title did not render after its async setup',
+      });
       expect(hasLastStepTitle).toBe(true);
 
       const skipVisible = await browser.execute(() => {

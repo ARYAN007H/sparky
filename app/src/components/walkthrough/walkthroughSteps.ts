@@ -80,7 +80,7 @@ export function createWalkthroughSteps(
       placement: 'top',
       skipBeacon: true,
       before: async () => {
-        navigate('/connections');
+        navigate('/connections?tab=composio');
         await waitForTarget('skills-grid');
       },
     },
@@ -93,6 +93,7 @@ export function createWalkthroughSteps(
       placement: 'bottom',
       skipBeacon: true,
       before: async () => {
+        navigate('/connections?tab=channels');
         await waitForTarget('skills-channels');
       },
     },
