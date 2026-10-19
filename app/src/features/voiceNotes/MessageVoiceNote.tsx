@@ -40,6 +40,9 @@ export function MessageVoiceNote({
       noteId={note.noteId}
       durationMs={note.durationMs}
       waveform={note.waveform}
+      visemes={note.visemes}
+      mascotPlayback={!withTranscript}
+      speechText={text}
       transcript={withTranscript ? text : undefined}
     />
   );

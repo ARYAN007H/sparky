@@ -16,6 +16,8 @@ export interface VoiceNoteMeta {
   durationMs?: number;
   /** Normalised 0..1 bar heights, user recordings only. */
   waveform?: number[];
+  /** Provider timeline saved with synthesized replies; absent on legacy notes. */
+  visemes?: Array<{ viseme: string; start_ms: number; end_ms: number }>;
 }
 
 /** `source` the composer stamps on a turn that began as a voice note. */
@@ -56,6 +58,16 @@ export function readVoiceNoteMeta(extraMetadata: unknown): VoiceNoteMeta | null 
     durationMs: typeof note.durationMs === 'number' ? note.durationMs : undefined,
     waveform: Array.isArray(note.waveform)
       ? note.waveform.filter((v): v is number => typeof v === 'number')
+      : undefined,
+    visemes: Array.isArray(note.visemes)
+      ? note.visemes.filter(
+          (frame): frame is { viseme: string; start_ms: number; end_ms: number } =>
+            !!frame &&
+            typeof frame === 'object' &&
+            typeof (frame as Record<string, unknown>).viseme === 'string' &&
+            Number.isFinite((frame as Record<string, unknown>).start_ms) &&
+            Number.isFinite((frame as Record<string, unknown>).end_ms)
+        )
       : undefined,
   };
 }
