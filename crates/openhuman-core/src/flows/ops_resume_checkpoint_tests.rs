@@ -7,6 +7,8 @@ use super::*;
 async fn flows_resume_succeeds_when_the_graph_is_unchanged() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
+    // This graph contains no inference node. Resuming a parked non-LLM flow
+    // must not gain a provider-readiness dependency from the StartRun path.
     let created = flows_create(&config, "gated".to_string(), approval_gated_graph(), false)
         .await
         .unwrap();
@@ -41,6 +43,18 @@ async fn flows_resume_succeeds_when_the_graph_is_unchanged() {
     )
     .await
     .expect("resume must succeed when the pinned graph still matches the current one");
+    let response_keys: std::collections::BTreeSet<_> = resumed
+        .value
+        .as_object()
+        .expect("resume keeps the established object response")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        response_keys,
+        ["output", "pending_approvals", "thread_id"].into_iter().collect(),
+        "ResumeRun's internal admission acknowledgement must not change the public RPC shape"
+    );
     assert_eq!(resumed.value["pending_approvals"], json!([]));
     assert!(
         !resumed.value["output"]["nodes"]["downstream"]["items"].is_null(),
