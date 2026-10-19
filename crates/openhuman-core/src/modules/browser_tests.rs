@@ -286,10 +286,19 @@ fn a_returned_page_off_https_is_refused_naming_its_scheme() {
     ] {
         let error = client.check_returned_url(url).expect_err(url);
         let text = error.to_string();
-        assert!(matches!(error, BrowserCallError::Policy(_)), "{url}: {text}");
-        assert!(text.contains("only HTTPS URLs are allowed"), "{url}: {text}");
+        assert!(
+            matches!(error, BrowserCallError::Policy(_)),
+            "{url}: {text}"
+        );
+        assert!(
+            text.contains("only HTTPS URLs are allowed"),
+            "{url}: {text}"
+        );
         assert!(text.contains(scheme), "{url}: {text}");
-        assert!(!text.contains("secret") && !text.contains("token"), "{url}: {text}");
+        assert!(
+            !text.contains("secret") && !text.contains("token"),
+            "{url}: {text}"
+        );
     }
 }
 
