@@ -209,6 +209,65 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
         });
     assert_eq!(user.and_then(|value| value.pointer("/voiceNote/noteId")), Some(&json!("recording-1")));
     assert_eq!(assistant.and_then(|value| value.pointer("/voiceNote/noteId")), Some(&json!("reply-1")));
+
+    let newest_page = transcript_get(
+        &ctx,
+        TranscriptGetRequest {
+            thread_id: THREAD.into(),
+            cursor: None,
+            limit: Some(1),
+        },
+    )
+    .await
+    .unwrap()
+    .value
+    .data
+    .unwrap();
+    assert!(newest_page.items.iter().any(|item| matches!(
+        item,
+        tinyagents_session::transcript::view::DisplayItem::AssistantMessage {
+            content,
+            extra_metadata: Some(metadata),
+            ..
+        } if content == "hi there" && metadata.pointer("/voiceNote/noteId") == Some(&json!("reply-1"))
+    )), "the voice metadata follows the assistant item onto its paginated page");
+
+    blocking::append_message(
+        ctx.clone(),
+        workspace,
+        THREAD.into(),
+        ConversationMessage {
+            id: "user-voice-duplicate".into(),
+            content: "hello".into(),
+            message_type: "text".into(),
+            extra_metadata: json!({"voiceNote": {"noteId": "recording-2"}}),
+            sender: "user".into(),
+            created_at: "2026-10-15T00:00:03Z".into(),
+        },
+    )
+    .await
+    .unwrap();
+    let ambiguous = transcript_get(
+        &ctx,
+        TranscriptGetRequest {
+            thread_id: THREAD.into(),
+            cursor: None,
+            limit: None,
+        },
+    )
+    .await
+    .unwrap()
+    .value
+    .data
+    .unwrap();
+    assert!(ambiguous.items.iter().all(|item| !matches!(
+        item,
+        tinyagents_session::transcript::view::DisplayItem::UserMessage {
+            content,
+            extra_metadata: Some(metadata),
+            ..
+        } if content == "hello" && metadata.get("voiceNote").is_some()
+    )), "repeated identical content is not guessed onto either user row");
 }
 
 #[tokio::test]

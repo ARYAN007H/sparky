@@ -112,6 +112,7 @@ async fn attach_voice_note_metadata(
                     .and_then(serde_json::Value::as_str);
                 match (request_id, row_request_id) {
                     (Some(projected), Some(stored)) => projected == stored,
+                    (Some(_), None) if sender == "agent" => false,
                     // User rows are durably written before the core returns its
                     // request id. Exact text is safe only when unique in this
                     // thread; repeated messages are left unlabelled.
