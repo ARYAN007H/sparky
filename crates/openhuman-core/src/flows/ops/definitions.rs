@@ -177,12 +177,13 @@ pub fn load_flow_graph(config: &Config, id: &str) -> Result<Option<WorkflowGraph
 /// so a legacy draft can still be opened and repaired; execution resolves only
 /// graphs the current engine can run safely.
 pub(crate) async fn load_engine_compatible_flow_graph(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: &str,
 ) -> Result<Option<WorkflowGraph>, String> {
     let graph = load_flow_graph(config, id)?;
     if let Some(graph) = graph.as_ref() {
-        ensure_config_aware_engine_compatible(&crate::core::runtime::DispatchCtx::ambient(), config, graph).await
+        ensure_config_aware_engine_compatible(ctx, config, graph).await
             .map_err(|error| format!("workflow_id '{id}' is engine-incompatible: {error}"))?;
     }
     Ok(graph)

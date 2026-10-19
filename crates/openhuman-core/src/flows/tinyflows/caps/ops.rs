@@ -281,7 +281,10 @@ pub fn build_capabilities(
                 approval,
             },
         )),
-        resolver: Arc::new(OpenHumanWorkflowResolver { config }),
+        resolver: Arc::new(OpenHumanWorkflowResolver {
+            ctx: ctx.clone(),
+            config,
+        }),
     }
 }
 

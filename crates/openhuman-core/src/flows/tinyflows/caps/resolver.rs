@@ -29,6 +29,7 @@ use tinyflows::model::WorkflowGraph;
 /// rejects direct self-references before a child runs, so this adapter does not
 /// itself need cycle detection — it is a pure id → graph lookup.
 pub struct OpenHumanWorkflowResolver {
+    pub ctx: crate::core::runtime::DispatchCtx,
     pub config: Arc<Config>,
 }
 
@@ -40,7 +41,7 @@ impl WorkflowResolver for OpenHumanWorkflowResolver {
             %workflow_id,
             "[flows] sub_workflow resolver: resolving workflow_id to a saved flow graph"
         );
-        let loaded = flows::ops::load_engine_compatible_flow_graph(&self.config, workflow_id).await;
+        let loaded = flows::ops::load_engine_compatible_flow_graph(&self.ctx, &self.config, workflow_id).await;
         match loaded {
             Ok(Some(graph)) => {
                 tracing::debug!(
