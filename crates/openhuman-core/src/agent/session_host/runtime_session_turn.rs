@@ -161,15 +161,17 @@ fn runtime_turn_error(
         std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
     >,
 ) -> anyhow::Error {
-    let refusal = sidecar
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .dispatch_refusal
-        .take();
-    match refusal {
-        Some(refusal) => anyhow::Error::new(refusal),
-        None => anyhow::anyhow!(error.to_string()),
+    if matches!(error, tinyagents_runtime::RuntimeError::Driver(_)) {
+        let refusal = sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .dispatch_refusal
+            .take();
+        if let Some(refusal) = refusal {
+            return anyhow::Error::new(refusal);
+        }
     }
+    anyhow::anyhow!(error.to_string())
 }
 
 /// Applies the pending one-turn overrides to this turn's resume mode.

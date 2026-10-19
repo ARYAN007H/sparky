@@ -444,6 +444,7 @@ fn child_inherits_the_same_physical_dispatch_admission() {
         parent.dispatch_admission.as_ref().unwrap(),
         child.dispatch_admission.as_ref().unwrap()
     ));
+    assert!(Arc::ptr_eq(&parent.session_sidecar, &child.session_sidecar));
 }
 
 #[test]
@@ -458,6 +459,10 @@ fn detached_child_inherits_the_parent_dispatch_admission() {
     assert!(Arc::ptr_eq(
         parent.dispatch_admission.as_ref().unwrap(),
         parent.detached_child().dispatch_admission.as_ref().unwrap()
+    ));
+    assert!(!Arc::ptr_eq(
+        &parent.session_sidecar,
+        &parent.detached_child().session_sidecar
     ));
 }
 
