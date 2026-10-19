@@ -58,7 +58,6 @@ import { resetApp } from '../helpers/reset-app';
 import {
   dismissWalkthroughIfVisible,
   navigateViaHash,
-  waitForHomePage,
 } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
@@ -107,17 +106,6 @@ async function disarmWalkthrough(): Promise<void> {
     },
     { completedKey: WALKTHROUGH_KEY, pendingKey: WALKTHROUGH_PENDING_KEY }
   );
-}
-
-/**
- * Fire the `walkthrough:restart` CustomEvent so a mounted AppWalkthrough
- * component picks up the armed localStorage state and shows the Joyride UI.
- */
-async function dispatchWalkthroughRestart(): Promise<void> {
-  if (!supportsExecuteScript()) return;
-  await browser.execute(() => {
-    window.dispatchEvent(new CustomEvent('walkthrough:restart'));
-  });
 }
 
 /**
@@ -179,25 +167,6 @@ async function advanceTourSteps(count: number): Promise<void> {
   }
 }
 
-/**
- * Poll `window.location.hash` until it contains `fragment`, or until `timeout`
- * expires. Returns the final hash value.
- *
- * This is necessary because Joyride awaits the `before` hook asynchronously;
- * the hash update may arrive one render cycle after the click is processed.
- */
-async function _waitForHash(fragment: string, timeout = 15_000): Promise<string> {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const hash = await browser.execute(() => window.location.hash);
-    if (String(hash).includes(fragment)) return String(hash);
-    await browser.pause(500);
-  }
-  // Return whatever the current hash is so the caller's expect() shows a
-  // useful diff rather than a timeout error.
-  return String(await browser.execute(() => window.location.hash));
-}
-
 // ── suite ─────────────────────────────────────────────────────────────────────
 
 describe('Guided tour — gates and resume behaviour (#1215)', function () {
@@ -219,58 +188,45 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
     await stopMockServer();
   });
 
-  // ── Scenario 1: Skills gate ────────────────────────────────────────────────
+  // ── Scenario 1: Start and navigate ─────────────────────────────────────────
 
-  describe('Scenario 1 — skills gate', () => {
-    // GAP: AppWalkthrough's run state is initialised once via useState lazy
-    //      initializer at mount time. After resetApp walks onboarding, the
-    //      walkthrough auto-starts (onboarded=true + no walkthrough_completed),
-    //      is dismissed by afterEach, and markWalkthroughComplete() sets
-    //      walkthrough_completed=true. The test then calls armWalkthrough()
-    //      + dispatchWalkthroughRestart() but Joyride does not reset its
-    //      internal step index on a run=false→true transition, so the tooltip
-    //      may not appear at step 0 on a mounted instance that already finished.
-    //      Needs an AppWalkthrough key-reset or an explicit stepIndex prop to
-    //      force Joyride back to step 0.
+  describe('Scenario 1 — start and navigate', () => {
     it('tour starts and tooltip is visible at step 1 (home-card)', async () => {
       await navigateViaHash('/home');
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
       expect(await waitForTourTooltip()).toBe(true);
       expect(await textExists('1 of 10')).toBe(true);
-      expect(await textExists('home-card')).toBe(true);
+      expect(
+        await browser.execute(() => document.querySelector('[data-walkthrough="home-card"]') !== null)
+      ).toBe(true);
     });
 
-    // GAP: Same root cause as the tooltip-visible test above — tooltip never
-    //      appears after dispatchWalkthroughRestart() when Joyride has already
-    //      completed a prior run on the same mounted instance. Without the
-    //      tooltip, advanceTourSteps() finds no primary button and the hash
-    //      stays at #/home instead of advancing to #/connections (Phase 2: was #/skills).
     it('tour navigates to /connections and highlights skills-grid after 3 Next clicks', async () => {
       await navigateViaHash('/home');
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
       expect(await waitForTourTooltip()).toBe(true);
       await advanceTourSteps(3);
-      await browser.waitUntil(async () => String(await browser.execute(() => window.location.hash)).includes('/connections'), {
-        timeout: 15_000,
-        timeoutMsg: 'tour did not navigate to /connections after three steps',
-      });
-      expect(await textExists('skills-grid')).toBe(true);
+      await browser.waitUntil(
+        async () =>
+          String(await browser.execute(() => window.location.hash)).includes('/connections'),
+        {
+          timeout: 15_000,
+          timeoutMsg: 'tour did not navigate to /connections after three steps',
+        }
+      );
+      expect(
+        await browser.execute(
+          () => document.querySelector('[data-walkthrough="skills-grid"]') !== null
+        )
+      ).toBe(true);
     });
-
-
   });
 
   // ── Scenario 2: Chat gate (final step) ────────────────────────────────────
 
   describe('Scenario 2 — chat gate (first message)', () => {
-    // GP-3: Reaching step 9 requires clicking Next 8 times with async before
-    // hooks in between. Any single before-hook timeout (e.g. waitForTarget on
-    // a slow CI runner) aborts the sequence leaving the tour on the wrong step.
-    // There is no Joyride API to jump directly to a specific step index.
-    // Skipped until a step-jump helper or a more reliable advance mechanism
-    // is available.
     it('final tour step renders on /chat with a pre-seeded welcome note', async () => {
       // Drive the visible controls through the actual tour instead of seeking
       // into Joyride's internal step state.
@@ -280,9 +236,9 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       //   - Skip button is absent on the last step.
       //
       await navigateViaHash('/home');
-      await armWalkthrough();
+      expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
-      await waitForTourTooltip(10_000);
+      expect(await waitForTourTooltip(10_000)).toBe(true);
       await advanceTourSteps(8);
 
       const hasLastStepTitle = await textExists("You're all set!");
@@ -332,26 +288,11 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
   // ── Scenario 3: Resume after relaunch ─────────────────────────────────────
 
   describe('Scenario 3 — resume after relaunch (close + reopen)', () => {
-    // GAP: After reload, AppWalkthrough mounts fresh and calls
-    //      isWalkthroughPending(onboarded). The onboarded prop comes from
-    //      snapshot.onboardingCompleted, which is fetched asynchronously from
-    //      the core via fetchCoreAppSnapshot(). During the reload the Redux
-    //      store is re-hydrated from redux-persist, but the core snapshot RPC
-    //      may not resolve before AppWalkthrough's useState lazy initializer
-    //      runs — so onboarded is false at init time. The walkthrough_pending
-    //      key is present in localStorage (set by armWalkthrough), so
-    //      isWalkthroughPending(false) would still return true via the key
-    //      check. However, if the auth guard redirects to onboarding or
-    //      BootCheckGate blocks rendering, AppWalkthrough never mounts and the
-    //      tooltip never appears. The exact sequencing is environment-dependent
-    //      and the test cannot reliably produce the tooltip within 15 s in CI.
     it('walkthrough re-shows after renderer reload when pending flag is set', async () => {
       await navigateViaHash('/home');
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
       expect(await waitForTourTooltip(20_000)).toBe(true);
     });
-
-
   });
 });
