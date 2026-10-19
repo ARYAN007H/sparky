@@ -4,7 +4,7 @@
  * Run with: node --test scripts/ci/__tests__/check-storage-owner.test.mjs
  *
  * Cargo metadata dep_kinds format:
- *   - Normal dep: { kind: "normal" } or absent (treated as normal)
+ *   - Normal dep: { kind: "normal" } or absent (treated as normal by cargo)
  *   - Build dep:  { kind: "build" }
  *   - Dev dep:    { kind: "dev" }
  */
@@ -17,7 +17,7 @@ const REGISTRY = 'registry+https://github.com/rust-lang/crates.io-index';
 const tsd_git = (tag) => `git+https://github.com/tinyhumansai/tinystoragedrivers?tag=${tag}#`;
 
 // ---------------------------------------------------------------------------
-// Helper builders — dep_kinds uses "normal" (string), not null
+// Helper builders
 // ---------------------------------------------------------------------------
 
 /** Path crate (first-party, source = null). */
@@ -40,20 +40,8 @@ const regPkg = (name, version, manifest, deps = []) => ({
   dependencies: deps,
 });
 
-/** Git crate. */
-const gitPkg = (name, version, manifest, git_source, deps = []) => ({
-  id: `${name} ${version} ${git_source}`,
-  name,
-  version,
-  manifest_path: manifest,
-  source: git_source,
-  dependencies: deps,
-});
-
 /** Normal dep_kinds entry. */
 const NORMAL = [{ kind: 'normal' }];
-/** Build dep_kinds entry. */
-const BUILD = [{ kind: 'build' }];
 
 /** Resolve node for a path crate. */
 const pathNode = (name, version, deps) => ({
@@ -103,15 +91,29 @@ const transitive_engine_fixture = {
 // Fixture: tsd tag mismatch → must FAIL
 // some-odd-crate (path) depends on tinystoragedrivers-core with git tag "99.0.0"
 // but vendored version is "1.0.0".
+// Note: dep.source must be set for the mismatch check to read the tag.
 // ---------------------------------------------------------------------------
 
 const tsd_tag_mismatch_fixture = {
   packages: [
     pathPkg('tinystoragedrivers-core', '1.0.0',
       `${ROOT}/vendor/tinystoragedrivers/crates/tinystoragedrivers-core/Cargo.toml`),
-    pathPkg('some-odd-crate', '0.1.0', `${ROOT}/crates/some-odd-crate/Cargo.toml`, [
-      { name: 'tinystoragedrivers-core', pkg: `tinystoragedrivers-core 1.0.0 ${tsd_git('99.0.0')}` },
-    ]),
+    // some-odd-crate depends on tinystoragedrivers-core with an explicit git source
+    // whose tag differs from the vendored version.
+    {
+      id: `some-odd-crate 0.1.0`,
+      name: 'some-odd-crate',
+      version: '0.1.0',
+      manifest_path: `${ROOT}/crates/some-odd-crate/Cargo.toml`,
+      source: null,
+      dependencies: [
+        {
+          name: 'tinystoragedrivers-core',
+          pkg: `tinystoragedrivers-core 1.0.0 ${tsd_git('99.0.0')}`,
+          source: tsd_git('99.0.0'),  // <-- must be set for tag mismatch check
+        },
+      ],
+    },
   ],
   resolve: {
     nodes: [
@@ -181,19 +183,19 @@ const vendored_ok_fixture = {
 
 // ---------------------------------------------------------------------------
 // Fixture: aws-sdk-s3 reached directly from non-allowlisted crate → must FAIL
-// openhuman-rpc (path) -> aws-sdk-s3 (registry)
+// openhuman-core (NOT allowlisted) -> aws-sdk-s3 (registry)
 // ---------------------------------------------------------------------------
 
 const aws_s3_fixture = {
   packages: [
-    pathPkg('openhuman-rpc', '0.1.0', `${ROOT}/crates/openhuman-rpc/Cargo.toml`, [
+    pathPkg('openhuman-core', '0.1.0', `${ROOT}/crates/openhuman-core/Cargo.toml`, [
       { name: 'aws-sdk-s3', pkg: `aws-sdk-s3 1.0.0 ${REGISTRY}` },
     ]),
     regPkg('aws-sdk-s3', '1.0.0', '/fake/.cargo/registry/src/aws/aws-sdk-s3-1.0.0/Cargo.toml'),
   ],
   resolve: {
     nodes: [
-      pathNode('openhuman-rpc', '0.1.0', [['aws-sdk-s3', '1.0.0', REGISTRY]]),
+      pathNode('openhuman-core', '0.1.0', [['aws-sdk-s3', '1.0.0', REGISTRY]]),
       regNode('aws-sdk-s3', '1.0.0', []),
     ],
   },
