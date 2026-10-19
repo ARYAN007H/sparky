@@ -639,8 +639,6 @@ impl OpenHumanRunContext {
         // child's parks route through the origin and are marked detached, so
         // their cards survive the parent turn's end (#5499).
         child.approval = Default::default();
-        child.model_budget = None;
-        child.dispatch_admission = None;
         child.dispatch = None;
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.parent_subagent_usage = None;

@@ -451,7 +451,7 @@ fn child_inherits_the_same_physical_dispatch_admission() {
 }
 
 #[test]
-fn detached_child_does_not_inherit_parent_dispatch_admission() {
+fn detached_child_retains_the_parent_dispatch_admission() {
     let admission: Arc<dyn crate::agent::tinyagents::budget::PhysicalDispatchAdmission> =
         Arc::new(TestAdmission);
     let parent = OpenHumanRunContext {
@@ -459,7 +459,10 @@ fn detached_child_does_not_inherit_parent_dispatch_admission() {
         ..OpenHumanRunContext::new()
     };
 
-    assert!(parent.detached_child().dispatch_admission.is_none());
+    assert!(Arc::ptr_eq(
+        parent.dispatch_admission.as_ref().unwrap(),
+        parent.detached_child().dispatch_admission.as_ref().unwrap()
+    ));
 }
 
 struct TestAdmission;
