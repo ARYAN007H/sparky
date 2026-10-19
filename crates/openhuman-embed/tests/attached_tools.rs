@@ -195,11 +195,12 @@ fn attached_tools_survive_clones_and_session_resume() {
             assert!(
                 durable_messages.iter().any(|message| {
                     message["role"] == "system"
-                        && message["content"]
-                            .as_str()
-                            .is_some_and(|content| content.contains("openhuman-permanent-tools"))
+                        && message["content"].as_str().is_some_and(|content| {
+                            content.contains("FROZEN_HOST_PROMPT")
+                                && content.contains("openhuman-permanent-tools")
+                        })
                 }),
-                "the new session must persist its permanent-tools system message"
+                "the new session must persist its prompt and permanent-tools system message"
             );
             let declared_tools = durable["tools"]
                 .as_array()
@@ -224,10 +225,6 @@ fn attached_tools_survive_clones_and_session_resume() {
             assert!(
                 !sealed.contains("hivemind_list"),
                 "the original generation cannot contain the later attachment: {sealed}"
-            );
-            assert!(
-                durable.contains("FROZEN_HOST_PROMPT"),
-                "successor prefix: {durable}"
             );
             let requests = chat_requests(&provider).await;
             assert_eq!(requests.len(), 4);
