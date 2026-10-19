@@ -2,8 +2,8 @@
 
 mod common;
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use openhuman_embed::budget::{
@@ -112,6 +112,7 @@ fn repair_refusal_is_typed_and_does_not_reach_fallback_or_emit_a_phantom_dispatc
                 .await
                 .expect_err("the repair call is refused by host policy");
 
+            eprintln!("controlled turn error: {error:?}");
             match error {
                 CoreError::DispatchAdmission { source, usage, .. } => {
                     assert_eq!(source.reason(), DispatchRefusalReason::CallLimit);
