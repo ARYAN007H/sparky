@@ -112,7 +112,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         .with_input_screening(!request.run_context.data.untrusted_input_turn)
         .with_approval(request.run_context.data.approval.clone())
         .with_dispatch(request.run_context.data.dispatch_ctx());
-        let (screened_input, block_reason) = security
+        let (_, block_reason) = security
             .screen_new_user_row(&mut request.history)
             .await
             .map_err(|error| driver_failure(error.to_string()))?;
