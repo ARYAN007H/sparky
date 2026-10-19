@@ -555,7 +555,7 @@ async fn agent_run_status_returns_null_for_an_unknown_run() {
     );
 }
 
-/// `agent_runs_active` takes two optional filters and must accept the
+/// The `agent_runs` controller domain's `agent_runs_active` takes two optional filters and must accept the
 /// unfiltered call, both filters, and either alone — always returning a `runs`
 /// array. A filter that was wired as required would break the UI's default
 /// unfiltered poll.
