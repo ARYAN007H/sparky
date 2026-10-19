@@ -108,10 +108,13 @@ impl ChannelHostCallbacks {
 impl ChannelHostCallbacks {
     async fn deliver_inbound(&self, channel: String, message: serde_json::Value) -> Result<()> {
         Self::validate_callback_size(&message)?;
-        if let Ok(delivery) = serde_json::from_value::<
-            tinychannels_bus::module_relay::RelayInboundDelivery,
-        >(message.clone())
-        {
+        let relay_shaped = message.get("envelope").is_some()
+            || message.get("delivered_via_authenticated_relay").is_some();
+        if relay_shaped {
+            let delivery = serde_json::from_value::<
+                tinychannels_bus::module_relay::RelayInboundDelivery,
+            >(message.clone())
+            .map_err(|_| Error::failed("invalid relay delivery"))?;
             if delivery.envelope.channel.id != channel {
                 return Err(Error::failed(
                     "relay callback channel does not match envelope",
