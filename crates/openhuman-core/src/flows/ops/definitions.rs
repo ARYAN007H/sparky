@@ -176,13 +176,13 @@ pub fn load_flow_graph(config: &Config, id: &str) -> Result<Option<WorkflowGraph
 /// Resolver-only saved-graph lookup. Authoring tools use [`load_flow_graph`]
 /// so a legacy draft can still be opened and repaired; execution resolves only
 /// graphs the current engine can run safely.
-pub(crate) fn load_engine_compatible_flow_graph(
+pub(crate) async fn load_engine_compatible_flow_graph(
     config: &Config,
     id: &str,
 ) -> Result<Option<WorkflowGraph>, String> {
     let graph = load_flow_graph(config, id)?;
     if let Some(graph) = graph.as_ref() {
-        ensure_config_aware_engine_compatible(config, graph)
+        ensure_config_aware_engine_compatible(config, graph).await
             .map_err(|error| format!("workflow_id '{id}' is engine-incompatible: {error}"))?;
     }
     Ok(graph)
