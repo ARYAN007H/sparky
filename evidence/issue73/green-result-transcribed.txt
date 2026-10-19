@@ -1,0 +1,37 @@
+Transcribed from exec session 81290; this is not a raw log.
+
+Command:
+RUST_TEST_THREADS=1 RUST_MIN_STACK=16777216 scripts/ci-cancel-aware.sh cargo test --manifest-path Cargo.toml -p openhuman wiring_warnings_ -- --nocapture
+
+Terminal result:
+Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 55s
+Running unittests src/lib.rs (target/debug/deps/openhuman_core-892fcbd058403dd6)
+
+running 13 tests
+test flows::ops::tests::run_status_and_prompt_binding_tests::graph_wiring_warnings_uses_the_probed_output_fields_when_schema_is_unknown ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::flows_get_tool_contract_rpc_warns_for_runtime_gated_uncurated_action ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_flags_a_downstream_binding_missing_the_data_prefix ... module panicked at ops_tool_contract_and_wiring_warnings_tests.rs:172:5
+FAILED
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_flags_a_downstream_field_not_in_output_fields ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_flags_a_split_out_path_that_resolves_to_a_non_array ... module panicked at ops_tool_contract_and_wiring_warnings_tests.rs:303:5
+FAILED
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_is_silent_for_a_whole_payload_binding ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_is_silent_for_composio_envelope_metadata_fields ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_is_silent_on_split_out_when_schema_is_wholly_unknown ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_is_silent_when_the_downstream_field_is_real ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_resolves_a_separated_action_slug_alias ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_suggests_the_probed_split_out_path_when_schema_is_unknown ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_suggests_the_real_split_out_path ... ok
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejects ... ok
+
+failures:
+
+failures:
+    flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_flags_a_downstream_binding_missing_the_data_prefix
+    flows::ops::tests::tool_contract_and_wiring_warnings_tests::graph_wiring_warnings_flags_a_split_out_path_that_resolves_to_a_non_array
+
+test result: FAILED. 11 passed; 2 failed; 0 ignored; 9848 filtered out; finished in 12.70s
+
+error: test failed, to rerun pass `-p openhuman --lib`
+
+Numeric exit code: 101

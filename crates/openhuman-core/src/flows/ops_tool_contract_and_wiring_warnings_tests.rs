@@ -169,6 +169,7 @@ async fn graph_wiring_warnings_flags_a_downstream_binding_missing_the_data_prefi
         ]
     }));
     let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    eprintln!("native output: {warnings:?}");
     assert!(
         warnings.iter().any(|w| w.contains("item.json.data.ts")
             && w.contains("post")
@@ -300,6 +301,7 @@ async fn graph_wiring_warnings_flags_a_split_out_path_that_resolves_to_a_non_arr
         ]
     }));
     let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    eprintln!("native output: {warnings:?}");
     assert!(
         warnings
             .iter()
