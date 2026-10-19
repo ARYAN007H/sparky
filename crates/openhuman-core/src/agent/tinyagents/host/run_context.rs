@@ -645,6 +645,9 @@ impl OpenHumanRunContext {
         child.dispatch = None;
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.parent_subagent_usage = None;
+        // Detached work has its own terminal boundary; its typed refusal must
+        // never be mistaken for the interactive parent's failure.
+        child.session_sidecar = Arc::new(Mutex::new(SessionTurnSidecar::default()));
         child.cancellation = tinyagents_harness::cancel::CancellationToken::new();
         child
     }
