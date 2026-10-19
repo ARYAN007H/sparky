@@ -225,11 +225,8 @@ test.describe('Chat transcript stick-to-bottom', () => {
     await completeTurn(page, FIRST_PROMPT, 'FIRST-REPLY-END');
 
     const overflowing = await scrollState(page);
-    test.skip(
-      /* https://github.com/tinyhumansai/openhuman/issues/6563 */
-      overflowing.scrollHeight <= overflowing.clientHeight + 200,
-      'transcript did not overflow enough to scroll — viewport too tall for this fixture'
-    );
+    const fixtureTooShort = overflowing.scrollHeight <= overflowing.clientHeight + 200;
+    test.skip(fixtureTooShort, 'fixture too short'); // https://github.com/tinyhumansai/openhuman/issues/6563
 
     // Park the reader well above the bottom, past the 80px stick threshold.
     const parkedTop = Math.max(0, overflowing.scrollHeight - overflowing.clientHeight - 600);
@@ -292,11 +289,8 @@ test.describe('Chat transcript stick-to-bottom', () => {
     await completeTurn(page, FIRST_PROMPT, 'FIRST-REPLY-END');
 
     const first = await scrollState(page);
-    test.skip(
-      /* https://github.com/tinyhumansai/openhuman/issues/6563 */
-      first.scrollHeight <= first.clientHeight + 200,
-      'transcript did not overflow enough to scroll — viewport too tall for this fixture'
-    );
+    const firstFixtureTooShort = first.scrollHeight <= first.clientHeight + 200;
+    test.skip(firstFixtureTooShort, 'fixture too short'); // https://github.com/tinyhumansai/openhuman/issues/6563
 
     await scrollTo(page, first.scrollHeight);
     expect((await scrollState(page)).distanceFromBottom).toBeLessThanOrEqual(80);
@@ -386,11 +380,8 @@ test.describe('Chat transcript stick-to-bottom', () => {
     expect(threadA, 'thread A must have an id').not.toBeNull();
 
     const overflowing = await scrollState(page);
-    test.skip(
-      /* https://github.com/tinyhumansai/openhuman/issues/6563 */
-      overflowing.scrollHeight <= overflowing.clientHeight + 200,
-      'transcript did not overflow enough to scroll — viewport too tall for this fixture'
-    );
+    const threadFixtureTooShort = overflowing.scrollHeight <= overflowing.clientHeight + 200;
+    test.skip(threadFixtureTooShort, 'fixture too short'); // https://github.com/tinyhumansai/openhuman/issues/6563
 
     // Thread B. Leaving A is what puts A's messages in the cache.
     await startNewThread(page);

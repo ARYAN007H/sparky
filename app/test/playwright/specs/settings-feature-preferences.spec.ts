@@ -286,20 +286,16 @@ test.describe('Settings - Feature Preferences', () => {
     await openAuthenticatedRoute(page, 'pw-settings-mascot-voice', '/settings/voice');
 
     await expect(page.getByText('Mascot Voice')).toBeVisible();
-    test.skip(
-      /* https://github.com/tinyhumansai/openhuman/issues/1762 */
+    const customVoiceOptionUnavailable =
       (await page
         .locator('[data-testid="mascot-voice-select"] option[value="__custom__"]')
-        .count()) === 0,
-      'custom mascot voice option is unavailable in this build'
-    );
+        .count()) === 0;
+    test.skip(customVoiceOptionUnavailable, 'option unavailable'); // https://github.com/tinyhumansai/openhuman/issues/1762
 
     await page.getByTestId('mascot-voice-select').selectOption('__custom__');
-    test.skip(
-      /* https://github.com/tinyhumansai/openhuman/issues/1762 */
-      (await page.getByTestId('mascot-voice-input').count()) === 0,
-      'custom mascot voice input did not appear after selecting __custom__'
-    );
+    const customVoiceInputUnavailable =
+      (await page.getByTestId('mascot-voice-input').count()) === 0;
+    test.skip(customVoiceInputUnavailable, 'input unavailable'); // https://github.com/tinyhumansai/openhuman/issues/1762
 
     await page.getByTestId('mascot-voice-input').fill('voice-e2e-custom');
     await page.getByTestId('mascot-voice-save-paste').click();
