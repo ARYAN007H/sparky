@@ -540,10 +540,17 @@ validate_final_appimage() (
     # On the runner the host WebKit matches the bundled one, so the default run
     # takes the system-WebKit hook path (#7652). Smoke the bundled path as well,
     # because hosts without webkit2gtk-4.1 still take it.
+    local host_notice='[openhuman] using host WebKitGTK from '
     smoke_extracted_apprun "$appdir" "$foreign_cwd" "$smoke_log" || return 1
+    grep -Fq "$host_notice" "$smoke_log" \
+      || { runtime_validation_error "default smoke did not select the host WebKitGTK"; return 1; }
     echo "[appimage-runtime] Smoking again with OPENHUMAN_APPIMAGE_WEBKIT=bundled"
     OPENHUMAN_APPIMAGE_WEBKIT=bundled \
       smoke_extracted_apprun "$appdir" "$foreign_cwd" "$smoke_log" || return 1
+    if grep -Fq "$host_notice" "$smoke_log"; then
+      runtime_validation_error "OPENHUMAN_APPIMAGE_WEBKIT=bundled smoke still selected the host WebKitGTK"
+      return 1
+    fi
   else
     echo "[appimage-runtime] Static validation complete; executable smoke disabled for this architecture"
   fi
