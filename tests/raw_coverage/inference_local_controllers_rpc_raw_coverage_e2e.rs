@@ -162,6 +162,16 @@ const EXPECTED_WIRE_METHODS: &[(&str, &str)] = &[
     ("test_connection", "openhuman.inference_test_connection"),
 ];
 
+/// Controllers that remain owned by inference's local runtime after chat moves
+/// to `agent_runs`; pin this exact inventory so a new local controller cannot
+/// slip into the broader registry check without a wire-name entry.
+const EXPECTED_LOCAL_RUNTIME_METHODS: &[(&str, &str)] = &[
+    ("transcribe", "openhuman.inference_transcribe"),
+    ("transcribe_bytes", "openhuman.inference_transcribe_bytes"),
+    ("tts", "openhuman.inference_tts"),
+    ("test_connection", "openhuman.inference_test_connection"),
+];
+
 /// Pins the wire method name of every local inference controller.
 ///
 /// This is the contract the frontend and every embedder dispatch against, and
@@ -170,6 +180,24 @@ const EXPECTED_WIRE_METHODS: &[(&str, &str)] = &[
 /// break every caller.
 #[test]
 fn local_inference_controllers_pin_their_registered_wire_method_names() {
+    let local_controllers = all_local_inference_registered_controllers();
+    assert_eq!(
+        local_controllers.len(),
+        EXPECTED_LOCAL_RUNTIME_METHODS.len(),
+        "local inference controller inventory changed; add its wire name to the expected list"
+    );
+    for (function, wire) in EXPECTED_LOCAL_RUNTIME_METHODS {
+        let registered = controller(&local_controllers, function);
+        assert_eq!(registered.rpc_method_name(), *wire);
+        assert_eq!(registered.schema.namespace, "inference");
+    }
+    assert!(
+        local_controllers.iter().all(|registered| {
+            !matches!(registered.schema.function, "agent_chat" | "agent_chat_simple")
+        }),
+        "agent chat controllers belong to agent_runs, not inference's local runtime"
+    );
+
     let controllers: Vec<_> = all_registered_controllers()
         .into_iter()
         .filter(|controller| {
