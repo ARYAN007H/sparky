@@ -102,25 +102,27 @@ async fn run_imported_history_prefix_regression() {
             && legacy_answer < current_question,
         "the live prefix precedes imported rows, followed by this turn"
     );
+    let session_ref = tinyagents_session::transcript::SessionRef::scoped(
+        "relay-import-thread",
+        &actual_agent_id,
+    );
+    let original = locator
+        .read_session_transcript(&session_ref.first_generation())
+        .expect("original imported generation")
+        .read_session()
+        .unwrap()
+        .unwrap();
+    assert_eq!(original.messages, imported);
+
+    let head = locator.head_generation(&session_ref);
+    assert_ne!(head, session_ref, "prefix adoption opens a successor generation");
     let transcript = locator
-        .read_session_transcript(&tinyagents_session::transcript::SessionRef::scoped(
-            "relay-import-thread",
-            &actual_agent_id,
-        ))
+        .read_session_transcript(&head)
         .expect("adopted session transcript")
         .read_session()
         .unwrap()
         .unwrap();
-    let inferred_system_prefix = transcript
-        .messages
-        .iter()
-        .take_while(|message| message.role == "system")
-        .count();
-    assert!(
-        transcript.meta.prefix_message_count.unwrap_or_default() > 0
-            || inferred_system_prefix > 0,
-        "the committed system prefix has either an explicit boundary or a legacy-inferable leading system row"
-    );
+    assert!(transcript.meta.prefix_message_count.unwrap_or_default() > 0);
     assert!(transcript
         .tools
         .as_ref()
