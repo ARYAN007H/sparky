@@ -5,7 +5,7 @@ use openhuman_embed::{
     ToolScopeSpec, Workspace,
 };
 use std::sync::Arc;
-use tinyagents_session::transcript::{SessionRef, TranscriptLocator};
+use tinyagents_session::transcript::SessionRef;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 // Runtime is process-wide. Keep the guard on the synchronous test caller;
