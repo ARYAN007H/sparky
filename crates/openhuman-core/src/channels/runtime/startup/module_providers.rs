@@ -482,10 +482,6 @@ impl Channel for ModuleChannel {
     }
 }
 
-#[cfg(test)]
-#[path = "module_providers_tests.rs"]
-mod tests;
-
 impl ModuleChannel {
     pub(super) async fn send_progressive_typed(
         &self,
@@ -596,3 +592,7 @@ impl ModuleChannel {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "module_providers_tests.rs"]
+mod tests;

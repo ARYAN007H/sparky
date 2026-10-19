@@ -10,10 +10,8 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
 async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlock() {
-    let _env = EnvVarGuard::locked_set_async("OPENHUMAN_TELEGRAM_BOT_API_BASE", "http://unused")
-        .await;
     let server = MockServer::start().await;
-    let _env = _env.with("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri());
+    let _env = EnvVarGuard::locked_set_async("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri()).await;
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
 
@@ -127,10 +125,9 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
             if outcome.error.is_none()
                 && outcome.receipt.primary_platform_message_id.as_deref() == Some("991")
     ));
-    Mock::given(method("POST"))
-        .and(path("/bottoken/sendMessage"))
-        .expect(0)
-        .mount(&server)
-        .await;
-    runtime.close().await.expect("module runtime should shut down");
+    server.verify().await;
+    runtime
+        .close()
+        .await
+        .expect("module runtime should shut down");
 }
