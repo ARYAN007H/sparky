@@ -278,8 +278,16 @@ async fn invoke_method_unknown_method_returns_unknown_error() {
 
 #[tokio::test]
 async fn invoke_retired_dictation_settings_method_returns_unknown_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.config_path = tmp.path().join("config.toml");
+    config.workspace_dir = tmp.path().join("workspace");
+    let ctx = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
     let err = invoke_method(
-        DispatchCtx::ambient(),
+        DispatchCtx::new(ctx),
         default_state(),
         "openhuman.config_get_dictation_settings",
         json!({}),

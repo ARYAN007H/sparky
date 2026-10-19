@@ -194,7 +194,7 @@ custom_dictionary = ["OpenHuman"]
     )
     .unwrap();
 
-    let mut config = Config::load_from_config_path(&config_path, &workspace)
+    let config = Config::load_from_config_path(&config_path, &workspace)
         .await
         .unwrap();
     assert_eq!(config.voice_server.stt_engine, crate::config::schema::SttEngine::Elevenlabs);
