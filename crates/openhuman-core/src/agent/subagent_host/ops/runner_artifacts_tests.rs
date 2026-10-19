@@ -86,7 +86,7 @@ async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap()
         .artifact_paths
         .iter()
         .find(|path| path.starts_with("outputs/"))
-        .expect("host projection records its artifact path");
+        .unwrap_or_else(|| panic!("host projection records its artifact path: {:?} / {}", outcome.artifact_paths, outcome.output));
     let parent_copy = parent_action_dir.join(stored_path);
     assert!(
         parent_copy.is_file(),
