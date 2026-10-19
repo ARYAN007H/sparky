@@ -61,18 +61,20 @@ function VoiceNotePlayerBody({
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const totalMs = loadedMs ?? durationMs ?? 0;
   const frames = visemes?.length ? visemes : proceduralVisemes(speechText, totalMs);
+  const framesRef = useRef(frames);
+  framesRef.current = frames;
 
   const publishMascot = useCallback(
     (active: boolean, atMs = 0) => {
       if (!mascotPlayback) return;
       let viseme = 'sil';
       if (active) {
-        const frame = frames.find(item => atMs >= item.start_ms && atMs < item.end_ms);
+        const frame = framesRef.current.find(item => atMs >= item.start_ms && atMs < item.end_ms);
         viseme = frame?.viseme ?? 'sil';
       }
       window.dispatchEvent(new CustomEvent('voice-note-mascot', { detail: { active, viseme } }));
     },
-    [frames, mascotPlayback]
+    [mascotPlayback]
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
