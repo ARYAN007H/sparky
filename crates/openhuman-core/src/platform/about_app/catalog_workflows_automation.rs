@@ -223,6 +223,21 @@ Capability {
         privacy: None,
     },
 Capability {
+        id: "automation.inbound_event_queues",
+        name: "Inbound Event Queues",
+        domain: "automation",
+        category: CapabilityCategory::Automation,
+        description: "Composio triggers and agent webhooks are queued on this device before \
+                      triage. A redelivered trigger is handled once, a flood is paced and \
+                      folded into one digest, a triage that asks to wait is retried when it \
+                      asked to instead of being dropped, and events that keep failing are \
+                      parked for review rather than lost. Runs in the TinyEventQueues module.",
+        how_to: "Configured with [components] eventqueues and [inbound] in config.toml; \
+                 inspect with the inbound.stats, inbound.dead and inbound.redrive RPC methods",
+        status: CapabilityStatus::Beta,
+        privacy: None,
+    },
+Capability {
         id: "automation.task_sources",
         name: "Task Sources",
         domain: "automation",
