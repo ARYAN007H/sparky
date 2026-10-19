@@ -187,10 +187,10 @@ async fn a_refused_message_publishes_no_turn_events() {
 async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_error() {
     use crate::core::runtime::{DomainSet, context::CoreContext};
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
-    let _ = env_logger::builder()
-        .is_test(true)
-        .filter_level(log::LevelFilter::Debug)
-        .try_init();
+    // Root chat turns need the process's hosted definition catalogue. Other
+    // tests may initialize it first, so the idempotent `OnceLock` initializer
+    // is intentionally best-effort here.
+    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
     use wiremock::{
         Mock, MockServer, ResponseTemplate,
         matchers::{method, path},
