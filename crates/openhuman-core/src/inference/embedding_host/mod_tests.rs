@@ -4,8 +4,8 @@
 //! `#[path = "mod_tests.rs"] mod tests;` so `super::*` still resolves to the
 //! `embeddings` module.
 
-use super::*;
 use super::cloud::{DEFAULT_CLOUD_EMBEDDING_DIMENSIONS, DEFAULT_CLOUD_EMBEDDING_MODEL};
+use super::*;
 
 // ── create_embedding_provider_with_credentials ───────────
 

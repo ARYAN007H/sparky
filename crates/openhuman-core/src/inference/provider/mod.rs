@@ -37,5 +37,5 @@ pub use factory::{
 pub use openhuman_backend_model::PROVIDER_LABEL;
 
 #[cfg(test)]
-#[path = "ops_tests.rs"]
-mod model_listing_tests;
+#[path = "model_listing_test_support.rs"]
+pub(crate) mod model_listing_test_support;
