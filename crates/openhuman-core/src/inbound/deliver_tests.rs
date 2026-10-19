@@ -217,16 +217,54 @@ fn classifications_are_bounded() {
         _ => unreachable!(),
     };
     for n in 0..=CLASSIFIED_CAPACITY {
-        classified.keep(format!("k{n}"), run.clone());
+        classified.keep(format!("k{n}"), run.clone(), NOW_MS);
     }
-    classified.keep("k1".to_owned(), run.clone());
+    classified.keep("k1".to_owned(), run.clone(), NOW_MS);
     assert_eq!(classified.runs.len(), CLASSIFIED_CAPACITY);
     assert!(
-        classified.take("k0").is_none(),
+        classified.take("k0", NOW_MS).is_none(),
         "the oldest was not evicted"
     );
-    assert!(classified.take("k1").is_some());
-    assert!(classified.take("k1").is_none());
+    assert!(classified.take("k1", NOW_MS).is_some());
+    assert!(classified.take("k1", NOW_MS).is_none());
+    // A stale classification is not applied on a late delivery.
+    classified.keep("k2".to_owned(), run, NOW_MS);
+    assert!(classified
+        .take("k2", NOW_MS + CLASSIFIED_TTL_MS + 1)
+        .is_none());
+}
+
+#[tokio::test]
+async fn a_redelivered_accepted_turn_is_not_decided_twice() {
+    // The module's callback deadline passed while the first triage was still
+    // deciding; it redelivers the same turn. One decision, one apply.
+    let triage = ScriptedTriage::new([
+        decision(TriageAction::React),
+        decision(TriageAction::React),
+    ]);
+    let deliverer = deliverer(&triage);
+    for attempt in [1, 2] {
+        let response = deliverer
+            .deliver(turn(vec![trigger_event("u1")], Lane::Background, attempt))
+            .await;
+        assert_eq!(response.status, DeliverStatus::Accepted);
+    }
+    assert_eq!(triage.runs(), 1, "the redelivery was triaged again");
+    let _ = triage.until_applied(1, Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(triage.applied().len(), 1, "the redelivery was applied again");
+}
+
+#[test]
+fn accepted_turns_are_bounded() {
+    let mut accepted = Accepted::default();
+    for n in 0..=ACCEPTED_CAPACITY {
+        accepted.remember(&format!("t{n}"));
+    }
+    accepted.remember("t5");
+    assert_eq!(accepted.order.len(), ACCEPTED_CAPACITY);
+    assert!(!accepted.contains("t0"));
+    assert!(accepted.contains("t5"));
 }
 
 #[tokio::test]

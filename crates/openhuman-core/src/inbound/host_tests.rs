@@ -1,6 +1,7 @@
 //! Tests for the served host callbacks.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde_json::json;
 use tinybus::Interface;
