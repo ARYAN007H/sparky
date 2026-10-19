@@ -2,7 +2,7 @@
 /** Full mocked recording -> transcription -> assistant speech -> reload flow. */
 import { waitForApp } from '../helpers/app-helpers';
 import { chatMounted, clickByTitle, getSelectedThreadId, waitForAssistantReplyContaining } from '../helpers/chat-harness';
-import { clickTestId, textExists, waitForTestId } from '../helpers/element-helpers';
+import { clickElement, clickTestId, textExists, waitForTestId } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
@@ -101,8 +101,8 @@ describe('Chat voice notes', () => {
 
     const playButtons = await browser.$$('[data-testid="voice-note-toggle"]');
     expect(playButtons.length).toBe(2);
-    await clickTestId('voice-note-toggle');
-    await browser.waitUntil(async () => await browser.execute(() => document.querySelector('[data-testid="voice-note-toggle"]')?.getAttribute('aria-label')?.toLowerCase().includes('pause')), { timeout: 5_000 });
-    await clickTestId('voice-note-toggle');
+    await clickElement(playButtons[1]);
+    await browser.waitUntil(async () => (await browser.$$('[data-testid="voice-note-toggle"]'))[1]?.getAttribute('aria-label').then(label => label?.toLowerCase().includes('pause')), { timeout: 5_000 });
+    await clickElement((await browser.$$('[data-testid="voice-note-toggle"]'))[1]);
   });
 });

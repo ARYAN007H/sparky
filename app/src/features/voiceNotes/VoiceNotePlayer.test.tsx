@@ -86,6 +86,29 @@ describe('VoiceNotePlayer', () => {
     await waitFor(() => expect(screen.getByTestId('voice-note-time')).toHaveTextContent('0:12'));
   });
 
+  it('drives assistant mascot playback from stored visemes and silences it on pause/unmount', async () => {
+    const { unmount } = render(
+      <VoiceNotePlayer
+        src="blob:reply"
+        mascotPlayback
+        speechText="reply"
+        visemes={[{ viseme: 'aa', start_ms: 0, end_ms: 500 }]}
+      />
+    );
+    const onPlayback = vi.fn();
+    window.addEventListener('voice-note-mascot', onPlayback);
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(onPlayback).toHaveBeenCalled());
+    expect(onPlayback.mock.calls.at(-1)?.[0].detail).toEqual({ active: true, viseme: 'aa' });
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(false));
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(true));
+    unmount();
+    expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(false);
+    window.removeEventListener('voice-note-mascot', onPlayback);
+  });
+
   it('shows an error when the core has no audio for the note', async () => {
     api.readVoiceNote.mockResolvedValue(null);
     render(<VoiceNotePlayer noteId="missing" />);

@@ -42,9 +42,21 @@ describe('voiceNoteApi', () => {
   it('reads a voice note reference from persisted metadata and rejects junk', () => {
     expect(
       readVoiceNoteMeta({
-        voiceNote: { noteId: 'n1', mime: 'audio/mpeg', durationMs: 900, waveform: [0.1, 'x', 0.5] },
+        voiceNote: {
+          noteId: 'n1',
+          mime: 'audio/mpeg',
+          durationMs: 900,
+          waveform: [0.1, 'x', 0.5],
+          visemes: [{ viseme: 'aa', start_ms: 0, end_ms: 20 }, { viseme: 4 }],
+        },
       })
-    ).toEqual({ noteId: 'n1', mime: 'audio/mpeg', durationMs: 900, waveform: [0.1, 0.5] });
+    ).toEqual({
+      noteId: 'n1',
+      mime: 'audio/mpeg',
+      durationMs: 900,
+      waveform: [0.1, 0.5],
+      visemes: [{ viseme: 'aa', start_ms: 0, end_ms: 20 }],
+    });
     expect(readVoiceNoteMeta({ voiceNote: { noteId: '' } })).toBeNull();
     expect(readVoiceNoteMeta({ voiceNote: 'x' })).toBeNull();
     expect(readVoiceNoteMeta({})).toBeNull();
