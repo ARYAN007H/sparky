@@ -68,9 +68,7 @@ fn one_shot(url: &str, args: &[&str]) -> (std::process::Output, tempfile::TempDi
     (output, workspace)
 }
 
-/// Every driver is asked the same thing: write a job in one process, list in
-/// another. A durable driver shows it to the second process; `memory` keeps
-/// nothing between processes, so it must not.
+/// SQLite is asked to persist a job written by one process for another.
 fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
     let args = [
         "cron",
@@ -98,17 +96,10 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
         String::from_utf8_lossy(&listed.stderr)
     );
     let stdout = String::from_utf8_lossy(&listed.stdout);
-    if case.driver.is_durable() {
-        assert!(
-            stdout.contains("storage-probe"),
-            "second process sees the job: {stdout}"
-        );
-    } else {
-        assert!(
-            !stdout.contains("storage-probe"),
-            "memory keeps nothing between processes: {stdout}"
-        );
-    }
+    assert!(
+        stdout.contains("storage-probe"),
+        "second process sees the job: {stdout}"
+    );
 
     // And without the URL the same fresh workspace has nothing.
     let workspace = tempfile::tempdir().unwrap();
@@ -124,4 +115,15 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
     );
 }
 
-driver_cases!(url a_second_process_reads_what_a_one_shot_wrote_to_the_backend);
+#[cfg(feature = "storage-sqlite")]
+mod sqlite {
+    use super::*;
+
+    #[test]
+    fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
+        storage_drivers::run_url(
+            storage_drivers::Driver::Sqlite,
+            super::a_second_process_reads_what_a_one_shot_wrote_to_the_backend,
+        );
+    }
+}

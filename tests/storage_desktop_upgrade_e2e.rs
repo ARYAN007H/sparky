@@ -15,9 +15,8 @@
 //! * no file of the workspace was modified, created or removed.
 //!
 //! Its own binary: it installs a storage backend into the process-wide slot and
-//! sets the keyring master key. Each driver is its own case
-//! (`support/storage_drivers.rs`), so the MongoDB case runs in the
-//! `storage-mongodb` workflow against the replica set.
+//! sets the keyring master key. Memory and SQLite are separate cases
+//! (`support/storage_drivers.rs`).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

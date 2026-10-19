@@ -25,6 +25,7 @@ impl Default for Config {
         });
 
         Self {
+            runtime_state: super::config::ConfigRuntimeState::default(),
             profile_providers: None,
             workspace_dir: openhuman_dir.join("workspace"),
             action_dir: crate::config::default_action_dir(),
@@ -115,7 +116,6 @@ impl Default for Config {
             tts_provider: None,
             integrations: IntegrationsConfig::default(),
             update: UpdateConfig::default(),
-            dictation: DictationConfig::default(),
             onboarding_completed: false,
             chat_onboarding_completed: false,
             model_registry: Vec::new(),
