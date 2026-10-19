@@ -35,9 +35,19 @@ struct Row {
     queues: QueueManifestSource,
 }
 
-/// Where a row's queue manifest comes from, read when the grant is built (at
+/// Where a row's queue grant comes from, read when the grant is built (at
 /// bind), so a manifest the host loads from configuration is current.
-pub(super) type QueueManifestSource = Option<fn() -> Option<Arc<QueueManifest>>>;
+pub(super) type QueueManifestSource = Option<fn() -> Option<QueueGrant>>;
+
+/// The queues a module is granted: the manifest the host declares on its
+/// scope, and where they live.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct QueueGrant {
+    /// The queues the module may use; the storage server refuses any other.
+    pub manifest: Arc<QueueManifest>,
+    /// `Storage` keeps them in the scope's documents; a broker URL moves them.
+    pub backend: tinystoragedrivers::QueueConfig,
+}
 
 const ROWS: [Row; 6] = [
     Row {
@@ -109,6 +119,11 @@ pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, mo
 
 /// The grant generated for `module_id`, or `None` for a module with no row.
 pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
+    let queues = ROWS
+        .iter()
+        .find(|row| row.module == module_id)
+        .and_then(|row| row.queues)
+        .and_then(|source| source());
     let row = ROWS.iter().find(|row| row.module == module_id)?;
     let items = module_items(row.owner);
     let mut secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
@@ -119,7 +134,8 @@ pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
         blob_prefixes: items.blobs,
         secret_prefixes,
         writable: true,
-        queues: row.queues.and_then(|source| source()),
+        queues: queues.as_ref().map(|grant| Arc::clone(&grant.manifest)),
+        queue_backend: queues.map(|grant| grant.backend),
     })
 }
 

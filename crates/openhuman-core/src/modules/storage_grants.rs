@@ -117,6 +117,10 @@ pub struct StorageGrant {
     /// The queues the module may use, as a manifest the host declares on the
     /// module's scope when it binds; `None` grants no `Queues` object.
     pub queues: Option<Arc<QueueManifest>>,
+    /// Where the granted queues live: `None` (or `QueueConfig::Storage`) keeps
+    /// them in the module scope's own documents; a broker URL moves them
+    /// there when the host binds. Meaningless without [`Self::queues`].
+    pub queue_backend: Option<tinystoragedrivers::QueueConfig>,
 }
 
 /// Collection names no grant may hold: the encrypted secret documents and the
