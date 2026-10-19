@@ -553,15 +553,17 @@ impl ModuleChannel {
                 ),
             )
             .await
-            .map_err(anyhow::Error::new)?;
-        if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
+            .map_err(|error| {
+                tracing::warn!("channel reply preparation failed in the compiled module");
+                anyhow::Error::new(error)
+            })?;
+        let delivery = if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
             self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
                     tinychannels_bus::methods::SEND_RELAY_INTENT,
                     (relay.clone(), prepared.intent),
                 )
                 .await
-                .map_err(anyhow::Error::new)?;
         } else {
             self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
@@ -569,8 +571,11 @@ impl ModuleChannel {
                     (self.name.clone(), prepared.intent),
                 )
                 .await
-                .map_err(anyhow::Error::new)?;
         };
+        delivery.map_err(|error| {
+            tracing::warn!("channel reply delivery failed in the compiled module");
+            anyhow::Error::new(error)
+        })?;
         Ok(())
     }
 
