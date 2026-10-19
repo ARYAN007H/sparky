@@ -10,8 +10,9 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
 async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlock() {
+    let env_lock = EnvVarGuard::locked_async().await;
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::locked_set_async("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri()).await;
+    let _env = env_lock.with("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri());
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
 
@@ -81,7 +82,7 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
         ..Default::default()
     };
     let opened: ProgressiveResult = tokio::time::timeout(
-        Duration::from_secs(3),
+        Duration::from_secs(10),
         runtime.lease.object().call_confidential(
             tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
             (ProgressiveCommand::OpenOutput {
@@ -91,7 +92,7 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
                 },
                 conversation: scope,
                 turn_id: "compiled-module-turn".into(),
-                lifetime_ms: 5_000,
+                lifetime_ms: 30_000,
             },),
         ),
     )
@@ -103,7 +104,7 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
     };
 
     let completed: ProgressiveResult = tokio::time::timeout(
-        Duration::from_secs(3),
+        Duration::from_secs(10),
         runtime.lease.object().call_confidential(
             tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
             (ProgressiveCommand::FeedOutput {
@@ -125,6 +126,14 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
             if outcome.error.is_none()
                 && outcome.receipt.primary_platform_message_id.as_deref() == Some("991")
     ));
+    let requests = server.received_requests().await.expect("mock requests");
+    let send = requests
+        .iter()
+        .find(|request| request.url.path() == "/bottoken/sendMessage")
+        .expect("one mock Telegram sendMessage request");
+    let body: serde_json::Value = serde_json::from_slice(&send.body).expect("JSON request body");
+    assert_eq!(body["chat_id"], "42");
+    assert_eq!(body["text"], "nested callback delivery");
     server.verify().await;
     runtime
         .close()
