@@ -450,6 +450,18 @@ fn child_inherits_the_same_physical_dispatch_admission() {
     ));
 }
 
+#[test]
+fn detached_child_does_not_inherit_parent_dispatch_admission() {
+    let admission: Arc<dyn crate::agent::tinyagents::budget::PhysicalDispatchAdmission> =
+        Arc::new(TestAdmission);
+    let parent = OpenHumanRunContext {
+        dispatch_admission: Some(admission),
+        ..OpenHumanRunContext::new()
+    };
+
+    assert!(parent.detached_child().dispatch_admission.is_none());
+}
+
 struct TestAdmission;
 
 #[async_trait::async_trait]
