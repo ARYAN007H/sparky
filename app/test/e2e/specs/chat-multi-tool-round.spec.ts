@@ -59,9 +59,9 @@ const FORCED_RESPONSES = [
 
 async function renderedToolCards(): Promise<string[]> {
   return (await browser.execute(() =>
-    Array.from(document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')).map(
-      card => card.innerText
-    )
+    Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')
+    ).map(card => card.innerText)
   )) as string[];
 }
 

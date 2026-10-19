@@ -45,9 +45,9 @@ const FORCED_RESPONSES = [
 
 async function renderedToolCards(): Promise<string[]> {
   return (await browser.execute(() =>
-    Array.from(document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')).map(
-      card => card.innerText
-    )
+    Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')
+    ).map(card => card.innerText)
   )) as string[];
 }
 
@@ -101,11 +101,7 @@ describe('Chat tool-call lifecycle', () => {
 
     await browser.waitUntil(
       async () => (await renderedToolCards()).some(card => card.includes('Fetching example.com')),
-      {
-        timeout: 45_000,
-        interval: 100,
-        timeoutMsg: 'Rendered web_fetch tool card never appeared',
-      }
+      { timeout: 45_000, interval: 100, timeoutMsg: 'Rendered web_fetch tool card never appeared' }
     );
     expect(await textExists('Fetching example.com')).toBe(true);
   });
