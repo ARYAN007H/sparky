@@ -136,18 +136,28 @@ fn to_json_returns_inner_value() {
 #[tokio::test]
 async fn retired_server_start_is_not_registered() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
-    let _workspace = tempfile::tempdir().expect("private workspace");
+    let workspace = tempfile::tempdir().expect("private workspace");
     let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.action_dir = workspace.path().to_path_buf();
     config.modules.enabled = false;
     config.modules.allow_download = false;
     let core = CoreContext::for_test_with_config(DomainSet::full(), config);
-    let result = crate::core::all::try_invoke_registered_rpc(
+    let result = crate::core::invoke::invoke_method(
         DispatchCtx::new(core),
+        crate::core::types::AppState {
+            core_version: env!("CARGO_PKG_VERSION").to_string(),
+        },
         "openhuman.voice_server_start",
-        Map::new(),
+        Value::Object(Map::new()),
     )
     .await;
-    assert!(result.is_none(), "retired RPC must be indistinguishable from an unknown method");
+    assert!(
+        result
+            .expect_err("retired method must be reported as unknown")
+            .starts_with(crate::core::dispatch::UNKNOWN_METHOD_PREFIX),
+        "retired RPC must be indistinguishable from an unknown method"
+    );
 }
 
 #[test]
