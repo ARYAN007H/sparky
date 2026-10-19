@@ -1,33 +1,6 @@
 // @ts-nocheck
 /**
- * Harness — Composio tool-call prompt flow (WS-D spec 1).
- *
- * Exercises the complete round-trip when the chat harness routes a user
- * prompt through the LLM, the LLM emits a tool_call for a Composio action,
- * the core dispatches the action to the Composio execute endpoint (mocked),
- * and the second LLM turn returns a final answer.
- *
- * Scenario: Gmail GMAIL_GET_MAIL routes through the harness and renders a final reply.
- *
- * Observation strategy:
- *   - LLM forced-responses queue drives the two-turn sequence.
- *   - The tool name appears in the request body sent to the LLM (second turn
- *     includes the tool result message), so `waitForToolCallInMockLog` searches
- *     LLM completions requests.
- *   - Composio execute is the canonical confirmation that the core actually
- *     dispatched the action — we also assert it where feasible.
- *   - UI final-reply assertion is the user-visible acceptance criterion.
- *
- * NOTE: The composio tool name registered in Rust is "composio" (see
- * crates/openhuman-core/src/tools/impl/network/composio.rs). The LLM-side tool call uses
- * the Composio action name as the function.name (e.g. "GMAIL_GET_MAIL").
- * The mock execute endpoint is POST /agent-integrations/composio/execute with
- * body { action: "GMAIL_GET_MAIL", ... }.
- *
- * TODO(ws-a-followup): If the in-process core dispatches tools against the
- * real Composio API rather than the mock backend, the composio execute assertion
- * will time out.  In that scenario the test degrades gracefully: the LLM-turn
- * assertion and UI reply assertion still hold (they only require the mock LLM).
+ * Harness Composio E2E: one Gmail action renders a user-visible reply.
  */
 import { waitForApp } from '../helpers/app-helpers';
 import {
@@ -43,7 +16,6 @@ import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import {
   clearRequestLog,
-  getRequestLog,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
@@ -194,27 +166,6 @@ describe('Harness — Composio tool-call prompt flow', () => {
       await waitForAssistantReplyContaining('Q3 Budget Review', { logPrefix: LOG_PREFIX })
     ).toBe(true);
 
-    // Verify the composio execute was hit (best-effort — may fail if the core
-    // is not routing tool calls through the mock backend in this E2E build).
-    const composioHit = log.find(
-      r => r.method === 'POST' && r.url.includes('/agent-integrations/composio/execute')
-    );
-    if (composioHit) {
-      console.log(`${LOG_PREFIX} C1.1: composio execute confirmed in mock log`);
-    } else {
-      console.warn(
-        `${LOG_PREFIX} C1.1: composio execute NOT found in mock log — ` +
-          `core may route tools to real Composio API in this build. ` +
-          `LLM and UI assertions still hold. TODO(ws-a-followup): add mock routing for composio.`
-      );
-    }
-
     console.log(`${LOG_PREFIX} C1.1: PASSED`);
   });
-
-  // ── C1.2 — GitHub GITHUB_LIST_REPOS ──────────────────────────────────────
-
-  // ── C1.3 — Composio execute failure ──────────────────────────────────────
-
-  // ── C1.4 — Linear LINEAR_CREATE_ISSUE ────────────────────────────────────
 });
