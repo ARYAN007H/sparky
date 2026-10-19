@@ -265,7 +265,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
         let p = deserialize_params::<AgentChatParams>(params)?;
         let mut config = ctx.load_config().await?;
         to_json(
-            crate::inference::host_runtime::rpc::agent_chat(
+            crate::inference::host_runtime::ops::agent_chat(
                 &mut config,
                 &p.message,
                 p.model_override,
@@ -288,7 +288,7 @@ fn handle_chat_simple(ctx: DispatchCtx, params: Map<String, Value>) -> Controlle
         let p = deserialize_params::<AgentChatParams>(params)?;
         let config = ctx.load_config().await?;
         to_json(
-            crate::inference::host_runtime::rpc::agent_chat_simple(
+            crate::inference::host_runtime::ops::agent_chat_simple(
                 &ctx,
                 &config,
                 &p.message,

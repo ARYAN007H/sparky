@@ -44,7 +44,7 @@ const LMSTUDIO_TEMPLATE_400: &str = "lmstudio returned: Engine protocol predict 
 /// Build a flattened managed-backend error string the way it reaches
 /// `classify_inference_error` after the typed provider error is collapsed
 /// to a `String` (the `"OpenHuman API error (<status>): <body>"` envelope
-/// from `inference::provider::ops::api_error`).
+/// from `inference::provider::http_error::api_error`).
 fn managed_error(status: &str, body: &str) -> String {
     format!("OpenHuman API error ({status}): {body}")
 }
@@ -138,3 +138,7 @@ mod rate_limit_classification_tests;
 mod session_and_concurrency_tests;
 #[path = "web_tests_start_chat_ingress_tests.rs"]
 mod start_chat_ingress_tests;
+
+#[cfg(feature = "voice")]
+#[path = "web_tests_ptt_source_tests.rs"]
+mod ptt_source_tests;

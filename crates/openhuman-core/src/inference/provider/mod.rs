@@ -9,11 +9,12 @@ pub mod error_classify;
 pub mod error_code;
 pub mod factory;
 pub(crate) mod fallback_diagnostics;
+pub mod http_error;
 pub(crate) mod model;
+pub mod models;
 pub(crate) mod openai_codex;
 /// Provider-neutral managed-provider pieces that stay in the core.
 pub mod openhuman_backend_model;
-pub mod ops;
 pub mod types;
 
 #[allow(unused_imports)]
@@ -34,4 +35,7 @@ pub use factory::{
     provider_for_role, role_for_model_tier, BYOK_INCOMPLETE_SENTINEL,
 };
 pub use openhuman_backend_model::PROVIDER_LABEL;
-pub use ops::*;
+
+#[cfg(test)]
+#[path = "model_listing_test_support.rs"]
+pub(crate) mod model_listing_test_support;
