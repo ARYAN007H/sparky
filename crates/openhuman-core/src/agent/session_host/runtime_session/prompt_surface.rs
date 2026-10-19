@@ -8,7 +8,10 @@ impl OpenHumanSessionHost {
     /// they need live integrations or synthesized tools.
     pub fn render_current_turn_prompt(&self) -> Result<String> {
         let prelude = self.create_turn_prelude(false);
-        Ok(prelude.build_system_prompt_tiered()?.text)
+        Ok(prelude
+            .build_system_prompt_tiered()?
+            .system_messages()
+            .join(""))
     }
 
     pub(super) fn create_turn_prelude(
