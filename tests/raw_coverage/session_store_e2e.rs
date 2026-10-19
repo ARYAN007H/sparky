@@ -406,6 +406,176 @@ async fn session_import_rejects_malformed_params() {
 
 // ── tokenjuice ────────────────────────────────────────────────────────────
 
+/// `tokenjuice.detect` → `.compress` → `.retrieve`: the full CCR round trip,
+/// plus the invariants that must hold whichever branch the router takes.
+///
+/// A 400-row JSON array is the fixture because it is the one kind the existing
+/// `json_rpc_e2e` coverage already pins `detect` on, so the cross-controller
+/// assertion below rests on a classification asserted independently elsewhere.
+/// In practice it compresses ~19× and takes the lossy path, so the `retrieve`
+/// leg runs for real and the original is compared byte for byte.
+///
+/// **The lossy branch is guarded rather than assumed, and that is deliberate.**
+/// Whether the router compresses is its own decision under a hint this RPC
+/// cannot fully steer: `handle_compress` builds `ContentHint` from `tool_name`
+/// alone (`inference/tokenjuice/schemas.rs:241-248`), leaving `explicit`,
+/// `mime`, `extension` and `query` unreachable. Asserting `lossy == true`
+/// unconditionally would pin a detector heuristic, not a contract — and the
+/// same controller passes a 16 KB uniform *log* straight through untouched, so
+/// the heuristic is not a stable thing to assert on. See
+/// `~/tinyhuman/bugs/e2e-wave-tokenjuice-compress-drops-most-of-the-content-hint.md`.
+///
+/// What is asserted unconditionally is what must hold on every branch:
+///
+///  1. an applied `compress` and `detect` agree on the content kind — two
+///     controllers, one classifier, and nothing else checks they stay in step;
+///  2. the reported byte counts describe the actual strings, not estimates;
+///  3. **nothing is lost**: a lossy compaction is recoverable through the token
+///     byte-for-byte, and a pass-through returns the input unchanged.
+#[tokio::test]
+async fn tokenjuice_compress_agrees_with_detect_and_never_loses_content() {
+    let _lock = env_lock_async().await;
+    let harness = setup().await;
+
+    // A JSON array: the one kind the existing `json_rpc_e2e` coverage already
+    // pins `detect` on, so the cross-controller assertion below rests on a
+    // classification that is independently asserted elsewhere.
+    let rows: Vec<Value> = (0..400)
+        .map(|i| json!({ "id": i, "name": format!("row-{i}"), "status": "ok", "score": i * 3 }))
+        .collect();
+    let content = Value::Array(rows).to_string();
+    assert!(
+        content.len() > 8_000,
+        "the fixture must clear the 2048-byte compression floor with margin"
+    );
+
+    let detected = rpc(
+        &harness.rpc_base,
+        32_001,
+        "openhuman.tokenjuice_detect",
+        json!({ "content": content }),
+    )
+    .await;
+    let detected_kind = payload(&detected, "tokenjuice_detect")
+        .get("kind")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("detect must report a kind: {detected}"))
+        .to_string();
+    assert_eq!(
+        detected_kind, "json",
+        "a JSON array must classify as json: {detected}"
+    );
+
+    let compressed = rpc(
+        &harness.rpc_base,
+        32_002,
+        "openhuman.tokenjuice_compress",
+        json!({ "content": content, "tool_name": "session_store_e2e" }),
+    )
+    .await;
+    let compressed = payload(&compressed, "tokenjuice_compress");
+
+    // (2) The byte counts describe the actual strings.
+    let text = compressed
+        .get("text")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("compress must return the routed text: {compressed}"));
+    assert_eq!(
+        compressed.get("originalBytes").and_then(Value::as_u64),
+        Some(content.len() as u64),
+        "originalBytes must be the byte length handed in: {compressed}"
+    );
+    assert_eq!(
+        compressed.get("compactedBytes").and_then(Value::as_u64),
+        Some(text.len() as u64),
+        "compactedBytes is documented as the byte length of `text`: {compressed}"
+    );
+
+    // (3) Nothing is lost, on whichever branch the router took.
+    let applied = compressed
+        .get("applied")
+        .and_then(Value::as_bool)
+        .unwrap_or_else(|| {
+            panic!("compress must report whether it changed the content: {compressed}")
+        });
+    let lossy = compressed
+        .get("lossy")
+        .and_then(Value::as_bool)
+        .unwrap_or_else(|| panic!("compress must report whether it dropped data: {compressed}"));
+
+    if !applied {
+        assert!(!lossy, "a pass-through cannot be lossy: {compressed}");
+        let kind = compressed.get("kind").and_then(Value::as_str);
+        assert!(
+            kind == Some("plain_text") || kind == Some(detected_kind.as_str()),
+            "a pass-through uses either its plain-text wire kind or the detector's routed kind: {compressed}"
+        );
+        assert_eq!(
+            text, content,
+            "a pass-through must return the input unchanged — byte for byte"
+        );
+        assert_eq!(
+            compressed.get("compressor").and_then(Value::as_str),
+            Some("none"),
+            "a pass-through must name no compressor: {compressed}"
+        );
+        assert_eq!(
+            compressed.get("ccrToken"),
+            Some(&Value::Null),
+            "nothing was offloaded, so there is no token to hand back: {compressed}"
+        );
+    } else {
+        assert_eq!(
+            compressed.get("kind").and_then(Value::as_str),
+            Some(detected_kind.as_str()),
+            "an applied compression must route on the same kind detect reports: {compressed}"
+        );
+        assert!(
+            text.len() < content.len(),
+            "an applied compaction must shrink the payload: {compressed}"
+        );
+        assert_ne!(
+            compressed.get("compressor").and_then(Value::as_str),
+            Some("none"),
+            "an applied compaction must name the compressor that fired: {compressed}"
+        );
+    }
+
+    if lossy {
+        let token = compressed
+            .get("ccrToken")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| {
+                panic!(
+                    "a lossy compaction over the CCR threshold must be recoverable: {compressed}"
+                )
+            })
+            .to_string();
+
+        let retrieved = rpc(
+            &harness.rpc_base,
+            32_003,
+            "openhuman.tokenjuice_retrieve",
+            json!({ "token": token }),
+        )
+        .await;
+        let retrieved = payload(&retrieved, "tokenjuice_retrieve");
+        assert_eq!(
+            retrieved.get("found").and_then(Value::as_bool),
+            Some(true),
+            "the token minted by compress must resolve: {retrieved}"
+        );
+        assert_eq!(
+            retrieved.get("content").and_then(Value::as_str),
+            Some(content.as_str()),
+            "retrieve must return the original verbatim — a compaction that \
+             cannot be undone byte-for-byte has lost data"
+        );
+    }
+
+    harness.join.abort();
+}
+
 /// Failure paths: `compress` needs content, and `retrieve` of a token that was
 /// never minted is a clean `found: false` rather than an error.
 #[tokio::test]
