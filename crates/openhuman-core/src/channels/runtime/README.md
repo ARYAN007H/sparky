@@ -32,6 +32,19 @@ the module, then applies OpenHuman's routing, approval, and agent-turn policy.
 Replies and interactions are sent through the module's typed channel objects;
 the host does not reconstruct provider-specific outbound behavior.
 
+The dispatch loop admits each message first: preparation, the
+`ChannelMessageReceived` event, runtime commands and approval replies run
+immediately. What remains goes through the per-conversation debouncer
+([`inbound_debounce`](../../inbound_debounce/README.md)) keyed by
+`history_key`. Messages from one sender within the quiet window
+(`[inbound_debounce]`, 1.5 s by default, 4 s once the batch holds media,
+capped at 10 s) become one turn, and a typing indicator starts when the window
+opens. A conversation never runs two turns at once: messages that arrive while
+its turn runs are collected into one follow-up turn that sees the first turn's
+history. Different conversations still run in parallel up to the module's
+in-flight limit. When the inbound queue closes, every buffered message is
+flushed before the loop returns.
+
 The always-on `ChannelInboundSubscriber` handles hosted-channel messages
 published by the backend socket. It prepares the caller's identity, opens a
 private module runtime, and executes progressive delivery against the captured
