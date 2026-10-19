@@ -131,14 +131,13 @@ TinyHosts’ bounded directory preparation currently returns up to 4 MiB of sour
 Existing larger Launch/Deploy requests keep their transport budget. Streaming or
 module-owned prepared artifacts remain required for larger host directory inputs.
 
-TinyComputer’s reliable Globe reads retain one bounded snapshot until acknowledgment.
-Native overflow, malformed events and unexpected EOF mark continuity loss. Hosts
-must await its terminal shutdown before unloading. TinyVoice owns native Linux and
-Windows hotkey listeners and accepts sequenced generic facts for macOS. Its reads
-retain the previous batch across continuity loss, allowing a valid acknowledgment
-to retrieve the inactive reset snapshot. Shared activation types live in the bus
-contract and are re-exported by the implementation. OpenHuman still needs the
-Computer-to-Voice adapter and compatible released artifacts before switching.
+At this migration stage, TinyComputer’s reliable Globe reads retained one bounded
+snapshot until acknowledgment. Native overflow, malformed events and unexpected
+EOF marked continuity loss. TinyVoice then owned native Linux and Windows
+listeners and accepted sequenced generic facts for macOS. Its reads retained the
+previous batch across continuity loss. The later desktop voice cut removed this
+host integration; the optional TinyVoice contract remains available to other
+consumers.
 
 TinyDocs PR 35 moves PNG/JPEG header interpretation into the module and adds
 bounded typed image inspection. Its parser regressions and rebuilt artifact
@@ -294,8 +293,9 @@ exceptions, with 26 temporary exceptions and one pending contract. The flows
 profile measures 325 packages and 303 names; the all-feature profile measures
 513 packages and 471 names, nine fewer of each than the preceding cutover.
 Both profiles still contain the two native builds `libsqlite3-sys` and `ring`.
-These counts do not measure binary size or build time. TinyVoice capture and
-non-macOS hotkeys remain a separate host migration.
+These counts do not measure binary size or build time. At this migration stage,
+TinyVoice capture and non-macOS hotkeys remained a separate host migration; the
+later desktop voice cut removed those host integrations.
 
 Linux packaging explicitly stages `libxdo.so.3` and `libasound.so.2` for loaded
 modules in both AppImage layouts, checking the target ELF architecture before
@@ -330,8 +330,9 @@ recording summaries and cancellation that waits for native finish cleanup. The
 host holds opaque reservations, reads WAV output in
 256 KiB slices, polls at most two continuous chunks per request, and releases
 leases on cancellation, sign-out and shutdown. Failed cleanup stays registered
-for retry. Microphone authorization remains a TinyComputer call; the host does
-not link TinyVoice or CPAL. The existing hotkey adapter remains module-backed.
+for retry. Microphone authorization remained a TinyComputer call; the host did
+not link TinyVoice or CPAL. This is an earlier implementation snapshot; the
+later desktop voice cut removed this adapter from OpenHuman.
 
 TinyVoice v0.3.0 (contract 1.10) added wake-word sequencing
 (`SequenceUtterance`), pre-transcription recording gates (`GateRecording`) and
