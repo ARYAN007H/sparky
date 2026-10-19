@@ -15,7 +15,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus as traits;
-use tinychannels_runtime::context::ChatMessage;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
@@ -436,7 +435,7 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None => None,
     };
-    let cancellation = CancellationToken::new();
+    let cancellation = tinyagents_harness::CancellationToken::new();
     let agent_call: std::pin::Pin<
         Box<dyn std::future::Future<Output = anyhow::Result<AgentTurnResponse>> + Send + '_>,
     > = match selected_host {

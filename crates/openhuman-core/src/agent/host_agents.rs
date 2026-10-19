@@ -114,7 +114,7 @@ impl HostAgent {
             turn_deadline: turn_deadline
                 .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
             approval: approval.clone(),
-            memory_identity: Some(crate::memory::scope::MemoryIdentity::root().child(agent_id)),
+            memory_identity: Some(crate::memory::scope::MemoryIdentity::root().child(&agent_id)),
             ..Default::default()
         });
         self.scope(session.run_single_with_approval(message, Some(origin), approval))
