@@ -115,7 +115,8 @@ tinyflows-import = { path = "../../vendor/tinyflows/crates/tinyflows-import", de
 # commit 612ea5e "refactor: split tinyagents into focused crates" and follow-on
 # work): there is no longer a single `tinyagents` package. openhuman now depends
 # directly on the members it actually uses — `tinyagents-harness` (agent loop,
-# tools, middleware), `tinyagents-graph` (durable state graphs),
+# tools, middleware), `tinyagents-hooks` (host-provided lifecycle and stop
+# hooks), `tinyagents-graph` (durable state graphs),
 # `tinyagents-registry` (capability/model registry), and
 # `tinyagents-session` (durable session history + run ledger, previously gated
 # behind this crate's own `sqlite` feature — it is its own always-on crate now).
@@ -146,6 +147,7 @@ tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness
     "multimodal",
     "builtin-tools",
 ] }
+tinyagents-hooks = { path = "../../vendor/tinyagents/crates/tinyagents-hooks" }
 tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", features = ["storage"] }
 tiny-artifacts = { path = "../../vendor/tiny-artifacts/crates/tiny-artifacts" }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }

@@ -6,7 +6,7 @@ use crate::agent::stop_hooks::BudgetStopHook;
 use crate::agent::tinyagents::TurnModelSource;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};
+use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
 use tinyinference_llm::usage::Usage;

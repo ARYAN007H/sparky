@@ -98,6 +98,7 @@ tinyinference-voice = { path = "vendor/tinyagents/vendor/tinyinference/crates/ti
 # own for standalone builds); resolve those names to the one copy the host uses.
 tinyagents-live = { path = "vendor/tinyagents/crates/tinyagents-live" }
 tinyagents-harness = { path = "vendor/tinyagents/crates/tinyagents-harness" }
+tinyagents-hooks = { path = "vendor/tinyagents/crates/tinyagents-hooks" }
 tinytools = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools" }
 tinybus = { path = "vendor/tinybus/crates/tinybus" }
 tinybus-macros = { path = "vendor/tinybus/crates/tinybus-macros" }

@@ -2,8 +2,7 @@
 
 use std::sync::Arc;
 use tinyagents_harness::cost::TurnCost;
-use tinyagents_harness::middleware::library::StopHookMiddleware;
-use tinyagents_harness::middleware::StopHook;
+use tinyagents_hooks::stop::{StopHook, StopHookMiddleware};
 use tinyagents_harness::steering::SteeringHandle;
 
 /// Install product policies and preserve the host-facing halt summary.
@@ -34,7 +33,7 @@ pub(super) fn install(
 
 fn record_halt_summary(
     halt_summary: &tinyagents_harness::turn_outcome::HaltSummarySlot,
-    report: &tinyagents_harness::middleware::library::StopReport,
+    report: &tinyagents_hooks::stop::StopReport,
 ) {
     *halt_summary
         .lock()

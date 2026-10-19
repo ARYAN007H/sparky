@@ -20,10 +20,11 @@ use tinyagents_harness::middleware::{
 };
 use tinyagents_harness::middleware::{
     plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
-    BudgetMiddleware, BudgetParityObserver, ContextCompressionMiddleware,
+    BudgetMiddleware, ContextCompressionMiddleware,
     PromptCacheGuardMiddleware, RepeatProgressMiddleware, RunModeHandle,
     ToolPolicyMiddleware as TaToolPolicyMiddleware,
 };
+use tinyagents_hooks::lifecycle::BudgetParityObserver;
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
 use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
