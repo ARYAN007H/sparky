@@ -19,7 +19,12 @@
 //! A digest turn (many events folded together) is triaged once, as one
 //! envelope listing them. `ClassifySalience` runs the same triage for a
 //! borderline event and maps the action to a salience class; the decision is
-//! kept for the event's delivery so it is not triaged twice.
+//! kept (for ten minutes) for the event's delivery so it is not triaged twice.
+//!
+//! One decision per turn: the triage timeout stays under the module's
+//! callback deadline (`[inbound] triage_timeout_ms`, at most 25 s), and a
+//! turn that was already accepted is accepted again without triage, so a
+//! redelivery that raced a slow answer never applies a second decision.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
@@ -39,6 +44,12 @@ use crate::triage::{TriageAction, TriageOutcome, TriageRun, TriageRunner, Trigge
 /// How many classifications are kept for their delivery.
 const CLASSIFIED_CAPACITY: usize = 256;
 
+/// How long a classification is kept for its delivery.
+const CLASSIFIED_TTL_MS: i64 = 10 * 60 * 1_000;
+
+/// How many accepted turns are remembered against a redelivery.
+const ACCEPTED_CAPACITY: usize = 1_024;
+
 /// The salience class of a triage action.
 #[must_use]
 pub fn class_of(action: TriageAction) -> SalienceClass {
@@ -53,13 +64,13 @@ pub fn class_of(action: TriageAction) -> SalienceClass {
 /// Decisions made while classifying, waiting for their event's delivery.
 #[derive(Debug, Default)]
 struct Classified {
-    runs: HashMap<String, TriageRun>,
+    runs: HashMap<String, (TriageRun, i64)>,
     order: VecDeque<String>,
 }
 
 impl Classified {
-    fn keep(&mut self, key: String, run: TriageRun) {
-        if self.runs.insert(key.clone(), run).is_none() {
+    fn keep(&mut self, key: String, run: TriageRun, at_ms: i64) {
+        if self.runs.insert(key.clone(), (run, at_ms)).is_none() {
             self.order.push_back(key);
         }
         while self.order.len() > CLASSIFIED_CAPACITY {
@@ -69,10 +80,32 @@ impl Classified {
         }
     }
 
-    fn take(&mut self, key: &str) -> Option<TriageRun> {
-        let run = self.runs.remove(key)?;
+    /// The decision kept for `key`, unless it is older than the TTL at `now_ms`.
+    fn take(&mut self, key: &str, now_ms: i64) -> Option<TriageRun> {
+        let (run, at_ms) = self.runs.remove(key)?;
         self.order.retain(|kept| kept != key);
-        Some(run)
+        (now_ms - at_ms <= CLASSIFIED_TTL_MS).then_some(run)
+    }
+}
+
+/// Turns already accepted, newest last.
+#[derive(Debug, Default)]
+struct Accepted {
+    order: VecDeque<String>,
+}
+
+impl Accepted {
+    fn contains(&self, turn_id: &str) -> bool {
+        self.order.iter().any(|kept| kept == turn_id)
+    }
+
+    fn remember(&mut self, turn_id: &str) {
+        if !self.contains(turn_id) {
+            self.order.push_back(turn_id.to_owned());
+        }
+        while self.order.len() > ACCEPTED_CAPACITY {
+            self.order.pop_front();
+        }
     }
 }
 
@@ -84,6 +117,7 @@ pub struct Deliverer {
     now_ms: fn() -> i64,
     max_attempts: Box<dyn Fn(Lane) -> Option<u32> + Send + Sync>,
     classified: Mutex<Classified>,
+    accepted: Mutex<Accepted>,
 }
 
 impl std::fmt::Debug for Deliverer {
@@ -110,6 +144,7 @@ impl Deliverer {
             now_ms: system_now_ms,
             max_attempts: Box::new(|lane| super::settings::current().max_attempts(lane)),
             classified: Mutex::new(Classified::default()),
+            accepted: Mutex::new(Accepted::default()),
         }
     }
 
@@ -136,6 +171,12 @@ impl Deliverer {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
+    fn accepted(&self) -> std::sync::MutexGuard<'_, Accepted> {
+        self.accepted
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     /// Classify a borderline event by triaging it.
     ///
     /// # Errors
@@ -158,7 +199,8 @@ impl Deliverer {
                     class = ?class,
                     "[inbound] classified"
                 );
-                self.classified().keep(event.dedupe_key(), run);
+                self.classified()
+                    .keep(event.dedupe_key(), run, (self.now_ms)());
                 Ok(ClassifySalienceResponse::new(class))
             }
             Ok(Ok(_)) => Err("triage did not decide".to_owned()),
@@ -170,6 +212,17 @@ impl Deliverer {
     /// Deliver one due turn.
     pub async fn deliver(&self, request: DeliverRequest) -> DeliverResponse {
         let turn = request.turn;
+        if self.accepted().contains(&turn.turn_id) {
+            // The module redelivered a turn whose decision is already being
+            // applied (its answer missed the callback deadline): say so again
+            // rather than deciding and acting a second time.
+            tracing::info!(
+                turn = %turn.turn_id,
+                attempt = turn.attempt,
+                "[inbound] turn already accepted; not triaging it again"
+            );
+            return DeliverResponse::new(DeliverStatus::Accepted);
+        }
         let (envelope, first) = match self.envelope(&turn) {
             Ok(found) => found,
             Err(detail) => {
@@ -178,9 +231,10 @@ impl Deliverer {
                 return DeliverResponse::new(DeliverStatus::Rejected { detail });
             }
         };
+        let now_ms = (self.now_ms)();
         let cached = first
             .as_ref()
-            .and_then(|event| self.classified().take(&event.dedupe_key()));
+            .and_then(|event| self.classified().take(&event.dedupe_key(), now_ms));
         let outcome = match cached {
             Some(run) => Ok(Ok(TriageOutcome::Decision(run))),
             None => tokio::time::timeout(self.timeout, self.runner.run(&self.ctx, &envelope)).await,
@@ -194,6 +248,7 @@ impl Deliverer {
                     attempt = turn.attempt,
                     "[inbound] delivered; applying the decision"
                 );
+                self.accepted().remember(&turn.turn_id);
                 self.apply(run, envelope);
                 DeliverStatus::Accepted
             }
@@ -201,7 +256,7 @@ impl Deliverer {
                 defer_until_ms,
                 reason,
             })) => {
-                let wait = u64::try_from(defer_until_ms - (self.now_ms)()).unwrap_or(0);
+                let wait = u64::try_from(defer_until_ms - now_ms).unwrap_or(0);
                 tracing::info!(
                     turn = %turn.turn_id,
                     label = %envelope.display_label,
@@ -274,10 +329,17 @@ impl Deliverer {
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
             if let Err(error) = runner.apply(&ctx, run, &envelope).await {
-                tracing::error!(
-                    label = %envelope.display_label,
-                    error = %error,
-                    "[inbound] apply_decision failed"
+                // The turn is already acknowledged: make the failure visible
+                // through the observability classifier, as the direct path does.
+                let detail = format!(
+                    "[inbound] apply_decision failed (label={}): {error:#}",
+                    envelope.display_label
+                );
+                crate::core::observability::report_error_or_expected(
+                    detail.as_str(),
+                    "inbound",
+                    "apply_decision",
+                    &[("label", envelope.display_label.as_str())],
                 );
             }
         });
