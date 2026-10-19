@@ -37,7 +37,11 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
                     crate::core::runtime::DomainSet::full(),
                     Default::default(),
                 )
-                .without_user_skill_roots(),
+                .without_user_skill_roots()
+                .definitions(Arc::new(
+                    crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(
+                    ),
+                )),
             );
     let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&core_context));
 
