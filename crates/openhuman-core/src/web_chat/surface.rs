@@ -188,11 +188,14 @@ impl Surface {
     /// sequence order. Module errors fail closed; the host never reimplements
     /// the projection locally.
     pub(crate) async fn output(&self, event: ChannelOutputEvent) {
+        eprintln!("surface output invoked");
         self.project(event, None).await;
     }
 
     async fn project(&self, event: ChannelOutputEvent, interim_round: Option<u32>) {
+        eprintln!("surface project waiting for state");
         let mut state = self.state.lock().await;
+        eprintln!("surface project acquired state");
         if state.closed {
             log::debug!(
                 "[web-channel] dropping output after terminal request_id={}",
