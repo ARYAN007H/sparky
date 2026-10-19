@@ -25,11 +25,8 @@ use serde_json::{json, Value};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
-use openhuman_core::security::credentials::{
-    AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
-};
-
 const BOT_TOKEN: &str = "session-restart-token";
+const MOCK_API_KEY: &str = "loopback-session-restart-key";
 const RPC_TOKEN: &str = "native-session-restart-rpc-token";
 const FIRST_TEXT: &str = "remember this after the core restarts";
 const SECOND_TEXT: &str = "what did I ask before the restart?";
@@ -217,6 +214,9 @@ embedding_provider = "none"
 embedding_model = "none"
 embedding_dimensions = 0
 
+[update]
+enabled = false
+
 [channels_config.telegram]
 bot_token = "{BOT_TOKEN}"
 allowed_users = ["42"]
@@ -232,25 +232,12 @@ default_model = "session-model"
 "#
     );
     std::fs::write(openhuman_dir.join("config.toml"), &config).expect("write config");
-    // Core config resolution uses the operator profile when no identity has
-    // been established, while workspace state is independently pinned here.
-    let mut parsed: openhuman_core::config::Config =
+    let parsed: openhuman_core::config::Config =
         toml::from_str(&config).expect("mock config matches the core schema");
-    parsed.config_path = openhuman_dir.join("config.toml");
-    parsed.workspace_dir = workspace.to_path_buf();
     assert_eq!(
         parsed.channels_config.telegram.as_ref().unwrap().bot_token,
         BOT_TOKEN
     );
-    AuthService::from_config(&parsed)
-        .store_provider_token(
-            APP_SESSION_PROVIDER,
-            DEFAULT_AUTH_PROFILE_NAME,
-            "loopback-test-session",
-            HashMap::new(),
-            true,
-        )
-        .expect("seed session for custom-provider access gate");
 }
 
 struct CoreProcess {
@@ -308,8 +295,10 @@ fn start_core(
         .env("OPENHUMAN_WORKSPACE", workspace)
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
         .env("OPENHUMAN_MODEL", "mock:session-model")
+        .env("OPENHUMAN_BACKEND_API_KEY", MOCK_API_KEY)
         .env("BACKEND_URL", inference)
         .env("OPENHUMAN_API_URL", inference)
+        .env("OPENHUMAN_AUTO_UPDATE_ENABLED", "false")
         .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
         .env("OPENHUMAN_COMPONENT_CHANNELS", "1")
         .env("OPENHUMAN_MODULE_SOURCE", "linked")
@@ -322,7 +311,6 @@ fn start_core(
         .env_remove("OPENHUMAN_MODULE_PATH")
         .env_remove("OPENHUMAN_MODULE_SOURCE_DIR")
         .env_remove("OPENHUMAN_MODE")
-        .env_remove("OPENHUMAN_BACKEND_API_KEY")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
         .envs(
             [
