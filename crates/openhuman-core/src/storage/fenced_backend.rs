@@ -23,7 +23,10 @@
 //! See [`super::fence`] for what the checks do and do not guarantee.
 
 use std::ops::Range;
-use std::sync::Arc;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -491,6 +494,57 @@ struct FencedBlobs {
     guard: Guard,
 }
 
+/// Two handles to one stream, used only to recover the input when a native
+/// fenced handle rejects streaming before it reads any bytes.
+#[derive(Clone)]
+struct SharedBlobReader {
+    reader: Arc<Mutex<tinystoragedrivers::BlobReader>>,
+    bytes_read: Arc<AtomicU64>,
+}
+
+impl tokio::io::AsyncRead for SharedBlobReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        let mut reader = match this.reader.lock() {
+            Ok(reader) => reader,
+            Err(_) => {
+                return Poll::Ready(Err(std::io::Error::other(
+                    "shared blob reader lock was poisoned",
+                )));
+            }
+        };
+        let before = buf.filled().len();
+        let outcome = reader.as_mut().poll_read(cx, buf);
+        if let Poll::Ready(Ok(())) = &outcome {
+            let read = buf.filled().len().saturating_sub(before) as u64;
+            this.bytes_read.fetch_add(read, Ordering::Relaxed);
+        }
+        outcome
+    }
+}
+
+fn shared_blob_readers(
+    reader: tinystoragedrivers::BlobReader,
+) -> (
+    tinystoragedrivers::BlobReader,
+    tinystoragedrivers::BlobReader,
+    Arc<AtomicU64>,
+) {
+    let reader = Arc::new(Mutex::new(reader));
+    let bytes_read = Arc::new(AtomicU64::new(0));
+    let handle = || {
+        Box::pin(SharedBlobReader {
+            reader: Arc::clone(&reader),
+            bytes_read: Arc::clone(&bytes_read),
+        }) as tinystoragedrivers::BlobReader
+    };
+    (handle(), handle(), bytes_read)
+}
+
 impl std::fmt::Debug for FencedBlobs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FencedBlobs")
@@ -506,8 +560,7 @@ impl BlobStore for FencedBlobs {
     }
 
     /// The driver's abilities, minus presigned URLs: a presigned PUT is a write
-    /// the fence never sees, so the view does not offer them (the trait
-    /// default for `presign_get`/`presign_put` is `Unsupported`).
+    /// the fence never sees, so the view does not offer them.
     fn capabilities(&self) -> Capabilities {
         self.inner.capabilities().without(Capability::PresignedUrls)
     }
@@ -528,6 +581,87 @@ impl BlobStore for FencedBlobs {
 
     async fn get_stream(&self, key: &str) -> Result<Option<BlobStream>> {
         self.inner.get_stream(key).await
+    }
+
+    async fn put_stream(
+        &self,
+        key: &str,
+        reader: tinystoragedrivers::BlobReader,
+        len: u64,
+        content_type: Option<&str>,
+    ) -> Result<BlobMeta> {
+        match self.guard.admit("blobs.put_stream").await? {
+            None => self.inner.put_stream(key, reader, len, content_type).await,
+            Some((lease, scoped)) => {
+                let (attempt, fallback, bytes_read) = shared_blob_readers(reader);
+                let outcome = scoped
+                    .blobs()
+                    .put_stream(key, attempt, len, content_type)
+                    .await;
+                match outcome {
+                    Err(error)
+                        if unfenceable(&error) && bytes_read.load(Ordering::Relaxed) == 0 =>
+                    {
+                        tracing::debug!(
+                            target: "openhuman::storage::fence",
+                            op = "blobs.put_stream",
+                            "[storage][fence] driver cannot fence this stream write; host check only"
+                        );
+                        self.inner
+                            .put_stream(key, fallback, len, content_type)
+                            .await
+                    }
+                    outcome => self.guard.settle(&lease, "blobs.put_stream", outcome).await,
+                }
+            }
+        }
+    }
+
+    async fn put_stream_expiring(
+        &self,
+        key: &str,
+        reader: tinystoragedrivers::BlobReader,
+        len: u64,
+        content_type: Option<&str>,
+        ttl: Duration,
+    ) -> Result<BlobMeta> {
+        match self.guard.admit("blobs.put_stream_expiring").await? {
+            None => {
+                self.inner
+                    .put_stream_expiring(key, reader, len, content_type, ttl)
+                    .await
+            }
+            Some((lease, scoped)) => {
+                let (attempt, fallback, bytes_read) = shared_blob_readers(reader);
+                let outcome = scoped
+                    .blobs()
+                    .put_stream_expiring(key, attempt, len, content_type, ttl)
+                    .await;
+                match outcome {
+                    Err(error)
+                        if unfenceable(&error) && bytes_read.load(Ordering::Relaxed) == 0 =>
+                    {
+                        tracing::debug!(
+                            target: "openhuman::storage::fence",
+                            op = "blobs.put_stream_expiring",
+                            "[storage][fence] driver cannot fence this stream write; host check only"
+                        );
+                        self.inner
+                            .put_stream_expiring(key, fallback, len, content_type, ttl)
+                            .await
+                    }
+                    outcome => {
+                        self.guard
+                            .settle(&lease, "blobs.put_stream_expiring", outcome)
+                            .await
+                    }
+                }
+            }
+        }
+    }
+
+    async fn presign_get(&self, key: &str, ttl: Duration) -> Result<String> {
+        self.inner.presign_get(key, ttl).await
     }
 
     async fn put(&self, key: &str, bytes: Vec<u8>, content_type: Option<&str>) -> Result<BlobMeta> {
