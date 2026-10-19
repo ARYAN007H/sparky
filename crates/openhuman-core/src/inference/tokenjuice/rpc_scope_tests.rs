@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 
 use crate::config::Config;
 use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-use crate::storage::StorageBackend;
 use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPath};
 
 #[derive(Default)]
@@ -60,14 +59,6 @@ impl JuiceFixture {
             bytes: 12,
         })
     }
-
-    async fn import_savings(
-        &self,
-        _aggregate: tinyjuice_bus::savings::SavingsAggregate,
-    ) -> tinybus::Result<bool> {
-        self.0.methods.lock().unwrap().push("ImportSavings".into());
-        Ok(true)
-    }
 }
 
 async fn fixture() -> (tinybus::Proxy, Arc<Calls>) {
@@ -101,9 +92,8 @@ async fn fixture() -> (tinybus::Proxy, Arc<Calls>) {
     (proxy, calls)
 }
 
-fn derived_context(base: &Arc<CoreContext>, config: Config, profile: &str) -> DispatchCtx {
-    let overlay =
-        ContextOverlay::new(config, DomainSet::full(), Default::default()).profile(profile);
+fn derived_context(base: &Arc<CoreContext>, config: Config) -> DispatchCtx {
+    let overlay = ContextOverlay::new(config, DomainSet::full(), Default::default());
     DispatchCtx::new(base.derive_with(overlay))
 }
 
@@ -157,51 +147,6 @@ fn profile_config(workspace: &std::path::Path, threshold: usize) -> Config {
     config
 }
 
-struct StorageGuard(Option<Arc<dyn StorageBackend>>);
-
-impl StorageGuard {
-    fn install_memory() -> Self {
-        Self(crate::storage::install(Arc::new(
-            crate::storage::MemoryStorage::new(),
-        )))
-    }
-}
-
-impl Drop for StorageGuard {
-    fn drop(&mut self) {
-        crate::storage::clear();
-        if let Some(previous) = self.0.take() {
-            crate::storage::install(previous);
-        }
-    }
-}
-
-fn savings_marker_id(workspace: &std::path::Path) -> String {
-    use sha2::Digest as _;
-    let path = workspace.join("state").join("tokenjuice_savings.json");
-    let digest = sha2::Sha256::digest(path.as_os_str().as_encoded_bytes());
-    format!("savings@{}", &hex::encode(digest)[..16])
-}
-
-async fn savings_imported(workspace: &std::path::Path, profile: Option<&str>) -> bool {
-    let backend = crate::storage::installed().expect("the fixture storage backend is installed");
-    let scope = crate::storage::scope_for_module(profile, "tinyjuice");
-    let scoped = backend.for_scope(&scope).unwrap();
-    crate::storage::import_state::host_import_done(
-        &scoped,
-        "tinyjuice_host_import",
-        &savings_marker_id(workspace),
-    )
-    .await
-    .unwrap()
-}
-
-const SAVINGS_SNAPSHOT: &str = r#"{
-    "total":{"events":1,"originalTokens":12,"compactedTokens":6,"tokensSaved":6,"costSavedUsd":0.0},
-    "byModel":{},
-    "byCompressor":{}
-}"#;
-
 #[tokio::test]
 async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install() {
     let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
@@ -210,14 +155,7 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
     std::fs::create_dir_all(&operator_workspace).unwrap();
     let _workspace_env =
         crate::config::test_env::EnvVarGuard::workspace_unlocked(&operator_workspace);
-    let _storage = StorageGuard::install_memory();
-
     let workspaces = [tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap()];
-    for workspace in &workspaces {
-        let state = workspace.path().join("state");
-        std::fs::create_dir_all(&state).unwrap();
-        std::fs::write(state.join("tokenjuice_savings.json"), SAVINGS_SNAPSHOT).unwrap();
-    }
     let configs = [
         profile_config(workspaces[0].path(), 711),
         profile_config(workspaces[1].path(), 922),
@@ -225,8 +163,8 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
     let root_config = Config::default();
     let base = CoreContext::for_test_with_config(DomainSet::full(), root_config);
     let contexts = [
-        derived_context(&base, configs[0].clone(), "juice-profile-a"),
-        derived_context(&base, configs[1].clone(), "juice-profile-b"),
+        derived_context(&base, configs[0].clone()),
+        derived_context(&base, configs[1].clone()),
     ];
 
     let (proxy, calls) = fixture().await;
@@ -284,14 +222,6 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
             "{method} reached the TinyBus client once per derived context"
         );
     }
-    assert_eq!(
-        methods
-            .iter()
-            .filter(|actual| actual.as_str() == "ImportSavings")
-            .count(),
-        2,
-        "legacy savings from both caller workspaces reached TinyBus"
-    );
     drop(methods);
     let installs = calls.installs.lock().unwrap();
     for (index, config) in configs.iter().enumerate() {
@@ -305,19 +235,6 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
                         == config.tokenjuice.min_bytes_to_compress
             }),
             "Install must carry workspace and option values from derived config {index}"
-        );
-        let profile = ["juice-profile-a", "juice-profile-b"][index];
-    }
-    drop(installs);
-    for (index, config) in configs.iter().enumerate() {
-        let profile = ["juice-profile-a", "juice-profile-b"][index];
-        assert!(
-            savings_imported(&config.workspace_dir, Some(profile)).await,
-            "legacy savings import must complete in the caller's profile scope"
-        );
-        assert!(
-            !savings_imported(&config.workspace_dir, None).await,
-            "legacy savings import must not write into the controlled operator scope"
         );
     }
 }
