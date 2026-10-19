@@ -5,6 +5,10 @@ use crate::agent_runs::agent_chat::params::AgentChatParams;
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
+#[cfg(test)]
+#[path = "controllers_tests.rs"]
+mod tests;
+
 #[derive(Debug, Deserialize)]
 struct InferenceAgentChatParams {
     #[serde(flatten)]
