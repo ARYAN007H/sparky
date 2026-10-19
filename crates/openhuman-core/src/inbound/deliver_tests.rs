@@ -61,7 +61,10 @@ async fn a_decision_is_accepted_and_applied() {
         .await;
     assert_eq!(response.status, DeliverStatus::Accepted);
     let applied = triage.until_applied(1, Duration::from_secs(5)).await;
-    assert_eq!(applied, vec!["composio/github/GITHUB_ISSUE_OPENED".to_owned()]);
+    assert_eq!(
+        applied,
+        vec!["composio/github/GITHUB_ISSUE_OPENED".to_owned()]
+    );
 }
 
 #[tokio::test]
@@ -174,7 +177,11 @@ async fn a_classification_is_reused_by_the_delivery() {
         .deliver(turn(vec![event], Lane::Interactive, 1))
         .await;
     assert_eq!(response.status, DeliverStatus::Accepted);
-    assert_eq!(triage.runs(), 1, "the delivery triaged a classified event again");
+    assert_eq!(
+        triage.runs(),
+        1,
+        "the delivery triaged a classified event again"
+    );
 }
 
 #[tokio::test]
@@ -187,7 +194,14 @@ async fn a_classification_without_a_decision_keeps_the_score() {
             .await;
         assert!(refused.is_err());
     }
-    let chat = InboundEvent::new("web:chat", "1", "c", Sender::new("u"), EventKind::Message, 0);
+    let chat = InboundEvent::new(
+        "web:chat",
+        "1",
+        "c",
+        Sender::new("u"),
+        EventKind::Message,
+        0,
+    );
     assert!(deliverer
         .classify(ClassifySalienceRequest::new(chat, 40))
         .await
@@ -207,7 +221,10 @@ fn classifications_are_bounded() {
     }
     classified.keep("k1".to_owned(), run.clone());
     assert_eq!(classified.runs.len(), CLASSIFIED_CAPACITY);
-    assert!(classified.take("k0").is_none(), "the oldest was not evicted");
+    assert!(
+        classified.take("k0").is_none(),
+        "the oldest was not evicted"
+    );
     assert!(classified.take("k1").is_some());
     assert!(classified.take("k1").is_none());
 }

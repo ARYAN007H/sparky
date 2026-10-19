@@ -49,7 +49,11 @@ async fn a_deferred_composio_trigger_is_retried_at_its_defer_time_instead_of_dro
     route(&rig, Some(active_config()), trigger("uuid-deferred")).await;
 
     let applied = triage.until_applied(1, Duration::from_secs(15)).await;
-    assert_eq!(applied, vec![LABEL.to_owned()], "the deferred trigger was dropped");
+    assert_eq!(
+        applied,
+        vec![LABEL.to_owned()],
+        "the deferred trigger was dropped"
+    );
     assert_eq!(triage.runs(), 2, "triaged, deferred, then triaged again");
     assert!(
         started.elapsed() >= Duration::from_millis(350),
@@ -72,7 +76,11 @@ async fn a_redelivered_composio_trigger_produces_one_turn() {
     assert_eq!(applied, vec![LABEL.to_owned()]);
     // Give a second turn every chance to appear.
     tokio::time::sleep(Duration::from_millis(500)).await;
-    assert_eq!(triage.applied().len(), 1, "a redelivery produced another turn");
+    assert_eq!(
+        triage.applied().len(),
+        1,
+        "a redelivery produced another turn"
+    );
     assert_eq!(triage.runs(), 1, "a redelivery was triaged again");
 }
 

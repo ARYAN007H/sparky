@@ -8,6 +8,13 @@
 //! inbound event queues' `Deliver` callback all go through this trait, so
 //! their behavior is testable without a model: tests script the outcomes, and
 //! production uses [`RemoteTriage`].
+//!
+//! [`RemoteTriage`] carries its provenance in its name: it applies every
+//! decision under [`remote_trigger_origin`], so it is only for payloads an
+//! outsider can influence. A locally initiated trigger keeps calling
+//! [`apply_decision`] under `local_trigger_origin` itself. The dispatch-site
+//! tripwire (`origin_tests::every_dispatch_site_scopes_an_origin`) counts a
+//! file that constructs `RemoteTriage` as a remote dispatch site.
 
 use async_trait::async_trait;
 
@@ -44,7 +51,8 @@ pub trait TriageRunner: Send + Sync {
     ) -> anyhow::Result<()>;
 }
 
-/// The production runner: [`run_triage`] and [`apply_decision`].
+/// The production runner for remote payloads: [`run_triage`], and
+/// [`apply_decision`] under [`remote_trigger_origin`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RemoteTriage;
 

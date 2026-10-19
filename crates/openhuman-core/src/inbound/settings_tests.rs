@@ -84,7 +84,10 @@ fn a_queue_url_selects_the_backend() {
     config.inbound.queue_url = Some("amqp://guest:guest@localhost/".into());
     let refused = resolve(&config).unwrap_err();
     assert!(refused.contains("rabbitmq"), "{refused}");
-    assert!(!refused.contains("guest:guest"), "credentials leaked: {refused}");
+    assert!(
+        !refused.contains("guest:guest"),
+        "credentials leaked: {refused}"
+    );
 }
 
 #[tokio::test]

@@ -11,7 +11,10 @@ fn every_function_has_a_schema_and_a_controller() {
     let controllers = all_registered_controllers();
     assert_eq!(controllers.len(), 3);
     assert_eq!(schemas("unknown").function, "unknown");
-    assert!(schemas("redrive").inputs.iter().any(|input| input.name == "id" && input.required));
+    assert!(schemas("redrive")
+        .inputs
+        .iter()
+        .any(|input| input.name == "id" && input.required));
 }
 
 #[tokio::test]

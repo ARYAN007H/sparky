@@ -166,8 +166,7 @@ mod inbound {
     async fn route(rig: &Rig, config: Option<crate::config::Config>, correlation_id: &str) {
         let envelope = request();
         let queued =
-            route_agent_trigger(config, &envelope, correlation_id, Some(rig.client.clone()))
-                .await;
+            route_agent_trigger(config, &envelope, correlation_id, Some(rig.client.clone())).await;
         if !queued {
             triage_agent_directly(
                 DispatchCtx::host_default(),
@@ -189,7 +188,11 @@ mod inbound {
         route(&rig, Some(active_config()), "corr-deferred").await;
 
         let applied = triage.until_applied(1, Duration::from_secs(15)).await;
-        assert_eq!(applied, vec![LABEL.to_owned()], "the deferred webhook was dropped");
+        assert_eq!(
+            applied,
+            vec![LABEL.to_owned()],
+            "the deferred webhook was dropped"
+        );
         assert_eq!(triage.runs(), 2, "triaged, deferred, then triaged again");
         assert!(
             started.elapsed() >= Duration::from_millis(350),
@@ -210,7 +213,11 @@ mod inbound {
         let applied = triage.until_applied(1, Duration::from_secs(15)).await;
         assert_eq!(applied, vec![LABEL.to_owned()]);
         tokio::time::sleep(Duration::from_millis(500)).await;
-        assert_eq!(triage.applied().len(), 1, "a redelivery produced another turn");
+        assert_eq!(
+            triage.applied().len(),
+            1,
+            "a redelivery produced another turn"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

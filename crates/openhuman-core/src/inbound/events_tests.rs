@@ -23,10 +23,14 @@ fn a_composio_trigger_round_trips_with_a_stable_identity() {
     assert_eq!(event.event_id, "uuid-1");
     assert_eq!(event.conversation_key, "composio:gmail:uuid-1");
     assert_eq!(event.kind, EventKind::Trigger);
-    assert!(event.text.starts_with("composio/gmail/GMAIL_NEW_GMAIL_MESSAGE"));
+    assert!(event
+        .text
+        .starts_with("composio/gmail/GMAIL_NEW_GMAIL_MESSAGE"));
     // A redelivery is the same event to the queues.
     assert_eq!(
-        composio(&composio_envelope("uuid-1", "id-1")).unwrap().dedupe_key(),
+        composio(&composio_envelope("uuid-1", "id-1"))
+            .unwrap()
+            .dedupe_key(),
         event.dedupe_key()
     );
 
@@ -47,7 +51,10 @@ fn a_composio_trigger_round_trips_with_a_stable_identity() {
 
 #[test]
 fn a_composio_trigger_without_a_uuid_uses_its_id_or_a_fresh_one() {
-    assert_eq!(composio(&composio_envelope("", "id-7")).unwrap().event_id, "id-7");
+    assert_eq!(
+        composio(&composio_envelope("", "id-7")).unwrap().event_id,
+        "id-7"
+    );
     let fresh = composio(&composio_envelope("", "")).unwrap();
     assert!(uuid::Uuid::parse_str(&fresh.event_id).is_ok());
 }
@@ -104,8 +111,15 @@ fn an_event_that_is_not_a_trigger_has_no_envelope() {
 #[test]
 fn a_digest_lists_every_folded_event() {
     let trigger = composio(&composio_envelope("u1", "")).unwrap();
-    let chat = InboundEvent::new("web:chat", "9", "c", Sender::new("x"), EventKind::Message, 0)
-        .text("hello");
+    let chat = InboundEvent::new(
+        "web:chat",
+        "9",
+        "c",
+        Sender::new("x"),
+        EventKind::Message,
+        0,
+    )
+    .text("hello");
     let turn = Turn::new("t-9", Lane::Digest, "c", vec![trigger, chat]);
     let digest = digest_envelope(&turn);
     assert_eq!(digest.display_label, "external/inbound-digest/t-9");

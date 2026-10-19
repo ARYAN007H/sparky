@@ -77,7 +77,10 @@ fn inbound_queue_capability_shows_disabled_when_the_eventqueues_component_is_off
         CapabilityStatus::Disabled
     );
     let tasks = super::super::lookup("automation.task_sources").expect("task sources");
-    assert_eq!(apply_components(tasks, &off("eventqueues")).status, tasks.status);
+    assert_eq!(
+        apply_components(tasks, &off("eventqueues")).status,
+        tasks.status
+    );
 }
 
 #[test]

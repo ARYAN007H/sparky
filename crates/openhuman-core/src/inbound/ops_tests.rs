@@ -13,7 +13,9 @@ async fn the_component_switch_refuses_every_operation() {
         dead(&config, &client, None).await.map(|_| ()),
         redrive(&config, &client, "x").await.map(|_| ()),
     ] {
-        assert!(refused.unwrap_err().contains("COMPONENT_DISABLED:eventqueues"));
+        assert!(refused
+            .unwrap_err()
+            .contains("COMPONENT_DISABLED:eventqueues"));
     }
 }
 
@@ -28,7 +30,9 @@ async fn the_operations_reach_the_module() {
     let parked = dead(&config, &rig.client, Some(10_000)).await.unwrap();
     assert!(parked.value.items.is_empty());
 
-    let gone = redrive(&config, &rig.client, "teq.dead/none").await.unwrap();
+    let gone = redrive(&config, &rig.client, "teq.dead/none")
+        .await
+        .unwrap();
     assert!(!gone.value.redriven);
     assert!(redrive(&config, &rig.client, " ")
         .await
