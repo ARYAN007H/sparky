@@ -91,29 +91,30 @@ fn event_alias_suppressed_for_streaming_deltas() {
 #[tokio::test]
 async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
     let (_service, io) = SocketIo::new_svc();
+    let request_id = format!(
+        "socketio-routing-{}",
+        crate::core_host::web_chat::unix_epoch_ms()
+    );
     let (connected_tx, mut connected_rx) = tokio::sync::mpsc::unbounded_channel();
     io.ns("/", move |socket: SocketRef| {
         connected_tx.send(socket).expect("test receiver stays open");
     });
 
     let (_initiator_tx, mut initiator_rx) = io.new_dummy_sock("/", ()).await;
-    let _ = initiator_rx.recv().await.expect("initiator connects");
+    receive_connect(&mut initiator_rx).await;
     let initiator = connected_rx.recv().await.expect("initiator socket");
     initiator.join("client-a").expect("join client room");
     initiator.join("thread:thread-1").expect("join thread room");
 
     let (_reconnected_tx, mut reconnected_rx) = io.new_dummy_sock("/", ()).await;
-    let _ = reconnected_rx
-        .recv()
-        .await
-        .expect("reconnected peer connects");
+    receive_connect(&mut reconnected_rx).await;
     let reconnected = connected_rx.recv().await.expect("reconnected peer socket");
     reconnected
         .join("thread:thread-1")
         .expect("reconnected peer joins thread room");
 
     let (_unrelated_tx, mut unrelated_rx) = io.new_dummy_sock("/", ()).await;
-    let _ = unrelated_rx.recv().await.expect("unrelated peer connects");
+    receive_connect(&mut unrelated_rx).await;
     let unrelated = connected_rx.recv().await.expect("unrelated peer socket");
     unrelated
         .join("thread:thread-2")
@@ -123,7 +124,7 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
         context: WebEventContext {
             client_id: "client-a".into(),
             thread_id: "thread-1".into(),
-            request_id: "request-1".into(),
+            request_id: request_id.clone(),
             ..Default::default()
         },
         full_response: Some("finished".into()),
@@ -131,7 +132,8 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
         usage: None,
         timing: None,
         parts: None,
-    });
+    })
+    .await;
     emit_web_channel_event(&io, done);
 
     let initiator_packets = receive_messages(&mut initiator_rx, 2).await;
@@ -163,19 +165,20 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
     );
     assert_empty_queue(&mut initiator_rx);
     assert_empty_queue(&mut reconnected_rx);
-    assert_no_message(&mut unrelated_rx).await;
+    assert_empty_queue(&mut unrelated_rx);
 
     let delta = next_scoped_event(WebChannelEvent::TextDelta {
         context: WebEventContext {
             client_id: "client-a".into(),
             thread_id: "thread-1".into(),
-            request_id: "request-1".into(),
+            request_id,
             ..Default::default()
         },
         delta: Some("token".into()),
         delta_kind: None,
         round: None,
-    });
+    })
+    .await;
     emit_web_channel_event(&io, delta);
 
     let initiator_delta = receive_messages(&mut initiator_rx, 1).await;
@@ -188,13 +191,34 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
     assert_eq!(reconnected_delta[0].1["delta"], "token");
     assert_empty_queue(&mut initiator_rx);
     assert_empty_queue(&mut reconnected_rx);
-    assert_no_message(&mut unrelated_rx).await;
+    assert_empty_queue(&mut unrelated_rx);
 }
 
-fn next_scoped_event(event: WebChannelEvent) -> crate::core_host::web_chat::ScopedWebEvent {
+async fn next_scoped_event(event: WebChannelEvent) -> crate::core_host::web_chat::ScopedWebEvent {
+    let expected = event.context().clone();
+    let expected_name = event.event_name();
     let mut events = crate::core_host::web_chat::subscribe_web_channel_events();
     crate::core_host::web_chat::publish_web_channel_event(event);
-    events.try_recv().expect("published web event is scoped")
+    tokio::time::timeout(std::time::Duration::from_secs(1), async move {
+        loop {
+            match events.recv().await {
+                Ok(event)
+                    if event.context().client_id == expected.client_id
+                        && event.context().thread_id == expected.thread_id
+                        && event.context().request_id == expected.request_id
+                        && event.event_name() == expected_name =>
+                {
+                    return event;
+                }
+                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    panic!("web event bus closed before publishing test event")
+                }
+            }
+        }
+    })
+    .await
+    .expect("published web event reaches test subscriber")
 }
 
 async fn receive_messages(
@@ -228,6 +252,13 @@ async fn receive_messages(
     messages
 }
 
+async fn receive_connect(rx: &mut tokio::sync::mpsc::Receiver<Packet>) {
+    tokio::time::timeout(std::time::Duration::from_secs(1), rx.recv())
+        .await
+        .expect("socket handshake arrives before timeout")
+        .expect("socket stays connected during handshake");
+}
+
 fn event_names(packets: &[(String, serde_json::Value)]) -> Vec<&str> {
     packets.iter().map(|(name, _)| name.as_str()).collect()
 }
@@ -240,17 +271,6 @@ fn assert_empty_queue(rx: &mut tokio::sync::mpsc::Receiver<Packet>) {
         ),
         "socket received an unexpected duplicate event"
     );
-}
-
-async fn assert_no_message(rx: &mut tokio::sync::mpsc::Receiver<Packet>) {
-    while let Ok(Some(packet)) =
-        tokio::time::timeout(std::time::Duration::from_millis(30), rx.recv()).await
-    {
-        assert!(
-            !matches!(packet, Packet::Message(_)),
-            "unrelated room received event: {packet:?}"
-        );
-    }
 }
 
 #[test]
