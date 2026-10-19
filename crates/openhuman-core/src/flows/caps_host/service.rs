@@ -7,11 +7,14 @@ use tinyflows_bus::runs;
 
 use crate::security::credentials::HttpCredentialsStore;
 
+#[path = "service_agent.rs"]
+mod service_agent;
+#[path = "service_helpers.rs"]
+mod service_helpers;
+
 use super::binding::CapsHostBinding;
-use super::{
-    OpenHumanAgentRunner, OpenHumanCode, OpenHumanHttp, OpenHumanLlm, OpenHumanMemory,
-    OpenHumanTools,
-};
+use super::{OpenHumanCode, OpenHumanHttp, OpenHumanLlm, OpenHumanTools};
+use service_helpers::{bus_error, memory, to_bus_agent_definition};
 
 pub(crate) struct CapsHostService(Arc<CapsHostBinding>);
 
@@ -173,7 +176,7 @@ impl CapsHostService {
             .insert(handle.clone(), state);
         let binding = Arc::clone(&self.0);
         tokio::spawn(async move {
-            if let Err(error) = Self::run_agent(binding.clone(), request).await {
+            if let Err(error) = service_agent::run_agent(binding.clone(), request).await {
                 if let Some(state) = binding.agent_runs.lock().await.get(&handle).cloned() {
                     let mut state = state.lock().await;
                     state.error = Some(error);
