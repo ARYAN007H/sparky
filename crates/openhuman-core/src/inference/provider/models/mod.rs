@@ -1,6 +1,6 @@
 //! Configured and synthesized model catalogs for inference providers.
 
-pub(crate) mod catalog_listing;
+pub mod catalog_listing;
 pub(crate) mod local_runtime;
 mod openrouter;
 
