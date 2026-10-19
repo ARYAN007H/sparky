@@ -148,7 +148,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         (config, version)
     };
 
-    let tenant_b_version = {
+    let (tenant_b_version, tenant_b_model) = {
         let _source = ForcedDocumentSource::new(
             scoped(&storage, "tenant-source-b"),
             Scope::new("tenant-source-b").unwrap(),
@@ -159,10 +159,24 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
             .await
             .unwrap();
         let version = *config.document_version.lock().unwrap();
-        version
+        let docs = Arc::clone(scoped(&storage, "tenant-source-b").documents());
+        let stored = docs
+            .get(
+                super::super::CONFIG_COLLECTION,
+                &super::super::storage_schema::document_id("tenant-source-b").unwrap(),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(version, Some(stored.version));
+        (version, config.default_model.clone())
     };
+    let tenant_a_version = tenant_a_version.expect("tenant A config is document-backed");
+    let tenant_b_version = tenant_b_version.expect("tenant B config is document-backed");
     assert_eq!(tenant_a_version, tenant_b_version);
     let mut from_tenant_a = from_tenant_a;
+    assert_eq!(from_tenant_a.default_model.as_deref(), Some("tenant-a"));
+    assert_eq!(tenant_b_model.as_deref(), Some("tenant-b"));
 
     from_tenant_a.default_model = Some("must-not-cross-tenant-boundary".into());
     let error = {
