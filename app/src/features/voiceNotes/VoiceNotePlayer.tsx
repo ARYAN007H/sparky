@@ -75,9 +75,7 @@ function VoiceNotePlayerBody({
         viseme = frame?.viseme ?? 'sil';
       }
       window.dispatchEvent(
-        new CustomEvent('voice-note-mascot', {
-          detail: { owner: playbackOwner, active, viseme },
-        })
+        new CustomEvent('voice-note-mascot', { detail: { owner: playbackOwner, active, viseme } })
       );
     },
     [mascotPlayback, playbackOwner]
