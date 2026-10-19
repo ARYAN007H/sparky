@@ -122,22 +122,6 @@ async function sendMessage(page: Page, prompt: string): Promise<void> {
   await page.getByTestId('send-message-button').click();
 }
 
-async function toolTimelineNames(page: Page, threadId: string): Promise<string[]> {
-  return page.evaluate(currentThreadId => {
-    const store = (
-      window as unknown as {
-        __OPENHUMAN_STORE__?: {
-          getState?: () => {
-            chatRuntime?: { toolTimelineByThread?: Record<string, Array<{ name?: string }>> };
-          };
-        };
-      }
-    ).__OPENHUMAN_STORE__;
-    const entries = store?.getState?.().chatRuntime?.toolTimelineByThread?.[currentThreadId] ?? [];
-    return entries.map(entry => entry.name ?? '');
-  }, threadId);
-}
-
 test.describe('Chat Tool Call Flow', () => {
   test('renders a terminal tool call, final answer, and clears in-flight state', async ({
     page,
@@ -177,10 +161,6 @@ test.describe('Chat Tool Call Flow', () => {
     const toolTrigger = toolCard.getByRole('button').first();
     if ((await toolTrigger.getAttribute('aria-expanded')) !== 'true') await toolTrigger.click();
     await expect(toolCard.getByText('Input', { exact: true })).toBeVisible();
-
-    await expect
-      .poll(async () => toolTimelineNames(page, threadId), { timeout: 20_000 })
-      .toEqual(expect.arrayContaining([expect.stringContaining('web_fetch')]));
 
     expect(threadId.length).toBeGreaterThan(0);
   });

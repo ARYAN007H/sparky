@@ -2,7 +2,6 @@ import { expect, type Page, test } from '@playwright/test';
 
 import {
   bootRuntimeReadyGuestPage,
-  callCoreRpc,
   dismissWalkthroughIfPresent,
   signInViaBypassUser,
   waitForAppReady,
@@ -11,10 +10,7 @@ import {
 const CONNECTOR_NAME = 'Gmail';
 const TOOLKIT_SLUG = 'gmail';
 const CONNECTION_ID = 'c-gmail-1';
-const ACTION = 'GMAIL_FETCH_EMAILS';
 const MOCK_BASE = 'http://127.0.0.1:' + (process.env.E2E_MOCK_PORT || '18473');
-
-type RequestLogEntry = { method?: string; url?: string; body?: string };
 
 async function mockFetch(path: string, init?: RequestInit) {
   const response = await fetch(MOCK_BASE + path, init);
@@ -36,11 +32,6 @@ async function setMockBehavior(behavior: Record<string, unknown>) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ behavior }),
   });
-}
-
-async function getRequestLog(): Promise<RequestLogEntry[]> {
-  const payload = await mockFetch('/__admin/requests');
-  return (payload.data as RequestLogEntry[]) ?? [];
 }
 
 async function seedConnector(status: 'ACTIVE' | 'FAILED' | 'EXPIRED' = 'ACTIVE') {
@@ -111,6 +102,19 @@ test.describe('Gmail Integration Flows', () => {
     const dialog = await openModal(page);
     await expect(dialog).toContainText(CONNECTOR_NAME);
     await expect(dialog.getByTestId('trigger-toggles')).toBeVisible();
+  });
+
+  test('disconnects Gmail from the current Composio management screen', async ({ page }) => {
+    const dialog = await openModal(page);
+    await expect(dialog).toContainText('Gmail is connected');
+
+    await dialog.getByRole('button', { name: 'Disconnect', exact: true }).click();
+
+    await expect(dialog.getByRole('button', { name: 'Connect Gmail', exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(dialog).not.toContainText('Gmail is connected');
+    await expect(page.getByTestId('skill-install-composio-gmail')).toContainText(/Connect/i);
   });
 
   test('failed and expired states remain usable', async ({ page }) => {

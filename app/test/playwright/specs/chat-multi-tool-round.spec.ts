@@ -130,22 +130,6 @@ async function sendMessage(page: Page, prompt: string): Promise<void> {
   await page.getByTestId('send-message-button').click();
 }
 
-async function toolTimelineNames(page: Page, threadId: string): Promise<string[]> {
-  return page.evaluate(currentThreadId => {
-    const store = (
-      window as unknown as {
-        __OPENHUMAN_STORE__?: {
-          getState?: () => {
-            chatRuntime?: { toolTimelineByThread?: Record<string, Array<{ name?: string }>> };
-          };
-        };
-      }
-    ).__OPENHUMAN_STORE__;
-    const entries = store?.getState?.().chatRuntime?.toolTimelineByThread?.[currentThreadId] ?? [];
-    return entries.map(entry => entry.name ?? '');
-  }, threadId);
-}
-
 test.describe('Chat Multi Tool Round', () => {
   test('runs file_read then grep before the final answer', async ({ page }) => {
     await resetMock();
@@ -157,14 +141,14 @@ test.describe('Chat Multi Tool Round', () => {
     await sendMessage(page, PROMPT);
 
     await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible({ timeout: 50_000 });
-    await expect
-      .poll(async () => toolTimelineNames(page, threadId), { timeout: 20_000 })
-      .toEqual(expect.arrayContaining([expect.stringContaining('web_fetch'), expect.stringContaining('web_search')]));
-
-    const names = await toolTimelineNames(page, threadId);
-    const fetchIndex = names.findIndex(name => name.includes('web_fetch'));
-    const searchIndex = names.findIndex(name => name.includes('web_search'));
+    const cards = page.getByTestId('assistant-ui-tool-call');
+    await expect(cards.filter({ hasText: 'Fetching example.com' })).toHaveCount(1);
+    await expect(cards.filter({ hasText: 'Searching the web' })).toHaveCount(1);
+    const renderedCards = await cards.allTextContents();
+    const fetchIndex = renderedCards.findIndex(text => text.includes('Fetching example.com'));
+    const searchIndex = renderedCards.findIndex(text => text.includes('Searching the web'));
     expect(fetchIndex).toBeGreaterThanOrEqual(0);
     expect(searchIndex).toBeGreaterThan(fetchIndex);
+    await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible();
   });
 });
