@@ -50,7 +50,7 @@ async fn flows_run_detached_registers_the_run_before_returning_its_id() {
     let flow = store::create_flow(
         &config,
         "detached-cancel-race".to_string(),
-        structurally_valid_graph(trigger_only_graph()),
+        approval_gated_graph(),
         false,
         true,
     )
