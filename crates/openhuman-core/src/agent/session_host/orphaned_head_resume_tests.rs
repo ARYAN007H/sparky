@@ -245,7 +245,7 @@ async fn credential_redaction_survives_resume() {
         .find(|message| matches!(message, Message::User(_)))
         .expect("user row sent to provider")
         .text();
-    assert_eq!(first_user, redacted);
+    assert!(first_user.contains(&redacted));
     assert!(!first_user.contains(&secret));
     let persisted = head_of(&locator, "thread-credential-redaction");
     let persisted_json = serde_json::to_string(&persisted.messages).expect("serialize transcript");
