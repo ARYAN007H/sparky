@@ -3,15 +3,15 @@
 //! inspecting/clearing a thread's run queue. The turns and their queues live
 //! in the context's turn runner; these are the thin entry points over it.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::core::Outcome;
 use crate::core::runtime::DispatchCtx;
-use crate::web_chat::WebChannelEvent;
+use crate::core::Outcome;
 use crate::web_chat::event_context;
+use crate::web_chat::WebChannelEvent;
 
 use super::super::event_bus::publish_web_channel_event_in;
-use super::super::runner::{CancelNote, runtime, scope_of};
+use super::super::runner::{runtime, scope_of, CancelNote};
 use super::super::types::ChatRequestMetadata;
 use super::start_chat::start_chat;
 

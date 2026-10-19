@@ -90,12 +90,10 @@ fn a_finished_tool_call_caps_output_and_arguments_and_names_its_failure() {
         panic!("tool result")
     };
     assert!(output.len() <= MAX_WEB_TOOL_PAYLOAD_BYTES && output.contains("truncated"));
-    assert!(
-        arguments
-            .expect("arguments")
-            .as_str()
-            .is_some_and(|marker| marker.contains("truncated"))
-    );
+    assert!(arguments
+        .expect("arguments")
+        .as_str()
+        .is_some_and(|marker| marker.contains("truncated")));
     let summary = summary.expect("failure summary");
     assert_eq!(summary.cause_plain, failure.cause_plain);
     assert_eq!(summary.recoverable, failure.recoverable);
@@ -300,11 +298,9 @@ fn subagent_tool_calls_carry_their_arguments_and_capped_results() {
         .expect("a completed sub-agent call"),
     );
     assert_eq!(completed.state, "tool_result");
-    assert!(
-        completed
-            .output
-            .is_some_and(|out| out.contains("truncated"))
-    );
+    assert!(completed
+        .output
+        .is_some_and(|out| out.contains("truncated")));
     assert_eq!(completed.structured, Some(json!({ "kind": "web_search" })));
     assert!(sub_tool_completed(AgentProgress::TurnStarted).is_none());
 }

@@ -1,6 +1,6 @@
 use super::super::channel::CHANNEL_OUTBOUND_EVENT;
 use super::*;
-use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
+use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use std::sync::Mutex;
@@ -211,16 +211,12 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         }
     }
     assert_eq!(outbound.len(), 2, "one channel_outbound per reply");
-    assert!(
-        outbound
-            .iter()
-            .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT)
-    );
-    assert!(
-        outbound
-            .iter()
-            .all(|event| event.context().thread_id == thread)
-    );
+    assert!(outbound
+        .iter()
+        .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT));
+    assert!(outbound
+        .iter()
+        .all(|event| event.context().thread_id == thread));
     assert_eq!(outbound[0].context().request_id, "req-m1");
     assert!(matches!(
         outbound[0].wire_event(),

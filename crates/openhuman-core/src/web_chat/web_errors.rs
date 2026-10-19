@@ -13,7 +13,7 @@ pub(crate) use budget::{
     generic_inference_error_user_message, inference_budget_exceeded_user_message,
     is_action_budget_exhausted, is_inference_budget_exceeded_error,
 };
-pub(crate) use classify::{ClassifiedError, classify_inference_error};
+pub(crate) use classify::{classify_inference_error, ClassifiedError};
 pub(crate) use retry::{is_non_retryable_rate_limit_text, retry_after_hint};
 pub(crate) use timeout::{
     is_outer_backstop_timeout, is_turn_timeout_error, turn_idle_error_message,

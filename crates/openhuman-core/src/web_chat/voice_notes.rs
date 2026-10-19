@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 const LOG_PREFIX: &str = "[web_channel][voice_note]";
 /// `source` the composer stamps on a turn that began as a voice note.
@@ -215,7 +215,7 @@ pub(crate) fn store_synthesized_reply(
     request_id: &str,
     audio_base64: &str,
     audio_mime: &str,
-    visemes: &[tinyinference_voice::VisemeFrame],
+    visemes: &[impl serde::Serialize],
 ) -> bool {
     use base64::Engine as _;
     if audio_base64.is_empty() {
@@ -235,9 +235,13 @@ pub(crate) fn store_synthesized_reply(
                 let path = dir(workspace).join(format!("{id}.visemes.json"));
                 if let Err(err) = serde_json::to_vec(visemes)
                     .map_err(|err| err.to_string())
-                    .and_then(|encoded| std::fs::write(path, encoded).map_err(|err| err.to_string()))
+                    .and_then(|encoded| {
+                        std::fs::write(path, encoded).map_err(|err| err.to_string())
+                    })
                 {
-                    log::warn!("{LOG_PREFIX} could not store reply visemes request_id={request_id}: {err}");
+                    log::warn!(
+                        "{LOG_PREFIX} could not store reply visemes request_id={request_id}: {err}"
+                    );
                 }
             }
             true

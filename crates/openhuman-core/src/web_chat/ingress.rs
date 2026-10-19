@@ -14,12 +14,12 @@ use tinyagents_harness::turn_runner::{
 };
 
 use super::ops::StartChatError;
-use super::runner::{Admission, CancelNote, Shared, WebRunner, scope_of};
+use super::runner::{scope_of, Admission, CancelNote, Shared, WebRunner};
 use crate::agent::queued_turn::QueuedPayload;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use crate::security::prompt_injection::{
-    PromptEnforcementAction, PromptEnforcementContext, enforce_prompt_input,
+    enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
 };
 
 const LOG: &str = "[web-channel]";
