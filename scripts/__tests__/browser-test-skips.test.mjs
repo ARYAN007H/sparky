@@ -9,6 +9,8 @@ test("browser skip guard requires an issue URL on the added skip line", () => {
     "+  this.skip(); // https://github.com/tinyhumansai/openhuman/issues/124",
     "+  it.skip('missing link', () => {}); // see issue #456",
     "+  describe.skip('also missing', () => {});",
+    "+  test.describe.skip('qualified and missing', () => {});",
+    "+  test.step.skip('qualified helper and missing', () => {});",
     "+  this.skip(); // no issue link",
     "+  test.skip( // multiline call still needs link on this line",
     "+    'tracked only on the next line' // https://github.com/tinyhumansai/openhuman/issues/789",
@@ -19,6 +21,8 @@ test("browser skip guard requires an issue URL on the added skip line", () => {
   assert.deepEqual(untrackedSkipLines(patch), [
     "it.skip('missing link', () => {}); // see issue #456",
     "describe.skip('also missing', () => {});",
+    "test.describe.skip('qualified and missing', () => {});",
+    "test.step.skip('qualified helper and missing', () => {});",
     "this.skip(); // no issue link",
     "test.skip( // multiline call still needs link on this line",
   ]);
