@@ -1,6 +1,6 @@
 //! Host adapters over one identity-scoped TinyChannels module object.
 
-use super::callback::ChannelHostCallbacks;
+use super::callback::{ChannelHostCallbacks, ProgressiveChannelTransport};
 use super::credentials::hydrate_channel_credentials;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
@@ -73,8 +73,14 @@ impl ModuleChannelRuntime {
                 tracing::warn!("[channels] legacy delivery import failed, will retry: {error:#}");
             }
         }
-        let callback =
-            ChannelHostCallbacks::new(dispatch_ctx, Arc::clone(&config), context, dispatch);
+        let progressive_channels = Arc::new(OnceLock::new());
+        let callback = ChannelHostCallbacks::new(
+            dispatch_ctx,
+            Arc::clone(&config),
+            context,
+            Arc::clone(&progressive_channels),
+            dispatch,
+        );
         let lease = ChannelRuntimeLease::open(client.clone(), callback)
             .await
             .map_err(anyhow::Error::new)
