@@ -11,6 +11,23 @@ fn insert_then_list_returns_pending_row() {
 }
 
 #[test]
+fn approval_payload_home_path_is_redacted_before_persistence() {
+    let (config, _dir) = test_config();
+    let mut pending = sample("home-path", "sess-A");
+    pending.args_redacted = crate::security::approval::redact_args(&json!({
+        "action": "list",
+        "cwd": "/Users/approval-user/work/openhuman",
+    }));
+
+    insert_pending(&config, &pending, "sess-A").unwrap();
+    let stored = list_pending(&config).unwrap();
+    let cwd = stored[0]["args_redacted"]["cwd"].as_str().unwrap();
+    assert!(!cwd.contains("approval-user"), "stored {cwd}");
+    assert!(cwd.contains("<HOME>"), "stored {cwd}");
+    assert!(cwd.ends_with("/work/openhuman"), "stored {cwd}");
+}
+
+#[test]
 fn list_pending_returns_rows_from_every_session() {
     let (config, _dir) = test_config();
     insert_pending(&config, &sample("a", "sess-A"), "sess-A").unwrap();
