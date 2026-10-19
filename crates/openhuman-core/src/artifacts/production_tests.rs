@@ -95,8 +95,7 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     assert_eq!(
         kept,
         crate::artifacts::tiny_store::version_files_dir(&workspace)
-            .join(&id)
-            .join("v1.pptx")
+            .join(&expected_key)
     );
     assert_eq!(
         files_in(&files),
