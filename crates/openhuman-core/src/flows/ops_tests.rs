@@ -396,63 +396,6 @@ fn seeded_slack_send_contract() -> ToolContract {
     }
 }
 
-// ── validate_connection_refs (WS3) ──────────────────────────────────────────
-//
-// The transcript bug: the user's connections were twitter →
-// `composio:twitter:ca_JX6QU88UfSk4`, gmail → `composio:gmail:ca_vX_WA8FsqNmE`,
-// tiktok → `composio:tiktok:ca_LPCp3WQpaDma`. The agent wired
-// `composio:twitter:ca_LPCp3WQpaDma` (the TIKTOK id) onto a Twitter node and
-// every author-time gate returned ok. These tests exercise the pure matcher so
-// no live Composio backend is touched.
-
-/// Build a composio `FlowConnection` fixture (the exact shape
-/// `build_flow_connections` produces).
-fn ws3_flow_conn(toolkit: &str, id: &str) -> FlowConnection {
-    FlowConnection {
-        connection_ref: format!("composio:{toolkit}:{id}"),
-        kind: "composio".to_string(),
-        display: toolkit.to_string(),
-        toolkit: Some(toolkit.to_string()),
-        scheme: None,
-        platform_user_id: None,
-    }
-}
-
-/// The user's real connected set from the transcript.
-fn ws3_transcript_connections() -> Vec<FlowConnection> {
-    vec![
-        ws3_flow_conn("twitter", "ca_JX6QU88UfSk4"),
-        ws3_flow_conn("gmail", "ca_vX_WA8FsqNmE"),
-        ws3_flow_conn("tiktok", "ca_LPCp3WQpaDma"),
-    ]
-}
-
-/// A single tool_call node graph with `slug` + optional `connection_ref`.
-fn ws3_tool_call_graph(slug: &str, connection_ref: Option<&str>) -> WorkflowGraph {
-    let mut config = json!({ "slug": slug, "args": {} });
-    if let Some(cr) = connection_ref {
-        config["connection_ref"] = json!(cr);
-    }
-    graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "act", "kind": "tool_call", "name": "Act", "config": config }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "act" } ]
-    }))
-}
-
-fn upload_graph(path: Value) -> WorkflowGraph {
-    graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "up", "kind": "tool_call", "name": "Upload",
-              "config": { "slug": "oh:storage_upload_file", "args": { "path": path } } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "up" } ]
-    }))
-}
-
 // ── validate_tool_contracts: arg-NAME validation against the input schema
 //    (B13 — a misnamed/unsupported field, e.g. `text` instead of
 //    `markdown_text` for `SLACK_SEND_MESSAGE`, used to sail through
