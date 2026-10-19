@@ -83,8 +83,11 @@ const ChatMascotOverlay = () => {
   const replayOwnerRef = useRef<string | null>(null);
   useEffect(() => {
     const onPlayback = (event: Event) => {
-      const detail = (event as CustomEvent<{ owner: string; active: boolean; viseme: string }>)
-        .detail;
+      const detail = (event as CustomEvent<{
+        owner: string;
+        active: boolean;
+        viseme: string;
+      }>).detail;
       if (!detail?.owner) return;
       if (detail.active) {
         replayOwnerRef.current = detail.owner;

@@ -209,14 +209,16 @@ describe('ChatMascotOverlay', () => {
 
   it('ignores cleanup from an older replay owner after another reply takes over', () => {
     renderOverlay(true);
-    const publish = (owner: string, active: boolean, viseme: string) =>
+    const publish = (owner: string, active: boolean, viseme: string, claim = false) =>
       window.dispatchEvent(
-        new CustomEvent('voice-note-mascot', { detail: { owner, active, viseme } })
+        new CustomEvent('voice-note-mascot', { detail: { owner, active, viseme, claim } })
       );
 
-    act(() => publish('reply-a', true, 'aa'));
+    act(() => publish('reply-a', true, 'aa', true));
     expect(screen.getByTestId('mascot-rive')).toHaveAttribute('data-viseme', 'aa');
-    act(() => publish('reply-b', true, 'PP'));
+    act(() => publish('reply-b', true, 'PP', true));
+    expect(screen.getByTestId('mascot-rive')).toHaveAttribute('data-viseme', 'PP');
+    act(() => publish('reply-a', true, 'oo'));
     expect(screen.getByTestId('mascot-rive')).toHaveAttribute('data-viseme', 'PP');
     act(() => publish('reply-a', false, 'sil'));
     expect(screen.getByTestId('mascot-rive')).toHaveAttribute('data-viseme', 'PP');

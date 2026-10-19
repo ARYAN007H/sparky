@@ -67,7 +67,7 @@ function VoiceNotePlayerBody({
   framesRef.current = frames;
 
   const publishMascot = useCallback(
-    (active: boolean, atMs = 0) => {
+    (active: boolean, atMs = 0, claim = false) => {
       if (!mascotPlayback) return;
       let viseme = 'sil';
       if (active) {
@@ -75,7 +75,9 @@ function VoiceNotePlayerBody({
         viseme = frame?.viseme ?? 'sil';
       }
       window.dispatchEvent(
-        new CustomEvent('voice-note-mascot', { detail: { owner: playbackOwner, active, viseme } })
+        new CustomEvent('voice-note-mascot', {
+          detail: { owner: playbackOwner, active, viseme, claim },
+        })
       );
     },
     [mascotPlayback, playbackOwner]
@@ -120,10 +122,10 @@ function VoiceNotePlayerBody({
       }
     }
     const audio = new window.Audio(url);
-    const publishAtCurrentTime = () => {
+    const publishAtCurrentTime = (claim = false) => {
       const atMs = audio.currentTime * 1000;
       setPositionMs(atMs);
-      publishMascot(!audio.paused && !audio.ended, atMs);
+      publishMascot(!audio.paused && !audio.ended, atMs, claim);
     };
     const stopSampling = () => {
       if (playbackRafRef.current !== null) {
@@ -158,7 +160,7 @@ function VoiceNotePlayerBody({
     });
     audio.addEventListener('play', () => {
       setPlaying(true);
-      publishAtCurrentTime();
+      publishAtCurrentTime(true);
       stopSampling();
       playbackRafRef.current = window.requestAnimationFrame(sampleWhilePlaying);
     });
