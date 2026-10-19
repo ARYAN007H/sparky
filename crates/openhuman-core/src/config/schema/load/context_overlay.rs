@@ -1,14 +1,41 @@
 //! Per-context config overrides reapplied after a fresh persisted reload.
 
+use crate::config::schema::{
+    AppliedInferenceOverride, ComposioHostCredential, EphemeralRoute, ResolvedEndpoints,
+    SearchHostCredential,
+};
 use crate::config::Config;
+use crate::profiles::provider_settings::ProfileProviderSettings;
 use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub(crate) struct ConfigContextOverlay {
     base: Value,
     changes: Vec<Change>,
-    runtime: Box<Config>,
+    runtime: RuntimeBindings,
+}
+
+#[derive(Clone)]
+struct RuntimeBindings {
+    profile_providers: Option<Arc<ProfileProviderSettings>>,
+    workspace_dir: PathBuf,
+    action_dir: PathBuf,
+    config_path: PathBuf,
+    cli_inference_snapshot: Option<AppliedInferenceOverride>,
+    recovered_from_corruption: bool,
+    ephemeral_route: Option<EphemeralRoute>,
+    resolved_endpoints: ResolvedEndpoints,
+    legacy_memory_sources: Vec<Value>,
+    memory_legacy_backend: Option<crate::config::schema::memory::LegacyBackend>,
+    composio_host_credential: Option<ComposioHostCredential>,
+    search_engine: Option<String>,
+    search_enabled_providers: Option<BTreeSet<String>>,
+    search_parallel_route: Option<String>,
+    search_gemini_route: Option<String>,
+    search_host_credentials: BTreeMap<String, SearchHostCredential>,
 }
 
 #[derive(Clone)]
@@ -42,13 +69,11 @@ impl ConfigContextOverlay {
         let target = serde_json::to_value(child)?;
         diff_values(&parent_value, &target, &mut Vec::new(), &mut changes);
 
-        let mut runtime = child.clone();
-        runtime.context_overlay = std::sync::Mutex::new(None);
-        runtime.context_snapshot = None;
+        let runtime = RuntimeBindings::capture(child);
         Ok(Arc::new(Self {
             base,
             changes,
-            runtime: Box::new(runtime),
+            runtime,
         }))
     }
 
@@ -60,7 +85,7 @@ impl ConfigContextOverlay {
         }
         let mut result: Config = serde_json::from_value(value)?;
         copy_runtime_bindings(fresh, &mut result);
-        copy_runtime_bindings(&self.runtime, &mut result);
+        self.runtime.apply(&mut result);
         result.document_snapshot =
             std::sync::Mutex::new(fresh.document_snapshot.lock().unwrap().clone());
         result.context_snapshot = fresh.context_snapshot.clone();
@@ -70,6 +95,48 @@ impl ConfigContextOverlay {
             runtime: self.runtime.clone(),
         })));
         Ok(result)
+    }
+}
+
+impl RuntimeBindings {
+    fn capture(source: &Config) -> Self {
+        Self {
+            profile_providers: source.profile_providers.clone(),
+            workspace_dir: source.workspace_dir.clone(),
+            action_dir: source.action_dir.clone(),
+            config_path: source.config_path.clone(),
+            cli_inference_snapshot: source.cli_inference_snapshot.clone(),
+            recovered_from_corruption: source.recovered_from_corruption,
+            ephemeral_route: source.ephemeral_route.clone(),
+            resolved_endpoints: source.resolved_endpoints.clone(),
+            legacy_memory_sources: source.legacy_memory_sources.clone(),
+            memory_legacy_backend: source.memory.legacy_backend.clone(),
+            composio_host_credential: source.composio.host_credential.clone(),
+            search_engine: source.search.engine.clone(),
+            search_enabled_providers: source.search.enabled_providers.clone(),
+            search_parallel_route: source.search.parallel_route.clone(),
+            search_gemini_route: source.search.gemini_route.clone(),
+            search_host_credentials: source.search.host_credentials.clone(),
+        }
+    }
+
+    fn apply(&self, target: &mut Config) {
+        target.profile_providers = self.profile_providers.clone();
+        target.workspace_dir = self.workspace_dir.clone();
+        target.action_dir = self.action_dir.clone();
+        target.config_path = self.config_path.clone();
+        target.cli_inference_snapshot = self.cli_inference_snapshot.clone();
+        target.recovered_from_corruption = self.recovered_from_corruption;
+        target.ephemeral_route = self.ephemeral_route.clone();
+        target.resolved_endpoints = self.resolved_endpoints.clone();
+        target.legacy_memory_sources = self.legacy_memory_sources.clone();
+        target.memory.legacy_backend = self.memory_legacy_backend.clone();
+        target.composio.host_credential = self.composio_host_credential.clone();
+        target.search.engine = self.search_engine.clone();
+        target.search.enabled_providers = self.search_enabled_providers.clone();
+        target.search.parallel_route = self.search_parallel_route.clone();
+        target.search.gemini_route = self.search_gemini_route.clone();
+        target.search.host_credentials = self.search_host_credentials.clone();
     }
 }
 
@@ -136,20 +203,5 @@ fn apply_change(current: &mut Value, path: &[String], value: Option<Value>) {
 }
 
 pub(crate) fn copy_runtime_bindings(source: &Config, target: &mut Config) {
-    target.profile_providers = source.profile_providers.clone();
-    target.workspace_dir = source.workspace_dir.clone();
-    target.action_dir = source.action_dir.clone();
-    target.config_path = source.config_path.clone();
-    target.cli_inference_snapshot = source.cli_inference_snapshot.clone();
-    target.recovered_from_corruption = source.recovered_from_corruption;
-    target.ephemeral_route = source.ephemeral_route.clone();
-    target.resolved_endpoints = source.resolved_endpoints.clone();
-    target.legacy_memory_sources = source.legacy_memory_sources.clone();
-    target.memory.legacy_backend = source.memory.legacy_backend.clone();
-    target.composio.host_credential = source.composio.host_credential.clone();
-    target.search.engine = source.search.engine.clone();
-    target.search.enabled_providers = source.search.enabled_providers.clone();
-    target.search.parallel_route = source.search.parallel_route.clone();
-    target.search.gemini_route = source.search.gemini_route.clone();
-    target.search.host_credentials = source.search.host_credentials.clone();
+    RuntimeBindings::capture(source).apply(target);
 }
