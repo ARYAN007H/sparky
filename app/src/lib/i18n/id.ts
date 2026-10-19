@@ -589,6 +589,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Persetujuan desktop yang tertunda tidak dapat dimuat. Segarkan untuk mencoba lagi.',
   'desktop.unsupported': 'Kontrol desktop tidak tersedia di lingkungan ini.',
+  'desktop.unsupportedWindows':
+    'Kontrol desktop belum tersedia di Windows. Kontrol Browser sudah berfungsi di Windows.',
   'desktop.localOnly': 'Pengaturan ini hanya berlaku untuk komputer ini.',
   'desktop.permissions': 'Izin sistem',
   'desktop.openSettings': 'Buka pengaturan',

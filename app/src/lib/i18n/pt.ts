@@ -590,6 +590,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Não foi possível carregar as aprovações de desktop pendentes. Atualize para tentar novamente.',
   'desktop.unsupported': 'O controle do computador não está disponível neste ambiente.',
+  'desktop.unsupportedWindows':
+    'O controle do computador ainda não está disponível no Windows. O controle do navegador já funciona no Windows.',
   'desktop.localOnly': 'Esta configuração vale apenas para este computador.',
   'desktop.permissions': 'Permissões do sistema',
   'desktop.openSettings': 'Abrir configurações',

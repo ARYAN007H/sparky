@@ -596,6 +596,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Impossibile caricare le approvazioni desktop in attesa. Aggiorna per riprovare.',
   'desktop.unsupported': 'Il controllo desktop non è disponibile in questo ambiente.',
+  'desktop.unsupportedWindows':
+    'Il controllo desktop non è ancora disponibile su Windows. Il controllo del browser funziona già su Windows.',
   'desktop.localOnly': 'Questa impostazione vale solo per questo computer.',
   'desktop.permissions': 'Autorizzazioni di sistema',
   'desktop.openSettings': 'Apri impostazioni',

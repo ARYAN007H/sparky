@@ -487,6 +487,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Bekleyen masaüstü onayları yüklenemedi. Yeniden denemek için yenileyin.',
   'desktop.unsupported': 'Masaüstü denetimi bu çalışma ortamında kullanılamıyor.',
+  'desktop.unsupportedWindows':
+    "Masaüstü denetimi henüz Windows'ta kullanılamıyor. Tarayıcı denetimi Windows'ta şu anda çalışıyor.",
   'desktop.localOnly': 'Bu ayar yalnızca bu bilgisayar için geçerlidir.',
   'desktop.permissions': 'Sistem izinleri',
   'desktop.openSettings': 'Ayarları aç',

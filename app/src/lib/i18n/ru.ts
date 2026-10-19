@@ -587,6 +587,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Не удалось загрузить ожидающие подтверждения действий на рабочем столе. Обновите страницу и повторите попытку.',
   'desktop.unsupported': 'Управление рабочим столом недоступно в этой среде.',
+  'desktop.unsupportedWindows':
+    'Управление рабочим столом пока недоступно в Windows. Управление браузером в Windows уже работает.',
   'desktop.localOnly': 'Эта настройка действует только на этом компьютере.',
   'desktop.permissions': 'Системные разрешения',
   'desktop.openSettings': 'Открыть настройки',

@@ -578,6 +578,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'অপেক্ষমাণ ডেস্কটপ অনুমোদন লোড করা যায়নি। আবার চেষ্টা করতে রিফ্রেশ করুন।',
   'desktop.unsupported': 'এই পরিবেশে ডেস্কটপ নিয়ন্ত্রণ উপলব্ধ নয়।',
+  'desktop.unsupportedWindows':
+    'Windows-এ ডেস্কটপ নিয়ন্ত্রণ এখনও উপলব্ধ নয়। ব্রাউজার নিয়ন্ত্রণ এখনই Windows-এ কাজ করে।',
   'desktop.localOnly': 'এই সেটিং শুধু এই কম্পিউটারে প্রযোজ্য।',
   'desktop.permissions': 'সিস্টেম অনুমতি',
   'desktop.openSettings': 'সেটিংস খুলুন',

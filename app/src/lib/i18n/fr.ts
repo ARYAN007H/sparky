@@ -600,6 +600,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Impossible de charger les approbations du bureau en attente. Actualisez pour réessayer.',
   'desktop.unsupported': 'Le contrôle du bureau n’est pas disponible dans cet environnement.',
+  'desktop.unsupportedWindows':
+    'Le contrôle du bureau n’est pas encore disponible sous Windows. Le contrôle du navigateur fonctionne déjà sous Windows.',
   'desktop.localOnly': 'Ce réglage ne s’applique qu’à cet ordinateur.',
   'desktop.permissions': 'Autorisations système',
   'desktop.openSettings': 'Ouvrir les réglages',

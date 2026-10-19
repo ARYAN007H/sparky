@@ -596,6 +596,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'No se pudieron cargar las aprobaciones pendientes del escritorio. Actualiza para reintentarlo.',
   'desktop.unsupported': 'El control del escritorio no está disponible en este entorno.',
+  'desktop.unsupportedWindows':
+    'El control del escritorio aún no está disponible en Windows. El control del navegador ya funciona en Windows.',
   'desktop.localOnly': 'Este ajuste solo se aplica a este equipo.',
   'desktop.permissions': 'Permisos del sistema',
   'desktop.openSettings': 'Abrir ajustes',

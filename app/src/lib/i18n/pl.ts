@@ -591,6 +591,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Nie udało się wczytać oczekujących zgód na dostęp do pulpitu. Odśwież, aby spróbować ponownie.',
   'desktop.unsupported': 'Sterowanie pulpitem jest niedostępne w tym środowisku.',
+  'desktop.unsupportedWindows':
+    'Sterowanie pulpitem nie jest jeszcze dostępne w systemie Windows. Sterowanie przeglądarką już działa w systemie Windows.',
   'desktop.localOnly': 'To ustawienie dotyczy tylko tego komputera.',
   'desktop.permissions': 'Uprawnienia systemowe',
   'desktop.openSettings': 'Otwórz ustawienia',
