@@ -11,16 +11,14 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinyflows::caps::*;
-use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
 use crate::flows::agent_route::{
     harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
 };
+use crate::modules::tinyflows as module;
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected
 /// agent kind by one of two paths, chosen by [`route_for_agent_ref`]:
@@ -120,9 +118,8 @@ fn max_parallel_harness_agents(raw: Option<&str>) -> usize {
         .unwrap_or(DEFAULT_MAX_PARALLEL_HARNESS_AGENTS)
 }
 
-#[async_trait]
-impl AgentRunner for OpenHumanAgentRunner {
-    async fn run_agent(
+impl OpenHumanAgentRunner {
+    pub(crate) async fn run_agent(
         &self,
         agent_ref: &str,
         request: Value,
