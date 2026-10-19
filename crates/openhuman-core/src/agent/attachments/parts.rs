@@ -92,7 +92,7 @@ fn source_of(media: &MediaReference, index: usize) -> Result<&str, AttachmentPar
 /// Render `parts` after `text` as the staging markers, in order.
 ///
 /// `Text` parts join the message text. Images become `[IMAGE:…]`; video,
-/// audio and files become `[FILE:…]`. Any other part kind is refused.
+/// audio, voice notes and files become `[FILE:…]`. Any other part kind is refused.
 pub fn fold_into_message(text: &str, parts: &[ContentPart]) -> Result<String, AttachmentPartError> {
     if parts.is_empty() {
         return Ok(text.to_string());
@@ -110,6 +110,9 @@ pub fn fold_into_message(text: &str, parts: &[ContentPart]) -> Result<String, At
             }
             ContentPart::Video { media, .. }
             | ContentPart::Audio { media, .. }
+            | ContentPart::VoiceNote {
+                voice_note: tinychannels_bus::VoiceNote { media, .. },
+            }
             | ContentPart::File { media, .. } => {
                 markers.push(format!("[FILE:{}]", source_of(media, index)?));
             }
