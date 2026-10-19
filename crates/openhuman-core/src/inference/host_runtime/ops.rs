@@ -15,7 +15,7 @@ mod turn_guards;
 
 pub use agent_chat::{
     AgentChatEnv, AgentChatReply, AgentChatTarget, agent_chat, agent_chat_for,
-    agent_chat_reply_for, agent_chat_simple,
+    agent_chat_reply_for, agent_chat_reply_for_controlled, agent_chat_simple,
 };
 pub use complete_once::{
     CompletionEndpoint, complete_once, complete_once_controlled, complete_once_observed,
