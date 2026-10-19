@@ -528,9 +528,9 @@ async fn repair_cannot_exceed_dispatch_limit() {
         .complete(request)
         .await;
 
-    assert!(result.is_err(), "the refused repair must be terminal");
     let requests = server.received_requests().await.expect("recording on");
     assert_eq!(requests.len(), 1, "a refused repair must not reach the server");
+    assert!(result.is_err(), "the refused repair must be terminal");
 }
 
 #[test]

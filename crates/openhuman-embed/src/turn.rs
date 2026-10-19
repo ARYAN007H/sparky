@@ -429,6 +429,15 @@ impl Turn {
         self
     }
 
+    /// Share a host-owned physical-dispatch policy with this turn and its children.
+    pub fn dispatch_admission(
+        mut self,
+        admission: Arc<dyn crate::budget::PhysicalDispatchAdmission>,
+    ) -> Self {
+        self.dispatch_admission = Some(admission);
+        self
+    }
+
     /// Narrow the model-directed delegation depth for this turn tree.
     pub(crate) fn with_spawn_depth_limit(mut self, limit: usize) -> Self {
         self.spawn_depth_limit = Some(limit);
