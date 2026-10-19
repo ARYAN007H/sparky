@@ -495,7 +495,7 @@ impl SpawnAsyncSubagentTool {
                                         .await;
                                 }
                             }
-                            SubagentRunStatus::Incomplete { ref reason } => {
+                            SubagentRunStatus::Incomplete { ref reason, .. } => {
                                 // Async sub-agent stopped short (stuck halt / iteration
                                 // cap). Mark the session finished and deliver the PARTIAL
                                 // progress back to the parent, framed so it is not
