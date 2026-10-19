@@ -462,12 +462,3 @@ async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
         "{warnings:?}"
     );
 }
-
-/// (Codex feedback on this PR) `notion` ships a static curated catalog
-/// (`catalog_for_toolkit`), so at RUNTIME `flow_tool_allowed`'s Path A
-/// hard-rejects any slug `find_curated` doesn't recognize — even a real,
-/// live action. Without this check, a real-but-uncurated action for a
-/// statically-catalogued toolkit would pass authoring/save here and then
-/// fail every single run as "tool not permitted". Uses its own toolkit key
-/// (`notion`, not `slack`/`gmail`) since it seeds different `is_curated`
-/// content than every other test sharing those keys.
