@@ -415,8 +415,8 @@ fn handle_settings_update(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 fn handle_savings_stats(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate(&ctx)?;
-        let cache = super::cache_stats().await?;
         let config = ctx.load_config().await.map_err(|e| e.to_string())?;
+        let cache = super::cache_stats_with_config(&config).await?;
         super::install_from_config(&config).await?;
         let agg = super::savings::stats(&super::client(&config)).await?;
         Ok(serde_json::json!({
