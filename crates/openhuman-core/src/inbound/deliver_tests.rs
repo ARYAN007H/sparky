@@ -10,7 +10,6 @@ use tinyeventqueues_bus::{EventKind, Sender};
 use super::*;
 use crate::inbound::events;
 use crate::inbound::fixture::{decision, decision_outcome, deferred, ScriptedTriage, Step};
-use crate::config::schema::inbound::MAX_TRIAGE_TIMEOUT_MS;
 use crate::triage::TriggerEnvelope;
 
 const NOW_MS: i64 = 1_000_000;
@@ -323,6 +322,11 @@ async fn a_long_apply_is_acknowledged_at_the_budget_and_finishes_on_its_own() {
 
 #[tokio::test]
 async fn a_configured_deliverer_reads_the_triage_timeout_on_first_use() {
+    // The first callback loads `[inbound]`: keep it off the developer's config.
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let tmp = tempfile::tempdir().unwrap();
+    let _workspace = crate::config::test_env::EnvVarGuard::workspace_unlocked(tmp.path());
+    let _home = crate::config::test_env::EnvVarGuard::set("HOME", tmp.path());
     let triage = ScriptedTriage::new([decision(TriageAction::React)]);
     let deliverer = Deliverer::configured(
         triage.clone() as Arc<dyn TriageRunner>,
@@ -333,5 +337,5 @@ async fn a_configured_deliverer_reads_the_triage_timeout_on_first_use() {
         .deliver(turn(vec![trigger_event("u1")], Lane::Background, 1))
         .await;
     assert_eq!(response.status, DeliverStatus::Accepted);
-    assert!(deliverer.timeout().await <= Duration::from_millis(MAX_TRIAGE_TIMEOUT_MS));
+    assert!(deliverer.timeout().await <= Duration::from_secs(25));
 }
