@@ -43,7 +43,7 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
     let ctx = DispatchCtx::ambient();
     let client_id = "channel-timeout-client";
     let thread_id = "channel-timeout-thread";
-    let mut event_rx = crate::web_chat::subscribe_web_channel_events();
+    let event_rx = crate::web_chat::subscribe_web_channel_events();
     let request_id = crate::web_chat::start_chat(
         &ctx,
         client_id,
@@ -64,6 +64,7 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
         tokio::task::yield_now().await;
     }
 
+    let producer_request_id = request_id.clone();
     let sink = RecordingReply::default();
     let session = tokio_util::sync::CancellationToken::new();
     let producer = async {
@@ -74,7 +75,7 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
                 context: WebEventContext {
                     client_id: client_id.into(),
                     thread_id: thread_id.into(),
-                    request_id: request_id.clone(),
+                    request_id: producer_request_id.clone(),
                     ..Default::default()
                 },
                 delta: Some("still working".into()),

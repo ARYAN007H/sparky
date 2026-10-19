@@ -77,7 +77,7 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
     config.modules.allow_download = false;
     config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
     config.channels_config.telegram = Some(tinychannels_bus::config::TelegramConfig {
-        bot_token: "bottoken".into(),
+        bot_token: "token".into(),
         chat_id: None,
         allowed_users: vec!["42".into()],
         stream_mode: Default::default(),
