@@ -24,8 +24,10 @@ while IFS= read -r -d '' file; do
   rm -f -- "${file}"
   removed=$((removed + 1))
 done < <(
+  # <crate>-<16 hex metadata hash> with no extension: test executables.
+  # rlib/rmeta/so/d files and build-script dirs keep their names.
   find "${dir}" -type f -path '*/deps/*' -perm -u+x \
-    -regex '.*/deps/[A-Za-z0-9_]+-[0-9a-f]\{16\}' -print0
+    -name '*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]' ! -name '*.*' -print0
 )
 profiles=0
 while IFS= read -r -d '' file; do
