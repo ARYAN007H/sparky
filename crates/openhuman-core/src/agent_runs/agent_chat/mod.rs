@@ -2,6 +2,7 @@
 
 pub(crate) mod guards;
 mod envelope;
+mod attachments;
 mod controllers;
 pub(crate) mod params;
 mod session_turn;

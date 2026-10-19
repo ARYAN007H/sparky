@@ -3,6 +3,7 @@
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 use crate::core::Outcome;
+use super::envelope::AgentChatReply;
 
 use super::guards::{
     effective_agent_chat_origin, enforce_user_prompt_or_reject, grant_turn_cwd,
@@ -428,42 +429,22 @@ pub async fn agent_chat_reply_for(
         agent.set_thread_id(Some(id));
         log::debug!("[inference] agent_chat bound session for thread_id={id}");
     }
-    // Host attachments, staged where the provider will look for them: the
-    // turn's root when it has one, the configured `action_dir` otherwise.
-    // Their references lead the message, so the model reads the files first
-    // and the caption after, as an upload with a caption reads.
-    let staged_message;
-    let message = match target {
+    // Host attachments are staged where the provider will look for them: the
+    // turn root, or the configured action directory when no root was supplied.
+    let staged_message = match target {
         AgentChatTarget::Definition { attachments, .. } if !attachments.is_empty() => {
-            let staging_config = match turn_cwd.as_ref() {
-                Some(root) => {
-                    let mut scoped = config.clone();
-                    scoped.action_dir = root.clone();
-                    scoped
-                }
-                None => config.clone(),
-            };
-            let scope = crate::attachments::AttachmentAccessScope {
-                external_channel: false,
-                workspace: turn_cwd.clone(),
-            };
-            let references = crate::attachments::host::stage_host(
+            super::attachments::stage_host_attachments(
                 attachments,
                 turn_session_id.unwrap_or("direct"),
-                &staging_config,
-                &scope,
+                config,
+                turn_cwd.clone(),
+                message,
             )
-            .await
-            .map_err(|e| e.to_string())?;
-            log::debug!(
-                "[inference] agent_chat staged {} host attachment(s)",
-                attachments.len()
-            );
-            staged_message = format!("{references}{message}");
-            staged_message.as_str()
+            .await?
         }
-        _ => message,
+        _ => message.to_string(),
     };
+    let message = staged_message.as_str();
     if let AgentChatTarget::Definition {
         untrusted_input: true,
         ..
