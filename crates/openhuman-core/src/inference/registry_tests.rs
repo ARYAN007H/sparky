@@ -21,7 +21,9 @@ impl ChatModel<()> for FakeModel {
     }
 }
 
-fn fake_entry(seen: Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>) -> ChatModelEntry {
+type SeenRequests = Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>;
+
+fn fake_entry(seen: SeenRequests) -> ChatModelEntry {
     ChatModelEntry {
         build: Arc::new(move |request| {
             seen.lock().unwrap().push((
