@@ -37,7 +37,7 @@ use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
 use crate::agent::queued_turn::QueuedPayload;
-use crate::agent::turn_origin::{AgentTurnOrigin, with_origin};
+use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
@@ -249,26 +249,22 @@ impl WebHost {
         // a pointer rather than inlining it into this frame.
         #[cfg(feature = "tinymemes")]
         let turn_started = std::time::Instant::now();
-        let turn = Box::pin(with_origin(
-            origin.clone(),
-            crate::agent::turn_host::run_session_turn(
-                agent,
-                crate::agent::turn_host::AgentTurnRequest {
-                    message: request.text.clone(),
-                    thread_id: Some(thread_id.to_owned()),
-                    origin,
-                    approval,
-                    progress: Some(progress_tx),
-                    run_queue: Some(queue),
-                    cancellation,
-                    turn_deadline: request.deadline,
-                    // Also the turn's workspace, so attachment reads and
-                    // delegated sub-agents use the upload folder (#7714).
-                    workspace: thread_dir
-                        .map(tinytools::WorkspaceDescriptor::new),
-                    host_env: Default::default(),
-                },
-            ),
+        let turn = Box::pin(crate::agent::turn_host::run_session_turn(
+            agent,
+            crate::agent::turn_host::AgentTurnRequest {
+                message: request.text.clone(),
+                thread_id: Some(thread_id.to_owned()),
+                origin,
+                approval,
+                progress: Some(progress_tx),
+                run_queue: Some(queue),
+                cancellation,
+                turn_deadline: request.deadline,
+                // Also the turn's workspace, so attachment reads and
+                // delegated sub-agents use the upload folder (#7714).
+                workspace: thread_dir.map(tinytools::WorkspaceDescriptor::new),
+                host_env: Default::default(),
+            },
         ));
         let outcome = turn.await;
         let result = match outcome {

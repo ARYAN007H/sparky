@@ -103,20 +103,31 @@ impl HostAgent {
         let mut session = self.session_host(&config, Some(session_key))?;
         session.set_thread_id(Some(session_key));
         session.set_event_context(event_session_id, channel);
-        session.set_on_progress(progress);
-        session.set_host_env(crate::agent::turn_env::HostTurnEnv {
-            hooks: self.hooks.clone(),
-            core: Some(Arc::downgrade(&self.context)),
-            cancellation: Some(cancellation),
-            turn_deadline: turn_deadline
-                .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
-            approval: approval.clone(),
-            memory_identity: Some(crate::memory::scope::MemoryIdentity::root().child(&agent_id)),
-            ..Default::default()
-        });
         session.adopt_imported_history(imported_history)?;
-        self.scope(session.run_single_with_approval(message, Some(origin), approval))
-            .await
+        self.scope(crate::agent::turn_host::run_session_turn(
+            &mut session,
+            crate::agent::turn_host::AgentTurnRequest {
+                message: message.to_owned(),
+                thread_id: Some(session_key.to_owned()),
+                origin,
+                approval: approval.clone(),
+                progress,
+                run_queue: None,
+                cancellation,
+                turn_deadline,
+                workspace: None,
+                host_env: crate::agent::turn_env::HostTurnEnv {
+                    hooks: self.hooks.clone(),
+                    core: Some(Arc::downgrade(&self.context)),
+                    approval,
+                    memory_identity: Some(
+                        crate::memory::scope::MemoryIdentity::root().child(&agent_id),
+                    ),
+                    ..Default::default()
+                },
+            },
+        ))
+        .await
     }
 
     /// Build a session for this agent from `config` -- normally a clone of
