@@ -57,6 +57,24 @@ pub(crate) enum ParallelTaskRejectionKind {
     RequiresIsolation,
 }
 
+#[derive(Default)]
+struct RejectionKinds(Mutex<HashMap<usize, ParallelTaskRejectionKind>>);
+
+impl RejectionKinds {
+    fn insert(&self, index: usize, kind: ParallelTaskRejectionKind) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(index, kind);
+    }
+
+    fn into_inner(self) -> HashMap<usize, ParallelTaskRejectionKind> {
+        self.0
+            .into_inner()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
 pub(crate) struct ParallelTaskRejection {
     pub(crate) task_id: String,
     pub(crate) agent_id: String,
@@ -234,7 +252,7 @@ struct AdmitPayload {
 struct SpawnParallelPolicy<'a> {
     parent: &'a ParentExecutionContext,
     /// Rejection kind per input index (the module carries only the sentence).
-    kinds: Mutex<HashMap<usize, ParallelTaskRejectionKind>>,
+    kinds: RejectionKinds,
 }
 
 impl SpawnParallelPolicy<'_> {
@@ -244,10 +262,7 @@ impl SpawnParallelPolicy<'_> {
         kind: ParallelTaskRejectionKind,
         message: String,
     ) -> AdmissionVerdict {
-        self.kinds
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(index, kind);
+        self.kinds.insert(index, kind);
         AdmissionVerdict::Reject(message)
     }
 }
@@ -322,13 +337,10 @@ pub(crate) fn prepare_spawn_parallel_tasks_from_defs(
     );
     let policy = SpawnParallelPolicy {
         parent,
-        kinds: Mutex::new(HashMap::new()),
+        kinds: RejectionKinds::default(),
     };
     let staged = plan.stage(&policy);
-    let kinds = policy
-        .kinds
-        .into_inner()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let kinds = policy.kinds.into_inner();
     staged
         .into_iter()
         .enumerate()
@@ -377,6 +389,10 @@ pub(crate) fn prepare_spawn_parallel_tasks_from_defs(
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "staging_tests.rs"]
+mod tests;
 
 /// Render a claim conflict as the sentence the calling model reads.
 ///
