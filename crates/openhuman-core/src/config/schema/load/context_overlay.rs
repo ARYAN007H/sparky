@@ -53,16 +53,7 @@ impl std::fmt::Debug for ConfigContextOverlay {
 
 impl ConfigContextOverlay {
     pub(crate) fn derive(parent: &Config, child: &Config) -> anyhow::Result<Arc<Self>> {
-        let parent_anchor = parent.document_snapshot.lock().unwrap().anchor.clone();
-        let child_anchor = child.document_snapshot.lock().unwrap().anchor.clone();
-        let same_source = match (&parent_anchor, &child_anchor) {
-            (Some(parent), Some(child)) => parent == child,
-            (None, None) => {
-                super::source::normalized_path(&parent.config_path)
-                    == super::source::normalized_path(&child.config_path)
-            }
-            _ => false,
-        };
+        let same_source = same_source(parent, child);
         anyhow::ensure!(
             same_source,
             "cannot derive config overrides from different persistence sources"
@@ -75,6 +66,40 @@ impl ConfigContextOverlay {
         let parent_value = serde_json::to_value(parent)?;
         let target = serde_json::to_value(child)?;
         diff_values(&parent_value, &target, &mut Vec::new(), &mut changes);
+
+        let runtime = RuntimeBindings::capture(child);
+        Ok(Arc::new(Self { changes, runtime }))
+    }
+
+    /// Record the small set of serialized config fields owned by a hosted
+    /// profile. A profile config is derived from operator config but persisted
+    /// under another scope, so diffing the two complete documents would pin
+    /// operator settings into the profile after a conflict refresh.
+    pub(crate) fn derive_profile(
+        parent: Option<&Config>,
+        child: &Config,
+    ) -> anyhow::Result<Arc<Self>> {
+        let mut changes = Vec::new();
+        if let Some(parent) = parent.filter(|parent| same_source(parent, child)) {
+            if let Some(inherited) = parent.context_overlay.lock().unwrap().clone() {
+                changes.extend(inherited.changes.clone());
+            }
+            let parent_value = serde_json::to_value(parent)?;
+            let child_value = serde_json::to_value(child)?;
+            diff_values(&parent_value, &child_value, &mut Vec::new(), &mut changes);
+        }
+
+        let child_value = serde_json::to_value(child)?;
+        for path in PROFILE_OWNED_PATHS {
+            let value = value_at_path(&child_value, path)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("profile-owned config path is missing"))?;
+            changes.retain(|change| !change.path.starts_with(path));
+            changes.push(Change {
+                path: path.iter().map(|part| (*part).to_string()).collect(),
+                value: Some(value),
+            });
+        }
 
         let runtime = RuntimeBindings::capture(child);
         Ok(Arc::new(Self { changes, runtime }))
@@ -97,6 +122,39 @@ impl ConfigContextOverlay {
         })));
         Ok(result)
     }
+}
+
+const PROFILE_OWNED_PATHS: &[&[&str]] = &[
+    &["files_dir_override"],
+    &["memory", "agent_id"],
+    &["memory", "root"],
+    &["memory", "layout"],
+    &["agent", "channel_permissions"],
+    &["agent", "max_tool_iterations_override"],
+    &["autonomy"],
+    &["cron", "agent_jobs_only"],
+    &["cron", "min_interval_secs"],
+    &["cron", "max_active_jobs"],
+];
+
+fn same_source(parent: &Config, child: &Config) -> bool {
+    let parent_anchor = parent.document_snapshot.lock().unwrap().anchor.clone();
+    let child_anchor = child.document_snapshot.lock().unwrap().anchor.clone();
+    match (&parent_anchor, &child_anchor) {
+        (Some(parent), Some(child)) => parent == child,
+        (None, None) => {
+            super::source::normalized_path(&parent.config_path)
+                == super::source::normalized_path(&child.config_path)
+        }
+        _ => false,
+    }
+}
+
+fn value_at_path<'a>(mut value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    for part in path {
+        value = value.get(*part)?;
+    }
+    Some(value)
 }
 
 impl RuntimeBindings {
