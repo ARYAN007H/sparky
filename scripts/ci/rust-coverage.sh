@@ -166,22 +166,19 @@ target_expected_in_coverage() {
 # scripts/ci-cancel-aware.sh) stops the run at once.
 FAILED_SUITES=()
 
-# On the self-hosted guest (CI_SCRATCH_DIR is set) log what the scratch disk has
-# left and how large the coverage target and its raw profiles are after each
-# suite, so a full disk (EX63 run 39292268284) names the suite that grew it.
-disk_note() {
-  [ -n "${CI_SCRATCH_DIR:-}" ] || return 0
-  local target="${CARGO_BUILD_TARGET_DIR:-target}" free
-  free="$(df -h "${CI_SCRATCH_DIR}" 2>/dev/null | awk 'NR==2 { print $4 " free of " $2 }')"
-  log "disk after $1: ${free:-unknown}; target $(du -sh "${target}" 2>/dev/null | cut -f1)," \
-    "profraw $(find "${target}" -name '*.profraw' -print0 2>/dev/null | du -ch --files0-from=- 2>/dev/null | tail -1 | cut -f1)"
-}
-
 suite() {
   local name="$1" rc=0
   shift
   COV_SUITE="$(printf '%s' "$name" | tr -cs '[:alnum:]' '-')" "$@" || rc=$?
-  disk_note "${name}"
+  # On the self-hosted guest (CI_SCRATCH_DIR is set) log what the scratch disk
+  # has left and how large the coverage target and its raw profiles are after
+  # each suite, so a full disk (EX63 run 39292268284) names the suite that
+  # grew it.
+  if [ -n "${CI_SCRATCH_DIR:-}" ]; then
+    log "disk after ${name}: $(df -h "${CI_SCRATCH_DIR}" 2>/dev/null | awk 'NR==2 { print $4 " free of " $2 }')," \
+      "target $(du -sh "${CARGO_BUILD_TARGET_DIR:-target}" 2>/dev/null | cut -f1)," \
+      "profraw $(find "${CARGO_BUILD_TARGET_DIR:-target}" -name '*.profraw' -print0 2>/dev/null | du -ch --files0-from=- 2>/dev/null | tail -1 | cut -f1)"
+  fi
   case "${rc}" in
     0) ;;
     130 | 143)
