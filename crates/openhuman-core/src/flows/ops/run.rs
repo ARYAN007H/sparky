@@ -35,7 +35,7 @@ pub async fn flows_run(
     // to the shared run body. Both the synchronous "Run" RPC path (this fn) and
     // the detached agent path ([`flows_run_detached`]) reuse `run_flow_body` so
     // a single [`RunRowFinalizer`] guards the row on every exit — bug B42.
-    let prepared = prepare_flow_run(config, flow_id, &inputs)?;
+    let prepared = prepare_flow_run(config, flow_id, &inputs).await?;
     let thread_id = prepared.thread_id.clone();
     let no_actionable_nodes = prepared.no_actionable_nodes;
     let resolved_inputs = prepared.inputs;
@@ -93,7 +93,7 @@ pub async fn flows_run_detached(
     inputs: serde_json::Map<String, Value>,
     trigger: FlowRunTrigger,
 ) -> Result<Outcome<Value>, String> {
-    let prepared = prepare_flow_run(config, flow_id, &inputs)?;
+    let prepared = prepare_flow_run(config, flow_id, &inputs).await?;
     let thread_id = prepared.thread_id.clone();
     let no_actionable_nodes = prepared.no_actionable_nodes;
     let resolved_inputs = prepared.inputs;
@@ -194,7 +194,7 @@ pub(super) struct PreparedFlowRun {
 /// The engine re-resolves the same values (it is the authority on its own
 /// contract); doing it twice is cheap and keeps this host from having to trust
 /// its own copy of the rules.
-pub(super) fn prepare_flow_run(
+pub(super) async fn prepare_flow_run(
     config: &Config,
     flow_id: &str,
     inputs: &serde_json::Map<String, Value>,
