@@ -52,6 +52,12 @@ export default async function voiceSttRoundtrip({ mock, rpc, log }) {
     );
   }
   log(
-    "canonical STT RPC returned the mock transcript after posting valid PCM WAV to local mock",
+    `voice STT receipt: ${JSON.stringify({
+      provider: "cloud",
+      transcript: result.text,
+      request_method: request.method,
+      request_path: new URL(request.url, mock.url).pathname,
+      filename: "retained-stt.wav",
+    })}`,
   );
 }
