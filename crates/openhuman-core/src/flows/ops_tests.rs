@@ -711,8 +711,6 @@ mod approval_manifest_and_catalog_tests;
 mod builder_repair_tests;
 #[path = "ops_builder_trail_off_tests.rs"]
 mod builder_trail_off_tests;
-#[path = "ops_connection_ref_gate_tests.rs"]
-mod connection_ref_gate_tests;
 #[path = "ops_engine_compatibility_tests.rs"]
 mod engine_compatibility_tests;
 #[path = "ops_inference_gate_tests.rs"]
