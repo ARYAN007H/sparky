@@ -75,6 +75,25 @@ fn physical_dispatch_refusal_survives_the_neutral_driver_error_boundary() {
 }
 
 #[test]
+fn a_later_driver_failure_clears_a_child_refusal_the_parent_handled() {
+    let sidecar = sidecar();
+    sidecar.lock().unwrap().dispatch_refusal =
+        Some(crate::agent::tinyagents::budget::DispatchRefusal::new(
+            crate::agent::tinyagents::budget::DispatchRefusalReason::CallLimit,
+        ));
+    let snapshot = Arc::new(std::sync::Mutex::new(Default::default()));
+
+    let _failure = driver_error_with_snapshot(
+        anyhow::anyhow!("later unrelated root failure"),
+        &snapshot,
+        &sidecar,
+        std::time::Duration::from_millis(1),
+    );
+
+    assert!(sidecar.lock().unwrap().dispatch_refusal.is_none());
+}
+
+#[test]
 fn stalled_model_stream_reports_completed_evidence_instead_of_its_narration() {
     let snapshot = Arc::new(std::sync::Mutex::new(
         crate::agent::tinyagents::middleware::turn_context::TranscriptSnapshot {

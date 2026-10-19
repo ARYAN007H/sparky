@@ -587,12 +587,10 @@ fn driver_error_with_snapshot(
     let dispatch_refusal = error.chain().find_map(|cause| {
         cause.downcast_ref::<crate::agent::tinyagents::budget::DispatchRefusal>()
     });
-    if let Some(refusal) = dispatch_refusal {
-        sidecar
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .dispatch_refusal = Some(*refusal);
-    }
+    sidecar
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .dispatch_refusal = dispatch_refusal.copied();
     let typed = error
         .chain()
         .find_map(|cause| cause.downcast_ref::<tinyagents_harness::TinyAgentsError>());
