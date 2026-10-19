@@ -556,7 +556,19 @@ async fn admission_only_completion_refuses_before_provider_and_observer() {
 
 #[tokio::test]
 async fn scoped_monetary_budget_keeps_the_shared_dispatch_admission() {
-    let server = server_replying(body("{\"ok\":true}", "stop")).await;
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let text = if *replies == 0 { "invalid" } else { "{\"ok\":true}" };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, "stop"))
+        })
+        .mount(&server)
+        .await;
     let admission = Arc::new(OneCallAdmission(std::sync::atomic::AtomicUsize::new(0)));
     let budget = crate::budget::ModelBudget {
         ledger: crate::budget::Budget::new(crate::budget::SpendLimits {
@@ -570,16 +582,18 @@ async fn scoped_monetary_budget_keeps_the_shared_dispatch_admission() {
         },
     };
 
-    completer(&server)
+    let error = completer(&server)
         .budget(budget)
         .dispatch_admission(admission)
-        .complete(CompletionRequest::new(
-            "budgeted-admission",
-            vec![ChatMessage::user("private")],
-        ))
+        .complete(
+            CompletionRequest::new("budgeted-admission", vec![ChatMessage::user("private")])
+                .response_format(ResponseFormat::JsonObject)
+                .structured_retries(1),
+        )
         .await
-        .expect("the first call is admitted");
+        .expect_err("the repair is refused after creating a scoped spend ledger");
 
+    assert!(matches!(error, CoreError::DispatchAdmission { .. }));
     assert_eq!(server.received_requests().await.unwrap().len(), 1);
 }
 

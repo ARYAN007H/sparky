@@ -430,7 +430,7 @@ fn child_inherits_shared_model_budget_and_narrowed_depth_limit() {
 
 #[test]
 fn child_inherits_the_same_physical_dispatch_admission() {
-    let admission: Arc<dyn super::super::budget::PhysicalDispatchAdmission> =
+    let admission: Arc<dyn crate::agent::tinyagents::budget::PhysicalDispatchAdmission> =
         Arc::new(TestAdmission);
     let env = crate::agent::turn_env::HostTurnEnv {
         dispatch_admission: Some(admission.clone()),
@@ -449,14 +449,16 @@ fn child_inherits_the_same_physical_dispatch_admission() {
 struct TestAdmission;
 
 #[async_trait::async_trait]
-impl super::super::budget::PhysicalDispatchAdmission for TestAdmission {
+impl crate::agent::tinyagents::budget::PhysicalDispatchAdmission for TestAdmission {
     async fn acquire(
         &self,
     ) -> Result<
-        Arc<dyn super::super::budget::PhysicalDispatchPermit>,
-        super::super::budget::DispatchRefusal,
+        Arc<dyn crate::agent::tinyagents::budget::PhysicalDispatchPermit>,
+        crate::agent::tinyagents::budget::DispatchRefusal,
     > {
-        unreachable!("this context inheritance test never acquires a permit")
+        Err(crate::agent::tinyagents::budget::DispatchRefusal::new(
+            crate::agent::tinyagents::budget::DispatchRefusalReason::CallLimit,
+        ))
     }
 }
 
