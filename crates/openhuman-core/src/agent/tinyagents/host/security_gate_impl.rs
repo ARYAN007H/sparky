@@ -135,10 +135,7 @@ impl OpenHumanSecurityGate {
                 }
                 ContentBlock::Json(value) | ContentBlock::ProviderExtension(value) => {
                     let rendered = value.to_string();
-                    match self
-                        .screen_input(&rendered, ContentOrigin::User)
-                        .await?
-                    {
+                    match self.screen_input(&rendered, ContentOrigin::User).await? {
                         ScreenOutcome::Pass => {}
                         ScreenOutcome::Redacted(redacted) => {
                             *value = serde_json::from_str(&redacted)

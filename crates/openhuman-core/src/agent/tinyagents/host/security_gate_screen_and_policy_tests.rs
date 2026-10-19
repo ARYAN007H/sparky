@@ -192,17 +192,13 @@ async fn allow_and_deny_channel_verdicts_are_unchanged() {
 async fn screen_input_redacts_credentials_without_changing_screening_policy() {
     let gate = gate(AutonomyLevel::Full);
     let secret: String = [
-        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7',
-        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-        'o', 'p',
+        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
     ]
     .into_iter()
     .collect();
     let text = format!("credential={secret}");
-    let outcome = gate
-        .screen_input(&text, ContentOrigin::User)
-        .await
-        .unwrap();
+    let outcome = gate.screen_input(&text, ContentOrigin::User).await.unwrap();
     let ScreenOutcome::Redacted(redacted) = outcome else {
         panic!("credential input should be redacted, got {outcome:?}");
     };

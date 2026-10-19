@@ -221,9 +221,8 @@ async fn credential_redaction_survives_resume() {
             .expect("session build")
     };
     let secret: String = [
-        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7',
-        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-        'o', 'p',
+        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
     ]
     .into_iter()
     .collect();
@@ -235,7 +234,11 @@ async fn credential_redaction_survives_resume() {
     assert_eq!(host.turn(&original).await.unwrap(), "first reply");
     drop(host);
 
-    let first_request = model.requests().into_iter().next().expect("first model call");
+    let first_request = model
+        .requests()
+        .into_iter()
+        .next()
+        .expect("first model call");
     let first_user = first_request
         .messages
         .iter()
@@ -252,7 +255,10 @@ async fn credential_redaction_survives_resume() {
     let mut resumed = new_host();
     resumed.set_thread_id(Some("thread-credential-redaction"));
     assert!(resumed.resume_bound_session().await.unwrap());
-    assert_eq!(resumed.turn("continue safely").await.unwrap(), "second reply");
+    assert_eq!(
+        resumed.turn("continue safely").await.unwrap(),
+        "second reply"
+    );
     let requests = model.requests();
     let resumed_request = requests.last().expect("resumed model call");
     let resumed_users: Vec<String> = resumed_request
@@ -262,5 +268,7 @@ async fn credential_redaction_survives_resume() {
         .map(Message::text)
         .collect();
     assert!(resumed_users.iter().any(|message| message == &redacted));
-    assert!(resumed_users.iter().all(|message| !message.contains(&secret)));
+    assert!(resumed_users
+        .iter()
+        .all(|message| !message.contains(&secret)));
 }
