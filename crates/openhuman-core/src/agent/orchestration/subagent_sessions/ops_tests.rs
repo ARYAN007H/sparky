@@ -77,18 +77,10 @@ fn compatible_session_reuses_and_incompatible_shape_spawns_new() {
 fn closed_session_is_not_reusable() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
-    let task_key = format!(
-        "task-{}",
-        dir.path()
-            .file_name()
-            .expect("tempdir name")
-            .to_string_lossy()
-    );
-    let selector = selector(&task_key);
     let session = upsert_running(
         &store,
         SubagentSessionUpsert {
-            selector: selector.clone(),
+            selector: selector("task"),
             display_name: None,
             task_title: "Task".into(),
             worker_thread_id: None,
@@ -99,13 +91,47 @@ fn closed_session_is_not_reusable() {
     .unwrap();
 
     assert!(close(&store, &session.subagent_session_id).unwrap());
-    let reusable = find_reusable(&store, &selector).unwrap();
+    let reusable = find_reusable(&store, &selector("task")).unwrap();
     assert!(
         reusable.is_none(),
         "closed session {} matched reusable record {:?}",
         session.subagent_session_id,
         reusable.map(|record| (record.subagent_session_id, record.status, record.reusable))
     );
+}
+
+#[test]
+fn an_equal_millisecond_live_close_persists_and_a_stale_snapshot_cannot_reopen_it() {
+    use crate::agent::orchestration::subagent_sessions::store_documents::{with_override, Docs};
+    use crate::storage::{MemoryStorage, Scope, StorageBackend};
+
+    let storage = MemoryStorage::new();
+    let docs = Docs::over(&storage.for_scope(&Scope::new("local").unwrap()).unwrap());
+    let original = session("equal-ms-close");
+    docs.save(std::slice::from_ref(&original)).unwrap();
+    let stale_snapshot = docs.load().unwrap();
+    let store = SubagentSessionStore::new(std::env::temp_dir());
+
+    with_override(docs.clone(), || {
+        let mut equal_ms_closed = original.clone();
+        equal_ms_closed.status = DurableSubagentStatus::Closed;
+        equal_ms_closed.reusable = false;
+        // Deliberately preserve the same `_ms` value. A close can occur
+        // inside the same millisecond as the last update.
+        store.save(&[equal_ms_closed]).unwrap();
+
+        // A whole-list snapshot at the same timestamp must not reopen it.
+        store.save(&stale_snapshot).unwrap();
+    });
+
+    let closed = docs
+        .load()
+        .unwrap()
+        .into_iter()
+        .find(|record| record.subagent_session_id == "equal-ms-close")
+        .expect("session remains stored");
+    assert_eq!(closed.status, DurableSubagentStatus::Closed);
+    assert!(!closed.reusable);
 }
 
 #[test]

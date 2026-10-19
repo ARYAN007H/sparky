@@ -94,6 +94,32 @@ pub fn upsert_running(
     let _guard = store_write_lock()
         .lock()
         .map_err(|_| "subagent session store lock poisoned".to_string())?;
+    if let Some(reuse) = reuse {
+        let selector = upsert.selector.clone();
+        let worker_thread_id = upsert.worker_thread_id.clone();
+        let display_name = upsert.display_name.clone();
+        let task_id = upsert.task_id.clone();
+        if let Some(updated) =
+            store.update_session(&reuse.subagent_session_id, move |session, now| {
+                session.parent_session = selector.parent_session.clone();
+                session.parent_thread_id = selector.parent_thread_id.clone();
+                session.worker_thread_id = worker_thread_id
+                    .clone()
+                    .or_else(|| session.worker_thread_id.clone());
+                session.display_name = display_name
+                    .clone()
+                    .or_else(|| session.display_name.clone());
+                session.current_task_id = Some(task_id.clone());
+                session.status = DurableSubagentStatus::Running;
+                session.reusable = true;
+                session.latest_error = None;
+                session.updated_at = now.clone();
+                session.last_used_at = now;
+            })?
+        {
+            return Ok(updated);
+        }
+    }
     let mut sessions = store.load()?;
     let now = chrono::Utc::now().to_rfc3339();
     let session_id = reuse
@@ -157,7 +183,7 @@ pub fn mark_finished(
     let updated = update_session(store, subagent_session_id, |session, now| {
         session.current_task_id = Some(task_id.to_string());
         session.status = DurableSubagentStatus::from_run_status(run_status);
-        session.latest_history = Some(history);
+        session.latest_history = Some(history.clone());
         session.latest_error = None;
         session.updated_at = now.clone();
         session.last_used_at = now;
@@ -180,7 +206,7 @@ pub fn mark_failed(
     let updated = update_session(store, subagent_session_id, |session, now| {
         session.current_task_id = Some(task_id.to_string());
         session.status = DurableSubagentStatus::Failed;
-        session.latest_error = Some(error);
+        session.latest_error = Some(error.clone());
         session.updated_at = now.clone();
         session.last_used_at = now;
     })?;

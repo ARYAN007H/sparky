@@ -213,16 +213,17 @@ impl Docs {
         let id = key_of(subagent_session_id)?;
         self.0.run(|docs| async move {
             let repo = tinystoragedrivers::Repo::<Value>::new(&docs, SESSIONS)?;
-            let updated = repo.update(&id, move |current| {
-                let Some(current) = current else {
-                    return Ok(None);
-                };
-                let stored: StoredSession = serde_json::from_value(current)?;
-                let mut session = DurableSubagentSession::from(stored);
-                update(&mut session, chrono::Utc::now().to_rfc3339());
-                Ok(Some(serde_json::to_value(StoredSession::from(&session))?))
-            })
-            .await?;
+            let updated = repo
+                .update(&id, move |current| {
+                    let Some(current) = current else {
+                        return Ok(None);
+                    };
+                    let stored: StoredSession = serde_json::from_value(current)?;
+                    let mut session = DurableSubagentSession::from(stored);
+                    update(&mut session, chrono::Utc::now().to_rfc3339());
+                    Ok(Some(serde_json::to_value(StoredSession::from(&session))?))
+                })
+                .await?;
             updated
                 .map(|(stored, _)| {
                     serde_json::from_value::<StoredSession>(stored)
