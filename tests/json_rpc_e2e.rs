@@ -2720,8 +2720,14 @@ async fn json_rpc_protocol_auth_and_agent_hello_inner() {
         "expected error for unknown method: {unknown}"
     );
 
+    // Agent teams are a retired product surface. Keep a real HTTP JSON-RPC
+    // assertion here so dispatch cannot accidentally bring its methods back.
+    let retired_team_method =
+        post_json_rpc(&rpc_base, 3, "openhuman.agent_team_list", json!({})).await;
+    assert_unknown_method(&retired_team_method, "openhuman.agent_team_list");
+
     // --- auth: session state (no JWT yet) ---
-    let state_before = post_json_rpc(&rpc_base, 3, "openhuman.auth_get_state", json!({})).await;
+    let state_before = post_json_rpc(&rpc_base, 4, "openhuman.auth_get_state", json!({})).await;
     let state_outer = assert_no_jsonrpc_error(&state_before, "get_state");
     let state_body = state_outer.get("result").unwrap_or(state_outer);
     assert!(
@@ -2732,7 +2738,7 @@ async fn json_rpc_protocol_auth_and_agent_hello_inner() {
     // --- auth: store session (validates JWT via mock GET /auth/me) ---
     let store = post_json_rpc(
         &rpc_base,
-        4,
+        5,
         "openhuman.auth_store_session",
         json!({
             "token": "e2e-test-jwt",
