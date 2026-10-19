@@ -212,8 +212,6 @@ impl StopReasonKind {
             "validation" | "invalid_arguments" => Self::InvalidCalls,
             "unavailable" | "service_refused" => Self::Unavailable,
             "site_refused" => Self::SiteRefused,
-            "out_of_credits" => Self::OutOfCredits,
-            "provider_config" => Self::ProviderConfig,
             _ => Self::Generic,
         }
     }
@@ -264,19 +262,7 @@ fn times(count: usize) -> String {
 
 /// The user-facing reply for a turn the breaker stopped with `stop_note`.
 pub(crate) fn render_stop_summary(results: &[CheckpointToolResult], stop_note: &str) -> String {
-    render_stop_summary_with_cause(results, stop_note, None)
-}
-
-/// Render a stopped-turn summary from its typed cause when the harness has
-/// one. The note is only a compatibility source for old, untyped stops.
-pub(crate) fn render_stop_summary_with_cause(
-    results: &[CheckpointToolResult],
-    stop_note: &str,
-    failure_cause: Option<&tinyagents_harness::no_progress::ClassifiedStopCause>,
-) -> String {
-    let kind = failure_cause
-        .map(|cause| StopReasonKind::from_failure_class(&cause.class))
-        .unwrap_or_else(|| StopReasonKind::from_stop_note(stop_note));
+    let kind = StopReasonKind::from_stop_note(stop_note);
     tracing::debug!(
         reason = kind.key(),
         results = results.len(),

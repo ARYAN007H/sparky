@@ -133,9 +133,9 @@ fn classified_halt_summary_uses_typed_cause_when_halt_copy_conflicts() {
 fn classified_halt_summary_uses_typed_class_for_translated_notes() {
     let note = "Interrompo aqui: bloqueado por política de segurança, orçamento esgotado.";
     let cases = [
-        ("out_of_credits", "inference budget"),
-        ("provider_config", "configured correctly"),
-        ("transient", "temporary service issues"),
+        ("out_of_credits", "inference credits"),
+        ("provider_config", "configured model or provider rejected"),
+        ("transient", "temporarily unavailable"),
         ("blocked_by_policy", "security settings"),
     ];
 
