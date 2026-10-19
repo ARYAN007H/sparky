@@ -80,7 +80,7 @@ async fn flows_run_detached_registers_the_run_before_returning_its_id() {
         .expect("the detached run's owner-scoped CatalogStorage must be available")
         .storage();
     assert!(
-        runs_adapter::run_bindings(&storage, &run_id).is_some(),
+        crate::flows::runs_adapter::run_bindings(&storage, &run_id).is_some(),
         "the detached run must retain its owner and CapsHost bindings before returning its run_id"
     );
 }
