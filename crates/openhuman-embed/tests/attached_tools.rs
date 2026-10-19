@@ -190,7 +190,7 @@ fn attached_tools_survive_clones_and_session_resume() {
                     .any(|line| line.contains("openhuman-permanent-tools")
                         && line.contains("hivemind_message")
                         && line.contains("hivemind_list")),
-                "successor generation must persist the updated permanent-tool catalogue"
+                "the new session must persist the updated permanent-tool catalogue"
             );
             let sealed = frozen_generation_zero.to_string();
             assert!(
