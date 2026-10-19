@@ -57,10 +57,7 @@ async fn concurrent_linked_module_client_requests_share_the_ready_fixture() {
 
 #[tokio::test]
 async fn linked_module_accepts_confidential_web_projection_begin() {
-    let proxy = client()
-        .await
-        .fixture_proxy()
-        .expect("the linked module fixture should expose its proxy");
+    let module = client().await;
     let handle: tinychannels_bus::module_web_output::WebTurnHandle = proxy
         .call_confidential(
             tinychannels_bus::methods::BEGIN_WEB_TURN,
