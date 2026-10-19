@@ -5,10 +5,6 @@ use crate::agent_runs::agent_chat::params::AgentChatParams;
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
-#[cfg(test)]
-#[path = "controllers_tests.rs"]
-mod tests;
-
 #[derive(Debug, Deserialize)]
 struct InferenceAgentChatParams {
     #[serde(flatten)]
@@ -24,31 +20,53 @@ struct InferenceAgentChatParams {
 }
 
 pub(crate) fn schemas(function: &str) -> ControllerSchema {
-    let inputs = vec![
-        required_string("message", "User message."),
-        optional_string("model_override", "Optional model override."),
-        optional_f64("temperature", "Optional temperature override."),
-        optional_string("thread_id", "Optional backend thread id for cache grouping and inference logs."),
-        optional_string("agent_id", "Optional agent definition id to run the turn as. Omit for the orchestrator."),
-        optional_string("cwd", "Optional working directory for this turn; must be an existing directory."),
-        optional_string("inference_url", "Optional OpenAI-compatible endpoint for this call only. Requires api_key; never persisted."),
-        optional_string("api_key", "Bearer for inference_url. Scoped to this call and to that endpoint alone."),
-        FieldSchema {
-            name: "inference_headers",
-            ty: TypeSchema::Option(Box::new(TypeSchema::Array(Box::new(TypeSchema::Json)))),
-            comment: "Custom header name/value pairs for inference_url only; never persisted.",
-            required: false,
-        },
-    ];
     match function {
         "agent_chat" => ControllerSchema {
             namespace: "inference",
             function: "agent_chat",
             description: "Run one-shot agent chat with optional model overrides.",
-            inputs,
+            inputs: vec![
+                required_string("message", "User message."),
+                optional_string("model_override", "Optional model override."),
+                optional_f64("temperature", "Optional temperature override."),
+                optional_string(
+                    "thread_id",
+                    "Optional backend thread id for cache grouping and inference logs.",
+                ),
+                optional_string(
+                    "agent_id",
+                    "Optional agent definition id to run the turn as. Omit for the \
+                     orchestrator.",
+                ),
+                optional_string(
+                    "cwd",
+                    "Optional working directory for this turn: the agent's file and shell \
+                     tools are rooted here, so relative paths resolve inside it. Must be an \
+                     existing directory. Omit (or pass empty) to use the configured action_dir.",
+                ),
+                optional_string(
+                    "inference_url",
+                    "Optional OpenAI-compatible endpoint for this call only. \
+                     Requires api_key; never persisted.",
+                ),
+                optional_string(
+                    "api_key",
+                    "Bearer for inference_url. Scoped to this call and to that \
+                     endpoint alone.",
+                ),
+                FieldSchema {
+                    name: "inference_headers",
+                    ty: TypeSchema::Option(Box::new(TypeSchema::Array(Box::new(TypeSchema::Json)))),
+                    comment:
+                        "Custom header name/value pairs for inference_url only; never persisted.",
+                    required: false,
+                },
+            ],
             outputs: vec![json_output(
                 "response",
-                "Agent response payload with result, logs, hit_cap, and an optional checkpoint.",
+                "Agent response payload: `result` (the reply text), `logs`, `hit_cap` (true when \
+                 the turn stopped at its tool-iteration cap instead of finishing) and, only when \
+                 hit_cap is true, `checkpoint` (the resumable checkpoint text, equal to `result`).",
             )],
         },
         "agent_chat_simple" => ControllerSchema {
@@ -190,3 +208,7 @@ fn json_output(name: &'static str, comment: &'static str) -> FieldSchema {
         required: true,
     }
 }
+
+#[cfg(test)]
+#[path = "controllers_tests.rs"]
+mod tests;

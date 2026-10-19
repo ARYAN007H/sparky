@@ -47,3 +47,23 @@ fn inference_agent_chat_parses_its_route_fields() {
         vec![("x-test".into(), "value".into())]
     );
 }
+
+#[test]
+fn inference_agent_chat_keeps_the_optional_agent_id_schema_and_typed_route_fields() {
+    let schema = schemas("agent_chat");
+    let agent_id = schema
+        .inputs
+        .iter()
+        .find(|field| field.name == "agent_id")
+        .expect("agent_id is part of the inference chat contract");
+    assert!(!agent_id.required);
+
+    let invalid = serde_json::from_value::<InferenceAgentChatParams>(serde_json::json!({
+        "message": "hello",
+        "inference_url": 7
+    }));
+    assert!(
+        invalid.is_err(),
+        "the inference surface still validates route fields"
+    );
+}
