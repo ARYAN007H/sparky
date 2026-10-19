@@ -66,7 +66,7 @@ pub fn redact_url_for_log(raw: &str) -> String {
 /// untouched. Routing fields that already contain a `:` are assumed to be
 /// in the new `<slug>:<model>` form.
 pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
-    use super::super::cloud_providers::{AuthStyle, builtin_cloud_provider};
+    use super::super::cloud_providers::{builtin_cloud_provider, AuthStyle};
 
     for entry in &mut config.cloud_providers {
         if entry.label.is_empty() {
