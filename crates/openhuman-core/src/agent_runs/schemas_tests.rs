@@ -17,7 +17,6 @@ fn controller_schema_inventory_is_stable() {
             "get_definition",
             "reload_definitions",
             "triage_evaluate",
-            "graph_topologies",
             "registry_snapshot",
             "context_breakdown",
         ]
