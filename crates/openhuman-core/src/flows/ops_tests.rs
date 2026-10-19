@@ -117,6 +117,8 @@ fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
         "the isolated process must start with TinyFlows unloaded"
     );
     let result = flows_import(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &Config::default(),
         json!({
             "name": "constant import",
             "nodes": [{"id":"trigger","kind":"trigger","name":"Trigger"}],
@@ -321,7 +323,10 @@ fn seed_suggestion(config: &Config, id: &str) {
 /// Runs a candidate graph `Value` through the exact same migrate/validate
 /// path the builder tools use, for a [`WorkflowGraph`] test fixture.
 fn graph(value: Value) -> WorkflowGraph {
-    validate_and_migrate_graph(value).expect("structurally valid test graph")
+    let graph = tinyflows::migrate::deserialize_graph(value).expect("test graph deserializes");
+    tinyflows::validate::validate(&graph).expect("structurally valid test graph");
+    tinyflows::compat::ensure_compatible(&graph).expect("engine-compatible test graph");
+    graph
 }
 
 // ── validate_inference_readiness (provider-connectivity author gate, B45) ──
