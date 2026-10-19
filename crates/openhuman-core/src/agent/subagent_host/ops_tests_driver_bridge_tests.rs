@@ -154,9 +154,11 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
     let cancelled_context = options.run_context.clone();
     let cancelled_options = options.clone();
     let follower = tokio::spawn(async move {
-        crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
+        let r = crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
             .run(&follower_parent, "produce a report".into())
-            .await
+            .await;
+        eprintln!("DBG follower ended early: {:?}", r.as_ref().map(|o| o.output.clone()).map_err(|e| e.to_string()));
+        r
     });
     let mut cancelled_parent = cancelled_context.into_tinyagents(
         tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
