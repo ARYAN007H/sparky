@@ -612,6 +612,10 @@ async fn a_recovered_file_fallback_rewrites_the_bootstrap_file_too() {
     let body = source.read().await.unwrap();
     assert!(body.from_document);
     assert!(body.contents.contains("recovered"));
+
+    // The auxiliary bootstrap-file export must not erase the document
+    // revision captured by the first successful save.
+    config.save().await.unwrap();
 }
 
 #[path = "concurrency_tests.rs"]
