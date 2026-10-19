@@ -96,8 +96,7 @@ impl AgentRunRegistry {
             cancellation,
         };
         self.by_handle.insert(entry.handle.clone(), state);
-        self.by_request_id
-            .insert(client_request_id, entry.clone());
+        self.by_request_id.insert(client_request_id, entry.clone());
         Ok(AgentRunAdmission {
             entry,
             start_task: !cancelled_before_admission,

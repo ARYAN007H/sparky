@@ -77,10 +77,10 @@ pub(crate) async fn run_agent(
     };
     let scope = Arc::clone(&binding);
     let turn = scope.within(async move {
-            runner
-                .run_agent(&agent_ref, config, connection.as_deref())
-                .await
-        });
+        runner
+            .run_agent(&agent_ref, config, connection.as_deref())
+            .await
+    });
     let result = tokio::select! {
         biased;
         _ = cancellation.cancelled() => Err("agent run was cancelled".to_owned()),

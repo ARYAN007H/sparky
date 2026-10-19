@@ -6,7 +6,7 @@ use crate::core::runtime::{ComponentSet, CoreContext, DispatchCtx, DomainSet};
 use std::sync::Arc;
 use tempfile::TempDir;
 
-fn binding(ctx: DispatchCtx, temp: &TempDir) -> CapsHostBinding {
+pub(super) fn binding(ctx: DispatchCtx, temp: &TempDir) -> CapsHostBinding {
     let config = Config {
         workspace_dir: temp.path().join("workspace"),
         action_dir: temp.path().join("workspace"),
@@ -41,7 +41,11 @@ async fn callback_reenters_the_captured_context_instead_of_ambient_context() {
 
     CoreContext::scope(ambient, async {
         assert!(DispatchCtx::ambient().components().sandbox);
-        assert!(!binding.within(async { DispatchCtx::ambient().components().sandbox }).await);
+        assert!(
+            !binding
+                .within(async { DispatchCtx::ambient().components().sandbox })
+                .await
+        );
     })
     .await;
 }

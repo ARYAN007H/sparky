@@ -2,6 +2,23 @@ use super::*;
 
 use super::super::binding::AgentRunRegistry;
 
+#[test]
+fn generated_caps_host_interface_members_match_the_v2_wire_contract() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let binding =
+        super::super::binding_tests::binding(crate::core::runtime::DispatchCtx::unbound(), &temp);
+    let service = CapsHostService::new(Arc::new(binding));
+    let actual: std::collections::HashSet<_> = tinybus::service::Interface::members(&service)
+        .into_iter()
+        .map(|member| member.to_string())
+        .collect();
+    let expected: std::collections::HashSet<_> = runs::CAPS_METHODS
+        .iter()
+        .map(|member| (*member).to_owned())
+        .collect();
+    assert_eq!(actual, expected);
+}
+
 fn state() -> Arc<tokio::sync::Mutex<super::super::agent::AgentRunState>> {
     Arc::new(tokio::sync::Mutex::new(
         super::super::agent::AgentRunState::default(),
@@ -50,7 +67,11 @@ async fn duplicate_agent_run_request_returns_the_original_handle_without_restart
         .unwrap();
 
     let duplicate = registry
-        .admit("request-1".into(), state(), tokio_util::sync::CancellationToken::new())
+        .admit(
+            "request-1".into(),
+            state(),
+            tokio_util::sync::CancellationToken::new(),
+        )
         .unwrap();
 
     assert!(first.start_task);

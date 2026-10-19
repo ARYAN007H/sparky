@@ -185,11 +185,7 @@ impl CapsHostService {
             .agent_runs
             .lock()
             .await
-            .admit(
-                request.client_request_id.clone(),
-                state,
-                cancellation,
-            )
+            .admit(request.client_request_id.clone(), state, cancellation)
             .map_err(tinybus::Error::failed)?;
         if admission.cancelled_before_admission {
             let mut state = admission.entry.state.lock().await;
@@ -213,10 +209,7 @@ impl CapsHostService {
         Ok(runs::AgentRunHandle { handle })
     }
 
-    async fn agent_cancel(
-        &self,
-        request: runs::AgentCancelRequest,
-    ) -> tinybus::Result<()> {
+    async fn agent_cancel(&self, request: runs::AgentCancelRequest) -> tinybus::Result<()> {
         if !valid_agent_request_id(&request.client_request_id) {
             return Err(tinybus::Error::failed(
                 "AgentCancel requires a nonempty bounded client_request_id",

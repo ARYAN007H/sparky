@@ -296,7 +296,9 @@ async fn serving_caps_host_advertises_v2_without_replacing_other_peer_manifest_e
         .await
         .expect("manifest lookup succeeds")
         .unwrap_or_else(|| tinybus::PeerManifest::new("openhuman-module-host"));
-    original.provides.retain(|item| item.interface != caps_interface);
+    original
+        .provides
+        .retain(|item| item.interface != caps_interface);
     original.provides.push(tinybus::InterfaceVersion::provided(
         caps_interface.clone(),
         tinybus::Version::new(1, 0, 0),
@@ -328,17 +330,26 @@ async fn serving_caps_host_advertises_v2_without_replacing_other_peer_manifest_e
         .provided(&caps_interface)
         .expect("CapsHost is advertised");
     assert_eq!(caps_host.speaks, tinybus::Version::new(2, 0, 0));
-    assert!(announced
-        .provides
-        .iter()
-        .any(|item| item.interface.as_str() == "ai.tinyhumans.openhuman.TestPreserved"));
+    assert!(
+        announced
+            .provides
+            .iter()
+            .any(|item| item.interface.as_str() == "ai.tinyhumans.openhuman.TestPreserved")
+    );
     assert_eq!(announced.consumes, prior_consumes);
 
     let proxy = connection
-        .proxy(HOST_BUS_NAME, &registration.0, tinyflows_bus::runs::CAPS_INTERFACE)
+        .proxy(
+            HOST_BUS_NAME,
+            &registration.0,
+            tinyflows_bus::runs::CAPS_INTERFACE,
+        )
         .expect("CapsHost proxy resolves");
     proxy
-        .call::<serde_json::Value>("AgentCancel", (serde_json::json!({"client_request_id":"probe"}),))
+        .call::<serde_json::Value>(
+            "AgentCancel",
+            (serde_json::json!({"client_request_id":"probe"}),),
+        )
         .await
         .expect("the advertised member is actually served");
 }

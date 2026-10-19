@@ -68,5 +68,8 @@ fn custom_agent_route_requires_an_enabled_registry_entry() {
         route_custom_entry_lookup(Some(&custom_registry_entry(false))),
         AgentRoute::RegistryFallback
     );
-    assert_eq!(route_custom_entry_lookup(None), AgentRoute::RegistryFallback);
+    assert_eq!(
+        route_custom_entry_lookup(None),
+        AgentRoute::RegistryFallback
+    );
 }

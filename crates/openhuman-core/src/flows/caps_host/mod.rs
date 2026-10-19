@@ -16,8 +16,8 @@ pub(crate) mod tools;
 #[path = "binding_tests.rs"]
 mod binding_tests;
 
-pub(crate) use binding::{CapsHostRegistration, serve};
 pub(crate) use agent::OpenHumanAgentRunner;
+pub(crate) use binding::{CapsHostRegistration, serve};
 pub(crate) use code::OpenHumanCode;
 pub(crate) use error::{CapsError, EngineError, Result};
 pub(crate) use http::{OpenHumanHttp, resolve_http_credential};

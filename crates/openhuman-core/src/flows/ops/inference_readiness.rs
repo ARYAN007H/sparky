@@ -142,7 +142,11 @@ pub(super) async fn evaluate_inference_readiness(
     graph: &WorkflowGraph,
 ) -> Option<InferenceReadinessEvaluation> {
     let mut roles = Vec::new();
-    for node in graph.nodes.iter().filter(|node| node.kind == NodeKind::Agent) {
+    for node in graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == NodeKind::Agent)
+    {
         roles.push((node.id.clone(), agent_node_role(config, node).await));
     }
     let evaluation = crate::inference::readiness::evaluate(ctx, config, &roles).await?;
