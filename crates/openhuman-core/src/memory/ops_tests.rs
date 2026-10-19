@@ -2,8 +2,8 @@ use super::*;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::memory::types::EngineStatus;
 use tinymemory_api::{
-    FetchMode, ItemKind, ListRequest, MemoryMeta, MetaFilter, SourceKind, SourceRef, StoreItem,
-    ToolCallRef,
+    FetchMode, ItemKind, LearningKind, ListRequest, MemoryMeta, MetaFilter, SourceKind, SourceRef,
+    StoreItem, ToolCallRef,
 };
 
 fn learn_params(text: &str) -> LearnParams {
