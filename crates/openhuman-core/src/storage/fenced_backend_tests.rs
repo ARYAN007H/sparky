@@ -8,6 +8,7 @@ use crate::storage::MemoryStorage;
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use tinystoragedrivers::BlobReader;
 
 /// A native streaming driver that records whether the fenced view reaches its
 /// streaming entry point instead of collecting the body and calling `put`.
@@ -293,7 +294,8 @@ async fn stale_blob_stream_is_refused_before_the_reader_is_polled(expiring: bool
         remaining: 1024 * 1024,
         bytes_read: Arc::clone(&bytes_read),
     };
-    let blobs = a.scoped("profile:alice").blobs();
+    let scoped = a.scoped("profile:alice");
+    let blobs = scoped.blobs();
     let outcome = if expiring {
         blobs
             .put_stream_expiring(
