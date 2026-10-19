@@ -29,8 +29,8 @@ async fn validate_over_bus(
 fn is_engine_compatibility_error(code: &str) -> bool {
     matches!(
         code,
-        tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN
-            | tinyflows::compat::UNSUPPORTED_MAIN_PORT_CONDITIONAL_FAN_IN
+        "unsupported_nested_conditional_fan_in"
+            | "unsupported_main_port_conditional_fan_in"
             | "incompatible_referenced_workflow"
     )
 }
