@@ -18,6 +18,7 @@ async fn debug_prompt_matches_the_system_prompt_sent_on_a_cold_turn() {
         .expect("session build");
     host.set_thread_id(None::<&str>);
     host.ensure_runtime_session().expect("runtime session");
+    host.refresh_prompt_surface().await;
 
     let dumped = host
         .render_current_turn_prompt()
