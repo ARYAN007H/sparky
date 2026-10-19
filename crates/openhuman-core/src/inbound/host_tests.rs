@@ -56,8 +56,6 @@ async fn deliver_and_classify_go_to_the_deliverer() {
 
 #[tokio::test]
 async fn install_serves_the_callbacks_under_the_contract_name() {
-    // `install` loads the host config; hold the env lock the config tests use.
-    let _env = crate::config::TEST_ENV_LOCK.lock().await;
     let bus = tinybus::transport::memory::MemoryBus::new();
     tinybus::broker::Broker::new().spawn(bus.clone());
     let connection = tinybus::Connection::connect(bus.connect().await.unwrap())

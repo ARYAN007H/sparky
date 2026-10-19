@@ -138,7 +138,8 @@ enum Applied {
 pub struct Deliverer {
     runner: Arc<dyn TriageRunner>,
     ctx: DispatchCtx,
-    timeout: Duration,
+    /// The triage timeout: given, or read from `[inbound]` on first use.
+    timeout: tokio::sync::OnceCell<Duration>,
     now_ms: fn() -> i64,
     max_attempts: Box<dyn Fn(Lane) -> Option<u32> + Send + Sync>,
     budget: Duration,
@@ -149,7 +150,7 @@ pub struct Deliverer {
 impl std::fmt::Debug for Deliverer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Deliverer")
-            .field("timeout", &self.timeout)
+            .field("timeout", &self.timeout.get())
             .finish_non_exhaustive()
     }
 }
@@ -163,6 +164,23 @@ impl Deliverer {
     /// `timeout`, and reads each lane's attempts from the configured queues.
     #[must_use]
     pub fn new(runner: Arc<dyn TriageRunner>, ctx: DispatchCtx, timeout: Duration) -> Self {
+        Self::build(runner, ctx, tokio::sync::OnceCell::new_with(Some(timeout)))
+    }
+
+    /// A deliverer whose triage timeout is `[inbound] triage_timeout_ms`, read
+    /// from `ctx`'s configuration on the first callback. Loading it when the
+    /// callbacks are served instead would initialise a config file on a host
+    /// that never configured one.
+    #[must_use]
+    pub fn configured(runner: Arc<dyn TriageRunner>, ctx: DispatchCtx) -> Self {
+        Self::build(runner, ctx, tokio::sync::OnceCell::new())
+    }
+
+    fn build(
+        runner: Arc<dyn TriageRunner>,
+        ctx: DispatchCtx,
+        timeout: tokio::sync::OnceCell<Duration>,
+    ) -> Self {
         Self {
             runner,
             ctx,
@@ -199,6 +217,22 @@ impl Deliverer {
         self
     }
 
+    /// The triage timeout, read from `[inbound]` on first use when not given.
+    async fn timeout(&self) -> Duration {
+        *self
+            .timeout
+            .get_or_init(|| async {
+                match self.ctx.load_config().await {
+                    Ok(config) => config.inbound.triage_timeout(),
+                    Err(error) => {
+                        tracing::debug!(error = %error, "[inbound] config unavailable; default triage timeout");
+                        crate::config::schema::InboundConfig::default().triage_timeout()
+                    }
+                }
+            })
+            .await
+    }
+
     fn classified(&self) -> std::sync::MutexGuard<'_, Classified> {
         self.classified
             .lock()
@@ -223,7 +257,8 @@ impl Deliverer {
     ) -> Result<ClassifySalienceResponse, String> {
         let event = request.event;
         let envelope = envelope_of(&event).ok_or("not an inbound trigger")?;
-        match tokio::time::timeout(self.timeout, self.runner.run(&self.ctx, &envelope)).await {
+        let timeout = self.timeout().await;
+        match tokio::time::timeout(timeout, self.runner.run(&self.ctx, &envelope)).await {
             Ok(Ok(TriageOutcome::Decision(run))) => {
                 let class = class_of(run.decision.action);
                 tracing::debug!(
@@ -272,7 +307,10 @@ impl Deliverer {
             .and_then(|event| self.classified().take(&event.dedupe_key(), now_ms));
         let outcome = match cached {
             Some(run) => Ok(Ok(TriageOutcome::Decision(run))),
-            None => tokio::time::timeout(self.timeout, self.runner.run(&self.ctx, &envelope)).await,
+            None => {
+                let timeout = self.timeout().await;
+                tokio::time::timeout(timeout, self.runner.run(&self.ctx, &envelope)).await
+            }
         };
         let status = match outcome {
             Ok(Ok(TriageOutcome::Decision(run))) => {
@@ -344,7 +382,7 @@ impl Deliverer {
                 tracing::warn!(
                     turn = %turn.turn_id,
                     label = %envelope.display_label,
-                    timeout_ms = self.timeout.as_millis() as u64,
+                    timeout_ms = self.timeout.get().map_or(0, |t| t.as_millis() as u64),
                     "[inbound] triage timed out; retrying"
                 );
                 self.retry(&turn, None, "triage timed out")

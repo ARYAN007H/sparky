@@ -56,16 +56,9 @@ impl InboundHost {
 /// Serve the callbacks on `connection`, triaging under the host's own context.
 pub(crate) async fn install(connection: &tinybus::Connection) -> tinybus::Result<()> {
     let ctx = DispatchCtx::host_default();
-    // Read once, when the callbacks are served: a change takes effect on the
-    // next core start.
-    let timeout = match ctx.load_config().await {
-        Ok(config) => config.inbound.triage_timeout(),
-        Err(error) => {
-            tracing::debug!(error = %error, "[inbound] config unavailable; default triage timeout");
-            crate::config::schema::InboundConfig::default().triage_timeout()
-        }
-    };
-    let deliverer = Deliverer::new(Arc::new(RemoteTriage), ctx, timeout);
+    // The triage timeout is read from `[inbound]` on the first callback:
+    // loading the config here would initialise one on a host that has none.
+    let deliverer = Deliverer::configured(Arc::new(RemoteTriage), ctx);
     connection
         .serve_at(
             ObjectPath::new(PATH)?,
