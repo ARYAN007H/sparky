@@ -393,4 +393,3 @@ async fn github_files_per_repository_only_when_switched_on() {
         "one belief build per node written"
     );
 }
-

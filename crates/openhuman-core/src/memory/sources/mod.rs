@@ -10,8 +10,8 @@
 pub mod state;
 mod sync;
 
-use tinymemory_tools::ops::MemoryOps;
 use tinymemory_integrations::sources::SourceSpec;
+use tinymemory_tools::ops::MemoryOps;
 
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
