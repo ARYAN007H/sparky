@@ -1,4 +1,7 @@
 use super::*;
+use crate::config::Config;
+use crate::security::SecurityPolicy;
+use crate::security::credentials::{HttpCredential, HttpCredentialsStore};
 
 fn http_cred_store() -> (tempfile::TempDir, HttpCredentialsStore) {
     let dir = tempfile::tempdir().expect("tempdir");
