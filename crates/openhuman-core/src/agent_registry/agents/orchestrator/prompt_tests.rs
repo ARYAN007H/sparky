@@ -353,8 +353,8 @@ fn composio_connect_is_not_advertised_when_the_tool_is_not_visible() {
 fn withheld_specialist_roster_keeps_live_when_to_use_descriptions() {
     use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 
-    let registry = AgentDefinitionRegistry::init_global_builtins()
-        .expect("built-in agent definitions");
+    AgentDefinitionRegistry::init_global_builtins().expect("built-in agent definitions");
+    let registry = AgentDefinitionRegistry::current().expect("initialized agent registry");
     let orchestrator = registry.get("orchestrator").expect("orchestrator");
     let (tool_name, description) = orchestrator
         .subagents
