@@ -502,7 +502,6 @@ pub(crate) fn spawn_progress_bridge(
     dispatch_ctx: DispatchCtx,
 ) {
     dispatch_ctx.clone().spawn(async move {
-        eprintln!("progress bridge: task started");
         let ids = TurnIds {
             client_id,
             thread_id,
@@ -510,7 +509,6 @@ pub(crate) fn spawn_progress_bridge(
         };
         let mut projection =
             ProgressProjection::new(&dispatch_ctx, ids, metadata, config, turn_state_store).await;
-        eprintln!("progress bridge: projection ready");
         let mut beat =
             tokio::time::interval(std::time::Duration::from_secs(INFERENCE_HEARTBEAT_SECS));
         beat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -533,9 +531,7 @@ pub(crate) fn spawn_progress_bridge(
                 // the timer while awaiting them would cancel the progress
                 // event that already won the receive branch.
                 Next::Progress(Some(event)) => {
-                    eprintln!("progress bridge: event received");
                     projection.on_event(event).await;
-                    eprintln!("progress bridge: event projected");
                 }
                 Next::Progress(None) => break,
                 Next::Heartbeat => projection.heartbeat().await,
