@@ -390,9 +390,9 @@ async fn wait_for_completion(state: &MockState, count: usize) {
                 .sent_messages
                 .lock()
                 .expect("Telegram sent messages")
-                .len();
+                .clone();
             panic!(
-                "timed out waiting for model request {count}; observed {model_requests} model requests, Telegram offsets {offsets:?}, and {sent_messages} outbound messages"
+                "timed out waiting for model request {count}; observed {model_requests} model requests, Telegram offsets {offsets:?}, and outbound bodies {sent_messages:#?}"
             );
         }
         sleep(Duration::from_millis(50)).await;
