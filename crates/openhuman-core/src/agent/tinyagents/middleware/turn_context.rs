@@ -61,6 +61,9 @@ pub(crate) struct TurnContextMiddleware {
     /// partial transcript on `Err`). Set by the sub-agent path and by the
     /// top-level chat turn (#6281); `None` on the channel path.
     pub(crate) transcript_snapshot: Option<TranscriptSnapshotSink>,
+    /// The session driver screened the new input before its early-return
+    /// snapshot boundary.
+    pub(crate) new_input_screened: bool,
 }
 
 /// What a [`TranscriptSnapshotMiddleware`] has seen of a live run.

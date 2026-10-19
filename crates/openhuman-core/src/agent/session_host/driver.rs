@@ -79,15 +79,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         &self,
         mut request: DriverRequest<OpenHumanRunContext>,
     ) -> Result<DriverOutcome, DriverFailure> {
-        // The generic runtime has already admitted the current message by the
-        // time it reaches the driver, but its durable seed is still the raw
-        // request history. Scrub user text before every early snapshot/return
-        // path so cancellation cannot persist a credential the provider gate
-        // has already redacted.
-        scrub_user_history(
-            &mut request.history,
-            !request.run_context.data.untrusted_input_turn,
-        );
         // Heal a head persisted before #6721 was fixed, before anything reads
         // the history: this turn then commits a clean generation.
         repair_orphaned_tool_head(&mut request.history);
@@ -109,6 +100,33 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .context_middleware
             .clone()
             .ok_or_else(|| driver_failure("session turn is missing its request-scoped context"))?;
+        let hosted_base = self.hosted_base.clone().ok_or_else(|| {
+            driver_failure(
+                "hosted root invocation is unavailable because the session has no hosted authority",
+            )
+        })?;
+        let security = crate::agent::tinyagents::host::OpenHumanSecurityGate::new(
+            hosted_base.security_policy.clone(),
+            Vec::new(),
+        )
+        .with_input_screening(!request.run_context.data.untrusted_input_turn)
+        .with_approval(request.run_context.data.approval.clone())
+        .with_dispatch(request.run_context.data.dispatch_ctx());
+        let (screened_input, block_reason) = security
+            .screen_new_user_row(&mut request.history)
+            .await
+            .map_err(|error| driver_failure(error.to_string()))?;
+        if let Some(reason) = block_reason {
+            // The generic session persists only a supplied partial on driver
+            // failure. Omitting it prevents a blocked raw input from becoming
+            // durable while preserving the gate's block result.
+            return Err(DriverFailure {
+                error: RuntimeError::Driver(reason),
+                partial: None,
+                outcome: None,
+            });
+        }
+        context_mw.new_input_screened = screened_input;
         // The harness drops its `AgentRun` on an error.  Snapshot the exact
         // request boundary before assembling the graph so the error path can
         // persist only provider-accepted rounds, plus a display-only failure
@@ -195,11 +213,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         let cancellation = request.run_context.cancellation.clone();
         // Boxing avoids worker-stack overflow in debug builds.
         let turn = Box::pin(async move {
-            let hosted_base = self.hosted_base.clone().ok_or_else(|| {
-                anyhow::anyhow!(
-                    "hosted root invocation is unavailable because the session has no hosted authority"
-                )
-            })?;
+            let hosted_base = hosted_base.clone();
             let mut run_context = run_context;
             run_context.workspace = self.workspace.clone().or(run_context.workspace);
             run_context.sandbox_mode = Some(self.sandbox_mode);
@@ -514,21 +528,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             // `None` lets the runtime derive the outcome from `interrupted`.
             outcome: None,
         })
-    }
-}
-
-fn scrub_user_history(history: &mut [Message], enabled: bool) {
-    if !enabled {
-        return;
-    }
-    for message in history {
-        if let Message::User(user) = message {
-            for block in &mut user.content {
-                if let tinyinference_llm::message::ContentBlock::Text(text) = block {
-                    *text = tinyinference_core::sanitize::scrub_credentials(text);
-                }
-            }
-        }
     }
 }
 
