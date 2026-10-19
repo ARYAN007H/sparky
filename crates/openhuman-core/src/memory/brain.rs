@@ -16,8 +16,8 @@ use tinymemory_integrations::documents::RawDocument;
 use tinymemory_tools::layout::placement::{brain_node_with, files_source};
 use tinymemory_tools::{Brain, BrainSource, MemoryLayout};
 
-use crate::config::schema::MemorySourceKind;
 use crate::config::Config;
+use crate::config::schema::MemorySourceKind;
 
 use super::engine;
 use super::lifecycle::jobs;
@@ -186,14 +186,16 @@ pub async fn ingest(
             let size = std::fs::metadata(path)
                 .map_err(|error| Error::InvalidRequest(format!("cannot read the file: {error}")))?
                 .len();
-            tinymemory_integrations::brain::check_ingest_size(size).map_err(|error| match error {
-                tinymemory_integrations::documents::Error::TooLarge { .. } => {
-                    Error::InvalidRequest(format!(
-                        "the file is {size} bytes; the limit is {MAX_INGEST_BYTES}"
-                    ))
-                }
-                error => Error::InvalidRequest(error.to_string()),
-            })?;
+            tinymemory_integrations::brain::check_ingest_size(size).map_err(
+                |error| match error {
+                    tinymemory_integrations::documents::Error::TooLarge { .. } => {
+                        Error::InvalidRequest(format!(
+                            "the file is {size} bytes; the limit is {MAX_INGEST_BYTES}"
+                        ))
+                    }
+                    error => Error::InvalidRequest(error.to_string()),
+                },
+            )?;
             let bytes = tokio::fs::read(path)
                 .await
                 .map_err(|error| Error::InvalidRequest(format!("cannot read the file: {error}")))?;
@@ -218,7 +220,7 @@ pub async fn ingest(
         _ => {
             return Err(Error::InvalidRequest(
                 ("pass exactly one of `path` or `text`").into(),
-            ))
+            ));
         }
     };
     if let Some(title) = params.title.filter(|title| !title.trim().is_empty()) {

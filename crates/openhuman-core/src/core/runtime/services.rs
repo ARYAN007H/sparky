@@ -508,8 +508,8 @@ pub fn spawn_socket_auto_connect(
                     Ok(Some(t)) => t,
                     Ok(None) => {
                         log::info!(
-                        "[socket] No session token stored — skipping auto-connect (will connect after login)"
-                    );
+                            "[socket] No session token stored — skipping auto-connect (will connect after login)"
+                        );
                         return;
                     }
                     Err(e) => {
