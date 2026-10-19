@@ -267,6 +267,14 @@ fn allowed_set(collection: &str) -> Result<(), StorageError> {
     }
 }
 
+fn flow_namespace_filter(collection: &str, filter: Filter) -> Filter {
+    if GRAPH_COLLECTIONS.contains(&collection) {
+        Filter::eq("ns", "flows").and(filter)
+    } else {
+        filter
+    }
+}
+
 fn encoded<T: Serialize>(value: T) -> Result<Value, StorageError> {
     serde_json::to_value(value)
         .map_err(|error| StorageError::invalid_input(format!("catalog value encoding failed: {error}")))
@@ -388,9 +396,7 @@ impl CatalogStoragePort {
         let result = async {
             allowed_set(&request.collection)?;
             let mut query: Query = decoded(encoded(request.query)?)?;
-            if GRAPH_COLLECTIONS.contains(&request.collection.as_str()) {
-                query.filter = Filter::eq("ns", "flows").and(query.filter);
-            }
+            query.filter = flow_namespace_filter(&request.collection, query.filter);
             let page: Page<Versioned<Value>> = self
                 .scope
                 .documents()?
@@ -425,10 +431,8 @@ impl CatalogStoragePort {
     ) -> BusResult<CatalogStorageReply> {
         let result = async {
             allowed_set(&request.collection)?;
-            let mut filter: Filter = decoded(encoded(request.filter)?)?;
-            if GRAPH_COLLECTIONS.contains(&request.collection.as_str()) {
-                filter = Filter::eq("ns", "flows").and(filter);
-            }
+            let filter: Filter = decoded(encoded(request.filter)?)?;
+            let filter = flow_namespace_filter(&request.collection, filter);
             self.scope
                 .documents()?
                 .delete_where(&request.collection, &filter)
