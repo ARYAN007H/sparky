@@ -130,7 +130,7 @@ async fn agent_ref_unknown_is_rejected() {
 /// Pinned here rather than left to the vendor's own suite because the
 /// `workflow_builder` agent can propose this shape, and the message a builder
 /// sees on rejection is this host's contract with it.
-
+///
 /// The agent-ref gate resolves a custom agent through the context it is handed,
 /// not the one the calling task happens to run under: two tenants' registries
 /// never cross.

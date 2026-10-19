@@ -57,7 +57,7 @@ impl Callbacks {
             Ok(graph.map(|graph| serde_json::to_value(graph).expect("graph serializes")))
         })
         .await
-        .map_err(|error| tinybus::Error::failed(error))
+        .map_err(tinybus::Error::failed)
     }
 
     async fn check_gate(&self, stage: String, graph: Value) -> BusResult<Vec<String>> {
@@ -84,7 +84,7 @@ impl Callbacks {
             }
         })
         .await
-        .map_err(|error| tinybus::Error::failed(error))
+        .map_err(tinybus::Error::failed)
     }
 
     async fn lookup_tool_contract(&self, slug: String) -> BusResult<Option<ToolContract>> {
@@ -109,7 +109,7 @@ impl Callbacks {
             }))
         })
         .await
-        .map_err(|error| tinybus::Error::failed(error))
+        .map_err(tinybus::Error::failed)
     }
 }
 
@@ -170,7 +170,7 @@ impl ApprovalCallbacks {
                 Ok(classes)
             })
             .await
-            .map_err(|error| tinybus::Error::failed(error))
+            .map_err(tinybus::Error::failed)
     }
 }
 
