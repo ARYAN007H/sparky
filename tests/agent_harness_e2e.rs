@@ -4420,9 +4420,9 @@ mod tool_policy_boundary_placement {
     /// the inference backend's automatic prefix cache everything behind it. It
     /// also replaced each agent's opening persona line with a constant heading.
     ///
-    /// This drives the real `OpenHumanSessionHost::build_system_prompt`. The four tests #5821
+    /// This drives the real `OpenHumanSessionHost::render_current_turn_prompt`. The four tests #5821
     /// shipped exercise the extracted pure helper `append_tool_policy_boundary`
-    /// and would all still pass if `build_system_prompt` stopped calling it; the
+    /// and would all still pass if the current-turn builder stopped calling it; the
     /// one existing test that goes through the builder,
     /// `turn_tests_part_01_tests::system_prompt_includes_tool_policy_boundary`,
     /// asserts the block is PRESENT and says nothing about where.

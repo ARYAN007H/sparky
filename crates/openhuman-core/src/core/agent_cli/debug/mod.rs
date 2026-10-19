@@ -4,7 +4,7 @@
 //! Instead of re-implementing prompt assembly, this module routes
 //! through [`OpenHumanSessionHost::from_config_for_agent`] — the same entry point the
 //! Tauri web channel and CLI use — and then calls
-//! [`OpenHumanSessionHost::build_system_prompt`] on the constructed session. The
+//! [`OpenHumanSessionHost::render_current_turn_prompt`] on the constructed session. The
 //! output is assembled through the current-turn prelude used by runtime
 //! sessions, so it matches the system prompt on a cold model request.
 //!

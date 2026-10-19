@@ -151,8 +151,8 @@ fn collects_agentid_entries_and_expands_skills_wildcard_to_deferred_actions() {
     );
 
     // Every action is `Deferred`: off the wire, reachable through
-    // `tool_search`. (The archetype delegates are `Hidden` — the collapsed
-    // `delegate_to` tool advertises them — so only the actions are checked.)
+    // `tool_search`. Archetype delegates are Hidden from this registry view,
+    // while their live routing descriptions are included in the orchestrator prompt.
     for tool in tools.iter().filter(|t| t.name().starts_with("G")) {
         assert_eq!(
             tool.exposure(),
