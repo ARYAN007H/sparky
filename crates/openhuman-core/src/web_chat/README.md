@@ -112,7 +112,7 @@ subscriber all listen to.
 6. **Progress, projected once.** The agent's `AgentProgress` stream goes
    through a tap (`turn_host::tap_progress`) that folds each event into the
    idle record and tells the runner when model or tool work opens and closes
-   (`WorkStarted` / `WorkFinished`, `turn_activity::WorkTracker`), then
+   (`WorkStarted` / `WorkFinished`, TinyAgents' `turn_runner::WorkTracker`), then
    hands it to the runner, which calls `WebEvents::progress` in order. That is
    `ProgressProjection::on_event` (`progress.rs`), the one consumer: it maps the
    event to the canonical output vocabulary (`progress_map.rs`), publishes it
@@ -214,7 +214,7 @@ endless heartbeat stream (#4746), both owned by the runner:
 - The **idle guard** ends a turn that has emitted no progress event, with no
   model or tool call in flight, for 900 s (`OPENHUMAN_WEB_TURN_IDLE_SECS`, `0`
   disables it). The host feeds it: every event is progress, and
-  `turn_activity::WorkTracker` reports open calls, so a silent provider retry
+  TinyAgents' `turn_runner::WorkTracker` reports open calls, so a silent provider retry
   or a long shell build is never idle. What it catches is silence nothing else
   bounds: session checkout, the persistence plumbing, or a harness that
   stopped with no call open.
@@ -263,7 +263,7 @@ and artifact bridges itself (`openhuman-tui/src/runner.rs`).
 | [`ingress.rs`](./ingress.rs) | `WebIngress`: the runner's ingress policy (attachments, guardrail, approval reply, hook). |
 | [`turn_host.rs`](./turn_host.rs) | `WebHost`: session checkout/checkin and the agent run, the progress tap, the heartbeat. |
 | [`turn_events.rs`](./turn_events.rs) | `WebEvents` (progress and the terminal event), `WebFailures` (error copy), `WebReplies` (reply store), `WebSummarizer` (grounded close). Sentry suppression and timeout tagging. |
-| [`turn_activity.rs`](./turn_activity.rs) | The idle guard's inputs (`WorkTracker`) and where a turn got stuck (`TurnActivity`, `StuckPoint`). |
+| [`turn_activity.rs`](./turn_activity.rs) | Where a turn got stuck (`TurnActivity`, `StuckPoint`) and its reply context. Work-liveness folding lives in TinyAgents' `turn_runner::WorkTracker`. |
 | [`turn_close.rs`](./turn_close.rs) | The reply that closes a turn a guard stopped. |
 | [`progress.rs`](./progress.rs) | `ProgressProjection`, the single consumer of a turn's progress, and `spawn_progress_bridge`. |
 | [`progress_map.rs`](./progress_map.rs) | `AgentProgress` to the canonical `ChannelOutputEvent`, with payload caps. |

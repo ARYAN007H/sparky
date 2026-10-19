@@ -18,7 +18,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_harness::turn_runner::{
-    QueueDisposition, TurnHost, TurnRequest, TurnResult, TurnSession, TurnSignal,
+    QueueDisposition, TurnHost, TurnRequest, TurnResult, TurnSession, TurnSignal, WorkTracker,
 };
 use tinyagents_harness::CancellationToken;
 use tinyinference_llm::failure::is_empty_provider_response_text;
@@ -31,7 +31,7 @@ use super::session::{
     checkin_session_agent, checkout_session_agent, normalize_model_override, CheckoutPolicy,
 };
 use super::surface::TurnIds;
-use super::turn_activity::{TurnActivity, WorkTracker};
+use super::turn_activity::TurnActivity;
 use super::types::WebChatTaskResult;
 use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,

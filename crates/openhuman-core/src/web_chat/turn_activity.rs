@@ -1,26 +1,18 @@
 //! What one web-chat turn last did, kept for the reply that closes it when a
-//! guard stops it, and the open-call tracking that feeds the idle guard.
+//! guard stops it.
 //!
 //! The idle guard itself is TinyAgents' turn runner: it ends a turn that has
 //! been **silent with nothing in flight** for the idle window. Two inputs are
 //! this host's:
 //!
-//! * [`WorkTracker`] reports, as `WorkStarted` / `WorkFinished`, whether a
-//!   parent-scope model call (`IterationStarted` -> `ModelCallCompleted`) or a
-//!   tool call (`ToolCallStarted` -> `ToolCallCompleted`) is open. A silent
-//!   provider retry or a long shell build is in flight, not idle. A completion
-//!   event can be lost under backpressure, so later events also close what
-//!   they prove finished: a `ToolCallStarted` means the model call that asked
-//!   for it returned, an `IterationStarted` that the previous tool round did.
 //! * [`TurnActivity`] remembers the last step, so the stop reply can say where
 //!   the turn got stuck ([`StuckPoint`]), and the config and reply locale the
 //!   turn resolved, so it is written to the turn's own workspace.
+//! * TinyAgents' [`tinyagents_harness::turn_runner::WorkTracker`] folds generic
+//!   progress into the balanced work signals consumed by its idle guard.
 
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
-
-use tinyagents_harness::turn_runner::TurnSignal;
 
 use tinyagents_harness::progress::AgentProgress;
 
@@ -172,53 +164,6 @@ impl TurnActivity {
             Some(step) => StuckPoint::BetweenSteps {
                 after: step.to_string(),
             },
-        }
-    }
-}
-
-/// Whether a parent-scope model or tool call is open, reported to the idle
-/// guard as balanced `WorkStarted` / `WorkFinished` signals.
-#[derive(Debug, Default)]
-pub(crate) struct WorkTracker {
-    model_call_open: bool,
-    open_tool_calls: HashSet<String>,
-}
-
-impl WorkTracker {
-    fn open(&self) -> bool {
-        self.model_call_open || !self.open_tool_calls.is_empty()
-    }
-
-    /// Fold one event in; the signal, if the turn went from idle to working
-    /// or back.
-    pub(crate) fn observe(&mut self, event: &AgentProgress) -> Option<TurnSignal> {
-        let was_open = self.open();
-        match event {
-            AgentProgress::IterationStarted { .. } => {
-                self.open_tool_calls.clear();
-                self.model_call_open = true;
-            }
-            AgentProgress::ModelCallCompleted {
-                subagent_task_id: None,
-                ..
-            } => self.model_call_open = false,
-            AgentProgress::ToolCallStarted { call_id, .. } => {
-                self.model_call_open = false;
-                self.open_tool_calls.insert(call_id.clone());
-            }
-            AgentProgress::ToolCallCompleted { call_id, .. } => {
-                self.open_tool_calls.remove(call_id);
-            }
-            AgentProgress::TurnCompleted { .. } => {
-                self.open_tool_calls.clear();
-                self.model_call_open = false;
-            }
-            _ => {}
-        }
-        match (was_open, self.open()) {
-            (false, true) => Some(TurnSignal::WorkStarted),
-            (true, false) => Some(TurnSignal::WorkFinished),
-            _ => None,
         }
     }
 }
