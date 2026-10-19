@@ -36,10 +36,25 @@ pub(super) async fn finish_native_reply(
     let Some(reply) = reply else {
         return false;
     };
-    if let Err(error) = reply.finish(text).await {
-        tracing::error!("[dispatch] native progressive final delivery failed: {error}");
-    }
-    true
+    let delivered = match reply.finish(text).await {
+        Ok(result) if delivery_succeeded(&result) => true,
+        Ok(result) => {
+            tracing::error!(
+                outcomes = delivery_outcome_count(&result),
+                unsupported_parts = delivery_unsupported_count(&result),
+                "[dispatch] native progressive final delivery was incomplete"
+            );
+            false
+        }
+        Err(error) => {
+            tracing::error!("[dispatch] native progressive final delivery failed: {error}");
+            if let Err(close_error) = reply.close().await {
+                tracing::warn!("[dispatch] native progressive close failed: {close_error}");
+            }
+            false
+        }
+    };
+    delivered
 }
 
 pub(super) fn spawn_native_progress(
@@ -47,16 +62,80 @@ pub(super) fn spawn_native_progress(
     reply: std::sync::Arc<NativeProgressiveReply>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
+        let mut failed = false;
         while let Some(progress) = events.recv().await {
             let Some(event) = output_event(progress) else {
                 continue;
             };
-            if let Err(error) = reply.feed(vec![event]).await {
-                tracing::warn!("[dispatch] progressive channel update failed: {error}");
-                break;
+            match reply.feed(vec![event]).await {
+                Ok(result) if delivery_succeeded(&result) => {}
+                Ok(result) => {
+                    tracing::warn!(
+                        outcomes = delivery_outcome_count(&result),
+                        unsupported_parts = delivery_unsupported_count(&result),
+                        "[dispatch] progressive channel update was incomplete"
+                    );
+                    failed = true;
+                    break;
+                }
+                Err(error) => {
+                    tracing::warn!("[dispatch] progressive channel update failed: {error}");
+                    failed = true;
+                    break;
+                }
+            }
+        }
+        if failed {
+            if let Err(error) = reply.close().await {
+                tracing::warn!("[dispatch] native progressive close failed: {error}");
             }
         }
     })
+}
+
+fn delivery_succeeded(result: &tinychannels_bus::module_progressive::ProgressiveResult) -> bool {
+    use tinychannels_bus::module_progressive::ProgressiveResult;
+    match result {
+        ProgressiveResult::Updated => true,
+        ProgressiveResult::DeliveryOutcome { outcome } => outcome.error.is_none(),
+        ProgressiveResult::DeliveryOutcomes { outcomes } => {
+            outcomes.iter().all(|outcome| outcome.error.is_none())
+        }
+        ProgressiveResult::DeliveryBatch {
+            outcomes,
+            unsupported,
+            failure,
+        } => {
+            outcomes.iter().all(|outcome| outcome.error.is_none())
+                && unsupported.is_empty()
+                && failure.is_none()
+        }
+        ProgressiveResult::DeliveryUnsupported { parts } => parts.is_empty(),
+        _ => false,
+    }
+}
+
+fn delivery_outcome_count(result: &tinychannels_bus::module_progressive::ProgressiveResult) -> usize {
+    use tinychannels_bus::module_progressive::ProgressiveResult;
+    match result {
+        ProgressiveResult::DeliveryOutcome { .. } => 1,
+        ProgressiveResult::DeliveryOutcomes { outcomes }
+        | ProgressiveResult::DeliveryBatch { outcomes, .. } => outcomes.len(),
+        _ => 0,
+    }
+}
+
+fn delivery_unsupported_count(
+    result: &tinychannels_bus::module_progressive::ProgressiveResult,
+) -> usize {
+    use tinychannels_bus::module_progressive::ProgressiveResult;
+    match result {
+        ProgressiveResult::DeliveryUnsupported { parts }
+        | ProgressiveResult::DeliveryBatch {
+            unsupported: parts, ..
+        } => parts.len(),
+        _ => 0,
+    }
 }
 
 fn output_event(progress: AgentProgress) -> Option<ChannelOutputEvent> {

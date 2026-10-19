@@ -191,7 +191,10 @@ impl NativeProgressiveReply {
         }
     }
 
-    pub(crate) async fn feed(&self, events: Vec<ChannelOutputEvent>) -> Result<(), ModuleCallError> {
+    pub(crate) async fn feed(
+        &self,
+        events: Vec<ChannelOutputEvent>,
+    ) -> Result<ProgressiveResult, ModuleCallError> {
         let result: ProgressiveResult = self
             .object
             .call_confidential(
@@ -202,24 +205,65 @@ impl NativeProgressiveReply {
                 },),
             )
             .await?;
-        if !matches!(result, ProgressiveResult::Updated | ProgressiveResult::DeliveryBatch { .. }) {
+        if !matches!(
+            result,
+            ProgressiveResult::Updated
+                | ProgressiveResult::DeliveryOutcome { .. }
+                | ProgressiveResult::DeliveryOutcomes { .. }
+                | ProgressiveResult::DeliveryUnsupported { .. }
+                | ProgressiveResult::DeliveryBatch { .. }
+        ) {
             crate::modules::report::malformed_reply("tinychannels");
             return Err(ModuleCallError::ModuleFault);
         }
-        Ok(())
+        Ok(result)
     }
 
-    pub(crate) async fn finish(&self, text: &str) -> Result<(), ModuleCallError> {
+    /// Deliver the canonical final event and return every receipt/failure fact.
+    pub(crate) async fn finish(
+        &self,
+        text: &str,
+    ) -> Result<ProgressiveResult, ModuleCallError> {
         let result: ProgressiveResult = self
             .object
             .call_confidential(
                 methods::EXECUTE_PROGRESSIVE,
-                (ProgressiveCommand::Finish {
+                (ProgressiveCommand::FeedOutput {
                     handle: self.handle.clone(),
-                    text: text.to_owned(),
+                    events: vec![ChannelOutputEvent::FinalMessage {
+                        text: text.to_owned(),
+                        parts: Vec::new(),
+                        receipt: None,
+                    }],
                 },),
             )
             .await?;
+        if !matches!(
+            result,
+            ProgressiveResult::DeliveryOutcome { .. }
+                | ProgressiveResult::DeliveryOutcomes { .. }
+                | ProgressiveResult::DeliveryUnsupported { .. }
+                | ProgressiveResult::DeliveryBatch { .. }
+        ) {
+            crate::modules::report::malformed_reply("tinychannels");
+            return Err(ModuleCallError::ModuleFault);
+        }
+        Ok(result)
+    }
+
+    /// Abort an unfinished reply after cancellation or a failed progress call.
+    pub(crate) async fn close(&self) -> Result<(), ModuleCallError> {
+        let result: ProgressiveResult = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            self.object.call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Close {
+                    handle: self.handle.clone(),
+                },),
+            ),
+        )
+        .await
+        .map_err(|_| ModuleCallError::ModuleFault)??;
         if result != ProgressiveResult::Closed {
             crate::modules::report::malformed_reply("tinychannels");
             return Err(ModuleCallError::ModuleFault);

@@ -542,7 +542,8 @@ pub(crate) async fn process_channel_runtime_message(
                 started_at.elapsed().as_millis(),
                 truncate_with_ellipsis(&response_text, REPLY_LOG_TRUNCATE_CHARS)
             );
-            if !super::progressive::finish_native_reply(&native_reply, &response_text).await {
+            let delivered = super::progressive::finish_native_reply(&native_reply, &response_text).await;
+            if native_reply.is_none() {
             if let Some(channel) = target_channel.as_ref() {
                 if let Some(ref draft_id) = draft_message_id {
                     if let Err(e) = channel
@@ -573,7 +574,7 @@ pub(crate) async fn process_channel_runtime_message(
                 }
             }
             }
-            (true, response_text, resolved_provider, resolved_model)
+            (delivered, response_text, resolved_provider, resolved_model)
         }
         Ok(Err(e)) => {
             if is_context_window_overflow_error(&ctx, &e)
@@ -585,7 +586,8 @@ pub(crate) async fn process_channel_runtime_message(
                     "  ⚠️ Context window exceeded after {}ms",
                     started_at.elapsed().as_millis()
                 );
-                if !super::progressive::finish_native_reply(&native_reply, error_text).await {
+                let _ = super::progressive::finish_native_reply(&native_reply, error_text).await;
+                if native_reply.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
                     if let Some(ref draft_id) = draft_message_id {
                         let _ = channel
@@ -676,7 +678,8 @@ pub(crate) async fn process_channel_runtime_message(
                     ],
                 );
             }
-            if !super::progressive::finish_native_reply(&native_reply, &error_response).await {
+            let _ = super::progressive::finish_native_reply(&native_reply, &error_response).await;
+            if native_reply.is_none() {
             if let Some(channel) = target_channel.as_ref() {
                 if let Some(ref draft_id) = draft_message_id {
                     let _ = channel
@@ -722,7 +725,8 @@ pub(crate) async fn process_channel_runtime_message(
             );
             let error_text =
                 "⚠️ Request timed out while waiting for the model. Please try again.".to_string();
-            if !super::progressive::finish_native_reply(&native_reply, &error_text).await {
+            let _ = super::progressive::finish_native_reply(&native_reply, &error_text).await;
+            if native_reply.is_none() {
             if let Some(channel) = target_channel.as_ref() {
                 if let Some(ref draft_id) = draft_message_id {
                     let _ = channel
