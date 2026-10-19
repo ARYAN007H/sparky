@@ -85,7 +85,8 @@ const FORCED_RESPONSES = [
 /** The checklist's rendered items: `[content, status]` pairs, in list order. */
 async function readChecklist(): Promise<Array<[string, string]>> {
   return (await browser.execute(() => {
-    const rows = Array.from(document.querySelectorAll('[data-testid="todo-item"]'));
+    const card = document.querySelector('[data-testid="todo-checklist"]');
+    const rows = Array.from(card?.querySelectorAll('[data-testid="todo-item"]') ?? []);
     return rows.map(row => [(row.textContent ?? '').trim(), row.getAttribute('data-status') ?? '']);
   })) as Array<[string, string]>;
 }
