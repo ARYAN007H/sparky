@@ -272,6 +272,29 @@ impl NativeProgressiveReply {
     }
 }
 
+impl Drop for NativeProgressiveReply {
+    fn drop(&mut self) {
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        let object = self.object.clone();
+        let handle = self.handle.clone();
+        runtime.spawn(async move {
+            let close = object.call_confidential::<ProgressiveResult>(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Close { handle },),
+            );
+            match tokio::time::timeout(std::time::Duration::from_secs(5), close).await {
+                Ok(Ok(ProgressiveResult::Closed)) => {}
+                Ok(Ok(_)) => crate::modules::report::malformed_reply("tinychannels"),
+                Ok(Err(_)) | Err(_) => {
+                    tracing::debug!("[channels] native progressive cleanup did not complete")
+                }
+            }
+        });
+    }
+}
+
 impl ModuleProgressiveReply {
     pub(super) async fn open(
         config: crate::config::Config,

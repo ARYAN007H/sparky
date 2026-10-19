@@ -78,8 +78,11 @@ fn progressive_delivery_status_rejects_partial_or_unsupported_terminal_results()
     assert!(!delivery_succeeded(&partial));
 
     let unsupported = ProgressiveResult::DeliveryUnsupported {
-        parts: vec![tinychannels_bus::channel::OutboundContentPart::Text {
-            text: "retained content".into(),
+        parts: vec![tinychannels_bus::channel::OutboundContentPart::Content {
+            part: tinychannels_bus::channel::ContentPart::Text {
+                text: "retained content".into(),
+                markdown_dialect: None,
+            },
         }],
     };
     assert!(!delivery_succeeded(&unsupported));
