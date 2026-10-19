@@ -254,9 +254,9 @@ engine = "tinyhumans"
 }
 
 pub(crate) struct TestHarness {
-    _tmp: TempDir,
-    home: std::path::PathBuf,
-    _guards: Vec<EnvVarGuard>,
+    pub(crate) _tmp: TempDir,
+    pub(crate) home: std::path::PathBuf,
+    pub(crate) _guards: Vec<EnvVarGuard>,
     pub(crate) rpc_base: String,
     pub(crate) join: tokio::task::JoinHandle<Result<(), std::io::Error>>,
 }
@@ -289,7 +289,7 @@ pub(crate) async fn setup() -> TestHarness {
         _tmp: tmp,
         home,
         _guards: guards,
-        pub(crate) rpc_base: format!("http://{addr}"),
+        rpc_base: format!("http://{addr}"),
         join,
     }
 }
