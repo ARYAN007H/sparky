@@ -47,17 +47,6 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 /// action is rejected on EVERY real run, so the author-time gate and the early
 /// builder-tool warnings (`get_tool_contract` / `search_tool_catalog`) must all
 /// agree on it — one home for the check so they cannot drift.
-pub(crate) fn toolkit_has_curated_catalog(toolkit: &str) -> bool {
-    // The curated catalogs moved to `tinymemory-bus` (OpenHuman#5560) and are
-    // reachable directly via `catalog_for_toolkit`, so this no longer needs
-    // the engine-backed provider-registry hop the comment here used to
-    // explain: `get_provider(toolkit).curated_tools()` was verified identical
-    // to `catalog_for_toolkit(toolkit)` for every toolkit that had one, and
-    // tinymemory v1.13.4 deleted the registry outright, so the hop is gone
-    // rather than merely unnecessary.
-    crate::integrations::composio::catalog::has_curated_catalog(toolkit)
-}
-
 pub(crate) async fn validate_tool_contracts(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
     use crate::integrations::composio::contract::validation::{
         validate_tool_contract_nodes, ToolContractNode,
