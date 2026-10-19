@@ -56,46 +56,16 @@ pub struct OpenHumanHttp {
     pub approval: crate::security::approval::ApprovalTurnContext,
 }
 
-/// Resolves an optional HTTP `connection_ref` to the stored credential to
-/// inject. Split out as a free function (over the store, not `&self`) so the
-/// resolve/fail-closed policy is unit-testable without constructing a full
-/// [`OpenHumanHttp`] adapter.
-///
-/// - `None` conn, or a `connection_ref` whose prefix isn't `http_cred:` →
-///   `Ok(None)` (no credential to inject; a non-`http_cred:` prefix is logged
-///   and ignored, matching the pre-Phase-2 behavior).
-/// - a `http_cred:<name>` naming a **known** credential → `Ok(Some(cred))`
-///   (secret-bearing — the caller injects it server-side, never logs it).
-/// - a `http_cred:<name>` naming an **unknown** credential, a malformed
-///   (empty/whitespace-only) name, or a store error → `Err` — the request
-///   must fail closed, never proceed unauthenticated. Distinguishing "no
-///   `http_cred:` prefix at all" from "`http_cred:` prefix with a malformed
-///   name" matters: [`http_cred_name`] collapses both to `None`, which would
-///   otherwise let a typo'd or data-derived empty ref (e.g. `"http_cred:"`)
-///   silently fall through to an unauthenticated request (Codex P2 finding).
+/// Resolve the exact name returned by the module's credential parser. Trim
+/// only at the host's encrypted-store lookup boundary to preserve the prior
+/// credential identifier policy.
 pub(crate) fn resolve_http_credential(
     store: &HttpCredentialsStore,
-    conn: Option<&str>,
+    credential_name: Option<&str>,
 ) -> Result<Option<HttpCredential>> {
-    let Some(conn) = conn else {
+    let Some(name) = credential_name.map(str::trim).filter(|name| !name.is_empty()) else {
         return Ok(None);
     };
-    if conn.strip_prefix("http_cred:").is_none() {
-        tracing::debug!(target: "flows", %conn, "[flows] http conn: unrecognized connection_ref prefix (expected `http_cred:<name>`) — ignoring");
-        return Ok(None);
-    }
-    let Some(name) = http_cred_name(conn) else {
-        tracing::warn!(
-            target: "flows",
-            %conn,
-            "[flows] http_request: connection_ref has the `http_cred:` prefix but no credential \
-             name — failing the request closed rather than sending it unauthenticated"
-        );
-        return Err(EngineError::Capability(format!(
-            "http_request connection_ref has a malformed http_cred name: {conn:?}"
-        )));
-    };
-
     match store.get(name) {
         Ok(Some(cred)) => {
             tracing::debug!(
@@ -131,47 +101,8 @@ pub(crate) fn resolve_http_credential(
     }
 }
 
-/// Merges a resolved credential's auth header into the outbound `request`'s
-/// `headers` object (creating it when absent), returning the header **name**
-/// that was injected for redacted logging. The header value carries the secret
-/// and is placed only into the request handed to `HttpRequestTool` — it is
-/// never logged or returned. An explicit stored credential wins over any inline
-/// same-named header the flow author set.
-pub(crate) fn inject_http_credential(request: &mut Value, cred: &HttpCredential) -> Result<String> {
-    let (header_name, header_value) = cred
-        .to_header()
-        .map_err(|e| EngineError::Capability(e.to_string()))?;
-
-    let obj = request.as_object_mut().ok_or_else(|| {
-        EngineError::Capability("http_request config must be a JSON object".to_string())
-    })?;
-    let headers_entry = obj
-        .entry("headers")
-        .or_insert_with(|| Value::Object(serde_json::Map::new()));
-    // A flow author may leave `headers` unset (null) — coerce to an object so
-    // the credential still injects. A non-object, non-null `headers` is a
-    // malformed config we refuse rather than silently drop the credential.
-    if headers_entry.is_null() {
-        *headers_entry = Value::Object(serde_json::Map::new());
-    }
-    let headers_obj = headers_entry.as_object_mut().ok_or_else(|| {
-        EngineError::Capability("http_request `headers` must be a JSON object".to_string())
-    })?;
-    headers_obj.insert(header_name.clone(), Value::String(header_value));
-
-    tracing::info!(
-        target: "flows",
-        cred = %cred.name,
-        scheme = cred.scheme.as_str(),
-        header = %header_name,
-        "[flows] http_request: injected stored credential header (value redacted)"
-    );
-    Ok(header_name)
-}
-
-#[async_trait]
-impl HttpClient for OpenHumanHttp {
-    async fn request(&self, mut request: Value, conn: Option<&str>) -> Result<Value> {
+impl OpenHumanHttp {
+    pub(crate) async fn request(&self, mut request: Value, conn: Option<&str>) -> Result<Value> {
         const TOOL_NAME: &str = "flows_http_request";
 
         // Autonomy-tier gate (Phase 2): an http_request node reaches the network,
@@ -185,10 +116,24 @@ impl HttpClient for OpenHumanHttp {
         let tier_decision =
             enforce_node_tier_gate(&security, CommandClass::Network, "http_request")?;
 
+        let portability = module::portability_proxy(&self.config)
+            .await
+            .map_err(EngineError::Capability)?;
+        let inspected: tinyflows_bus::portability::HttpRequestDetails = portability
+            .call(
+                tinyflows_bus::portability::methods::INSPECT_HTTP_REQUEST,
+                &(tinyflows_bus::portability::InspectHttpRequest {
+                    request: request.clone(),
+                    connection_ref: conn.map(str::to_owned),
+                },),
+            )
+            .await
+            .map_err(|error| EngineError::Capability(error.to_string()))?;
+
         // The approval gate summarizes/redacts the request BEFORE any credential
         // is injected, so a stored secret never lands in the approval UI or
         // audit trail. Injection happens strictly after this point.
-        let summary = crate::security::approval::summarize_action(TOOL_NAME, &request);
+        let summary = inspected.redacted_summary;
         let redacted = crate::security::approval::redact_args(&request);
         let (outcome, audit_id) = gate_call_for_tier(
             &self.ctx,
@@ -206,8 +151,32 @@ impl HttpClient for OpenHumanHttp {
         // Resolve `http_cred:<name>` to a stored credential and inject its auth
         // header server-side. An unknown name fails the request closed (see
         // `resolve_http_credential`) — we never send it unauthenticated.
-        if let Some(cred) = resolve_http_credential(&self.http_creds, conn)? {
-            inject_http_credential(&mut request, &cred)?;
+        if let Some(cred) =
+            resolve_http_credential(&self.http_creds, inspected.credential_name.as_deref())?
+        {
+            let (header, value) = cred
+                .to_header()
+                .map_err(|error| EngineError::Capability(error.to_string()))?;
+            request = portability
+                .call(
+                    tinyflows_bus::portability::methods::PREPARE_HTTP_REQUEST,
+                    &(tinyflows_bus::portability::PrepareHttpRequest {
+                        request,
+                        credential: tinyflows_bus::portability::HttpCredentialTemplate::Resolved {
+                            header,
+                            value,
+                        },
+                    },),
+                )
+                .await
+                .map_err(|error| EngineError::Capability(error.to_string()))?;
+            tracing::info!(
+                target: "flows",
+                cred = %cred.name,
+                scheme = cred.scheme.as_str(),
+                header = %header,
+                "[flows] http_request: module injected stored credential header (value redacted)"
+            );
         }
 
         let tool = http_request_tool(
@@ -243,20 +212,7 @@ impl HttpClient for OpenHumanHttp {
             Err(e) => Err(EngineError::Capability(e.to_string())),
         };
 
-        if let Some(id) = audit_id {
-            if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
-                let exec = if outcome.is_ok() {
-                    crate::security::approval::ExecutionOutcome::Success
-                } else {
-                    crate::security::approval::ExecutionOutcome::Failure
-                };
-                gate.record_execution(
-                    &id,
-                    exec,
-                    outcome.as_ref().err().map(ToString::to_string).as_deref(),
-                );
-            }
-        }
+        close_audit(audit_id.as_deref(), &outcome);
 
         outcome
     }
