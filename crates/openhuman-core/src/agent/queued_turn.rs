@@ -5,6 +5,7 @@
 //! orchestration metadata needed to dispatch a deferred follow-up turn.
 
 use tinyagents_harness::turn_runner::{QueueDisposition, RequeuePayload, ScopeKey, TurnRequest};
+use std::sync::Arc;
 
 /// The host metadata one OpenHuman turn carries through TinyAgents' turn
 /// runner and its run queue: which client asked, the per-message model and
@@ -25,6 +26,10 @@ pub struct QueuedPayload {
     pub locale: Option<String>,
     pub metadata: tinychannels_bus::web::ChatRequestMetadata,
     pub queued_at_ms: u64,
+    /// Already-resolved internal agent authority and durable channel identity.
+    /// Requeued placeholders inherit it from their running turn; public chat
+    /// metadata never supplies or overrides this value.
+    pub(crate) trusted_turn: Option<Arc<super::turn_host::TrustedAgentTurn>>,
 }
 
 impl std::fmt::Debug for QueuedPayload {
@@ -35,6 +40,7 @@ impl std::fmt::Debug for QueuedPayload {
             .field("temperature", &self.temperature)
             .field("locale", &self.locale)
             .field("queued_at_ms", &self.queued_at_ms)
+            .field("has_trusted_turn", &self.trusted_turn.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -50,6 +56,9 @@ impl RequeuePayload for QueuedPayload {
     fn adopt(&mut self, running: &Self) {
         if self.ctx.is_none() {
             self.ctx.clone_from(&running.ctx);
+        }
+        if self.trusted_turn.is_none() {
+            self.trusted_turn.clone_from(&running.trusted_turn);
         }
         if self.client_id.is_empty() {
             self.client_id.clone_from(&running.client_id);

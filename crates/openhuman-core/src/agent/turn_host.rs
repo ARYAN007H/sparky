@@ -11,6 +11,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     agent::{
+        host_agents::HostAgent,
         queued_turn::QueuedTurn,
         session_host::OpenHumanSessionHost,
         turn_env::HostTurnEnv,
@@ -18,6 +19,34 @@ use crate::{
     },
     security::approval::ApprovalTurnContext,
 };
+
+/// Trusted identity and authority selected at an inbound host boundary.
+///
+/// This value is carried internally through queue rehydration. It is never
+/// serialized into chat metadata or accepted from an RPC/model request.
+#[derive(Clone)]
+pub(crate) struct TrustedAgentTurn {
+    pub(crate) host_agent: HostAgent,
+    pub(crate) channel: String,
+    pub(crate) session_key: String,
+    pub(crate) event_session_id: String,
+    pub(crate) origin: AgentTurnOrigin,
+    pub(crate) approval: ApprovalTurnContext,
+    pub(crate) relay_thread: Option<String>,
+    pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
+}
+
+impl std::fmt::Debug for TrustedAgentTurn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrustedAgentTurn")
+            .field("agent_id", &self.host_agent.definition.id)
+            .field("channel", &self.channel)
+            .field("session_scoped", &!self.session_key.is_empty())
+            .field("relay_thread", &self.relay_thread)
+            .field("imported_history_rows", &self.imported_history.len())
+            .finish_non_exhaustive()
+    }
+}
 
 /// The trusted, already-routed inputs for one agent turn.
 pub(crate) struct AgentTurnRequest {
