@@ -122,6 +122,39 @@ async function readGoal(): Promise<{ status: string; objective: string } | null>
   })) as { status: string; objective: string } | null;
 }
 
+/** Content-free identity check for the thread that owns the visible turn. */
+async function readSelectedThreadSnapshot(): Promise<{
+  threadId: string | null;
+  messageCount: number;
+  hasUserMessage: boolean;
+  hasAssistantMessage: boolean;
+}> {
+  return (await browser.execute(() => {
+    const winAny = window as unknown as { __OPENHUMAN_STORE__?: { getState: () => unknown } };
+    const state = winAny.__OPENHUMAN_STORE__?.getState() as
+      | {
+          thread?: {
+            selectedThreadId?: string | null;
+            messagesByThreadId?: Record<string, Array<{ sender?: string }>>;
+          };
+        }
+      | undefined;
+    const threadId = state?.thread?.selectedThreadId ?? null;
+    const messages = threadId ? (state?.thread?.messagesByThreadId?.[threadId] ?? []) : [];
+    return {
+      threadId,
+      messageCount: messages.length,
+      hasUserMessage: messages.some(message => message.sender === 'user'),
+      hasAssistantMessage: messages.some(message => message.sender === 'assistant'),
+    };
+  })) as {
+    threadId: string | null;
+    messageCount: number;
+    hasUserMessage: boolean;
+    hasAssistantMessage: boolean;
+  };
+}
+
 async function waitForProgress(completed: number, total: number, timeout = 45_000) {
   await browser.waitUntil(
     async () => {
@@ -217,6 +250,33 @@ describe('Chat todos and goals', () => {
     console.log(`${LOG_PREFIX} G1.1: task card — ${JSON.stringify(goal)}`);
     expect(goal?.objective).toBe(OBJECTIVE);
     expect(goal?.status).toBe('waiting');
+
+    // New-thread creation can expose its placeholder selection before the
+    // durable turn is attached. Track the actual selected thread only after
+    // Redux proves it owns this rendered conversation.
+    const placeholderThreadId = threadId;
+    await browser.waitUntil(
+      async () => {
+        const current = await readSelectedThreadSnapshot();
+        return Boolean(
+          current.threadId && current.hasUserMessage && current.hasAssistantMessage
+        );
+      },
+      {
+        timeout: 15_000,
+        timeoutMsg: `selected thread never owned the rendered turn: ${JSON.stringify(
+          await readSelectedThreadSnapshot()
+        )}`,
+      }
+    );
+    const current = await readSelectedThreadSnapshot();
+    expect(current.threadId).toBeTruthy();
+    expect(current.hasUserMessage).toBe(true);
+    expect(current.hasAssistantMessage).toBe(true);
+    console.log(
+      `${LOG_PREFIX} G1.1 identity: placeholder_changed=${current.threadId !== placeholderThreadId}; selected_message_count=${current.messageCount}`
+    );
+    threadId = current.threadId!;
   });
 
   it('G1.2 — the checklist renders all five items with their statuses', async () => {
@@ -270,6 +330,10 @@ describe('Chat todos and goals', () => {
     const items = await readChecklist();
     expect(items.map(([, status]) => status)).toEqual(['done', 'done', 'done', 'done', 'done']);
     expect(await readGoal()).toMatchObject({ status: 'done', objective: OBJECTIVE });
+    const current = await readSelectedThreadSnapshot();
+    expect(current.threadId).toBe(threadId);
+    expect(current.hasUserMessage).toBe(true);
+    expect(current.hasAssistantMessage).toBe(true);
     console.log(`${LOG_PREFIX} G1.4: passed — all five done, goal complete`);
   });
 
