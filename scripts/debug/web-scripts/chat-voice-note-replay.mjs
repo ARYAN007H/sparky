@@ -248,8 +248,7 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
   );
   if (
     !projectedVoiceNotes.some(
-      (item) =>
-        item.kind === "userMessage" && item.noteId === typedVoiceNoteId,
+      (item) => item.kind === "userMessage" && item.noteId === typedVoiceNoteId,
     ) ||
     !projectedVoiceNotes.some((item) => item.kind === "assistantMessage")
   )
