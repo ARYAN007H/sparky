@@ -102,7 +102,7 @@ pub enum ExpectedErrorKind {
     /// tier alias leaked to a provider that only speaks its native ids
     /// (#2079), an unknown / stale model pin (#2202), or a model-specific
     /// temperature constraint (#2076 — Moonshot Kimi K2). The provider
-    /// HTTP layer (`providers::ops::api_error`) already demotes its own
+    /// HTTP layer (`provider::http_error::api_error`) already demotes its own
     /// per-attempt event; this catches the *re-report* when the same
     /// error is raised again by `agent.run_single` /
     /// `web_channel.run_chat_task` under `domain=agent` / `web_channel`.
@@ -911,7 +911,7 @@ fn is_embedding_model_rejected(lower: &str) -> bool {
 /// The canonical OpenHuman session-expired wire shapes:
 ///
 /// - `"OpenHuman API error (401 Unauthorized): {…\"Session expired. Please
-///   log in again.\"…}"` — emitted by `providers::ops::api_error` from the
+///   log in again.\"…}"` — emitted by `provider::http_error::api_error` from the
 ///   OpenHuman backend and re-raised through `agent::run_single` /
 ///   `web_chat::run_chat_task` (OPENHUMAN-TAURI-26). The
 ///   `"session expired"` substring anchors the match to the OpenHuman
@@ -1388,7 +1388,7 @@ fn is_channel_supervisor_restart_message(lower: &str) -> bool {
 /// scheduler tick handlers — under a different `domain` tag, escaping the
 /// provider-scoped filter and producing one Sentry event per failed turn.
 ///
-/// The canonical wire format from `providers::ops::api_error` is:
+/// The canonical wire format from `provider::http_error::api_error` is:
 /// `"<provider> API error (<status>): <sanitized>"` — e.g.
 /// `"OpenHuman API error (504 Gateway Timeout): error code: 504"`. Pin the
 /// match to that exact `"api error (<status>"` prefix so an unrelated message

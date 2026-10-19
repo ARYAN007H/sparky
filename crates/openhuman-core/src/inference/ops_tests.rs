@@ -258,7 +258,7 @@ async fn inference_openai_oauth_disconnect_returns_removed_flag() {
 
 // ── is_unknown_provider_user_config (TAURI-RUST-X) ───────────────────────
 //
-// `inference_list_models` calls `providers::ops::list_configured_models`,
+// `inference_list_models` calls `provider::models::catalog_listing::list_configured_models`,
 // which surfaces a `String` error when the user-selected provider id isn't
 // registered in the cloud-provider list (e.g. picking "ollama" — a local
 // runtime — as a cloud provider). The error string is emitted at
