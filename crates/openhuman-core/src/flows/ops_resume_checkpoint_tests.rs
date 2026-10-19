@@ -1,5 +1,58 @@
 use super::*;
 
+/// Rewrite a module-created run document only for the migration fixture below.
+/// All normal run setup and execution still go through the TinyFlows bus.
+fn update_parked_run_document_for_test(
+    config: &Config,
+    run_id: &str,
+    update: impl FnOnce(&mut Value),
+) {
+    use tinyflows_bus::catalog::{
+        self as catalog, CatalogDocumentPrecondition, CatalogStorageReply,
+        CatalogVersionedDocument, DocGetRequest, DocPutRequest,
+    };
+
+    let reply = crate::flows::catalog_storage::call_test_storage::<CatalogStorageReply, _>(
+        config,
+        catalog::storage::GET,
+        (DocGetRequest {
+            collection: "flows.runs".into(),
+            id: run_id.to_owned(),
+        },),
+    )
+    .expect("read the module-created parked run document");
+    let value = match reply {
+        CatalogStorageReply::Value { value } => value,
+        CatalogStorageReply::Error { error } => panic!("run fixture read failed: {error:?}"),
+    };
+    let mut stored: CatalogVersionedDocument = serde_json::from_value(
+        value
+            .as_array()
+            .and_then(|items| items.first())
+            .cloned()
+            .or_else(|| value.as_object().map(|_| value.clone()))
+            .expect("DocGet must return the stored versioned run document"),
+    )
+    .expect("decode the module-created parked run document");
+    update(&mut stored.doc);
+
+    let reply = crate::flows::catalog_storage::call_test_storage::<CatalogStorageReply, _>(
+        config,
+        catalog::storage::PUT,
+        (DocPutRequest {
+            collection: "flows.runs".into(),
+            id: run_id.to_owned(),
+            doc: stored.doc,
+            precondition: CatalogDocumentPrecondition::Version(stored.version),
+            schema: stored.meta.schema,
+            expires_ms: stored.meta.expires_ms,
+            created_ms: Some(stored.meta.created_ms),
+        },),
+    )
+    .expect("write the scoped migration fixture");
+    assert!(matches!(reply, CatalogStorageReply::Value { .. }));
+}
+
 /// The success-path mirror of the refusal test above: when nothing rewrites
 /// the flow between park and resume, the recomputed hash matches the pinned
 /// one and the resume proceeds exactly as it did before this guard existed.
