@@ -82,13 +82,15 @@ The module reads its own `TINYMEMES_*` overrides from the process environment, s
 
 With the switch off, `[inbound] enabled = false`, or the module unavailable on this host, events take the direct triage path as before. An event too large to queue (over 192 KiB encoded) also takes the direct path.
 
+A delivery is acknowledged once triage has decided, and the decision is applied in its own task. A long agent run therefore never holds a queue lease, but an apply that fails is reported rather than retried. A deferral counts as a delivery attempt: a trigger still deferring after the lane's `max_attempts` (5) is dead-lettered and can be redriven. Webhooks are deduplicated per request, by correlation id. When the queues are active the module is loaded in the background at startup, so work a previous run left queued is delivered without waiting for the next event.
+
 | `[inbound]` key | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | `true` | route inbound events through the queues |
 | `queues_path` | unset | a `queues.json` replacing the module's shipped one; the host declares exactly these queues on the module's storage scope |
 | `pipeline_path` | unset | a `pipeline.json` replacing the shipped one (gate, coalescing, salience, lanes, cadences, retry back-off) |
 | `queue_url` | `storage` | where the queues live: the module's storage scope, or `amqp://` / `amqps://` for a RabbitMQ broker in builds with the storage `rabbitmq` driver |
-| `triage_timeout_ms` | `90000` | how long one delivered event's triage may take before the delivery is retried |
+| `triage_timeout_ms` | `25000` | how long one delivered event's triage may take before the delivery is retried; at most 25 s, below the module's 30 s callback deadline; read at startup |
 
 ## Wallet
 

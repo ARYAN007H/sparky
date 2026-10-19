@@ -4,9 +4,11 @@
 //!
 //! - `source` `composio:<toolkit>` or `webhook:<tunnel>`, which the shipped
 //!   `pipeline.json` source policies match (`composio:*`, `webhook:*`);
-//! - `event_id` the source's own id (the Composio trigger uuid, or id; the
-//!   webhook's correlation id), so a redelivery of the same trigger has the
-//!   same `source:event_id` and the queues reject it;
+//! - `event_id` the source's own id, so a redelivery has the same
+//!   `source:event_id` and the queues reject it. For a Composio trigger that
+//!   is its uuid (or id): a trigger the backend redelivers is handled once.
+//!   For an agent webhook it is the request's correlation id, which is per
+//!   request: a resent request with a new correlation id is a new event;
 //! - a `conversation_key` unique to the event, so two triggers are never
 //!   coalesced into one turn: each is triaged on its own;
 //! - kind `Trigger` (never ambient chatter), and the envelope itself in `raw`,

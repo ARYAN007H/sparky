@@ -118,10 +118,13 @@ static CURRENT: RwLock<Option<Arc<Resolved>>> = RwLock::new(None);
 /// The resolution the module was last configured with, or the shipped one.
 #[must_use]
 pub fn current() -> Arc<Resolved> {
+    static SHIPPED: std::sync::OnceLock<Arc<Resolved>> = std::sync::OnceLock::new();
     let guard = CURRENT
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    guard.clone().unwrap_or_else(|| Arc::new(shipped()))
+    guard
+        .clone()
+        .unwrap_or_else(|| Arc::clone(SHIPPED.get_or_init(|| Arc::new(shipped()))))
 }
 
 fn remember(resolved: Resolved) -> Arc<Resolved> {
