@@ -28,7 +28,7 @@ pub(super) fn record_context_config_overlay(
     if let Some(config_overlay) = config_overlay {
         match config_overlay {
             Ok(config_overlay) => {
-                overlay.config.context_overlay = std::sync::Mutex::new(Some(config_overlay));
+                overlay.config.runtime_state.context_overlay = std::sync::Mutex::new(Some(config_overlay));
             }
             Err(error) => {
                 log::warn!("[core-context] unable to record derived config overrides: {error}")
@@ -48,7 +48,7 @@ impl CoreContext {
     pub(crate) fn latest_embedder_config(&self) -> Option<crate::config::Config> {
         let snapshot = self.latest_embedder_config.as_ref()?;
         let mut config = snapshot.lock().ok()?.clone();
-        config.context_snapshot = Some(Arc::downgrade(snapshot));
+        config.runtime_state.context_snapshot = Some(Arc::downgrade(snapshot));
         Some(config)
     }
 

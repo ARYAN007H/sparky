@@ -12,7 +12,7 @@ pub(super) fn is_document_conflict(error: &anyhow::Error) -> bool {
 
 impl Config {
     pub(crate) fn bind_context_snapshot(snapshot: &std::sync::Arc<std::sync::Mutex<Config>>) {
-        snapshot.lock().unwrap().context_snapshot = Some(std::sync::Arc::downgrade(snapshot));
+        snapshot.lock().unwrap().runtime_state.context_snapshot = Some(std::sync::Arc::downgrade(snapshot));
     }
 
     pub(super) fn refresh_context_after_conflict<'a>(
@@ -21,7 +21,7 @@ impl Config {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
         Box::pin(async move {
             let Some(snapshot) = self
-                .context_snapshot
+                .runtime_state.context_snapshot
                 .as_ref()
                 .and_then(std::sync::Weak::upgrade)
             else {
@@ -29,7 +29,7 @@ impl Config {
             };
             let (config_path, workspace_dir, runtime) = {
                 let current = snapshot.lock().unwrap();
-                if *current.document_snapshot.lock().unwrap() != *expected {
+                if *current.runtime_state.document_snapshot.lock().unwrap() != *expected {
                     return;
                 }
                 (
@@ -42,10 +42,10 @@ impl Config {
             else {
                 return;
             };
-            if refreshed.document_snapshot.lock().unwrap().anchor != expected.anchor {
+            if refreshed.runtime_state.document_snapshot.lock().unwrap().anchor != expected.anchor {
                 return;
             }
-            let overlay = runtime.context_overlay.lock().unwrap().clone();
+            let overlay = runtime.runtime_state.context_overlay.lock().unwrap().clone();
             if let Some(overlay) = overlay {
                 let Ok(merged) = overlay.reapply(&refreshed) else {
                     return;
@@ -54,10 +54,10 @@ impl Config {
             } else {
                 super::context_overlay::copy_runtime_bindings(&runtime, &mut refreshed);
             }
-            refreshed.context_snapshot = Some(std::sync::Arc::downgrade(&snapshot));
+            refreshed.runtime_state.context_snapshot = Some(std::sync::Arc::downgrade(&snapshot));
 
             let mut current = snapshot.lock().unwrap();
-            if *current.document_snapshot.lock().unwrap() == *expected {
+            if *current.runtime_state.document_snapshot.lock().unwrap() == *expected {
                 *current = refreshed;
             }
         })

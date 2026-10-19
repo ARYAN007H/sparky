@@ -58,7 +58,7 @@ impl ConfigContextOverlay {
             same_source,
             "cannot derive config overrides from different persistence sources"
         );
-        let inherited = parent.context_overlay.lock().unwrap().clone();
+        let inherited = parent.runtime_state.context_overlay.lock().unwrap().clone();
         let mut changes = inherited
             .as_ref()
             .map(|overlay| overlay.changes.clone())
@@ -81,7 +81,7 @@ impl ConfigContextOverlay {
     ) -> anyhow::Result<Arc<Self>> {
         let mut changes = Vec::new();
         if let Some(parent) = parent.filter(|parent| same_source(parent, child)) {
-            if let Some(inherited) = parent.context_overlay.lock().unwrap().clone() {
+            if let Some(inherited) = parent.runtime_state.context_overlay.lock().unwrap().clone() {
                 changes.extend(inherited.changes.clone());
             }
             let parent_value = serde_json::to_value(parent)?;
@@ -112,10 +112,10 @@ impl ConfigContextOverlay {
         let mut result: Config = serde_json::from_value(value)?;
         copy_runtime_bindings(fresh, &mut result);
         self.runtime.apply(&mut result);
-        result.document_snapshot =
-            std::sync::Mutex::new(fresh.document_snapshot.lock().unwrap().clone());
-        result.context_snapshot = fresh.context_snapshot.clone();
-        result.context_overlay = std::sync::Mutex::new(Some(Arc::new(Self {
+        result.runtime_state.document_snapshot =
+            std::sync::Mutex::new(fresh.runtime_state.document_snapshot.lock().unwrap().clone());
+        result.runtime_state.context_snapshot = fresh.runtime_state.context_snapshot.clone();
+        result.runtime_state.context_overlay = std::sync::Mutex::new(Some(Arc::new(Self {
             changes: self.changes.clone(),
             runtime: self.runtime.clone(),
         })));
@@ -137,8 +137,8 @@ const PROFILE_OWNED_PATHS: &[&[&str]] = &[
 ];
 
 fn same_source(parent: &Config, child: &Config) -> bool {
-    let parent_anchor = parent.document_snapshot.lock().unwrap().anchor.clone();
-    let child_anchor = child.document_snapshot.lock().unwrap().anchor.clone();
+    let parent_anchor = parent.runtime_state.document_snapshot.lock().unwrap().anchor.clone();
+    let child_anchor = child.runtime_state.document_snapshot.lock().unwrap().anchor.clone();
     match (&parent_anchor, &child_anchor) {
         (Some(parent), Some(child)) => parent == child,
         (None, None) => {

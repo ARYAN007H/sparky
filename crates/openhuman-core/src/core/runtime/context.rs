@@ -425,7 +425,7 @@ impl CoreContext {
         };
         let agent = self.agent.derive(&mut overlay);
         config_access::record_context_config_overlay(self.profile(), parent_config, &mut overlay);
-        overlay.config.context_snapshot = None;
+        overlay.config.runtime_state.context_snapshot = None;
         let latest_embedder_config = Some(Arc::new(std::sync::Mutex::new(overlay.config.clone())));
         if let Some(snapshot) = &latest_embedder_config {
             crate::config::Config::bind_context_snapshot(snapshot);

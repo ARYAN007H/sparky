@@ -410,7 +410,7 @@ impl Config {
         update_snapshot: bool,
     ) -> Result<()> {
         let source_anchor = source.anchor();
-        let expected_snapshot = self.document_snapshot.lock().unwrap().clone();
+        let expected_snapshot = self.runtime_state.document_snapshot.lock().unwrap().clone();
         let initial_file_import = matches!(
             (&expected_snapshot.anchor, &source_anchor),
             (
@@ -471,21 +471,21 @@ impl Config {
         if !update_snapshot {
             return Ok(());
         }
-        *self.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
+        *self.runtime_state.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
             version,
             anchor: Some(source_anchor.clone()),
         };
 
         if let Some(snapshot) = self
-            .context_snapshot
+            .runtime_state.context_snapshot
             .as_ref()
             .and_then(std::sync::Weak::upgrade)
         {
             let mut current = snapshot.lock().unwrap();
-            let current_state = current.document_snapshot.lock().unwrap().clone();
+            let current_state = current.runtime_state.document_snapshot.lock().unwrap().clone();
             if current_state == expected_snapshot {
                 let published = self.clone();
-                *published.document_snapshot.lock().unwrap() =
+                *published.runtime_state.document_snapshot.lock().unwrap() =
                     super::super::ConfigDocumentSnapshot {
                         version,
                         anchor: Some(source_anchor),

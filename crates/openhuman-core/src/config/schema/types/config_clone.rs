@@ -12,11 +12,7 @@ impl Clone for Config {
     #[inline(never)]
     fn clone(&self) -> Self {
         Self {
-            document_snapshot: std::sync::Mutex::new(
-                self.document_snapshot.lock().unwrap().clone(),
-            ),
-            context_snapshot: self.context_snapshot.clone(),
-            context_overlay: std::sync::Mutex::new(self.context_overlay.lock().unwrap().clone()),
+            runtime_state: self.runtime_state.clone(),
             profile_providers: self.profile_providers.clone(),
             workspace_dir: self.workspace_dir.clone(),
             action_dir: self.action_dir.clone(),
