@@ -3,6 +3,10 @@
 //! Isolates config under a temp `HOME` so auth profiles and the OpenHuman provider resolve
 //! the same state directory. Run a namespace with `cargo test -p openhuman-cli --test json_rpc_<namespace>_e2e`.
 
+// This harness is compiled separately into each namespace test binary; each
+// binary intentionally uses only the helpers and re-exports it needs.
+#![allow(dead_code, unused_imports)]
+
 #[path = "tinyhumans_boot.rs"]
 pub mod tinyhumans_boot;
 

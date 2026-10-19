@@ -1810,6 +1810,54 @@ async fn json_rpc_workflow_run_engine_executes_builtin_to_completion_inner() {
     mock_join.abort();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// #5846 — the two authoring-gate behaviour changes, driven end-to-end through
+// the real strict-mode create path.
+//
+// `flows_create` with `strict: true` runs `ops::strict_gate`
+// (`flows/schemas_handlers.rs:18`) -> `run_builder_gates`
+// (`flows/ops_part_01.rs:509`) -> `validate_binding_resolvability`
+// (`flows/ops_part_02.rs:433`) -> `tinyflows::gates::failures`, the stack
+// #5846 evicted upstream.
+//
+// `ops_tests_part_06_tests.rs` already pins the gate FUNCTION at unit level.
+// What no test covered is that the evicted gate is still WIRED into the strict
+// RPC path — the eviction moved the implementation out of this repository, so
+// the wiring is exactly the thing that can now rot without a local test failing.
+//
+// A NOTE ON #5846's SUMMARY. The PR body reads "a workflow whose `tool_call`
+// arg binds to a schema-less agent is now refused". Taken literally that is not
+// what the gate does, deliberately: an agent with NO `output_parser.schema` is
+// skipped because "the field may exist, so it is unverifiable rather than
+// guaranteed invalid" (`gates/mod.rs:234-239`). Only a field absent from a
+// schema that EXISTS is refused. These tests pin the implemented contract, and
+// the carve-out gets its own case precisely because the PR wording invites
+// someone to "fix" it away.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A `tool_call` arg reading a field the target agent's declared schema omits.
+#[cfg(feature = "flows")]
+fn graph_binding_to_undeclared_agent_field() -> Value {
+    json!({
+        "name": "undeclared-field",
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "summarize", "kind": "agent", "name": "Summarize",
+              "config": { "prompt": "summarize",
+                "output_parser": { "schema": { "type": "object",
+                  "properties": { "summary": { "type": "string" } } } } } },
+            { "id": "post", "kind": "tool_call", "name": "Post",
+              "config": { "slug": "SLACK_SEND_MESSAGE",
+                "args": { "channel": "=nodes.summarize.item.json.channel" } } }
+        ],
+        "edges": [
+            { "from_node": "t", "to_node": "summarize" },
+            { "from_node": "summarize", "to_node": "post" }
+        ]
+    })
+}
+
+
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn json_rpc_flows_strict_create_refuses_binding_to_undeclared_agent_field() {

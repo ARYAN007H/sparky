@@ -640,6 +640,61 @@ async fn voice_status_returns_availability() {
 }
 
 #[tokio::test]
+async fn voice_stt_dispatch_reaches_handler_and_rejects_invalid_audio_structurally() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+    let _piper_guard = EnvVarGuard::unset("PIPER_BIN");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+    for config_path in [
+        openhuman_home.join("config.toml"),
+        openhuman_home.join("users/local/config.toml"),
+    ] {
+        use std::io::Write as _;
+        let mut config = std::fs::OpenOptions::new()
+            .append(true)
+            .open(config_path)
+            .expect("open seeded config");
+        writeln!(
+            config,
+            "\n[[voice_providers]]\nslug = \"e2e-stt\"\nendpoint = \"http://127.0.0.1:9\""
+        )
+        .expect("append test STT provider");
+    }
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let response = post_json_rpc(
+        &rpc_base,
+        1,
+        "openhuman.voice_stt_dispatch",
+        json!({ "provider": "e2e-stt", "audio_base64": "not base64", "mime_type": "audio/wav" }),
+    )
+    .await;
+    assert_eq!(response["error"]["code"], json!(-32000), "{response}");
+    assert!(
+        response["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("[voice-factory] base64 decode error")),
+        "voice STT handler must reject malformed audio before making a provider request: {response}"
+    );
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
+#[tokio::test]
 async fn voice_live_settings_round_trip_over_json_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
@@ -869,51 +924,4 @@ async fn voice_test_provider_honours_validate_only_for_the_stt_workload() {
 
     mock_join.abort();
     rpc_join.abort();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// #5846 — the two authoring-gate behaviour changes, driven end-to-end through
-// the real strict-mode create path.
-//
-// `flows_create` with `strict: true` runs `ops::strict_gate`
-// (`flows/schemas_handlers.rs:18`) -> `run_builder_gates`
-// (`flows/ops_part_01.rs:509`) -> `validate_binding_resolvability`
-// (`flows/ops_part_02.rs:433`) -> `tinyflows::gates::failures`, the stack
-// #5846 evicted upstream.
-//
-// `ops_tests_part_06_tests.rs` already pins the gate FUNCTION at unit level.
-// What no test covered is that the evicted gate is still WIRED into the strict
-// RPC path — the eviction moved the implementation out of this repository, so
-// the wiring is exactly the thing that can now rot without a local test failing.
-//
-// A NOTE ON #5846's SUMMARY. The PR body reads "a workflow whose `tool_call`
-// arg binds to a schema-less agent is now refused". Taken literally that is not
-// what the gate does, deliberately: an agent with NO `output_parser.schema` is
-// skipped because "the field may exist, so it is unverifiable rather than
-// guaranteed invalid" (`gates/mod.rs:234-239`). Only a field absent from a
-// schema that EXISTS is refused. These tests pin the implemented contract, and
-// the carve-out gets its own case precisely because the PR wording invites
-// someone to "fix" it away.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// A `tool_call` arg reading a field the target agent's declared schema omits.
-#[cfg(feature = "flows")]
-fn graph_binding_to_undeclared_agent_field() -> Value {
-    json!({
-        "name": "undeclared-field",
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "summarize", "kind": "agent", "name": "Summarize",
-              "config": { "prompt": "summarize",
-                "output_parser": { "schema": { "type": "object",
-                  "properties": { "summary": { "type": "string" } } } } } },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "SLACK_SEND_MESSAGE",
-                "args": { "channel": "=nodes.summarize.item.json.channel" } } }
-        ],
-        "edges": [
-            { "from_node": "t", "to_node": "summarize" },
-            { "from_node": "summarize", "to_node": "post" }
-        ]
-    })
 }
