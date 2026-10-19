@@ -11,8 +11,7 @@ use tinychannels_bus::channel::{
 use tinychannels_bus::module_progressive::{
     ProgressiveTransportRequest, ProgressiveTransportResult,
 };
-use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult};
-use tinychannels_runtime::SendMessage;
+use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, SendMessage};
 
 #[derive(Default)]
 struct RecordingChannel {
@@ -41,7 +40,13 @@ impl Channel for RecordingChannel {
                 platform_message_ids: vec!["telegram-message-7".into()],
                 ..Default::default()
             },
-            ..Default::default()
+            error: Some(tinychannels_bus::channel::ChannelSendError {
+                kind: tinychannels_bus::channel::SendErrorKind::Transient,
+                message: "one trailing segment was not delivered".into(),
+                sent_before_error: true,
+                retryable: true,
+                ..Default::default()
+            }),
         })
     }
 
@@ -146,12 +151,23 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
         outcome.receipt.primary_platform_message_id.as_deref(),
         Some("telegram-message-7")
     );
+    assert_eq!(outcome.receipt.platform_message_ids, ["telegram-message-7"]);
+    let error = outcome.error.as_ref().expect("partial send failure is preserved");
+    assert_eq!(error.message, "one trailing segment was not delivered");
+    assert!(error.sent_before_error);
+    assert!(error.retryable);
     let sent = channel.sent.lock().await;
     assert_eq!(sent.len(), 1);
+    assert_eq!(
+        sent[0].channel_ref.as_ref().unwrap().id,
+        "telegram"
+    );
     assert_eq!(
         sent[0].channel_ref.as_ref().unwrap().account_id.as_deref(),
         Some("bot-account-a")
     );
+    assert_eq!(sent[0].conversation_id, "chat-42");
+    assert_eq!(sent[0].conversation_ref.as_ref().unwrap().id, "chat-42");
     assert_eq!(
         sent[0]
             .conversation_ref
@@ -162,6 +178,7 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
         Some("topic-9")
     );
     assert_eq!(sent[0].turn_id.as_deref(), Some("turn-11"));
+    // Sequence and segment are represented in the module's idempotency key.
     assert_eq!(sent[0].idempotency_key, "turn-11:3:1");
     assert_eq!(sent[0].parts, parts);
 }
