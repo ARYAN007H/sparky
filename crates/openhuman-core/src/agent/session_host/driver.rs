@@ -81,10 +81,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
     ) -> Result<DriverOutcome, DriverFailure> {
         // Heal an orphaned tool head before reading history.
         repair_orphaned_tool_head(&mut request.history);
-        // These two inputs are prepared by the OpenHuman lifecycle hook for
-        // this exact request.  Falling back to the snapshots captured when the
-        // long-lived driver was constructed would let a later channel/tool
-        // policy or context change execute under stale authority.
+        // Use the policy and context prepared for this exact request.
         let tool_policy = request
             .run_context
             .data
