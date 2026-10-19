@@ -100,6 +100,66 @@ fn unrecognized_typed_class_does_not_fall_back_to_english_halt_phrases() {
     );
 }
 
+#[test]
+fn classified_halt_maps_all_typed_stop_categories_and_aliases() {
+    let cases = [
+        ("transient", "temporarily unavailable"),
+        ("uncertain_side_effect", "could not confirm whether it went through"),
+        ("authentication", "rejected my credentials"),
+        ("permission", "don't have permission"),
+        ("policy", "security settings"),
+        ("missing_program", "program or feature"),
+        ("not_found", "could not be found"),
+        ("invalid_calls", "requests as invalid"),
+        ("unavailable", "not available right now"),
+        ("site_refused", "website kept refusing"),
+        ("repeated_failure", "same step kept failing"),
+        ("varied_failures", "different tool calls in a row failed"),
+        ("repeating_step", "repeating the same step"),
+        ("out_of_credits", "inference credits"),
+        ("provider_config", "configured model or provider rejected"),
+        ("missing_connection", "isn't connected"),
+        ("future_failure_class", "my tool calls were not getting anywhere"),
+        ("blocked_by_policy", "security settings"),
+        ("unsupported", "program or feature"),
+        ("missing_app", "program or feature"),
+        ("missing_window", "could not be found"),
+        ("validation", "requests as invalid"),
+        ("invalid_arguments", "requests as invalid"),
+        ("service_refused", "not available right now"),
+    ];
+
+    for (class, expected_copy) in cases {
+        let outcome = classified_halt(
+            "Interrompo: bloqueado por segurança; o texto foi traduzido.",
+            class,
+        );
+        let close = classified_halt_close(&outcome)
+            .unwrap_or_else(|| panic!("typed `{class}` cause must close the turn"));
+        assert!(
+            close.output.contains(expected_copy),
+            "typed `{class}` cause must use its stop-category copy: {}",
+            close.output
+        );
+        assert_eq!(
+            close.usage.model_calls, 0,
+            "typed `{class}` cause closes without another model call"
+        );
+        let stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
+            outcome.breaker_halt.as_deref(),
+            outcome.failure_cause.clone(),
+            false,
+            false,
+        )
+        .expect("typed stop remains projected");
+        assert_eq!(
+            stop.operation.as_deref(),
+            Some("search"),
+            "typed `{class}` cause keeps its operation"
+        );
+    }
+}
+
 #[tokio::test]
 async fn typed_cause_without_halt_note_still_closes_and_keeps_operation() {
     let mut outcome = classified_halt("", "provider_config");
