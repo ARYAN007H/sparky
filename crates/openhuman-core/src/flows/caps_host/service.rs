@@ -171,6 +171,16 @@ impl CapsHostService {
         &self,
         request: runs::AgentRunRequest,
     ) -> tinybus::Result<runs::AgentRunHandle> {
+        if request
+            .identity
+            .run_id
+            .as_deref()
+            .is_some_and(|run_id| run_id != self.0.run_id)
+        {
+            return Err(tinybus::Error::failed(
+                "agent request belongs to a different workflow run",
+            ));
+        }
         if !valid_agent_request_id(&request.client_request_id) {
             return Err(tinybus::Error::failed(
                 "AgentRun requires a nonempty bounded client_request_id",

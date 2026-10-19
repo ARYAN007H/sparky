@@ -86,3 +86,28 @@ fn malformed_agent_request_ids_are_rejected() {
     assert!(!valid_agent_request_id(&"x".repeat(129)));
     assert!(valid_agent_request_id("client-request-1"));
 }
+
+#[tokio::test]
+async fn agent_run_rejects_an_identity_from_another_bound_run() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let binding = super::super::binding_tests::binding(
+        crate::core::runtime::DispatchCtx::unbound(),
+        &temp,
+    );
+    let service = CapsHostService::new(Arc::new(binding));
+    let member = tinybus::MemberName::new(runs::caps::AGENT_RUN).unwrap();
+    let error = tinybus::service::Interface::call(
+        &service,
+        &member,
+        serde_json::json!([{
+            "client_request_id":"request-1",
+            "agent":{"id":"agent"},
+            "identity":{"run_id":"different-run"},
+            "config":{}
+        }]),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.to_string().contains("different workflow run"));
+}
