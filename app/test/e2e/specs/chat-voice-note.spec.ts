@@ -32,7 +32,7 @@ const REPLY = 'I will remind you about the dentist.';
 
 function silentWavBase64() {
   const sampleRate = 8000;
-  const samples = new Uint8Array(sampleRate / 2);
+  const samples = new Uint8Array(sampleRate * 5);
   const bytes = new Uint8Array(44 + samples.length);
   const view = new DataView(bytes.buffer);
   const tag = (offset, value) =>
