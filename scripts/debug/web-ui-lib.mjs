@@ -57,6 +57,24 @@ export async function ensureSignedInChat(page, appOrigin) {
   await composer.waitFor({ state: "visible", timeout: 120_000 });
 }
 
+/** Create an authenticated core RPC client with a bounded request lifetime. */
+export function createCoreRpcClient(rpcUrl, token, fetchImpl = fetch, timeoutMs = 10_000) {
+  return async (method, params = {}) => {
+    const res = await fetchImpl(rpcUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const body = await res.json();
+    if (body.error) throw new Error(`${method}: ${body.error.message}`);
+    return body.result;
+  };
+}
+
 export const USAGE = `Usage: pnpm debug web [options]
 
 Boots a throwaway stack — mock backend, a fresh \`openhuman-core serve\` on a

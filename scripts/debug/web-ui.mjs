@@ -24,6 +24,7 @@ import {
   devConnectUrl,
   ensureSignedInChat,
   coreLaunchSpec,
+  createCoreRpcClient,
   freePort,
   isLoopback,
   mergeChildEnv,
@@ -269,19 +270,7 @@ async function main() {
     return file;
   };
 
-  const rpc = async (method, params = {}) => {
-    const res = await fetch(rpcUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
-    });
-    const body = await res.json();
-    if (body.error) throw new Error(`${method}: ${body.error.message}`);
-    return body.result;
-  };
+  const rpc = createCoreRpcClient(rpcUrl, token);
 
   // The first load compiles the app's modules on demand; give it room.
   page.setDefaultNavigationTimeout(120_000);

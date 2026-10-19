@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   coreLaunchSpec,
+  createCoreRpcClient,
   devConnectUrl,
   ensureSignedInChat,
   mergeChildEnv,
@@ -81,6 +82,25 @@ test("ensureSignedInChat propagates its bounded composer wait failure", async ()
     (error) => error === timeout,
   );
   assert.equal(navigatedTo, "http://localhost:1420/#/chat");
+});
+
+test("core RPC client bounds a stalled request and propagates its timeout", async () => {
+  let signal;
+  const hangingFetch = (_url, init) => {
+    signal = init.signal;
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  };
+  const rpc = createCoreRpcClient(
+    "http://127.0.0.1:7788/rpc",
+    "test-token",
+    hangingFetch,
+    5,
+  );
+
+  await assert.rejects(rpc("openhuman.auth_get_state"), { name: "TimeoutError" });
+  assert.equal(signal.aborted, true);
 });
 
 test("coreLaunchSpec isolates the core from operator credentials, storage, and dotenv", () => {
