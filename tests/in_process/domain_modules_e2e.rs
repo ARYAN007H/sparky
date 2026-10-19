@@ -1191,7 +1191,7 @@ async fn composio_controller_validation_rejects_malformed_params_over_rpc() {
             62,
             "openhuman.composio_list_tools",
             json!({ "toolkits": "gmail" }),
-            "invalid 'toolkits'",
+            "invalid type for param 'toolkits' in composio.list_tools: expected array, got string",
         ),
         (
             63,
