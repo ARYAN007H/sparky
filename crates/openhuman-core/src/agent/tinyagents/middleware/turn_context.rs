@@ -366,6 +366,7 @@ impl TurnContextMiddleware {
             autocompact_enabled: true,
             compaction: Default::default(),
             transcript_snapshot: None,
+            new_input_screened: false,
         }
     }
 

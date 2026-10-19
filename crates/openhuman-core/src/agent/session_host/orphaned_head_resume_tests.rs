@@ -248,7 +248,7 @@ async fn credential_redaction_survives_resume() {
     assert_eq!(first_user, redacted);
     assert!(!first_user.contains(&secret));
     let persisted = head_of(&locator, "thread-credential-redaction");
-    let persisted_json = serde_json::to_string(&persisted).expect("serialize transcript");
+    let persisted_json = serde_json::to_string(&persisted.messages).expect("serialize transcript");
     assert!(!persisted_json.contains(&secret));
     assert!(persisted_json.contains(&redacted));
 

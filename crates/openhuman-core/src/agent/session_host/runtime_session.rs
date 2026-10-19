@@ -289,6 +289,7 @@ impl OpenHumanSessionHost {
             autocompact_enabled,
             compaction,
             transcript_snapshot: None,
+            new_input_screened: false,
         };
         let driver = Arc::new(OpenHumanSessionDriver::new(
             self.turn_model_source.clone(),
