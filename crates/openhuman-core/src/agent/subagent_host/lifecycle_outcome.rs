@@ -12,7 +12,7 @@ pub(super) fn encode_classified_stop_cause(
 ) -> serde_json::Value {
     let stop = crate::agent::turn_projection::breaker_stop_with_cause(cause.clone());
     serde_json::json!({
-        "class": stop.failure_class.as_ref().map(|class| class.as_str()),
+        "class": stop.failure_class.as_deref(),
         "operation": stop.operation,
     })
 }
