@@ -80,14 +80,24 @@ fn a_queue_url_selects_the_backend() {
     let mut config = Config::default();
     config.inbound.queue_url = Some("storage".into());
     assert_eq!(resolve(&config).unwrap().backend, QueueConfig::Storage);
-    // This build carries no broker driver: an AMQP URL is refused by name.
+    // Credentials over plaintext AMQP are refused before anything connects.
     config.inbound.queue_url = Some("amqp://guest:guest@localhost/".into());
     let refused = resolve(&config).unwrap_err();
-    assert!(refused.contains("rabbitmq"), "{refused}");
+    assert!(refused.contains("amqps://"), "{refused}");
     assert!(
         !refused.contains("guest:guest"),
         "credentials leaked: {refused}"
     );
+    // This build carries no broker driver: an AMQP URL is refused by name.
+    for url in ["amqp://localhost/", "amqps://guest:guest@localhost/"] {
+        config.inbound.queue_url = Some(url.into());
+        let refused = resolve(&config).unwrap_err();
+        assert!(refused.contains("rabbitmq"), "{url}: {refused}");
+        assert!(
+            !refused.contains("guest:guest"),
+            "credentials leaked: {refused}"
+        );
+    }
 }
 
 #[tokio::test]
