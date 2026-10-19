@@ -154,7 +154,41 @@ async fn execute_rejects_too_many_slides() {
     let args = json!({ "title": "Big deck", "slides": slides });
     let result = tool.execute(args).await.expect("execute returns Ok");
     assert!(result.is_error);
-    assert!(result.text().contains(&MAX_SLIDES.to_string()));
+    assert!(
+        result.text().contains("must contain ≤ 64 slides"),
+        "the tool should preserve the bus limit in its error: {}",
+        result.text()
+    );
+}
+
+#[test]
+fn resolved_presentation_uses_bus_validation_and_preserves_its_limit_error() {
+    let input = GeneratePresentationInput {
+        title: "Deck".to_string(),
+        artifact_id: None,
+        author: None,
+        theme: None,
+        slides: (0..=MAX_SLIDES)
+            .map(|i| super::types::SlideRequest {
+                title: format!("Slide {i}"),
+                body: None,
+                bullets: Vec::new(),
+                speaker_notes: None,
+                images: Vec::new(),
+            })
+            .collect(),
+    };
+    let spec = super::types::to_bus_spec(&input, vec![Vec::new(); input.slides.len()]);
+
+    let error = spec.validate().expect_err("the bus slide limit is enforced");
+    let error = PresentationError::from(error);
+    match error {
+        PresentationError::InvalidInput { field, reason } => {
+            assert_eq!(field, "slides");
+            assert_eq!(reason, "must contain ≤ 64 slides");
+        }
+        other => panic!("expected bus validation to map to InvalidInput, got {other:?}"),
+    }
 }
 
 #[tokio::test]
