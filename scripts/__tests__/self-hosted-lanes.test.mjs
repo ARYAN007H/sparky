@@ -1125,7 +1125,9 @@ test("the ex63 profile logs where the scratch disk's space goes at each lane end
   const seen = [];
   const run = (cmd) => {
     seen.push(cmd);
-    return cmd.startsWith("df") ? "Filesystem Size Used Avail\n/dev/vdb 160G 150G 10G" : "12G\ttarget/ci-private-coverage";
+    return cmd.startsWith("df")
+      ? "Filesystem Size Used Avail\n/dev/vdb 160G 150G 10G"
+      : "12G\ttarget/ci-private-coverage";
   };
   const report = diskUsageReport({ profile: "ex63", scratch: "/scratch", run });
   assert.match(report, /df -h \/scratch/);
@@ -1133,6 +1135,9 @@ test("the ex63 profile logs where the scratch disk's space goes at each lane end
   assert.match(report, /du -sh target\/\*/);
   assert.match(report, /12G\ttarget\/ci-private-coverage/);
   assert.ok(seen.some((c) => c.includes("target/*")));
-  assert.equal(diskUsageReport({ profile: "hosted", scratch: "/scratch", run }), null);
+  assert.equal(
+    diskUsageReport({ profile: "hosted", scratch: "/scratch", run }),
+    null,
+  );
   assert.equal(diskUsageReport({ profile: "ex63", scratch: "", run }), null);
 });

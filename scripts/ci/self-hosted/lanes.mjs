@@ -522,7 +522,9 @@ export class Runner {
       this.finish(id, record.status);
     }
     const disk = diskUsageReport({ profile: this.plan.profile });
-    if (disk) logStream.write(`\n[ci][lanes] lane ${lane.name} end\n${disk}\n`);
+    if (disk) {
+      logStream.write(`\n[ci][lanes] lane ${lane.name} end\n${disk}\n`);
+    }
     await new Promise((res) => logStream.end(res));
     // Dump the whole lane log once, folded, so parallel lanes never interleave.
     const failed = results.some((r) => r.status === "failure" && !r.reportOnly);
