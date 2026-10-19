@@ -1109,6 +1109,7 @@ describe('session expiry fixes (#5868)', () => {
       </CoreStateProvider>
     );
     await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('tok1'));
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockClear();
 
     // The native session owner can clear a rejected credential while a
     // deep-link delivery is still suppressing destructive re-auth handling.
@@ -1125,8 +1126,8 @@ describe('session expiry fixes (#5868)', () => {
       );
     });
 
+    expect(vi.mocked(coreStateApi.fetchCoreAppSnapshot)).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('none'));
-    expect(vi.mocked(coreStateApi.fetchCoreAppSnapshot)).toHaveBeenCalledTimes(2);
     expect(vi.mocked(tauriCommands.logout)).not.toHaveBeenCalled();
   });
 
@@ -1149,6 +1150,7 @@ describe('session expiry fixes (#5868)', () => {
       </CoreStateProvider>
     );
     await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('tok1'));
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockClear();
 
     await act(async () => {
       window.dispatchEvent(
@@ -1161,9 +1163,8 @@ describe('session expiry fixes (#5868)', () => {
       );
     });
 
-    await waitFor(() =>
-      expect(vi.mocked(coreStateApi.fetchCoreAppSnapshot)).toHaveBeenCalledTimes(2)
-    );
+    expect(vi.mocked(coreStateApi.fetchCoreAppSnapshot)).toHaveBeenCalledTimes(1);
+    await act(async () => {});
     expect(screen.getByTestId('token').textContent).toBe('tok1');
     expect(vi.mocked(tauriCommands.logout)).not.toHaveBeenCalled();
   });
