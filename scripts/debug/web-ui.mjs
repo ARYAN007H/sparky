@@ -24,6 +24,7 @@ import {
   devConnectUrl,
   freePort,
   isLoopback,
+  mergeChildEnv,
   parseArgs,
   runStamp,
   USAGE,
@@ -84,14 +85,9 @@ function startChild(name, command, args, env, cwd = repo) {
   const launchArgs = largeStack
     ? ["-c", 'ulimit -s 65520 || exit 1; exec "$@"', "debug-web-core", command, ...args]
     : args;
-  const childEnv = { ...process.env };
-  for (const [key, value] of Object.entries(env)) {
-    if (value === null) delete childEnv[key];
-    else childEnv[key] = value;
-  }
   const child = spawn(launchCommand, launchArgs, {
     cwd,
-    env: childEnv,
+    env: mergeChildEnv(process.env, env),
     stdio: ["ignore", out, out],
     detached: true,
   });

@@ -3,6 +3,16 @@
 // browser, a core or Vite.
 import net from "node:net";
 
+/** Merge child overrides into an inherited environment; null explicitly unsets a key. */
+export function mergeChildEnv(parent, overrides) {
+  const env = { ...parent };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === null) delete env[key];
+    else env[key] = value;
+  }
+  return env;
+}
+
 export const USAGE = `Usage: pnpm debug web [options]
 
 Boots a throwaway stack — mock backend, a fresh \`openhuman-core serve\` on a
