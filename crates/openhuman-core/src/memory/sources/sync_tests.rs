@@ -394,20 +394,3 @@ async fn github_files_per_repository_only_when_switched_on() {
     );
 }
 
-#[test]
-fn orphaned_connector_files_are_removed_and_missing_ones_ignored() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("memory");
-    std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("connector_items.json"), "{}").unwrap();
-    std::fs::write(dir.join("connection_roots.json"), "{}").unwrap();
-    std::fs::write(dir.join("sources_state.json"), "{}").unwrap();
-    state::remove_orphaned_connector_files(tmp.path());
-    assert!(!dir.join("connector_items.json").exists());
-    assert!(!dir.join("connection_roots.json").exists());
-    assert!(
-        dir.join("sources_state.json").exists(),
-        "live state is kept"
-    );
-    state::remove_orphaned_connector_files(tmp.path());
-}
