@@ -56,15 +56,11 @@ async fn flows_get_tool_contract_rpc_warns_for_runtime_gated_uncurated_action() 
 // ── graph_wiring_warnings: required-arg advisory + output-field/split_out.path
 //    advisories (Part 2c/2d) ────────────────────────────────────────────────
 
-/// `graph_wiring_warnings`'s own required-arg check, exercised DIRECTLY
-/// (rather than through `revise_workflow`/`save_workflow`, where the newer
-/// `validate_tool_contracts` hard-rejects the identical condition first —
-/// see `revise_workflow_rejects_a_missing_required_composio_arg` in
-/// `builder_tools_tests.rs`). Keeps this advisory code path covered for any
-/// caller that consults `graph_wiring_warnings` without also running the
-/// hard gate first.
+/// Required args have one authoritative authoring check: the hard host gate.
+/// The TinyFlows advisory surface reports portable wiring diagnostics only,
+/// so this condition must not produce a duplicate warning.
 #[tokio::test]
-async fn graph_wiring_warnings_flags_a_missing_required_arg() {
+async fn wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejects() {
     seed_live_catalog_cache("slack", vec![seeded_slack_send_contract()]);
     let config = Config::default();
     let g = graph(json!({
@@ -78,10 +74,13 @@ async fn graph_wiring_warnings_flags_a_missing_required_arg() {
     }));
     let warnings = graph_wiring_warnings(&config, &g).await;
     assert!(
-        warnings
-            .iter()
-            .any(|w| w.contains("`text`") && w.contains("post")),
+        warnings.is_empty(),
         "{warnings:?}"
+    );
+    let errors = crate::flows::host_gates::validate_tool_contracts(&config, &g).await;
+    assert!(
+        errors.iter().any(|error| error.contains("text") && error.contains("post")),
+        "the hard host gate must remain authoritative: {errors:?}"
     );
 }
 
