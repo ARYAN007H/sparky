@@ -12,7 +12,7 @@
  *   9.3.1  Scoped Email Fetch — skill fetches emails within allowed scope
  *   9.3.2  Time-Range Filtering — time-based email filtering works
  *   9.3.3  Attachment Handling — attachment tools available
- *   9.4.1  Manual Disconnect — disconnect flow with confirmation
+ *   9.4.1  Manual Disconnect — current Composio UI returns to Connect state
  *   9.4.2  Token Revocation Handling — app handles revoked token gracefully
  *   9.4.3  Expired Token Refresh Flow — app handles expired tokens
  *   9.4.4  Re-Authorization Flow — setup wizard accessible after disconnect
