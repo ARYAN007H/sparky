@@ -156,7 +156,10 @@ async fn external_config_conflict_refreshes_the_context_before_the_next_read() {
     let conflict = CoreContext::scope(ctx.clone(), async {
         (controller.handler)(
             DispatchCtx::new(ctx.clone()),
-            json!({"default_temperature": 0.8}).as_object().unwrap().clone(),
+            json!({"default_temperature": 0.8})
+                .as_object()
+                .unwrap()
+                .clone(),
         )
         .await
         .unwrap_err()

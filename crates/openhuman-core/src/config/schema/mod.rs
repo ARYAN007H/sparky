@@ -3,9 +3,9 @@
 //! Split into submodules; this module re-exports the main `Config` and all public types.
 
 pub mod cloud_providers;
-pub use cloud_providers::{generate_provider_id, is_slug_reserved, AuthStyle, CloudProviderCreds};
+pub use cloud_providers::{AuthStyle, CloudProviderCreds, generate_provider_id, is_slug_reserved};
 pub mod ephemeral_route;
-pub use ephemeral_route::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
+pub use ephemeral_route::{EPHEMERAL_ROUTE_SLUG, EphemeralRoute};
 pub mod resolved_endpoints;
 pub use resolved_endpoints::ResolvedEndpoints;
 mod agent;
@@ -33,17 +33,17 @@ pub use hosting::HostingConfig;
 pub mod storage;
 pub use storage::StorageConfig;
 pub mod profile_layout;
-pub use profile_layout::{users_dir, ProfileLayout};
+pub use profile_layout::{ProfileLayout, users_dir};
 mod identity_cost;
 pub(crate) mod load;
 pub(crate) use load::config_from_toml_str;
 pub(crate) use load::source::storage_schema::storage_schema as config_storage_schema;
 pub use load::{
-    action_dir_env_override, active_user_marker_path, active_workspace_dir,
+    PRE_LOGIN_USER_ID, action_dir_env_override, active_user_marker_path, active_workspace_dir,
     active_workspace_dir_cached, active_workspace_snapshot, clear_active_user, default_action_dir,
     default_files_dir, default_projects_dir, default_root_openhuman_dir, pre_login_user_dir,
     read_active_user_id, resolve_action_dir, resolve_files_dir, user_openhuman_dir,
-    write_active_user_id, PRE_LOGIN_USER_ID,
+    write_active_user_id,
 };
 // Crate-internal: the invalidation half of the cached active workspace. The
 // marker writers in `load_user_state` call it from outside `load`; the
@@ -100,19 +100,18 @@ pub use identity_cost::{
 pub use local_ai::{LocalAiConfig, LocalAiUsage};
 pub use memes::MemesConfig;
 pub use memory::{
-    migrate_legacy_source, MemoryAgentConfig, MemoryConfig, MemoryConversationsConfig,
+    MEMORY_CORTEXDB_KEY_NAME, MemoryAgentConfig, MemoryConfig, MemoryConversationsConfig,
     MemoryEngineSettings, MemoryLayoutMode, MemoryRecallConfig, MemorySourceConfig,
-    MemorySourceKind, MEMORY_CORTEXDB_KEY_NAME,
+    MemorySourceKind, migrate_legacy_source,
 };
 pub use modules::{
-    module_source_env_for, ModuleOverride, ModuleSourceMode, ModulesConfig, MODULE_SOURCE_ENV,
+    MODULE_SOURCE_ENV, ModuleOverride, ModuleSourceMode, ModulesConfig, module_source_env_for,
 };
 pub use observability::{AgentTracingBackend, AgentTracingConfig, ObservabilityConfig};
 pub use privacy::{PrivacyConfig, PrivacyMode};
 pub use proxy::{
-    apply_runtime_proxy_to_builder, build_runtime_proxy_client,
+    ProxyConfig, ProxyScope, apply_runtime_proxy_to_builder, build_runtime_proxy_client,
     build_runtime_proxy_client_with_timeouts, runtime_proxy_config, set_runtime_proxy_config,
-    ProxyConfig, ProxyScope,
 };
 pub use routes::{EmbeddingRouteConfig, ModelRouteConfig};
 pub use runtime::{
@@ -123,17 +122,17 @@ pub use scheduler_gate::{PauseReason, Policy, SchedulerGateConfig, SchedulerGate
 pub use task_sources::TaskSourcesConfig;
 pub use tokenjuice::TokenjuiceConfig;
 pub use tools::{
-    BrowserComputerUseConfig, BrowserConfig, ComposioConfig, ComposioDirectBaseUrls,
-    ComposioHostCredential, CurlConfig, GitbooksConfig, HttpHeader, HttpRequestConfig,
-    IntegrationToggle, IntegrationsConfig, LegacySearchInputs, McpAuthConfig, McpClientConfig,
-    McpClientIdentityConfig, McpServerConfig, McpToolExposure, MultimodalConfig,
-    MultimodalFileConfig, PresentationMode, ProviderRoute, SearchConfig, SearchEngineCredentials,
+    BrowserComputerUseConfig, BrowserConfig, COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT,
+    COMPOSIO_MODE_DISABLED, ComposioConfig, ComposioDirectBaseUrls, ComposioHostCredential,
+    CurlConfig, GitbooksConfig, HttpHeader, HttpRequestConfig, IntegrationToggle,
+    IntegrationsConfig, LegacySearchInputs, MANAGED_SEARCH_PROVIDERS, McpAuthConfig,
+    McpClientConfig, McpClientIdentityConfig, McpServerConfig, McpToolExposure, MultimodalConfig,
+    MultimodalFileConfig, PresentationMode, ProviderRoute, SEARCH_ENGINE_BRAVE,
+    SEARCH_ENGINE_DISABLED, SEARCH_ENGINE_EXA, SEARCH_ENGINE_MANAGED, SEARCH_ENGINE_PARALLEL,
+    SEARCH_ENGINE_QUERIT, SEARCH_ENGINE_TAVILY, SEARCH_PROVIDERS, SEARCH_ROLE_ANSWER,
+    SEARCH_ROLE_CONTENTS, SEARCH_ROLE_SEARCH, SEARCH_ROLES, SearchConfig, SearchEngineCredentials,
     SearchHostCredential, SearchProviderSettings, SearxngConfig, SecretsConfig, SeltzConfig,
-    UnknownKeyedSearchProvider, WebSearchConfig, COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT,
-    COMPOSIO_MODE_DISABLED, MANAGED_SEARCH_PROVIDERS, SEARCH_ENGINE_BRAVE, SEARCH_ENGINE_DISABLED,
-    SEARCH_ENGINE_EXA, SEARCH_ENGINE_MANAGED, SEARCH_ENGINE_PARALLEL, SEARCH_ENGINE_QUERIT,
-    SEARCH_ENGINE_TAVILY, SEARCH_PROVIDERS, SEARCH_ROLES, SEARCH_ROLE_ANSWER, SEARCH_ROLE_CONTENTS,
-    SEARCH_ROLE_SEARCH,
+    UnknownKeyedSearchProvider, WebSearchConfig,
 };
 pub use update::{UpdateConfig, UpdateRestartStrategy};
 pub use web_chat_config::WebChatConfig;
@@ -143,8 +142,9 @@ pub mod voice_live;
 pub mod voice_providers;
 pub use voice_live::LiveVoiceConfig;
 pub use voice_providers::{
-    generate_voice_provider_id, is_voice_slug_reserved, BuiltinVoiceProvider, VoiceCapability,
-    VoiceProviderCreds, BUILTIN_VOICE_PROVIDERS,
+    BUILTIN_VOICE_PROVIDERS, BuiltinVoiceProvider, VoiceCapability, VoiceProviderCreds,
+    generate_voice_provider_id, is_voice_slug_reserved,
 };
 mod types;
+pub(crate) use types::ConfigDocumentSnapshot;
 pub use types::*;

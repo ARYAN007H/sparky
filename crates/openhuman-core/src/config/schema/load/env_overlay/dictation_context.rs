@@ -1,7 +1,7 @@
 //! Env overrides for dictation and the context-management budget.
 
-use crate::config::schema::load::env::EnvLookup;
 use crate::config::schema::Config;
+use crate::config::schema::load::env::EnvLookup;
 
 impl Config {
     pub(super) fn apply_dictation_env<E: EnvLookup + ?Sized>(&mut self, env: &E) {

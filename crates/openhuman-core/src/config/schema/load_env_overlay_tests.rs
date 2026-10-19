@@ -101,11 +101,12 @@ fn env_overlay_output_language_accepts_non_empty_value() {
 
     cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_OUTPUT_LANGUAGE", "zh-CN"));
     assert_eq!(cfg.output_language.as_deref(), Some("zh-CN"));
-    assert!(cfg
-        .output_language_directive()
-        .as_deref()
-        .unwrap_or_default()
-        .contains("Simplified Chinese"));
+    assert!(
+        cfg.output_language_directive()
+            .as_deref()
+            .unwrap_or_default()
+            .contains("Simplified Chinese")
+    );
 
     cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_OUTPUT_LANGUAGE", "   "));
     assert_eq!(

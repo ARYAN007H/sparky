@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
 use tinyinference_providers::builtin::{
-    BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
+    BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS, BuiltinAuthStyle,
 };
 
 /// A built-in cloud provider preset in the host's [`AuthStyle`] vocabulary.

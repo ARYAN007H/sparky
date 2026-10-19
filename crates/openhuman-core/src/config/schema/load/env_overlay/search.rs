@@ -1,11 +1,11 @@
 //! Env overrides for web search: provider set, routes, roles, keys, and the
 //! Seltz/SearXNG options.
 
-use crate::config::schema::load::env::parse_env_bool;
 use crate::config::schema::load::env::EnvLookup;
+use crate::config::schema::load::env::parse_env_bool;
 use crate::config::schema::{
-    Config, PresentationMode, ProviderRoute, SearchProviderSettings, MANAGED_SEARCH_PROVIDERS,
-    SEARCH_PROVIDERS, SEARCH_ROLES,
+    Config, MANAGED_SEARCH_PROVIDERS, PresentationMode, ProviderRoute, SEARCH_PROVIDERS,
+    SEARCH_ROLES, SearchProviderSettings,
 };
 
 impl Config {
@@ -158,7 +158,9 @@ impl Config {
             }));
         }
         if let Some(value) = env.get_any(&["OPENHUMAN_GEMINI_ROUTE"]) {
-            log::warn!("[config][search] OPENHUMAN_GEMINI_ROUTE is deprecated; use OPENHUMAN_SEARCH_ROUTES=gemini=<route>");
+            log::warn!(
+                "[config][search] OPENHUMAN_GEMINI_ROUTE is deprecated; use OPENHUMAN_SEARCH_ROUTES=gemini=<route>"
+            );
             routes.push(("gemini".into(), value));
         }
         for (provider, route) in routes {
@@ -205,7 +207,9 @@ impl Config {
             }
         }
         if env.contains("OPENHUMAN_PARALLEL_ROUTE") {
-            log::warn!("[config][search] managed Parallel is no longer offered; OPENHUMAN_PARALLEL_ROUTE is ignored (Parallel uses your own key)");
+            log::warn!(
+                "[config][search] managed Parallel is no longer offered; OPENHUMAN_PARALLEL_ROUTE is ignored (Parallel uses your own key)"
+            );
         }
         if let Some(key) = env.get_any(&["OPENHUMAN_PARALLEL_API_KEY", "PARALLEL_API_KEY"]) {
             if !key.trim().is_empty() {

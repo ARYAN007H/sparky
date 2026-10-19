@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 
 pub use load_user_state::{
-    active_user_marker_path, clear_active_user, pre_login_user_dir, read_active_user_id,
-    read_active_user_id_checked_async, user_openhuman_dir, write_active_user_id, PRE_LOGIN_USER_ID,
+    PRE_LOGIN_USER_ID, active_user_marker_path, clear_active_user, pre_login_user_dir,
+    read_active_user_id, read_active_user_id_checked_async, user_openhuman_dir,
+    write_active_user_id,
 };
 // Sync variant is consumed only by the `read_active_user_id` wrapper (in
 // load_user_state) and the load_tests module; the async resolver below uses

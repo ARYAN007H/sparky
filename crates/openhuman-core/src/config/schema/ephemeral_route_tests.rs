@@ -143,10 +143,12 @@ fn apply_without_a_model_changes_nothing() {
     apply(&mut config, route());
     assert!(config.ephemeral_route.is_none());
     assert!(config.chat_provider.is_none());
-    assert!(config
-        .cloud_providers
-        .iter()
-        .all(|entry| entry.slug != EPHEMERAL_ROUTE_SLUG));
+    assert!(
+        config
+            .cloud_providers
+            .iter()
+            .all(|entry| entry.slug != EPHEMERAL_ROUTE_SLUG)
+    );
 }
 
 #[test]
