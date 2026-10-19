@@ -305,7 +305,7 @@ test("private coverage executes every package configuration once and reports aft
   // resolves (and builds) the core and its dependencies once for all of them.
   const unified = selections.filter((line) =>
     line.includes(
-      "--features channels,storage-file --no-report --no-fail-fast -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
+      "--features channels --no-report --no-fail-fast -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
     ),
   );
   assert.equal(unified.length, 4);
