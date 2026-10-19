@@ -80,6 +80,8 @@ pub(crate) struct ScriptedTriage {
     script: Mutex<VecDeque<Step>>,
     runs: AtomicUsize,
     applied: Mutex<Vec<String>>,
+    failing_applies: AtomicUsize,
+    apply_delay: Mutex<Duration>,
 }
 
 impl ScriptedTriage {
@@ -89,6 +91,16 @@ impl ScriptedTriage {
             script: Mutex::new(steps.into_iter().map(Into::into).collect()),
             ..Self::default()
         })
+    }
+
+    /// Fail the next `n` applies.
+    pub(crate) fn fail_next_applies(&self, n: usize) {
+        self.failing_applies.store(n, Ordering::SeqCst);
+    }
+
+    /// Take `delay` over every apply.
+    pub(crate) fn slow_applies(&self, delay: Duration) {
+        *self.apply_delay.lock().unwrap() = delay;
     }
 
     /// How many triage runs happened.
@@ -147,6 +159,17 @@ impl TriageRunner for ScriptedTriage {
         _run: TriageRun,
         envelope: &TriggerEnvelope,
     ) -> anyhow::Result<()> {
+        let delay = *self.apply_delay.lock().unwrap();
+        if !delay.is_zero() {
+            tokio::time::sleep(delay).await;
+        }
+        let failing = self
+            .failing_applies
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok();
+        if failing {
+            return Err(anyhow::anyhow!("scripted apply failure"));
+        }
         self.applied
             .lock()
             .unwrap()

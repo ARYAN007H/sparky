@@ -282,3 +282,42 @@ async fn the_default_deliverer_reads_attempts_from_the_configured_queues() {
         .await;
     assert_eq!(response.status, DeliverStatus::Retry { after_ms: None });
 }
+
+#[tokio::test]
+async fn a_failed_apply_is_retried_instead_of_acknowledged() {
+    // The agent dispatch fails: the turn must stay recoverable.
+    let triage = ScriptedTriage::new([
+        decision(TriageAction::React),
+        decision(TriageAction::React),
+    ]);
+    triage.fail_next_applies(1);
+    let deliverer = deliverer(&triage);
+    let first = deliverer
+        .deliver(turn(vec![trigger_event("u1")], Lane::Background, 1))
+        .await;
+    assert_eq!(first.status, DeliverStatus::Retry { after_ms: None });
+    assert!(triage.applied().is_empty());
+    // The redelivery is not treated as already accepted: it decides and
+    // applies again.
+    let second = deliverer
+        .deliver(turn(vec![trigger_event("u1")], Lane::Background, 2))
+        .await;
+    assert_eq!(second.status, DeliverStatus::Accepted);
+    assert_eq!(triage.applied().len(), 1);
+    assert_eq!(triage.runs(), 2);
+}
+
+#[tokio::test]
+async fn a_long_apply_is_acknowledged_at_the_budget_and_finishes_on_its_own() {
+    let triage = ScriptedTriage::new([decision(TriageAction::Escalate)]);
+    triage.slow_applies(Duration::from_millis(300));
+    let deliverer = deliverer(&triage).with_budget(Duration::from_millis(50));
+    let started = std::time::Instant::now();
+    let response = deliverer
+        .deliver(turn(vec![trigger_event("u1")], Lane::Background, 1))
+        .await;
+    assert_eq!(response.status, DeliverStatus::Accepted);
+    assert!(started.elapsed() < Duration::from_millis(300));
+    let applied = triage.until_applied(1, Duration::from_secs(5)).await;
+    assert_eq!(applied.len(), 1);
+}
