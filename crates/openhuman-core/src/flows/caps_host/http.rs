@@ -163,7 +163,7 @@ impl OpenHumanHttp {
                     &(tinyflows_bus::portability::PrepareHttpRequest {
                         request,
                         credential: tinyflows_bus::portability::HttpCredentialTemplate::Resolved {
-                            header,
+                            header: header.clone(),
                             value,
                         },
                     },),
