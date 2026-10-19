@@ -441,6 +441,12 @@ impl Config {
         } else {
             None
         };
+        let overlay_base_after_save =
+            if update_snapshot && self.context_overlay.lock().unwrap().is_some() {
+                Some(serde_json::to_value(self).context("Failed to snapshot config context")?)
+            } else {
+                None
+            };
         let version = match source.write_versioned(&toml_str, expected).await {
             Ok(version) => version,
             Err(error) => {
@@ -458,7 +464,14 @@ impl Config {
             version,
             anchor: Some(source_anchor.clone()),
         };
-        *self.context_overlay.lock().unwrap() = None;
+        if let Some(base) = overlay_base_after_save {
+            let existing_overlay = { self.context_overlay.lock().unwrap().clone() };
+            if let Some(overlay) = existing_overlay {
+                let mut advanced = (*overlay).clone();
+                advanced.base = base;
+                *self.context_overlay.lock().unwrap() = Some(std::sync::Arc::new(advanced));
+            }
+        }
 
         if let Some(snapshot) = self
             .context_snapshot
