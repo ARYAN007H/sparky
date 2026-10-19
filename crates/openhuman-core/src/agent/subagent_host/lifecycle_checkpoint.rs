@@ -13,3 +13,7 @@ pub(super) fn absolute_checkpoint_dir(path: PathBuf) -> PathBuf {
         }
     })
 }
+
+#[cfg(test)]
+#[path = "lifecycle_checkpoint_tests.rs"]
+mod tests;
