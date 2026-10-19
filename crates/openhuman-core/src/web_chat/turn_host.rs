@@ -262,7 +262,10 @@ impl WebHost {
                 turn_deadline: request.deadline,
                 // Also the turn's workspace, so attachment reads and
                 // delegated sub-agents use the upload folder (#7714).
-                workspace: thread_dir.map(tinytools::WorkspaceDescriptor::new),
+                workspace: thread_dir
+                    .map(tinytools::WorkspaceDescriptor::new)
+                    .map(crate::agent::turn_host::WorkspaceBinding::Set)
+                    .unwrap_or(crate::agent::turn_host::WorkspaceBinding::Clear),
                 host_env: Default::default(),
             },
         ));

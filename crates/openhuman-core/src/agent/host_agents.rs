@@ -115,7 +115,7 @@ impl HostAgent {
                 run_queue: None,
                 cancellation,
                 turn_deadline,
-                workspace: None,
+                workspace: crate::agent::turn_host::WorkspaceBinding::Preserve,
                 host_env: crate::agent::turn_env::HostTurnEnv {
                     hooks: self.hooks.clone(),
                     core: Some(Arc::downgrade(&self.context)),
