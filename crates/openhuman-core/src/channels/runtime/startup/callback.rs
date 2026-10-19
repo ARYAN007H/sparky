@@ -124,6 +124,38 @@ impl ChannelHostCallbacks {
             return Ok(());
         }
 
+        // v22 providers deliver the normalized envelope directly through the
+        // same host callback. Keep it intact until module preparation derives
+        // the legacy prompt projection and scoped identity. A typed-looking
+        // payload must never fall through and be reinterpreted as v21 text.
+        let typed_envelope = message
+            .get("channel")
+            .is_some_and(serde_json::Value::is_object)
+            || ["conversation", "parts", "access"]
+                .iter()
+                .any(|field| message.get(*field).is_some());
+        if typed_envelope {
+            let envelope: tinychannels_bus::ChannelInboundEnvelope =
+                serde_json::from_value(message)
+                    .map_err(|_| Error::failed("invalid inbound envelope"))?;
+            if channel.trim().is_empty()
+                || envelope.channel.id != tinychannels_bus::provider_id(&channel)
+                || envelope.channel.account_id.as_deref() != Some(channel.as_str())
+                || envelope.message_id.trim().is_empty()
+                || envelope.conversation.id.trim().is_empty()
+            {
+                return Err(Error::failed("inbound envelope identity is invalid"));
+            }
+            self.dispatch
+                .send(RuntimeChannelMessage::with_inbound_envelope(
+                    tinychannels_bus::ChannelMessage::default(),
+                    envelope,
+                ))
+                .await
+                .map_err(|_| Error::failed("channel dispatch is closed"))?;
+            return Ok(());
+        }
+
         let message: tinychannels_bus::ChannelMessage = serde_json::from_value(message)
             .map_err(|_| Error::failed("invalid inbound message"))?;
         if message.channel != channel {
