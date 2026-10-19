@@ -12,7 +12,7 @@ pub(crate) type EngineError = CapsError;
 impl fmt::Display for CapsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Capability(message) => f.write_str(message),
+            Self::Capability(message) => write!(f, "capability error: {message}"),
         }
     }
 }

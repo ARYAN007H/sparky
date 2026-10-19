@@ -14,6 +14,10 @@ pub(crate) mod tools;
 
 pub(crate) use binding::{CapsHostRegistration, serve};
 pub(crate) use error::{CapsError, EngineError, Result};
+pub(crate) use code::OpenHumanCode;
+pub(crate) use http::{
+    OpenHumanHttp, resolve_http_credential,
+};
 pub(crate) use llm::OpenHumanLlm;
 pub(crate) use service::CapsHostService;
 pub(crate) use tools::OpenHumanTools;
@@ -21,7 +25,7 @@ pub(crate) use tier::{
     close_audit, current_tier_policy, enforce_current_node_tier_gate,
     enforce_node_tier_gate, gate_call_for_tier,
 };
-pub(crate) use tools::NATIVE_TOOL_PREFIX;
+pub(crate) use tools::{NATIVE_TOOL_PREFIX, classify_composio_action_for_tier};
 
 #[cfg(test)]
 #[path = "ops_tests.rs"]
