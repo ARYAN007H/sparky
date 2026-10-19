@@ -1,0 +1,32 @@
+Transcribed from exec session 46730; this is not a raw log.
+
+Command:
+RUST_TEST_THREADS=1 RUST_MIN_STACK=16777216 scripts/ci-cancel-aware.sh cargo test --manifest-path Cargo.toml -p openhuman wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejects -- --nocapture
+
+Terminal result:
+Finished `test` profile [unoptimized + debuginfo] target(s) in 5m 11s
+Running unittests src/lib.rs (target/debug/deps/openhuman_core-892fcbd058403dd6)
+
+running 1 test
+test flows::ops::tests::tool_contract_and_wiring_warnings_tests::wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejects ...
+thread 'flows::ops::tests::tool_contract_and_wiring_warnings_tests::wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejects' (2033591) panicked at crates/openhuman-core/src/flows/ops_tool_contract_and_wiring_warnings_tests.rs:76:5:
+["Node 'post': required arg `text` of `SLACK_SEND_MESSAGE` is not wired — set args.text, e.g. \"=nodes.<upstream_id>.item.json.<field>\" (an agent feeding this value needs an output schema — `output_parser.schema` — so its fields are addressable)."]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    flows::ops::tests::tool_contract_and_wiring_warnings_tests::wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejects
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 9860 filtered out; finished in 0.11s
+
+error: test failed, to rerun pass `-p openhuman --lib`
+
+Numeric exit code: 101
+
+Snapshot provenance:
+- Base HEAD before test edit: 4b8d5bf5cc9f928827f370a48c74eedf4845e8bd.
+- Test-only checkpoint HEAD at test result: a2347ac7275b7e8d6b2fb5b0ac3dc59a1c7b0674.
+- Test file SHA-256 during run and after result: 626c69d8dd7bf97208eaa6e37929167f67014e1cfa74f7d8adaa553e3a70ccce.
+- Source was frozen from test creation through numeric exit; no implementation edits occurred before the RED result.
