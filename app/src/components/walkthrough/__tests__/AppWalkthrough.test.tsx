@@ -550,12 +550,8 @@ describe('createWalkthroughSteps', () => {
     const navigate = vi.fn();
     const steps = createWalkthroughSteps(navigate);
 
-    // Steps: 0=chat, 1=integrations, 2=channels, 3=settings, 4=chat-tab, 6=chat-welcome.
-    // The tail has shifted as obsolete targets/features were removed: the
-    // Human, Feedback and Memory nav entries, followed by the two Home anchors.
-    // (Human has no nav row — the chat composer's idle button opens it), when
-    // the Feedback step went with the sidebar icon it pointed at, and when the
-    // Memory nav step went with Memory's move under Connections.
+    // Steps: 0=chat, 1=integrations, 2=channels, 3=settings, 4=chat-tab,
+    // 6=chat-welcome. The same-shell Connections nav step is index 5.
     const crossPageIndices = [0, 1, 2, 3, 4, 6];
     for (const idx of crossPageIndices) {
       expect(typeof steps[idx].before, `step[${idx}] should have a before fn`).toBe('function');
@@ -606,6 +602,7 @@ describe('createWalkthroughSteps', () => {
       '[data-walkthrough="settings-menu"]',
       '[data-walkthrough="tab-chat"]',
       '[data-walkthrough="tab-connections"]',
+      '[data-walkthrough="chat-agent-panel"]',
     ]);
     expect(steps).toHaveLength(7);
     expect(targets).not.toContain('[data-walkthrough="home-card"]');
