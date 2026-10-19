@@ -215,11 +215,10 @@ pub fn spawn_update_scheduler() -> tokio::task::JoinHandle<()> {
     })
 }
 
-/// Boot-time flow-run reconciliation (bug B42): reconciles any `flow_runs` row
-/// left at `running` by a prior process (crash/SIGKILL/power loss — where the
-/// in-process `RunRowFinalizer` drop-guard never got to run) to a terminal
-/// `interrupted`, so the run-details sidebar never shows a perpetual blank
-/// spinner for a run nothing is executing.
+/// Boot-time flow-run reconciliation: asks the TinyFlows Runs module to mark
+/// eligible local orphan rows left at `running` by a prior process as
+/// `interrupted`. The module owns the boot floor, live-actor checks, CAS,
+/// summary, checkpoint and terminal-event cleanup.
 ///
 /// Owned by the flows domain rather than piggybacked on cron bootstrap: runs
 /// can be started by the RPC "Run" control, the agent `run_flow` tool and the
