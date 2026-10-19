@@ -124,9 +124,10 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // user-configured `[agent].agent_timeout_secs` (#5027).
     // Model, tools and the identity-refreshing system prompt (`turn_parts`),
     // shared with the hosted-channel relay.
+    #[cfg(all(feature = "flows", feature = "skills"))]
+    crate::skills::schedule_flow_authoring_prewarm(&dispatch, &config, None);
     let parts = build_channel_turn_parts(&dispatch, &config, &security, PromptToolDescs::Fixed)?;
     let model = parts.model.clone();
-    let workspace = config.workspace_dir.clone();
     let skills = parts.skills.clone();
 
     // Install the triggered-workflow subscriber now that workflows are
@@ -134,7 +135,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // ignored. Idempotent + shares a process-global OnceLock with the
     // `bootstrap_core_runtime` site, so it registers exactly once regardless of
     // which startup path runs first (web-chat-only cores never reach here).
-    crate::skills::bus::ensure_triggered_workflow_subscriber(&workspace);
+    crate::skills::bus::ensure_triggered_workflow_subscriber_for(&dispatch, &config, None);
 
     if !skills.is_empty() {
         println!(

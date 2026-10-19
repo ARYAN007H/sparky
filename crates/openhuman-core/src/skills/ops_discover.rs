@@ -20,12 +20,16 @@ use std::path::Path;
 
 pub use api::{
     discover_automations, discover_workflows, discovery_home_dir, init_workflows_dir,
-    is_workspace_trusted, load_workflow_metadata,
+    is_workspace_trusted, load_workflow_metadata, load_workflow_metadata_for,
 };
-pub use resource::read_workflow_resource;
+pub use resource::{read_workflow_resource, read_workflow_resource_for};
 
 pub(crate) use api::discover_workflows_inner;
 pub(crate) use api::invalidate_workflow_metadata_cache;
+pub(crate) use api::load_workflow_metadata_for_domains;
+pub(crate) use api::load_workflow_metadata_for_with_home;
+#[cfg(feature = "flows")]
+pub(crate) use api::DiscoveryGate;
 
 #[cfg(test)]
 pub(crate) use api::DISCOVERY_CALLS;

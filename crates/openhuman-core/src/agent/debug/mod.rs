@@ -94,6 +94,9 @@ pub async fn dump_agent_prompt(options: DumpPromptOptions) -> Result<DumpedPromp
         options.model_override.clone(),
     )
     .await?;
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
+    #[cfg(all(feature = "flows", feature = "skills"))]
+    crate::skills::bundled::flow_authoring::prewarm(&ctx, &config, None).await;
 
     // Ensure the registry is populated — `from_config_for_agent`
     // errors for any non-orchestrator id when the global registry
@@ -101,7 +104,7 @@ pub async fn dump_agent_prompt(options: DumpPromptOptions) -> Result<DumpedPromp
     AgentDefinitionRegistry::init_global(&config.workspace_dir)
         .context("initialising AgentDefinitionRegistry for prompt dump")?;
 
-    render_via_session(&config, &options.agent_id).await
+    render_via_session(&ctx, &config, &options.agent_id).await
 }
 
 /// Dump every registered agent's system prompt in one shot.
@@ -115,6 +118,9 @@ pub async fn dump_all_agent_prompts(
 ) -> Result<Vec<DumpedPrompt>> {
     let config =
         load_dump_config(workspace_dir_override, config_path_override, model_override).await?;
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
+    #[cfg(all(feature = "flows", feature = "skills"))]
+    crate::skills::bundled::flow_authoring::prewarm(&ctx, &config, None).await;
 
     AgentDefinitionRegistry::init_global(&config.workspace_dir)
         .context("initialising AgentDefinitionRegistry for prompt dump")?;
@@ -131,7 +137,7 @@ pub async fn dump_all_agent_prompts(
 
     let mut results = Vec::with_capacity(ids.len());
     for id in ids {
-        let dumped = render_via_session(&config, &id)
+        let dumped = render_via_session(&ctx, &config, &id)
             .await
             .with_context(|| format!("rendering prompt for agent `{id}`"))?;
         results.push(dumped);
@@ -174,13 +180,13 @@ async fn load_dump_config(
 
 /// Build a real [`Agent`] via `from_config_for_agent`, populate live
 /// connected integrations, and render the turn-1 system prompt.
-async fn render_via_session(config: &Config, agent_id: &str) -> Result<DumpedPrompt> {
-    let mut agent = OpenHumanSessionHost::from_config_for_agent(
-        &crate::core::runtime::DispatchCtx::host_default(),
-        config,
-        agent_id,
-    )
-    .with_context(|| format!("building session agent for `{agent_id}`"))?;
+async fn render_via_session(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    agent_id: &str,
+) -> Result<DumpedPrompt> {
+    let mut agent = OpenHumanSessionHost::from_config_for_agent(ctx, config, agent_id)
+        .with_context(|| format!("building session agent for `{agent_id}`"))?;
 
     // Match turn-1 behaviour: fetch the user's active Composio
     // connections so the rendered prompt mirrors what the LLM actually

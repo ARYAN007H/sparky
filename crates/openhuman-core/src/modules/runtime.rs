@@ -113,6 +113,27 @@ pub fn is_started() -> bool {
     RUNTIME.get().is_some_and(Result::is_ok)
 }
 
+/// Whether `id` is admitted and currently serving on an already-started
+/// module runtime. This is a read-only snapshot; it never starts the runtime.
+#[must_use]
+pub fn is_module_serving(id: &str) -> bool {
+    let Some(record) = crate::modules::registry::find(id) else {
+        return false;
+    };
+    let Some(Ok(runtime)) = RUNTIME.get() else {
+        return false;
+    };
+    runtime.host().list().into_iter().any(|module| {
+        module.manifest.bus_name.as_str() == record.bus_name
+            && module.manifest.object_path.as_str() == record.object_path
+            && module.enabled
+            && matches!(
+                module.state,
+                tinybus::module::ModuleState::Ready | tinybus::module::ModuleState::Serving
+            )
+    })
+}
+
 #[cfg(test)]
 #[path = "runtime_tests.rs"]
 mod tests;

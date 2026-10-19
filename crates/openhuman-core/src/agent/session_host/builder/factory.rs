@@ -795,7 +795,7 @@ impl OpenHumanSessionHost {
             .workspace_dir(config.workspace_dir.clone())
             .action_dir(config.action_dir.clone())
             .workspace_descriptor(workspace_descriptor)
-            .workflows(workflows::session_workflows(config, host_only))
+            .workflows(workflows::session_workflows(ctx, config, host_only))
             .post_turn_hooks(post_turn_hooks)
             .agent_definition_name(agent_id.to_string())
             .omit_memory_context(effective_omit_memory_context)

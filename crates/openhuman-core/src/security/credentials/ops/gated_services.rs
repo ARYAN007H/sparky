@@ -47,6 +47,9 @@ pub async fn start_credential_gated_services(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
 ) {
+    // Optional TinyFlows resources warm in the background and must never hold
+    // credential activation or ordinary chat startup on module availability.
+    crate::skills::schedule_flow_authoring_prewarm(ctx, config, None);
     // These login-gated services are mutually independent — the ONLY ordering
     // constraint is voice-server → standalone-dictation-listener (they contend
     // for the single rdev global listener on macOS). Previously each was
@@ -77,17 +80,6 @@ pub async fn start_credential_gated_services(
     if cfg!(test) && std::env::var_os("OPENHUMAN_RUN_LOGIN_GATED_SERVICES_IN_TEST").is_none() {
         log::debug!("[services] login-gated services skipped under unit test");
         return;
-    }
-
-    // An embedder's task-local user-root policy does not cross spawn_blocking;
-    // its first agent build warms the correctly scoped cache instead.
-    if !is_embedder_host() {
-        let skills_workspace = config.workspace_dir.clone();
-        // Detached on purpose: the warm-up must not delay startup.
-        tokio::task::spawn_blocking(move || {
-            let count = crate::skills::load_workflow_metadata(&skills_workspace).len();
-            log::debug!("[services] skill metadata cache warmed entries={count}");
-        });
     }
 
     spawn_integrations_cache_warm(config);
