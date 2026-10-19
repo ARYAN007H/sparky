@@ -481,3 +481,7 @@ fn queues(selector: &str, request: &Value) -> Result<Plan, Denied> {
 #[cfg(test)]
 #[path = "storage_grants_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "storage_grants_queues_tests.rs"]
+mod queues_tests;
