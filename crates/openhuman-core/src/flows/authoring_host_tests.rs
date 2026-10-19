@@ -122,7 +122,10 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
         alice_report
             .errors
             .iter()
-            .any(|error| error.code == "unsupported_nested_conditional_fan_in"),
+            .any(|error| {
+                error.code == "incompatible_referenced_workflow"
+                    && error.message.contains("unsupported_nested_conditional_fan_in")
+            }),
         "Alice must resolve her incompatible child: {:?}",
         alice_report.errors
     );
