@@ -10,12 +10,10 @@ import {
   assertConnectorCardVisible,
   assertModalPhase,
   assertSessionNotNuked,
-  injectComposioFault,
   openConnectorModal,
   seedComposioConnection,
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
-import { callOpenhumanRpc } from '../helpers/core-rpc';
 import {
   textExists,
   waitForText,
@@ -29,8 +27,6 @@ import {
   navigateViaHash,
 } from '../helpers/shared-flows';
 import {
-  clearRequestLog,
-  getRequestLog,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
@@ -144,8 +140,6 @@ describe('Jira Composio connector flow', () => {
   });
 
 
-
-
   it('failed connection shows error state, not blank screen', async function () {
     this.timeout(60_000);
     seedComposioConnection(TOOLKIT_SLUG, 'FAILED', 'c-jira-fail');
@@ -168,28 +162,4 @@ describe('Jira Composio connector flow', () => {
     console.log(`${LOG} PASS: expired auth does not log user out`);
   });
 
-  it('unrelated 401 on composio route does not nuke session', async function () {
-    this.timeout(60_000);
-    injectComposioFault(400);
-    await callOpenhumanRpc('openhuman.composio_execute', {
-      connection_id: 'c-jira-1',
-      action: 'JIRA_LIST_ISSUES',
-      params: {},
-    });
-    await assertSessionNotNuked();
-    console.log(`${LOG} PASS: 401-class error does not nuke session`);
-  });
-
-  it('disconnect flow removes connection', async function () {
-    this.timeout(60_000);
-    seedComposioConnection(TOOLKIT_SLUG, 'ACTIVE', 'c-jira-1');
-    clearRequestLog();
-    await callOpenhumanRpc('openhuman.composio_delete_connection', { connection_id: 'c-jira-1' });
-    const deleteReq = getRequestLog().find(
-      r => r.method === 'DELETE' && r.url.includes('/composio/connections/')
-    );
-    expect(deleteReq).toBeDefined();
-    console.log(`${LOG} PASS: disconnect routed DELETE`);
-    await assertSessionNotNuked();
-  });
 });

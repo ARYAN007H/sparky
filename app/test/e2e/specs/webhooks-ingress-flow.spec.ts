@@ -41,6 +41,8 @@ describe('Webhooks ingress surface (stub-level)', () => {
     expect(atShell).toBe(true);
   });
 
+  // No Rust owner test exercises this RPC wire surface against its router;
+  // retain these assertions until that integration coverage exists.
   it('exposes the stub webhook RPC surface with stable result and log shapes', async () => {
     const tunnelUuid = 'e2e-webhooks-ingress-tunnel';
 

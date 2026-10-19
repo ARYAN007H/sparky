@@ -56,8 +56,6 @@ async function waitForCoreSidecar(timeout = 30_000): Promise<void> {
   );
 }
 
-// Module-level capture: ingest returns a server-generated UUID; share it
-// across tests so mark_read and list can reference the same notification.
 describe('Notifications', () => {
   before(async function () {
     // waitForApp() + waitForCoreSidecar(30s) cannot fit the default 30s Mocha
@@ -74,7 +72,6 @@ describe('Notifications', () => {
   after(async () => {
     await stopMockServer();
   });
-
 
   it('Notifications page renders integration notifications', async () => {
     await callOpenhumanRpc('openhuman.notification_ingest', {
@@ -105,7 +102,7 @@ describe('Notifications', () => {
     stepLog('Notifications route hash', { currentHash });
 
     // If the route redirected (e.g. auth guard), skip the UI assertions
-    // since the RPC tests above already prove the notification backend works.
+    // because this spec owns notifications presentation, not RPC result semantics.
     expect(String(currentHash)).toContain('/notifications');
 
     await waitForNotificationsSections(10_000);
