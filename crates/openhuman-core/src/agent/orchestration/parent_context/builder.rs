@@ -130,7 +130,7 @@ pub(crate) async fn build_root_parent(
 /// have every nested `spawn_subagent` die at runtime with
 /// [`SubagentRunError::NoParentContext`](crate::agent::subagent_host::SubagentRunError::NoParentContext).
 /// The parent is a value the closure receives and passes to the spawns it makes
-/// (`AgentOrchestrationSession::spawn_agent`); nothing reads it ambiently.
+/// (the host sub-agent dispatch path); nothing reads it ambiently.
 ///
 /// `parent_override` is the explicit injection point for a parent the caller
 /// already has (a test driving a surface under a mock parent, and thus a mock

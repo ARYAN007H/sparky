@@ -168,7 +168,7 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
 
     let parent = openhuman_core::agent::harness::ParentExecutionContext {
         agent_definition_id: "orchestrator".into(),
-        allowed_subagent_ids: ["critic".to_string()].into_iter().collect(),
+        allowed_subagent_ids: ["summarizer".to_string()].into_iter().collect(),
         turn_model_source: openhuman_core::agent::tinyagents::TurnModelSource::from_model(model),
         all_tools: Arc::new(vec![Box::new(MockCalendarTool)]),
         all_tool_specs: Arc::new(vec![Arc::new(MockCalendarTool.spec())]),
@@ -199,7 +199,7 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
     let mut def =
         openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::global()
             .unwrap()
-            .get("critic")
+            .get("summarizer")
             .unwrap()
             .clone();
     // A Hint sub-agent builds a fresh provider via the workload factory

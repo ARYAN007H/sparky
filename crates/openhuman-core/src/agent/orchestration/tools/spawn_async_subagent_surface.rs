@@ -234,7 +234,7 @@ impl Tool for SpawnAsyncSubagentTool {
         let agent_id_schema = if agent_ids.is_empty() {
             json!({
                 "type": "string",
-                "description": "Sub-agent id (e.g. planner, critic, summarizer)."
+                "description": "Sub-agent id (e.g. researcher, summarizer)."
             })
         } else {
             json!({

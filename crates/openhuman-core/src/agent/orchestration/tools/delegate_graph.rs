@@ -122,7 +122,7 @@ impl Tool for DelegateGraphTool {
         let agent_id_schema = if agent_ids.is_empty() {
             json!({
                 "type": "string",
-                "description": "Sub-agent id (e.g. code_executor, planner, critic)."
+                "description": "Sub-agent id (e.g. code_executor, researcher, summarizer)."
             })
         } else {
             json!({
