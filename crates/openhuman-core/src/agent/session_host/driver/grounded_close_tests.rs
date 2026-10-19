@@ -118,7 +118,7 @@ fn classified_halt_summary_uses_typed_cause_when_halt_copy_conflicts() {
 
     let close = classified_halt_close(&outcome).expect("classified halt");
     assert!(
-        close.output.contains("inference budget"),
+        close.output.contains("inference credits"),
         "typed out_of_credits cause must win over contradictory prose: {}",
         close.output
     );
