@@ -1,7 +1,7 @@
 //! Typed input / output / error contracts for the `generate_presentation` tool.
 
 use serde::{Deserialize, Serialize};
-use tinydocs_bus::spec::presentation::{PresentationSpec, SlideSpec};
+use tinydocs_bus::spec::presentation::{PresentationRequestSpec, PresentationSpec, SlideRequestSpec, SlideSpec};
 
 use crate::modules::documents::DocumentCallError;
 
@@ -221,9 +221,26 @@ impl From<tinydocs_bus::Error> for PresentationError {
     }
 }
 
+/// Validate source-agnostic request metadata before the host resolves image
+/// references. Each requested image is represented by its caption, including
+/// images whose host-side reference will later fail to resolve.
+pub(super) fn validate_request(input: &GeneratePresentationInput) -> Result<(), PresentationError> {
+    let request = PresentationRequestSpec {
+        title: input.title.clone(),
+        author: input.author.clone(),
+        theme: input.theme.clone(),
+        slides: input.slides.iter().map(|slide| SlideRequestSpec {
+            title: slide.title.clone(),
+            body: slide.body.clone(),
+            bullets: slide.bullets.clone(),
+            speaker_notes: slide.speaker_notes.clone(),
+            images: slide.images.iter().map(|image| image.caption.clone()).collect(),
+        }).collect(),
+    };
+    request.validate().map_err(PresentationError::from)
+}
+
 /// Reject empty host-owned image references before attempting to resolve them.
-/// The shared bus validator owns all content and image-field limits once the
-/// host has resolved usable image bytes.
 pub(super) fn validate_image_references(
     input: &GeneratePresentationInput,
 ) -> Result<(), PresentationError> {
@@ -253,7 +270,7 @@ pub(super) fn validate_image_references(
 /// Project tool input and host-resolved image bytes onto the owner bus contract.
 pub(super) fn to_bus_spec(
     input: &GeneratePresentationInput,
-    resolved_images: &[Vec<tinydocs_bus::spec::SlideImage>],
+    resolved_images: Vec<Vec<tinydocs_bus::spec::SlideImage>>,
 ) -> Result<PresentationSpec, PresentationError> {
     if input.slides.len() != resolved_images.len() {
         return Err(PresentationError::InvalidInput {
@@ -271,7 +288,7 @@ pub(super) fn to_bus_spec(
             body: slide.body.clone(),
             bullets: slide.bullets.clone(),
             speaker_notes: slide.speaker_notes.clone(),
-            images: images.clone(),
+            images,
         })
         .collect();
 

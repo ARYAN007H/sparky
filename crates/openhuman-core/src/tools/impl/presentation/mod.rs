@@ -50,7 +50,7 @@ mod tests;
 use tinydocs_bus::spec::SlideImage;
 
 use self::types::{
-    to_bus_spec, validate_image_references, GeneratePresentationInput, GeneratePresentationOutput,
+    to_bus_spec, validate_image_references, validate_request, GeneratePresentationInput, GeneratePresentationOutput,
     PresentationError, SlideImageRequest, SlideImageSource, MAX_IMAGE_BYTES,
 };
 
@@ -332,7 +332,7 @@ impl PresentationTool {
             }
         };
 
-        if let Err(err) = validate_image_references(&input) {
+        if let Err(err) = validate_request(&input).and_then(|()| validate_image_references(&input)) {
             tracing::debug!(target: "presentation", err = %err, "[presentation] validation rejected input");
             return Ok(ToolResult::error(err.to_string()));
         }
@@ -349,7 +349,7 @@ impl PresentationTool {
             );
         }
 
-        let spec = match to_bus_spec(&input, &resolved_images) {
+        let spec = match to_bus_spec(&input, resolved_images) {
             Ok(spec) => spec,
             Err(err) => return Ok(ToolResult::error(err.to_string())),
         };
@@ -404,7 +404,7 @@ impl PresentationTool {
 
         let bytes = match engine::generate(
             &input,
-            &resolved_images,
+            &spec,
             GENERATION_TIMEOUT,
             self.config.as_ref(),
         )
