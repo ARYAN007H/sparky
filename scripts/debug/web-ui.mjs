@@ -156,10 +156,13 @@ async function signIn(page, rpc, appOrigin) {
   await page.getByText("Welcome to OpenHuman").waitFor({ timeout: 120_000 });
   log("signing in through the GitHub provider button (mock backend)…");
   await page.getByRole("button", { name: "GitHub" }).click();
-  await waitFor(async () => (await rpc("openhuman.auth_get_state")).isAuthenticated, {
-    timeoutMs: 120_000,
-    what: "the core's authenticated state after mock sign-in",
-  });
+  await waitFor(
+    async () => (await rpc("openhuman.auth_get_state")).isAuthenticated,
+    {
+      timeoutMs: 120_000,
+      what: "the core's authenticated state after mock sign-in",
+    },
+  );
   await ensureSignedInChat(page, appOrigin);
 }
 
@@ -266,15 +269,6 @@ async function main() {
     return file;
   };
 
-  // The first load compiles the app's modules on demand; give it room.
-  page.setDefaultNavigationTimeout(120_000);
-  await page.goto(devConnectUrl(appOrigin, rpcUrl, token));
-  if (opts.signIn) {
-    await signIn(page, rpc, appOrigin);
-    log(`signed in      ${page.url()}`);
-  }
-  await screenshot("ready");
-
   const rpc = async (method, params = {}) => {
     const res = await fetch(rpcUrl, {
       method: "POST",
@@ -288,6 +282,16 @@ async function main() {
     if (body.error) throw new Error(`${method}: ${body.error.message}`);
     return body.result;
   };
+
+  // The first load compiles the app's modules on demand; give it room.
+  page.setDefaultNavigationTimeout(120_000);
+  await page.goto(devConnectUrl(appOrigin, rpcUrl, token));
+  if (opts.signIn) {
+    await signIn(page, rpc, appOrigin);
+    log(`signed in      ${page.url()}`);
+  }
+  await screenshot("ready");
+
   const mock = {
     url: mockUrl,
     set: (key, value) =>

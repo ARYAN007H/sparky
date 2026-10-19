@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   coreLaunchSpec,
   devConnectUrl,
+  ensureSignedInChat,
   mergeChildEnv,
   freePort,
   isLoopback,
@@ -13,6 +14,31 @@ import {
   startCoreChild,
   waitFor,
 } from "../debug/web-ui-lib.mjs";
+
+test("ensureSignedInChat opens the canonical chat route from an authenticated home", async () => {
+  let visible = false;
+  let navigatedTo;
+  const page = {
+    getByRole(role, options) {
+      assert.equal(role, "textbox");
+      assert.equal(options.name, "Message input");
+      return {
+        isVisible: async () => visible,
+        waitFor: async ({ state }) => {
+          assert.equal(state, "visible");
+          assert.equal(visible, true);
+        },
+      };
+    },
+    async goto(url) {
+      navigatedTo = url;
+      visible = true;
+    },
+  };
+
+  await ensureSignedInChat(page, "http://localhost:1420");
+  assert.equal(navigatedTo, "http://localhost:1420/#/chat");
+});
 
 test("coreLaunchSpec isolates the core from operator credentials, storage, and dotenv", () => {
   const inheritedEnv = {
