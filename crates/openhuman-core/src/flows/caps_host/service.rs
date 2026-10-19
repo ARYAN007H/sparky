@@ -172,7 +172,8 @@ impl CapsHostService {
 impl CapsHostService {
     async fn llm_complete(&self, request: Value, conn: Option<String>) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move {
                 OpenHumanLlm {
                     ctx: binding.ctx.clone(),
@@ -192,7 +193,8 @@ impl CapsHostService {
         conn: Option<String>,
     ) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move {
                 OpenHumanTools {
                     ctx: binding.ctx.clone(),
@@ -209,7 +211,8 @@ impl CapsHostService {
 
     async fn http_request(&self, request: Value, conn: Option<String>) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move {
                 OpenHumanHttp {
                     ctx: binding.ctx.clone(),
@@ -228,7 +231,8 @@ impl CapsHostService {
 
     async fn code_run(&self, request: runs::CodeRunRequest) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move {
                 OpenHumanCode {
                     config: Arc::clone(&binding.config),
@@ -256,7 +260,8 @@ impl CapsHostService {
         opts: Value,
     ) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move { memory(&binding).recall(&scope, &query, opts).await })
             .await
             .map_err(bus_error)
@@ -264,7 +269,8 @@ impl CapsHostService {
 
     async fn memory_flavour(&self, slug: String) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move { memory(&binding).flavour(&slug).await })
             .await
             .map_err(bus_error)
@@ -272,7 +278,8 @@ impl CapsHostService {
 
     async fn memory_people(&self, query: Option<String>) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move { memory(&binding).people(query.as_deref()).await })
             .await
             .map_err(bus_error)
@@ -285,7 +292,8 @@ impl CapsHostService {
         value: Value,
     ) -> tinybus::Result<()> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move { memory(&binding).remember(&scope, &key, value).await })
             .await
             .map_err(bus_error)
@@ -293,7 +301,8 @@ impl CapsHostService {
 
     async fn memory_forget(&self, scope: String, key: String) -> tinybus::Result<()> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move { memory(&binding).forget(&scope, &key).await })
             .await
             .map_err(bus_error)
@@ -351,7 +360,8 @@ impl CapsHostService {
 
     async fn resolve_agent(&self, id: String) -> tinybus::Result<Option<runs::AgentDefinition>> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move {
                 crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
                     &binding.config.workspace_dir,
@@ -369,7 +379,8 @@ impl CapsHostService {
 
     async fn list_agents(&self) -> tinybus::Result<Vec<runs::AgentDefinition>> {
         let binding = Arc::clone(&self.0);
-        binding
+        let scope = Arc::clone(&binding);
+        scope
             .within(async move {
                 crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
                     &binding.config.workspace_dir,
