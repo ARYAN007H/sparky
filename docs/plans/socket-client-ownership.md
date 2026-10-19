@@ -197,14 +197,16 @@ fixture is in its owning test target. Delete `ws_loop.rs`,
 every mapped assertion has moved or been explicitly retired above. Do not
 delete event handlers, schemas, manager consumers, or product-policy tests.
 
-## Follow-up issue drafts
+## Filed follow-up issues
 
-These are the exact issue bodies to file and link under
-`tinyhumansai/openhuman#8089` after this design is reviewed. The SDK issue must
-land upstream first; OpenHuman can then update its SDK gitlink and implement
-the adapter/port move in a separate leaf.
+These issues were filed and linked under `tinyhumansai/openhuman#8089`. The SDK
+contract issue is [tinyhumansai/sdk#2](https://github.com/senamakel/sdk/issues/2);
+the dependent OpenHuman adapter issue is
+[senamakel/openhuman#420](https://github.com/senamakel/openhuman/issues/420).
+The SDK issue must land upstream first; OpenHuman can then update its SDK
+gitlink and implement the adapter/port move in a separate leaf.
 
-### SDK issue: make SocketConnection suitable for a supervised host
+### Filed SDK issue: make SocketConnection suitable for a supervised host
 
 **Title:** `socket: expose a bounded single-attempt connection contract`
 
@@ -267,7 +269,7 @@ credential refresh, observability, and event-bus policies stay in its host
 adapter/core port.
 ```
 
-### OpenHuman issue: move socket implementation behind the hosted adapter
+### Filed OpenHuman issue: move socket implementation behind the hosted adapter
 
 **Title:** `platform/socket: replace the hand-rolled client with the TinyHumans SDK adapter`
 
@@ -275,8 +277,9 @@ adapter/core port.
 
 ```markdown
 Parent: tinyhumansai/openhuman#8089
-Depends on: the tinyhumans-sdk single-attempt SocketConnection contract being
-available upstream and pinned by the TinyHumans SDK submodule.
+Depends on: [tinyhumansai/sdk#2](https://github.com/senamakel/sdk/issues/2),
+the single-attempt SocketConnection contract being available upstream and
+pinned by the TinyHumans SDK submodule.
 
 ## Context
 
