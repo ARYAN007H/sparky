@@ -175,14 +175,11 @@ async function captureToolTimeline(page: Page, threadId: string): Promise<unknow
         };
       }
     ).__OPENHUMAN_STORE__;
-    return store?.getState?.().chatRuntime?.toolTimelineByThread?.[id]?.map(row => ({
-      id: row.id,
-      name: row.name,
-      status: row.status,
-      round: row.round,
-      argsLength: row.argsBuffer?.length ?? 0,
-      resultLength: row.result?.length ?? 0,
-    }));
+    return store
+      ?.getState?.()
+      .chatRuntime?.toolTimelineByThread?.[
+        id
+      ]?.map(row => ({ id: row.id, name: row.name, status: row.status, round: row.round, argsLength: row.argsBuffer?.length ?? 0, resultLength: row.result?.length ?? 0 }));
   }, threadId);
 }
 
@@ -385,7 +382,10 @@ test.describe('assistant-ui tool-result elements', () => {
       await waitForTurnCompletion(page, threadId);
       console.log(
         '[epic235 tool progress]',
-        JSON.stringify({ events: progress.events, timeline: await captureToolTimeline(page, threadId) })
+        JSON.stringify({
+          events: progress.events,
+          timeline: await captureToolTimeline(page, threadId),
+        })
       );
     }
     const card = await openToolCall(
