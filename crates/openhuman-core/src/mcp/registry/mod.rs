@@ -487,3 +487,6 @@ pub(crate) fn tools_safe_for_agent(
 mod stub;
 #[cfg(not(feature = "mcp"))]
 pub use stub::*;
+
+#[cfg(test)]
+pub(crate) use schemas::registry_get_parameter_contract;

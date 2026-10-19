@@ -133,8 +133,7 @@ fn handle_live_settings_get(ctx: DispatchCtx, _params: Map<String, Value>) -> Co
 
 fn handle_live_settings_set(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let patch: LiveSettingsPatch = serde_json::from_value(Value::Object(params))
-            .map_err(|e| format!("invalid params: {e}"))?;
+        let patch = parse_params::<LiveSettingsPatch>(params)?;
         let mut config = ctx.load_config().await?;
         to_value(ops::live_settings_set(&mut config, patch).await?.value)
     })
@@ -142,8 +141,7 @@ fn handle_live_settings_set(ctx: DispatchCtx, params: Map<String, Value>) -> Con
 
 fn handle_live_test_provider(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let params: TestParams = serde_json::from_value(Value::Object(params))
-            .map_err(|e| format!("invalid params: {e}"))?;
+        let params = parse_params::<TestParams>(params)?;
         let config = ctx.load_config().await?;
         to_value(
             ops::live_test_provider(&config, &params.provider)
@@ -186,3 +184,14 @@ pub fn live_controller_schemas() -> Vec<ControllerSchema> {
 #[cfg(test)]
 #[path = "schemas_tests.rs"]
 mod tests;
+
+
+fn parse_params<T: serde::de::DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
+    serde_json::from_value(Value::Object(params)).map_err(|e| format!("invalid params: {e}"))
+}
+
+#[cfg(test)]
+#[path = "schema_parameter_contracts.rs"]
+mod parameter_contracts;
+#[cfg(test)]
+pub(crate) use parameter_contracts::contracts as parameter_contracts;

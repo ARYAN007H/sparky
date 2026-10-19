@@ -62,3 +62,6 @@ pub use types::{VoiceSpeechResult, VoiceStatus, VoiceTtsResult};
 mod stub;
 #[cfg(not(feature = "voice"))]
 pub use stub::*;
+
+#[cfg(all(test, feature = "voice"))]
+pub(crate) use schemas::parameter_contracts;

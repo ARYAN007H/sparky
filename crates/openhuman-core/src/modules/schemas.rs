@@ -270,7 +270,7 @@ fn handle_browser_forget_sites(ctx: DispatchCtx, params: Map<String, Value>) -> 
 
 fn handle_computer_status(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let load = params.get("load").and_then(Value::as_bool).unwrap_or(false);
+        let load = computer_status_load(&params);
         let config = ctx.load_config().await?;
         crate::core::runtime::components::require_config(&config, "computer")?;
         controller_value(super::computer::status(&config, load).await)
@@ -329,3 +329,19 @@ fn string_param(params: &Map<String, Value>, key: &str) -> Option<String> {
 #[cfg(test)]
 #[path = "schemas_tests.rs"]
 mod tests;
+
+
+fn computer_status_load(params: &Map<String, Value>) -> bool {
+    params.get("load").and_then(Value::as_bool).unwrap_or(false)
+}
+
+#[cfg(test)]
+pub(crate) fn computer_status_parameter_contract() -> crate::core::all::ControllerParamContract {
+    crate::core::all::ControllerParamContract {
+        method: "modules.computer_status",
+        required: &[],
+        handler: handle_computer_status,
+        examples: vec![serde_json::json!({}),serde_json::json!({"load":false}),serde_json::json!({"load":true})],
+        parse: |params| { let _ = computer_status_load(&params); Ok(()) },
+    }
+}
