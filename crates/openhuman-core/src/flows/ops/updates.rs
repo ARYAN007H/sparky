@@ -127,16 +127,12 @@ async fn flows_update_inner(
     let graph = match graph_json {
         Some(raw) => {
             let graph = validate_and_migrate_graph(ctx, config, raw).await?;
+            ensure_config_aware_engine_compatible(ctx, config, &graph).await?;
             graph
         }
-        None => {
-            validate_and_migrate_graph(
-                ctx,
-                config,
-                serde_json::to_value(&existing.graph).map_err(|error| error.to_string())?,
-            )
-            .await?
-        }
+        // Metadata-only updates preserve access to legacy graphs written by
+        // older versions, even when the current engine no longer accepts them.
+        None => existing.graph.clone(),
     };
     // B29 Rule 1 analogue: disarm every manual/none → automatic trigger
     // transition, unconditionally. `now_auto` is safe to compute here (it

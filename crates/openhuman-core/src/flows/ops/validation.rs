@@ -26,6 +26,10 @@ async fn validate_over_bus(
         .map_err(|error| error.wire_message())
 }
 
+fn is_engine_compatibility_error(code: &str) -> bool {
+    code.starts_with("unsupported_") || code.starts_with("incompatible_referenced_workflow")
+}
+
 /// Validates and migrates a graph through TinyFlows, resolving saved children
 /// through the host callback bound to the current invocation scope.
 pub(crate) async fn validate_and_migrate_graph(
@@ -34,7 +38,11 @@ pub(crate) async fn validate_and_migrate_graph(
     graph: Value,
 ) -> Result<WorkflowGraph, String> {
     let report = validate_over_bus(ctx, config, graph).await?;
-    if let Some(error) = report.errors.first() {
+    if let Some(error) = report
+        .errors
+        .iter()
+        .find(|error| !is_engine_compatibility_error(&error.code))
+    {
         return Err(error.message.clone());
     }
     report
@@ -53,10 +61,7 @@ pub(crate) async fn config_aware_engine_compatibility_errors(
     Ok(report
         .errors
         .into_iter()
-        .filter(|error| {
-            error.code.starts_with("unsupported_")
-                || error.code.starts_with("incompatible_referenced_workflow")
-        })
+        .filter(|error| is_engine_compatibility_error(&error.code))
         .map(|error| format!("{}: {}", error.code, error.message))
         .collect())
 }
