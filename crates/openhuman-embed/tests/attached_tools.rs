@@ -1,7 +1,7 @@
 mod common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
+    Agent, AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
     ToolScopeSpec, Workspace,
 };
 use std::sync::Arc;
@@ -32,10 +32,11 @@ impl Tool for Marker {
     }
 }
 
-fn transcript_snapshot(
-    transcripts: &dyn TranscriptLocator,
-    session: &SessionRef,
-) -> serde_json::Value {
+fn transcript_snapshot(agent: &Agent, session: &SessionRef) -> serde_json::Value {
+    let transcripts =
+        tinyagents_session::port::WorkspaceStores::open(agent.workspace_dir(), agent.id())
+            .expect("the agent's durable workspace store")
+            .transcripts();
     let handle = transcripts
         .read_session_transcript(session)
         .expect("the durable session transcript exists");
@@ -144,14 +145,19 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .send()
                 .await
                 .unwrap();
-            let transcripts =
-                tinyagents_session::port::WorkspaceStores::open(agent.workspace_dir(), agent.id())
-                    .expect("the agent's durable workspace store")
-                    .transcripts();
             let continuing_session = SessionRef::scoped("continuing", agent.id());
-            assert_eq!(transcripts.session_chain(&continuing_session).len(), 1);
-            let frozen_generation_zero =
-                transcript_snapshot(transcripts.as_ref(), &continuing_session);
+            let transcript_store =
+                tinyagents_session::port::WorkspaceStores::open(agent.workspace_dir(), agent.id())
+                    .expect("the agent's durable workspace store");
+            assert_eq!(
+                transcript_store
+                    .transcripts()
+                    .session_chain(&continuing_session)
+                    .len(),
+                1
+            );
+            drop(transcript_store);
+            let frozen_generation_zero = transcript_snapshot(&agent, &continuing_session);
             agent
                 .attach_tools(
                     "second",
@@ -177,19 +183,33 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .unwrap();
             assert_eq!(agent.config().action_dir, original_config.action_dir);
             assert_eq!(
-                transcript_snapshot(transcripts.as_ref(), &continuing_session),
+                transcript_snapshot(&agent, &continuing_session),
                 frozen_generation_zero,
                 "the continuing session must leave its durable generation unchanged"
             );
             let after_attach_session = SessionRef::scoped("after-attach", agent.id());
-            let durable = transcript_snapshot(transcripts.as_ref(), &after_attach_session);
-            let durable = serde_json::to_string(&durable).unwrap();
+            let durable = transcript_snapshot(&agent, &after_attach_session);
+            let durable_messages = durable["messages"]
+                .as_array()
+                .expect("the new session's durable messages");
             assert!(
-                durable
-                    .lines()
-                    .any(|line| line.contains("openhuman-permanent-tools")
-                        && line.contains("hivemind_message")
-                        && line.contains("hivemind_list")),
+                durable_messages.iter().any(|message| {
+                    message["role"] == "system"
+                        && message["content"]
+                            .as_str()
+                            .is_some_and(|content| content.contains("openhuman-permanent-tools"))
+                }),
+                "the new session must persist its permanent-tools system message"
+            );
+            let declared_tools = durable["tools"]
+                .as_array()
+                .expect("the new session's durable tool catalogue");
+            let tool_names = declared_tools
+                .iter()
+                .filter_map(|tool| tool["function"]["name"].as_str())
+                .collect::<Vec<_>>();
+            assert!(
+                tool_names.contains(&"hivemind_message") && tool_names.contains(&"hivemind_list"),
                 "the new session must persist the updated permanent-tool catalogue"
             );
             let sealed = frozen_generation_zero.to_string();
