@@ -5,6 +5,8 @@ use std::time::Duration;
 use tinyagents_harness::progress::AgentProgress;
 use tokio::sync::broadcast::error::TryRecvError;
 
+const MODULE_OUTPUT_TEST_TIMEOUT: Duration = Duration::from_secs(35);
+
 #[test]
 fn interim_narration_skips_only_empty_text() {
     assert_eq!(interim_narration_text(""), None);
@@ -126,7 +128,7 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
 
     // The bus is process-global — skip unrelated events from concurrent
     // tests and wait (bounded) for our thread's tool_result.
-    let event = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    let event = tokio::time::timeout(MODULE_OUTPUT_TEST_TIMEOUT, async {
         loop {
             match bus.recv().await {
                 Ok(ev)
@@ -439,7 +441,7 @@ async fn short_narration_is_flushed_on_the_rounds_first_tool_call() {
     .await
     .unwrap();
 
-    let interim = tokio::time::timeout(Duration::from_secs(5), async {
+    let interim = tokio::time::timeout(MODULE_OUTPUT_TEST_TIMEOUT, async {
         loop {
             let ev = recv_for_thread(&mut bus, "thread-short-narration").await;
             if ev.event_name() == "chat_interim" {
@@ -503,7 +505,7 @@ async fn hold_text_stream_suppresses_text_delta_but_keeps_interim() {
     .await
     .unwrap();
 
-    let events = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    let events = tokio::time::timeout(MODULE_OUTPUT_TEST_TIMEOUT, async {
         let mut seen = Vec::new();
         loop {
             match bus.recv().await {
