@@ -126,9 +126,10 @@ async fn a_dropped_runner_stops_the_tap() {
     assert!(*drained_rx.borrow());
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn the_heartbeat_beats_only_for_a_live_turn() {
     use super::super::surface::TurnIds;
+    let _module = crate::channels::module_fixture::client().await;
     let mut bus = crate::web_chat::subscribe_web_channel_events();
     let ids = TurnIds {
         client_id: "hb-client".into(),
@@ -145,10 +146,14 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
         )
         .await,
     ));
-    let beat = AbortOnDrop(spawn_heartbeat(&DispatchCtx::ambient(), projection.clone()));
+    let beat = AbortOnDrop(spawn_heartbeat_with_interval(
+        &DispatchCtx::ambient(),
+        projection.clone(),
+        Duration::from_millis(25),
+    ));
 
     // Before `TurnStarted` the turn is not live: no beat, however long it waits.
-    tokio::time::sleep(Duration::from_secs(INFERENCE_HEARTBEAT_SECS * 3)).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
     assert!(bus.try_recv().is_err());
 
     projection
@@ -156,7 +161,7 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
         .await
         .on_event(AgentProgress::TurnStarted)
         .await;
-    tokio::time::sleep(Duration::from_secs(INFERENCE_HEARTBEAT_SECS + 1)).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
     let mut names = Vec::new();
     while let Ok(event) = bus.try_recv() {
         if event.context().thread_id == "host-hb-thread" {
