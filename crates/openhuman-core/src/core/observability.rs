@@ -2546,7 +2546,7 @@ pub fn report_warning_message(message: &str, domain: &str, operation: &str, extr
 /// that the reliable-provider layer already handles via retry + fallback.
 ///
 /// The primary suppression lives at the call site
-/// (`crate::inference::provider::ops::should_report_provider_http_failure`),
+/// (`crate::inference::provider::http_error::should_report_provider_http_failure`),
 /// which short-circuits transient codes before `report_error` ever fires.
 /// This helper is intended for use inside the `sentry::ClientOptions`
 /// `before_send` hook as defense-in-depth — it catches any future call

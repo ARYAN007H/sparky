@@ -130,7 +130,7 @@ async fn a_registered_catalog_answers_the_model_listing_for_its_provider() {
             limits: None,
         },
     );
-    let listing = crate::inference::provider::ops::list_configured_models_from_config(
+    let listing = crate::inference::provider::models::list_configured_models_from_config(
         "fake-catalog",
         &Config::default(),
     )
@@ -141,7 +141,7 @@ async fn a_registered_catalog_answers_the_model_listing_for_its_provider() {
 
 #[tokio::test]
 async fn without_a_catalog_an_unknown_provider_still_errors() {
-    let error = crate::inference::provider::ops::list_configured_models_from_config(
+    let error = crate::inference::provider::models::list_configured_models_from_config(
         "fake-catalog",
         &Config::default(),
     )
@@ -230,7 +230,7 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
         ..Config::default()
     };
     let listing =
-        crate::inference::provider::ops::list_configured_models_from_config("p_ephemeral", &config)
+        crate::inference::provider::models::list_configured_models_from_config("p_ephemeral", &config)
             .await;
     unregister_catalog(PROVIDER_OPENHUMAN);
     listing.unwrap();
