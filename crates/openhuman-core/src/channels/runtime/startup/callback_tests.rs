@@ -14,7 +14,6 @@ use tinychannels_bus::module_progressive::{
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, SendMessage};
 
 struct RecordingChannel {
-struct RecordingChannel {
     name: String,
     sent: tokio::sync::Mutex<Vec<ChannelOutboundMessage>>,
 }
@@ -66,17 +65,6 @@ impl Channel for RecordingChannel {
     ) -> anyhow::Result<()> {
         Ok(())
     }
-}
-
-fn callback_for(
-    channel: Arc<RecordingChannel>,
-) -> (ChannelHostCallbacks, Arc<ChannelRuntimeContext>) {
-    let mut channels = HashMap::new();
-    channels.insert(
-        channel.name().to_owned(),
-        channel as Arc<dyn Channel>,
-    );
-    callback_for_channels(channels)
 }
 
 fn callback_for_channels(
@@ -257,7 +245,10 @@ async fn native_progressive_transport_rejects_unconfigured_account_without_provi
         )))
         .await;
 
-    assert!(result.is_err(), "an unknown explicit account must fail closed");
+    assert!(
+        result.is_err(),
+        "an unknown explicit account must fail closed"
+    );
     assert!(first_account.sent.lock().await.is_empty());
     assert!(second_account.sent.lock().await.is_empty());
 }
