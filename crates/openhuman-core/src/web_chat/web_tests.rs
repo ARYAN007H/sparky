@@ -1,4 +1,5 @@
 use super::{
+    ChatRequestMetadata, ClassifiedError, StartChatError, TestRunChatTaskBlock, WebChatParams,
     all_web_channel_controller_schemas, all_web_channel_registered_controllers, cancel_chat_scoped,
     channel_web_cancel, channel_web_queue_clear, channel_web_queue_remove,
     channel_web_queue_status, classify_inference_error, drain_queued_turns_for_test,
@@ -7,14 +8,13 @@ use super::{
     locale_reply_directive, normalize_model_override, parallel_in_flight_entries_for_test,
     provider_role_for_model_override, schemas, sentry_suppression_reason,
     set_test_forced_run_chat_task_error, set_test_run_chat_task_block, start_chat,
-    subscribe_web_channel_events, ChatRequestMetadata, ClassifiedError, StartChatError,
-    TestRunChatTaskBlock, WebChatParams,
+    subscribe_web_channel_events,
 };
 use crate::core::TypeSchema;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tinyagents_harness::run_queue::QueueLane;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 // Serializes every test that drives `start_chat` with the process-global
 // `run_chat_task` test hooks (forced error / forced block) or the
