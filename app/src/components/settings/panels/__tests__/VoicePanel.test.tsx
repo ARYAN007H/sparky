@@ -73,10 +73,7 @@ const makeVoiceSettings = (overrides: Partial<VoiceSettings> = {}): VoiceSetting
   ...overrides,
 });
 
-type RuntimeHarness = {
-  voiceStatus: VoiceStatus;
-  voiceSettings: VoiceSettings;
-};
+type RuntimeHarness = { voiceStatus: VoiceStatus; voiceSettings: VoiceSettings };
 
 describe('VoicePanel', () => {
   let runtime: RuntimeHarness;
