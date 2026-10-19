@@ -1003,55 +1003,6 @@ impl OpenHumanSessionHost {
         );
         Ok(())
     }
-
-    /// Publish a caller-driven visibility/policy mutation into the live hook
-    /// state. The runtime keeps generic snapshots immutable per request; this
-    /// simply replaces the host composition from which the *next* snapshot,
-    /// execution source, and enforcement object are built.
-    pub(in crate::agent::session_host) fn sync_runtime_tool_surface(&self) {
-        self.sync_runtime_tool_surface_with_auto_include(None);
-    }
-
-    /// Publish a visibility mutation and record whether future dynamically
-    /// connected delegates may enter the surface without an explicit allow.
-    pub(in crate::agent::session_host) fn sync_runtime_tool_surface_with_auto_include(
-        &self,
-        auto_include_new_synthesized_tools: Option<bool>,
-    ) {
-        let prelude = self
-            .runtime_state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .prelude
-            .clone();
-        let Some(prelude) = prelude else {
-            return;
-        };
-        let prior_auto_include = prelude
-            .tool_surface
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .auto_include_new_synthesized_tools;
-        prelude.replace_tool_surface(OpenHumanTurnToolSurface {
-            tools: self.tools.clone(),
-            synthesized_tools: self.synthesized_tools.clone(),
-            tool_specs: self.tool_specs.clone(),
-            durable_tool_specs: self.durable_tool_specs.clone(),
-            visible_tool_specs: self.visible_tool_specs.clone(),
-            visible_tool_names: self.visible_tool_names.clone(),
-            deferred_tool_names: self.deferred_tool_names.clone(),
-            permanent_tool_names: self.permanent_tool_names.clone(),
-            discovery_enabled: self.discovery_enabled,
-            requested_deferred_tools: self.requested_deferred_tools.clone(),
-            auto_include_new_synthesized_tools: auto_include_new_synthesized_tools
-                .unwrap_or(prior_auto_include),
-            synthesized_tool_names: self.synthesized_tool_names.clone(),
-            tool_policy_session: self.tool_policy_session.clone(),
-            event_session_id: self.event_session_id.clone(),
-            event_channel: self.event_channel.clone(),
-            agent_definition_name: self.agent_definition_name.clone(),
-        });
-    }
 }
 
 #[path = "runtime_session_tool_surface.rs"]
