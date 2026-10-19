@@ -262,6 +262,24 @@ fn projected_transcript_is_restored_in_chronological_order() {
 }
 
 #[test]
+fn projected_voice_note_keeps_its_transcript_and_duration_label() {
+    let mut state = TranscriptState::new(CLIENT);
+    state.load_transcript(&serde_json::json!({
+        "result": {"data": {"items": [
+            {
+                "kind": "userMessage",
+                "content": "Remind me about the dentist",
+                "extraMetadata": {"voiceNote": {"durationMs": 12000}}
+            }
+        ]}}
+    }));
+    assert_eq!(
+        state.entries()[0].text,
+        "[voice note 0:12] Remind me about the dentist"
+    );
+}
+
+#[test]
 fn tool_result_updates_the_originating_activity() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("do it");
