@@ -20,7 +20,6 @@ import {
   assertConnectorCardVisible,
   assertModalPhase,
   assertSessionNotNuked,
-  injectComposioFault,
   openConnectorModal,
   seedComposioConnection,
   seedComposioToolkits,

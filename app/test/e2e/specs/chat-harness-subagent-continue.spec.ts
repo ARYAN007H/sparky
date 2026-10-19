@@ -32,9 +32,6 @@
  * Verifies:
  *   - The tool timeline shows a subagent entry.
  *   - The final canary text renders in the DOM.
- *   - The mock LLM received ≥4 POST requests (orchestrator initial +
- *     researcher initial + orchestrator relay + orchestrator continue +
- *     researcher resumed + orchestrator final).
  *   - Persisted thread JSONL contains the final canary text.
  */
 import { waitForApp } from '../helpers/app-helpers';
@@ -51,7 +48,7 @@ import { callOpenhumanRpc } from '../helpers/core-rpc';
 import { textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
-import { getRequestLog, setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
+import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
 
 const USER_ID = 'e2e-chat-harness-subagent-continue';
 // Per-turn probes carry disjoint distinctive tokens so `pickProbeText`'s

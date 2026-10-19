@@ -22,7 +22,6 @@ import { completeOnboardingIfVisible, navigateToSkills } from '../helpers/shared
 import {
   clearRequestLog,
   resetMockBehavior,
-  setMockBehavior,
   startMockServer,
   stopMockServer,
 } from '../mock-server';

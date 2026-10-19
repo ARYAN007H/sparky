@@ -20,13 +20,7 @@ import {
 import { textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
-import {
-  clearRequestLog,
-  getRequestLog,
-  setMockBehavior,
-  startMockServer,
-  stopMockServer,
-} from '../mock-server';
+import { clearRequestLog, setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
 
 const LOG_PREFIX = '[chat-tool-call-flow]';
 const USER_ID = 'e2e-chat-tool-call-flow';

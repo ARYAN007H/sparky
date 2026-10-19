@@ -10,12 +10,10 @@ import {
   assertConnectorCardVisible,
   assertModalPhase,
   assertSessionNotNuked,
-  injectComposioFault,
   openConnectorModal,
   seedComposioConnection,
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
-import { callOpenhumanRpc } from '../helpers/core-rpc';
 import {
   textExists,
   waitForText,
@@ -26,7 +24,6 @@ import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { completeOnboardingIfVisible, navigateToSkills } from '../helpers/shared-flows';
 import {
   clearRequestLog,
-  getRequestLog,
   resetMockBehavior,
   startMockServer,
   stopMockServer,

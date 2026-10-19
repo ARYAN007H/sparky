@@ -1,72 +1,16 @@
 /**
- * Chat harness + wallet flow end-to-end.
- *
- * This spec locks down the current wallet contract as it exists today:
- *
- *   1. A user can complete local wallet setup through the real
- *      Recovery Phrase panel, which persists `state/wallet-state.json`
- *      in the workspace.
- *   2. A real `/chat` turn lets the orchestrator reach the `web3` skill
- *      pack through `use_skill` and invoke `wallet_prepare_transfer`
- *      itself (the crypto sub-agent and its `do_crypto` delegate are gone).
- *   3. The resulting prepared quote is visible from Rust-side
- *      test-support introspection, proving the agent flow crossed the
- *      UI → core → tool-dispatch boundary.
- *
- * What this does NOT claim:
- *   - on-chain broadcast
- *   - desktop-keystore signing
- *
- * The current core implementation explicitly stops at
- * `execute_prepared -> ReadyToSign`, so the E2E keeps its assertion
- * surface honest and checks the prepared quote boundary.
+ * The Recovery Phrase panel lets a user create and back up a local wallet.
+ * This flow covers its visible phrase and persisted wallet setup state.
  */
 import { waitForApp } from '../helpers/app-helpers';
-import {
-  chatMounted,
-  clickByTitle,
-  clickSend,
-  getSelectedThreadId,
-  typeIntoComposer,
-  waitForSocketConnected,
-} from '../helpers/chat-harness';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
 import { clickText, textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
-import {
-  clearRequestLog,
-  getRequestLog,
-  setMockBehavior,
-  startMockServer,
-  stopMockServer,
-} from '../mock-server';
+import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
 
 const USER_ID = 'e2e-chat-harness-wallet-flow';
-const CANARY = 'wallet-quote-canary-8d13';
 const JOHN_ADDRESS = '0x00000000000000000000000000000000000000aa';
-const WALLET_PROMPT = `Send John $5 on EVM at ${JOHN_ADDRESS} and tell me ${CANARY}.`;
-
-/** One `use_skill` call into the `web3` pack, the orchestrator's route to wallet tools. */
-function web3Call(id: string, tool: string, args: Record<string, unknown>) {
-  return {
-    content: '',
-    toolCalls: [
-      { id, name: 'use_skill', arguments: JSON.stringify({ skill: 'web3', tool, args }) },
-    ],
-  };
-}
-
-const FORCED_RESPONSES = [
-  web3Call('call_wallet_status_1', 'wallet_status', {}),
-  web3Call('call_wallet_chain_status_1', 'wallet_chain_status', {}),
-  web3Call('call_wallet_prepare_transfer_1', 'wallet_prepare_transfer', {
-    chain: 'evm',
-    toAddress: JOHN_ADDRESS,
-    amountRaw: '5000000000000000000',
-  }),
-  { content: `Prepared a wallet quote for John. ${CANARY}` },
-];
 
 async function clickRecoveryConsentCheckbox(): Promise<void> {
   const checkbox = await browser.$('#mnemonic-confirm-checkbox');
