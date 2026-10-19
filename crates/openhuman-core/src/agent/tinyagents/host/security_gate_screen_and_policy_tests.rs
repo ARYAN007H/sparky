@@ -220,9 +220,7 @@ async fn screen_input_redacts_credentials_without_changing_screening_policy() {
 async fn tool_screening_preserves_host_confirmation_tokens() {
     let gate = gate(AutonomyLevel::Full);
     let token = "00000000-0000-4000-8000-000000000123";
-    let response = format!(
-        r#"{{"status":"NeedsConfirmation","pending":{{"token":"{token}"}}}}"#
-    );
+    let response = format!(r#"{{"status":"NeedsConfirmation","pending":{{"token":"{token}"}}}}"#);
 
     let outcome = gate
         .screen_input(&response, ContentOrigin::Tool)
