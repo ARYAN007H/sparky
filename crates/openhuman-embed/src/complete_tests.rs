@@ -782,6 +782,27 @@ async fn provider_failure_maps_to_an_rpc_error() {
 }
 
 #[tokio::test]
+async fn provider_failure_keeps_the_complete_once_prefix() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(400).set_body_string("bad request"))
+        .mount(&server)
+        .await;
+
+    let request = CompletionRequest::new("m", vec![ChatMessage::user("x")]);
+    let error = completer(&server)
+        .complete(request)
+        .await
+        .expect_err("a provider failure must preserve the legacy completion context");
+
+    assert!(
+        matches!(error, CoreError::Rpc { message, .. } if message.starts_with("complete_once: model error:")),
+        "{error:?}"
+    );
+}
+
+#[tokio::test]
 async fn slow_provider_hits_the_timeout_branch() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
