@@ -16,7 +16,7 @@ Voice is an optional core capability. The Cargo `voice` feature is off in contri
 - **Hallucination filter.** Strips known artifacts such as "Thanks for watching" and phrases invented from silence.
 - **Postprocessing.** Punctuation, capitalization and dictation cleanup.
 
-Dictation can replace the active text input or go straight into a chat with the agent. Desktop global dictation and push-to-talk hotkeys are no longer part of the product.
+Dictation can replace the active text input or go straight into a chat with the agent. Desktop global voice shortcuts are no longer part of the product.
 
 ## Text-to-speech
 
