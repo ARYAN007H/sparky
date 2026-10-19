@@ -490,7 +490,6 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
     assert_eq!(refreshed.memory.agent_id.as_deref(), Some(id.as_str()));
     assert_eq!(refreshed.agent.max_tool_iterations_override, Some(4));
     assert!(!refreshed.agent.channel_permissions.is_empty());
-
     let nested = context.derive_with(ContextOverlay::new(
         refreshed,
         context.domains(),
