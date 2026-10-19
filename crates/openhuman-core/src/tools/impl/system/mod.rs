@@ -1,5 +1,5 @@
 //! Cross-cutting system tools: shell, Node/npm/Python execution, tool
-//! detection/install, time helpers, LSP, proxy config, update check/apply.
+//! detection/install, time helpers, proxy config, update check/apply.
 //! Each family, its tool structs, and its registration gates are catalogued in
 //! `tools/impl/README.md`.
 

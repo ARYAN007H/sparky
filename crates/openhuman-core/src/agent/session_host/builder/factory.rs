@@ -437,12 +437,9 @@ impl OpenHumanSessionHost {
                         let mut set: std::collections::HashSet<String> =
                             names.iter().cloned().collect();
                         // Only the *advertised* ones. A synthesised tool that
-                        // reports `ToolExposure::Hidden` is a member of a
-                        // collapsed tool — today every `ArchetypeDelegationTool`,
-                        // whose family the single `delegate_to` tool now stands
-                        // for. Inserting it here would put it back on the wire
-                        // beside the tool that replaced it, shipping both
-                        // surfaces and saving nothing.
+                        // reports `ToolExposure::Hidden` stays off the wire.
+                        // Inserting it here would defeat the exposure policy and
+                        // duplicate the route through a second surface.
                         //
                         // This is not the same judgement as
                         // `strip_deferred_from_visible`, which deliberately
