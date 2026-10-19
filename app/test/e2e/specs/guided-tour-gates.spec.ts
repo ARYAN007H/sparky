@@ -13,9 +13,9 @@
  *      Skill-connection gating is NOT implemented; that assertion is skipped
  *      and the gap is called out explicitly (GP-1).
  *
- *   2. Chat gate: the final (9th) step has a `before` hook that creates a
+ *   2. Chat gate: the final (7th) step has a `before` hook that creates a
  *      thread and seeds a welcome message, then navigates to /chat. Reaching
- *      step 9 by clicking Next 8 times is inherently fragile in CI (any one
+ *      step 7 by clicking Next 6 times is inherently fragile in CI (any one
  *      before-hook timeout aborts the sequence). The multi-step-advance test
  *      is therefore skipped (GP-3: no shortcut to jump to an arbitrary step),
  *      and replaced by two fast, independent assertions:
@@ -188,29 +188,29 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
   // ── Scenario 1: Start and navigate ─────────────────────────────────────────
 
   describe('Scenario 1 — start and navigate', () => {
-    it('tour starts and tooltip is visible at step 1 (home-card)', async () => {
+    it('tour starts on the current chat panel at step 1 of 7', async () => {
       await navigateViaHash('/home');
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
       expect(await waitForTourTooltip()).toBe(true);
-      expect(await textExists('1 of 9')).toBe(true);
+      expect(await textExists('1 of 7')).toBe(true);
       expect(
         await browser.execute(
-          () => document.querySelector('[data-walkthrough="home-card"]') !== null
+          () => document.querySelector('[data-walkthrough="chat-agent-panel"]') !== null
         )
       ).toBe(true);
     });
 
-    it('tour navigates to /connections and highlights skills-grid after 3 Next clicks', async () => {
+    it('tour navigates to /connections and highlights skills-grid after 1 Next click', async () => {
       await navigateViaHash('/home');
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
       expect(await waitForTourTooltip()).toBe(true);
-      await advanceTourSteps(3);
+      await advanceTourSteps(1);
       await browser.waitUntil(
         async () =>
           String(await browser.execute(() => window.location.hash)).includes('/connections'),
-        { timeout: 15_000, timeoutMsg: 'tour did not navigate to /connections after three steps' }
+        { timeout: 15_000, timeoutMsg: 'tour did not navigate to /connections after one step' }
       );
       expect(
         await browser.execute(
@@ -235,7 +235,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
       expect(await waitForTourTooltip(10_000)).toBe(true);
-      await advanceTourSteps(8);
+      await advanceTourSteps(6);
 
       const hasLastStepTitle = await textExists("You're all set!");
       expect(hasLastStepTitle).toBe(true);
@@ -256,7 +256,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       }
 
       // Navigate directly to /chat and verify the data-walkthrough target that
-      // Joyride must spotlight on steps 3 and 9 is present in the DOM.
+      // Joyride must spotlight on steps 1 and 7 is present in the DOM.
       // This is independent of the full tour advance sequence.
       await navigateViaHash('/chat');
 
