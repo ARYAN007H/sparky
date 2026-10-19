@@ -58,12 +58,37 @@ pub(crate) struct ConfigRead {
     pub source_anchor: ConfigSourceAnchor,
 }
 
+/// A retained identity for the document backend that owns a snapshot.
+#[derive(Clone)]
+pub(crate) enum DocumentBackendIdentity {
+    Installed(std::sync::Arc<dyn crate::storage::StorageBackend>),
+    Test(std::sync::Arc<()>),
+}
+
+impl std::fmt::Debug for DocumentBackendIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DocumentBackendIdentity(..)")
+    }
+}
+
+impl PartialEq for DocumentBackendIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Installed(left), Self::Installed(right)) => std::sync::Arc::ptr_eq(left, right),
+            (Self::Test(left), Self::Test(right)) => std::sync::Arc::ptr_eq(left, right),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for DocumentBackendIdentity {}
+
 /// Identity of the exact persistence target a config snapshot was read from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ConfigSourceAnchor {
     File(std::path::PathBuf),
     Document {
-        backend: usize,
+        backend: DocumentBackendIdentity,
         scope: String,
         id: String,
     },
@@ -138,7 +163,7 @@ pub(crate) fn for_config(config_path: &Path) -> Result<Box<dyn ConfigSource>> {
             forced.scope,
             forced.keys,
             file,
-            std::sync::Arc::as_ptr(forced.scoped.documents()) as *const () as usize,
+            DocumentBackendIdentity::Test(forced.identity),
         )));
     }
     if !crate::storage::installed_is_shared() {
@@ -146,13 +171,12 @@ pub(crate) fn for_config(config_path: &Path) -> Result<Box<dyn ConfigSource>> {
     }
     let resolved = crate::storage::current_scope().map(|scope| {
         crate::storage::installed().map(|backend| {
-            let identity = std::sync::Arc::as_ptr(&backend) as *const () as usize;
             let scoped = backend.for_scope(&scope);
-            scoped.map(|scoped| (scoped, scope, identity))
+            scoped.map(|scoped| (scoped, scope, backend))
         })
     });
     match resolved {
-        Ok(Some(Ok((scoped, scope, identity)))) => {
+        Ok(Some(Ok((scoped, scope, backend)))) => {
             let keys = crate::storage::secrets::keys()
                 .map_err(|error| anyhow::anyhow!("config document key: {error}"))?;
             Ok(Box::new(DocumentConfigSource::new(
@@ -160,7 +184,7 @@ pub(crate) fn for_config(config_path: &Path) -> Result<Box<dyn ConfigSource>> {
                 scope,
                 keys,
                 file,
-                identity,
+                DocumentBackendIdentity::Installed(backend),
             )))
         }
         Ok(None) => Ok(Box::new(file)),
