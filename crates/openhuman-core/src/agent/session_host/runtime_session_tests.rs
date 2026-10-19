@@ -74,15 +74,14 @@ async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
     let (tx, mut rx) = tokio::sync::mpsc::channel(4);
     let mut context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     context.progress = Some(tx);
-    context.session_sidecar.lock().unwrap().stop = Some(
-        crate::agent::turn_projection::breaker_stop_with_cause(
+    context.session_sidecar.lock().unwrap().stop =
+        Some(crate::agent::turn_projection::breaker_stop_with_cause(
             tinyagents_harness::no_progress::ClassifiedStopCause {
                 class: "uncertain_side_effect".into(),
                 operation: "web_answer_tool".into(),
                 summary: "classified failure".into(),
             },
-        ),
-    );
+        ));
     let receipt = CommitReceipt {
         outcome: SessionTurnOutcome {
             history: Vec::new(),

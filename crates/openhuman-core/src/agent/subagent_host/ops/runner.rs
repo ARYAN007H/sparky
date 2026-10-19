@@ -898,15 +898,7 @@ async fn run_typed_mode(
         );
     }
 
-    let (
-        output,
-        iterations,
-        agg_usage,
-        early_exit_tool,
-        hit_cap,
-        breaker_halt,
-        failure_cause,
-    ) =
+    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt, failure_cause) =
         super::graph::run_subagent_via_graph(
             subagent_source.clone(),
             &model,

@@ -53,9 +53,14 @@ fn an_incomplete_reason_maps_to_cap_or_breaker() {
     );
     let stop = stop_from_incomplete(CLASSIFIED_NOTE);
     assert_eq!(stop.kind, TurnStopKind::Breaker);
-    assert_eq!(stop.operation, None, "legacy prose cannot inject typed metadata");
     assert_eq!(
-        breaker_stop_with_cause(classified_cause()).operation.as_deref(),
+        stop.operation, None,
+        "legacy prose cannot inject typed metadata"
+    );
+    assert_eq!(
+        breaker_stop_with_cause(classified_cause())
+            .operation
+            .as_deref(),
         Some("web_answer_tool")
     );
 }

@@ -177,10 +177,7 @@ fn a_stopped_subagent_span_closes_at_warning_with_stop_attributes() {
         (AgentProgress::TurnStarted, 0),
         (spawn("t-stop", "Research"), 5),
         (
-            subagent_completed(
-                "t-stop",
-                Some(classified_breaker_stop()),
-            ),
+            subagent_completed("t-stop", Some(classified_breaker_stop())),
             40,
         ),
     ]);

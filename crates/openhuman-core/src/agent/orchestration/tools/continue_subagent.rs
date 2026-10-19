@@ -553,7 +553,10 @@ impl ContinueSubagentTool {
                         }
                         Ok(ToolResult::success(outcome.output))
                     }
-                    SubagentRunStatus::Incomplete { reason, failure_cause } => {
+                    SubagentRunStatus::Incomplete {
+                        reason,
+                        failure_cause,
+                    } => {
                         // The continued sub-agent stopped short again (stuck halt
                         // / iteration cap). Hand back the partial progress framed
                         // as incomplete rather than a clean success (#4096).

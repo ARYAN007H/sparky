@@ -77,10 +77,18 @@ fn compatible_session_reuses_and_incompatible_shape_spawns_new() {
 fn closed_session_is_not_reusable() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let task_key = format!(
+        "task-{}",
+        dir.path()
+            .file_name()
+            .expect("tempdir name")
+            .to_string_lossy()
+    );
+    let selector = selector(&task_key);
     let session = upsert_running(
         &store,
         SubagentSessionUpsert {
-            selector: selector("task"),
+            selector: selector.clone(),
             display_name: None,
             task_title: "Task".into(),
             worker_thread_id: None,
@@ -91,7 +99,13 @@ fn closed_session_is_not_reusable() {
     .unwrap();
 
     assert!(close(&store, &session.subagent_session_id).unwrap());
-    assert!(find_reusable(&store, &selector("task")).unwrap().is_none());
+    let reusable = find_reusable(&store, &selector).unwrap();
+    assert!(
+        reusable.is_none(),
+        "closed session {} matched reusable record {:?}",
+        session.subagent_session_id,
+        reusable.map(|record| (record.subagent_session_id, record.status, record.reusable))
+    );
 }
 
 #[test]
