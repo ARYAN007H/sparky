@@ -1,0 +1,365 @@
+//! Durable native-channel history across actual CLI process restarts.
+//!
+//! The first process receives a Telegram update and calls a loopback model.
+//! After that process exits, a second `openhuman-core serve` process receives a
+//! new update for the same Telegram conversation. The second model request
+//! must contain the first user's message from the session transcript.
+//!
+//! Both Telegram and inference are loopback mocks. This target needs the
+//! linked TinyChannels module implementation so it exercises the native
+//! Telegram listener rather than a host-side REST adapter.
+
+use std::collections::VecDeque;
+use std::fs::File;
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::routing::post;
+use axum::{Json, Router};
+use serde_json::{json, Value};
+use tokio::task::JoinHandle;
+use tokio::time::sleep;
+
+const BOT_TOKEN: &str = "session-restart-token";
+const RPC_TOKEN: &str = "native-session-restart-rpc-token";
+const FIRST_TEXT: &str = "remember this after the core restarts";
+const SECOND_TEXT: &str = "what did I ask before the restart?";
+
+#[derive(Default)]
+struct MockState {
+    updates: Mutex<VecDeque<Value>>,
+    update_offsets: Mutex<Vec<i64>>,
+    completions: Mutex<Vec<Value>>,
+    sent_messages: Mutex<Vec<Value>>,
+}
+
+struct MockServers {
+    telegram: String,
+    inference: String,
+    _telegram_task: JoinHandle<()>,
+    _inference_task: JoinHandle<()>,
+    state: Arc<MockState>,
+}
+
+async fn start_mock_servers() -> MockServers {
+    let state = Arc::new(MockState::default());
+    let telegram_app = Router::new()
+        .route("/botsession-restart-token/getUpdates", post(get_updates))
+        .route("/botsession-restart-token/sendMessage", post(send_message))
+        .route("/botsession-restart-token/editMessageText", post(send_message))
+        .route("/botsession-restart-token/sendChatAction", post(ok))
+        .route("/botsession-restart-token/getMe", post(get_me))
+        .with_state(Arc::clone(&state));
+    let inference_app = Router::new()
+        .route("/v1/chat/completions", post(chat_completion))
+        .with_state(Arc::clone(&state));
+    let (telegram, telegram_task) = serve(telegram_app).await;
+    let (inference, inference_task) = serve(inference_app).await;
+    MockServers {
+        telegram,
+        inference,
+        _telegram_task: telegram_task,
+        _inference_task: inference_task,
+        state,
+    }
+}
+
+async fn serve(app: Router) -> (String, JoinHandle<()>) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind loopback mock");
+    let address = listener.local_addr().expect("mock address");
+    let task = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .await
+            .expect("serve loopback mock");
+    });
+    (format!("http://{address}"), task)
+}
+
+async fn get_updates(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    let offset = body.get("offset").and_then(Value::as_i64).unwrap_or_default();
+    state
+        .update_offsets
+        .lock()
+        .expect("Telegram offsets")
+        .push(offset);
+    let mut updates = state.updates.lock().expect("Telegram updates");
+    updates.retain(|update| {
+        update
+            .get("update_id")
+            .and_then(Value::as_i64)
+            .is_some_and(|id| id >= offset)
+    });
+    Json(json!({ "ok": true, "result": updates.iter().cloned().collect::<Vec<_>>() }))
+}
+
+async fn send_message(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    state
+        .sent_messages
+        .lock()
+        .expect("Telegram sent messages")
+        .push(body);
+    let id = state
+        .sent_messages
+        .lock()
+        .expect("Telegram sent messages")
+        .len() as i64;
+    Json(json!({ "ok": true, "result": { "message_id": id, "chat": { "id": 42 } } }))
+}
+
+async fn ok() -> Json<Value> {
+    Json(json!({ "ok": true, "result": true }))
+}
+
+async fn get_me() -> Json<Value> {
+    Json(json!({ "ok": true, "result": { "id": 9, "is_bot": true, "username": "test_bot" } }))
+}
+
+async fn chat_completion(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    let index = {
+        let mut completions = state.completions.lock().expect("model requests");
+        completions.push(body.clone());
+        completions.len()
+    };
+    let response = json!({
+        "choices": [{
+            "index": 0,
+            "message": { "role": "assistant", "content": format!("mock reply {index}") },
+            "finish_reason": "stop"
+        }]
+    });
+    (StatusCode::OK, Json(response))
+}
+
+fn message_update(update_id: i64, message_id: i64, text: &str) -> Value {
+    json!({
+        "update_id": update_id,
+        "message": {
+            "message_id": message_id,
+            "date": 1_800_000_000,
+            "from": { "id": 42, "is_bot": false, "first_name": "Ada" },
+            "chat": { "id": 42, "type": "private", "first_name": "Ada" },
+            "text": text
+        }
+    })
+}
+
+fn push_update(state: &MockState, update_id: i64, message_id: i64, text: &str) {
+    state
+        .updates
+        .lock()
+        .expect("Telegram updates")
+        .push_back(message_update(update_id, message_id, text));
+}
+
+fn write_config(home: &Path, workspace: &Path, inference: &str) {
+    let openhuman_dir = home.join(".openhuman");
+    std::fs::create_dir_all(&openhuman_dir).expect("create OpenHuman config dir");
+    std::fs::create_dir_all(workspace).expect("create workspace");
+    let config = format!(
+        r#"default_model = "mock:session-model"
+chat_provider = "mock:session-model"
+api_url = "{inference}"
+default_temperature = 0.0
+
+[secrets]
+encrypt = false
+
+[memory]
+provider = "none"
+embedding_provider = "none"
+embedding_model = "none"
+embedding_dimensions = 0
+
+[channels_config.telegram]
+bot_token = "{BOT_TOKEN}"
+allowed_users = ["42"]
+mention_only = false
+
+[[cloud_providers]]
+id = "p_session_restart"
+slug = "mock"
+label = "Session restart mock"
+endpoint = "{inference}/v1"
+auth_style = "none"
+default_model = "session-model"
+"#
+    );
+    std::fs::write(openhuman_dir.join("config.toml"), config).expect("write config");
+    // Core config resolution uses the operator profile when no identity has
+    // been established, while workspace state is independently pinned here.
+    let parsed: openhuman_core::config::Config =
+        toml::from_str(&config).expect("mock config matches the core schema");
+    assert_eq!(parsed.channels_config.telegram.as_ref().unwrap().bot_token, BOT_TOKEN);
+}
+
+struct CoreProcess(Child);
+
+impl Drop for CoreProcess {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn start_core(home: &Path, workspace: &Path, telegram: &str, log_path: &Path) -> (CoreProcess, String) {
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("reserve core port")
+        .local_addr()
+        .expect("core port")
+        .port();
+    let stdout = File::create(log_path).expect("create core log");
+    let stderr = stdout.try_clone().expect("clone core log handle");
+    let child = Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
+        .args(["serve", "--port", &port.to_string()])
+        .env("HOME", home)
+        .env("USERPROFILE", home)
+        .env("OPENHUMAN_WORKSPACE", workspace)
+        .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
+        .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
+        .env("OPENHUMAN_MODULE_SOURCE", "linked")
+        .env("OPENHUMAN_KEYRING_MASTER_KEY", "44".repeat(32))
+        .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
+        .env_remove("OPENHUMAN_MODE")
+        .env_remove("OPENHUMAN_BACKEND_API_KEY")
+        .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::from(stderr))
+        .spawn()
+        .expect("spawn openhuman-core");
+    (CoreProcess(child), format!("http://127.0.0.1:{port}"))
+}
+
+async fn wait_until(label: &str, mut condition: impl FnMut() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(45);
+    while !condition() {
+        assert!(Instant::now() < deadline, "timed out waiting for {label}");
+        sleep(Duration::from_millis(50)).await;
+    }
+}
+
+async fn wait_healthy(base: &str, process: &mut CoreProcess, log_path: &Path) {
+    let client = reqwest::Client::new();
+    let health = format!("{base}/health");
+    let deadline = Instant::now() + Duration::from_secs(90);
+    loop {
+        if client
+            .get(&health)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+        {
+            return;
+        }
+        if let Ok(Some(exit)) = process.0.try_wait() {
+            let log = std::fs::read_to_string(log_path).unwrap_or_default();
+            panic!("core exited before health became ready ({exit}):\n{log}");
+        }
+        assert!(Instant::now() < deadline, "core did not become healthy");
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+async fn wait_for_completion(state: &MockState, count: usize) {
+    wait_until("model request", || {
+        state
+            .completions
+            .lock()
+            .expect("model requests")
+            .len()
+            >= count
+    })
+    .await;
+    wait_until("final Telegram reply", || {
+        state
+            .sent_messages
+            .lock()
+            .expect("Telegram sent messages")
+            .iter()
+            .any(|body| body["text"].as_str().is_some_and(|text| text.contains(&format!("mock reply {count}"))))
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn native_telegram_session_resumes_after_the_core_process_restarts() {
+    let tmp = tempfile::tempdir().expect("temporary core home");
+    let home = std::fs::canonicalize(tmp.path()).expect("canonicalize temporary home");
+    let workspace = home.join("workspace");
+    let logs = home.join("logs");
+    std::fs::create_dir_all(&logs).expect("create logs");
+
+    let mocks = start_mock_servers().await;
+    write_config(&home, &workspace, &mocks.inference);
+
+    // The first listener instance consumes one real native Telegram update.
+    let (mut first, first_rpc) =
+        start_core(&home, &workspace, &mocks.telegram, &logs.join("first.log"));
+    wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
+    let first_pid = first.0.id();
+    push_update(&mocks.state, 100, 10, FIRST_TEXT);
+    wait_for_completion(&mocks.state, 1).await;
+    // Telegram only acknowledges a delivered update after the client advances
+    // its polling offset; wait for that protocol step before stopping process 1.
+    wait_until("Telegram acknowledgement of first update", || {
+        mocks
+            .state
+            .update_offsets
+            .lock()
+            .expect("Telegram offsets")
+            .iter()
+            .any(|offset| *offset > 100)
+    })
+    .await;
+    first.0.kill().expect("stop first core process");
+    first.0.wait().expect("reap first core process");
+
+    // The second process starts from the same durable workspace and gets a
+    // distinct message in the same Telegram conversation.
+    push_update(&mocks.state, 101, 11, SECOND_TEXT);
+    let (mut second, second_rpc) =
+        start_core(&home, &workspace, &mocks.telegram, &logs.join("second.log"));
+    assert_ne!(first_pid, second.0.id(), "restart must use a fresh process");
+    wait_healthy(&second_rpc, &mut second, &logs.join("second.log")).await;
+    wait_until("second model request", || {
+        mocks
+            .state
+            .completions
+            .lock()
+            .expect("model requests")
+            .len()
+            >= 2
+    })
+    .await;
+
+    let requests = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .clone();
+    let second_messages = requests[1]["messages"]
+        .as_array()
+        .expect("OpenAI-compatible messages");
+    assert!(
+        second_messages.iter().any(|message| {
+            message["role"] == "user" && message["content"].as_str() == Some(FIRST_TEXT)
+        }),
+        "the restarted process must resume the first Telegram turn in the exact second model request; got {}",
+        serde_json::to_string_pretty(&requests[1]).unwrap()
+    );
+}
