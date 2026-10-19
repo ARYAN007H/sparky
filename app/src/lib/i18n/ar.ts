@@ -592,6 +592,8 @@ const messages: TranslationMap = {
   'memory.error.planRequired': 'الذاكرة غير مضمّنة في خطتك. قم بترقية خطتك لاستخدامها.',
   'memory.planRequired.title': 'غير مضمّنة في خطتك',
   'memory.planRequired.action': 'ترقية',
+  'memoryPage.engine.builtin.planRequired':
+    'خطتك لا تتضمن الذاكرة المستضافة لدى TinyHumans. قم بالترقية إلى Basic أو Pro لاستخدامها.',
   'alerts.title': 'التنبيهات',
   'alerts.empty': 'لا توجد تنبيهات بعد',
   'alerts.markAllRead': 'تحديد الكل كمقروء',

@@ -598,6 +598,8 @@ const en: TranslationMap = {
   'memory.error.planRequired': "Memory isn't included in your plan. Upgrade your plan to use it.",
   'memory.planRequired.title': 'Not in your plan',
   'memory.planRequired.action': 'Upgrade',
+  'memoryPage.engine.builtin.planRequired':
+    "Your plan doesn't include memory hosted by TinyHumans. Upgrade to Basic or Pro to use it.",
 
   // Activity surface: Phase 3 renamed tabs
   'activity.tabs.automations': 'Automations',

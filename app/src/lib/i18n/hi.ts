@@ -606,6 +606,8 @@ const messages: TranslationMap = {
     'मेमोरी आपके प्लान में शामिल नहीं है। इसका उपयोग करने के लिए अपना प्लान अपग्रेड करें।',
   'memory.planRequired.title': 'आपके प्लान में नहीं',
   'memory.planRequired.action': 'अपग्रेड करें',
+  'memoryPage.engine.builtin.planRequired':
+    'आपके प्लान में TinyHumans द्वारा होस्ट की गई मेमोरी शामिल नहीं है। इसका उपयोग करने के लिए Basic या Pro में अपग्रेड करें।',
   'alerts.title': 'अलर्ट',
   'alerts.empty': 'अभी कोई अलर्ट नहीं',
   'alerts.markAllRead': 'सभी पढ़ा हुआ मार्क करें',

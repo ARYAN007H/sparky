@@ -247,6 +247,31 @@ describe('MemoryEngineTab', () => {
       expect(hoisted.openUrl).toHaveBeenCalledWith('https://tinyhumans.ai/terms');
     });
 
+    it('disables Use on a FREE plan and points to an upgrade (#8081)', () => {
+      hoisted.plan = 'FREE';
+      renderTab(OFF);
+      const panel = pick('builtin');
+      expect(within(panel).getByTestId('memory-engine-builtin-submit')).toBeDisabled();
+      expect(within(panel).getByTestId('memory-engine-builtin-plan-required')).toHaveTextContent(
+        "Your plan doesn't include memory hosted by TinyHumans."
+      );
+      fireEvent.click(within(panel).getByTestId('memory-engine-builtin-submit'));
+      expect(hoisted.engineSet).not.toHaveBeenCalled();
+      expect(within(panel).getByTestId('memory-engine-builtin-upgrade')).toHaveTextContent(
+        'Upgrade'
+      );
+    });
+
+    it.each([['BASIC'], ['PRO'], [null]])('keeps Use enabled on plan %s', plan => {
+      hoisted.plan = plan;
+      renderTab(OFF);
+      const panel = pick('builtin');
+      expect(within(panel).getByTestId('memory-engine-builtin-submit')).toBeEnabled();
+      expect(
+        within(panel).queryByTestId('memory-engine-builtin-plan-required')
+      ).not.toBeInTheDocument();
+    });
+
     it('gives the Basic plan 1 GB of memory', () => {
       hoisted.plan = 'BASIC';
       renderTab(BUILTIN_ON);

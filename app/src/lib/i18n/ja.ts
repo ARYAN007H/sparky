@@ -4775,6 +4775,8 @@ const messages: TranslationMap = {
     'メモリーはご利用のプランに含まれていません。利用するにはプランをアップグレードしてください。',
   'memory.planRequired.title': 'プランに含まれていません',
   'memory.planRequired.action': 'アップグレード',
+  'memoryPage.engine.builtin.planRequired':
+    'ご利用のプランには TinyHumans がホストするメモリーが含まれていません。利用するには Basic または Pro にアップグレードしてください。',
   'onboarding.custom.search.skipForNow': '今はスキップ',
   'onboarding.custom.search.ready': 'Web検索の準備ができました。',
   'onboarding.custom.search.notReady':

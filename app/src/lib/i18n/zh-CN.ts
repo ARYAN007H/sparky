@@ -566,6 +566,8 @@ const messages: TranslationMap = {
   'memory.error.planRequired': '你的套餐不包含记忆功能。升级套餐即可使用。',
   'memory.planRequired.title': '不在你的套餐中',
   'memory.planRequired.action': '升级',
+  'memoryPage.engine.builtin.planRequired':
+    '你的套餐不包含由 TinyHumans 托管的记忆功能。升级到 Basic 或 Pro 即可使用。',
   'alerts.title': '通知',
   'alerts.empty': '暂无通知',
   'alerts.markAllRead': '全部标记为已读',

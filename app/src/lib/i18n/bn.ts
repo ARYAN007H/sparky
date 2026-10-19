@@ -601,6 +601,8 @@ const messages: TranslationMap = {
     'আপনার প্ল্যানে মেমোরি অন্তর্ভুক্ত নেই। এটি ব্যবহার করতে আপনার প্ল্যান আপগ্রেড করুন।',
   'memory.planRequired.title': 'আপনার প্ল্যানে নেই',
   'memory.planRequired.action': 'আপগ্রেড করুন',
+  'memoryPage.engine.builtin.planRequired':
+    'আপনার প্ল্যানে TinyHumans-হোস্ট করা মেমোরি অন্তর্ভুক্ত নেই। এটি ব্যবহার করতে Basic বা Pro-তে আপগ্রেড করুন।',
   'alerts.title': 'সতর্কতা',
   'alerts.empty': 'এখনো কোনো সতর্কতা নেই',
   'alerts.markAllRead': 'সব পঠিত চিহ্নিত করুন',

@@ -4428,6 +4428,8 @@ const messages: TranslationMap = {
   'memory.error.planRequired': 'Bellek planınıza dahil değil. Kullanmak için planınızı yükseltin.',
   'memory.planRequired.title': 'Planınıza dahil değil',
   'memory.planRequired.action': 'Yükselt',
+  'memoryPage.engine.builtin.planRequired':
+    "Planınız TinyHumans tarafından barındırılan belleği içermiyor. Kullanmak için Basic veya Pro'ya yükseltin.",
   'memoryPage.engine.badgeDegraded': 'Kısıtlı çalışıyor',
   'memoryPage.engine.badgeDown': 'Ulaşılamıyor',
   'memoryPage.engine.connecting': 'Bağlanıyor…',

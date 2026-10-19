@@ -614,6 +614,8 @@ const messages: TranslationMap = {
     'Pamięć nie jest uwzględniona w Twoim planie. Ulepsz plan, aby z niej korzystać.',
   'memory.planRequired.title': 'Poza Twoim planem',
   'memory.planRequired.action': 'Ulepsz plan',
+  'memoryPage.engine.builtin.planRequired':
+    'Twój plan nie obejmuje pamięci hostowanej przez TinyHumans. Przejdź na Basic lub Pro, aby z niej korzystać.',
   'alerts.title': 'Alerty',
   'alerts.empty': 'Brak alertów',
   'alerts.markAllRead': 'Oznacz wszystkie jako przeczytane',

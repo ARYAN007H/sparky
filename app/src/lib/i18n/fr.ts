@@ -624,6 +624,8 @@ const messages: TranslationMap = {
     "La mémoire n'est pas incluse dans votre forfait. Passez à un forfait supérieur pour l'utiliser.",
   'memory.planRequired.title': 'Non incluse dans votre forfait',
   'memory.planRequired.action': 'Mettre à niveau',
+  'memoryPage.engine.builtin.planRequired':
+    "Votre forfait n'inclut pas la mémoire hébergée par TinyHumans. Passez à Basic ou Pro pour l'utiliser.",
   'alerts.title': 'Alertes',
   'alerts.empty': "Aucune alerte pour l'instant",
   'alerts.markAllRead': 'Tout marquer comme lu',

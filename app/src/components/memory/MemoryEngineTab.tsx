@@ -51,6 +51,7 @@ import MemoryConnectionPanel from './MemoryConnectionPanel';
 import MemoryCortexAnnouncement from './MemoryCortexAnnouncement';
 import MemoryCortexCard from './MemoryCortexCard';
 import MemoryDisabledCard from './MemoryDisabledCard';
+import { planIncludesMemory } from './memoryPlan';
 import MemoryProviderLogo, { type MemoryProviderOption } from './MemoryProviderLogo';
 
 export { CORTEXDB_SELF_HOST_DOCS_URL } from './MemoryConnectionPanel';
@@ -302,7 +303,7 @@ export default function MemoryEngineTab({ state, onStateChange, embedded }: Memo
       onLocalKey={setLocalKey}
       canSubmit={
         option === 'builtin'
-          ? saving === null && signedIn
+          ? saving === null && signedIn && (plan === null || planIncludesMemory(plan))
           : option === 'apikey'
             ? canSubmitCloud
             : canSubmitLocal

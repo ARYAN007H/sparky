@@ -610,6 +610,8 @@ const messages: TranslationMap = {
     'Память не входит в ваш тариф. Перейдите на более высокий тариф, чтобы пользоваться ею.',
   'memory.planRequired.title': 'Не входит в ваш тариф',
   'memory.planRequired.action': 'Улучшить тариф',
+  'memoryPage.engine.builtin.planRequired':
+    'Ваш тариф не включает память, размещённую в TinyHumans. Перейдите на Basic или Pro, чтобы пользоваться ею.',
   'alerts.title': 'Оповещения',
   'alerts.empty': 'Оповещений пока нет',
   'alerts.markAllRead': 'Отметить всё прочитанным',

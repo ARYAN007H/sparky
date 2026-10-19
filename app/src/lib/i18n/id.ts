@@ -613,6 +613,8 @@ const messages: TranslationMap = {
     'Memori tidak termasuk dalam paket Anda. Tingkatkan paket Anda untuk menggunakannya.',
   'memory.planRequired.title': 'Tidak termasuk dalam paket Anda',
   'memory.planRequired.action': 'Tingkatkan',
+  'memoryPage.engine.builtin.planRequired':
+    'Paket Anda tidak termasuk memori yang di-hosting oleh TinyHumans. Tingkatkan ke Basic atau Pro untuk menggunakannya.',
   'alerts.title': 'Peringatan',
   'alerts.empty': 'Belum ada peringatan',
   'alerts.markAllRead': 'Tandai semua sudah dibaca',

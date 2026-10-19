@@ -620,6 +620,8 @@ const messages: TranslationMap = {
     'La memoria non è inclusa nel tuo piano. Passa a un piano superiore per usarla.',
   'memory.planRequired.title': 'Non inclusa nel tuo piano',
   'memory.planRequired.action': 'Aggiorna piano',
+  'memoryPage.engine.builtin.planRequired':
+    'Il tuo piano non include la memoria ospitata da TinyHumans. Passa a Basic o Pro per usarla.',
   'alerts.title': 'Avvisi',
   'alerts.empty': 'Nessun avviso',
   'alerts.markAllRead': 'Segna tutti come letti',

@@ -624,6 +624,8 @@ const messages: TranslationMap = {
     'Memory ist in deinem Tarif nicht enthalten. Wechsle zu einem höheren Tarif, um es zu nutzen.',
   'memory.planRequired.title': 'Nicht in deinem Tarif',
   'memory.planRequired.action': 'Upgrade',
+  'memoryPage.engine.builtin.planRequired':
+    'Dein Tarif enthält kein von TinyHumans gehostetes Memory. Wechsle zu Basic oder Pro, um es zu nutzen.',
   'alerts.title': 'Warnungen',
   'alerts.empty': 'Noch keine Benachrichtigungen',
   'alerts.markAllRead': 'Alle als gelesen markieren',
