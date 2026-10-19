@@ -12,6 +12,4 @@ pub use session_turn::{
     agent_chat, agent_chat_for, agent_chat_reply_for, AgentChatEnv, AgentChatTarget,
 };
 
-pub(crate) use controllers::{
-    all_registered_controllers as all_inference_agent_chat_registered_controllers,
-};
+pub(crate) use controllers::all_registered_controllers as all_inference_agent_chat_registered_controllers;
