@@ -205,6 +205,37 @@ async fn ingest_refuses_bad_input() {
     .is_err());
 }
 
+
+#[tokio::test]
+async fn ingest_rejects_path_and_text_together_without_ingesting() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = bind_reference(&config);
+    let path = tmp.path().join("valid.md");
+    std::fs::write(&path, "valid file content").unwrap();
+
+    let error = ingest(
+        &config,
+        &MemoryIdentity::root(),
+        BrainIngestParams {
+            path: Some(path.display().to_string()),
+            text: Some("valid text content".into()),
+            source: Some("files".into()),
+            title: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        MemoryError::InvalidRequest(message)
+            if message == "pass exactly one of `path` or `text`"
+    ));
+    assert!(stored(&engine, MetaFilter::kinds([ItemKind::Document]))
+        .await
+        .is_empty());
+}
+
 #[tokio::test]
 async fn a_file_is_converted_and_filed_under_files() {
     let tmp = tempfile::tempdir().unwrap();
