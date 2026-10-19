@@ -3,7 +3,8 @@ use crate::config::test_env::EnvVarGuard;
 use std::sync::Arc;
 use std::time::Duration;
 use tinychannels_bus::module_progressive::{
-    ChannelOutputEvent, ProgressiveCommand, ProgressiveResult,
+    ChannelOutputEvent, ProgressiveCommand, ProgressiveResult, ProgressiveTransportRequest,
+    ProgressiveTransportResult,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -30,6 +31,29 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
             "ok": true,
             "result": true
         })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/bottoken/editMessageText"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": {
+                "message_id": 991,
+                "date": 1,
+                "chat": { "id": 42, "type": "private" },
+                "text": "updated"
+            }
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/bottoken/deleteMessage"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": true
+        })))
+        .expect(1)
         .mount(&server)
         .await;
     Mock::given(method("POST"))
@@ -126,12 +150,84 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
     .await
     .expect("module-to-host-to-module send must not deadlock")
     .expect("the configured module adapter should deliver the final message");
-    assert!(matches!(
-        completed,
-        ProgressiveResult::DeliveryOutcome { outcome }
-            if outcome.error.is_none()
-                && outcome.receipt.primary_platform_message_id.as_deref() == Some("991")
-    ));
+    let receipt = match completed {
+        ProgressiveResult::DeliveryOutcome { outcome } => {
+            assert!(outcome.error.is_none());
+            assert_eq!(
+                outcome.receipt.primary_platform_message_id.as_deref(),
+                Some("991")
+            );
+            outcome.receipt
+        }
+        other => panic!("expected typed delivery outcome, got {other:?}"),
+    };
+
+    // Exercise the actual host adapter against the same compiled module object.
+    // These Edit/Delete callback operations must retain the module receipt scope
+    // and return the provider's real outcome through the bus contract.
+    let adapter = ModuleChannel {
+        name: "telegram".into(),
+        object: runtime.lease.object().clone(),
+        interaction: tinychannels_bus::ChannelInteractionInfo {
+            capabilities: Default::default(),
+            proactive_target: None,
+            supports_reactions: false,
+            supports_draft_updates: false,
+        },
+        relay: None,
+        relay_fronted: false,
+    };
+    let channel_ref = tinychannels_bus::ChannelRef {
+        id: "telegram".into(),
+        account_id: Some("telegram".into()),
+    };
+    let conversation = tinychannels_bus::ConversationRef {
+        kind: tinychannels_bus::ConversationKind::Dm,
+        id: "42".into(),
+        ..Default::default()
+    };
+    let edited = adapter
+        .dispatch_progressive(ProgressiveTransportRequest::Edit {
+            channel: "telegram".into(),
+            turn_id: Some("compiled-module-turn".into()),
+            channel_ref: Some(channel_ref.clone()),
+            conversation: Some(conversation.clone()),
+            message_id: "991".into(),
+            receipt: Some(receipt.clone()),
+            text: "updated".into(),
+        })
+        .await
+        .expect("scoped edit should cross the compiled module bus");
+    assert!(
+        matches!(edited, ProgressiveTransportResult::Outcome(outcome) if outcome.error.is_none())
+    );
+    let deleted = adapter
+        .dispatch_progressive(ProgressiveTransportRequest::Delete {
+            channel: "telegram".into(),
+            turn_id: Some("compiled-module-turn".into()),
+            channel_ref: Some(channel_ref.clone()),
+            conversation: Some(conversation.clone()),
+            message_id: "991".into(),
+            receipt: Some(receipt.clone()),
+        })
+        .await
+        .expect("scoped delete should cross the compiled module bus");
+    assert!(matches!(deleted, ProgressiveTransportResult::Acknowledged));
+    let mut wrong_scope = conversation.clone();
+    wrong_scope.kind = tinychannels_bus::ConversationKind::Group;
+    let rejected = adapter
+        .dispatch_progressive(ProgressiveTransportRequest::Delete {
+            channel: "telegram".into(),
+            turn_id: Some("compiled-module-turn".into()),
+            channel_ref: Some(channel_ref),
+            conversation: Some(wrong_scope),
+            message_id: "991".into(),
+            receipt: Some(receipt),
+        })
+        .await
+        .expect("a mismatched scoped receipt should fail closed");
+    assert!(matches!(rejected, ProgressiveTransportResult::Unavailable));
+
     let requests = server.received_requests().await.expect("mock requests");
     let send = requests
         .iter()
