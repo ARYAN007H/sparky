@@ -261,6 +261,7 @@ test.describe('assistant-ui tool-result elements', () => {
   test('an edit renders its added and removed lines through the code-diff element', async ({
     page,
   }) => {
+    const progress = process.env.EPIC235_CAPTURE_TOOL_PROGRESS ? captureToolProgress(page) : null;
     const threadId = await openChat(page);
     const PROMPT = 'AUI-DIFF-CASE raise the retry count and the timeout';
     const actionDir = process.env.OPENHUMAN_ACTION_DIR;
@@ -280,6 +281,16 @@ test.describe('assistant-ui tool-result elements', () => {
     ]);
 
     await sendTurn(page, threadId, PROMPT);
+    if (progress) {
+      await waitForTurnCompletion(page, threadId);
+      console.log(
+        '[epic235 edit progress]',
+        JSON.stringify({
+          events: progress.events,
+          timeline: await captureToolTimeline(page, threadId),
+        })
+      );
+    }
     const card = await openToolCall(page, /Edit|edit/);
 
     const diff = card.getByTestId('tool-body-file-diff').first();
