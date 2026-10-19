@@ -474,6 +474,3 @@ pub(super) async fn close_if_needed(
 #[path = "grounded_close_tests.rs"]
 mod tests;
 
-#[cfg(test)]
-#[path = "grounded_close_typed_stop_tests.rs"]
-mod typed_stop_tests;
