@@ -72,7 +72,7 @@ async fn wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejec
         ],
         "edges": [ { "from_node": "t", "to_node": "post" } ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
     assert!(
         warnings.is_empty(),
         "{warnings:?}"
@@ -106,7 +106,7 @@ async fn graph_wiring_warnings_flags_a_downstream_field_not_in_output_fields() {
             { "from_node": "post", "to_node": "xform" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
     assert!(
         warnings
             .iter()
@@ -135,7 +135,7 @@ async fn graph_wiring_warnings_is_silent_when_the_downstream_field_is_real() {
             { "from_node": "post", "to_node": "xform" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
     assert!(
         !warnings.iter().any(|w| w.contains("not in")),
         "a real output field must not warn: {warnings:?}"
@@ -168,7 +168,7 @@ async fn graph_wiring_warnings_flags_a_downstream_binding_missing_the_data_prefi
             { "from_node": "post", "to_node": "xform" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
     eprintln!("native output: {warnings:?}");
     assert!(
         warnings.iter().any(|w| w.contains("item.json.data.ts")
@@ -203,7 +203,7 @@ async fn graph_wiring_warnings_is_silent_for_a_whole_payload_binding() {
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.is_empty(),
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed").is_empty(),
         "{:?}",
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await
     );
@@ -237,7 +237,7 @@ async fn graph_wiring_warnings_is_silent_for_composio_envelope_metadata_fields()
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.is_empty(),
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed").is_empty(),
         "{:?}",
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await
     );
@@ -265,7 +265,7 @@ async fn graph_wiring_warnings_suggests_the_real_split_out_path() {
             { "from_node": "post", "to_node": "split" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
     assert!(
         warnings.iter().any(|w| w.contains("json.data.messages")),
         "{warnings:?}"
@@ -300,7 +300,7 @@ async fn graph_wiring_warnings_flags_a_split_out_path_that_resolves_to_a_non_arr
             { "from_node": "post", "to_node": "split" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
     eprintln!("native output: {warnings:?}");
     assert!(
         warnings
@@ -342,7 +342,7 @@ async fn graph_wiring_warnings_is_silent_on_split_out_when_schema_is_wholly_unkn
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.is_empty(),
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed").is_empty(),
         "{:?}",
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await
     );
@@ -396,7 +396,7 @@ async fn graph_wiring_warnings_suggests_the_probed_split_out_path_when_schema_is
             { "from_node": "post", "to_node": "split" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &g).await.expect("TinyFlows wiring warnings should succeed");
     assert!(
         warnings.iter().any(|w| w.contains("json.data.issues")),
         "{warnings:?}"
@@ -419,7 +419,7 @@ async fn graph_wiring_warnings_suggests_the_probed_split_out_path_when_schema_is
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &fixed).await.is_empty(),
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &fixed).await.expect("TinyFlows wiring warnings should succeed").is_empty(),
         "{:?}",
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &config, &fixed).await
     );
@@ -445,7 +445,7 @@ async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
         ]
     }));
 
-    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &Config::default(), &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::unbound(), &Config::default(), &g).await.expect("TinyFlows wiring warnings should succeed");
 
     assert_eq!(
         warnings.len(),
