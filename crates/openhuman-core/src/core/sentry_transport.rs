@@ -116,8 +116,8 @@ impl SharedReqwestTransport {
                             }
                         }
                         Err(error) => {
-                        sentry_debug!("failed to send Sentry envelope: {error}");
-                    }
+                            sentry_debug!("failed to send Sentry envelope: {error}");
+                        }
                     }
                 }
             })
