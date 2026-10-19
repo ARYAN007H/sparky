@@ -104,7 +104,7 @@ impl HostAgent {
         session.set_thread_id(Some(session_key));
         session.set_event_context(event_session_id, channel);
         session.adopt_imported_history(imported_history)?;
-        self.scope(crate::agent::turn_host::run_session_turn(
+        self.scope(crate::agent::turn_host::AgentTurnHost::run(
             &mut session,
             crate::agent::turn_host::AgentTurnRequest {
                 message: message.to_owned(),

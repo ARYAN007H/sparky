@@ -249,7 +249,7 @@ impl WebHost {
         // a pointer rather than inlining it into this frame.
         #[cfg(feature = "tinymemes")]
         let turn_started = std::time::Instant::now();
-        let turn = Box::pin(crate::agent::turn_host::run_session_turn(
+        let turn = Box::pin(crate::agent::turn_host::AgentTurnHost::run(
             agent,
             crate::agent::turn_host::AgentTurnRequest {
                 message: request.text.clone(),
