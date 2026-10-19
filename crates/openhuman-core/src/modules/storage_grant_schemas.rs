@@ -119,12 +119,8 @@ pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, mo
 
 /// The grant generated for `module_id`, or `None` for a module with no row.
 pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
-    let queues = ROWS
-        .iter()
-        .find(|row| row.module == module_id)
-        .and_then(|row| row.queues)
-        .and_then(|source| source());
     let row = ROWS.iter().find(|row| row.module == module_id)?;
+    let queues = row.queues.and_then(|source| source());
     let items = module_items(row.owner);
     let mut secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
     secret_prefixes.extend(items.secrets);

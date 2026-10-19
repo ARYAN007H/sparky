@@ -21,6 +21,7 @@ fn with_queues() -> StorageGrant {
         collections: vec![CollectionSpec::new("notes")],
         writable: true,
         queues: Some(manifest()),
+        queue_backend: None,
         ..StorageGrant::default()
     }
 }
@@ -28,6 +29,7 @@ fn with_queues() -> StorageGrant {
 fn without_queues() -> StorageGrant {
     StorageGrant {
         queues: None,
+        queue_backend: None,
         ..with_queues()
     }
 }
@@ -159,6 +161,7 @@ fn validate_refuses_an_invalid_manifest_and_storage_layer_collections() {
     broken.version = 99;
     let bad_manifest = StorageGrant {
         queues: Some(Arc::new(broken)),
+        queue_backend: None,
         ..with_queues()
     };
     assert!(bad_manifest.validate().is_err());

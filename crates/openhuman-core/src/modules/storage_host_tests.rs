@@ -74,6 +74,7 @@ fn grant(collection: &str) -> StorageGrant {
         secret_prefixes: vec!["token.".into()],
         writable: true,
         queues: None,
+        queue_backend: None,
     }
 }
 
