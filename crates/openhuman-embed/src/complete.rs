@@ -55,6 +55,11 @@ use tinyinference_llm::model::{ModelRequest, ModelResponse};
 use crate::error::CoreError;
 use crate::turn::{is_safe_endpoint_for_bearer, sanitize_url_for_display, Route};
 
+pub use tinyagents_harness::observability::{
+    PhysicalDispatchMetadata, PhysicalDispatchObserver, PhysicalDispatchOutcome,
+    PhysicalDispatchStatus, PhysicalDispatchTerminal, PhysicalDispatchUsage,
+};
+
 /// Method label carried by every [`CoreError`] this module returns.
 pub const COMPLETE: &str = "openhuman.complete";
 
@@ -236,8 +241,10 @@ impl CompletionRequest {
         self
     }
 
-    /// Bound each physical provider HTTP request, including repair attempts.
-    /// This leaves the logical call deadline and cancellation scope unchanged.
+    /// Bound each provider request, including structured-repair attempts.
+    /// Provider-internal compatibility retries remain within that request and
+    /// use the same timeout. This leaves the logical call deadline and
+    /// cancellation scope unchanged.
     pub fn timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.timeout_ms = Some(timeout_ms);
         self
@@ -426,13 +433,19 @@ pub trait CompletionObserver: Send + Sync {
     fn on_complete(&self, trace: &CompletionTrace<'_>);
 }
 
+#[derive(Clone, Default)]
+struct CompleterObservers {
+    completion: Option<Arc<dyn CompletionObserver>>,
+    physical_dispatch: Option<Arc<dyn PhysicalDispatchObserver>>,
+}
+
 /// Runs stateless completions against one [`Route`].
 #[derive(Clone)]
 pub struct Completer {
     route: Route,
     headers: Vec<(String, String)>,
     timeout: Option<Duration>,
-    observer: Option<Arc<dyn CompletionObserver>>,
+    observers: Arc<CompleterObservers>,
     cancellation: crate::cancellation::Cancellation,
     budget: Option<crate::budget::ModelBudget>,
 }
@@ -443,7 +456,7 @@ impl std::fmt::Debug for Completer {
             .field("route", &self.route)
             .field("headers", &self.headers.len())
             .field("timeout", &self.timeout)
-            .field("observer", &self.observer.is_some())
+            .field("observer", &self.observers.completion.is_some())
             .finish()
     }
 }
@@ -455,7 +468,7 @@ impl Completer {
             headers: route.headers.clone(),
             route,
             timeout: None,
-            observer: None,
+            observers: Arc::new(CompleterObservers::default()),
             cancellation: Default::default(),
             budget: None,
         }
@@ -491,7 +504,20 @@ impl Completer {
 
     /// Report every call to `observer`.
     pub fn observer(mut self, observer: Arc<dyn CompletionObserver>) -> Self {
-        self.observer = Some(observer);
+        Arc::make_mut(&mut self.observers).completion = Some(observer);
+        self
+    }
+
+    /// Observe each admitted provider `ChatModel` invocation without request
+    /// or response content.
+    ///
+    /// With a budget, the observer receives charge-normalized usage after
+    /// admission, matching the amount settled by the ledger. A refusal before
+    /// provider invocation does not produce an event. Structured repairs use
+    /// separate invocations. Transport-level compatibility retries performed
+    /// inside one provider invocation remain part of its event and latency.
+    pub fn physical_observer(mut self, observer: Arc<dyn PhysicalDispatchObserver>) -> Self {
+        Arc::make_mut(&mut self.observers).physical_dispatch = Some(observer);
         self
     }
 
@@ -524,7 +550,7 @@ impl Completer {
             _ = self.cancellation.cancelled() => Err(CoreError::Cancelled { method: COMPLETE }),
             result = operation => result,
         };
-        if let Some(observer) = &self.observer {
+        if let Some(observer) = &self.observers.completion {
             observer.on_complete(&CompletionTrace {
                 request: &request,
                 outcome: result.as_ref(),
@@ -602,10 +628,11 @@ impl Completer {
                 call: budget.call,
             });
         // The spend ledger is an explicit argument of the call, not an ambient scope.
-        let call = openhuman_core::inference::host_runtime::ops::complete_once(
+        let call = openhuman_core::inference::host_runtime::ops::complete_once_observed(
             &endpoint,
             request.into_wire(),
             budget.as_ref(),
+            self.observers.physical_dispatch.clone(),
         );
         let started = std::time::Instant::now();
         let response = call.await.map_err(|message| {
