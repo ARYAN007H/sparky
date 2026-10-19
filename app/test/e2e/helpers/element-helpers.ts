@@ -422,6 +422,22 @@ export async function countTestId(testId: string): Promise<number> {
   ).length;
 }
 
+/** Wait until an audio element captured by an E2E Audio constructor has decoded data. */
+export async function waitForDecodedAudioAtIndex(
+  index: number,
+  timeout: number = 5_000
+): Promise<void> {
+  await browser.waitUntil(
+    async () =>
+      await browser.execute((audioIndex: number) => {
+        const audio = (window as Window & { __E2E_AUDIO_ELEMENTS?: HTMLAudioElement[] })
+          .__E2E_AUDIO_ELEMENTS?.[audioIndex];
+        return Boolean(audio && audio.readyState >= 2 && Number.isFinite(audio.duration) && audio.duration > 0);
+      }, index),
+    { timeout, timeoutMsg: `Audio ${index} did not decode before ${timeout}ms` }
+  );
+}
+
 /** Click an indexed repeated test-id control through the shared click path. */
 export async function clickTestIdAtIndex(
   testId: string,

@@ -12,6 +12,7 @@ import {
   clickTestIdAtIndex,
   countTestId,
   textExists,
+  waitForDecodedAudioAtIndex,
   waitForTestId,
   waitForTestIdAtIndex,
 } from '../helpers/element-helpers';
@@ -160,7 +161,18 @@ describe('Chat voice notes', () => {
     await browser.waitUntil(async () => (await countTestId('voice-note-toggle')) === 2, {
       timeout: 5_000,
     });
+    await browser.execute(() => {
+      const NativeAudio = window.Audio;
+      window.__E2E_AUDIO_ELEMENTS = [];
+      window.Audio = class extends NativeAudio {
+        constructor(source) {
+          super(source);
+          window.__E2E_AUDIO_ELEMENTS.push(this);
+        }
+      };
+    });
     await clickTestIdAtIndex('voice-note-toggle', 0);
+    await waitForDecodedAudioAtIndex(0);
     await browser.waitUntil(
       async () =>
         (await (await waitForTestId('voice-note-toggle')).getAttribute('aria-label'))
@@ -170,6 +182,7 @@ describe('Chat voice notes', () => {
     );
     await clickTestIdAtIndex('voice-note-toggle', 0);
     await clickTestIdAtIndex('voice-note-toggle', 1);
+    await waitForDecodedAudioAtIndex(1);
     await browser.waitUntil(
       async () =>
         (await (await waitForTestIdAtIndex('voice-note-toggle', 1)).getAttribute('aria-label'))
