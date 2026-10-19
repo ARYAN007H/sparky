@@ -71,6 +71,13 @@
   },
   {
     "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/agent/tools/delegate.rs",
+    "line": 254,
+    "text": ".with_thread_id(tool_context.and_then(ToolRunContext::thread_id));",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/turn_origin.rs",
     "line": 268,
     "text": "Some(origin) => with_origin(origin, fut).await,",
@@ -149,28 +156,28 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/ops/execution.rs",
-    "line": 315,
+    "line": 312,
     "text": "let run = with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/ops/resume.rs",
-    "line": 308,
+    "line": 305,
     "text": "let run = with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/tinyflows/caps/agent.rs",
-    "line": 467,
+    "line": 469,
     "text": "Box::pin(turn_origin::with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/tinyflows/caps/tier.rs",
-    "line": 116,
+    "line": 118,
     "text": "turn_origin::with_origin(",
     "occurrence": 1
   },
@@ -179,6 +186,41 @@
     "path": "crates/openhuman-core/src/inference/host_runtime/ops/agent_chat.rs",
     "line": 591,
     "text": "let run = crate::agent::turn_origin::with_origin(",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/inference/provider/factory/managed_backend.rs",
+    "line": 40,
+    "text": ".with_thread_id(thread_id),",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
+    "line": 51,
+    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
+    "line": 78,
+    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
+    "occurrence": 2
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model.rs",
+    "line": 141,
+    "text": "pub fn with_thread_id(mut self, thread_id: Option<impl AsRef<str>>) -> Self {",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model.rs",
+    "line": 480,
+    "text": "fn with_thread_id(request: ModelRequest, thread_id: Option<&str>) -> ModelRequest {",
     "occurrence": 1
   },
   {
@@ -303,50 +345,8 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-embed/src/turn_control.rs",
-    "line": 413,
+    "line": 405,
     "text": "Some(origin) => openhuman_core::agent::turn_origin::with_origin(origin, dispatch).await,",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 12,
-    "text": "use super::managed_reasoning::{apply_reasoning_hint, with_thread_id};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 109,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 136,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 2
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_model.rs",
-    "line": 95,
-    "text": "pub fn with_thread_id(mut self, thread_id: Option<impl AsRef<str>>) -> Self {",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_reasoning.rs",
-    "line": 67,
-    "text": "pub(super) fn with_thread_id(request: ModelRequest, thread_id: Option<&str>) -> ModelRequest {",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/mod.rs",
-    "line": 76,
-    "text": ".with_thread_id(request.thread_id);",
     "occurrence": 1
   },
   {
@@ -450,7 +450,7 @@
   {
     "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/lib.rs",
-    "line": 129,
+    "line": 128,
     "text": "pub use tinytools_agent;",
     "occurrence": 1
   },
@@ -492,7 +492,7 @@
   {
     "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-graph/src/lib.rs",
-    "line": 48,
+    "line": 47,
     "text": "pub use tinyagents_harness::error::{Result, TinyAgentsError};",
     "occurrence": 1
   },
@@ -548,7 +548,7 @@
   {
     "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-session/src/port/mod.rs",
-    "line": 69,
+    "line": 68,
     "text": "pub use tinyagents_harness::store::{AppendStore, Store};",
     "occurrence": 1
   },
