@@ -1,5 +1,6 @@
-use super::catalog_listing::list_configured_models_from_config;
 use super::*;
+
+use super::catalog_listing::list_configured_models_from_config;
 use crate::inference::provider::model_listing_test_support::{
     configure_generic_workspace, configure_openrouter_workspace, spawn_openrouter_probe_server,
     spawn_static_models_server,
