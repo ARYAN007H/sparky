@@ -130,10 +130,6 @@ removed rather than kept under new names:
   final notice before the lease is released. The rich awaited completion
   callback still writes workflow-proposal and incomplete-run framing; the plain
   owner status watcher is the sole generic TaskStore mirror.
-- `start_member_run` keeps product active-member and claimable-task prechecks,
-  then `TeamService::start_member_with_started` owns claim, active state,
-  completion and token-scoped cleanup. The host returns the owner's receipt
-  over a oneshot before continuing its real worker executor.
 - Workflow start/resume/stop use `WorkflowRunSupervisor` generation APIs.
   OpenHuman commits durable start/resume transitions inside
   `start_scoped_with_commit` / `resume_scoped_with_commit`, so the durable CAS

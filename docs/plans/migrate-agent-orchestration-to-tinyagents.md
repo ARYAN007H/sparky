@@ -33,8 +33,6 @@ The crate exposes host-neutral workflow composition and execution seams, never
 OpenHuman values:
 
 ```rust
-pub trait TeamLedger: Send + Sync { /* team/member/task/event operations */ }
-
 pub trait WorkflowStore: Send + Sync { /* load/upsert workflow snapshots */ }
 #[async_trait]
 pub trait WorkflowExecutor: Send + Sync {

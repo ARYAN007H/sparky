@@ -67,13 +67,12 @@ Memory follows TinyMemory's standard layout (`tinymemory_tools::MemoryLayout`):
  +-- agent:<memory agent>   one agent's conversations, one turn per item
 ```
 
-A `MemoryIdentity` (in [`scope.rs`](./scope.rs)) is the acting agent definition and, for a
-team member, its team. It is explicit, never ambient: a turn's
-`OpenHumanRunContext::memory_identity` carries it (`MemoryIdentity::child` for
-each sub-agent, `team_member` from the team runtime through
-`HostTurnEnv::memory_identity`), the RPC handlers and the embed facade pass
-`MemoryIdentity::root()`, and the `confine`, `brain`, `lifecycle` and `ops`
-entry points take a `&MemoryIdentity`.
+A `MemoryIdentity` (in [`scope.rs`](./scope.rs)) identifies the acting agent
+definition and its optional team namespace. It is explicit, never ambient: a
+turn's `OpenHumanRunContext::memory_identity` carries it, and each sub-agent's
+identity derives from its parent with `MemoryIdentity::child`. RPC handlers and
+the embed facade pass `MemoryIdentity::root()`, and the `confine`, `brain`,
+`lifecycle` and `ops` entry points take a `&MemoryIdentity`.
 `MemoryIdentity::resolve` turns it into a `ResolvedIdentity` (layout root plus
 memory agent id), first match wins:
 
