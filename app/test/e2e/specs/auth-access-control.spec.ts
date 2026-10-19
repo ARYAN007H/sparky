@@ -36,7 +36,6 @@ import {
 } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import {
-  navigateToBilling,
   navigateToHome,
   navigateToSettings,
   navigateViaHash,
@@ -258,12 +257,12 @@ describe('Auth & Access Control', () => {
   // 2. Default Plan
   // -------------------------------------------------------------------------
 
-  it.skip('3.1.1 — billing dashboard handoff is available', async () => {
-    await navigateToBilling();
+  it('3.1.1 — billing dashboard handoff is available', async () => {
+    await navigateViaHash('/settings/account');
     // The upstream billing summary now arrives asynchronously. Reuse the
     // polling marker assertion so this first navigation has the same contract
     // as the later billing checks in this spec.
-    await expectBillingMarkers(['Open billing dashboard']);
+    await expectBillingMarkers(['Open dashboard']);
 
     console.log('[AuthAccess] 3.1.1 — Billing web handoff verified');
     await navigateToHome();
@@ -273,11 +272,11 @@ describe('Auth & Access Control', () => {
   // 3. Upgrade Flow
   // -------------------------------------------------------------------------
 
-  it.skip('3.2.1 — billing dashboard entry point is stable', async () => {
-    await navigateToBilling();
+  it('3.2.1 — billing dashboard entry point is stable', async () => {
+    await navigateViaHash('/settings/account');
     clearRequestLog();
 
-    await expectBillingMarkers(['Open billing dashboard', 'TinyHumans on the web']);
+    await expectBillingMarkers(['Open dashboard', 'Plan & billing']);
 
     console.log('[AuthAccess] 3.2.1 — Billing dashboard entry point verified');
     await navigateToHome();
@@ -287,35 +286,35 @@ describe('Auth & Access Control', () => {
   // 4. Active Subscription Display
   // -------------------------------------------------------------------------
 
-  it.skip('3.3.1 — subscription management handoff is displayed correctly', async () => {
+  it('3.3.1 — subscription management handoff is displayed correctly', async () => {
     // Seed mock state explicitly so this test is self-contained
     setMockBehavior('plan', 'BASIC');
     setMockBehavior('planActive', 'true');
     setMockBehavior('planExpiry', new Date(Date.now() + 30 * 86400000).toISOString());
     clearRequestLog();
 
-    await navigateToBilling();
+    await navigateViaHash('/settings/account');
 
     await expectBillingMarkers([
-      'Billing moved to the web',
-      'Subscription changes',
-      'Open billing dashboard',
+      'Plan & billing',
+      'Manage your subscription, credits, and invoices',
+      'Open dashboard',
     ]);
 
     console.log('[AuthAccess] 3.3.1 — Subscription management handoff verified');
   });
 
-  it.skip('3.3.3 — manage subscription uses the web dashboard handoff', async () => {
+  it('3.3.3 — manage subscription uses the web dashboard handoff', async () => {
     // Seed mock state explicitly so this test is self-contained
     setMockBehavior('plan', 'BASIC');
     setMockBehavior('planActive', 'true');
     setMockBehavior('planExpiry', new Date(Date.now() + 30 * 86400000).toISOString());
     clearRequestLog();
 
-    await navigateToBilling();
+    await navigateViaHash('/settings/account');
     await browser.pause(3_000);
 
-    await expectBillingMarkers(['Open billing dashboard']);
+    await expectBillingMarkers(['Open dashboard']);
 
     console.log('[AuthAccess] 3.3.3 — Dashboard handoff verified');
     resetMockBehavior();
@@ -326,7 +325,7 @@ describe('Auth & Access Control', () => {
   // 5. Logout
   // -------------------------------------------------------------------------
 
-  it.skip('user can log out via Settings and returns to Welcome', async () => {
+  it('user can log out via Settings and returns to Welcome', async () => {
     // resetApp established a clean authenticated session for this suite.
     // A second asynchronous deep-link login here races its post-login redirect
     // against the Settings navigation, while adding no logout coverage.
@@ -445,7 +444,7 @@ describe('Auth & Access Control', () => {
     expect(onWelcome).toBe(true);
   });
 
-  it.skip('revoked session auto-logs out the user', async function () {
+  it('revoked session auto-logs out the user', async function () {
     this.timeout(120_000);
     // Login fresh
     clearRequestLog();

@@ -21,7 +21,6 @@ import { textExists, waitForTestId } from '../helpers/element-helpers';
 import { isTauriDriver } from '../helpers/platform';
 import { resetApp } from '../helpers/reset-app';
 import {
-  navigateToBilling,
   navigateToHome,
   navigateViaHash,
   waitForHomePage,
@@ -128,11 +127,13 @@ describe('User journey — settings round-trip', () => {
     expect(found).toBe(true);
   });
 
-  it('/settings/billing — billing panel loads within 15s', async () => {
-    console.log(`${LOG_PREFIX} Navigating to /settings/billing`);
-    // navigateToBilling includes its own content verification.
-    await navigateToBilling();
-    console.log(`${LOG_PREFIX} /settings/billing: loaded`);
+  it('/settings/account — billing dashboard handoff loads within 15s', async () => {
+    console.log(`${LOG_PREFIX} Navigating to /settings/account`);
+    await navigateViaHash('/settings/account');
+    await waitForPanelLoad('/settings/account');
+    expect(await textExists('Plan & billing')).toBe(true);
+    expect(await textExists('Open dashboard')).toBe(true);
+    console.log(`${LOG_PREFIX} /settings/account: billing handoff loaded`);
   });
 
   it('/home — loads after settings round-trip', async () => {
