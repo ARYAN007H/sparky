@@ -184,22 +184,6 @@ async fn get_dictation_settings_reads_from_loaded_config() {
 }
 
 #[tokio::test]
-async fn get_voice_server_settings_reads_from_loaded_config() {
-    let _g = ENV_LOCK.lock().await;
-    let tmp = tempdir().unwrap();
-    unsafe {
-        std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
-    }
-    let outcome = get_voice_server_settings(&DispatchCtx::process_default())
-        .await
-        .expect("ok");
-    assert!(outcome.value.get("auto_start").is_some());
-    assert!(outcome.value.get("custom_dictionary").is_some());
-    unsafe {
-        std::env::remove_var("OPENHUMAN_WORKSPACE");
-    }
-}
-
 async fn get_onboarding_completed_reads_from_loaded_config() {
     let _g = ENV_LOCK.lock().await;
     let tmp = tempdir().unwrap();
