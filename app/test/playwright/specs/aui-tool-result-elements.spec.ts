@@ -113,20 +113,43 @@ function captureToolProgress(page: Page): { events: Record<string, unknown>[] } 
         const data = decoded[1];
         if (!data || typeof data !== 'object') return;
         const event = data as Record<string, unknown>;
-        events.push({
+        const sanitized = {
           name,
           request_id: event.request_id,
           round: event.round,
           tool_call_id: event.tool_call_id,
           tool_name: event.tool_name,
           success: event.success,
-        });
+        };
+        events.push(sanitized);
+        console.log('[epic235 socket tool progress]', JSON.stringify(sanitized));
       } catch {
         // Engine.IO control frames and non-JSON packets carry no tool progress.
       }
     });
   });
   return { events };
+}
+
+async function waitForTurnCompletion(page: Page, threadId: string): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(id => {
+          const store = (
+            window as unknown as {
+              __OPENHUMAN_STORE__?: {
+                getState?: () => {
+                  chatRuntime?: { inferenceTurnLifecycleByThread?: Record<string, string> };
+                };
+              };
+            }
+          ).__OPENHUMAN_STORE__;
+          return store?.getState?.().chatRuntime?.inferenceTurnLifecycleByThread?.[id] ?? null;
+        }, threadId),
+      { timeout: 45_000, message: 'the synthetic tool turn did not complete' }
+    )
+    .toBeNull();
 }
 
 async function captureToolTimeline(page: Page, threadId: string): Promise<unknown> {
@@ -359,7 +382,7 @@ test.describe('assistant-ui tool-result elements', () => {
 
     await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
     if (progress) {
-      await expect(page.getByTestId('agent-message').last()).toContainText('Tool result received.');
+      await waitForTurnCompletion(page, threadId);
       console.log(
         '[epic235 tool progress]',
         JSON.stringify({ events: progress.events, timeline: await captureToolTimeline(page, threadId) })
