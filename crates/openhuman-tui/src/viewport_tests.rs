@@ -62,7 +62,6 @@ fn idle_and_old_entry_edits_do_not_revisit_settled_history() {
 
 #[test]
 fn indexed_rows_equal_full_wrapping_after_updates_resizes_and_expired_journal() {
-    use openhuman_rpc::embed::chat_surface::WebChannelEvent;
     let mut state = TranscriptState::new("test");
     state.apply_event(
         &serde_json::from_value(serde_json::json!({
@@ -173,7 +172,7 @@ fn changing_an_old_tools_height_updates_prefix_lookup_without_rebuilding_history
             .extend(fields.as_object().unwrap().clone());
         serde_json::from_value::<WebChannelEvent>(value).unwrap()
     };
-    state.apply_event(&event("tool_call"));
+    state.apply_event(&event("tool_call", serde_json::json!({})));
     for _ in 0..300 {
         state.push_system("settled");
     }
