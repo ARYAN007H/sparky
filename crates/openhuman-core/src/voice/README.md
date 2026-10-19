@@ -133,11 +133,6 @@ frontend without Tauri-side shortcut registration. The same file starts and
 stops TinyVoice's native listener (`start_if_enabled` / `stop`) and normalizes
 product hotkey strings before passing them to the module.
 
-Typed events go through the process-wide `BUS`. [`bus.rs`](./bus.rs) publishes
-`DomainEvent::Voice(VoiceEvent::PttTranscriptCommitted)` with the thread id,
-session id, text length, held milliseconds and a watchdog flag. The raw
-transcript is never included.
-
 ### Reply speech
 
 `reply_speech::synthesize_reply` posts the agent's reply text to the backend's
@@ -223,7 +218,6 @@ one chat and the meet bot use, then streams the reply back as
 | [`server.rs`](./server.rs), [`server/`](./server/) | The `VoiceServer` dictation runtime: hotkey loop, recording lifecycle, gates, delivery, global singleton. [README](server/README.md). |
 | [`audio_capture.rs`](./audio_capture.rs) | Microphone recording to 16 kHz mono WAV (`start_recording`, `RecordingHandle`, `RecordingResult`, `list_input_devices`) with peak RMS and the host microphone-permission policy. The `cpal` stream is `tinyvoice::capture`. |
 | [`dictation_listener.rs`](./dictation_listener.rs) | The two broadcast channels and host event-forwarding lifecycle over TinyVoice's native listener. |
-| [`bus.rs`](./bus.rs) | `publish_ptt_transcript_committed`. |
 | `live/` | Live voice agents: `providers.rs`, `session.rs`, `ws.rs` (`http-server` only), `persist.rs`, `ops.rs` / `schemas.rs` (`voice.live_*`), `types.rs`, `error.rs`, and `prompt.md` (voice guidance for the model). |
 | [`realtime.rs`](./realtime.rs) | `mint_voice_agent_signed_url`: a short-lived signed WebSocket URL from the backend's `/voice-agent/get-signed-url`. The provider API key never leaves the server. |
 | [`realtime_harness.rs`](./realtime_harness.rs), [`realtime_harness/`](./realtime_harness/) | `voice:harness` turn handler: `prompt.rs` (prompt extraction), `agent.rs` (per-turn orchestrator), `chat_delivery.rs` (socket emits, deferred chat delivery), `turn_handler.rs`. |
@@ -340,8 +334,8 @@ server and listener when gating credentials change),
   it off. `pub mod voice` always compiles as a facade. With the feature off, [`stub.rs`](./stub.rs) replaces the real modules and mirrors
   the surface other code depends on (`server`, `dictation_listener`,
   `streaming`, `live::ws`, `reply_speech`, `cloud_transcribe`,
-  `cli`, `create_stt_provider`, `effective_stt_provider`, `SttProvider`,
-  `publish_ptt_transcript_committed`) with no-op or disabled-error bodies.
+  `cli`, `create_stt_provider`, `effective_stt_provider`, `SttProvider`) with
+  no-op or disabled-error bodies.
   Signature drift is caught by the disabled build
   (`cargo check --no-default-features --features "<all-but-voice>"`), so change
   both sides together. `VOICE_COMPILED_IN` is ungated so the desktop shell can

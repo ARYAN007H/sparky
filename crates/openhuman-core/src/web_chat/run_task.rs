@@ -12,8 +12,8 @@ use crate::progress::AgentProgress;
 use super::ops::BudgetCorrelation;
 use super::progress_bridge::spawn_progress_bridge;
 use super::session::{
-    checkin_session_agent, checkout_session_agent, normalize_model_override, CheckedOutSession,
-    CheckoutPolicy,
+    CheckedOutSession, CheckoutPolicy, checkin_session_agent, checkout_session_agent,
+    normalize_model_override,
 };
 use super::types::{ChatRequestMetadata, WebChatTaskResult};
 use super::web_errors::{
@@ -320,17 +320,6 @@ pub(crate) async fn run_chat_task(
                     thread_id,
                     request_id,
                 ),
-            }
-        }
-        if metadata.source.as_deref() == Some("ptt") {
-            if let Some(session_id) = metadata.session_id {
-                crate::voice::publish_ptt_transcript_committed(
-                    thread_id.to_string(),
-                    session_id,
-                    task_result.full_response.chars().count(),
-                    0,
-                    false,
-                );
             }
         }
     }
