@@ -5,8 +5,7 @@
 //!   `spawn_parallel_agents`.
 //! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
 //!   `wait_subagent`, `wait` / `wait_loop`, `list_subagents`.
-//! - **Delegation**: `DelegateGraphTool`, `ArchetypeDelegationTool`,
-//!   and `CollapsedDelegationTool` (`delegate_to`).
+//! - **Delegation**: `DelegateGraphTool` and `ArchetypeDelegationTool`.
 //!
 //! TinyAgents owns generic control operations; the host control module keeps
 //! the product declarations and projections. Worker-thread persistence lives
@@ -20,8 +19,6 @@
 mod archetype_delegation;
 #[path = "tools/awaiting_user.rs"]
 pub(crate) mod awaiting_user;
-#[path = "tools/collapsed_delegation_host.rs"]
-mod collapsed_delegation;
 #[path = "tools/continue_subagent_host.rs"]
 mod continue_subagent;
 #[path = "tools/delegate_graph.rs"]
@@ -67,7 +64,6 @@ pub(crate) fn live_parent_run_context(
 }
 
 pub use archetype_delegation::{ArchetypeDelegationTool, DelegationTarget};
-pub use collapsed_delegation::{CollapsedDelegationTool, DelegateTarget, DELEGATE_TO_TOOL_NAME};
 pub(crate) use continue_subagent::ContinueSubagentDispatch;
 pub use continue_subagent::ContinueSubagentTool;
 pub(crate) use delegate_graph::DelegateGraphDispatch;

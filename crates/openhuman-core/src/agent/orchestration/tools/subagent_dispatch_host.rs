@@ -27,9 +27,6 @@ pub(crate) struct DelegationDispatch {
 }
 
 enum DelegationDispatchKind {
-    Collapsed {
-        targets: Result<Vec<super::collapsed_delegation::DelegateTarget>, String>,
-    },
     Archetype {
         agent_id: String,
     },
@@ -41,13 +38,6 @@ impl DelegationDispatch {
         delegation_target: Option<String>,
     ) -> Option<Self> {
         let kind = match tool.name() {
-            super::collapsed_delegation::DELEGATE_TO_TOOL_NAME => {
-                DelegationDispatchKind::Collapsed {
-                    targets: super::collapsed_delegation::dispatch_targets_from_schema(
-                        &tool.parameters_schema(),
-                    ),
-                }
-            }
             // The target is carried by the registered host extension, not
             // inferred from an ambient registry or a tool's spelling. This
             // keeps hidden packed delegates scoped to the catalogue that
@@ -83,24 +73,6 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for D
         let tool_context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
         let child = parent.data.child();
         match &self.kind {
-            DelegationDispatchKind::Collapsed { targets } => {
-                let targets = match targets {
-                    Ok(targets) => targets,
-                    Err(reason) => {
-                        return Ok(ToolResult::error(format!(
-                            "delegate_to: invalid advertised target mapping: {reason}"
-                        )));
-                    }
-                };
-                super::collapsed_delegation::execute_collapsed_delegation_with_live_parent(
-                    targets,
-                    arguments,
-                    Some(&tool_context),
-                    child,
-                    Some(parent),
-                )
-                .await
-            }
             DelegationDispatchKind::Archetype { agent_id } => {
                 super::archetype_delegation::execute_archetype_delegation_with_live_parent(
                     agent_id,
