@@ -554,10 +554,21 @@ impl OpenHumanAgentRunner {
                 0,
             )
             .await?;
-        let completion_request = json!({
-            "prompt": prepared.prompt,
-            "model": prepared.model,
-        });
+        let mut completion_request = request.clone();
+        if !completion_request.is_object() {
+            completion_request = Value::Object(Default::default());
+        }
+        if let Value::Object(object) = &mut completion_request {
+            object.remove("input_context");
+            object.remove("messages");
+            object.remove("output_parser");
+            object.remove("response_format");
+            object.remove("timeout_secs");
+            object.insert("prompt".to_owned(), Value::String(prepared.prompt));
+            if let Some(model) = prepared.model {
+                object.insert("model".to_owned(), Value::String(model));
+            }
+        }
         OpenHumanLlm {
             ctx: self.ctx.clone(),
             config: self.config.clone(),
