@@ -22,6 +22,12 @@
  * have been built with VITE_BACKEND_URL pointing there.
  */
 import { waitForApp } from '../helpers/app-helpers';
+import {
+  assertConnectorCardVisible,
+  openConnectorModal,
+  seedComposioConnection,
+  seedComposioToolkits,
+} from '../helpers/composio-helpers';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import {
   clickButton,
@@ -34,13 +40,13 @@ import {
 import {
   navigateToHome,
   navigateToIntelligence,
+  navigateToSkills,
   navigateToSettings,
   performFullLogin,
   waitForHomePage,
 } from '../helpers/shared-flows';
 import {
   clearRequestLog,
-  getRequestLog,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
@@ -56,17 +62,6 @@ const LOG_PREFIX = '[GmailFlow]';
 /**
  * Poll the mock server request log until a matching request appears.
  */
-async function waitForRequest(method, urlFragment, timeout = 15_000) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const log = getRequestLog();
-    const match = log.find(r => r.method === method && r.url.includes(urlFragment));
-    if (match) return match;
-    await browser.pause(500);
-  }
-  return undefined;
-}
-
 /**
  * Wait until the given text disappears from the accessibility tree.
  */
@@ -304,102 +299,44 @@ describe('Gmail Integration Flows', () => {
     it('9.4.1 — Manual Disconnect: disconnect flow with confirmation', async function () {
       this.timeout(90_000);
       resetMockBehavior();
+      seedComposioToolkits(['gmail']);
+      seedComposioConnection('gmail', 'ACTIVE', 'c-gmail-disconnect');
       await reAuthAndGoHome('e2e-gmail-disconnect-token');
+      await browser.execute(() => {
+        Object.keys(window.localStorage)
+          .filter(key => key.includes('composio:connections'))
+          .forEach(key => window.localStorage.removeItem(key));
+      });
+      await navigateViaHash('/chat');
+      await navigateToSkills();
+      await assertConnectorCardVisible('Gmail');
 
-      const emailVisible = await findGmailInUI();
-      if (!emailVisible) {
-        console.log(`${LOG_PREFIX} 9.4.1: Email skill not discovered. Checking Settings.`);
-        await navigateToHome();
-        await navigateToSettings();
-      }
-
-      await browser.pause(1_000);
-
-      // Open the Email modal
-      const modalState = await openGmailModal();
-
-      if (!modalState) {
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Email modal not opened — ` +
-            `skill not discovered in current environment.`
-        );
-        await navigateToHome();
-        return;
-      }
-
-      if (modalState === 'connect') {
-        // Not connected — disconnect test not applicable
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Email not connected (showing setup wizard). ` +
-            `Disconnect test skipped — requires connected state.`
-        );
-        await closeModalIfOpen();
-        await navigateToHome();
-        return;
-      }
-
-      // Management panel is open — look for Disconnect button
-      expect(modalState).toBe('manage');
-      console.log(`${LOG_PREFIX} 9.4.1: Email management panel open`);
-
-      const hasDisconnectButton = await textExists('Disconnect');
-
-      if (!hasDisconnectButton) {
-        const tree = await dumpAccessibilityTree();
-        console.log(
-          `${LOG_PREFIX} 9.4.1: "Disconnect" button not found. Tree:\n`,
-          tree.slice(0, 4000)
-        );
-        await closeModalIfOpen();
-        await navigateToHome();
-        return;
-      }
-
-      // Click "Disconnect" button
+      const modal = await openConnectorModal('Gmail', 15_000, 'Connected');
+      expect(modal).toContain('Manage Gmail');
+      expect(await textExists('Gmail is connected')).toBe(true);
       await clickText('Disconnect', 10_000);
-      console.log(`${LOG_PREFIX} 9.4.1: Clicked "Disconnect" button`);
-      await browser.pause(2_000);
 
-      // Verify confirmation dialog appears with Cancel + Confirm Disconnect
-      const hasCancel = await textExists('Cancel');
-      const hasConfirmDisconnect =
-        (await textExists('Confirm Disconnect')) || (await textExists('Confirm'));
-
-      if (hasCancel || hasConfirmDisconnect) {
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Confirmation dialog appeared — ` +
-            `Cancel: ${hasCancel}, Confirm: ${hasConfirmDisconnect}`
-        );
-        expect(hasCancel || hasConfirmDisconnect).toBe(true);
-
-        // Click "Confirm Disconnect"
-        clearRequestLog();
-        if (await textExists('Confirm Disconnect')) {
-          await clickText('Confirm Disconnect', 10_000);
-        } else if (await textExists('Confirm')) {
-          await clickText('Confirm', 10_000);
+      // Current Composio flow deletes immediately; the modal returns to its
+      // idle Connect state and refreshes the connector card from the mock API.
+      await browser.waitUntil(async () => await textExists('Connect Gmail'), {
+        timeout: 15_000,
+        interval: 300,
+        timeoutMsg: 'Gmail did not return to the current Connect UI after disconnect',
+      });
+      await browser.waitUntil(
+        async () =>
+          browser.execute(() => {
+            const card = document.querySelector<HTMLElement>(
+              '[data-testid="skill-install-composio-gmail"]'
+            );
+            return Boolean(card && !/Connected/i.test(card.textContent ?? ''));
+          }),
+        {
+          timeout: 15_000,
+          interval: 300,
+          timeoutMsg: 'Gmail connector card still reports connected after disconnect',
         }
-        console.log(`${LOG_PREFIX} 9.4.1: Clicked confirm disconnect`);
-        await browser.pause(3_000);
-
-        // After disconnect, the modal should close or show setup wizard
-        await browser.pause(2_000);
-        const hasConnectTitle = await textExists('Connect Email');
-        const hasManageTitle = await textExists('Manage Email');
-        console.log(
-          `${LOG_PREFIX} 9.4.1: After disconnect — Connect visible: ${hasConnectTitle}, ` +
-            `Manage visible: ${hasManageTitle}`
-        );
-      } else {
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Confirmation dialog not shown — ` +
-            `disconnect may have happened immediately`
-        );
-      }
-
-      await closeModalIfOpen();
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.4.1 PASSED`);
+      );
     });
 
     it('9.4.2 — Token Revocation Handling: app handles revoked token gracefully', async function () {
