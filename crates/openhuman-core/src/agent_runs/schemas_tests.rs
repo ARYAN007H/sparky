@@ -85,7 +85,7 @@ fn host_graph_topology_projection_keeps_delegation_only() {
         .into_iter()
         .map(|report| report.name)
         .collect();
-    assert!(names.contains(&"delegation".to_owned()), "saw {names:?}");
+    assert!(names.contains(&"delegation"), "saw {names:?}");
     assert!(
         !names.iter().any(|name| name.starts_with("agent_teams:")),
         "retired team graphs must not be projected: {names:?}"
