@@ -161,8 +161,10 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
                 "host-hb-thread",
                 "the inactive turn must not publish a heartbeat"
             ),
-            Err(tokio::sync::broadcast::error::TryRecvError::Empty
-            | tokio::sync::broadcast::error::TryRecvError::Closed) => break,
+            Err(
+                tokio::sync::broadcast::error::TryRecvError::Empty
+                | tokio::sync::broadcast::error::TryRecvError::Closed,
+            ) => break,
             Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
         }
     }
