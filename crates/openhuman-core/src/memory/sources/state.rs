@@ -9,30 +9,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
-use crate::memory::types::SourceStatus;
+pub use tinymemory_integrations::sources::{SourceState, SourceStatus};
 
 /// Serialises state-file read-modify-writes in this process.
 static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-
-/// What the last sync of one source left behind.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SourceState {
-    /// When the last sync finished.
-    #[serde(default)]
-    pub last_sync_at: Option<DateTime<Utc>>,
-    /// Current status.
-    #[serde(default)]
-    pub status: SourceStatus,
-    /// Why the last sync failed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    /// Items stored by the last successful sync.
-    #[serde(default)]
-    pub items: u64,
-}
 
 fn path(workspace_dir: &Path) -> PathBuf {
     workspace_dir.join("memory").join("sources_state.json")
@@ -99,14 +79,11 @@ pub fn reset_interrupted(workspace_dir: &Path) {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut all = read_all(workspace_dir);
-    let mut changed = false;
-    for state in all.values_mut() {
-        if state.status == SourceStatus::Syncing {
-            state.status = SourceStatus::Idle;
-            changed = true;
-        }
-    }
+    let changed = all
+        .values()
+        .any(|state| state.status == SourceStatus::Syncing);
     if changed {
+        tinymemory_integrations::sources::reset_interrupted(&mut all);
         write_all(workspace_dir, &all);
     }
 }

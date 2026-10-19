@@ -148,44 +148,24 @@ pub fn layout_of_source(
     config: &Config,
     source: &MemorySourceConfig,
 ) -> tinymemory_tools::MemoryLayout {
-    let default = || {
-        tinymemory_tools::layout::identity::Identity::root()
-            .resolve(&crate::memory::scope::identity_pins(config))
-            .layout
-    };
-    let Some(raw) = source
-        .namespace
-        .as_deref()
-        .filter(|raw| !raw.trim().is_empty())
-    else {
-        return default();
-    };
-    raw.parse::<tinymemory_api::Namespace>()
-        .map_err(|error| error.to_string())
-        .and_then(|root| tinymemory_tools::MemoryLayout::new(root).map_err(|error| error.to_string()))
-        .unwrap_or_else(|error| {
-            tracing::warn!(id = %source.id, %error, "[memory:sources] invalid root; using the configured one");
-            default()
-        })
+    tinymemory_integrations::sources::layout_of_source(&configured_layout(config), source)
 }
 
 /// The layout the configured source `source_id` files into; the configured
 /// root for an unknown id.
 #[must_use]
 pub fn layout_of(config: &Config, source_id: &str) -> tinymemory_tools::MemoryLayout {
-    config
-        .memory
-        .sources
-        .iter()
-        .find(|source| source.id == source_id)
-        .map_or_else(
-            || {
-                tinymemory_tools::layout::identity::Identity::root()
-                    .resolve(&crate::memory::scope::identity_pins(config))
-                    .layout
-            },
-            |source| layout_of_source(config, source),
-        )
+    tinymemory_integrations::sources::layout_of(
+        &configured_layout(config),
+        &config.memory.sources,
+        source_id,
+    )
+}
+
+fn configured_layout(config: &Config) -> tinymemory_tools::MemoryLayout {
+    tinymemory_tools::layout::identity::Identity::root()
+        .resolve(&crate::memory::scope::identity_pins(config))
+        .layout
 }
 
 #[cfg(test)]
