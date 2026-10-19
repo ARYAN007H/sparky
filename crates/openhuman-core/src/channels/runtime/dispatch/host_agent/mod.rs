@@ -29,7 +29,7 @@ use tinychannels_bus as traits;
 pub(crate) mod posture;
 mod turn;
 
-pub(crate) use turn::{run_host_agent_turn, HostChannelTurn};
+pub(crate) use turn::{HostChannelTurn, run_host_agent_turn};
 
 /// Resolve the config-owned target selected for an unbound channel into the
 /// same trusted host-agent carrier used by channel bindings. The effective
@@ -42,7 +42,10 @@ pub(crate) async fn configured_agent(
     let dispatch = ctx.dispatch_ctx();
     let mut config = match &ctx.config {
         Some(config) => config.as_ref().clone(),
-        None => dispatch.load_config().await.map_err(|error| error.to_string())?,
+        None => dispatch
+            .load_config()
+            .await
+            .map_err(|error| error.to_string())?,
     };
     let scoping = super::routing::resolve_target_agent(channel).await;
     let agent_id = scoping

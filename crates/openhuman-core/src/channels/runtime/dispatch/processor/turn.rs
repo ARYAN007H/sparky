@@ -3,7 +3,7 @@
 //! delivering the draft/final reply.
 
 use crate::agent::bus::AgentTurnResponse;
-use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
+use crate::channels::context::{ChannelRuntimeContext, is_context_window_overflow_error};
 use crate::channels::routes::{
     get_or_create_turn_model_source, get_route_selection, handle_runtime_command_if_needed,
 };
@@ -20,13 +20,13 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result, spawn_typing_task,
-    REPLY_LOG_TRUNCATE_CHARS,
+    REPLY_LOG_TRUNCATE_CHARS, build_channel_context_block, log_worker_join_result,
+    spawn_typing_task,
 };
-use super::super::host_agent::{self, run_host_agent_turn, seed_rows, HostChannelTurn, HostRoute};
+use super::super::host_agent::{self, HostChannelTurn, HostRoute, run_host_agent_turn, seed_rows};
+use super::RuntimeChannelMessage;
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::bus_turn::dispatch_bus_turn;
-use super::RuntimeChannelMessage;
 
 pub(crate) async fn process_channel_message(
     ctx: Arc<ChannelRuntimeContext>,
@@ -424,20 +424,16 @@ pub(crate) async fn process_channel_runtime_message(
     let mut configured_agent_error = None;
     let selected_host = match bound_agent {
         Some(host) => Some(*host),
-        None if ctx.config.is_some() => match host_agent::configured_agent(
-            ctx.as_ref(),
-            &msg.channel,
-            &route,
-        )
-        .await
-        {
-            Ok(host) => Some(host),
-            Err(error) => {
-                tracing::warn!(channel = %msg.channel, %error, "[dispatch] configured channel agent could not be built");
-                configured_agent_error = Some(error);
-                None
+        None if ctx.config.is_some() => {
+            match host_agent::configured_agent(ctx.as_ref(), &msg.channel, &route).await {
+                Ok(host) => Some(host),
+                Err(error) => {
+                    tracing::warn!(channel = %msg.channel, %error, "[dispatch] configured channel agent could not be built");
+                    configured_agent_error = Some(error);
+                    None
+                }
             }
-        },
+        }
         None => None,
     };
     let cancellation = CancellationToken::new();
@@ -470,18 +466,19 @@ pub(crate) async fn process_channel_runtime_message(
                 tinyagents_session::transcript::TranscriptMessage::user(&enriched_message),
             ];
             Box::pin(dispatch_bus_turn(
-            ctx.as_ref(),
-            &msg,
-            &route,
-            history,
-            active_turn_model_source,
-            progress_tx,
-            turn_origin,
-            approval,
+                ctx.as_ref(),
+                &msg,
+                &route,
+                history,
+                active_turn_model_source,
+                progress_tx,
+                turn_origin,
+                approval,
             ))
         }
     };
-    let llm_result = tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;
+    let llm_result =
+        tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;
     cancellation.cancel();
 
     // Wait for draft updater to finish

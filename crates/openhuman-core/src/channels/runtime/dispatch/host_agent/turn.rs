@@ -92,5 +92,9 @@ pub(crate) async fn run_host_agent_turn(
             turn_deadline,
         )
         .await?;
-    Ok(AgentTurnResponse::with_resolved_route(text, format!("agent:{agent_id}"), model))
+    Ok(AgentTurnResponse::with_resolved_route(
+        text,
+        format!("agent:{agent_id}"),
+        model,
+    ))
 }
