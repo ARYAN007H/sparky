@@ -79,7 +79,7 @@ fn plain_string_conversions_build_other_variant() {
 #[tokio::test]
 async fn voice_note_turn_id_is_bound_to_its_exact_user_row_before_admission() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-    use crate::threads::store::{ConversationMessage, CreateConversationThread, blocking};
+    use crate::threads::store::{blocking, ConversationMessage, CreateConversationThread};
     use crate::tools::toolpacks::ToolGroups;
     use serde_json::json;
 
@@ -89,10 +89,9 @@ async fn voice_note_turn_id_is_bound_to_its_exact_user_row_before_admission() {
         workspace_dir: workspace.clone(),
         ..crate::config::Config::default()
     };
-    let ctx = DispatchCtx::new(
-        CoreContext::for_test(DomainSet::full(), None)
-            .derive_with(ContextOverlay::new(config, DomainSet::kernel(), ToolGroups::none())),
-    );
+    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(config, DomainSet::kernel(), ToolGroups::none()),
+    ));
     blocking::ensure_thread(
         ctx.clone(),
         workspace.clone(),
@@ -135,9 +134,23 @@ async fn voice_note_turn_id_is_bound_to_its_exact_user_row_before_admission() {
     )
     .await
     .unwrap();
+    let conflicting = bind_voice_note_request_id(
+        &ctx,
+        "voice-thread",
+        "same transcription",
+        "note-1",
+        "request-2",
+    )
+    .await;
+    assert!(
+        conflicting.is_err(),
+        "a replay cannot overwrite the row's turn identity"
+    );
     let rows = blocking::get_messages(ctx, workspace, "voice-thread".into())
         .await
         .unwrap();
-    assert_eq!(rows[0].extra_metadata["requestId"], "request-1");
-    assert!(rows[1].extra_metadata.get("requestId").is_none());
+    let voice_row = rows.iter().find(|row| row.id == "voice-row").unwrap();
+    let plain_row = rows.iter().find(|row| row.id == "plain-row").unwrap();
+    assert_eq!(voice_row.extra_metadata["requestId"], "request-1");
+    assert!(plain_row.extra_metadata.get("requestId").is_none());
 }

@@ -145,8 +145,20 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
     .await
     .unwrap();
     for (id, content, sender, note_id, request_id) in [
-        ("user-voice", "hello", "user", Some("recording-1"), Some("req-1")),
-        ("assistant-voice", "hi there", "agent", Some("reply-1"), Some("req-1")),
+        (
+            "user-voice",
+            "hello",
+            "user",
+            Some("recording-1"),
+            Some("req-1"),
+        ),
+        (
+            "assistant-voice",
+            "hi there",
+            "agent",
+            Some("reply-1"),
+            Some("req-1"),
+        ),
         ("user-plain", "hello", "user", None, Some("req-2")),
         ("assistant-plain", "hi again", "agent", None, Some("req-2")),
     ] {
@@ -192,7 +204,10 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
         TranscriptMessage::assistant("hi again"),
     ];
     locator
-        .open_session(&SessionRef::scoped(THREAD, "orchestrator"), root_meta.clone())
+        .open_session(
+            &SessionRef::scoped(THREAD, "orchestrator"),
+            root_meta.clone(),
+        )
         .unwrap()
         .append_turn(TranscriptTurn {
             prev: &prior,
@@ -217,41 +232,45 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
     .value
     .data
     .unwrap();
-    let voice_user = page
-        .items
-        .iter()
-        .find_map(|item| match item {
-            tinyagents_session::transcript::view::DisplayItem::UserMessage {
-                content,
-                request_id,
-                extra_metadata,
-                ..
-            } if content == "hello" && request_id.as_deref() == Some("req-1") => extra_metadata.as_ref(),
-            _ => None,
-        });
+    let voice_user = page.items.iter().find_map(|item| match item {
+        tinyagents_session::transcript::view::DisplayItem::UserMessage {
+            content,
+            request_id,
+            extra_metadata,
+            ..
+        } if content == "hello" && request_id.as_deref() == Some("req-1") => {
+            extra_metadata.as_ref()
+        }
+        _ => None,
+    });
     let plain_duplicate_user = page.items.iter().find_map(|item| match item {
         tinyagents_session::transcript::view::DisplayItem::UserMessage {
             content,
             request_id,
             extra_metadata,
             ..
-        } if content == "hello" && request_id.as_deref() == Some("req-2") => extra_metadata.as_ref(),
+        } if content == "hello" && request_id.as_deref() == Some("req-2") => {
+            extra_metadata.as_ref()
+        }
         _ => None,
     });
-    let assistant = page
-        .items
-        .iter()
-        .find_map(|item| match item {
-            tinyagents_session::transcript::view::DisplayItem::AssistantMessage {
-                content,
-                extra_metadata,
-                ..
-            } if content == "hi there" => extra_metadata.as_ref(),
-            _ => None,
-        });
-    assert_eq!(voice_user.and_then(|value| value.pointer("/voiceNote/noteId")), Some(&json!("recording-1")));
+    let assistant = page.items.iter().find_map(|item| match item {
+        tinyagents_session::transcript::view::DisplayItem::AssistantMessage {
+            content,
+            extra_metadata,
+            ..
+        } if content == "hi there" => extra_metadata.as_ref(),
+        _ => None,
+    });
+    assert_eq!(
+        voice_user.and_then(|value| value.pointer("/voiceNote/noteId")),
+        Some(&json!("recording-1"))
+    );
     assert!(plain_duplicate_user.is_none_or(|value| value.get("voiceNote").is_none()));
-    assert_eq!(assistant.and_then(|value| value.pointer("/voiceNote/noteId")), Some(&json!("reply-1")));
+    assert_eq!(
+        assistant.and_then(|value| value.pointer("/voiceNote/noteId")),
+        Some(&json!("reply-1"))
+    );
     let mut cursor = None;
     let mut voice_reply_on_its_page = false;
     loop {
@@ -268,22 +287,27 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
         .value
         .data
         .unwrap();
-        voice_reply_on_its_page |= page.items.iter().any(|item| matches!(
-            item,
-            tinyagents_session::transcript::view::DisplayItem::AssistantMessage {
-                content,
-                request_id,
-                extra_metadata: Some(metadata),
-                ..
-            } if content == "hi there" && request_id.as_deref() == Some("req-1")
-                && metadata.pointer("/voiceNote/noteId") == Some(&json!("reply-1"))
-        ));
+        voice_reply_on_its_page |= page.items.iter().any(|item| {
+            matches!(
+                item,
+                tinyagents_session::transcript::view::DisplayItem::AssistantMessage {
+                    content,
+                    request_id,
+                    extra_metadata: Some(metadata),
+                    ..
+                } if content == "hi there" && request_id.as_deref() == Some("req-1")
+                    && metadata.pointer("/voiceNote/noteId") == Some(&json!("reply-1"))
+            )
+        });
         cursor = page.next_cursor;
         if cursor.is_none() {
             break;
         }
     }
-    assert!(voice_reply_on_its_page, "voice metadata survives paging to its assistant row");
+    assert!(
+        voice_reply_on_its_page,
+        "voice metadata survives paging to its assistant row"
+    );
 }
 
 #[tokio::test]

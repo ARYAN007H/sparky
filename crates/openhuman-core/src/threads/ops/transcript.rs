@@ -79,12 +79,9 @@ async fn attach_voice_note_metadata(
         .await
         .map_err(|error| format!("load config for voice-note projection: {error}"))?
         .workspace_dir;
-    let rows = conversations::blocking::get_messages(
-        ctx.clone(),
-        workspace_dir,
-        thread_id.to_string(),
-    )
-    .await?;
+    let rows =
+        conversations::blocking::get_messages(ctx.clone(), workspace_dir, thread_id.to_string())
+            .await?;
 
     for item in items {
         let (content, sender, request_id, projected_metadata) = match item {
@@ -93,13 +90,23 @@ async fn attach_voice_note_metadata(
                 request_id,
                 extra_metadata,
                 ..
-            } => (content.as_str(), "user", request_id.as_deref(), extra_metadata),
+            } => (
+                content.as_str(),
+                "user",
+                request_id.as_deref(),
+                extra_metadata,
+            ),
             DisplayItem::AssistantMessage {
                 content,
                 request_id,
                 extra_metadata,
                 ..
-            } => (content.as_str(), "agent", request_id.as_deref(), extra_metadata),
+            } => (
+                content.as_str(),
+                "agent",
+                request_id.as_deref(),
+                extra_metadata,
+            ),
             _ => continue,
         };
 
@@ -113,11 +120,11 @@ async fn attach_voice_note_metadata(
                     .and_then(serde_json::Value::as_str);
                 match (request_id, row_request_id) {
                     (Some(projected), Some(stored)) => projected == stored,
-                    (Some(_), None) if sender == "agent" => false,
-                    // User rows are durably written before the core returns its
-                    // request id. Exact text is safe only when unique in this
-                    // thread; repeated messages are left unlabelled.
-                    _ => true,
+                    (None, None) => true,
+                    // A modern transcript item cannot fall back to a different
+                    // or missing row request id. Legacy rows match only legacy
+                    // items, and the unique-content check below stays strict.
+                    _ => false,
                 }
             })
             .collect::<Vec<_>>();

@@ -108,9 +108,15 @@ fn typed_voice_media_must_match_its_durable_note_reference() {
         ..Default::default()
     };
 
-    assert!(validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/wav")).is_ok());
-    assert!(validate_typed_media(tmp.path(), "note-typed", &media("other-note", "audio/wav")).is_err());
-    assert!(validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/mpeg")).is_err());
+    assert!(
+        validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/wav")).is_ok()
+    );
+    assert!(
+        validate_typed_media(tmp.path(), "note-typed", &media("other-note", "audio/wav")).is_err()
+    );
+    assert!(
+        validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/mpeg")).is_err()
+    );
     assert!(validate_typed_media(tmp.path(), "missing", &media("missing", "audio/wav")).is_err());
 }
 

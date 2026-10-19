@@ -151,9 +151,13 @@ pub(crate) fn validate_typed_media(
     let (_, stored_mime) = read_note(workspace, note_id)?
         .ok_or_else(|| "typed voice note has no stored audio".to_string())?;
     if media.content_type.as_deref().is_some_and(|content_type| {
-            content_type.split(';').next().unwrap_or(content_type).trim() != stored_mime
-        })
-    {
+        content_type
+            .split(';')
+            .next()
+            .unwrap_or(content_type)
+            .trim()
+            != stored_mime
+    }) {
         return Err("typed voice note mime does not match the stored audio".into());
     }
     Ok(())

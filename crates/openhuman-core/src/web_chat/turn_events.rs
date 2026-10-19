@@ -19,10 +19,10 @@ use tinychannels_bus::web as bus_web;
 
 use super::runner::{CancelNote, Shared};
 use super::surface::{Surface, TurnIds};
-use super::turn_close::{StopCause, StoppedTurn, close_reply};
+use super::turn_close::{close_reply, StopCause, StoppedTurn};
 use super::web_errors::{
-    ClassifiedError, classify_inference_error, is_outer_backstop_timeout, turn_idle_error_message,
-    turn_timeout_error_message,
+    classify_inference_error, is_outer_backstop_timeout, turn_idle_error_message,
+    turn_timeout_error_message, ClassifiedError,
 };
 use crate::agent::queued_turn::QueuedPayload;
 

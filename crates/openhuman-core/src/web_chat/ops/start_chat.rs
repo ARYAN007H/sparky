@@ -14,7 +14,7 @@ use tinyagents_harness::turn_runner::{QueueDisposition, TurnRequest, TurnRunnerE
 use tinychannels_bus::web::{ChatRequestMetadata, QueueMode};
 use uuid::Uuid;
 
-use super::super::runner::{Admission, runtime, scope_of};
+use super::super::runner::{runtime, scope_of, Admission};
 use super::super::turn_activity::configured_idle_window;
 use crate::agent::queued_turn::QueuedPayload;
 use crate::core::events::DomainEvent;
@@ -388,7 +388,7 @@ async fn bind_voice_note_request_id(
     note_id: &str,
     request_id: &str,
 ) -> Result<(), StartChatError> {
-    use crate::threads::store::{ConversationMessagePatch, blocking};
+    use crate::threads::store::{blocking, ConversationMessagePatch};
 
     let workspace_dir = ctx
         .load_config()
@@ -415,8 +415,21 @@ async fn bind_voice_note_request_id(
     };
     let mut extra_metadata = row.extra_metadata.clone();
     let Some(metadata) = extra_metadata.as_object_mut() else {
-        return Err(StartChatError::Other("voice note row metadata is invalid".into()));
+        return Err(StartChatError::Other(
+            "voice note row metadata is invalid".into(),
+        ));
     };
+    if let Some(existing) = metadata
+        .get("requestId")
+        .and_then(serde_json::Value::as_str)
+    {
+        if existing == request_id {
+            return Ok(());
+        }
+        return Err(StartChatError::Other(format!(
+            "voice note {note_id} is already bound to request {existing}"
+        )));
+    }
     metadata.insert("requestId".into(), serde_json::json!(request_id));
     blocking::update_message(
         ctx.clone(),
