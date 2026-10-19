@@ -93,7 +93,7 @@ async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
         ]
     }));
 
-    let warnings = graph_wiring_warnings(&Config::default(), &g).await;
+    let warnings = graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), &g).await.unwrap();
 
     assert_eq!(
         warnings.len(),
@@ -469,7 +469,7 @@ async fn graph_wiring_warnings_is_silent_for_a_whole_payload_binding() {
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.is_empty(),
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.unwrap().is_empty(),
         "{:?}",
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.unwrap()
     );
@@ -503,7 +503,7 @@ async fn graph_wiring_warnings_is_silent_for_composio_envelope_metadata_fields()
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.is_empty(),
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.unwrap().is_empty(),
         "{:?}",
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.unwrap()
     );
@@ -607,7 +607,7 @@ async fn graph_wiring_warnings_is_silent_on_split_out_when_schema_is_wholly_unkn
         ]
     }));
     assert!(
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.is_empty(),
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.unwrap().is_empty(),
         "{:?}",
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await.unwrap()
     );
@@ -686,6 +686,6 @@ async fn graph_wiring_warnings_suggests_the_probed_split_out_path_when_schema_is
     assert!(
         graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &fixed).await.unwrap().is_empty(),
         "{:?}",
-        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &fixed).await
+        graph_wiring_warnings(&crate::core::runtime::DispatchCtx::ambient(), &config, &fixed).await.unwrap()
     );
 }
