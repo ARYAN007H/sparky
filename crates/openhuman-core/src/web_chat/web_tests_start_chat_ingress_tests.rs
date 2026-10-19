@@ -72,8 +72,11 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     let mut definition = crate::agent::harness::test_support::test_main_def();
     definition.id = "ptt_event_regression".to_string();
     definition.tools = tinyagents_definition::ToolScope::Named(Vec::new());
+    definition.extra_tools.clear();
+    definition.deferred_tools.clear();
     definition.subagents.clear();
     definition.max_iterations = 3;
+    definition.sandbox_mode = tinyagents_definition::SandboxMode::None;
     definition.extensions.omit_memory_context = true;
     definition.extensions.searches_connected_mcp = false;
     let definitions = Arc::new(
