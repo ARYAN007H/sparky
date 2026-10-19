@@ -510,17 +510,6 @@ pub fn all_tools_with_runtime(
         tools.extend(composio_tools);
     }
 
-    // Coding-harness `lsp` tool (issue #1205) — capability-gated by the
-    // OPENHUMAN_LSP_ENABLED env var. The backend (real language-server
-    // bridge) is a follow-up; today the gate just controls visibility
-    // so agents don't see a method that always errors.
-    if crate::tools::implementations::lsp_capability_enabled() {
-        tools.push(Box::new(crate::tools::implementations::LspTool::new()));
-        tracing::debug!("[lsp] capability gate on — LspTool registered");
-    } else {
-        tracing::debug!("[lsp] capability gate off (set OPENHUMAN_LSP_ENABLED=1 to register)");
-    }
-
     // Registered tool sources placed at the end of the catalogue
     // (`tools::sources`), after every built-in and before the filters below,
     // so they are gated exactly like built-ins. Nothing registered => nothing

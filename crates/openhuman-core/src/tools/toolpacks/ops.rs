@@ -123,17 +123,8 @@ pub fn strip_packed_from_visible(visible: &mut HashSet<String>, agent_id: &str) 
 /// Is `tool` withheld from `agent_id` by the pack table right now?
 ///
 /// The predicate behind [`strip_packed_from_visible`], exposed for callers that
-/// build a *listing* of tools rather than a visible set — today the collapsed
-/// `delegate_to` tool, whose `agent` enum is an advertised surface that no
-/// `visible` subtraction can reach.
-///
-/// That distinction is load-bearing. Collapsing the archetype delegates without
-/// it silently re-advertised seven routes the pack table deliberately withholds
-/// (`do_crypto`, `use_mcp_server`, `setup_skills`,
-/// `run_skill`, `build_workflow`, `discover_workflows`): each one stopped being
-/// a tool — so `strip_packed_from_visible` had nothing to remove — and became a
-/// string inside another tool's schema instead. A collapse must never widen
-/// what the pack posture narrowed.
+/// build a listing of tools rather than a visible set. This keeps packed tools
+/// out of listings while preserving their registered dispatch paths.
 pub fn is_withheld_from(agent_id: &str, tool: &str) -> bool {
     let groups = super::groups::current();
     groups.mode_for_tool(tool) == super::groups::GroupMode::Withheld

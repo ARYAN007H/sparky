@@ -260,13 +260,7 @@ fn master_agent_has_coding_hint_and_named_tools() {
     assert_eq!(def.sandbox_mode, SandboxMode::Sandboxed);
     match def.tools {
         ToolScope::Named(tools) => {
-            // spawn_subagent was removed in #1141. spawn_worker_thread is
-            // disabled pending its UI (#1624) and unregistered, so the
-            // named scope must not advertise it.
-            assert!(
-                !tools.iter().any(|t| t == "spawn_worker_thread"),
-                "spawn_worker_thread is disabled (#1624) and must not be named"
-            );
+            // The builtin scope contains only registered worker surfaces.
             // Sub-agent surface taught by prompt.md, deliberately three
             // tools (#5701): spawn, enumerate, resume. A sub-agent is
             // always async and its result is delivered back on an idle

@@ -1,10 +1,9 @@
 //! Cross-cutting system tools: shell, Node/npm/Python execution, tool
-//! detection/install, time helpers, LSP, proxy config, update check/apply.
+//! detection/install, time helpers, proxy config, update check/apply.
 //! Each family, its tool structs, and its registration gates are catalogued in
 //! `tools/impl/README.md`.
 
 mod install_tool;
-mod lsp;
 mod proxy_config;
 mod retrieve_tool_output;
 mod schedule;
@@ -20,7 +19,6 @@ use crate::tools::implementations::filesystem::gate::security_scoped_to_root;
 use tinytools::ToolRunContext;
 
 pub use install_tool::InstallToolTool;
-pub use lsp::{lsp_capability_enabled, LspTool, LSP_ENABLED_ENV};
 pub use proxy_config::ProxyConfigTool;
 pub use retrieve_tool_output::{retrieve_tool_output_tool, RetrieveToolOutputTool};
 pub use schedule::ScheduleTool;

@@ -529,7 +529,7 @@ async fn run_typed_mode(
     let before = allowed_indices.len();
     allowed_indices.retain(|&i| {
         let name = parent.all_tools[i].name();
-        !is_subagent_spawn_tool(name) && name != "spawn_worker_thread"
+        !is_subagent_spawn_tool(name)
     });
     let stripped = before - allowed_indices.len();
     if stripped > 0 {

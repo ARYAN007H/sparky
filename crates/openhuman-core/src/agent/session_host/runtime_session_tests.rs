@@ -583,14 +583,16 @@ async fn prompt_and_declared_tools(
         .prelude
         .clone()
         .expect("prelude");
-    let tiered = prelude.build_system_prompt_tiered().expect("system prompt");
+    let prompt = host
+        .render_current_turn_prompt()
+        .expect("current-turn system prompt");
     let snapshot = prelude
         .prepare(true)
         .await
         .expect("tool surface")
         .tools
         .expect("declared tools");
-    (tiered.text, snapshot)
+    (prompt, snapshot)
 }
 
 fn assert_no_goal_tools(prompt: &str, snapshot: &ToolSnapshot) {

@@ -291,9 +291,6 @@ pub const PACKS: &[ToolPack] = &[
         // `tool_search` finds one of them, and this skill hands out the whole
         // loop with its playbook. It replaced the `code_executor` / `critic` /
         // `tool_maker` specialists, whose value was that playbook.
-        // `lsp` is not listed: it registers only behind its capability gate,
-        // and every pack member must resolve in a default build. It is
-        // `Deferred` too, so `tool_search` still finds it when enabled.
         tools: &[
             "grep",
             "glob",

@@ -67,8 +67,7 @@ impl Tool for ArchetypeDelegationTool {
     /// sends them keeps working. `blocking` keeps its description because its
     /// default is behaviour-critical and not inferable from the name.
     ///
-    /// Shared with the collapsed `delegate_to` through
-    /// [`delegation_envelope_properties`]; enforced by
+    /// Shared by archetype delegates through [`delegation_envelope_properties`]; enforced by
     /// `envelope_descriptions_stay_within_budget`.
     fn parameters_schema(&self) -> serde_json::Value {
         json!({
@@ -250,8 +249,7 @@ pub(super) fn render_structured_handoff(prompt: &str, args: &Value) -> String {
     out
 }
 
-/// The advertised hand-off envelope, shared by every member delegate and the
-/// collapsed `delegate_to` so the two cannot drift. Only `prompt` and
+/// The advertised hand-off envelope shared by every member delegate. Only `prompt` and
 /// `blocking` are offered; the structured fields (`objective`, `evidence`,
 /// `constraints`, `must_not_assume`, `expected_output`,
 /// `citation_requirement`, `model`) are still read by

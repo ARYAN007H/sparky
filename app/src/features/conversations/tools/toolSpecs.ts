@@ -300,7 +300,6 @@ export const EXACT_TOOL_SPECS: Record<string, ToolSpec> = {
   // ── Agents and delegation ──────────────────────────────────────────────
   spawn_subagent: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
   spawn_async_subagent: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
-  spawn_worker_thread: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
   delegate_graph: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
   delegate: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent') }),
   delegate_to: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent', 'agent_id') }),

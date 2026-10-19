@@ -51,9 +51,8 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         // checkpointed to the session DB. Heavier than spawn_subagent; for
         // sub-tasks that benefit from a self-review/revision loop.
         Box::new(DelegateGraphTool::new()),
-        // The session todo list (Claude/Codex style): one whole-list write per
-        // call, scoped to the conversation thread. `plan_exit` is the marker
-        // that hands a plan-mode pass off to a build-mode pass.
+        // The session todo list is scoped to the conversation thread.
+        // `plan_exit` hands a completed plan-mode pass to the build-mode pass.
         Box::new(TodoTool::new(root_config.workspace_dir.clone())),
         // Interactive plan-review gate: parks the live turn on a thread-scoped
         // plan the user must approve before execution (Codex/Claude plan mode).

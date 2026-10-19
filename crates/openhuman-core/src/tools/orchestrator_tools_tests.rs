@@ -129,10 +129,6 @@ fn collects_agentid_entries_and_expands_skills_wildcard_to_deferred_actions() {
     assert_eq!(
         names,
         vec![
-            // `spawn_worker_thread` is temporarily disabled upstream —
-            // see tinyhumansai/openhuman#1624. Re-add the leading entry
-            // when the registration in `collect_orchestrator_tools` is
-            // restored.
             "research",        // researcher's delegate_name override
             "delegate_critic", // critic has no delegate_name → default
             // Actions sorted by toolkit, then action name.
@@ -155,8 +151,8 @@ fn collects_agentid_entries_and_expands_skills_wildcard_to_deferred_actions() {
     );
 
     // Every action is `Deferred`: off the wire, reachable through
-    // `tool_search`. (The archetype delegates are `Hidden` — the collapsed
-    // `delegate_to` tool advertises them — so only the actions are checked.)
+    // `tool_search`. Archetype delegates are Hidden from this registry view,
+    // while their live routing descriptions are included in the orchestrator prompt.
     for tool in tools.iter().filter(|t| t.name().starts_with("G")) {
         assert_eq!(
             tool.exposure(),
@@ -210,7 +206,6 @@ fn skills_wildcard_with_no_integrations_produces_no_integration_tools() {
     let reg = registry_with_targets();
     let tools = collect_orchestrator_tools(&orch, &reg, &[]);
     let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
-    // `spawn_worker_thread` is temporarily disabled — see #1624.
     assert_eq!(names, vec!["research", "delegate_critic"]);
 }
 
@@ -291,7 +286,6 @@ fn unknown_subagent_id_is_skipped_not_fatal() {
     let reg = registry_with_targets();
     let tools = collect_orchestrator_tools(&orch, &reg, &[]);
     let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
-    // `spawn_worker_thread` is temporarily disabled — see #1624.
     assert_eq!(names, vec!["research"]);
 }
 

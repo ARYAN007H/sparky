@@ -221,10 +221,10 @@ fn all_tools_registers_no_hosted_integration_families_without_a_tool_source() {
 }
 
 #[test]
-fn all_tools_registers_brave_engine_and_lsp_when_enabled() {
+fn all_tools_registers_brave_engine_when_enabled() {
     // Search registers one tool per capability role from the TinySearch
     // catalog; a usable BYOK Brave key yields the `search` role tool
-    // alongside lsp.
+    // alongside the builtin tool set.
     let tmp = TempDir::new().unwrap();
     let security = Arc::new(SecurityPolicy::default());
     let browser = BrowserConfig::default();
@@ -235,11 +235,6 @@ fn all_tools_registers_brave_engine_and_lsp_when_enabled() {
         crate::config::SearchProviderSettings::direct(),
     );
     cfg.search.brave.api_key = Some("test-brave-key".into());
-
-    let _env_guard = crate::config::TEST_ENV_LOCK.blocking_lock();
-    unsafe {
-        std::env::set_var(crate::tools::implementations::LSP_ENABLED_ENV, "1");
-    }
 
     let tools = all_tools(
         Arc::new(cfg.clone()),
@@ -257,13 +252,8 @@ fn all_tools_registers_brave_engine_and_lsp_when_enabled() {
         &[
             #[cfg(feature = "modules")]
             "web_search_tool",
-            "lsp",
         ],
     );
-
-    unsafe {
-        std::env::remove_var(crate::tools::implementations::LSP_ENABLED_ENV);
-    }
 }
 
 #[test]

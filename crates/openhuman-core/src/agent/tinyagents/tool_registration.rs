@@ -28,7 +28,6 @@ use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
 use crate::agent::tools::TodoToolDispatch;
 use crate::core::runtime::CoreContext;
 use crate::tools::delegate::DelegateToolDispatch;
-use crate::tools::implementations::threads::SpawnWorkerThreadDispatch;
 
 pub(crate) type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
 
@@ -120,7 +119,6 @@ pub(crate) fn typed_dispatch_for(
     let dispatch: Arc<dyn ToolDispatch<(), OpenHumanRunContext>> = match name {
         "spawn_parallel_agents" => Arc::new(SpawnParallelAgentsDispatch::new(adapter)),
         "spawn_async_subagent" => Arc::new(SpawnAsyncSubagentDispatch::new(adapter)),
-        "spawn_worker_thread" => Arc::new(SpawnWorkerThreadDispatch::new(adapter)),
         "spawn_subagent" => Arc::new(SpawnSubagentDispatch::new(adapter)),
         "continue_subagent" => Arc::new(ContinueSubagentDispatch::new(adapter)),
         "delegate_graph" => Arc::new(DelegateGraphDispatch::new(adapter)),

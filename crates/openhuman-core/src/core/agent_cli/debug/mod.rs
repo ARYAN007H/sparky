@@ -4,9 +4,9 @@
 //! Instead of re-implementing prompt assembly, this module routes
 //! through [`OpenHumanSessionHost::from_config_for_agent`] — the same entry point the
 //! Tauri web channel and CLI use — and then calls
-//! [`OpenHumanSessionHost::build_system_prompt`] on the constructed session. The
-//! output is byte-identical to what the LLM would receive on turn 1 of
-//! that agent.
+//! [`OpenHumanSessionHost::render_current_turn_prompt`] on the constructed session. The
+//! output is assembled through the current-turn prelude used by runtime
+//! sessions, so it matches the system prompt on a cold model request.
 //!
 //! Entry points:
 //! * [`dump_agent_prompt`] — dump a single agent by id.
@@ -187,7 +187,7 @@ async fn render_via_session(config: &Config, agent_id: &str) -> Result<DumpedPro
     agent.refresh_prompt_surface().await;
 
     let text = agent
-        .build_system_prompt()
+        .render_current_turn_prompt()
         .with_context(|| format!("rendering system prompt for `{agent_id}`"))?;
 
     Ok(session_dump(&agent, agent_id, text))
