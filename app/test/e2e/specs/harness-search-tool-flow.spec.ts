@@ -122,9 +122,6 @@ function findToolInLlmLog(
 // ---------------------------------------------------------------------------
 
 describe('Harness - Search tool-flow', () => {
-  before(function () {
-    this.skip();
-  });
   before(async function beforeSuite() {
     this.timeout(90_000);
     console.log(`${LOG_PREFIX} Starting mock server and resetting app`);

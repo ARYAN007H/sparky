@@ -53,9 +53,6 @@ interface TaskAssignResult {
 }
 
 describe('Agent teams live coordination surface', () => {
-  before(function () {
-    this.skip();
-  });
   let seeded: SeededTeam | null = null;
 
   before(async function beforeSuite() {
