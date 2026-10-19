@@ -305,7 +305,7 @@ test("private coverage executes every package configuration once and reports aft
   // resolves (and builds) the core and its dependencies once for all of them.
   const unified = selections.filter((line) =>
     line.includes(
-      "--features channels --no-report --no-fail-fast -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --tests -E ",
+      "--features channels --no-report --no-fail-fast -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
     ),
   );
   assert.equal(unified.length, 4);
@@ -365,7 +365,6 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
   const script = [
     "set -euo pipefail",
     'CORE_PRODUCT_FEATURES="channels,modules"',
-    "SUITE_TARGETS=(--tests)",
     ...source
       .split("\n")
       .filter((line) => /^(UNIFIED_PRODUCT_ARGS|FILTER_CLI_TESTS)=/.test(line)),
@@ -378,7 +377,7 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
         done
         printf '%s\\n' 'export INVENTORY_INSTRUMENTED=1' 'export CARGO_TARGET_DIR=instrumented-target'
       elif [[ "$*" == *"nextest list"* ]]; then
-        [[ "$*" == *"--features channels,modules -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --tests -E package(=openhuman-cli) & kind(test)"* ]] || return 65
+        [[ "$*" == *"--features channels,modules -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E package(=openhuman-cli) & kind(test)"* ]] || return 65
         [[ "$INVENTORY_INSTRUMENTED" == 1 && "$CARGO_TARGET_DIR" == instrumented-target && "$CARGO_BUILD_TARGET_DIR" == preserved-target ]] || return 66
       else return 67
       fi
@@ -469,13 +468,7 @@ test("nextest product suites share one Cargo argument set and differ only in the
   const args = source.match(/^UNIFIED_PRODUCT_ARGS=\((.*)\)$/m)[1];
   assert.equal(
     args,
-    '-p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli "${SUITE_TARGETS[@]}"',
-  );
-  // Under nextest only test targets are built: examples run nothing yet each
-  // links the whole instrumented core and stays on the scratch disk.
-  assert.match(
-    source,
-    /if \[ "\$\{OH_COV_RUNNER:-cargo\}" = "nextest" \]; then\n  SUITE_TARGETS=\(--tests\)\nelse\n  SUITE_TARGETS=\(--all-targets\)\nfi/,
+    "-p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets",
   );
   // Exact package matches: `package(openhuman)` alone would be a glob of the name.
   for (const value of [
@@ -489,7 +482,7 @@ test("nextest product suites share one Cargo argument set and differ only in the
   // feature suites keep their own resolutions.
   assert.doesNotMatch(source, /-p openhuman-cli --tests/);
   
-  assert.match(source, /suite "openhuman-rpc" llvm_cov_package .*-p openhuman-rpc "\$\{SUITE_TARGETS\[@\]\}"/);
-  assert.match(source, /suite "openhuman-tui" llvm_cov_package .*-p openhuman-tui "\$\{SUITE_TARGETS\[@\]\}"/);
-  assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package .*-p openhuman-embed "\$\{SUITE_TARGETS\[@\]\}"/);
+  assert.match(source, /suite "openhuman-rpc" llvm_cov_package .*-p openhuman-rpc --all-targets/);
+  assert.match(source, /suite "openhuman-tui" llvm_cov_package .*-p openhuman-tui --all-targets/);
+  assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package .*-p openhuman-embed --all-targets/);
 });
