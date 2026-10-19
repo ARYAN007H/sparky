@@ -61,7 +61,7 @@ pub use schema::{
     SearchConfig, SearchEngineCredentials, SearchHostCredential, SearchProviderSettings,
     SearxngConfig, SecretsConfig, SecurityConfig, ShellConfig, SlackConfig, StreamMode, SttEngine,
     TeamModelConfig, TelegramConfig, TokenjuiceConfig, UnknownKeyedSearchProvider, UpdateConfig,
-    UpdateRestartStrategy, VoiceActivationMode, VoiceServerConfig, WebSearchConfig, WebhookConfig,
+    UpdateRestartStrategy, VoiceServerConfig, WebSearchConfig, WebhookConfig,
     YuanbaoConfig, DEFAULT_MODEL, LEGACY_TIER_MODELS, MANAGED_MULTIMODAL_MODELS,
     MANAGED_SEARCH_PROVIDERS, MODEL_IMAGE_GENERATION_AGENT, MODEL_MANAGED_DEFAULT,
     MODEL_MEDIA_UNDERSTANDING, MODEL_VIDEO_GENERATION_AGENT, SEARCH_ENGINE_BRAVE,

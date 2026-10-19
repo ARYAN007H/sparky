@@ -490,7 +490,6 @@ pub struct Config {
     pub update: UpdateConfig,
 
     #[serde(default)]
-    pub dictation: DictationConfig,
 
     /// Whether the user has completed the **React UI** onboarding flow.
     ///
