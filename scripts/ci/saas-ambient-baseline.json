@@ -693,13 +693,6 @@
     "occurrence": 2
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/security/credentials/ops/gated_services.rs",
-    "line": 134,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 3
-  },
-  {
     "rule": "home-dir",
     "path": "crates/openhuman-core/src/security/secret_storage/store.rs",
     "line": 245,
