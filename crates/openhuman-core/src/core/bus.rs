@@ -95,7 +95,8 @@ pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events";
 /// `ComposioConnectionCreated` and `ComposioConfigChanged` (additive): a
 /// subscriber rebuilds its dispatch context from it instead of reading an
 /// ambient one.
-pub const EVENTS_VERSION: Version = Version::new(1, 13, 0);
+/// `2.0.0` removes the unused `Voice::PttTranscriptCommitted` event.
+pub const EVENTS_VERSION: Version = Version::new(2, 0, 0);
 
 /// The bus. Initialised once by [`init`]; safe to touch before that.
 pub static BUS: OnceBus<DomainEvent> = OnceBus::new();

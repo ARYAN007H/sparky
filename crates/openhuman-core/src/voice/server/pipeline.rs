@@ -3,8 +3,8 @@
 //! (min duration, silence, hallucination) and the initial-prompt / recent
 //! transcript bookkeeping that improves STT continuity.
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use log::{debug, info, warn};
@@ -13,13 +13,13 @@ use tokio::sync::Mutex;
 use crate::config::Config;
 use crate::modules::accessibility::{AccessibilityClient, FocusTarget, PasteRequest};
 use crate::modules::voice::{
-    gate_recording, is_hallucinated, GateVerdict, HallucinationMode, RecordingGates, SessionInput,
+    GateVerdict, HallucinationMode, RecordingGates, SessionInput, gate_recording, is_hallucinated,
 };
 use crate::voice::audio_capture::RecordingHandle;
 
-use super::recorder::Recorder;
-use super::types::{VoiceServerConfig, MAX_INITIAL_PROMPT_CHARS, MAX_RECENT_TRANSCRIPTS};
 use super::LOG_PREFIX;
+use super::recorder::Recorder;
+use super::types::{MAX_INITIAL_PROMPT_CHARS, MAX_RECENT_TRANSCRIPTS, VoiceServerConfig};
 
 /// Capture the frontmost app name at hotkey press so insertion can be validated later.
 #[cfg(target_os = "macos")]
@@ -206,17 +206,22 @@ pub(super) async fn process_recording_bg(
                     // inserts into the user's active text field, so a stray
                     // "Thank you." is visible and undoable, while a filter that
                     // failed closed would swallow real dictation with no trace.
-                    let hallucinated =
-                        match is_hallucinated(config, text, HallucinationMode::Dictation).await {
-                            Ok(verdict) => verdict,
-                            Err(error) => {
-                                warn!(
+                    let hallucinated = match is_hallucinated(
+                        config,
+                        text,
+                        HallucinationMode::Dictation,
+                    )
+                    .await
+                    {
+                        Ok(verdict) => verdict,
+                        Err(error) => {
+                            warn!(
                                 "{LOG_PREFIX} [pipeline={pipeline_id}] stage=gate_hallucination \
                                      UNAVAILABLE ({error}); passing text through"
                             );
-                                false
-                            }
-                        };
+                            false
+                        }
+                    };
                     if hallucinated {
                         warn!(
                             "{LOG_PREFIX} [pipeline={pipeline_id}] stage=gate_hallucination DROPPED text='{}'",
@@ -261,7 +266,9 @@ pub(super) async fn process_recording_bg(
                                 })
                                 .await
                             {
-                                warn!("{LOG_PREFIX} [pipeline={pipeline_id}] stage=deliver_paste FAILED: {e}");
+                                warn!(
+                                    "{LOG_PREFIX} [pipeline={pipeline_id}] stage=deliver_paste FAILED: {e}"
+                                );
                                 *last_error.lock().await = Some(e.to_string());
                             } else {
                                 let insert_elapsed = insert_started.elapsed();
@@ -274,7 +281,9 @@ pub(super) async fn process_recording_bg(
                             }
                         }
                     } else {
-                        warn!("{LOG_PREFIX} [pipeline={pipeline_id}] stage=gate_empty DROPPED (transcription was blank)");
+                        warn!(
+                            "{LOG_PREFIX} [pipeline={pipeline_id}] stage=gate_empty DROPPED (transcription was blank)"
+                        );
                     }
                 }
                 Err(e) => {
@@ -282,7 +291,9 @@ pub(super) async fn process_recording_bg(
                     // subprocess layer and logged with a 5-minute backoff.
                     // Demote to warn! so they don't flood Sentry (issue #5168).
                     if e.contains("STATUS_DLL_NOT_FOUND") {
-                        warn!("{LOG_PREFIX} [pipeline={pipeline_id}] stage=transcribe DLL_UNAVAILABLE: {e}");
+                        warn!(
+                            "{LOG_PREFIX} [pipeline={pipeline_id}] stage=transcribe DLL_UNAVAILABLE: {e}"
+                        );
                     } else {
                         warn!("{LOG_PREFIX} [pipeline={pipeline_id}] stage=transcribe FAILED: {e}");
                     }

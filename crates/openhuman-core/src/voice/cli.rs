@@ -6,10 +6,10 @@
 //! registry pattern because it blocks forever on the hotkey listener, so the
 //! adapter lives here inside the voice domain rather than in `crates/openhuman-core/src/core/cli.rs`.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
-use crate::core::logging::{init_for_cli_run, CliLogDefault};
-use crate::voice::server::{run_standalone, VoiceServerConfig};
+use crate::core::logging::{CliLogDefault, init_for_cli_run};
+use crate::voice::server::{VoiceServerConfig, run_standalone};
 use tinyvoice_bus::hotkey::ActivationMode;
 
 /// Parse and execute the `openhuman voice` / `openhuman dictate` subcommand.

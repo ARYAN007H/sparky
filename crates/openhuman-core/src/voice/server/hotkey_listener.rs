@@ -473,7 +473,7 @@ async fn close_globe(
             Err(crate::modules::accessibility::AccessibilityError::Operation(error))
                 if error.code == "UNKNOWN_LISTENER" =>
             {
-                return
+                return;
             }
             Err(error) => warn!("{LOG_PREFIX} Globe cleanup pending: {error}"),
         }

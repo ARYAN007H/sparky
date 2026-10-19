@@ -75,19 +75,21 @@ fn status_schema_has_no_inputs() {
 #[test]
 fn transcribe_schema_requires_audio_path() {
     let s = voice_schemas("voice_transcribe");
-    assert!(s
-        .inputs
-        .iter()
-        .any(|i| i.name == "audio_path" && i.required));
+    assert!(
+        s.inputs
+            .iter()
+            .any(|i| i.name == "audio_path" && i.required)
+    );
 }
 
 #[test]
 fn transcribe_bytes_schema_requires_audio_bytes() {
     let s = voice_schemas("voice_transcribe_bytes");
-    assert!(s
-        .inputs
-        .iter()
-        .any(|i| i.name == "audio_bytes" && i.required));
+    assert!(
+        s.inputs
+            .iter()
+            .any(|i| i.name == "audio_bytes" && i.required)
+    );
 }
 
 #[test]
@@ -141,7 +143,7 @@ fn to_json_returns_inner_value() {
 #[tokio::test]
 async fn overlay_notify_recording_started_publishes_pressed_event() {
     use crate::voice::dictation_listener::subscribe_dictation_events;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     let mut rx = subscribe_dictation_events();
     let params = Map::from_iter([("state".to_string(), json!("recording_started"))]);
@@ -431,10 +433,11 @@ fn update_provider_settings_schema_has_correct_inputs() {
 #[test]
 fn list_models_schema_requires_provider_id() {
     let s = voice_schemas("voice_list_models");
-    assert!(s
-        .inputs
-        .iter()
-        .any(|i| i.name == "provider_id" && i.required));
+    assert!(
+        s.inputs
+            .iter()
+            .any(|i| i.name == "provider_id" && i.required)
+    );
 }
 
 #[test]

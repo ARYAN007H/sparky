@@ -115,8 +115,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_transcribe" => ControllerSchema {
             namespace: "voice",
             function: "transcribe",
-            description:
-                "Transcribe audio from a file path through the configured STT engine, with optional LLM cleanup.",
+            description: "Transcribe audio from a file path through the configured STT engine, with optional LLM cleanup.",
             inputs: vec![
                 required_string("audio_path", "Path to the audio file."),
                 optional_string("context", "Conversation context for LLM post-processing."),
@@ -133,8 +132,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_transcribe_bytes" => ControllerSchema {
             namespace: "voice",
             function: "transcribe_bytes",
-            description:
-                "Transcribe audio from raw bytes through the configured STT engine, with optional LLM cleanup.",
+            description: "Transcribe audio from raw bytes through the configured STT engine, with optional LLM cleanup.",
             inputs: vec![
                 FieldSchema {
                     name: "audio_bytes",
@@ -167,8 +165,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_reply_synthesize" => ControllerSchema {
             namespace: "voice",
             function: "reply_synthesize",
-            description:
-                "Synthesize an agent reply via the hosted backend (ElevenLabs) and return \
+            description: "Synthesize an agent reply via the hosted backend (ElevenLabs) and return \
                  base64 audio plus an Oculus-15 viseme alignment for mascot lip-sync.",
             inputs: vec![
                 required_string("text", "Text to synthesize."),
@@ -187,8 +184,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_stt_dispatch" => ControllerSchema {
             namespace: "voice",
             function: "stt_dispatch",
-            description:
-                "Factory-dispatched speech-to-text. Routes to the OpenHuman backend proxy or a \
+            description: "Factory-dispatched speech-to-text. Routes to the OpenHuman backend proxy or a \
                  third-party provider based on `provider` (or, when unspecified, the resolved \
                  `voice_server.stt_engine`). Returns the same `{ text }` payload either way.",
             inputs: vec![
@@ -200,21 +196,20 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
                     "provider",
                     "Override provider: 'cloud' or '<slug>[:<model>]'. Defaults to the resolved voice_server.stt_engine.",
                 ),
-                optional_string("model", "Model id for the selected engine (e.g. 'scribe_v1', 'whisper-1')."),
+                optional_string(
+                    "model",
+                    "Model id for the selected engine (e.g. 'scribe_v1', 'whisper-1').",
+                ),
                 optional_string("mime_type", "Audio MIME type (default: audio/webm)."),
                 optional_string("file_name", "Filename hint (default: audio.webm)."),
                 optional_string("language", "BCP-47 language hint, e.g. 'en'."),
             ],
-            outputs: vec![json_output(
-                "result",
-                "SttResult: { text, provider }.",
-            )],
+            outputs: vec![json_output("result", "SttResult: { text, provider }.")],
         },
         "voice_tts_dispatch" => ControllerSchema {
             namespace: "voice",
             function: "tts_dispatch",
-            description:
-                "Factory-dispatched text-to-speech. Routes to the cloud ElevenLabs proxy \
+            description: "Factory-dispatched text-to-speech. Routes to the cloud ElevenLabs proxy \
                  (returns rich viseme alignment) or local Piper (returns audio + a synthetic \
                  viseme timeline) based on `provider` (or `config.local_ai.tts_provider`).",
             inputs: vec![
@@ -236,8 +231,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_set_providers" => ControllerSchema {
             namespace: "voice",
             function: "set_providers",
-            description:
-                "Persist the STT / TTS provider selection (and optional model/voice id) into \
+            description: "Persist the STT / TTS provider selection (and optional model/voice id) into \
                  `config.local_ai.{stt,tts}_provider` so subsequent voice_stt_dispatch / \
                  voice_tts_dispatch calls resolve without an explicit provider param.",
             inputs: vec![
@@ -260,8 +254,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_update_provider_settings" => ControllerSchema {
             namespace: "voice",
             function: "update_provider_settings",
-            description:
-                "Persist the voice provider registry and STT/TTS routing strings. \
+            description: "Persist the voice provider registry and STT/TTS routing strings. \
                  Mirrors openhuman.inference_update_model_settings for the voice domain.",
             inputs: vec![
                 FieldSchema {
@@ -287,8 +280,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_list_models" => ControllerSchema {
             namespace: "voice",
             function: "list_models",
-            description:
-                "List available models or voices for a voice provider. Returns static \
+            description: "List available models or voices for a voice provider. Returns static \
                  presets for built-in slugs; probes /models for custom providers.",
             inputs: vec![
                 required_string("provider_id", "Provider id or slug."),
@@ -297,16 +289,12 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
                     "Filter by capability: 'stt' or 'tts'. Defaults to both.",
                 ),
             ],
-            outputs: vec![json_output(
-                "models",
-                "{ models: [{ id, label? }] }",
-            )],
+            outputs: vec![json_output("models", "{ models: [{ id, label? }] }")],
         },
         "voice_test_provider" => ControllerSchema {
             namespace: "voice",
             function: "test_provider",
-            description:
-                "Test a voice provider endpoint without saving. STT transcribes a \
+            description: "Test a voice provider endpoint without saving. STT transcribes a \
                  silent audio clip; TTS synthesizes 'Hello' and discards. With \
                  `validate_only` it is a dry run: a lightweight authenticated GET, \
                  no inference call and nothing persisted.",
@@ -336,8 +324,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "voice_server_start" => ControllerSchema {
             namespace: "voice",
             function: "server_start",
-            description:
-                "Start the voice dictation server (hotkey → record → transcribe → insert text).",
+            description: "Start the voice dictation server (hotkey → record → transcribe → insert text).",
             inputs: vec![
                 optional_string("hotkey", "Hotkey combination (default: Fn)."),
                 optional_string(
@@ -365,8 +352,7 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
         "overlay_stt_notify" => ControllerSchema {
             namespace: "voice",
             function: "overlay_stt_notify",
-            description:
-                "Notify the overlay of a voice/STT state change from the chat prompt button.",
+            description: "Notify the overlay of a voice/STT state change from the chat prompt button.",
             inputs: vec![
                 required_string(
                     "state",

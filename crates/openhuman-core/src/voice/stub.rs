@@ -74,21 +74,6 @@ pub fn create_stt_provider(
 }
 
 // ---------------------------------------------------------------------------
-// Event bus surface (mirrors `bus::publish_ptt_transcript_committed`)
-// ---------------------------------------------------------------------------
-
-/// No-op: with voice disabled there is no PTT dictation path to announce.
-pub fn publish_ptt_transcript_committed(
-    _thread_id: String,
-    _session_id: u64,
-    _text_len: usize,
-    _held_ms: u64,
-    _finalized_by_watchdog: bool,
-) {
-    log::debug!("[voice-stub] publish_ptt_transcript_committed ignored (voice disabled)");
-}
-
-// ---------------------------------------------------------------------------
 // cli::run_standalone_subcommand (kept registered as a CLI adapter)
 // ---------------------------------------------------------------------------
 

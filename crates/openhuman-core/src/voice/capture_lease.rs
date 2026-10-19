@@ -2,11 +2,11 @@
 use super::audio_capture::{RecordingResult, TARGET_SAMPLE_RATE};
 use crate::config::Config;
 use base64::Engine as _;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, LazyLock, Mutex,
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 use tinybus::module::ModuleClient;
 use tinyvoice_bus::{

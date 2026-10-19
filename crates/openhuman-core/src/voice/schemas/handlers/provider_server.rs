@@ -87,7 +87,7 @@ pub(crate) fn handle_voice_update_provider_settings(
 ) -> ControllerFuture {
     Box::pin(async move {
         use crate::config::schema::voice_providers::{
-            generate_voice_provider_id, is_voice_slug_reserved, VoiceCapability, VoiceProviderCreds,
+            VoiceCapability, VoiceProviderCreds, generate_voice_provider_id, is_voice_slug_reserved,
         };
         use tinyinference_voice::external_stt::SttApiStyle;
         use tinyinference_voice::external_tts::TtsApiStyle;
@@ -113,7 +113,7 @@ pub(crate) fn handle_voice_update_provider_settings(
                     Some(other) => {
                         return Err(format!(
                             "invalid capability '{other}' (valid: 'stt', 'tts', 'both')"
-                        ))
+                        ));
                     }
                 };
 
@@ -122,8 +122,8 @@ pub(crate) fn handle_voice_update_provider_settings(
                     Some("none") => crate::config::schema::AuthStyle::None,
                     Some(other) => {
                         return Err(format!(
-                        "invalid auth_style '{other}' for voice provider (valid: 'bearer', 'none')"
-                    ))
+                            "invalid auth_style '{other}' for voice provider (valid: 'bearer', 'none')"
+                        ));
                     }
                 };
 
@@ -134,7 +134,7 @@ pub(crate) fn handle_voice_update_provider_settings(
                     Some(other) => {
                         return Err(format!(
                             "invalid stt_api_style '{other}' (valid: 'openai_audio', 'deepgram', 'elevenlabs')"
-                        ))
+                        ));
                     }
                 };
 
@@ -144,7 +144,7 @@ pub(crate) fn handle_voice_update_provider_settings(
                     Some(other) => {
                         return Err(format!(
                             "invalid tts_api_style '{other}' (valid: 'openai_audio', 'elevenlabs')"
-                        ))
+                        ));
                     }
                 };
 
@@ -428,7 +428,7 @@ pub(crate) fn handle_voice_server_start(
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        use crate::voice::server::{global_server, VoiceServerConfig};
+        use crate::voice::server::{VoiceServerConfig, global_server};
         use tinyvoice_bus::hotkey::ActivationMode;
 
         let config = ctx.load_config().await?;
@@ -576,7 +576,7 @@ pub(crate) fn handle_overlay_stt_notify(
         );
 
         use crate::voice::dictation_listener::{
-            publish_dictation_event, publish_transcription, DictationEvent,
+            DictationEvent, publish_dictation_event, publish_transcription,
         };
 
         match p.state {

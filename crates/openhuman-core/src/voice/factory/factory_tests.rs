@@ -1,12 +1,12 @@
 //! Unit tests for the voice factory.
 
 use super::entry::{
-    create_stt_provider, create_tts_provider, resolve_tts_voice, DEFAULT_PIPER_VOICE,
+    DEFAULT_PIPER_VOICE, create_stt_provider, create_tts_provider, resolve_tts_voice,
 };
 use super::helpers::{effective_stt_provider, effective_tts_provider, split_slug_model};
-use crate::config::schema::voice_providers::VoiceCapability;
-use crate::config::schema::SttEngine;
 use crate::config::Config;
+use crate::config::schema::SttEngine;
+use crate::config::schema::voice_providers::VoiceCapability;
 use tinyinference_voice::external_stt::SttApiStyle;
 
 fn cfg() -> Config {

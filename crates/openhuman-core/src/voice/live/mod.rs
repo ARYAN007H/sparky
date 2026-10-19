@@ -28,5 +28,5 @@ pub mod types;
 pub mod ws;
 
 pub use error::LiveVoiceError;
-pub use providers::{PreparedProvider, GEMINI_LANGUAGES, GEMINI_VOICES};
+pub use providers::{GEMINI_LANGUAGES, GEMINI_VOICES, PreparedProvider};
 pub use schemas::{live_controller_schemas, live_registered_controllers, live_schemas};

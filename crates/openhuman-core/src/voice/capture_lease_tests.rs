@@ -142,7 +142,7 @@ fn fixture_lease(port: Arc<Fixture>) -> CaptureLease {
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn capture_never_retries_through_an_unattested_bus() {
-    use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPath};
+    use tinybus::{Connection, ObjectPath, broker::Broker, transport::memory::MemoryBus};
     #[derive(Clone)]
     struct Unattested(Arc<AtomicU64>);
     #[tinybus::interface(name = "test.Capture")]

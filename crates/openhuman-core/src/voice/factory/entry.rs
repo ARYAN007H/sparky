@@ -3,7 +3,7 @@
 use log::debug;
 
 use super::helpers::{
-    create_stt_provider_by_slug, create_tts_provider_by_slug, split_slug_model, LOG_PREFIX,
+    LOG_PREFIX, create_stt_provider_by_slug, create_tts_provider_by_slug, split_slug_model,
 };
 use super::registry::{stt_factory, tts_factory};
 use super::traits::{SttProvider, TtsProvider};

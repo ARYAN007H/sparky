@@ -133,11 +133,6 @@ frontend without Tauri-side shortcut registration. The same file starts and
 stops TinyVoice's native listener (`start_if_enabled` / `stop`) and normalizes
 product hotkey strings before passing them to the module.
 
-Typed events go through the process-wide `BUS`. [`bus.rs`](./bus.rs) publishes
-`DomainEvent::Voice(VoiceEvent::PttTranscriptCommitted)` with the thread id,
-session id, text length, held milliseconds and a watchdog flag. The raw
-transcript is never included.
-
 ### Reply speech
 
 `reply_speech::synthesize_reply` posts the agent's reply text to the backend's

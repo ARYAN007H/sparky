@@ -15,8 +15,8 @@ use std::time::Duration;
 use axum::extract::ws::{Message, WebSocket};
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
-use tinyagents_live::tinyliveagents::{CloseReason, LiveEvent};
 use tinyagents_live::LiveAgentEvent;
+use tinyagents_live::tinyliveagents::{CloseReason, LiveEvent};
 
 use super::error::LiveVoiceError;
 use super::persist::TranscriptPersister;

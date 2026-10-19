@@ -4,7 +4,7 @@
 use async_trait::async_trait;
 use log::debug;
 
-use super::super::local_speech::{synthesize_piper, PiperOptions};
+use super::super::local_speech::{PiperOptions, synthesize_piper};
 use super::traits::TtsProvider;
 use crate::config::Config;
 use crate::core::Outcome;
