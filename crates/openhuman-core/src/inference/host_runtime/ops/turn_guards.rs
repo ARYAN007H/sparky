@@ -4,7 +4,7 @@
 
 use crate::config::Config;
 use crate::security::prompt_injection::{
-    PromptEnforcementAction, PromptEnforcementContext, enforce_prompt_input,
+    enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
 };
 
 pub(super) fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
