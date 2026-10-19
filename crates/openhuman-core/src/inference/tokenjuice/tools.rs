@@ -2,7 +2,7 @@
 //!
 //! The content router may replace a large tool result with a compacted view and
 //! a `⟦tj:<hash>⟧` marker, stashing the original in the CCR store
-//! ([`crate::inference::tokenjuice::cache::store`]). This tool hands the
+//! ([`crate::inference::tokenjuice::store`]). This tool hands the
 //! original back on demand — fully or by a byte/line range — so even lossy
 //! compaction stays reversible.
 //!

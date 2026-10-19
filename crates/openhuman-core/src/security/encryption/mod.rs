@@ -9,7 +9,7 @@ pub mod ops;
 mod schemas;
 
 pub use core::*;
-pub use ops as rpc;
+
 pub use ops::*;
 pub use schemas::{
     all_controller_schemas as all_encryption_controller_schemas,

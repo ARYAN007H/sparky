@@ -20,7 +20,7 @@ pub(crate) mod mock;
 mod windows;
 
 pub use core::*;
-pub use ops as rpc;
+
 pub use ops::*;
 pub use restart::apply_startup_restart_delay_from_env;
 pub use restart::RestartStatus;

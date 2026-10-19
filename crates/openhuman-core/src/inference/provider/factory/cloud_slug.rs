@@ -65,7 +65,7 @@ pub(super) fn resolve_cloud_slug<'a>(
     // ignoring whatever effective_model we computed here.
     if entry.auth_style != AuthStyle::OpenhumanJwt && effective_model.trim().is_empty() {
         log::warn!(
-            "[nvidia-nim][chat-factory] role={} slug={} resolved to empty model — \
+            "[providers][chat-factory] role={} slug={} resolved to empty model — \
              provider string must include a model id (e.g. '{}:<model-id>') or \
              set default_model on the cloud_providers entry",
             role,

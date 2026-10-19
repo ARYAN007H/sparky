@@ -25,7 +25,7 @@ pub use enrichers::{
 };
 
 /// RPC operations for configuration.
-pub use ops as rpc;
+
 pub use ops::*;
 
 pub use schema::{

@@ -38,7 +38,7 @@ pub use egress::{
     emit_external_transfer, enforce_egress, local_only_blocks, local_only_tool_block, DataKind,
     EgressDescriptor, EgressReason, IdentificationRisk,
 };
-pub use ops as rpc;
+
 pub use ops::*;
 pub use policy::validate_path_within_root;
 #[allow(unused_imports)]

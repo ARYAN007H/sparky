@@ -112,7 +112,7 @@ pub(crate) fn build_channel_turn_parts(
                 config,
                 config.default_temperature,
             )?;
-            (model, provider::INFERENCE_BACKEND_ID.to_string())
+            (model, provider::factory::INFERENCE_BACKEND_ID.to_string())
         }
         ChatWorkloadResolution::Workload {
             provider_string,

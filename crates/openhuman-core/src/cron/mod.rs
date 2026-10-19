@@ -37,7 +37,7 @@ pub mod scheduler;
 #[path = "cutover_tests.rs"]
 mod cutover_tests;
 
-pub use ops as rpc;
+
 #[cfg(test)]
 pub use ops::update_cron_job;
 pub use ops::{add_once, add_once_at, pause_job, resume_job};
