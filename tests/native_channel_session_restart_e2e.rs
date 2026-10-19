@@ -231,7 +231,7 @@ auth_style = "none"
 default_model = "session-model"
 "#
     );
-    std::fs::write(openhuman_dir.join("config.toml"), config).expect("write config");
+    std::fs::write(openhuman_dir.join("config.toml"), &config).expect("write config");
     // Core config resolution uses the operator profile when no identity has
     // been established, while workspace state is independently pinned here.
     let mut parsed: openhuman_core::config::Config =
