@@ -1,6 +1,5 @@
 use super::*;
 
-use crate::config::schema::cloud_providers::AuthStyle;
 use crate::inference::provider::model_listing_test_support::{
     configure_generic_workspace, configure_openrouter_workspace, spawn_openrouter_probe_server,
     spawn_static_models_server,
