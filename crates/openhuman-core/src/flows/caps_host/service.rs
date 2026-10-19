@@ -171,23 +171,193 @@ impl CapsHostService {
         &self,
         request: runs::AgentRunRequest,
     ) -> tinybus::Result<runs::AgentRunHandle> {
-        let handle = uuid::Uuid::new_v4().simple().to_string();
+        if !valid_agent_request_id(&request.client_request_id) {
+            return Err(tinybus::Error::failed(
+                "AgentRun requires a nonempty bounded client_request_id",
+            ));
+        }
         let state = Arc::new(tokio::sync::Mutex::new(
             super::agent::AgentRunState::default(),
         ));
+        let binding = Arc::clone(&self.0);
+        let cancellation = binding.cancellation.child_token();
+        let admission = binding
+            .agent_runs
+            .lock()
+            .await
+            .admit(
+                request.client_request_id.clone(),
+                state,
+                cancellation,
+            )
+            .map_err(tinybus::Error::failed)?;
+        if admission.cancelled_before_admission {
+            let mut state = admission.entry.state.lock().await;
+            state.error = Some("agent request was cancelled before admission".to_owned());
+            state.done = true;
+        }
+        if admission.start_task {
+            let task_binding = Arc::clone(&binding);
+            let entry = admission.entry;
+            tokio::spawn(async move {
+                let _ = service_agent::run_agent(
+                    task_binding,
+                    request,
+                    Arc::clone(&entry.state),
+                    entry.cancellation,
+                )
+                .await;
+            });
+        }
+        Ok(runs::AgentRunHandle {
+            handle: admission.entry.handle,
+        })
+    }
+
+    async fn agent_cancel(
+        &self,
+        request: runs::AgentCancelRequest,
+    ) -> tinybus::Result<()> {
+        if !valid_agent_request_id(&request.client_request_id) {
+            return Err(tinybus::Error::failed(
+                "AgentCancel requires a nonempty bounded client_request_id",
+            ));
+        }
         self.0
             .agent_runs
             .lock()
             .await
-            .insert(handle.clone(), Arc::clone(&state));
+            .cancel(request.client_request_id);
+        Ok(())
+    }
+
+    async fn agent_events(
+        &self,
+        request: runs::AgentEventsRequest,
+    ) -> tinybus::Result<runs::AgentEventsResponse> {
+        let state = self
+            .0
+            .agent_runs
+            .lock()
+            .await
+            .state_for_handle(&request.handle)
+            .ok_or_else(|| tinybus::Error::failed("unknown agent run handle"))?;
+        let state = state.lock().await;
+        if let Some(error) = &state.error {
+            return Err(tinybus::Error::failed(error));
+        }
+        Ok(runs::AgentEventsResponse {
+            events: state
+                .events
+                .iter()
+                .filter(|event| event.seq > request.cursor)
+                .take(runs::MAX_AGENT_EVENTS_PAGE)
+                .cloned()
+                .collect(),
+            done: state.done,
+            outcome: state.done.then(|| state.outcome.clone()).flatten(),
+        })
+    }
+
+    async fn resolve_agent(&self, id: String) -> tinybus::Result<Option<runs::AgentDefinition>> {
         let binding = Arc::clone(&self.0);
-        tokio::spawn(async move {
-            if let Err(error) = service_agent::run_agent(binding.clone(), request, state).await {
-                if let Some(state) = binding.agent_runs.lock().await.get(&handle).cloned() {
-                    let mut state = state.lock().await;
-                    state.error = Some(error);
-                    state.done = true;
-                }
+        let scope = Arc::clone(&binding);
+        scope
+            .within(async move {
+                crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                    &binding.config.workspace_dir,
+                )
+                .map_err(|error| error.to_string())?;
+                let registry =
+                    crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+                registry
+                    .and_then(|registry| registry.get(&id).cloned())
+                    .map(to_bus_agent_definition)
+                    .transpose()
+            })
+            .await
+            .map_err(bus_error)
+    }
+
+    async fn list_agents(&self) -> tinybus::Result<Vec<runs::AgentDefinition>> {
+        let binding = Arc::clone(&self.0);
+        let scope = Arc::clone(&binding);
+        scope
+            .within(async move {
+                crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                    &binding.config.workspace_dir,
+                )
+                .map_err(|error| error.to_string())?;
+                let registry =
+                    crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+                registry
+                    .map(|registry| {
+                        registry
+                            .list()
+                            .into_iter()
+                            .map(to_bus_agent_definition)
+                            .collect()
+                    })
+                    .ok_or_else(|| "agent definition registry is unavailable".to_owned())
+            })
+            .await
+            .map_err(bus_error)
+    }
+
+    async fn resolve_context(
+        &self,
+        _request: runs::ResolveContextRequest,
+    ) -> tinybus::Result<Option<runs::ContextBlock>> {
+        Ok(None)
+    }
+
+    async fn resolve_tools(
+        &self,
+        _request: runs::ResolveToolsRequest,
+    ) -> tinybus::Result<Vec<runs::ToolDescriptor>> {
+        Ok(Vec::new())
+    }
+
+    async fn resolve_workdir(
+        &self,
+        _request: runs::ResolveWorkdirRequest,
+    ) -> tinybus::Result<runs::WorkdirCheck> {
+        Ok(runs::WorkdirCheck::Unmanaged)
+    }
+
+    async fn approval_decide(
+        &self,
+        request: runs::ApprovalRequest,
+    ) -> tinybus::Result<runs::ApprovalOutcome> {
+        if request
+            .run_id
+            .as_deref()
+            .is_some_and(|run_id| run_id != self.0.run_id)
+        {
+            return Err(tinybus::Error::failed(
+                "approval request belongs to a different workflow run",
+            ));
+        }
+        // OpenHuman persists graph-review rows through the module's parked run
+        // lifecycle. This callback preserves its idempotent pending contract;
+        // acting-tool approvals still use the host SecurityApprovalGate.
+        Ok(runs::ApprovalOutcome::Pending)
+    }
+
+    async fn approval_cancel(&self, _request: runs::ApprovalCancelRequest) -> tinybus::Result<()> {
+        // The module owns durable graph-review row retirement and sends this
+        // callback only as lifecycle notification.
+        Ok(())
+    }
+}
+
+fn valid_agent_request_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 128
+}
+
+#[cfg(test)]
+#[path = "service_tests.rs"]
+mod tests;
             }
         });
         Ok(runs::AgentRunHandle { handle })
