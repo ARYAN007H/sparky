@@ -254,13 +254,18 @@ fn assert_force_next_run_updates_collection(
         seed_docs
             .ensure_collection(&CollectionSpec::new(collection))
             .await?;
+        let seeded_job = if collection == "cron_jobs" {
+            json!({
+                "next_run": "2030-01-01T00:00:00Z",
+                "next_run_ms": 1_893_456_000_000_i64,
+                "next_run_ns": 1_893_456_000_000_000_000_i64,
+                "marker": "keep-me",
+            })
+        } else {
+            json!({ "next_run_ms": 123, "marker": "keep-me" })
+        };
         seed_docs
-            .put(
-                collection,
-                "seeded-job",
-                json!({ "next_run_ms": 123, "marker": "keep-me" }),
-                Precondition::Absent,
-            )
+            .put(collection, "seeded-job", seeded_job, Precondition::Absent)
             .await?;
         anyhow::Ok(())
     })
@@ -287,6 +292,15 @@ fn assert_force_next_run_updates_collection(
     let updated = updated.expect("seeded document remains present").doc;
     assert_eq!(updated["next_run_ms"], json!(456));
     assert_eq!(updated["marker"], json!("keep-me"));
+    if collection == "cron_jobs" {
+        assert_eq!(
+            chrono::DateTime::parse_from_rfc3339(updated["next_run"].as_str().unwrap())
+                .unwrap()
+                .timestamp_millis(),
+            456
+        );
+        assert_eq!(updated["next_run_ns"], json!(456_000_000));
+    }
     assert!(
         other.is_none(),
         "helper must not create or write {other_collection}"
