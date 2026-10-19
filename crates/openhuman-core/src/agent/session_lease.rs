@@ -44,6 +44,17 @@ pub(crate) struct SessionLease {
 }
 
 impl SessionLease {
+    pub(crate) async fn acquire_channel(
+        tenant: &crate::core::runtime::Tenant,
+        agent: &str,
+        session: &str,
+    ) -> Self {
+        let tenant_scope = crate::core::runtime::tenant::tenant_key(tenant, "");
+        Self::acquire(SessionLeaseKey::new(tenant_scope, agent, session), None)
+            .await
+            .expect("an unconditional session lease cannot be cancelled")
+    }
+
     pub(crate) async fn acquire(
         key: SessionLeaseKey,
         cancellation: Option<&CancellationToken>,
