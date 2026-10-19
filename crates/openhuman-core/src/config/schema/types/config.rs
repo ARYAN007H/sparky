@@ -11,7 +11,7 @@ use crate::config::schema::*;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ConfigDocumentSnapshot {
     pub version: Option<tinystoragedrivers::Version>,
-    pub anchor: Option<super::load::source::ConfigSourceAnchor>,
+    pub anchor: Option<super::super::load::source::ConfigSourceAnchor>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]

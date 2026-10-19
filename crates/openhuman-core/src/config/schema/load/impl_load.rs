@@ -412,7 +412,7 @@ impl Config {
         tracing::debug!(source = source.label(), "[config] saving config");
         let expected = expected_snapshot.version;
         let version = source.write_versioned(&toml_str, expected).await?;
-        *self.document_snapshot.lock().unwrap() = super::ConfigDocumentSnapshot {
+        *self.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
             version,
             anchor: Some(source_anchor.clone()),
         };
@@ -426,10 +426,11 @@ impl Config {
             let current_state = current.document_snapshot.lock().unwrap().clone();
             if current_state == expected_snapshot {
                 let mut published = self.clone();
-                *published.document_snapshot.lock().unwrap() = super::ConfigDocumentSnapshot {
-                    version,
-                    anchor: Some(source_anchor),
-                };
+                *published.document_snapshot.lock().unwrap() =
+                    super::super::ConfigDocumentSnapshot {
+                        version,
+                        anchor: Some(source_anchor),
+                    };
                 *current = published;
             }
         }
