@@ -171,3 +171,125 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         );
     }
 }
+
+#[tokio::test]
+async fn published_module_public_import_uses_authoring_bus_in_a_cold_process() {
+    const CHILD_ENV: &str = "OPENHUMAN_TINYFLOWS_IMPORT_CHILD";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "published_module_public_import_uses_authoring_bus_in_a_cold_process",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD_ENV, "1")
+            .output()
+            .expect("run isolated published-module authoring test");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        print!("{stdout}");
+        eprint!("{stderr}");
+        let child_output = format!("{stdout}{stderr}");
+        assert!(output.status.success(), "published authoring child failed:\n{child_output}");
+        assert!(
+            child_output.contains("running 1 test")
+                && child_output.contains("published_module_public_import_uses_authoring_bus_in_a_cold_process ... ok")
+                && child_output.contains("1 passed; 0 failed"),
+            "child must prove exactly one public-import test ran:\n{child_output}"
+        );
+        return;
+    }
+
+    let _env_lock = env_guard::env_lock_async().await;
+    let temp = tempfile::tempdir().expect("isolated home and workspace");
+    let _home_guard = EnvVarGuard::set_to_path("HOME", temp.path());
+    let _backend_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+    let _api_key_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_API_KEY");
+    let _session_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_SESSION_TOKEN");
+    let _storage_guard = EnvVarGuard::unset("OPENHUMAN_STORAGE_URL");
+    let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
+    let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
+    let _tinyflows_source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYFLOWS");
+    let (library, digest) = published_tinyflows::staged_v0_8_26_module();
+    let workspace = temp.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("workspace directory");
+    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
+    let quoted_library = serde_json::to_string(library.to_str().expect("module path UTF-8"))
+        .expect("quoted module path");
+    let config_path = temp.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        format!(
+            "api_url = \"http://127.0.0.1:1\"\n\n[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_library}\n"
+        ),
+    )
+    .expect("module override config");
+    let config = openhuman_core::config::Config::load_from_config_path(&config_path, &workspace)
+        .await
+        .expect("load isolated config");
+    assert_eq!(
+        openhuman_core::modules::state_of("tinyflows"),
+        openhuman_core::modules::ModuleState::Available,
+        "cold process must begin with TinyFlows unresolved"
+    );
+
+    let imported = openhuman_core::flows::ops::flows_import(
+        &openhuman_core::core::runtime::DispatchCtx::unbound(),
+        &config,
+        serde_json::json!({
+            "name": "published import",
+            "nodes": [{"id":"trigger","kind":"trigger","name":"Trigger"}],
+            "edges": []
+        }),
+        Some("native".into()),
+    )
+    .await
+    .expect("public import must call the published Authoring.ImportGraph member");
+    assert_eq!(imported.value.graph.name, "published import");
+    assert_eq!(
+        openhuman_core::modules::state_of("tinyflows"),
+        openhuman_core::modules::ModuleState::Ready,
+        "public import must load the checksum-verified published module (sha256 {digest})"
+    );
+
+    // Catalog.ApprovalManifest owns migration of graph JSON too. This legacy
+    // null schema version was accepted by the previous public operation and
+    // must still reach the invocation-scoped host classifier over TinyBus.
+    let ctx = openhuman_core::core::runtime::DispatchCtx::unbound();
+    let legacy_graph = serde_json::json!({
+        "schema_version": null,
+        "name": "legacy approval manifest",
+        "nodes": [
+            {"id":"trigger","kind":"trigger","name":"Trigger"},
+            {"id":"request","kind":"http_request","name":"Request","config":{"url":"https://example.test","method":"GET"}}
+        ],
+        "edges": [{"from_node":"trigger","to_node":"request"}]
+    });
+    let manifest = openhuman_core::flows::ops::flows_approval_manifest(
+        &ctx,
+        &config,
+        None,
+        Some(legacy_graph.clone()),
+    )
+    .await
+    .expect("published Catalog.ApprovalManifest must migrate and classify the raw graph");
+    assert!(manifest.value["entries"].as_array().is_some_and(|entries| {
+        entries.iter().any(|entry| {
+            entry["tool_name"] == "flows_http_request" && entry["kind"] == "approvable"
+        })
+    }));
+
+    let mut disabled = config.clone();
+    disabled.components.tinyflows = false;
+    let error = openhuman_core::flows::ops::flows_approval_manifest(
+        &ctx,
+        &disabled,
+        None,
+        Some(legacy_graph),
+    )
+    .await
+    .expect_err("a failed Catalog operation must propagate instead of yielding an empty grant list");
+    assert!(error.contains("COMPONENT_DISABLED"), "{error}");
+}
