@@ -1,5 +1,5 @@
-//! `OpenHumanMemory`: the host adapter backing the tinyflows `memory` node's
-//! `tinyflows::caps::MemoryProvider` capability, over memory v2.
+//! `OpenHumanMemory`: the host adapter backing the module's `Memory*`
+//! callbacks, over memory v2.
 //!
 //! **No new permission path.** Every operation routes through the same
 //! [`enforce_node_tier_gate`] / [`gate_call_for_tier`] pair every other acting
