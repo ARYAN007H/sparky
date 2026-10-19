@@ -101,7 +101,6 @@ const RULES = [
 const allTodoSurfaces = (page: Page): Locator =>
   page.locator('[data-testid="todo-checklist"], [data-testid="todo-receipt"]');
 
-/** The pinned, always-current list above the composer. */
 /**
  * The per-tool-call transcript snapshots. Each `TodoListPart` has its own
  * receipt wrapper; the pinned task cards use the separate `todo-checklist` id.
@@ -121,7 +120,7 @@ async function expandSnapshotReceipts(page: Page): Promise<void> {
 }
 
 /**
- * One list's item states, in list order, as the element publishes them to
+ * One surface's item states, in list order, as the element publishes them to
  * assistive technology (`todo-list.tsx:126`).
  *
  * Reads the DOM directly rather than through a tolerant helper: a helper that
