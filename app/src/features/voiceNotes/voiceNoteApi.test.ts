@@ -9,6 +9,7 @@ import {
   readVoiceNoteMeta,
   storeVoiceNote,
   transcribeVoiceNote,
+  voiceNoteContentPart,
 } from './voiceNoteApi';
 
 const rpc = vi.hoisted(() => ({ callCoreRpc: vi.fn() }));
@@ -20,6 +21,32 @@ describe('voiceNoteApi', () => {
   beforeEach(() => {
     rpc.callCoreRpc.mockReset();
     voice.openhumanVoiceTranscribeBytes.mockReset();
+  });
+
+  it('keeps a recording as a typed voice-note part with its media and duration', async () => {
+    const part = await voiceNoteContentPart(
+      new Blob([new Uint8Array([0, 1, 2])], { type: 'audio/wav' }),
+      5000,
+      [0.2, 0.8]
+    );
+
+    expect(part).toEqual({
+      kind: 'voice_note',
+      voiceNote: {
+        codec: 'audio/wav',
+        durationMs: 5000,
+        waveform: [0.2, 0.8],
+        pushToTalk: false,
+        media: {
+          url: 'data:audio/wav;base64,AAEC',
+          kind: 'audio',
+          contentType: 'audio/wav',
+          codec: 'audio/wav',
+          durationMs: 5000,
+          sizeBytes: 3,
+        },
+      },
+    });
   });
 
   it('round-trips bytes through base64, including large buffers', () => {
