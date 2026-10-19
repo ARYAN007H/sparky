@@ -115,11 +115,12 @@ fn a_drifted_contract_constant_is_reported_as_a_mismatch() {
     feature = "web3",
     feature = "voice",
     feature = "hosting",
-    feature = "tinymemes"
+    feature = "tinymemes",
+    feature = "inbound-queues"
 ))]
 #[test]
-fn a_product_feature_build_carries_all_thirteen_records() {
-    assert_eq!(ALL.len(), 13);
+fn a_product_feature_build_carries_all_fourteen_records() {
+    assert_eq!(ALL.len(), 14);
     for id in [
         "tinycomputer",
         "tinysearch",
@@ -134,6 +135,7 @@ fn a_product_feature_build_carries_all_thirteen_records() {
         "tinyflows",
         "tinyhosts",
         "tinymemes",
+        "tinyeventqueues",
     ] {
         assert!(find(id).is_some(), "{id} missing from the registry");
     }
