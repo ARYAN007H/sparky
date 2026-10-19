@@ -213,3 +213,116 @@ async fn approval_manifest_discloses_agent_ref_nodes_only() {
         Some("harness")
     );
 }
+
+#[tokio::test]
+async fn approval_manifest_never_claims_trust_that_was_never_granted() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+
+    // A candidate graph carries no flow id, so there is no `flow_tool_trust`
+    // row to join against and nothing can legitimately be "already trusted" —
+    // whether or not this process happens to have an `ApprovalGate` installed.
+    let outcome = flows_approval_manifest(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        Some(manifest_graph_json()),
+    )
+    .await
+    .expect("manifest must compute for a candidate graph");
+
+    let already_trusted = outcome.value["already_trusted"]
+        .as_array()
+        .expect("already_trusted must be an array");
+    assert!(
+        already_trusted.is_empty(),
+        "already_trusted must never name a permission no grant was ever made for; \
+         the save+enable card renders these as authorized: {outcome:?}"
+    );
+
+    let gate_installed = outcome.value["gate_installed"]
+        .as_bool()
+        .expect("gate_installed must be a bool");
+    let missing: Vec<&str> = outcome.value["missing"]
+        .as_array()
+        .expect("missing must be an array")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    if gate_installed {
+        // Gate installed, no grants held: every approvable key is asked for.
+        assert!(
+            missing.contains(&"flows_http_request") && missing.contains(&"flows_code"),
+            "{missing:?}"
+        );
+    } else {
+        // No gate: nothing ever parks, so nothing is missing either — the two
+        // lists are empty together and `gate_installed` is the only signal.
+        assert!(missing.is_empty(), "{missing:?}");
+    }
+}
+
+#[tokio::test]
+async fn get_tool_contract_rejects_a_malformed_slug_before_any_catalog_fetch() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+
+    // Each of these fails the `<TOOLKIT>_<ACTION>` shape, so the guard must
+    // fire and no live catalog round trip may be attempted (these tests run
+    // without Composio credentials or network).
+    for slug in ["nodashhere", "   ", "_LEADING_UNDERSCORE", "GMAIL_"] {
+        let err = flows_get_tool_contract(&config, slug)
+            .await
+            .expect_err("a malformed slug must be rejected");
+        assert!(
+            err.contains("'<TOOLKIT>_<ACTION>'"),
+            "slug {slug:?} must get the malformed-slug message, got: {err}"
+        );
+    }
+
+    // The message names what the caller sent, not the trimmed form — a blank
+    // slug used to be reported as `slug ''`, naming nothing the caller typed.
+    let err = flows_get_tool_contract(&config, " nodashhere ")
+        .await
+        .expect_err("a malformed slug must be rejected");
+    assert!(
+        err.contains("slug ' nodashhere '"),
+        "the error must quote the caller's own slug, got: {err}"
+    );
+}
+
+#[test]
+fn toolkit_for_contract_slug_accepts_real_action_slugs() {
+    // Ordinary single-segment toolkit.
+    assert_eq!(
+        toolkit_for_contract_slug("GMAIL_SEND_EMAIL").as_deref(),
+        Some("gmail")
+    );
+    // Surrounding whitespace is tolerated, as it was before the guard.
+    assert_eq!(
+        toolkit_for_contract_slug("  GMAIL_SEND_EMAIL  ").as_deref(),
+        Some("gmail")
+    );
+    // Every multi-segment toolkit prefix ends in `_`, so a real action under
+    // one of them always has non-empty segments either side of its first `_`.
+    assert_eq!(
+        toolkit_for_contract_slug("ZOHO_MAIL_SEND_EMAIL").as_deref(),
+        Some("zoho_mail")
+    );
+    assert_eq!(
+        toolkit_for_contract_slug("ONE_DRIVE_UPLOAD_FILE").as_deref(),
+        Some("one_drive")
+    );
+    assert_eq!(
+        toolkit_for_contract_slug("MICROSOFT_TEAMS_SEND_MESSAGE").as_deref(),
+        Some("microsoft_teams")
+    );
+
+    // The shared helper stays permissive for its other callers — this stricter
+    // rule is this controller's, not `toolkit_from_slug`'s.
+    assert_eq!(
+        crate::integrations::composio::contract::toolkit_from_slug("nodashhere").as_deref(),
+        Some("nodashhere")
+    );
+    assert_eq!(toolkit_for_contract_slug("nodashhere"), None);
+}
