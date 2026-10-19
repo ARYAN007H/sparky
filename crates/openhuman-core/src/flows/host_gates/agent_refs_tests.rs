@@ -191,4 +191,3 @@ async fn agent_ref_gate_reads_the_registry_of_the_explicit_context() {
         "tenant B must not see tenant A's agent: {for_b:?}"
     );
 }
-
