@@ -1,9 +1,9 @@
-//! Agent chat turns: the full tool-using turn and the simple no-tools variant.
+//! Agent chat turns with the full tool-using harness.
 
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
-use crate::core::Outcome;
 use super::envelope::AgentChatReply;
+use crate::core::Outcome;
 
 use super::guards::{
     effective_agent_chat_origin, enforce_user_prompt_or_reject, grant_turn_cwd,
