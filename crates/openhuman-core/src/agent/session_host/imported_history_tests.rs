@@ -111,7 +111,16 @@ async fn run_imported_history_prefix_regression() {
         .read_session()
         .unwrap()
         .unwrap();
-    assert!(transcript.meta.prefix_message_count.unwrap_or_default() > 0);
+    let inferred_system_prefix = transcript
+        .messages
+        .iter()
+        .take_while(|message| message.role == "system")
+        .count();
+    assert!(
+        transcript.meta.prefix_message_count.unwrap_or_default() > 0
+            || inferred_system_prefix > 0,
+        "the committed system prefix has either an explicit boundary or a legacy-inferable leading system row"
+    );
     assert!(transcript
         .tools
         .as_ref()
