@@ -260,7 +260,10 @@ pub fn spawn_flows_boot_reconcile(ctx: std::sync::Arc<crate::core::runtime::Core
 async fn reconcile_flows_on_boot(
     dispatch: &crate::core::runtime::DispatchCtx,
 ) -> Result<usize, String> {
-    let config = dispatch.load_config().await.map_err(|error| error.to_string())?;
+    let config = dispatch
+        .load_config()
+        .await
+        .map_err(|error| error.to_string())?;
     Ok(crate::flows::recovery::sweep_orphaned_runs_on_boot(dispatch, &config).await)
 }
 

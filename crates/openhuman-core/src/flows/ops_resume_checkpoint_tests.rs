@@ -122,14 +122,16 @@ fn profile_dispatch(config: &Config, profile: &str) -> crate::core::runtime::Dis
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 
     let root = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
-    crate::core::runtime::DispatchCtx::new(root.derive_with(
-        ContextOverlay::new(
-            config.clone(),
-            DomainSet::full(),
-            crate::tools::toolpacks::ToolGroups::default(),
-        )
-        .profile(profile),
-    ))
+    crate::core::runtime::DispatchCtx::new(
+        root.derive_with(
+            ContextOverlay::new(
+                config.clone(),
+                DomainSet::full(),
+                crate::tools::toolpacks::ToolGroups::default(),
+            )
+            .profile(profile),
+        ),
+    )
 }
 
 async fn scoped_run_status(
@@ -219,7 +221,10 @@ async fn resume_uses_the_captured_profile_scope_for_identical_run_ids() {
         resumed_a.value["output"]["run"]["trigger"]["owner"],
         json!("owner-a")
     );
-    assert_eq!(scoped_run_status(&ctx_a, &config, run_id).await, "completed");
+    assert_eq!(
+        scoped_run_status(&ctx_a, &config, run_id).await,
+        "completed"
+    );
     assert_eq!(
         scoped_run_status(&ctx_b, &config, run_id).await,
         "pending_approval",
@@ -240,7 +245,10 @@ async fn resume_uses_the_captured_profile_scope_for_identical_run_ids() {
         resumed_b.value["output"]["run"]["trigger"]["owner"],
         json!("owner-b")
     );
-    assert_eq!(scoped_run_status(&ctx_b, &config, run_id).await, "completed");
+    assert_eq!(
+        scoped_run_status(&ctx_b, &config, run_id).await,
+        "completed"
+    );
 }
 
 /// Migration safety (T-M1 requirement #4): a `flow_runs` row written before
