@@ -39,11 +39,12 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
         "hello from mock",
     ]));
     let model_errors = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let recording_model = Arc::new(RecordingModel {
+        inner: Arc::clone(&model),
+        errors: Arc::clone(&model_errors),
+    });
     let _model = crate::inference::provider::factory::test_provider_override::install_model(
-        Arc::new(RecordingModel {
-            inner: Arc::clone(&model),
-            errors: Arc::clone(&model_errors),
-        }),
+        Arc::clone(&recording_model) as Arc<dyn ChatModel<()>>,
     );
     let temp = tempfile::tempdir().expect("temporary test workspace");
     let workspace_dir = temp.path().join("workspace");
@@ -89,6 +90,8 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     components.skills = false;
     components.flows = false;
     components.voice = true;
+    let mut host_overrides = crate::agent::host_overrides::HostOverrides::default();
+    host_overrides.model = Some(recording_model);
     let core_context = crate::core::runtime::CoreContext::for_test_with_components(components)
         .derive_with(
             crate::core::runtime::ContextOverlay::new(
@@ -97,7 +100,8 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
                 crate::tools::toolpacks::ToolGroups::none(),
             )
             .without_user_skill_roots()
-            .definitions(definitions),
+            .definitions(definitions)
+            .host_overrides(Arc::new(host_overrides)),
         );
     let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&core_context));
 
