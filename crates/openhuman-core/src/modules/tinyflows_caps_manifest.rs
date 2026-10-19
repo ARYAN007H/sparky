@@ -3,9 +3,7 @@
 use tinybus::{InterfaceName, InterfaceVersion, PeerManifest, Version};
 
 /// Whether `object` is a valid v2 CapsHost service object.
-pub(super) fn is_caps_host_v2(
-    object: &impl tinybus::service::Interface,
-) -> Result<bool, String> {
+pub(super) fn is_caps_host_v2(object: &impl tinybus::service::Interface) -> Result<bool, String> {
     let interface = tinybus::service::Interface::name(object);
     if interface.as_str() != tinyflows_bus::runs::CAPS_INTERFACE {
         return Ok(false);
@@ -20,9 +18,7 @@ pub(super) fn is_caps_host_v2(
 
 /// Add CapsHost v2 to the existing peer manifest without dropping its other
 /// identities, interfaces, or required contracts.
-pub(super) async fn announce_caps_host_v2(
-    connection: &tinybus::Connection,
-) -> Result<(), String> {
+pub(super) async fn announce_caps_host_v2(connection: &tinybus::Connection) -> Result<(), String> {
     static MANIFEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
     let _lock = MANIFEST_LOCK.lock().await;
     let interface = InterfaceName::new(tinyflows_bus::runs::CAPS_INTERFACE)
