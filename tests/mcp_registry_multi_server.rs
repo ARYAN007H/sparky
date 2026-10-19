@@ -7,10 +7,10 @@
 #![cfg(feature = "mcp")]
 
 use openhuman_core::config::{
-    schema::{ModuleOverride, ModulesConfig},
     Config,
+    schema::{ModuleOverride, ModulesConfig},
 };
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 const MODULE_ARTIFACT_ENV: &str = "OPENHUMAN_TINYMCP_TEST_MODULE";
 
@@ -18,9 +18,7 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
     let workspace = tempfile::tempdir().expect("temporary MCP workspace");
     let artifact = std::env::var_os(MODULE_ARTIFACT_ENV)
         .map(std::path::PathBuf::from)
-        .or_else(|| {
-            openhuman_core::modules::local_artifact("tinymcp")
-        })
+        .or_else(|| openhuman_core::modules::local_artifact("tinymcp"))
         .expect("the MCP test runner supplies the verified TinyMCP artifact")
         .canonicalize()
         .expect("TinyMCP artifact exists");
@@ -240,18 +238,22 @@ async fn failed_connect_does_not_block_healthy_peer() {
             .expect("server remains visible after connect attempt")
     };
     assert_eq!(status_for(bad)["status"], "error");
-    assert!(status_for(bad)["last_error"]
-        .as_str()
-        .is_some_and(|error| !error.is_empty()));
+    assert!(
+        status_for(bad)["last_error"]
+            .as_str()
+            .is_some_and(|error| !error.is_empty())
+    );
     assert_eq!(status_for(good)["status"], "connected");
     assert!(status_for(good)["last_error"].is_null());
 
     let all_tools =
         openhuman_core::mcp::registry::connections::all_connected_tools_for_config(&config).await;
     assert!(all_tools.iter().all(|(id, _, _)| id != bad));
-    assert!(all_tools
-        .iter()
-        .any(|(id, _, tool)| id == good && tool.name == "echo"));
+    assert!(
+        all_tools
+            .iter()
+            .any(|(id, _, tool)| id == good && tool.name == "echo")
+    );
     assert_eq!(
         call_echo(&config, good, "isolation-check").await,
         "isolation-check"
@@ -293,9 +295,11 @@ async fn disabled_server_contributes_no_tools_to_agent_surface() {
 
     let all_tools =
         openhuman_core::mcp::registry::connections::all_connected_tools_for_config(&config).await;
-    assert!(all_tools
-        .iter()
-        .any(|(id, _, tool)| id == live && tool.name == "echo"));
+    assert!(
+        all_tools
+            .iter()
+            .any(|(id, _, tool)| id == live && tool.name == "echo")
+    );
     assert!(all_tools.iter().all(|(id, _, _)| id != quiet));
     assert_eq!(
         call_echo(&config, live, "live-while-quiet").await,

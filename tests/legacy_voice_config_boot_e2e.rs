@@ -1,7 +1,7 @@
 //! A real CLI host boot must tolerate pre-removal voice settings without
 //! starting the retired always-on listeners.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
@@ -65,7 +65,10 @@ fn wait_healthy(server: &mut Server, base: &str) {
         if let Ok(Some(status)) = server.0.try_wait() {
             panic!("openhuman-core exited before health: {status}");
         }
-        assert!(Instant::now() < deadline, "openhuman-core did not become healthy");
+        assert!(
+            Instant::now() < deadline,
+            "openhuman-core did not become healthy"
+        );
         std::thread::sleep(Duration::from_millis(100));
     }
 }
@@ -143,7 +146,9 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
         "the fake credential must exercise credential-gated startup: {logs}"
     );
     assert!(
-        !logs.contains("[voice::") && !logs.contains("dictation listener") && !logs.contains("hotkey listener"),
+        !logs.contains("[voice::")
+            && !logs.contains("dictation listener")
+            && !logs.contains("hotkey listener"),
         "retired voice listener started during boot: {logs}"
     );
 }

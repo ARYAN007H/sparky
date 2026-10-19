@@ -6,14 +6,14 @@
 
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::session_support::{
-    resolve_backend_credential, BackendCredential,
+    BackendCredential, resolve_backend_credential,
 };
 use serde_json::Value;
 use tinychannels_bus::controllers::{
     ChannelReactionResult, ChannelThreadListResult, ChannelThreadResult,
 };
 
-use crate::client::{flatten_authed_error, BackendClient};
+use crate::client::{BackendClient, flatten_authed_error};
 
 /// A result type that keeps the backend payload when its shape is unknown.
 pub(super) trait RawFallback {
