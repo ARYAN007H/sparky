@@ -528,6 +528,16 @@ describe('createWalkthroughSteps', () => {
     expect(steps[0].target).toBe('[data-walkthrough="home-card"]');
   });
 
+  it('starts at the current chat entry without steps for removed home anchors', () => {
+    const steps = createWalkthroughSteps(vi.fn());
+    const targets = steps.map(step => step.target);
+
+    expect(steps).toHaveLength(7);
+    expect(steps[0].target).toBe('[data-walkthrough="chat-agent-panel"]');
+    expect(targets).not.toContain('[data-walkthrough="home-card"]');
+    expect(targets).not.toContain('[data-walkthrough="home-cta"]');
+  });
+
   it('last step targets chat-agent-panel', () => {
     const navigate = vi.fn();
     const steps = createWalkthroughSteps(navigate);
