@@ -21,7 +21,7 @@ fn approval_payload_home_path_is_redacted_before_persistence() {
 
     insert_pending(&config, &pending, "sess-A").unwrap();
     let stored = list_pending(&config).unwrap();
-    let cwd = stored[0]["args_redacted"]["cwd"].as_str().unwrap();
+    let cwd = stored[0].args_redacted["cwd"].as_str().unwrap();
     assert!(!cwd.contains("approval-user"), "stored {cwd}");
     assert!(cwd.contains("<HOME>"), "stored {cwd}");
     assert!(cwd.ends_with("/work/openhuman"), "stored {cwd}");
