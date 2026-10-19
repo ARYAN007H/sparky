@@ -180,6 +180,7 @@ impl Surface {
                 *round = interim_round.filter(|round| *round > 0);
             }
         }
+        eprintln!("surface publish: {} thread={} projected={projected}", event.event_name(), event.context().thread_id);
         publish_web_channel_event_in(&self.ctx, event);
     }
 
@@ -234,6 +235,7 @@ impl Surface {
             }
         };
         let terminal = projected.events.iter().any(is_terminal);
+        eprintln!("surface module returned {} events", projected.events.len());
         for event in projected.events {
             self.publish(event, interim_round, true);
         }
