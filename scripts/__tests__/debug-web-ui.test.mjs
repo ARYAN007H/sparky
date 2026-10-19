@@ -4,12 +4,23 @@ import test from "node:test";
 
 import {
   devConnectUrl,
+  mergeChildEnv,
   freePort,
   isLoopback,
   parseArgs,
   runStamp,
   waitFor,
 } from "../debug/web-ui-lib.mjs";
+
+test("mergeChildEnv overrides and removes inherited variables", () => {
+  assert.deepEqual(
+    mergeChildEnv(
+      { KEEP: "parent", REMOVE: "credential", OVERRIDE: "parent" },
+      { REMOVE: null, OVERRIDE: "private", ADD: "value" },
+    ),
+    { KEEP: "parent", OVERRIDE: "private", ADD: "value" },
+  );
+});
 
 test("parseArgs defaults to an interactive, signed-in run that builds the core", () => {
   assert.deepEqual(parseArgs([]), {
