@@ -173,8 +173,6 @@ async fn run_channel_reply_loop(
     session: tokio_util::sync::CancellationToken,
     reply: &dyn ProgressiveReplySink,
 ) {
-    let timeout = tokio::time::Duration::from_secs(180);
-    let deadline = tokio::time::Instant::now() + timeout;
     let mut pending = Vec::with_capacity(32);
     let mut batch_timer = tokio::time::interval(tokio::time::Duration::from_millis(20));
     batch_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -187,11 +185,6 @@ async fn run_channel_reply_loop(
                     tracing::error!("[channel-inbound] delivery failed: {error}");
                     return;
                 }
-            }
-            _ = tokio::time::sleep_until(deadline) => {
-                tracing::error!("[channel-inbound] agent timed out after {}s", timeout.as_secs());
-                let _ = reply.finalize("Sorry, the request timed out.").await;
-                return;
             }
             event = event_rx.recv() => {
                 match event {
