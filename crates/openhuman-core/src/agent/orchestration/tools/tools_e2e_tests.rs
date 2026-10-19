@@ -2,7 +2,6 @@ use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool};
 use crate::agent::harness::ParentExecutionContext;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::integrations::ConnectedIntegration;
-use crate::threads::store as conversations;
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use serde_json::json;
@@ -16,7 +15,6 @@ use tinytools_agent::dialect::ToolCallFormat;
 
 const SPAWN_SUBAGENT_CANARY: &str = "tool-e2e-spawn-subagent-canary";
 const ARCHETYPE_DELEGATION_CANARY: &str = "tool-e2e-archetype-delegation-canary";
-const WORKER_THREAD_CANARY: &str = "tool-e2e-worker-thread-canary";
 
 #[tokio::test]
 async fn spawn_subagent_tool_runs_child_agent_e2e() {
