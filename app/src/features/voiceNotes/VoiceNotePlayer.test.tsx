@@ -99,13 +99,18 @@ describe('VoiceNotePlayer', () => {
     window.addEventListener('voice-note-mascot', onPlayback);
     fireEvent.click(screen.getByTestId('voice-note-toggle'));
     await waitFor(() => expect(onPlayback).toHaveBeenCalled());
-    expect(onPlayback.mock.calls.at(-1)?.[0].detail).toEqual({ active: true, viseme: 'aa' });
+    const owner = onPlayback.mock.calls.at(-1)?.[0].detail.owner;
+    expect(onPlayback.mock.calls.at(-1)?.[0].detail).toMatchObject({ active: true, viseme: 'aa' });
     fireEvent.click(screen.getByTestId('voice-note-toggle'));
-    await waitFor(() => expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(false));
+    await waitFor(() =>
+      expect(onPlayback.mock.calls.at(-1)?.[0].detail).toMatchObject({ owner, active: false })
+    );
     fireEvent.click(screen.getByTestId('voice-note-toggle'));
-    await waitFor(() => expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(true));
+    await waitFor(() =>
+      expect(onPlayback.mock.calls.at(-1)?.[0].detail).toMatchObject({ owner, active: true })
+    );
     unmount();
-    expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(false);
+    expect(onPlayback.mock.calls.at(-1)?.[0].detail).toMatchObject({ owner, active: false });
     window.removeEventListener('voice-note-mascot', onPlayback);
   });
 
