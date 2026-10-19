@@ -356,6 +356,14 @@ async fn wait_for_completion(state: &MockState, count: usize) {
     .await;
 }
 
+fn model_saw_user_text(request: &Value, text: &str) -> bool {
+    request["messages"].as_array().is_some_and(|messages| {
+        messages.iter().any(|message| {
+            message["role"] == "user" && message["content"].as_str() == Some(text)
+        })
+    })
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     let tmp = tempfile::tempdir().expect("temporary core home");
@@ -374,6 +382,19 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     let first_pid = first.0.id();
     push_update(&mocks.state, 100, 10, FIRST_TEXT);
     wait_for_completion(&mocks.state, 1).await;
+    let first_request = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .first()
+        .cloned()
+        .expect("first Telegram update reached the model");
+    assert!(
+        model_saw_user_text(&first_request, FIRST_TEXT),
+        "the first process must reach the model through native Telegram ingress: {}",
+        serde_json::to_string_pretty(&first_request).unwrap()
+    );
     // Telegram only acknowledges a delivered update after the client advances
     // its polling offset; wait for that protocol step before stopping process 1.
     wait_until("Telegram acknowledgement of first update", || {
@@ -413,13 +434,8 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         .lock()
         .expect("model requests")
         .clone();
-    let second_messages = requests[1]["messages"]
-        .as_array()
-        .expect("OpenAI-compatible messages");
     assert!(
-        second_messages.iter().any(|message| {
-            message["role"] == "user" && message["content"].as_str() == Some(FIRST_TEXT)
-        }),
+        model_saw_user_text(&requests[1], FIRST_TEXT),
         "the restarted process must resume the first Telegram turn in the exact second model request; got {}",
         serde_json::to_string_pretty(&requests[1]).unwrap()
     );
