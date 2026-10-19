@@ -92,7 +92,7 @@ mod search_path;
 pub(crate) mod site_memory_host;
 mod source;
 #[cfg(feature = "modules")]
-mod storage_grant_schemas;
+pub(crate) mod storage_grant_schemas;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
 #[cfg(feature = "modules")]
