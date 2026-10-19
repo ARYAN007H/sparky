@@ -560,7 +560,7 @@ async fn flows_resume_denying_a_gate_routes_to_its_error_port() {
 }
 
 #[tokio::test]
-async fn flows_resume_denying_a_gate_with_no_error_port_fails_the_run() {
+async fn flows_resume_returns_failed_step_output_when_denial_has_no_error_port() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     // `approval_gated_graph()` has only a `main` edge out of the gate — no
@@ -581,7 +581,7 @@ async fn flows_resume_denying_a_gate_with_no_error_port_fails_the_run() {
     .unwrap();
     let thread_id = run.value["thread_id"].as_str().unwrap().to_string();
 
-    let err = flows_resume(
+    let resumed = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
@@ -590,10 +590,12 @@ async fn flows_resume_denying_a_gate_with_no_error_port_fails_the_run() {
         vec!["gate".to_string()],
     )
     .await
-    .expect_err("denying a gate with no error port must fail the run");
+    .expect("step-level failure still has a successful engine outcome");
+    assert_eq!(resumed.value["pending_approvals"], json!([]));
+    assert_eq!(resumed.value["thread_id"], json!(thread_id));
     assert!(
-        err.contains("denied"),
-        "expected a denial error, got: {err}"
+        resumed.value["output"].is_object(),
+        "a failed step outcome must preserve the engine output in the legacy RPC response"
     );
 
     let reloaded = flows_get(&config, &created.value.id).await.unwrap();
