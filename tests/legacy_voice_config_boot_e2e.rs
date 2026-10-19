@@ -130,7 +130,10 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
         "openhuman.auth_set_credential",
         json!({"token":"th_test_local_only","kind":"api-key"}),
     );
-    assert!(credential.get("error").is_none(), "{credential}");
+    assert!(
+        credential.get("error").is_none(),
+        "installing the local test credential failed"
+    );
     let status = rpc(&base, "openhuman.voice_status", json!({}));
     assert!(status.get("error").is_none(), "{status}");
     assert_eq!(
@@ -143,12 +146,12 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
     let logs = std::fs::read_to_string(log_path).unwrap();
     assert!(
         logs.contains("login-gated services started concurrently"),
-        "the fake credential must exercise credential-gated startup: {logs}"
+        "the credential-gated startup completion record is missing"
     );
     assert!(
         !logs.contains("[voice::")
             && !logs.contains("dictation listener")
             && !logs.contains("hotkey listener"),
-        "retired voice listener started during boot: {logs}"
+        "retired voice listener startup record appeared during boot"
     );
 }
