@@ -38,13 +38,20 @@ pub async fn compute_approval_manifest(
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Result<Vec<Value>, String> {
+    compute_approval_manifest_json(ctx, config, serde_json::to_value(graph).map_err(|e| e.to_string())?).await
+}
+
+async fn compute_approval_manifest_json(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    graph: Value,
+) -> Result<Vec<Value>, String> {
     let registration = crate::flows::authoring_host::register(
         std::sync::Arc::new(config.clone()),
         ctx.clone(),
     )
     .await?;
     let proxy = crate::modules::tinyflows::catalog_proxy(config).await?;
-    let graph = serde_json::to_value(graph).map_err(|error| error.to_string())?;
     let entries: Vec<Value> = proxy
         .call(
             tinyflows_bus::catalog::members::APPROVAL_MANIFEST,
@@ -66,8 +73,7 @@ pub(crate) async fn approval_manifest_json(
     config: &Config,
     graph: Value,
 ) -> Result<Vec<Value>, String> {
-    let graph: WorkflowGraph = serde_json::from_value(graph).map_err(|error| error.to_string())?;
-    compute_approval_manifest(ctx, config, &graph).await
+    compute_approval_manifest_json(ctx, config, graph).await
 }
 
 /// RPC: the approval manifest for a saved flow (by `id`) or a candidate
@@ -91,13 +97,13 @@ pub async fn flows_approval_manifest(
                 .map_err(|e| e.to_string())?
                 .ok_or_else(|| format!("flow not found: {id}"))?;
             // `store::get_flow` already returns a migrated, deserialized graph.
-            (flow.graph, Some(id.to_string()))
+            (serde_json::to_value(flow.graph).map_err(|e| e.to_string())?, Some(id.to_string()))
         }
-        (None, Some(graph_json)) => (serde_json::from_value(graph_json).map_err(|e| e.to_string())?, None),
+        (None, Some(graph_json)) => (graph_json, None),
         (None, None) => return Err("provide 'id' or 'graph'".to_string()),
     };
 
-    let entries = compute_approval_manifest(ctx, config, &graph).await?;
+    let entries = compute_approval_manifest_json(ctx, config, graph).await?;
 
     let gate = crate::security::approval::ApprovalGate::try_global();
     let gate_installed = gate.is_some();
