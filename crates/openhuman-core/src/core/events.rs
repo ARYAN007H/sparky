@@ -405,15 +405,11 @@ pub enum DomainEvent {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tenant: Option<crate::core::runtime::Tenant>,
     },
-    /// Live per-step progress of an in-flight `flows_run` / `flows_resume`
-    /// (issue G2, live run observation). Published from
-    /// `flows::observability::FlowRunObserver::on_step_finish` as each
-    /// non-trigger node settles, so the Workflows UI can show a run advancing
-    /// node-by-node instead of only polling the settled `flow_runs` row. The
-    /// durable `flow_runs` row (updated incrementally by the same observer and
-    /// finalized at settle) remains the source of truth — this event is a
-    /// best-effort progress feed (broadcast bridges drop on lag), which is why
-    /// the frontend keeps its 2s poller as a fallback.
+    /// Live per-step progress of an in-flight `flows_run` / `flows_resume`.
+    /// The OpenHuman Runs adapter projects TinyFlows' ordered `step_started`
+    /// and `step` events so the Workflows UI can show a run advancing
+    /// node-by-node instead of only polling the module-owned run row. This is
+    /// a best-effort feed; the frontend keeps its 2s poller as a fallback.
     FlowRunProgress {
         /// The run's stable identifier (== the tinyflows checkpointer thread id).
         run_id: String,
@@ -423,14 +419,11 @@ pub enum DomainEvent {
         status: String,
     },
 
-    /// A `flows_run` (or `flows_resume`) invocation just persisted its
-    /// `flow_runs` row, before execution begins (issue B35, runs-rail live
-    /// refresh). Published from `flows::ops::flows_run` right after
-    /// `start_flow_run_row` returns, so the UI can show "Running" immediately
-    /// instead of waiting for the blocking RPC to resolve or the first
-    /// `FlowRunProgress` step. Covers every run source (Rpc/Schedule/AppEvent/
-    /// Resume, incl. copilot live-run) since they all funnel through
-    /// `start_flow_run_row`.
+    /// A `flows_run` (or `flows_resume`) invocation has started in the
+    /// TinyFlows Runs module, before execution begins. The OpenHuman Runs
+    /// adapter projects the module's `started` event so the UI can show
+    /// "Running" immediately instead of waiting for the blocking RPC or first
+    /// step event. Covers RPC, schedule, app-event, resume, and detached runs.
     FlowRunStarted {
         /// The affected flow's id.
         flow_id: String,
@@ -438,11 +431,10 @@ pub enum DomainEvent {
         run_id: String,
     },
 
-    /// The terminal companion to [`FlowRunStarted`] (issue B35 follow-up, runs
-    /// rail live finish). Published from `flows::ops::finish_flow_run_row`
-    /// right after `store::finish_flow_run` persists the terminal
-    /// `flow_runs` row, so the UI can flip a run to Completed/Failed live
-    /// instead of relying on a poll to notice the settled row.
+    /// The terminal companion to [`FlowRunStarted`]. The OpenHuman Runs
+    /// adapter publishes it once when PollRun returns the module's terminal
+    /// `finished` event, so the UI can update without waiting for its next
+    /// history poll.
     FlowRunFinished {
         /// The affected flow's id.
         flow_id: String,
