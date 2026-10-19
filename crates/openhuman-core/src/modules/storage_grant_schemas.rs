@@ -49,7 +49,7 @@ pub(crate) struct QueueGrant {
     pub backend: tinystoragedrivers::QueueConfig,
 }
 
-const ROWS: [Row; 6] = [
+const ROWS: &[Row] = &[
     Row {
         module: tinychannels::MODULE_ID,
         owner: "channels",
@@ -85,6 +85,16 @@ const ROWS: [Row; 6] = [
         owner: "juice",
         secrets: &[],
         queues: None,
+    },
+    // The inbound event queues keep their pipeline state in `teq.*`
+    // collections and their work in the queues the configured manifest
+    // declares (the shipped `queues.json` unless `[inbound] queues_path`).
+    #[cfg(feature = "inbound-queues")]
+    Row {
+        module: tinyeventqueues::MODULE_ID,
+        owner: tinyeventqueues_bus::storage::OWNER,
+        secrets: &[],
+        queues: Some(crate::inbound::queue_grant),
     },
 ];
 
@@ -161,6 +171,11 @@ pub(super) mod tinybox {
     pub(crate) const MODULE_ID: &str = "tinybox";
     /// The v1 jail-index collection the importer writes.
     pub(crate) const JAIL_INDEX_COLLECTION: &str = "tinybox_jail_index";
+}
+
+#[cfg(feature = "inbound-queues")]
+pub(super) mod tinyeventqueues {
+    pub(crate) const MODULE_ID: &str = "tinyeventqueues";
 }
 
 pub(super) mod tinyjuice {
