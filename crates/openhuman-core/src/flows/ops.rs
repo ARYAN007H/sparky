@@ -35,7 +35,6 @@
 use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
 
-use chrono::Utc;
 use serde_json::{json, Value};
 use tinyflows::model::{NodeKind, TriggerKind, WorkflowGraph};
 use tinyflows::triggers::graph_trigger_warnings;
@@ -49,17 +48,16 @@ pub(crate) use tinyflows_catalog::graph_policy::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin, TrustedAutomationSource};
+use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::flows::bus;
 use crate::flows::draft_store;
 use crate::flows::store;
-use crate::security::approval::{ApprovalChatContext, ApprovalTurnContext, FlowRunContext};
+use crate::security::approval::{ApprovalChatContext, ApprovalTurnContext};
 use tinyflows_catalog::build_registry;
-use tinyflows_catalog::run_registry;
 use tinyflows_catalog::types::{
-    FlowConnection, FlowRunStep, FlowRunTrigger, FlowSuggestion, SuggestionStatus,
+    FlowConnection, FlowRunTrigger, FlowSuggestion, SuggestionStatus,
 };
 use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 
@@ -76,6 +74,7 @@ const FLOW_RUN_TIMEOUT_SECS: u64 = 600;
 /// forever. The two are distinct mechanisms (flow runs execute as
 /// `TrustedAutomation { Workflow }`, which the tool-call gate lets through), so
 /// this is a dedicated flows-side TTL, not a reuse of the approval store's.
+#[cfg(test)]
 const FLOW_PARKED_TTL_SECS: i64 = tinyflows_catalog::run_management::PARKED_RUN_TTL_SECS;
 
 /// T-M1 fail-closed refusal: the graph hash pinned when this run parked no
@@ -84,6 +83,7 @@ const FLOW_PARKED_TTL_SECS: i64 = tinyflows_catalog::run_management::PARKED_RUN_
 /// `flows_resume` rejection so the UI/agent can tell a stale-approval refusal
 /// apart from an ordinary invalid-resume error and explain it plainly rather
 /// than surfacing a generic "resume failed".
+#[cfg(test)]
 const GRAPH_CHANGED_SINCE_PARK_ERROR: &str = "the workflow changed after this run was paused — \
      the pending approval no longer matches the current graph";
 
