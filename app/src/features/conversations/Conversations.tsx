@@ -1433,7 +1433,7 @@ const Conversations = ({
     // routed provider (managed cloud, BYOK, or a user-run local endpoint such
     // as Ollama configured under Connections → LLM).
     try {
-      const requestId = await chatSend({
+      await chatSend({
         threadId: sendingThreadId,
         message: messageText,
         ...(opts?.voicePart ? { attachments: [opts.voicePart] } : {}),
