@@ -398,6 +398,7 @@ fn only_modules_with_a_declared_grant_have_storage() {
                     | "tinychannels"
                     | "tinyconnectors"
                     | "tinywallet"
+                    | "tinyeventqueues"
                     | "tinybox"
                     | "tinyjuice"
             ),
@@ -504,5 +505,25 @@ fn the_write_selectors_track_the_contract_selector_sets() {
             "Streams.DeleteStream",
             "Streams.TruncateBefore",
         ]
+    );
+}
+
+/// The inbound event queues' grant is derived from their contract schema
+/// (the `teq.*` collections, with indexes) and carries the configured queue
+/// manifest, so the module can use both documents and queues.
+#[cfg(feature = "inbound-queues")]
+#[test]
+fn the_event_queues_grant_carries_their_collections_and_queues() {
+    let grant = declared("tinyeventqueues").expect("a grant");
+    assert!(grant.validate().is_ok());
+    assert_eq!(
+        grant.collections,
+        tinyeventqueues_bus::storage::collection_specs()
+    );
+    let manifest = grant.queues.expect("a queue manifest");
+    assert!(manifest.get("teq.ingress").is_some());
+    assert_eq!(
+        grant.queue_backend,
+        Some(tinystoragedrivers::QueueConfig::Storage)
     );
 }
