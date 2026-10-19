@@ -220,8 +220,8 @@ async fn screen_input_redacts_credentials_without_changing_screening_policy() {
 async fn screening_changes_only_the_new_user_row() {
     let gate = gate(AutonomyLevel::Full);
     let secret: String = [
-        's', 'k', '-', 'o', 'l', 'd', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+        's', 'k', '-', 'o', 'l', 'd', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
+        'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
     ]
     .into_iter()
     .collect();
@@ -239,7 +239,9 @@ async fn screening_changes_only_the_new_user_row() {
     assert!(!history[2].text().contains(&secret));
     assert!(history[2]
         .text()
-        .contains(&tinyinference_core::sanitize::scrub_credentials(&current_user)));
+        .contains(&tinyinference_core::sanitize::scrub_credentials(
+            &current_user
+        )));
 }
 
 #[tokio::test]

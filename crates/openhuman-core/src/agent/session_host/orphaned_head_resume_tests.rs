@@ -257,7 +257,11 @@ async fn credential_redaction_survives_resume() {
     // the screened row, without reintroducing the original input.
     let session_ref = tinyagents_session::transcript::SessionRef::scoped(
         "thread-credential-redaction",
-        persisted.meta.agent_id.clone().expect("host agent identity"),
+        persisted
+            .meta
+            .agent_id
+            .clone()
+            .expect("host agent identity"),
     );
     let (successor, compacted) = locator
         .begin_generation(&session_ref, persisted.meta.clone())
