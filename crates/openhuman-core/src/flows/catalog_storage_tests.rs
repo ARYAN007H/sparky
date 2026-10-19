@@ -247,6 +247,20 @@ async fn catalog_module_uses_captured_profile_and_storage_preserves_cas_metadata
         .unwrap();
     assert!(matches!(updated, CatalogStorageReply::Value { .. }));
 
+    let after_write: CatalogStorageReply = alice_bus
+        .call(catalog::storage::GET, &(get.clone(),))
+        .await
+        .unwrap();
+    let CatalogStorageReply::Value { value } = after_write else {
+        panic!("updated record remains readable");
+    };
+    let after_write: Option<CatalogVersionedDocument> = serde_json::from_value(value).unwrap();
+    assert_eq!(
+        after_write.unwrap().meta.created_ms,
+        record.meta.created_ms,
+        "write options preserve original creation metadata"
+    );
+
     let stale: CatalogStorageReply = alice_bus
         .call(catalog::storage::PUT, &(put,))
         .await
@@ -325,6 +339,16 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         .documents()
         .put(
             "graph.threads",
+            "flows/delete-me",
+            json!({"ns":"flows","thread":"delete-me","next":1}),
+            Precondition::Absent,
+        )
+        .await
+        .unwrap();
+    first
+        .documents()
+        .put(
+            "graph.threads",
             "other/bob-thread",
             json!({"ns":"other","thread":"bob-thread","next":1}),
             Precondition::Absent,
@@ -383,6 +407,58 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
     assert!(matches!(
         forbidden_get,
         CatalogStorageReply::Error { ref error } if error.kind == "invalid_input"
+    ));
+
+    let forbidden_put: CatalogStorageReply = proxy
+        .call(
+            catalog::storage::PUT,
+            &(DocPutRequest {
+                collection: "graph.threads".into(),
+                id: "other/attempted-write".into(),
+                doc: json!({"ns":"other"}),
+                precondition: CatalogDocumentPrecondition::None,
+                schema: 0,
+                expires_ms: None,
+                created_ms: None,
+            },),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        forbidden_put,
+        CatalogStorageReply::Error { ref error } if error.kind == "invalid_input"
+    ));
+
+    let forbidden_delete: CatalogStorageReply = proxy
+        .call(
+            catalog::storage::DELETE,
+            &(catalog::DocDeleteRequest {
+                collection: "graph.threads".into(),
+                id: "other/bob-thread".into(),
+                precondition: CatalogDocumentPrecondition::None,
+            },),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        forbidden_delete,
+        CatalogStorageReply::Error { ref error } if error.kind == "invalid_input"
+    ));
+
+    let deleted: CatalogStorageReply = proxy
+        .call(
+            catalog::storage::DELETE,
+            &(catalog::DocDeleteRequest {
+                collection: "graph.threads".into(),
+                id: "flows/delete-me".into(),
+                precondition: CatalogDocumentPrecondition::None,
+            },),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        deleted,
+        CatalogStorageReply::Value { ref value } if value == &Value::Bool(true)
     ));
 
     let backend_b: Arc<dyn StorageBackend> = Arc::new(crate::storage::MemoryStorage::new());
