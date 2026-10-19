@@ -380,7 +380,9 @@ pub(super) async fn close_if_needed(
     trace: Option<&Arc<SupplementalTrace>>,
 ) -> Option<GroundedClose> {
     let needs_cap_close = outcome.hit_cap && !outcome.wrap_up_injected;
-    let needs_final_close = outcome.text.trim().is_empty() || outcome.breaker_halt.is_some();
+    let needs_final_close = outcome.text.trim().is_empty()
+        || outcome.breaker_halt.is_some()
+        || outcome.failure_cause.is_some();
     if !needs_cap_close && !needs_final_close {
         return None;
     }
