@@ -216,6 +216,23 @@ async fn screen_input_redacts_credentials_without_changing_screening_policy() {
     assert_eq!(untrusted, ScreenOutcome::Pass);
 }
 
+#[tokio::test]
+async fn tool_screening_preserves_host_confirmation_tokens() {
+    let gate = gate(AutonomyLevel::Full);
+    let token = "00000000-0000-4000-8000-000000000123";
+    let response = format!(
+        r#"{{"status":"NeedsConfirmation","pending":{{"token":"{token}"}}}}"#
+    );
+
+    let outcome = gate
+        .screen_input(&response, ContentOrigin::Tool)
+        .await
+        .unwrap();
+
+    assert_eq!(outcome, ScreenOutcome::Pass);
+    assert_eq!(outcome.effective_text(&response), Some(response.as_str()));
+}
+
 /// A refused approval must reach the model as a Deny with a reason. Returned
 /// as `Prompted { approved: false }` it carried none, and the harness fell back
 /// to a bare "tool call was not approved" — after which the model redid the

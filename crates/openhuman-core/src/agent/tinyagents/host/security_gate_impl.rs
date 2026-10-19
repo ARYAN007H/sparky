@@ -81,6 +81,15 @@ impl SecurityGate for OpenHumanSecurityGate {
 
         match decision.action {
             PromptEnforcementAction::Allow => {
+                // Tool output has already crossed OpenHuman's tool-aware
+                // credential middleware. Re-running the generic scrubber
+                // here would redact the browser's host-minted confirmation
+                // token in a NeedsConfirmation response. Keep this gate's
+                // credential rewrite on user input; other origins retain the
+                // injection screen while their owning adapter handles secrets.
+                if origin != ContentOrigin::User {
+                    return Ok(ScreenOutcome::Pass);
+                }
                 let redacted = tinyinference_core::sanitize::scrub_credentials(text);
                 if redacted == text {
                     Ok(ScreenOutcome::Pass)
