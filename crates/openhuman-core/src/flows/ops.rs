@@ -34,7 +34,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyflows::model::{NodeKind, TriggerKind, WorkflowGraph};
 // The save/run safety predicates are `tinyflows-catalog`'s: whether a graph
 // fires unattended, whether it can act on the world, whether it has anything to
@@ -47,11 +47,11 @@ use crate::flows::bus;
 use crate::flows::draft_store;
 use crate::flows::store;
 use tinyflows_catalog::build_registry;
+#[cfg(test)]
+pub(crate) use tinyflows_catalog::graph_policy::graph_has_actionable_nodes;
 pub(crate) use tinyflows_catalog::graph_policy::{
     enforce_side_effect_approval, trigger_is_automatic,
 };
-#[cfg(test)]
-pub(crate) use tinyflows_catalog::graph_policy::graph_has_actionable_nodes;
 use tinyflows_catalog::types::{FlowConnection, FlowRunTrigger, FlowSuggestion, SuggestionStatus};
 use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 
