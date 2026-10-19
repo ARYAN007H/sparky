@@ -75,6 +75,44 @@ for (const [description, listing, code] of [
   });
 }
 
+test("the mock runner rejects a filter that matches no JSON-RPC test", () => {
+  const root = mkdtempSync(join(tmpdir(), "product-enumeration-filter-"));
+  try {
+    const cargo = join(root, "cargo");
+    writeFileSync(
+      cargo,
+      '#!/bin/bash\nif [[ " $* " == *" --list "* ]]; then echo "scenario_a: test"; exit 0; fi\nprintf "%s\\n" "$*" >> "$TEST_RAN"\n',
+      { mode: 0o755 },
+    );
+    const ran = join(root, "ran");
+    const result = spawnSync(
+      "bash",
+      [
+        "-c",
+        'set -euo pipefail\ncargo_test() { "$TEST_CARGO" "$@"; }\n' +
+          body +
+          '\nJSON_RPC_E2E_FILTER=definitely_no_matching_case run_json_rpc_e2e\n',
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          TEST_CARGO: cargo,
+          TEST_RAN: ran,
+        },
+      },
+    );
+    assert.notEqual(
+      result.status,
+      0,
+      "an unmatched filter must fail instead of silently skipping the suite",
+    );
+    assert.equal(existsSync(ran), false, "no test case should run for an unmatched filter");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("released TinyHosts contract callers match the declared libtest module", () => {
   const moduleSource = readFileSync(
     new URL("../../crates/openhuman-core/src/hosting/mod.rs", import.meta.url),
