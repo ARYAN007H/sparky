@@ -24,6 +24,7 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
       RUST_LOG: "trace",
     },
     {
+      repo: "/checkout/openhuman",
       workspace: "/private/run/workspace",
       mockUrl: "http://127.0.0.1:18500",
       token: "test-core-token",

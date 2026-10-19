@@ -165,6 +165,7 @@ async function main() {
   log(`mock backend   ${mockUrl}`);
 
   const coreLaunch = coreLaunchSpec(process.env, {
+    repo,
     workspace,
     mockUrl,
     token,
