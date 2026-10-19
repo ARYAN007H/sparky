@@ -211,25 +211,20 @@ fn spawn_test_bridge(
 /// "no response after 2 minutes" timeout (#4270).
 #[tokio::test(start_paused = true)]
 async fn emits_inference_heartbeat_while_turn_in_flight() {
-    eprintln!("heartbeat test: subscribe");
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-emit-4270";
     let request_id = "req-hb-emit-4270";
     let tx = spawn_test_bridge(thread_id, request_id);
-    eprintln!("heartbeat test: bridge spawned");
 
     // Turn begins — arms the liveness beat.
     tx.send(AgentProgress::TurnStarted).await.unwrap();
-    eprintln!("heartbeat test: start sent");
 
     // inference_start first, then a heartbeat after the interval elapses
     // (the paused clock auto-advances while the test awaits the bus).
     let start = recv_for_thread(&mut events, thread_id).await;
-    eprintln!("heartbeat test: got first {}", start.event_name());
     assert_eq!(start.event_name(), "inference_start");
 
     let beat = recv_for_thread(&mut events, thread_id).await;
-    eprintln!("heartbeat test: got second {}", beat.event_name());
     assert_eq!(beat.event_name(), "inference_heartbeat");
     assert_eq!(beat.context().thread_id, thread_id);
     assert_eq!(beat.context().request_id, request_id);
