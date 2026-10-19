@@ -234,15 +234,8 @@ fn approval_gated_graph_with_error_port() -> Value {
     })
 }
 
-// ── Live run observation (issue G2) ───────────────────────────────────────
-
-use crate::flows::tinyflows::observability::FlowRunObserver;
-use std::sync::Arc as StdArc;
-// `RunObserver` must be in scope to call `on_step_finish` on the observer.
-use tinyflows::observability::{ExecutionStep, RunObserver as _, StepStatus};
-
-/// trigger -> output_parser passthrough: the parser is a non-trigger node, so
-/// the engine fires `on_step_finish` for it, exercising live persistence.
+/// trigger -> output_parser passthrough for the module-owned run integration
+/// tests in `ops_run_rows_and_notifications_tests.rs`.
 fn passthrough_graph() -> Value {
     json!({
         "name": "passthrough",

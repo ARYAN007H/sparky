@@ -184,12 +184,6 @@ pub(crate) fn build_flow_connections(
     out
 }
 
-/// Return the trimmed nonempty name from a flow picker HTTP reference.
-pub(crate) fn http_credential_name(connection_ref: &str) -> Option<&str> {
-    let name = connection_ref.strip_prefix("http_cred:")?.trim();
-    (!name.is_empty()).then_some(name)
-}
-
 /// Human-readable picker label for a named HTTP credential, e.g.
 /// `"stripe (bearer)"`. Only the (non-secret) name + scheme — never the value.
 fn http_credential_display(cred: &crate::security::credentials::HttpCredentialSummary) -> String {

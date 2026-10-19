@@ -400,10 +400,6 @@ fn build_flow_connections_emits_parseable_refs_for_both_kinds() {
     let stripe = &out[1];
     assert_eq!(stripe.kind, "http");
     assert_eq!(stripe.connection_ref, "http_cred:stripe");
-    assert_eq!(
-        crate::flows::ops::connections::http_credential_name(&stripe.connection_ref),
-        Some("stripe")
-    );
     assert_eq!(stripe.scheme.as_deref(), Some("bearer"));
     assert_eq!(stripe.display, "stripe (bearer)");
     assert!(stripe.toolkit.is_none());
