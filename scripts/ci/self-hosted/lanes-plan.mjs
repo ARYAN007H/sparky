@@ -354,7 +354,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           name: "scripts-self-tests",
           when: areas.scripts,
           needs: ["pnpm-install"],
-          run: "pnpm test:scripts",
+          run: "pnpm test:scripts && node scripts/ci/check-browser-test-skips.mjs",
         },
       ],
     },
