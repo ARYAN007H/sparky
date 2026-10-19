@@ -36,12 +36,15 @@ pub(crate) struct RunSession {
     pub(super) bindings: std::sync::RwLock<Arc<RunBindings>>,
     pub(super) config: Arc<Config>,
     pub(super) flow: tokio::sync::RwLock<Flow>,
+    flow_id: String,
     pub(super) trigger: Mutex<FlowRunTrigger>,
     pub(super) run_id: String,
     cursor: std::sync::atomic::AtomicU64,
     poll_lock: tokio::sync::Mutex<()>,
     watchers: Mutex<Vec<tokio::sync::mpsc::UnboundedSender<RunEvent>>>,
-    started: std::sync::atomic::AtomicBool,
+    poller_started: std::sync::atomic::AtomicBool,
+    started_event: std::sync::atomic::AtomicBool,
+    finished_event: std::sync::atomic::AtomicBool,
     observations: Mutex<Vec<tinyagents_graph::GraphObservation>>,
 }
 
@@ -58,6 +61,7 @@ impl RunSession {
     ) -> Arc<Self> {
         Arc::new(Self {
             run_id: bindings.run_id.clone(),
+            flow_id: bindings.flow_id.clone(),
             bindings: std::sync::RwLock::new(bindings),
             config,
             flow: tokio::sync::RwLock::new(flow),
@@ -65,7 +69,9 @@ impl RunSession {
             cursor: std::sync::atomic::AtomicU64::new(cursor),
             poll_lock: tokio::sync::Mutex::new(()),
             watchers: Mutex::new(Vec::new()),
-            started: std::sync::atomic::AtomicBool::new(false),
+            poller_started: std::sync::atomic::AtomicBool::new(false),
+            started_event: std::sync::atomic::AtomicBool::new(false),
+            finished_event: std::sync::atomic::AtomicBool::new(false),
             observations: Mutex::new(Vec::new()),
         })
     }
@@ -127,14 +133,43 @@ impl RunSession {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = bindings;
     }
 
+    pub(super) fn current_bindings(&self) -> Arc<RunBindings> {
+        Arc::clone(
+            &self
+                .bindings
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+
     pub(super) async fn replace_flow(&self, flow: Flow) {
         *self.flow.write().await = flow;
+    }
+
+    pub(super) async fn flow(&self) -> Flow {
+        self.flow.read().await.clone()
+    }
+
+    pub(super) fn flow_id(&self) -> &str {
+        &self.flow_id
+    }
+
+    pub(super) fn mark_started(&self) -> bool {
+        !self
+            .started_event
+            .swap(true, std::sync::atomic::Ordering::AcqRel)
+    }
+
+    pub(super) fn mark_finished(&self) -> bool {
+        !self
+            .finished_event
+            .swap(true, std::sync::atomic::Ordering::AcqRel)
     }
 
     /// Start the one PollRun task for this process/run owner.
     pub(super) fn start_polling(self: &Arc<Self>, proxy: tinybus::Proxy) {
         if self
-            .started
+            .poller_started
             .swap(true, std::sync::atomic::Ordering::AcqRel)
         {
             return;

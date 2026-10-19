@@ -22,12 +22,13 @@ use crate::modules::tinyflows as module;
 
 const RUN_TIMEOUT_MS: u64 = 600_000;
 
-pub(crate) use session::{RunKey, RunSession, run_bindings};
+pub(crate) use session::{RunKey, RunSession};
 
 /// Callback authorities retained for one owner-scoped flow run.
 pub(crate) struct RunBindings {
     catalog: Arc<CatalogStorageRegistration>,
     caps: Arc<CapsHostRegistration>,
+    pub(crate) flow: Flow,
     pub(crate) flow_id: String,
     pub(crate) run_id: String,
     pub(crate) require_approval: bool,
@@ -61,21 +62,28 @@ pub(crate) struct RunOutcome {
 /// Typed result returned to the existing `flows_resume` controller.
 pub(crate) type ResumeOutcome = RunOutcome;
 
+/// Return the retained bindings only for the exact owner scope and opaque run
+/// id. This key is shared with the module's live Poll/Cancel owner identity.
+pub(crate) fn run_bindings(
+    storage: &tinyflows_bus::catalog::CatalogStorage,
+    run_id: &str,
+) -> Option<Arc<RunBindings>> {
+    session::get(storage, run_id).map(|session| session.current_bindings())
+}
+
 /// Retain one run's owner callback and its per-run capability callback.
 pub(crate) async fn register_bindings(
     ctx: &DispatchCtx,
     config: &Config,
-    flow_id: &str,
+    flow: &Flow,
     run_id: &str,
-    require_approval: bool,
 ) -> Result<Arc<RunBindings>, String> {
     let catalog = catalog_storage::register(ctx, config).await?;
     register_with_catalog(
         ctx,
         config,
-        flow_id,
+        flow,
         run_id,
-        require_approval,
         catalog,
     )
     .await
@@ -84,26 +92,26 @@ pub(crate) async fn register_bindings(
 async fn register_with_catalog(
     ctx: &DispatchCtx,
     config: &Config,
-    flow_id: &str,
+    flow: &Flow,
     run_id: &str,
-    require_approval: bool,
     catalog: Arc<CatalogStorageRegistration>,
 ) -> Result<Arc<RunBindings>, String> {
     let caps = caps_host::serve(
         ctx.clone(),
         Arc::new(config.clone()),
-        flow_id.to_owned(),
+        flow.id.clone(),
         run_id.to_owned(),
-        require_approval,
+        flow.require_approval,
         Arc::clone(&catalog),
     )
     .await?;
     Ok(Arc::new(RunBindings {
         catalog,
         caps: Arc::new(caps),
-        flow_id: flow_id.to_owned(),
+        flow: flow.clone(),
+        flow_id: flow.id.clone(),
         run_id: run_id.to_owned(),
-        require_approval,
+        require_approval: flow.require_approval,
     }))
 }
 
@@ -117,14 +125,7 @@ pub(crate) async fn start_run(
     inputs: serde_json::Map<String, Value>,
     trigger: FlowRunTrigger,
 ) -> Result<(Arc<RunSession>, tokio::sync::mpsc::UnboundedReceiver<runs::RunEvent>), String> {
-    let bindings = register_bindings(
-        ctx,
-        config,
-        &flow.id,
-        run_id,
-        flow.require_approval,
-    )
-    .await?;
+    let bindings = register_bindings(ctx, config, flow, run_id).await?;
     let session = RunSession::new(
         Arc::clone(&bindings),
         Arc::new(config.clone()),
@@ -213,6 +214,253 @@ pub(crate) async fn wait_for_outcome(
             _ => {}
         }
     }
+}
+
+/// Bind a fresh resume capability to the current owner and verify the parked
+/// run is visible in that same CatalogStorage scope.
+pub(crate) async fn register_resume_bindings(
+    ctx: &DispatchCtx,
+    config: &Config,
+    flow_id: &str,
+    run_id: &str,
+    require_approval: bool,
+) -> Result<Arc<RunBindings>, String> {
+    use tinyflows_bus::catalog::{self, FlowRun as WireRun, Workflow};
+
+    let catalog = catalog_storage::register(ctx, config).await?;
+    let storage = catalog.storage();
+    let runs = module::catalog_proxy(config).await?;
+    let run: Option<WireRun> = runs
+        .call(
+            catalog::members::GET_RUN,
+            (catalog::RunIdRequest {
+                storage: storage.clone(),
+                id: run_id.to_owned(),
+            },),
+        )
+        .await
+        .map_err(|error| error.wire_message())?;
+    let run = run.ok_or_else(|| format!("flow run '{run_id}' not found"))?;
+    if run.flow_id != flow_id {
+        return Err(format!("flow run '{run_id}' does not belong to flow '{flow_id}'"));
+    }
+    if run.status != "pending_approval" {
+        return Err(format!("flow run '{run_id}' is not waiting for approval"));
+    }
+
+    let workflow: Option<Workflow> = runs
+        .call(
+            catalog::members::GET_WORKFLOW,
+            (storage, flow_id.to_owned()),
+        )
+        .await
+        .map_err(|error| error.wire_message())?;
+    let flow: Flow = crate::flows::store::roundtrip(
+        workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?,
+    )
+    .map_err(|error| format!("decode workflow for resume: {error}"))?;
+    if flow.require_approval != require_approval {
+        return Err("workflow approval policy changed during resume".to_string());
+    }
+
+    if let Some(session) = session::get(&catalog.storage(), run_id) {
+        if session.flow_id() != flow_id {
+            return Err(format!("flow run '{run_id}' is bound to a different workflow"));
+        }
+    }
+    register_with_catalog(ctx, config, &flow, run_id, catalog).await
+}
+
+/// Resume a parked module run and await only the next segment's parked or
+/// terminal event. The prior parked cursor is drained before admission so a
+/// process-restarted waiter cannot mistake an earlier `parked` event for the
+/// result of this resume.
+pub(crate) async fn resume_and_wait(
+    ctx: &DispatchCtx,
+    config: &Config,
+    request: ResumeRun,
+    candidate: Arc<RunBindings>,
+) -> Result<ResumeOutcome, String> {
+    let storage = request.storage.clone();
+    let key = RunKey::new(&storage, &request.run_id);
+    let proxy = module::runs_proxy(config).await?;
+    let (session, inserted) = match session::get(&storage, &request.run_id) {
+        Some(session) => (session, false),
+        None => {
+            let session = RunSession::new(
+                Arc::clone(&candidate),
+                Arc::new(config.clone()),
+                candidate.flow.clone(),
+                FlowRunTrigger::Resume,
+                0,
+            );
+            if session.drain(&proxy, false).await? {
+                return Err(format!("flow run '{}' is already finished", request.run_id));
+            }
+            session::insert(Arc::clone(&session))?;
+            (session, true)
+        }
+    };
+
+    if !inserted {
+        session.drain(&proxy, true).await?;
+    }
+    let baseline = session.cursor();
+    let mut receiver = session.subscribe();
+    let resumed: runs::ResumeRunResponse = match proxy
+        .call(runs::methods::RESUME_RUN, (request.clone(),))
+        .await
+    {
+        Ok(resumed) => resumed,
+        Err(error) => {
+            if inserted {
+                session::remove(&session);
+            }
+            return Err(error.wire_message());
+        }
+    };
+    if resumed.run_id != request.run_id {
+        if inserted {
+            session::remove(&session);
+        }
+        return Err("TinyFlows resumed a different run id".to_string());
+    }
+
+    session.replace_flow(candidate.flow.clone()).await;
+    session.set_trigger(FlowRunTrigger::Resume);
+    session.replace_bindings(candidate).await;
+    session.start_polling(proxy);
+    let _ = ctx;
+    wait_for_outcome(&mut receiver, &request.run_id, baseline).await
+}
+
+/// Cancel a run through its exact owner-scoped CatalogStorage callback.
+pub(crate) async fn cancel_run(
+    config: &Config,
+    storage: tinyflows_bus::catalog::CatalogStorage,
+    run_id: &str,
+) -> Result<(bool, bool), String> {
+    let active = session::get(&storage, run_id);
+    let proxy = module::runs_proxy(config).await?;
+    let response: runs::CancelRunResponse = proxy
+        .call(
+            runs::methods::CANCEL_RUN,
+            (runs::RunControlRequest {
+                storage,
+                run_id: run_id.to_owned(),
+                cursor: 0,
+            },),
+        )
+        .await
+        .map_err(|error| error.wire_message())?;
+    let was_in_flight = response.signalled && active.is_some();
+    Ok((response.signalled, was_in_flight))
+}
+
+/// Expire parked runs in a scope, then drain their terminal events through the
+/// same projector used by active sessions.
+pub(crate) async fn expire_parked(
+    ctx: &DispatchCtx,
+    config: &Config,
+    catalog: Arc<CatalogStorageRegistration>,
+) -> Result<runs::ExpireParkedResponse, String> {
+    let proxy = module::runs_proxy(config).await?;
+    let response: runs::ExpireParkedResponse = proxy
+        .call(
+            runs::methods::EXPIRE_PARKED,
+            (runs::ExpireParked {
+                storage: catalog.storage(),
+            },),
+        )
+        .await
+        .map_err(|error| error.wire_message())?;
+    for (run_id, _) in &response.expired {
+        after_recovery(&catalog, run_id, config).await?;
+    }
+    let _ = ctx;
+    Ok(response)
+}
+
+/// Sweep orphaned runs in this scope and project only rows changed by the
+/// module's winning compare-and-swap.
+pub(crate) async fn boot_sweep(
+    ctx: &DispatchCtx,
+    config: &Config,
+    catalog: Arc<CatalogStorageRegistration>,
+) -> Result<runs::BootSweepResponse, String> {
+    let proxy = module::runs_proxy(config).await?;
+    let response: runs::BootSweepResponse = proxy
+        .call(
+            runs::methods::BOOT_SWEEP,
+            (runs::BootSweep {
+                storage: catalog.storage(),
+                shared_backend: crate::storage::installed_is_shared(),
+            },),
+        )
+        .await
+        .map_err(|error| error.wire_message())?;
+    for run_id in &response.interrupted {
+        after_recovery(&catalog, run_id, config).await?;
+    }
+    let _ = ctx;
+    Ok(response)
+}
+
+/// Project a recovered terminal event without reconstructing run state in the
+/// host. The storage address remains part of the dedupe key and data lookup.
+pub(crate) async fn after_recovery(
+    catalog: &Arc<CatalogStorageRegistration>,
+    run_id: &str,
+    config: &Config,
+) -> Result<(), String> {
+    let storage = catalog.storage();
+    if let Some(session) = session::get(&storage, run_id) {
+        let proxy = module::runs_proxy(config).await?;
+        let _ = session.drain(&proxy, true).await?;
+        return Ok(());
+    }
+
+    let key = RunKey::new(&storage, run_id);
+    let runs_proxy = module::runs_proxy(config).await?;
+    let catalog_proxy = module::catalog_proxy(config).await?;
+    let mut cursor = 0;
+    loop {
+        let page: runs::PollRun = runs_proxy
+            .call(
+                runs::methods::POLL_RUN,
+                (runs::RunControlRequest {
+                    storage: storage.clone(),
+                    run_id: run_id.to_owned(),
+                    cursor,
+                },),
+            )
+            .await
+            .map_err(|error| error.wire_message())?;
+        for event in &page.events {
+            if event.kind == "finished" {
+                let run: Option<tinyflows_bus::catalog::FlowRun> = catalog_proxy
+                    .call(
+                        tinyflows_bus::catalog::members::GET_RUN,
+                        (tinyflows_bus::catalog::RunIdRequest {
+                            storage: storage.clone(),
+                            id: run_id.to_owned(),
+                        },),
+                    )
+                    .await
+                    .map_err(|error| error.wire_message())?;
+                let flow_id = run
+                    .ok_or_else(|| format!("flow run '{run_id}' disappeared during recovery"))?
+                    .flow_id;
+                projection::project_recovered_finished(&key, &flow_id, run_id, event);
+            }
+            cursor = event.seq;
+        }
+        if page.done || page.events.is_empty() || page.next_cursor <= cursor {
+            break;
+        }
+        cursor = page.next_cursor;
+    }
+    Ok(())
 }
 
 fn finished_outcome(
