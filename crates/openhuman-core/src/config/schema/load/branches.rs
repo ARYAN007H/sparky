@@ -310,7 +310,7 @@ pub(super) async fn save_recovered(
     config.save().await?;
     if source.label() == "document" {
         let file = super::source::FileConfigSource::new(&config.config_path);
-        Box::pin(config.save_to(&file)).await?;
+        Box::pin(config.save_file_export(&file)).await?;
     }
     Ok(())
 }

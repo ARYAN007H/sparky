@@ -375,12 +375,36 @@ impl Config {
     /// Save into `source`. The loader also uses it to rewrite the local
     /// bootstrap file when a document-backed load recovered it.
     pub(super) async fn save_to(&self, source: &dyn super::source::ConfigSource) -> Result<()> {
+        self.save_to_inner(source, true).await
+    }
+
+    /// Persist a recovered local bootstrap file without changing the
+    /// document-backed snapshot that was just recovered and saved.
+    pub(super) async fn save_file_export(
+        &self,
+        source: &dyn super::source::ConfigSource,
+    ) -> Result<()> {
+        self.save_to_inner(source, false).await
+    }
+
+    async fn save_to_inner(
+        &self,
+        source: &dyn super::source::ConfigSource,
+        update_snapshot: bool,
+    ) -> Result<()> {
         let source_anchor = source.anchor();
         let expected_snapshot = self.document_snapshot.lock().unwrap().clone();
-        if expected_snapshot
-            .anchor
-            .as_ref()
-            .is_some_and(|anchor| anchor != &source_anchor)
+        let initial_file_import = matches!(
+            (&expected_snapshot.anchor, &source_anchor),
+            (
+                Some(super::source::ConfigSourceAnchor::File(path)),
+                super::source::ConfigSourceAnchor::Document { .. }
+            ) if path == &self.config_path && expected_snapshot.version.is_none()
+        );
+        if update_snapshot
+            && expected_snapshot.anchor.as_ref().is_some_and(|anchor| {
+                anchor != &source_anchor && !initial_file_import
+            })
         {
             return Err(tinystoragedrivers::StorageError::conflict(
                 "config snapshot belongs to a different persistence source",
@@ -410,8 +434,15 @@ impl Config {
             toml::to_string_pretty(&config_to_save).context("Failed to serialize config")?;
 
         tracing::debug!(source = source.label(), "[config] saving config");
-        let expected = expected_snapshot.version;
+        let expected = if update_snapshot {
+            expected_snapshot.version
+        } else {
+            None
+        };
         let version = source.write_versioned(&toml_str, expected).await?;
+        if !update_snapshot {
+            return Ok(());
+        }
         *self.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
             version,
             anchor: Some(source_anchor.clone()),
