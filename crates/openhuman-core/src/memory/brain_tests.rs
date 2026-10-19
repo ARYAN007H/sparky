@@ -205,7 +205,6 @@ async fn ingest_refuses_bad_input() {
     .is_err());
 }
 
-
 #[tokio::test]
 async fn ingest_rejects_path_and_text_together_without_ingesting() {
     let tmp = tempfile::tempdir().unwrap();
