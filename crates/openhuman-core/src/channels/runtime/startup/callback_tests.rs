@@ -13,16 +13,26 @@ use tinychannels_bus::module_progressive::{
 };
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, SendMessage};
 
-#[derive(Default)]
 struct RecordingChannel {
+struct RecordingChannel {
+    name: String,
     sent: tokio::sync::Mutex<Vec<ChannelOutboundMessage>>,
+}
+
+impl RecordingChannel {
+    fn new(name: &str) -> Self {
+        Self {
+            name: name.into(),
+            sent: tokio::sync::Mutex::new(Vec::new()),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 #[allow(deprecated)]
 impl Channel for RecordingChannel {
     fn name(&self) -> &str {
-        "telegram"
+        &self.name
     }
 
     async fn send(&self, _message: &SendMessage) -> anyhow::Result<()> {
@@ -112,8 +122,19 @@ fn callback_for_channels(
 
 #[tokio::test]
 async fn native_progressive_transport_dispatches_typed_content_through_configured_channel() {
-    let channel = Arc::new(RecordingChannel::default());
-    let (callback, _context) = callback_for(Arc::clone(&channel));
+    let other_account = Arc::new(RecordingChannel::new("telegram:bot-a"));
+    let selected_account = Arc::new(RecordingChannel::new("telegram:bot-b"));
+    let channels: HashMap<String, Arc<dyn Channel>> = HashMap::from([
+        (
+            other_account.name().to_owned(),
+            other_account.clone() as Arc<dyn Channel>,
+        ),
+        (
+            selected_account.name().to_owned(),
+            selected_account.clone() as Arc<dyn Channel>,
+        ),
+    ]);
+    let (callback, _context) = callback_for_channels(channels);
     let parts = vec![OutboundContentPart::Content {
         part: tinychannels_bus::ContentPart::Image {
             media: tinychannels_bus::MediaReference {
@@ -133,7 +154,7 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
                 turn_id: Some("turn-11".into()),
                 channel_ref: Some(tinychannels_bus::ChannelRef {
                     id: "telegram".into(),
-                    account_id: Some("bot-account-a".into()),
+                    account_id: Some("telegram:bot-b".into()),
                 }),
                 conversation: Some(tinychannels_bus::ConversationRef {
                     id: "chat-42".into(),
@@ -168,12 +189,13 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     assert_eq!(error.message, "one trailing segment was not delivered");
     assert!(error.sent_before_error);
     assert!(error.retryable);
-    let sent = channel.sent.lock().await;
+    assert!(other_account.sent.lock().await.is_empty());
+    let sent = selected_account.sent.lock().await;
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].channel_ref.as_ref().unwrap().id, "telegram");
     assert_eq!(
         sent[0].channel_ref.as_ref().unwrap().account_id.as_deref(),
-        Some("bot-account-a")
+        Some("telegram:bot-b")
     );
     assert_eq!(sent[0].conversation_id, "chat-42");
     assert_eq!(sent[0].conversation_ref.as_ref().unwrap().id, "chat-42");
@@ -194,8 +216,8 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
 
 #[tokio::test]
 async fn native_progressive_transport_rejects_unconfigured_account_without_provider_fallback() {
-    let first_account = Arc::new(RecordingChannel::default());
-    let second_account = Arc::new(RecordingChannel::default());
+    let first_account = Arc::new(RecordingChannel::new("telegram:bot-a"));
+    let second_account = Arc::new(RecordingChannel::new("telegram:bot-b"));
     let channels: HashMap<String, Arc<dyn Channel>> = HashMap::from([
         (
             "telegram:bot-a".into(),
