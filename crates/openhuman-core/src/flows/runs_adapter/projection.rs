@@ -1,11 +1,20 @@
 //! Project module-owned PollRun events onto OpenHuman events and Langfuse.
 
+use std::collections::{HashSet, VecDeque};
+use std::sync::{LazyLock, Mutex};
+
 use serde_json::Value;
 use tinyflows_bus::runs::{self, RunEvent};
 use tinyflows_catalog::types::FlowRunTrigger;
 
 use crate::core::events::DomainEvent;
 use crate::flows::runs_adapter::session::RunSession;
+use crate::flows::runs_adapter::RunKey;
+
+const RECENT_FINISHED_KEYS: usize = 4_096;
+
+static FINISHED_KEYS: LazyLock<Mutex<(HashSet<RunKey>, VecDeque<RunKey>)>> =
+    LazyLock::new(|| Mutex::new((HashSet::new(), VecDeque::new())));
 
 pub(super) async fn project(session: &RunSession, event: &RunEvent) {
     match event.kind.as_str() {
@@ -17,7 +26,10 @@ pub(super) async fn project(session: &RunSession, event: &RunEvent) {
                 });
             }
         }
-        "resumed" => session.set_trigger(FlowRunTrigger::Resume),
+        "resumed" => {
+            session.set_trigger(FlowRunTrigger::Resume);
+            session.mark_resumed();
+        }
         "step_started" => {
             if let Some(node_id) = event.data.get("node_id").and_then(Value::as_str) {
                 publish_step(session, node_id, "running");
@@ -42,11 +54,11 @@ pub(super) async fn project(session: &RunSession, event: &RunEvent) {
             ),
         },
         "agent_progress" => {
-            // The UI's existing workflow overlay is node-based. The detailed
-            // agent events stay on the module stream; consume them here so the
-            // shared cursor remains the sole owner of event ordering.
+            // Detailed agent events remain on the module stream. The OpenHuman
+            // workflow overlay consumes the node-level progress events above.
         }
         "parked" => {
+            session.mark_parked();
             let parked = match serde_json::from_value::<runs::RunParked>(event.data.clone()) {
                 Ok(parked) => parked,
                 Err(_) => {
@@ -78,17 +90,56 @@ pub(super) async fn project(session: &RunSession, event: &RunEvent) {
                     return;
                 }
             };
-            if session.mark_finished() {
+            if claim_finished(session.key()) {
                 crate::core::bus::BUS.publish(DomainEvent::FlowRunFinished {
                     flow_id: session.flow_id().to_owned(),
                     run_id: session.run_id.clone(),
                     status: finished.status.clone(),
                 });
+                export_segment(session, &finished.status).await;
             }
-            export_segment(session, &finished.status).await;
+            session.mark_finished();
         }
         _ => {}
     }
+}
+
+/// Project a recovery event when the run no longer has an in-process session.
+/// This path publishes only the newly committed terminal event; historical
+/// start/progress events are not replayed after a process restart.
+pub(crate) fn project_recovered_finished(
+    key: &RunKey,
+    flow_id: &str,
+    run_id: &str,
+    event: &RunEvent,
+) {
+    let Ok(finished) = serde_json::from_value::<runs::RunFinished>(event.data.clone()) else {
+        tracing::warn!(target: "flows", run_id, "[flows] recovery PollRun terminal outcome could not be decoded");
+        return;
+    };
+    if claim_finished(key.clone()) {
+        crate::core::bus::BUS.publish(DomainEvent::FlowRunFinished {
+            flow_id: flow_id.to_owned(),
+            run_id: run_id.to_owned(),
+            status: finished.status,
+        });
+    }
+}
+
+fn claim_finished(key: RunKey) -> bool {
+    let mut finished = FINISHED_KEYS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if !finished.0.insert(key.clone()) {
+        return false;
+    }
+    finished.1.push_back(key);
+    while finished.1.len() > RECENT_FINISHED_KEYS {
+        if let Some(expired) = finished.1.pop_front() {
+            finished.0.remove(&expired);
+        }
+    }
+    true
 }
 
 fn publish_step(session: &RunSession, node_id: &str, status: &str) {

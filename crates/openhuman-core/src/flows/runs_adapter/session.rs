@@ -45,6 +45,7 @@ pub(crate) struct RunSession {
     poller_started: std::sync::atomic::AtomicBool,
     started_event: std::sync::atomic::AtomicBool,
     finished_event: std::sync::atomic::AtomicBool,
+    live_actor: std::sync::atomic::AtomicBool,
     observations: Mutex<Vec<tinyagents_graph::GraphObservation>>,
 }
 
@@ -59,6 +60,7 @@ impl RunSession {
         trigger: FlowRunTrigger,
         cursor: u64,
     ) -> Arc<Self> {
+        let live_actor = trigger != FlowRunTrigger::Resume;
         Arc::new(Self {
             run_id: bindings.run_id.clone(),
             flow_id: bindings.flow_id.clone(),
@@ -72,6 +74,7 @@ impl RunSession {
             poller_started: std::sync::atomic::AtomicBool::new(false),
             started_event: std::sync::atomic::AtomicBool::new(false),
             finished_event: std::sync::atomic::AtomicBool::new(false),
+            live_actor: std::sync::atomic::AtomicBool::new(live_actor),
             observations: Mutex::new(Vec::new()),
         })
     }
@@ -155,15 +158,37 @@ impl RunSession {
     }
 
     pub(super) fn mark_started(&self) -> bool {
+        self.live_actor.store(true, std::sync::atomic::Ordering::Release);
         !self
             .started_event
             .swap(true, std::sync::atomic::Ordering::AcqRel)
     }
 
     pub(super) fn mark_finished(&self) -> bool {
+        self.live_actor.store(false, std::sync::atomic::Ordering::Release);
         !self
             .finished_event
             .swap(true, std::sync::atomic::Ordering::AcqRel)
+    }
+
+    pub(super) fn mark_parked(&self) {
+        self.live_actor.store(false, std::sync::atomic::Ordering::Release);
+    }
+
+    pub(super) fn mark_resumed(&self) {
+        self.live_actor.store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    pub(super) fn is_live_actor(&self) -> bool {
+        self.live_actor.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub(super) fn key(&self) -> RunKey {
+        let bindings = self
+            .bindings
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        RunKey::new(&bindings.storage(), &self.run_id)
     }
 
     /// Start the one PollRun task for this process/run owner.
@@ -284,19 +309,3 @@ pub(crate) fn remove(session: &Arc<RunSession>) {
     }
 }
 
-pub(crate) fn get_by_key(key: &RunKey) -> Option<Arc<RunSession>> {
-    SESSIONS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(key)
-        .cloned()
-}
-
-pub(crate) fn sessions() -> Vec<Arc<RunSession>> {
-    SESSIONS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .values()
-        .cloned()
-        .collect()
-}

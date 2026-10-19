@@ -276,12 +276,19 @@ pub(crate) async fn register_resume_bindings(
 /// process-restarted waiter cannot mistake an earlier `parked` event for the
 /// result of this resume.
 pub(crate) async fn resume_and_wait(
-    ctx: &DispatchCtx,
+    _ctx: &DispatchCtx,
     config: &Config,
     request: ResumeRun,
     candidate: Arc<RunBindings>,
 ) -> Result<ResumeOutcome, String> {
     let storage = request.storage.clone();
+    if candidate.flow_id != request.flow_id
+        || candidate.run_id != request.run_id
+        || candidate.storage() != storage
+        || candidate.caps_host() != request.caps_host
+    {
+        return Err("resume bindings do not match the owner-scoped request".to_string());
+    }
     let key = RunKey::new(&storage, &request.run_id);
     let proxy = module::runs_proxy(config).await?;
     let (session, inserted) = match session::get(&storage, &request.run_id) {
@@ -328,9 +335,9 @@ pub(crate) async fn resume_and_wait(
 
     session.replace_flow(candidate.flow.clone()).await;
     session.set_trigger(FlowRunTrigger::Resume);
+    session.mark_resumed();
     session.replace_bindings(candidate).await;
     session.start_polling(proxy);
-    let _ = ctx;
     wait_for_outcome(&mut receiver, &request.run_id, baseline).await
 }
 
