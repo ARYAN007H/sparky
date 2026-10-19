@@ -27,12 +27,12 @@ Click Tiny, the mascot in the chat composer, and talk. Tiny listens and answers 
 
 Choose how Tiny's voice runs under **Connections → Voice agents**:
 
-| Provider | Setup | Notes |
-| --- | --- | --- |
-| Gemini Live (TinyHumans) | None (default) | One model that hears and speaks. Billed through your TinyHumans balance. |
-| ElevenLabs Agent (TinyHumans) | None | Hosted ElevenLabs voice with OpenHuman as its brain. |
-| Gemini Live (Google API key) | Your Google AI Studio key | Talks to Google directly. |
-| Sarvam AI | Your Sarvam key | Indian languages (Hindi, Tamil, Bengali and more, or automatic detection). Sarvam's speech recognition, chat model and voices work together. |
+| Provider                      | Setup                     | Notes                                                                                                                                        |
+| ----------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini Live (TinyHumans)      | None (default)            | One model that hears and speaks. Billed through your TinyHumans balance.                                                                     |
+| ElevenLabs Agent (TinyHumans) | None                      | Hosted ElevenLabs voice with OpenHuman as its brain.                                                                                         |
+| Gemini Live (Google API key)  | Your Google AI Studio key | Talks to Google directly.                                                                                                                    |
+| Sarvam AI                     | Your Sarvam key           | Indian languages (Hindi, Tamil, Bengali and more, or automatic detection). Sarvam's speech recognition, chat model and voices work together. |
 
 Each card has a **Test** button that opens a short session to check the provider. You can also pick the voice, and the language where the provider supports it.
 
