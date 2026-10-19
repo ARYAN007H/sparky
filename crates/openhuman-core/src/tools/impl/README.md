@@ -39,10 +39,10 @@ tested but no production assembly site constructs it today.
   input, allocate artifact, generate bytes off the async runtime, finalize or
   fail the artifact) so further artifact-producing tools follow the same shape.
   tool surface, not a host capability.
-- [`system/mod.rs`](./system/mod.rs) (`security_for_tool_context`) and [`filesystem/gate.rs`](./filesystem/gate.rs)
-  (`security_scoped_to_root`, behind `FsGate::scoped_to_workspace`) each grant the run's TinyAgents workspace
-  descriptor as `action_dir` plus a `ReadWrite` trusted root on a per-call
-  clone of `SecurityPolicy`. They must stay in step; `is_always_forbidden` and
+- [`filesystem/gate.rs`](./filesystem/gate.rs) owns workspace descriptor
+  scoping. The filesystem gate and system policy resolver use the same helper,
+  which grants the descriptor root as `action_dir` plus a `ReadWrite` trusted
+  root on a per-call clone of `SecurityPolicy`; `is_always_forbidden` and
   `is_workspace_internal_path` are evaluated before any trusted-root shortcut.
 
 ## Further reading

@@ -10,7 +10,7 @@
 //! trusted roots and the approval gate remain host decisions. The tools only
 //! ask.
 
-mod gate;
+pub(in crate::tools::implementations) mod gate;
 
 #[cfg(test)]
 #[path = "gate_tests.rs"]
