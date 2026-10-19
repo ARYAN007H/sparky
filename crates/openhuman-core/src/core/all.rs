@@ -513,9 +513,14 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::platform::service::all_service_registered_controllers(),
     );
     let mut inference_controllers = crate::inference::all_inference_registered_controllers();
-    inference_controllers.extend(crate::agent_runs::all_inference_agent_chat_registered_controllers());
+    inference_controllers
+        .extend(crate::agent_runs::all_inference_agent_chat_registered_controllers());
     inference_controllers.extend(crate::inference::all_local_inference_registered_controllers());
-    push(&mut controllers, DomainGroup::Inference, inference_controllers);
+    push(
+        &mut controllers,
+        DomainGroup::Inference,
+        inference_controllers,
+    );
     // Embedding provider configuration and embed RPC.
     push(
         &mut controllers,
