@@ -123,74 +123,58 @@ re-arms schedules for every enabled flow.
 
 ### Running a flow
 
-There are two entry points in [`ops/run.rs`](./ops/run.rs). `flows_run` blocks until the run
-settles; `flows_run_detached` validates synchronously, then spawns the run and
-returns `{ run_id, status: "running", detached: true }` at once. The detached
-form exists because the harness caps one tool call at 120 seconds and a flow
-with a research agent node easily runs longer. The UI "Run" button and the
-`run_flow` agent tool use the detached path; the copilot polls `get_flow_run`.
-
-Both share one body, `run_flow_body` in [`ops/execution.rs`](./ops/execution.rs):
+There are two entry points in [`ops/run.rs`](./ops/run.rs). `flows_run` blocks
+until the TinyFlows run parks for approval or reaches a terminal result.
+`flows_run_detached` performs the same host preflight, starts the module run,
+and returns `{ run_id, status: "running", detached: true }` immediately. The
+existing RPC result for a blocking run remains
+`{ output, pending_approvals, thread_id }`.
 
 ```text
- prepare_flow_run      validate declared inputs, compile-check, mint thread_id
+ OpenHuman preflight: owner-scoped workflow lookup, host compatibility,
+ inference readiness, trusted input envelope
         |
- run_registry::register(thread_id)   cancel token + guard (before the id
-        |                            is visible, so a cancel never races it)
- start_flow_run_row    insert flow_runs row, status "running"
- FlowRunStarted        published on the bus
+ runs_adapter::start_run
+   retain stable CatalogStorage + per-run CapsHost registrations
+   Runs.StartRun(graph, input, inputs, timeout, workflow origin)
         |
- run_flow_body
-   RunRowFinalizer     drop guard: writes "interrupted" if the future dies
-   validate_inference_readiness   fail fast when no AI provider works
-   tinyflows::compiler::compile
-   build_capabilities + open_flow_checkpointer
-   run_with_checkpointer_journaled_observed   (raced against cancel token)
-        |  FlowRunObserver persists each finished step to the run row
-        v
- finalize: completed | completed_with_warnings | pending_approval |
-           failed | cancelled
-   record summary on the flow, Langfuse export (if usage sharing is on),
-   CoreNotification with an "approve" action when approvals are pending
+ one owner-scoped PollRun cursor
+   started / step_started / step / graph observations / agent progress
+   -> OpenHuman start/progress events and host Langfuse export
         |
- FlowRunFinished  ->  FlowRunDigestSubscriber, DedupCommitSubscriber
+   parked -> keep bindings alive, notify pending approval, no FlowRunFinished
+   finished -> publish FlowRunFinished once, map the legacy RPC result
 ```
 
-The whole run is scoped under
-`AgentTurnOrigin::TrustedAutomation { source: Workflow { require_approval } }`
-(`workflow_origin`), whatever started it. The trust argument is about the
-saved, validated graph, not the caller. `input` is the free-form trigger
-payload (reachable in expressions as `=run.trigger.…`); `inputs` fills the
-flow's declared inputs (`=inputs.<name>`), and a bad declared input is rejected
-before any run row exists.
+The module owns graph compilation, input validation, execution, run rows,
+checkpoints, cancellation, and dedup settlement. OpenHuman keeps inference
+readiness and compatibility preflight, policy and approval callbacks, the
+trusted workflow origin, event projection, and Langfuse export. `input` is the
+free-form trigger payload (reachable in expressions as `=run.trigger.…`);
+`inputs` fills the flow's declared inputs (`=inputs.<name>`).
 
-A run that reaches a gated node without trust parks as `pending_approval`. Its
-state lives in a durable SQLite checkpoint (`checkpoints.db`), so it survives a
-restart. `flows_resume` (in [`ops/resume.rs`](./ops/resume.rs)) continues it, but only after
-checking that the supplied `approvals` name at least one of the row's actually
-pending node ids. The engine treats any resume call as approval, so this guard
-is the host's enforcement. `flows_approval_manifest` computes, ahead of time,
+A run that reaches a gated node parks as `pending_approval`; the module keeps
+its durable snapshot and checkpoint for `flows_resume` to continue. OpenHuman
+checks host compatibility and binds a fresh CapsHost to the same owner-scoped
+CatalogStorage address. `flows_approval_manifest` computes, ahead of time,
 every trust key a fully pre-authorized run would need, so the save-and-enable
 card can ask once instead of parking node by node.
 
-`flows_cancel_run` (in [`ops/run_management.rs`](./ops/run_management.rs)) signals an in-flight run
-through `run_registry::cancel` and lets that run's own cancel arm write the
-terminal row. For a parked or orphaned run it writes `cancelled` itself and
-drops the checkpoint. Two sweeps clean up after crashes:
-`sweep_orphaned_running_runs_on_boot` marks rows left `running` by a dead
-process, and `sweep_expired_parked_runs` expires old parked runs.
+`flows_cancel_run` (in [`ops/run_management.rs`](./ops/run_management.rs)) calls
+Runs.CancelRun through the run's exact CatalogStorage owner address. The
+module settles active, parked, and orphaned runs. Boot recovery and parked-run
+expiry likewise call typed Runs operations and project only rows the module
+actually changed.
 
 ### After a run
 
-Three bus subscribers, all constructed in [`core/runtime/subscribers.rs`](../core/runtime/subscribers.rs), react
-to run events. `FlowRunDigestSubscriber` ([`bus/run_digest.rs`](./bus/run_digest.rs)) writes a short
-digest of each successful run into memory, tagged `flow:<id>` and
-`flow_run_digest`, keeping the newest 50 per flow. `DedupCommitSubscriber`
-([`bus/dedup_commit.rs`](./bus/dedup_commit.rs)) settles the `dedup` node's exactly-once contract: on
-success it folds each node's tentative key set into its committed set; on
-failure it drops the tentative keys so the items are retried. Commits are
-serialized per flow. `FlowTriggerSubscriber` is the trigger bridge described
-above.
+Two host bus subscribers are constructed in
+[`core/runtime/subscribers.rs`](../core/runtime/subscribers.rs).
+`FlowRunDigestSubscriber` ([`bus/run_digest.rs`](./bus/run_digest.rs)) writes a
+short digest of each successful run into memory, tagged `flow:<id>` and
+`flow_run_digest`, keeping the newest 50 per flow. `FlowTriggerSubscriber` is
+the trigger bridge described above. The TinyFlows module settles `dedup` node
+state as part of its winning run lifecycle operation.
 
 ### Authoring and discovery agents
 
@@ -236,19 +220,17 @@ Memory has no namespaces, so a flow's memory is the set of items tagged
 `flow_key_tag`, `flow_meta`, `flow_filter`, `cross_flow_filter`,
 `remember_keyed`, `forget_matching`, `FLOWS_TAG`) are re-exported from [`mod.rs`](./mod.rs)
 so the digest subscriber, `flows_delete`, the `memory` node adapter
-(`tinyflows::memory_adapter::OpenHumanMemory`) and the agent tools all tag the
-same way.
+served through CapsHost and the agent tools all tag the same way.
 
 ### Storage
 
-The catalog (`store.rs`), drafts (`draft_store.rs`), per-flow state and the run
-checkpointer are on the document port, in the acting agent's scope:
-`tinyflows_drivers::catalog::FlowCatalogDocuments`, `FlowStateDocuments`
-(through `tinyflows/state.rs`'s `FlowState`, which the engine's `StateStore`
-and the dedup settlement share) and `DriverCheckpointer`. tinyflows has no
-SQLite store of its own any more, so there is one path whatever the storage URL
-says: the installed backend, else a SQLite document database of the catalog's own
-(`<workspace>/flows/catalog.db`). The files tinyflows used to write
+The catalog (`store.rs`), drafts (`draft_store.rs`), run rows, per-flow state,
+and checkpoints are owned by TinyFlows' module services and the document port.
+OpenHuman registers a scope-bound CatalogStorage callback per acting storage
+scope and retains its stable address with each live or approval-parked run.
+There is one storage path whatever the storage URL says: the installed backend,
+else a SQLite document database of the catalog's own
+(`<workspace>/flows/catalog.db`). The files TinyFlows used to write
 (`flows/flows.db`, `flows/drafts/`, `flows/checkpoints.db`) are imported
 read-only once, at boot for an installed backend (`storage::import::tinyflows`)
 and on first use otherwise, and are never written again. When the scope cannot
@@ -261,12 +243,13 @@ Top level:
 
 | Path | What it does |
 | --- | --- |
-| `mod.rs` | Module declarations and re-exports: model types from `tinyflows_catalog`, node contracts, store helpers for the seam, flow-memory helpers. |
+| `mod.rs` | Module declarations and re-exports: node contracts and flow-memory helpers. |
 | [`ops.rs`](./ops.rs), `ops/` | Business operations returning `Outcome<T>`. See the table below. |
 | [`schemas.rs`](./schemas.rs), `schemas/`, [`schemas_handlers.rs`](./schemas_handlers.rs) | Controller schemas (split into `builder_schemas.rs`, `definition_schemas.rs`, `draft_schemas.rs`, `run_schemas.rs`) and thin handlers that load config, read params and call `ops::flows_*`. |
 | [`store.rs`](./store.rs) | Binds `FlowCatalogDocuments` to this host's storage (`scoped`, `documents`). Every function only substitutes the catalog; anything else in a body is host policy leaking into persistence. |
 | `draft_store.rs` | Same binding for the catalog's drafts. |
-| [`bus.rs`](./bus.rs), `bus/` | The three subscribers: `trigger.rs`, `run_digest.rs`, `dedup_commit.rs`. |
+| [`bus.rs`](./bus.rs), `bus/` | The trigger and run-digest subscribers. |
+| [`runs_adapter.rs`](./runs_adapter.rs), `runs_adapter/` | Scope-bound CatalogStorage and CapsHost ownership, Runs Start/Poll/Cancel calls, cursor projection, and legacy RPC result mapping. |
 | [`tools.rs`](./tools.rs) | `ProposeWorkflowTool` (`propose_workflow`) and `RunFlowTool` (`run_flow`). |
 | [`builder_host.rs`](./builder_host.rs) | Scope-bound `CopilotHost` callback over TinyBus. The compiled module owns the authoring tools; the callback binds their draft, flow, gate, agent, and suggestion ports to OpenHuman operations for one invocation. |
 | [`crate::integrations::composio::builder_tools`](../integrations/composio/builder_tools/mod.rs) | Composio-backed workflow-builder reads and catalog ranking. The mixed connection picker is composed by the flow host through a provider. |
@@ -276,7 +259,7 @@ Top level:
 | [`node_contracts.rs`](./node_contracts.rs) | Host overlay on `Catalog.NodeKinds` returned over TinyBus (which `tool_call` slugs resolve to Composio or native `oh:` tools, which trigger kinds dispatch here). |
 | [`host_gates/`](./host_gates/) | OpenHuman stages served through the scoped TinyFlows `AuthoringHost` callback. |
 | `../skills/bundled/flow_authoring.rs` | Adapts Copilot `ListResources` to TinySkills materialization and scoped skill discovery. |
-| `tinyflows/` | The capability seam. See [tinyflows/README.md](tinyflows/README.md). |
+| `tinyflows/` | Generic graph vocabulary and migration re-exports. See [tinyflows/README.md](tinyflows/README.md). |
 
 `ops/`, grouped by role:
 
@@ -284,7 +267,7 @@ Top level:
 | --- | --- |
 | Definitions | `definitions.rs` (create, get, list, delete, duplicate), `updates.rs` (update, history, rollback), `validation.rs` (validate, import, migrate), `drafts.rs` |
 | Triggers | `triggers.rs` (set_enabled, bind/unbind, boot reconcile) |
-| Runs | `run.rs` (entry points), `execution.rs` (shared body, origin, notifications, Langfuse export), `run_rows.rs` (row writes, `RunRowFinalizer`), `resume.rs`, `run_management.rs` (cancel, list, prune, sweeps), `inference_readiness.rs` |
+| Runs | `run.rs` (preflight and entry points), `execution.rs` (approval notification and Langfuse export), `resume.rs`, `run_management.rs` (cancel, list, prune), `inference_readiness.rs`; module lifecycle adapter in `runs_adapter.rs` |
 | Gates and manifests | `builder_gates.rs`, `approval_manifest.rs` |
 | Copilot and scout | `builder.rs`, `builder_toolset.rs`, `streaming.rs`, `trail_off.rs`, `discovery.rs` |
 | Catalog reads | `catalog.rs` (tool catalog search, tool contract), `connections.rs` (connection picker, required connections) |
@@ -300,10 +283,10 @@ Top level:
   migration, validation and import over TinyBus.
 - `run_builder_gates` (`ops/builder_gates.rs`): the agent-authored hard-gate
   stack.
-- `RunRowFinalizer` ([`ops/run_rows.rs`](./ops/run_rows.rs)): drop guard that keeps a run row from
-  being wedged at `running`.
-- `tinyflows::build_capabilities` / `tinyflows::open_flow_checkpointer`
-  ([`tinyflows/caps/`](./tinyflows/caps/)): wire the engine to OpenHuman for one run.
+- `runs_adapter::RunBindings`: retains the same owner-scoped CatalogStorage and
+  per-run CapsHost registration from admission through terminal settlement or
+  approval parking. Resume uses a fresh CapsHost registration and the exact
+  same stable storage address.
 - `bus::FlowTriggerSubscriber` ([`bus/trigger.rs`](./bus/trigger.rs)): the trigger-to-run bridge.
 - Model types, re-exported from `tinyflows_catalog` and not owned here: `Flow`,
   `FlowConnection`, `FlowDraft`, `FlowImport`, `FlowRevision`, `FlowRun`,
@@ -359,14 +342,14 @@ Agent tools: `core`'s [`tools/ops.rs`](../tools/ops.rs) adds 27 flows tools to t
   absence when the feature is off. A stub would make `flows.*` a known method
   that fails at runtime. If an always-compiled domain ever gains a real `use
   crate::flows::...`, convert to the facade-plus-stub shape used by `voice/`.
-- Register the cancel token before the run id becomes observable. Both run
-  entry points do this; moving registration into the spawned task reopens a race
-  where a cancel writes `cancelled` while the run still fires its side effects.
+- StartRun and ResumeRun must receive the trusted context and the typed
+  owner-scoped CapsHost and CatalogStorage addresses. Keep their registrations
+  alive until PollRun reports terminal settlement; dropping them after an
+  admission acknowledgement breaks active or parked callbacks.
 - `flows_resume` must keep its pending-node check. The engine does not enforce
   the `approvals` argument.
-- `kv_get`, `kv_set` and `upsert_flow_run_step` are public only so the seam
-  (`SqliteStateStore`, `FlowRunObserver`) can reach the store from the sibling
-  `tinyflows` module.
+- Run rows, checkpoints, event history, and dedup settlement are module-owned;
+  OpenHuman projects PollRun events and keeps the established RPC response.
 
 ## Tests
 
