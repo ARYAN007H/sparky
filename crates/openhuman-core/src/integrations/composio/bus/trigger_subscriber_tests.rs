@@ -91,7 +91,7 @@ async fn with_the_queues_off_a_trigger_is_triaged_directly() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn without_a_config_a_trigger_is_triaged_directly() {
-    let triage = ScriptedTriage::new([]);
+    let triage = ScriptedTriage::new(Vec::<crate::inbound::fixture::Step>::new());
     let rig = Rig::new(triage.clone()).await;
 
     route(&rig, None, trigger("uuid-no-config")).await;
@@ -105,7 +105,8 @@ async fn the_direct_path_logs_and_drops_a_deferral_and_a_terminal_outcome() {
         deferred(10),
         crate::triage::TriageOutcome::Terminal {
             reason: "no fallback".into(),
-        },
+        }
+        .into(),
     ]);
     for uuid in ["uuid-d1", "uuid-d2"] {
         triage_directly(DispatchCtx::host_default(), trigger(uuid), triage.clone())

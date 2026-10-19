@@ -31,7 +31,12 @@ use crate::triage::{
 };
 
 /// A decision of `action`.
-pub(crate) fn decision(action: TriageAction) -> TriageOutcome {
+pub(crate) fn decision(action: TriageAction) -> Step {
+    Step::Answer(decision_outcome(action))
+}
+
+/// The outcome of a decision of `action`.
+pub(crate) fn decision_outcome(action: TriageAction) -> TriageOutcome {
     TriageOutcome::Decision(TriageRun {
         decision: TriageDecision {
             action,
@@ -45,27 +50,39 @@ pub(crate) fn decision(action: TriageAction) -> TriageOutcome {
     })
 }
 
-/// A deferral until `now + after_ms`.
-pub(crate) fn deferred(after_ms: i64) -> TriageOutcome {
-    TriageOutcome::Deferred {
-        defer_until_ms: chrono::Utc::now().timestamp_millis() + after_ms,
-        reason: "scripted deferral".to_owned(),
+/// One scripted answer.
+#[derive(Debug, Clone)]
+pub(crate) enum Step {
+    /// Answer this outcome.
+    Answer(TriageOutcome),
+    /// Defer until `after_ms` after the triage that answers it.
+    DeferFor(i64),
+}
+
+impl From<TriageOutcome> for Step {
+    fn from(outcome: TriageOutcome) -> Self {
+        Self::Answer(outcome)
     }
+}
+
+/// A deferral of `after_ms`, counted from the triage that answers it.
+pub(crate) fn deferred(after_ms: i64) -> Step {
+    Step::DeferFor(after_ms)
 }
 
 /// A triage runner that answers from a script and records what it did.
 #[derive(Debug, Default)]
 pub(crate) struct ScriptedTriage {
-    script: Mutex<VecDeque<TriageOutcome>>,
+    script: Mutex<VecDeque<Step>>,
     runs: AtomicUsize,
     applied: Mutex<Vec<String>>,
 }
 
 impl ScriptedTriage {
-    /// Answer `outcomes` in order, then acknowledge.
-    pub(crate) fn new(outcomes: impl IntoIterator<Item = TriageOutcome>) -> Arc<Self> {
+    /// Answer `steps` in order, then acknowledge.
+    pub(crate) fn new<S: Into<Step>>(steps: impl IntoIterator<Item = S>) -> Arc<Self> {
         Arc::new(Self {
-            script: Mutex::new(outcomes.into_iter().collect()),
+            script: Mutex::new(steps.into_iter().map(Into::into).collect()),
             ..Self::default()
         })
     }
@@ -102,7 +119,14 @@ impl TriageRunner for ScriptedTriage {
     ) -> anyhow::Result<TriageOutcome> {
         self.runs.fetch_add(1, Ordering::SeqCst);
         let next = self.script.lock().unwrap().pop_front();
-        Ok(next.unwrap_or_else(|| decision(TriageAction::Acknowledge)))
+        Ok(match next {
+            Some(Step::Answer(outcome)) => outcome,
+            Some(Step::DeferFor(after_ms)) => TriageOutcome::Deferred {
+                defer_until_ms: chrono::Utc::now().timestamp_millis() + after_ms,
+                reason: "scripted deferral".to_owned(),
+            },
+            None => decision_outcome(TriageAction::Acknowledge),
+        })
     }
 
     async fn apply(
