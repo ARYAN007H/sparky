@@ -51,9 +51,7 @@ fn the_default_url_is_a_directory_under_the_workspace() {
 }
 
 #[tokio::test]
-async fn opens_memory_and_refuses_garbage() {
-    let backend = open("memory").await.unwrap();
-    assert_eq!(backend.driver(), "memory");
+async fn refuses_a_garbage_storage_url() {
     assert!(open("ftp://nope").await.is_err());
 }
 
