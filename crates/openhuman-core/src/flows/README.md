@@ -61,9 +61,12 @@ must name a connected account of the same toolkit as the slug), tool contracts
 and every required arg must be present), and required-arg resolvability.
 `propose_workflow`, `revise_workflow`, `edit_workflow`, `save_workflow`, and the
 `strict` create/update RPC path all route through it, so agent saves and UI
-saves cannot validate differently. Softer findings come back as warnings
-instead: [`ops/wiring_warnings.rs`](./ops/wiring_warnings.rs) flags unwired required args and bindings to
-output fields the action does not produce.
+saves cannot validate differently. Best-effort output-field, payload-envelope,
+and split-path findings come from TinyFlows' `Authoring.WiringWarnings` through
+[`ops/wiring_warnings.rs`](./ops/wiring_warnings.rs), with a scoped host
+`LookupToolContract` callback backed by the Composio catalog. Missing required
+args remain the responsibility of the hard `validate_tool_contracts` gate;
+they are not repeated as advisory warnings.
 
 `flows_create` (in [`ops/definitions.rs`](./ops/definitions.rs)) then applies two server-side rules
 regardless of what the caller asked for:
