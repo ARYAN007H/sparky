@@ -160,6 +160,37 @@ pub(crate) fn register_blocking(config: &Config) -> anyhow::Result<WireStorage> 
     })
 }
 
+/// Call the host document callback directly from a scoped unit-test fixture.
+#[cfg(test)]
+pub(crate) fn call_test_storage<T, A>(
+    config: &Config,
+    member: &'static str,
+    args: A,
+) -> anyhow::Result<T>
+where
+    T: serde::de::DeserializeOwned + Send + 'static,
+    A: Serialize + Send + 'static,
+{
+    let storage = register_blocking(config)?;
+    crate::storage::block_on_anyhow(async move {
+        let runtime = crate::modules::runtime::runtime()
+            .await
+            .map_err(anyhow::Error::msg)?;
+        let proxy = runtime
+            .connection()
+            .proxy(
+                &storage.callback.destination,
+                &storage.callback.object_path,
+                catalog::STORAGE_INTERFACE,
+            )
+            .map_err(anyhow::Error::msg)?;
+        proxy
+            .call(member, &args)
+            .await
+            .map_err(|error| anyhow::anyhow!(error))
+    })
+}
+
 #[cfg(test)]
 async fn pause_before_cache_insert(path: &str) {
     let gate = REGISTRATION_GATES

@@ -175,15 +175,12 @@ impl CapsHostService {
         let state = Arc::new(tokio::sync::Mutex::new(
             super::agent::AgentRunState::default(),
         ));
-        self.0.agent_runs.lock().await.insert(handle.clone(), state);
-        let binding = Arc::clone(&self.0);
-        let state = binding
+        self.0
             .agent_runs
             .lock()
             .await
-            .get(&handle)
-            .cloned()
-            .expect("run state was inserted");
+            .insert(handle.clone(), Arc::clone(&state));
+        let binding = Arc::clone(&self.0);
         tokio::spawn(async move {
             if let Err(error) = service_agent::run_agent(binding.clone(), request, state).await {
                 if let Some(state) = binding.agent_runs.lock().await.get(&handle).cloned() {

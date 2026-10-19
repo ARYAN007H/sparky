@@ -11,9 +11,9 @@ use super::binding::CapsHostBinding;
 pub(crate) async fn run_agent(
     binding: Arc<CapsHostBinding>,
     request: runs::AgentRunRequest,
+    state: Arc<tokio::sync::Mutex<AgentRunState>>,
 ) -> Result<runs::AgentRunOutcome, String> {
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(128);
-    let state = Arc::new(tokio::sync::Mutex::new(AgentRunState::default()));
     let progress_state = Arc::clone(&state);
     let progress = tokio::spawn(async move {
         while let Some(event) = progress_rx.recv().await {
