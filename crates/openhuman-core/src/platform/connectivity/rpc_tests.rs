@@ -458,7 +458,7 @@ async fn pick_listen_port_identifies_ipv6_openhuman_listener_when_supported() {
                     let _ = stream.read(&mut request).await;
                     let body = r#"{"name":"openhuman","ok":true}"#;
                     let response = format!(
-                        "HTTP/1.1 200 OK\\r\\ncontent-type: application/json\\r\\ncontent-length: {}\\r\\nconnection: close\\r\\n\\r\\n{}",
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
                         body.len(), body
                     );
                     let _ = stream.write_all(response.as_bytes()).await;
