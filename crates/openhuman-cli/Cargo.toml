@@ -79,8 +79,9 @@ name = "storage_schema_dump"
 path = "../../examples/storage_schema_dump.rs"
 
 [[test]]
-# Loads the tinydocs module from the linked executable and calls GenerateDocx
-# end to end. Local only: needs `--features linked-modules,documents`.
+# Loads tinydocs from the linked executable and calls GenerateDocx end to end.
+# `scripts/test-rust-e2e.sh --suite tinydocs_linked_e2e` enables its local-only
+# `linked-modules,documents` feature requirements explicitly.
 name = "tinydocs_linked_e2e"
 path = "../../tests/tinydocs_linked_e2e.rs"
 required-features = ["linked-modules", "documents"]
@@ -184,8 +185,8 @@ path = "../../tests/memory_v2_e2e.rs"
 name = "memory_cortexdb_live"
 path = "../../tests/memory_cortexdb_live.rs"
 # Memory v2 through the real `openhuman-core` binary against a live CortexDB.
-# Skips unless OPENHUMAN_LIVE_CORTEXDB_URL is set; run it with
-# scripts/test-memory-cortexdb-live.sh, which boots the server in Docker.
+# Explicitly ignored; run it with scripts/test-memory-cortexdb-live.sh, which
+# boots the server in Docker and sets OPENHUMAN_LIVE_CORTEXDB_URL.
 
 [[test]]
 name = "json_rpc_e2e"

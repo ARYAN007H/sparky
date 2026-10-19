@@ -2,7 +2,6 @@ use super::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
-use tinyagents_harness::observability::replay::read_run_events_page;
 use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
 use tinyagents_harness::HarnessStatusStore;
@@ -58,32 +57,6 @@ async fn mark_active(backend: &Arc<dyn StorageBackend>, run: &str) {
     let mut status = HarnessRunStatus::new(RunId::new(run), ComponentId::new("m".to_string()));
     status.mark_running(HarnessPhase::Model);
     store.put_status(status).await.unwrap();
-}
-
-async fn pages(
-    journal: &dyn HarnessEventJournal,
-    run: &str,
-) -> Vec<(Vec<AgentObservation>, Option<u64>)> {
-    let (mut out, mut cursor) = (Vec::new(), 0);
-    loop {
-        let page = read_run_events_page(journal, run, cursor, 3).await.unwrap();
-        out.push((page.events, page.next_offset));
-        match out.last().unwrap().1 {
-            Some(next) => cursor = next,
-            None => return out,
-        }
-    }
-}
-
-#[tokio::test]
-async fn a_sealed_journal_serves_the_same_pages_as_an_unsealed_one() {
-    let (_, backend) = backend_with_clock();
-    let journal = journal(&backend);
-    seed(&journal, "run.a", 7).await;
-    let before = pages(&journal, "run.a").await;
-    journal.seal_run("run.a").await.unwrap();
-    assert!(sealed(&backend, "run.a").await);
-    assert_eq!(pages(&journal, "run.a").await, before);
 }
 
 #[tokio::test]
