@@ -432,7 +432,9 @@ export async function waitForDecodedAudioAtIndex(
       await browser.execute((audioIndex: number) => {
         const audio = (window as Window & { __E2E_AUDIO_ELEMENTS?: HTMLAudioElement[] })
           .__E2E_AUDIO_ELEMENTS?.[audioIndex];
-        return Boolean(audio && audio.readyState >= 2 && Number.isFinite(audio.duration) && audio.duration > 0);
+        return Boolean(
+          audio && audio.readyState >= 2 && Number.isFinite(audio.duration) && audio.duration > 0
+        );
       }, index),
     { timeout, timeoutMsg: `Audio ${index} did not decode before ${timeout}ms` }
   );
