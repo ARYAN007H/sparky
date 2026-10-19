@@ -6,7 +6,7 @@
 //! [`crate::agent::OpenHumanSessionHost`] attaches it to its turn's
 //! [`OpenHumanRunContext`](crate::agent::tinyagents::host::OpenHumanRunContext)
 //! (`parent`), tools read it from there, and controller-spawned background
-//! surfaces (the workflow engine, agent teams) build a root one with
+//! surfaces (such as the workflow engine) build a root one with
 //! [`crate::agent::orchestration::parent_context::with_root_parent`] and pass it
 //! to the spawns they make. There is no ambient copy.
 //!

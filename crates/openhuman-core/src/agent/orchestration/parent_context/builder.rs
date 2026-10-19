@@ -1,11 +1,10 @@
 //! Shared root [`ParentExecutionContext`] builder for controller-spawned
 //! orchestration tasks (#3374 PR4, extracted from the #3375 workflow engine).
 //!
-//! The workflow-run engine ([`workflow_runs::engine`]) and the agent-team
-//! runtime ([`agent_teams::runtime`]) both need to spawn real sub-agents from a
-//! background task that has **no** enclosing agent turn on the stack, so there is
-//! no live parent execution context for the spawn to inherit — a naive spawn
-//! fails with `NoParentContext` (the TAURI-RUST-HMW regression, #4337).
+//! The workflow-run engine ([`workflow_runs::engine`]) needs to spawn real
+//! sub-agents from a background task that has **no** enclosing agent turn on the
+//! stack, so there is no live parent execution context for the spawn to inherit —
+//! a naive spawn fails with `NoParentContext` (the TAURI-RUST-HMW regression, #4337).
 //!
 //! The fix (proven in `triage::escalation::dispatch_target_agent`) is to build a
 //! *root* [`ParentExecutionContext`] from a config-built [`Agent`] and hand it,
@@ -40,10 +39,10 @@ const LOG_TARGET: &str = "agent_orchestration::parent_context";
 /// running sub-agents without an enclosing agent turn. The caller supplies the
 /// identity fields that distinguish one orchestration surface from another:
 ///
-/// - `agent_definition_id` — labels the root parent (e.g. `"workflow_engine"`,
-///   `"agent_team_runtime"`); surfaced in spawn metadata / logs.
+/// - `agent_definition_id` — labels the root parent (e.g. `"workflow_engine"`);
+///   surfaced in spawn metadata / logs.
 /// - `channel` — the logical channel the spawned work belongs to (e.g.
-///   `"workflow"`, `"team"`).
+///   `"workflow"`).
 /// - `session_prefix` — the `session_id` is `"{session_prefix}-{uuid}"`, keeping
 ///   each surface's sessions namespaced and greppable.
 ///
@@ -124,7 +123,7 @@ pub(crate) async fn build_root_parent(
 
 /// Build (or accept) the parent execution context for a **controller-spawned
 /// background orchestration surface** that has no enclosing agent turn (the
-/// workflow-run engine, the agent-team runtime, cron jobs), then run
+/// workflow-run engine or cron jobs), then run
 /// `run(parent)` with it.
 ///
 /// Folds [`build_root_parent`] and the hand-off into one call so a surface

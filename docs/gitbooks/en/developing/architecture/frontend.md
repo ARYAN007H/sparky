@@ -248,7 +248,7 @@ const result = await apiClient.post<LoginResponse>("/auth/login", {
 
 - `authApi` / `userApi`: auth + user profile
 - `threadApi`, `threadUsageApi`: chat threads
-- `agentTeamApi`, `agentWorkApi`, `subagentApi`: agents
+- `agentWorkApi`, `subagentApi`: agents
 - `skillsApi`, `skillRegistryApi`, `flowsApi`, `workflowRunsApi`: skills & automation
 - `channelConnectionsApi`, `mcpClientsApi`, `mcpSetupApi`, `tunnelsApi`: connections
 - `memoryApi`: Memory v2 RPC wrappers (`openhuman.memory_*`)

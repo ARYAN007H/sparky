@@ -22,20 +22,17 @@ Existing owners remain authoritative:
   DAG/map-reduce/workspace claims, checkpointing and delegation graph;
 - harness: subagents, cancellation/steering, workspace interfaces and git
   worktrees;
-- session: durable sessions, run ledger, team/workflow rows and CAS;
+- session: durable sessions, run ledger, workflow rows and CAS;
 - OpenHuman: config, policy/security/approval, concrete execution adapters,
   BUS/progress/chat projection, persistence-root wiring, RPC schemas, tools,
   worktree policy and product prompt/catalog choices.
 
 ## Public API
 
-The current crate exposes only the durable team ledger seam and callback member
-graph, never OpenHuman values. A future workflow slice may add typed plans and
-executor seams only when its engine consumes them:
+The crate exposes host-neutral workflow composition and execution seams, never
+OpenHuman values:
 
 ```rust
-pub trait TeamLedger: Send + Sync { /* team/member/task/event operations */ }
-
 pub trait WorkflowStore: Send + Sync { /* load/upsert workflow snapshots */ }
 #[async_trait]
 pub trait WorkflowExecutor: Send + Sync {
@@ -45,9 +42,8 @@ pub trait WorkflowExecutor: Send + Sync {
 }
 ```
 
-Provide `teams::{TeamService, TeamView, TeamError, run_member_graph}` and
-`workflow::{WorkflowDefinition, WorkflowPhase, validate, WorkflowEngine,
-WorkflowState, scheduler_graph}`. A `session-ledger` convenience adapter may
+Provide `workflow::{WorkflowDefinition, WorkflowPhase, validate,
+WorkflowEngine, WorkflowState, scheduler_graph}`. A `session-ledger` convenience adapter may
 wrap `tinyagents_session::run_ledger` with a caller-supplied workspace path;
 the host still chooses that path. Safety tier admission, agent lookup, tool
 visibility and worktree choice are inputs already authorized by the host, not
@@ -67,8 +63,6 @@ for ordinary workflow state.
 
 | OpenHuman source | Destination / action |
 | --- | --- |
-| `agent/orchestration/agent_teams/{types,ops,graph}.rs` | Move generic views/errors, dependency validation/service, and callback member graph to `tinyagents-orchestration/src/teams/`. |
-| `agent/orchestration/agent_teams/runtime.rs` | Split generic claim/select/prompt/message-boundary/reconciliation engine to `teams/runtime.rs`; retain OpenHuman root-parent, `run_subagent`, config and projection adapter. |
 | `agent/orchestration/workflow_runs/{types,graph}.rs`, pure `ops.rs` | Move to `src/workflow/{types,validate,graph}.rs`. Built-in host catalog and schema wiring stay. |
 | `workflow_runs/engine/{state,scheduler,cancel}.rs` | Move to `src/workflow/`. |
 | `workflow_runs/engine/{phase_exec,lifecycle}.rs` | Split generic bounded fanout/state machine to crate; keep `Config`, `AgentOrchestrationSession`, origin propagation, root parent, spawn and host persistence adapter. |
@@ -89,18 +83,6 @@ test importing its empty public modules.
 **GREEN:** Add the manifest, `lib.rs`, documentation and feature forwarding.
 Verify `cargo metadata --manifest-path vendor/tinyagents/Cargo.toml --no-deps`
 and `cargo test -p tinyagents-orchestration`.
-
-### O2 — team service and member graph
-
-**RED:** Port `agent_teams/graph_tests.rs` and generic `ops_tests.rs` cases to
-the new crate with a fake `TeamLedger`: duplicate names, unknown
-member/dependency, self/cycle rejection, ordered messages, claim race result,
-quality-gated completion and recovery, non-claimant/owner-mismatch completion,
-complete route, failed route, worker engine error, and optional graph-sink
-delivery.
-
-**GREEN:** Implement typed team service and callback graph. Add the optional
-session-ledger adapter only after the trait suite is green.
 
 ### O3 — workflow definitions and scheduler
 
@@ -123,9 +105,9 @@ origin/parent context.
 
 ### O5 — OpenHuman adapters and direct import cutover
 
-**RED:** Preserve OpenHuman integration tests for team worker execution,
-workflow policy denial, BUS/progress lifecycle, durable run rows and RPC wire
-shapes. Add grep/checker coverage rejecting moved API re-exports.
+**RED:** Preserve OpenHuman integration tests for workflow policy denial,
+BUS/progress lifecycle, durable run rows and RPC wire shapes. Add
+grep/checker coverage rejecting moved API re-exports.
 
 **GREEN:** Implement minimal host adapters, migrate direct consumers and
 topology registration, delete moved code and aliases in the same change.
@@ -148,8 +130,8 @@ cargo test --manifest-path vendor/tinyagents/Cargo.toml -p tinyagents-graph -p t
 cargo check --manifest-path vendor/tinyagents/Cargo.toml --workspace
 ```
 
-For the host cutover run `pnpm debug rust agent_team`, `pnpm debug rust
-workflow_run`, `pnpm debug rust spawn_parallel_agents`, `cargo check
+For the host cutover run `pnpm debug rust workflow_run`,
+`pnpm debug rust spawn_parallel_agents`, `cargo check
 --manifest-path Cargo.toml`, `pnpm rust:layout`, and `pnpm docs:check`. Use
 `scripts/ci-cancel-aware.sh` for long workspace gates and never export
 `CARGO_TARGET_DIR`.

@@ -100,7 +100,6 @@ Multi-agent orchestration runs on the tinyagents graph layer, through `tinyagent
 - [`orchestration/delegation.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/orchestration/delegation.rs) is a `plan → execute ⇄ review → finalize` `CompiledGraph`. It has conditional routing, `RecursionPolicy`, a durable `FileCheckpointer`, a `CancellationToken` and a `GraphTracingSink`.
 - The workflow phase engine fans each phase's agents out on the graph (`with_max_concurrency`). The durable `WorkflowRun` ledger stays the source of truth for resume.
 - `spawn_parallel_agents` runs its fan-out through the host `spawn_parallel` adapter over `tinyagents_orchestration::parallel`.
-- The agent-teams member runtime is a conditional-routing graph (`execute → complete | fail → done`, [`agent_teams/runtime.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/orchestration/agent_teams/runtime.rs)).
 - The detached-sub-agent registry is backed by a typed `TaskStore` lifecycle ledger (Pending, Running, then Completed, Failed or Cancelled).
 
 ## TinyAgents crate: features and compatibility
@@ -111,7 +110,7 @@ OpenHuman depends on the split TinyAgents 2.1 crate family by path into the vend
 - `sqlite` feature enabled with one native sqlite chain. OpenHuman's root and Tauri Cargo worlds pin `rusqlite = "=0.40.2"` (`bundled`); the pinned Rust 1.96 toolchain provides the `cfg_select!` macro its build script needs. Both worlds resolve to a single `libsqlite3-sys` chain. Durable graph checkpoints run through TinyAgents' own `SqliteCheckpointer` (see [`orchestration/delegation.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/orchestration/delegation.rs)).
 - WhatsApp Web storage bridge. `whatsapp-rust`'s Diesel-backed `sqlite-storage` feature links sqlite separately from rusqlite 0.40, so the optional `whatsapp-web` feature (forwarded to `tinychannels/whatsapp-web`) builds against `wacore::store::InMemoryBackend` and logs that sessions are not durable. Web sessions stay non-persistent until a rusqlite-backed durable WhatsApp store exists.
 - No scripting runtime. There is no `repl` or Rhai scripting feature and no `rhai_workflows` tool. Rhai still appears as a dependency of `tinyflows` for its own JSON-query stack, unrelated to the agent harness.
-- Ownership map: model construction → `inference::provider::create_chat_model*`; durable graph checkpoints → TinyAgents' `SqliteCheckpointer`; generic detached executor state → `DetachedTaskRegistry`; controller-facing durability → OpenHuman SQL/JSON run ledgers (`running_subagents`, `workflow_runs`, `agent_teams`, `command_center`). The generic harness/graph/middleware/event primitives are used as-is.
+- Ownership map: model construction → `inference::provider::create_chat_model*`; durable graph checkpoints → TinyAgents' `SqliteCheckpointer`; generic detached executor state → `DetachedTaskRegistry`; controller-facing durability → OpenHuman SQL/JSON run ledgers (`running_subagents`, `workflow_runs`, `command_center`). The generic harness/graph/middleware/event primitives are used as-is.
 
 The agent harness is the runtime that turns a user message (or a webhook fire, or a cron tick) into a complete, tool-using LLM interaction. It owns the tool-call loop, sub-agent dispatch, the trigger-triage pipeline, and the hook surface around them. It does not own provider HTTP transport, tool implementations, prompt-section assembly or memory storage. Those are separate domains the harness composes.
 
@@ -654,7 +653,6 @@ direct `tinyagents-orchestration::subagent` lifecycle. There is no
 Orchestration on graphs (`crates/openhuman-core/src/agent/orchestration/`):
 
 - Workflow phase DAG (`workflow_runs/engine.rs`) runs on a `dispatch ⇄ run_phase → done` conditional-routing graph; each phase fans its agents out via `graph::parallel::map_reduce`. The durable `workflow_runs` row stays the source of truth (controllers + resume read it).
-- Team member runtime (`agent_teams/runtime.rs`, `run_member_graph`) is a conditional-routing graph (`execute → complete|fail → done`).
 - Multi-stage delegation (`orchestration::delegation` + the `delegate` tool) runs `delegation.rs`, checkpointed to the session DB.
 - Detached sub-agents (`running_subagents.rs`) use TinyAgents `DetachedTaskRegistry` for ownership-aware snapshots, wait/timeout, steering lookup, cooperative cancellation, hard abort, and terminal cleanup. OpenHuman retains durable task-store projection, product/session metadata, RPC and delivery semantics, and the `RunQueue` compatibility fallback.
 
@@ -666,7 +664,7 @@ Deliberately kept off the crate's primitives (these are design decisions, not ga
   product checkpoint/session projection. It implements the TinyAgents
   planner/executor/persistence traits directly. The neutral driver, not a
   host-local runner, owns lifecycle sequencing and task-key coalescing.
-- Durable run ledgers (`workflow_runs`, `agent_teams`, `command_center`, `subagent_sessions`) stay on openhuman SQLite/JSON until their controller projections and restart semantics are mapped onto TinyAgents task/status/journal records. The `agent_teams` race-safe SQL compare-and-swap task claim remains OpenHuman-owned.
+- Durable run ledgers (`workflow_runs`, `command_center`, `subagent_sessions`) stay on openhuman SQLite/JSON until their controller projections and restart semantics are mapped onto TinyAgents task/status/journal records.
 
 > TinyAgents ships harness store/cache/session primitives (`harness::store` with JSONL append stores, `harness::cache`, `harness::subagent`, lineage-aware status), graph task stores, the detached runtime registry, and conformance contracts. The session shell and product-specific sub-agent build/delivery pipeline remain OpenHuman-owned.
 
