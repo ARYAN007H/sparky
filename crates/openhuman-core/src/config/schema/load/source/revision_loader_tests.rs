@@ -66,10 +66,6 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
     let _env = crate::config::test_env::lock_env_async().await;
     let previous_proxy = crate::config::runtime_proxy_config();
     let _restore = RuntimeProxyRestore(previous_proxy);
-    let _proxy_env = crate::config::test_env::EnvVarGuard::set(
-        "OPENHUMAN_HTTP_PROXY",
-        "http://environment-proxy.invalid:7890",
-    );
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
     let path = tmp.path().join("config.toml");
@@ -93,6 +89,10 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
         .await
         .unwrap();
     document_config.save().await.unwrap();
+    let _proxy_env = crate::config::test_env::EnvVarGuard::set(
+        "OPENHUMAN_HTTP_PROXY",
+        "http://environment-proxy.invalid:7890",
+    );
 
     let tool = crate::tools::ProxyConfigTool::new(
         Arc::new(document_config),
