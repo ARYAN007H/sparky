@@ -5,7 +5,7 @@ fn handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
 }
 
 fn other_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    panic!("the pure contract runner must never execute handlers");
+    panic!("this distinct handler must never be executed");
 }
 
 fn fixture() -> (RegisteredController, ControllerParamContract) {
