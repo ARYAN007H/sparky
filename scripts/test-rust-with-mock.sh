@@ -363,7 +363,7 @@ run_full_suite() {
       run_raw_coverage_modules "$@"
     elif [ "$target" = "in_process_all" ]; then
       run_in_process_modules "$@"
-    elif [ "$target" = "json_rpc_e2e" ]; then
+    elif [[ "$target" =~ ^json_rpc_.*_e2e$ ]]; then
       run_json_rpc_e2e "$@"
     elif [ "$target" = "tinymcp_storage_smoke_e2e" ]; then
       OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \

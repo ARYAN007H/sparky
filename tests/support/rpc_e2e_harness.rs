@@ -1,7 +1,7 @@
 //! HTTP JSON-RPC integration tests against a real axum stack and a mock upstream API.
 //!
 //! Isolates config under a temp `HOME` so auth profiles and the OpenHuman provider resolve
-//! the same state directory. Run with: `cargo test --test json_rpc_e2e`
+//! the same state directory. Run a namespace with `cargo test -p openhuman-cli --test json_rpc_<namespace>_e2e`.
 
 #[path = "tinyhumans_boot.rs"]
 pub mod tinyhumans_boot;
