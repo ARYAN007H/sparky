@@ -275,13 +275,13 @@ fn publish_chat_done(
     };
     publish_web_channel_event_in(
         ctx,
-        WebChannelEvent::from(chat_done_event(
+        chat_done_event(
             context,
             full_response,
             citations,
             usage_payload,
             timing_payload,
-        )),
+        ),
     );
 }
 

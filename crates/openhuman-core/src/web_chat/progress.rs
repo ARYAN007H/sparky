@@ -501,7 +501,7 @@ pub(crate) fn spawn_progress_bridge(
     config: Config,
     dispatch_ctx: DispatchCtx,
 ) {
-    let _ = spawn_progress_bridge_with_heartbeat_interval(
+    drop(spawn_progress_bridge_with_heartbeat_interval(
         rx,
         client_id,
         thread_id,
@@ -511,7 +511,7 @@ pub(crate) fn spawn_progress_bridge(
         config,
         dispatch_ctx,
         std::time::Duration::from_secs(INFERENCE_HEARTBEAT_SECS),
-    );
+    ));
 }
 
 #[allow(clippy::too_many_arguments)]
