@@ -39,5 +39,5 @@ pub use local_runtime::synthesize_local_runtime_entry;
 use openrouter::validate_openrouter_api_key;
 
 #[cfg(test)]
-#[path = "models_tests.rs"]
+# [path = "../models_tests.rs"]
 mod tests;

@@ -1,4 +1,4 @@
-use super::resolve_local_runtime_key;
+use super::models::catalog_listing::resolve_local_runtime_key;
 use crate::config::Config;
 
 #[test]
@@ -67,7 +67,7 @@ async fn claude_code_cli_provider_lists_no_models_without_a_request() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = workspace_with_provider(&tmp, "claude-code", "cli://claude-code", AuthStyle::None);
 
-    let outcome = super::list_configured_models_from_config("claude-code", &config)
+    let outcome = super::models::list_configured_models_from_config("claude-code", &config)
         .await
         .expect("claude-code must list an empty catalog, not fail");
     assert_eq!(outcome.value["models"], serde_json::json!([]));
@@ -81,7 +81,7 @@ async fn non_http_endpoint_lists_no_models_without_a_request() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = workspace_with_provider(&tmp, "custom-cli", "cli://custom", AuthStyle::None);
 
-    let outcome = super::list_configured_models_from_config("custom-cli", &config)
+    let outcome = super::models::list_configured_models_from_config("custom-cli", &config)
         .await
         .expect("non-http endpoint must list an empty catalog, not fail");
     assert_eq!(outcome.value["models"], serde_json::json!([]));
@@ -100,7 +100,7 @@ async fn unsupported_scheme_endpoint_still_surfaces_an_error() {
         AuthStyle::None,
     );
 
-    let result = super::list_configured_models_from_config("custom-ftp", &config).await;
+    let result = super::models::list_configured_models_from_config("custom-ftp", &config).await;
     assert!(result.is_err(), "ftp:// must not read as an empty catalog");
 }
 
@@ -117,7 +117,7 @@ async fn unregistered_managed_catalog_lists_no_models() {
         AuthStyle::OpenhumanJwt,
     );
     for provider in ["openhuman", "custom-managed"] {
-        let outcome = super::list_configured_models_from_config(provider, &config)
+        let outcome = super::models::list_configured_models_from_config(provider, &config)
             .await
             .expect("an unregistered managed catalog is empty, not an error");
         assert_eq!(outcome.value["models"], serde_json::json!([]), "{provider}");
