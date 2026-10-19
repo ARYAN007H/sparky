@@ -84,12 +84,7 @@ const ChatMascotOverlay = () => {
   useEffect(() => {
     const onPlayback = (event: Event) => {
       const detail = (
-        event as CustomEvent<{
-          owner: string;
-          active: boolean;
-          viseme: string;
-          claim: boolean;
-        }>
+        event as CustomEvent<{ owner: string; active: boolean; viseme: string; claim: boolean }>
       ).detail;
       if (!detail?.owner) return;
       if (detail.active && detail.claim) {

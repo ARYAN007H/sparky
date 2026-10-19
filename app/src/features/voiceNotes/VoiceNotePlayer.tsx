@@ -141,7 +141,7 @@ function VoiceNotePlayerBody({
       publishAtCurrentTime();
       playbackRafRef.current = window.requestAnimationFrame(sampleWhilePlaying);
     };
-    audio.addEventListener('timeupdate', publishAtCurrentTime);
+    audio.addEventListener('timeupdate', () => publishAtCurrentTime());
     audio.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
         setLoadedMs(audio.duration * 1000);
