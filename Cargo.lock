@@ -8829,7 +8829,7 @@ dependencies = [
  "tinystoragedrivers-busproxy",
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
- "tinyvoice-bus 0.1.4 (git+https://github.com/tinyhumansai/tinyvoice?rev=7a8e3ac5b31a11e9c061541b336c666ee10fa190)",
+ "tinyvoice-bus 0.2.0",
  "tokio",
  "tracing",
  "uuid",
@@ -9889,8 +9889,8 @@ dependencies = [
 
 [[package]]
 name = "tinyvoice-bus"
-version = "0.1.4"
-source = "git+https://github.com/tinyhumansai/tinyvoice?rev=7a8e3ac5b31a11e9c061541b336c666ee10fa190#7a8e3ac5b31a11e9c061541b336c666ee10fa190"
+version = "0.2.0"
+source = "git+https://github.com/tinyhumansai/tinyvoice?rev=321014b01a5d45fc75703e0a800d9c7f3354cc89#321014b01a5d45fc75703e0a800d9c7f3354cc89"
 dependencies = [
  "serde",
  "serde_json",
