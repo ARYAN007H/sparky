@@ -140,8 +140,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
         };
 
         let timeout = tokio::time::Duration::from_secs(180);
-        let deadline = tokio::time::Instant::now() + timeout;
-
+        let wait = run_channel_reply_loop(async {
         let mut pending = Vec::with_capacity(32);
         let mut batch_timer = tokio::time::interval(tokio::time::Duration::from_millis(20));
         batch_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -154,11 +153,6 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                         tracing::error!("[channel-inbound] delivery failed: {error}");
                         return;
                     }
-                }
-                _ = tokio::time::sleep_until(deadline) => {
-                    tracing::error!("[channel-inbound] agent timed out after {}s", timeout.as_secs());
-                    let _ = reply.finalize("Sorry, the request timed out.").await;
-                    return;
                 }
                 event = event_rx.recv() => {
                     match event {
@@ -270,7 +264,21 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
 
             }
         }
+        }).await;
+        if wait.is_err() {
+            tracing::error!("[channel-inbound] agent timed out after {}s", timeout.as_secs());
+            let _ = reply.finalize("Sorry, the request timed out.").await;
+        }
     }
+}
+
+/// The backend socket path's legacy fixed deadline around its shared-runner
+/// event stream. Kept separate so the same wait policy can be exercised with
+/// Tokio's virtual clock and later replaced by the runner's own lifecycle.
+async fn run_channel_reply_loop(
+    event_loop: impl std::future::Future<Output = ()>,
+) -> Result<(), tokio::time::error::Elapsed> {
+    tokio::time::timeout(tokio::time::Duration::from_secs(180), event_loop).await
 }
 
 async fn flush_events(
@@ -282,3 +290,7 @@ async fn flush_events(
     }
     reply.feed(std::mem::take(pending)).await
 }
+
+#[cfg(test)]
+#[path = "subscriber_tests.rs"]
+mod tests;
