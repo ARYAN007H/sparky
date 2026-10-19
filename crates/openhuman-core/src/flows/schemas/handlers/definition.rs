@@ -40,10 +40,11 @@ pub(in crate::flows::schemas) fn handle_validate(
 }
 
 pub(in crate::flows::schemas) fn handle_import(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
+        let config = ctx.load_config().await?;
         let graph = read_required::<Value>(&params, "graph")?;
         let format = params
             .get("format")
@@ -51,7 +52,7 @@ pub(in crate::flows::schemas) fn handle_import(
             .map(|v| serde_json::from_value::<String>(v.clone()))
             .transpose()
             .map_err(|e| format!("invalid 'format': {e}"))?;
-        to_json(ops::flows_import(graph, format).await?)
+        to_json(ops::flows_import(&ctx, &config, graph, format).await?)
     })
 }
 

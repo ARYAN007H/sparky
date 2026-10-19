@@ -7,7 +7,7 @@ use tinyflows_bus::{GraphValidation, ImportGraphResult, ValidateGraphRequest};
 pub(crate) use tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN;
 
 async fn validate_over_bus(
-    _ctx: &DispatchCtx,
+    ctx: &DispatchCtx,
     config: &Config,
     graph: Value,
 ) -> Result<GraphValidation, String> {
@@ -160,7 +160,7 @@ pub async fn flows_validate(
 /// Imports and validates native or n8n graph JSON through TinyFlows without
 /// persisting it.
 pub async fn flows_import(
-    ctx: &DispatchCtx,
+    _ctx: &DispatchCtx,
     config: &Config,
     graph_json: Value,
     format: Option<String>,
