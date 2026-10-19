@@ -29,6 +29,7 @@ pub(crate) mod builder_tools;
 mod builder_tools_connection_reads;
 pub mod bus;
 pub(crate) mod authoring_host;
+pub(crate) mod host_gates;
 pub mod catalogue;
 mod copilot_bus;
 mod draft_store;

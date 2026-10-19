@@ -63,15 +63,15 @@ impl Callbacks {
             let graph: tinyflows::model::WorkflowGraph =
                 serde_json::from_value(graph).map_err(|error| error.to_string())?;
             match stage.as_str() {
-                tinyflows_bus::host::TOOL_POLICY => Ok(ops::validate_upload_paths(&graph)),
+                tinyflows_bus::host::TOOL_POLICY => Ok(crate::flows::host_gates::validate_upload_paths(&graph)),
                 tinyflows_bus::host::AGENT_REFERENCES => {
-                    Ok(ops::validate_agent_refs(&context, &config, &graph).await)
+                    Ok(crate::flows::host_gates::validate_agent_refs(&context, &config, &graph).await)
                 }
                 tinyflows_bus::host::CONNECTIONS => {
-                    Ok(ops::validate_connection_refs(&context, &config, &graph).await)
+                    Ok(crate::flows::host_gates::validate_connection_refs(&context, &config, &graph).await)
                 }
                 tinyflows_bus::host::TOOL_CONTRACTS => {
-                    Ok(ops::validate_tool_contracts(&config, &graph).await)
+                    Ok(crate::flows::host_gates::validate_tool_contracts(&config, &graph).await)
                 }
                 _ => Err(format!("unknown TinyFlows authoring gate `{stage}`")),
             }
