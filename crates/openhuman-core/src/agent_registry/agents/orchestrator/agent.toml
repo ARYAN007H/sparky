@@ -32,49 +32,20 @@ omit_memory_context = false
 omit_safety_preamble = true
 
 # Delegation surface. The `collect_orchestrator_tools` helper reads this
-# at agent-build time and synthesises one `delegate_*` tool per entry:
+# at agent-build time and synthesises one `delegate_*` tool per named
+# specialist. The tool name and target `when_to_use` description are both
+# preserved in the model-facing routing surface. Archetype routes that are
+# withheld by a tool pack are described in the orchestrator prompt's live
+# specialist roster, using the registry's current `when_to_use` text.
 #
-#   * Bare agent ids → one `ArchetypeDelegationTool` each, using the
-#     target agent's `delegate_name` override (if any) or `delegate_{id}`
-#     as the tool name, and the target's `when_to_use` as the
-#     LLM-visible tool description.
+# `{ skills = "*" }` contributes deferred Composio actions, discovered through
+# `tool_search` and called directly; it does not spawn a sub-agent.
 #
-#   * `{ skills = "*" }` → one `Deferred` action tool per action of every
-#     connected Composio toolkit. Off the wire, found through `tool_search`,
-#     called directly. This used to be a `delegate_to_integrations_agent`
-#     spawn; one clear service action is now a search and a call, and the
-#     wildcard admits no sub-agent id (`AgentDefinition::allowed_subagent_ids`).
-#
-# The orchestrator LLM sees these as first-class entries in its
-# function-calling schema, so routing decisions happen at the tool-
-# selection layer rather than hidden inside a mega-tool's enum param.
-#
-# That decision still stands, and it has been re-examined: collapsing these
-# into one `delegate(agent = enum, ...)` looks like it would save ~6.8k tokens
-# but does not, because each tool's DISTINCT description (the target's
-# `when_to_use`) does not disappear — it just re-renders inside the mega-tool,
-# the way `SkillDelegationTool::build_description` already does. The tool NAMES
-# are load-bearing too: prompt.md teaches them individually, and the tool-pack
-# withholding table (`tools/toolpacks/registry.rs`) keys on them.
-#
-# What DID cost 6.8k was the shared argument envelope, emitted identically once
-# per delegate tool. That is fixed at the source: `ArchetypeDelegationTool::
-# parameters_schema` now carries descriptions only on the four fields whose name
-# does not carry their meaning, and the envelope's semantics are documented ONCE
-# in prompt.md under "Structured handoffs" — charged once instead of 19 times.
-# If you are here to propose the mega-tool again, it is a routing-quality change
-# needing an eval, not a token change.
-#
-# Most former specialists are deliberately ABSENT, and absence is the point.
-# A sub-agent whose whole value was a prompt over a handful of tools
-# (code_executor, critic, planner, settings_agent, scheduler_agent,
-# crypto_agent, mcp_agent, help, tools_agent, skill_creator, skill_executor)
-# is now an inline skill instead: its tools are `ToolExposure::Deferred`
-# (found through `tool_search`) and its playbook is the pack guide
-# `use_skill` prints (`tools/toolpacks/guides/`). What remains below are
-# specialists that own something a guide cannot: a pinned model
-# (vision/image/video), a separate long-running context (workflow_builder),
-# or a curated domain belt.
+# Specialists whose value is a prompt over a small tool set use inline skills
+# instead. Their tools are `ToolExposure::Deferred` (found through
+# `tool_search`) and their playbook is the pack guide printed by `use_skill`.
+# The specialists that remain below provide pinned models, long-running
+# contexts, or curated domain belts.
 
 # Named tools this agent reaches through `tool_search` instead of its wire:
 # still registered, found by a search, and callable by their own name (the
