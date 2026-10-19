@@ -15,11 +15,10 @@ use serde_json::Value;
 use sha2::Digest;
 use tinybus::Result as BusResult;
 use tinyflows_bus::catalog::{
-    self, CallbackAddress, CatalogCollectionSpec, CatalogDocumentMeta,
-    CatalogDocumentPrecondition, CatalogDocumentQuery, CatalogDocumentSearch, CatalogDocumentSort,
-    CatalogFilter, CatalogQuery, CatalogStorage as WireStorage, CatalogStorageFailure,
-    CatalogStorageReply, CatalogVersionedDocument, DocDeleteRequest, DocDeleteWhereRequest,
-    DocEnsureRequest, DocGetRequest, DocPutRequest, DocQueryRequest,
+    self, CallbackAddress, CatalogDocumentCursor, CatalogDocumentMeta,
+    CatalogStorage as WireStorage, CatalogStorageFailure, CatalogStorageReply,
+    CatalogVersionedDocument, DocDeleteRequest, DocDeleteWhereRequest, DocEnsureRequest,
+    DocGetRequest, DocPutRequest, DocQueryRequest,
 };
 use tinystoragedrivers::{
     Capability, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, Scope,
@@ -347,17 +346,24 @@ impl CatalogStoragePort {
                 .documents()?
                 .query(&request.collection, &query)
                 .await?;
-            Ok(page.map(|record| CatalogVersionedDocument {
-                id: record.id,
-                version: record.version,
-                doc: record.doc,
-                meta: CatalogDocumentMeta {
-                    schema: record.meta.schema,
-                    created_ms: record.meta.created_ms,
-                    updated_ms: record.meta.updated_ms,
-                    expires_ms: record.meta.expires_ms,
-                },
-            }))
+            Ok(catalog::CatalogDocumentPage {
+                items: page
+                    .items
+                    .into_iter()
+                    .map(|record| CatalogVersionedDocument {
+                        id: record.id,
+                        version: record.version,
+                        doc: record.doc,
+                        meta: CatalogDocumentMeta {
+                            schema: record.meta.schema,
+                            created_ms: record.meta.created_ms,
+                            updated_ms: record.meta.updated_ms,
+                            expires_ms: record.meta.expires_ms,
+                        },
+                    })
+                    .collect(),
+                next: page.next.map(|cursor| CatalogDocumentCursor(cursor.0)),
+            })
         }
         .await;
         Ok(catalog_reply(result))
