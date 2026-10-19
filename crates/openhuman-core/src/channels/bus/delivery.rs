@@ -220,10 +220,7 @@ impl NativeProgressiveReply {
     }
 
     /// Deliver the canonical final event and return every receipt/failure fact.
-    pub(crate) async fn finish(
-        &self,
-        text: &str,
-    ) -> Result<ProgressiveResult, ModuleCallError> {
+    pub(crate) async fn finish(&self, text: &str) -> Result<ProgressiveResult, ModuleCallError> {
         let result: ProgressiveResult = self
             .object
             .call_confidential(

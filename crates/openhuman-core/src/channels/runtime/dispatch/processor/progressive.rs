@@ -115,7 +115,9 @@ fn delivery_succeeded(result: &tinychannels_bus::module_progressive::Progressive
     }
 }
 
-fn delivery_outcome_count(result: &tinychannels_bus::module_progressive::ProgressiveResult) -> usize {
+fn delivery_outcome_count(
+    result: &tinychannels_bus::module_progressive::ProgressiveResult,
+) -> usize {
     use tinychannels_bus::module_progressive::ProgressiveResult;
     match result {
         ProgressiveResult::DeliveryOutcome { .. } => 1,

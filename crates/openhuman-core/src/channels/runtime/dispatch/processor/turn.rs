@@ -277,8 +277,8 @@ pub(crate) async fn process_channel_runtime_message(
     // Determine if this channel supports streaming draft updates
     let use_streaming = native_reply.is_none()
         && target_channel
-        .as_ref()
-        .is_some_and(|ch| ch.supports_draft_updates());
+            .as_ref()
+            .is_some_and(|ch| ch.supports_draft_updates());
 
     // Set up streaming channel if supported
     let (progress_tx, progress_rx) = if native_reply.is_some() || use_streaming {
@@ -312,9 +312,8 @@ pub(crate) async fn process_channel_runtime_message(
 
     // Spawn a task to forward streaming progress to draft updates
     let draft_updater = if let Some(reply) = native_reply.clone() {
-        progress_rx.map(|rx| {
-            AbortOnDropHandle::new(super::progressive::spawn_native_progress(rx, reply))
-        })
+        progress_rx
+            .map(|rx| AbortOnDropHandle::new(super::progressive::spawn_native_progress(rx, reply)))
     } else if let (Some(mut rx), Some(draft_id_ref), Some(channel_ref)) = (
         progress_rx,
         draft_message_id.as_deref(),
@@ -542,37 +541,38 @@ pub(crate) async fn process_channel_runtime_message(
                 started_at.elapsed().as_millis(),
                 truncate_with_ellipsis(&response_text, REPLY_LOG_TRUNCATE_CHARS)
             );
-            let delivered = super::progressive::finish_native_reply(&native_reply, &response_text).await;
+            let delivered =
+                super::progressive::finish_native_reply(&native_reply, &response_text).await;
             if native_reply.is_none() {
-            if let Some(channel) = target_channel.as_ref() {
-                if let Some(ref draft_id) = draft_message_id {
-                    if let Err(e) = channel
-                        .finalize_draft(
-                            &msg.reply_target,
-                            draft_id,
-                            &response_text,
-                            msg.thread_ts.as_deref(),
+                if let Some(channel) = target_channel.as_ref() {
+                    if let Some(ref draft_id) = draft_message_id {
+                        if let Err(e) = channel
+                            .finalize_draft(
+                                &msg.reply_target,
+                                draft_id,
+                                &response_text,
+                                msg.thread_ts.as_deref(),
+                            )
+                            .await
+                        {
+                            tracing::warn!("Failed to finalize draft: {e}; sending as new message");
+                            let _ = channel
+                                .send_with_outbound_intent(
+                                    &SendMessage::new(&response_text, &msg.reply_target)
+                                        .in_thread(msg.thread_ts.clone()),
+                                )
+                                .await;
+                        }
+                    } else if let Err(e) = channel
+                        .send_with_outbound_intent(
+                            &SendMessage::new(&response_text, &msg.reply_target)
+                                .in_thread(msg.thread_ts.clone()),
                         )
                         .await
                     {
-                        tracing::warn!("Failed to finalize draft: {e}; sending as new message");
-                        let _ = channel
-                            .send_with_outbound_intent(
-                                &SendMessage::new(&response_text, &msg.reply_target)
-                                    .in_thread(msg.thread_ts.clone()),
-                            )
-                            .await;
+                        eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
                     }
-                } else if let Err(e) = channel
-                    .send_with_outbound_intent(
-                        &SendMessage::new(&response_text, &msg.reply_target)
-                            .in_thread(msg.thread_ts.clone()),
-                    )
-                    .await
-                {
-                    eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
                 }
-            }
             }
             (delivered, response_text, resolved_provider, resolved_model)
         }
@@ -588,25 +588,25 @@ pub(crate) async fn process_channel_runtime_message(
                 );
                 let _ = super::progressive::finish_native_reply(&native_reply, error_text).await;
                 if native_reply.is_none() {
-                if let Some(channel) = target_channel.as_ref() {
-                    if let Some(ref draft_id) = draft_message_id {
-                        let _ = channel
-                            .finalize_draft(
-                                &msg.reply_target,
-                                draft_id,
-                                error_text,
-                                msg.thread_ts.as_deref(),
-                            )
-                            .await;
-                    } else {
-                        let _ = channel
-                            .send_with_outbound_intent(
-                                &SendMessage::new(error_text, &msg.reply_target)
-                                    .in_thread(msg.thread_ts.clone()),
-                            )
-                            .await;
+                    if let Some(channel) = target_channel.as_ref() {
+                        if let Some(ref draft_id) = draft_message_id {
+                            let _ = channel
+                                .finalize_draft(
+                                    &msg.reply_target,
+                                    draft_id,
+                                    error_text,
+                                    msg.thread_ts.as_deref(),
+                                )
+                                .await;
+                        } else {
+                            let _ = channel
+                                .send_with_outbound_intent(
+                                    &SendMessage::new(error_text, &msg.reply_target)
+                                        .in_thread(msg.thread_ts.clone()),
+                                )
+                                .await;
+                        }
                     }
-                }
                 }
 
                 BUS.publish(DomainEvent::ChannelMessageProcessed {
@@ -680,25 +680,25 @@ pub(crate) async fn process_channel_runtime_message(
             }
             let _ = super::progressive::finish_native_reply(&native_reply, &error_response).await;
             if native_reply.is_none() {
-            if let Some(channel) = target_channel.as_ref() {
-                if let Some(ref draft_id) = draft_message_id {
-                    let _ = channel
-                        .finalize_draft(
-                            &msg.reply_target,
-                            draft_id,
-                            &error_response,
-                            msg.thread_ts.as_deref(),
-                        )
-                        .await;
-                } else {
-                    let _ = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(&error_response, &msg.reply_target)
-                                .in_thread(msg.thread_ts.clone()),
-                        )
-                        .await;
+                if let Some(channel) = target_channel.as_ref() {
+                    if let Some(ref draft_id) = draft_message_id {
+                        let _ = channel
+                            .finalize_draft(
+                                &msg.reply_target,
+                                draft_id,
+                                &error_response,
+                                msg.thread_ts.as_deref(),
+                            )
+                            .await;
+                    } else {
+                        let _ = channel
+                            .send_with_outbound_intent(
+                                &SendMessage::new(&error_response, &msg.reply_target)
+                                    .in_thread(msg.thread_ts.clone()),
+                            )
+                            .await;
+                    }
                 }
-            }
             }
             (
                 false,
@@ -727,25 +727,25 @@ pub(crate) async fn process_channel_runtime_message(
                 "⚠️ Request timed out while waiting for the model. Please try again.".to_string();
             let _ = super::progressive::finish_native_reply(&native_reply, &error_text).await;
             if native_reply.is_none() {
-            if let Some(channel) = target_channel.as_ref() {
-                if let Some(ref draft_id) = draft_message_id {
-                    let _ = channel
-                        .finalize_draft(
-                            &msg.reply_target,
-                            draft_id,
-                            &error_text,
-                            msg.thread_ts.as_deref(),
-                        )
-                        .await;
-                } else {
-                    let _ = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(&error_text, &msg.reply_target)
-                                .in_thread(msg.thread_ts.clone()),
-                        )
-                        .await;
+                if let Some(channel) = target_channel.as_ref() {
+                    if let Some(ref draft_id) = draft_message_id {
+                        let _ = channel
+                            .finalize_draft(
+                                &msg.reply_target,
+                                draft_id,
+                                &error_text,
+                                msg.thread_ts.as_deref(),
+                            )
+                            .await;
+                    } else {
+                        let _ = channel
+                            .send_with_outbound_intent(
+                                &SendMessage::new(&error_text, &msg.reply_target)
+                                    .in_thread(msg.thread_ts.clone()),
+                            )
+                            .await;
+                    }
                 }
-            }
             }
             (
                 false,
