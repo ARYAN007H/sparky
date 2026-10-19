@@ -11,11 +11,11 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
     assert_eq!(tinycomputer_bus::CONTRACT_VERSION, (2, 20));
     assert_eq!(
         desktop.asset_for("ubuntu-24.04-x86_64").unwrap().sha256,
-        "fe79e93bf45d1ba3cd4212d04872530462a99d3d220da182070d54817e8291c6"
+        "c33256574bbffcff991d1da852c10f7ae5b5b838fe94ce70d801bdaa0975e190"
     );
     assert_eq!(
         desktop.asset_for("macos-26-arm64").unwrap().sha256,
-        "05872f842caa298380a54ea9108aeca04152a70c78fe7177936f61d21b43bc38"
+        "9bacf2451dc9b1113bd5293f268743048bbe4e92db4f343b9e6a9dadea68249b"
     );
 }
 
