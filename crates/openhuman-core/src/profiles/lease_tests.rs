@@ -322,7 +322,9 @@ async fn a_release_during_a_heartbeat_renewal_releases_the_renewed_grant() {
     drop(a.open(&alice).await.unwrap());
 
     // The heartbeat renews alice and stops before storing the new grant...
-    pausing.armed.store(true, std::sync::atomic::Ordering::SeqCst);
+    pausing
+        .armed
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     let heartbeat = tokio::spawn({
         let a = Arc::clone(&a);
         async move { renew_once(&a).await }
@@ -343,7 +345,10 @@ async fn a_release_during_a_heartbeat_renewal_releases_the_renewed_grant() {
     assert_eq!(release.await.unwrap(), Ok(true));
     assert!(!a.is_open(&alice));
     let record = a.leases().holder(alice.as_str()).await.unwrap().unwrap();
-    assert!(record.released, "the record is released cleanly: {record:?}");
+    assert!(
+        record.released,
+        "the record is released cleanly: {record:?}"
+    );
     let taken = b.open(&alice).await.unwrap();
     assert_eq!(taken.id, alice);
 }
