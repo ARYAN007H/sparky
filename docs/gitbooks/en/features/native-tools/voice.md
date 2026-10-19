@@ -15,7 +15,7 @@ Voice is an optional core capability. The Cargo `voice` feature is off in contri
 - **Hallucination filter.** Strips known artifacts such as "Thanks for watching" and phrases invented from silence.
 - **Postprocessing.** Punctuation, capitalization and dictation cleanup.
 
-The resulting text goes into the active chat composer, where you can edit or send it. Desktop global voice shortcuts are no longer part of the product.
+When you stop recording, the transcription is submitted as a message to the current chat. Desktop global voice shortcuts are no longer part of the product.
 
 ## Text-to-speech
 

@@ -208,7 +208,7 @@ In one comparison, `openhuman --lib` failed 5 tests on default features and 3 un
 
 ```bash
 RUST_MIN_STACK=67108864 cargo test -p openhuman --lib \
-  --features "$(bash scripts/ci/product-features.sh)"
+  --features "$(bash scripts/ci/product-features.sh --core)"
 ```
 
 `RUST_MIN_STACK` is per suite, not universal. Removing it from `openhuman-tinyhumans` still gives `183 passed; 0 failed`, so that crate does not need it. For `openhuman --lib`, `web_chat` is reported to abort with `fatal runtime error: stack overflow` without it, which is why the CI lane exports it. That abort has not been reproduced locally, so re-verify before relying on it elsewhere.
