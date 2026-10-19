@@ -11,6 +11,7 @@ pub mod state;
 mod sync;
 
 use tinymemory_integrations::sources::{Error as SourceError, SourceSpec};
+use tinymemory_integrations::sources::SourceState;
 use tinymemory_tools::ops::MemoryOps;
 
 use crate::config::Config;
@@ -34,7 +35,7 @@ fn source_spec_error(error: SourceError) -> Error {
 
 /// The view of `source` with its sync state.
 #[must_use]
-pub fn view(source: &MemorySourceConfig, state: Option<&state::SourceState>) -> SourceView {
+pub fn view(source: &MemorySourceConfig, state: Option<&SourceState>) -> SourceView {
     let state = state.cloned().unwrap_or_default();
     SourceView {
         id: source.id.clone(),

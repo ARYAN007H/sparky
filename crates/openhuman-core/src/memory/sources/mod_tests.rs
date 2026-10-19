@@ -1,7 +1,7 @@
 use super::*;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
-use crate::memory::types::SourceStatus;
 use chrono::Utc;
+use tinymemory_integrations::sources::{SourceState, SourceStatus};
 use tinymemory_api::{DocumentBody, MemoryMeta, SourceKind, SourceRef, StoreItem};
 
 fn add_params(kind: &str, target: &str) -> SourcesAddParams {
@@ -216,7 +216,7 @@ fn the_removed_composio_kind_is_rejected_and_every_other_kind_is_accepted() {
 #[test]
 fn view_overlays_the_sync_state() {
     let src = source("src-1", Some(30));
-    let state = state::SourceState {
+    let state = SourceState {
         last_sync_at: Some(Utc::now()),
         status: SourceStatus::Error,
         error: Some("boom".into()),
