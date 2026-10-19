@@ -70,6 +70,8 @@ pub mod desktop;
 #[cfg(feature = "documents")]
 #[cfg(feature = "modules")]
 pub mod documents;
+#[cfg(feature = "inbound-queues")]
+pub mod event_queues;
 #[cfg(feature = "modules")]
 pub mod linked;
 #[cfg(feature = "modules")]
