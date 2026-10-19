@@ -19,7 +19,7 @@ use openhuman_core::config::schema::cloud_providers::{
 };
 use openhuman_core::config::Config;
 use openhuman_core::core::types::AppState;
-use openhuman_core::inference::host_runtime::{local_ai_status, LocalAiService};
+use openhuman_core::inference::host_runtime::local_ai_status;
 use openhuman_core::inference::http;
 use openhuman_core::security::credentials::{
     AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
@@ -74,18 +74,15 @@ impl Drop for EnvVarGuard {
 /// by default. These tests mutate `OPENHUMAN_WORKSPACE`, `OPENHUMAN_OLLAMA_BASE_URL`,
 /// and binary path env vars, so every test takes this guard before reading or
 /// writing config that may be influenced by process env.
-static ENV_LOCK: &OnceLock<Mutex<()>> = &crate::SHARED_ENV_LOCK;
+static ENV_LOCK: &OnceLock<tokio::sync::Mutex<()>> = &crate::SHARED_ENV_LOCK;
 
-fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-    ENV_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
+async fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
+    ENV_LOCK.get_or_init(|| tokio::sync::Mutex::new(())).lock().await
 }
 
 #[tokio::test]
 async fn http_models_and_chat_use_mocked_ollama_without_real_runtime() {
-    let _env = env_lock();
+    let _env = env_lock().await;
     let (base, state) = serve_mock().await;
     let tmp = tempdir().expect("tempdir");
     let mut config = temp_config(&tmp);
@@ -101,7 +98,6 @@ async fn http_models_and_chat_use_mocked_ollama_without_real_runtime() {
         label: "Round 23".to_string(),
         endpoint: format!("{base}/cloud"),
         auth_style: CloudAuthStyle::None,
-        legacy_type: None,
         default_model: Some("cloud-default@0.5".to_string()),
     }];
     config.save().await.expect("save config");
@@ -197,7 +193,7 @@ async fn http_models_and_chat_use_mocked_ollama_without_real_runtime() {
 
 #[tokio::test]
 async fn local_service_reports_endpoint_state_from_mocked_ollama_without_spawning() {
-    let _env = env_lock();
+    let _env = env_lock().await;
     let (base, _state) = serve_mock().await;
     let tmp = tempdir().expect("tempdir");
     // Runtime binaries on PATH leave a marker if run: OpenHuman probes the
@@ -226,19 +222,8 @@ async fn local_service_reports_endpoint_state_from_mocked_ollama_without_spawnin
     let _piper_bin = EnvVarGuard::unset("PIPER_BIN");
     let _ollama_bin = EnvVarGuard::unset("OLLAMA_BIN");
 
-    let runtime = openhuman_core::inference::local_runtime_config(&config);
-    let service = LocalAiService::new(&runtime);
-    service.bootstrap(&runtime).await;
-    let status = service.status();
-    assert_eq!(status.vision_mode, "ondemand");
-    assert_eq!(status.chat_model_id, "gemma3:1b-it-qat");
-
-    let diagnostics = service.diagnostics(&runtime).await.expect("diagnostics");
-    assert_eq!(diagnostics["expected"]["vision_found"], true);
-
-    // No transcription assertion here: `transcribe_with_prompt` is a hosted
-    // call to the backend proxy since the whisper.cpp engine was deleted.
-
+    // Exercise the host operation's config projection. It may probe this
+    // loopback endpoint, but must not launch a local runtime binary itself.
     let ops_status = local_ai_status(&config).await.expect("ops status").value;
     assert_eq!(ops_status.provider, "ollama");
     assert!(
@@ -357,9 +342,11 @@ fn remember(state: &MockState, path: &str, body: Value) {
 fn temp_config(tmp: &TempDir) -> Config {
     let root = tmp.path().join(".openhuman");
     std::fs::create_dir_all(root.join("workspace")).expect("workspace dir");
-    let mut config = Config::default();
-    config.config_path = root.join("config.toml");
-    config.workspace_dir = root.join("workspace");
+    let mut config = Config {
+        config_path: root.join("config.toml"),
+        workspace_dir: root.join("workspace"),
+        ..Config::default()
+    };
     config.secrets.encrypt = false;
     config.api_url = Some("http://127.0.0.1:9".to_string());
     config

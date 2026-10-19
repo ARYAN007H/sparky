@@ -30,7 +30,7 @@ use openhuman_core::security::approval::{
 };
 use openhuman_core::security::turn_origin::{self, AgentTurnOrigin};
 use openhuman_core::security::{live_policy, SecurityPolicy};
-use openhuman_core::tools::registry::{registry_entries, registry_entries_for_config};
+use openhuman_core::tools::registry::registry_entries_for_config;
 use openhuman_rpc::server::build_core_http_router;
 use tinytools::registry::denials;
 
@@ -197,7 +197,7 @@ async fn rpc(rpc_base: &str, id: i64, method: &str, params: Value) -> Value {
         .unwrap_or_else(|err| panic!("json for {method}: {err}"))
 }
 
-fn test_mcp_server() -> InstalledServer {
+fn test_mcp_server(endpoint: &str) -> InstalledServer {
     InstalledServer {
         server_id: format!("tool-registry-test-{}", uuid::Uuid::new_v4()),
         qualified_name: "@openhuman-test/echo".to_string(),
@@ -205,13 +205,15 @@ fn test_mcp_server() -> InstalledServer {
         description: Some("Stub MCP server used by tool registry coverage tests.".to_string()),
         icon_url: None,
         command_kind: CommandKind::Binary,
-        command: env!("CARGO_BIN_EXE_test-mcp-stub").to_string(),
+        command: String::new(),
         args: Vec::new(),
         env_keys: Vec::new(),
         config: None,
         installed_at: 0,
         last_connected_at: None,
-        transport: Transport::Stdio,
+        transport: Transport::HttpRemote {
+            url: endpoint.to_string(),
+        },
         enabled: true,
     }
 }
@@ -222,8 +224,7 @@ async fn install_test_mcp_server(config: &Config, server: &InstalledServer) -> I
         json!({
             "mcpServers": {
                 server.qualified_name.clone(): {
-                    "command": server.command.clone(),
-                    "args": server.args.clone(),
+                    "url": server.transport.deployment_url().expect("HTTP fixture URL"),
                     "enabled": false,
                 }
             }
@@ -397,12 +398,13 @@ enabled = true
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tool_registry_entries_include_connected_mcp_client_tools() {
+    let mcp_server = crate::local_mcp_http::LocalMcpHttpServer::start_echo().await;
     let tmp = tempdir().expect("tempdir");
     let config = Config {
         workspace_dir: tmp.path().to_path_buf(),
         ..Config::default()
     };
-    let server = install_test_mcp_server(&config, &test_mcp_server()).await;
+    let server = install_test_mcp_server(&config, &test_mcp_server(mcp_server.endpoint())).await;
     openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
         &config,
         server.server_id.clone(),
@@ -414,6 +416,22 @@ async fn tool_registry_entries_include_connected_mcp_client_tools() {
         .await
         .expect("connect test mcp server");
     assert_eq!(tools.first().map(|tool| tool.name.as_str()), Some("echo"));
+    let canary = "TOOL_REGISTRY_MCP_ECHO_CANARY";
+    let call = openhuman_core::mcp::registry::ops::mcp_clients_tool_call(
+        &config,
+        server.server_id.clone(),
+        "echo".to_string(),
+        json!({ "message": canary }),
+    )
+    .await
+    .expect("call test MCP tool");
+    assert_eq!(call.value["is_error"], false);
+    assert_eq!(call.value["result"]["content"][0]["text"], canary);
+    assert_eq!(
+        mcp_server.tool_calls(),
+        vec![json!({ "name": "echo", "arguments": { "message": canary } })],
+        "the actual loopback MCP server must receive the tool call"
+    );
 
     // A second workspace, so that scoping is what the assertions below actually
     // test. With one workspace open, `registry_entries()` and the config-scoped
@@ -423,7 +441,12 @@ async fn tool_registry_entries_include_connected_mcp_client_tools() {
         workspace_dir: other_tmp.path().to_path_buf(),
         ..Config::default()
     };
-    let other_server = install_test_mcp_server(&other_config, &test_mcp_server()).await;
+    let other_mcp_server = crate::local_mcp_http::LocalMcpHttpServer::start_echo().await;
+    let other_server = install_test_mcp_server(
+        &other_config,
+        &test_mcp_server(other_mcp_server.endpoint()),
+    )
+    .await;
     openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
         &other_config,
         other_server.server_id.clone(),

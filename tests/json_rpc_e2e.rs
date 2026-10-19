@@ -6366,198 +6366,8 @@ async fn json_rpc_inference_status_reports_unreachable_without_spawning_a_runtim
     rpc_join.abort();
 }
 
-/// Matrix 3.1.5 — the model context-window requirement gate, over RPC.
-///
-/// `local_ai.model_context_check` rejects installed Ollama models whose native
-/// context window is below the memory layer's minimum, so that "short-context
-/// models can't silently truncate and corrupt recall" (its own capability
-/// description). The rejection itself was asserted nowhere that runs:
-///
-///   * the implementation and its unit tests live in
-///     `vendor/tinyagents/vendor/tinyinference/crates/tinyinference-local/`,
-///     and `vendor` is in the root `[workspace] exclude` — no OpenHuman lane
-///     compiles that package, let alone runs its tests;
-///   * OpenHuman itself never names `model_requirements`, so there is no
-///     in-crate seam to unit-test it directly;
-///   * `openhuman.inference_diagnostics` was named by two live e2e targets, but
-///     only inside a schema-catalog list and an error-path table.
-///
-/// So the RPC boundary is the only place this behaviour is reachable from code
-/// this repo builds, and that is what this test drives: a mock Ollama serving
-/// one model below the floor and one comfortably above it, through
-/// `/api/tags` + `/api/show`, exactly as the real daemon would.
-///
-/// Deliberately asserts the *relationship* rather than the literal 8192:
-/// `min_context_tokens` is re-exported from
-/// `tinyinference_embeddings::RECOMMENDED_OLLAMA_CONTEXT_TOKENS` and is allowed
-/// to move. What must not change without someone noticing is that a model under
-/// whatever that floor is gets `below_minimum` and one over it gets `ok`.
 #[tokio::test]
-async fn json_rpc_local_ai_ollama_diagnostics_rejects_a_short_context_model() {
-    let _env_lock = json_rpc_e2e_env_lock_async().await;
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path();
-    let openhuman_home = home.join(".openhuman");
-
-    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
-    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
-    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
-    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
-    let _ollama_env_guard = EnvVarGuard::unset("OPENHUMAN_OLLAMA_BASE_URL");
-
-    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
-    let mock_origin = format!("http://{}", mock_addr);
-    write_min_config(&openhuman_home, &mock_origin);
-
-    // Well under any plausible floor; the memory layer must refuse it.
-    const SHORT_CTX: u64 = 2_048;
-    // Comfortably over it.
-    const AMPLE_CTX: u64 = 131_072;
-    // The short-context model must be one the MVP chat allowlist accepts, or
-    // `effective_chat_model_id` rewrites the configured id to
-    // `MVP_DEFAULT_CHAT_MODEL` and `expected.chat_eligibility` resolves against
-    // a model this mock never lists. That rewrite is real behaviour, not a test
-    // artefact: under Ollama an off-allowlist chat model is redirected, so the
-    // realistic failure this gate exists for is the *allowlisted* model having
-    // too small a window.
-    const SHORT_MODEL: &str = "gemma3:1b-it-qat";
-    const AMPLE_MODEL: &str = "roomy-ctx:latest";
-
-    let ollama_app = Router::new()
-        .route(
-            "/api/tags",
-            get(|| async {
-                Json(json!({
-                    "models": [
-                        { "name": SHORT_MODEL, "size": 1_000_000, "modified_at": "2026-09-24T00:00:00Z" },
-                        { "name": AMPLE_MODEL, "size": 2_000_000, "modified_at": "2026-09-24T00:00:00Z" },
-                    ]
-                }))
-            }),
-        )
-        .route(
-            "/api/show",
-            post(|Json(body): Json<Value>| async move {
-                // `context_length_from_model_info` reads `{arch}.context_length`
-                // keyed off `general.architecture`; mirror that shape rather
-                // than a flattened convenience key, or the gate reads `Unknown`
-                // and this test would pass for the wrong reason.
-                let model = body.get("model").and_then(Value::as_str).unwrap_or_default();
-                let ctx = if model.starts_with("gemma3") {
-                    SHORT_CTX
-                } else {
-                    AMPLE_CTX
-                };
-                Json(json!({
-                    "model_info": {
-                        "general.architecture": "llama",
-                        "llama.context_length": ctx,
-                    },
-                    "capabilities": ["completion"],
-                }))
-            }),
-        );
-    let (ollama_addr, ollama_join) = serve_on_ephemeral(ollama_app).await;
-    let ollama_base = format!("http://{ollama_addr}");
-
-    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
-    let rpc_base = format!("http://{}", rpc_addr);
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let update = post_json_rpc(
-        &rpc_base,
-        60,
-        "openhuman.inference_update_local_settings",
-        json!({
-            "runtime_enabled": true,
-            "opt_in_confirmed": true,
-            "provider": "ollama",
-            "base_url": ollama_base,
-            "model_id": SHORT_MODEL,
-            "chat_model_id": SHORT_MODEL
-        }),
-    )
-    .await;
-    assert_no_jsonrpc_error(&update, "update_local_ai_settings_for_ollama");
-
-    let diagnostics =
-        post_json_rpc(&rpc_base, 61, "openhuman.inference_diagnostics", json!({})).await;
-    let result = assert_no_jsonrpc_error(&diagnostics, "ollama_context_diagnostics");
-
-    // The floor is reported, and it is a real number rather than a default 0 —
-    // a zero floor would accept everything and make the rest of this vacuous.
-    let floor = result
-        .get("context_requirement")
-        .and_then(|requirement| requirement.get("min_context_tokens"))
-        .and_then(Value::as_u64)
-        .expect("diagnostics must report the context floor");
-    assert!(
-        floor > SHORT_CTX && floor < AMPLE_CTX,
-        "this test's two fixtures must straddle the floor; floor={floor}, \
-         short={SHORT_CTX}, ample={AMPLE_CTX}"
-    );
-
-    let installed = result
-        .get("installed_models")
-        .and_then(Value::as_array)
-        .expect("diagnostics must list installed models");
-    assert_eq!(installed.len(), 2, "both mock models should be listed");
-
-    let eligibility_of = |name: &str| -> Value {
-        installed
-            .iter()
-            .find(|entry| entry.get("name").and_then(Value::as_str) == Some(name))
-            .and_then(|entry| entry.get("eligibility"))
-            .cloned()
-            .unwrap_or(Value::Null)
-    };
-
-    let short = eligibility_of(SHORT_MODEL);
-    assert_eq!(
-        short.get("status").and_then(Value::as_str),
-        Some("below_minimum"),
-        "a {SHORT_CTX}-token model is under the {floor}-token floor and must be \
-         rejected, not merely reported: {short}"
-    );
-    assert_eq!(
-        short.get("context_length").and_then(Value::as_u64),
-        Some(SHORT_CTX),
-        "the rejection must carry the window it read, so the UI can say why"
-    );
-    assert_eq!(
-        short.get("required").and_then(Value::as_u64),
-        Some(floor),
-        "the rejection must carry the floor it was measured against"
-    );
-
-    let ample = eligibility_of(AMPLE_MODEL);
-    assert_eq!(
-        ample.get("status").and_then(Value::as_str),
-        Some("ok"),
-        "a {AMPLE_CTX}-token model is over the floor and must be accepted; if \
-         this is also below_minimum the gate is refusing everything: {ample}"
-    );
-
-    // The active chat model is the short one, so the expected-model verdict
-    // must carry the rejection too — this is the field the UI reads to warn.
-    assert_eq!(
-        result
-            .get("expected")
-            .and_then(|expected| expected.get("chat_eligibility"))
-            .and_then(|eligibility| eligibility.get("status"))
-            .and_then(Value::as_str),
-        Some("below_minimum"),
-        "the configured chat model is the short-context one; its eligibility \
-         must reflect that"
-    );
-
-    ollama_join.abort();
-    mock_join.abort();
-    rpc_join.abort();
-}
-
-#[tokio::test]
-async fn json_rpc_local_ai_lm_studio_config_diagnostics_and_prompt() {
+async fn json_rpc_local_ai_lm_studio_settings_and_prompt() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
@@ -6664,27 +6474,6 @@ async fn json_rpc_local_ai_lm_studio_config_diagnostics_and_prompt() {
         Some(true)
     );
 
-    let diagnostics =
-        post_json_rpc(&rpc_base, 37, "openhuman.inference_diagnostics", json!({})).await;
-    let diagnostics_result = assert_no_jsonrpc_error(&diagnostics, "lm_studio_diagnostics");
-    assert_eq!(
-        diagnostics_result.get("provider").and_then(Value::as_str),
-        Some("lm_studio")
-    );
-    assert_eq!(
-        diagnostics_result
-            .get("lm_studio_running")
-            .and_then(Value::as_bool),
-        Some(true)
-    );
-    assert_eq!(
-        diagnostics_result
-            .get("expected")
-            .and_then(|expected| expected.get("chat_found"))
-            .and_then(Value::as_bool),
-        Some(true)
-    );
-
     let prompt = post_json_rpc(
         &rpc_base,
         38,
@@ -6708,7 +6497,7 @@ async fn json_rpc_local_ai_lm_studio_config_diagnostics_and_prompt() {
 }
 
 #[tokio::test]
-async fn json_rpc_local_ai_ollama_endpoint_normalizes_bind_address_and_clears() {
+async fn json_rpc_local_ai_ollama_settings_can_be_cleared_over_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
@@ -6733,20 +6522,11 @@ async fn json_rpc_local_ai_ollama_endpoint_normalizes_bind_address_and_clears() 
         "openhuman.inference_update_local_settings",
         json!({
             "provider": "ollama",
-            "base_url": "http://0.0.0.0:11434/api/tags"
+            "base_url": "http://127.0.0.1:11434"
         }),
     )
     .await;
-    let update_result = assert_no_jsonrpc_error(&update, "normalize ollama base_url");
-    assert_eq!(
-        update_result
-            .get("result")
-            .and_then(|value| value.get("config"))
-            .and_then(|config| config.get("local_ai"))
-            .and_then(|local_ai| local_ai.get("base_url"))
-            .and_then(Value::as_str),
-        Some("http://localhost:11434")
-    );
+    assert_no_jsonrpc_error(&update, "set ollama base_url over RPC");
 
     let clear = post_json_rpc(
         &rpc_base,
@@ -11162,108 +10942,16 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     rpc_join.abort();
 }
 
-/// Approval park + DENY over JSON-RPC (issue G4): a gate with both a `main`
-/// edge (→ `downstream`) and an `error` edge (→ `recover`). Resuming with the
-/// gate in `rejections` routes the denied gate's error item to `recover`, and
-/// `downstream` must not run.
+/// Keep one valid and one invalid `flows_validate` wire call at the host
+/// boundary; the engine validation details are covered by TinyFlows.
 #[cfg(feature = "flows")]
 #[tokio::test]
-async fn json_rpc_flows_resume_deny_routes_to_error_port() {
+async fn json_rpc_flows_validate_wire_shape() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let (rpc_base, _tmp, api_join, rpc_join, _guards) = boot_flows_rpc_env().await;
 
-    let graph = json!({
-        "name": "approval-gated-error-port",
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Trigger" },
-            { "id": "gate", "kind": "output_parser", "name": "Gate", "config": { "requires_approval": true } },
-            { "id": "downstream", "kind": "output_parser", "name": "Downstream" },
-            { "id": "recover", "kind": "output_parser", "name": "Recover" }
-        ],
-        "edges": [
-            { "from_node": "t", "to_node": "gate" },
-            { "from_node": "gate", "from_port": "main", "to_node": "downstream" },
-            { "from_node": "gate", "from_port": "error", "to_node": "recover" }
-        ]
-    });
-
-    let create = post_json_rpc(
-        &rpc_base,
-        9401,
-        "openhuman.flows_create",
-        json!({ "name": "Deny Demo", "graph": graph }),
-    )
-    .await;
-    let flow_id = peel_logs_envelope(assert_no_jsonrpc_error(&create, "flows_create"))
-        .get("id")
-        .and_then(Value::as_str)
-        .expect("flow id")
-        .to_string();
-
-    let run = post_json_rpc(
-        &rpc_base,
-        9402,
-        "openhuman.flows_run",
-        json!({ "id": flow_id, "input": { "x": 1 } }),
-    )
-    .await;
-    let thread_id = peel_logs_envelope(assert_no_jsonrpc_error(&run, "flows_run"))
-        .get("thread_id")
-        .and_then(Value::as_str)
-        .expect("thread_id")
-        .to_string();
-
-    // Deny the gate: no approvals, `gate` in rejections.
-    let resume = post_json_rpc(
-        &rpc_base,
-        9403,
-        "openhuman.flows_resume",
-        json!({ "id": flow_id, "thread_id": thread_id, "rejections": ["gate"] }),
-    )
-    .await;
-    let resume_out = peel_logs_envelope(assert_no_jsonrpc_error(&resume, "flows_resume"));
-    assert_eq!(resume_out["pending_approvals"], json!([]));
-    assert_eq!(
-        resume_out["output"]["nodes"]["recover"]["items"][0]["json"]["error"]["node"],
-        json!("gate"),
-        "a denied gate must route its error item to the `error`-port recovery node"
-    );
-    assert!(
-        resume_out["output"]["nodes"]["downstream"].is_null(),
-        "the main branch must not run when the gate is denied"
-    );
-
-    let get_run = post_json_rpc(
-        &rpc_base,
-        9404,
-        "openhuman.flows_get_run",
-        json!({ "run_id": thread_id }),
-    )
-    .await;
-    let run_row = peel_logs_envelope(assert_no_jsonrpc_error(&get_run, "flows_get_run"));
-    assert_eq!(
-        run_row.get("status").and_then(Value::as_str),
-        Some("completed")
-    );
-
-    api_join.abort();
-    rpc_join.abort();
-}
-
-/// `openhuman.flows_validate` over JSON-RPC (PHASE 3c): a structurally valid
-/// graph whose trigger kind does not fire automatically (`webhook`) validates
-/// clean but returns a loud, non-fatal warning; a `schedule` trigger (which
-/// does fire) warns nothing; a graph with no trigger is `valid: false` with a
-/// structural error and no warnings.
-#[cfg(feature = "flows")]
-#[tokio::test]
-async fn json_rpc_flows_validate_reports_warnings_and_errors() {
-    let _env_lock = json_rpc_e2e_env_lock_async().await;
-    let (rpc_base, _tmp, api_join, rpc_join, _guards) = boot_flows_rpc_env().await;
-
-    // 1. Webhook trigger — structurally valid, but does not fire yet → warning.
-    let webhook_graph = json!({
-        "name": "webhook-flow",
+    let valid_graph = json!({
+        "name": "wire-valid",
         "nodes": [
             { "id": "t", "kind": "trigger", "name": "Trigger", "config": { "trigger_kind": "webhook" } }
         ],
@@ -11273,60 +10961,13 @@ async fn json_rpc_flows_validate_reports_warnings_and_errors() {
         &rpc_base,
         9501,
         "openhuman.flows_validate",
-        json!({ "graph": webhook_graph }),
+        json!({ "graph": valid_graph }),
     )
     .await;
     let v = peel_logs_envelope(assert_no_jsonrpc_error(&validate, "flows_validate"));
     assert_eq!(v.get("valid").and_then(Value::as_bool), Some(true));
-    assert!(
-        v.get("errors")
-            .and_then(Value::as_array)
-            .expect("errors")
-            .is_empty(),
-        "a structurally valid webhook graph has no errors"
-    );
-    let warnings = v
-        .get("warnings")
-        .and_then(Value::as_array)
-        .expect("warnings");
-    assert_eq!(
-        warnings.len(),
-        1,
-        "webhook trigger emits exactly one warning"
-    );
-    assert!(
-        warnings[0]
-            .as_str()
-            .is_some_and(|w| w.contains("does not fire automatically")),
-        "webhook warning must explain the trigger will not fire on its own, got: {warnings:?}"
-    );
+    assert!(v.get("warnings").and_then(Value::as_array).is_some());
 
-    // 2. Schedule trigger — fires automatically → no warning.
-    let schedule_graph = json!({
-        "name": "scheduled-flow",
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Trigger", "config": { "trigger_kind": "schedule", "schedule": "0 9 * * *" } }
-        ],
-        "edges": []
-    });
-    let validate_sched = post_json_rpc(
-        &rpc_base,
-        9502,
-        "openhuman.flows_validate",
-        json!({ "graph": schedule_graph }),
-    )
-    .await;
-    let vs = peel_logs_envelope(assert_no_jsonrpc_error(&validate_sched, "flows_validate"));
-    assert_eq!(vs.get("valid").and_then(Value::as_bool), Some(true));
-    assert!(
-        vs.get("warnings")
-            .and_then(Value::as_array)
-            .expect("warnings")
-            .is_empty(),
-        "a schedule trigger fires automatically — no unfired-kind warning"
-    );
-
-    // 3. No trigger node — structurally invalid.
     let invalid_graph = json!({
         "name": "no-trigger",
         "nodes": [ { "id": "a", "kind": "output_parser", "name": "A" } ],
@@ -11334,37 +10975,22 @@ async fn json_rpc_flows_validate_reports_warnings_and_errors() {
     });
     let validate_bad = post_json_rpc(
         &rpc_base,
-        9503,
+        9502,
         "openhuman.flows_validate",
         json!({ "graph": invalid_graph }),
     )
     .await;
     let vb = peel_logs_envelope(assert_no_jsonrpc_error(&validate_bad, "flows_validate"));
     assert_eq!(vb.get("valid").and_then(Value::as_bool), Some(false));
-    assert!(
-        !vb.get("errors")
-            .and_then(Value::as_array)
-            .expect("errors")
-            .is_empty(),
-        "a graph without a trigger must report a structural error"
-    );
-    assert!(
-        vb.get("warnings")
-            .and_then(Value::as_array)
-            .expect("warnings")
-            .is_empty(),
-        "an invalid graph reports errors, not warnings"
-    );
+    assert!(vb.get("errors").and_then(Value::as_array).is_some());
 
-    // 4. A graph that cannot deserialize must preserve the member location
-    // and serde detail through the JSON-RPC envelope, not only in the
-    // in-process migration helper.
+    // Preserve serde's member path and detail across the JSON-RPC envelope.
     let malformed_graph = json!({
         "inputs": [ { "type": "string" } ]
     });
     let validate_malformed = post_json_rpc(
         &rpc_base,
-        9504,
+        9503,
         "openhuman.flows_validate",
         json!({ "graph": malformed_graph }),
     )

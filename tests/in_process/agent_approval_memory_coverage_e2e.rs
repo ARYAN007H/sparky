@@ -6,7 +6,7 @@
 //! The eight controllers here span three families whose existing raw-coverage
 //! files are already 2–4k lines each, and several of these tests need a
 //! *clean* process-global approval gate. Sharing a file with
-//! `tool_registry_approval_raw_coverage_e2e.rs` would make them order-dependent
+//! `tool_registry_approval_e2e.rs` would make them order-dependent
 //! on whether a sibling test already installed the gate — the exact reason that
 //! file documents for skipping `preauthorize_flow`'s success path
 //! (see its `approval_schema_handlers_validate_params_and_surface_empty_gate_state`).
@@ -235,7 +235,7 @@ async fn approval_get_gate_state_returns_a_consistent_boot_snapshot() {
 /// installs a **process-global** `OnceLock`. Doing that here would change what
 /// `approval_get_gate_state_returns_a_consistent_boot_snapshot` observes in the
 /// same binary, making the pair order-dependent — the identical reason
-/// `tool_registry_approval_raw_coverage_e2e.rs` gives for skipping this path.
+/// `tool_registry_approval_e2e.rs` gives for skipping this path.
 /// Grant idempotency ("already-trusted tools are reported, not re-granted") is
 /// covered by the unit tests in `approval::rpc` / `approval::store`, which own
 /// the gate lifecycle.
@@ -866,5 +866,5 @@ async fn agent_definitions_and_validation_are_exposed_over_rpc() {
         "agent_server_status should return an object: {status}"
     );
 
-    harness.join.abort();
+    harness._rpc_join.abort();
 }
