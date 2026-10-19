@@ -277,14 +277,14 @@ test.describe('assistant-ui tool-result elements', () => {
       })
     );
     await scriptToolCall('AUI-TABLE-CASE', [
-      { name: GITHUB_REPOSITORY_ACTION, arguments: { limit: 2 } },
+      {
+        name: 'composio_execute',
+        arguments: { tool: GITHUB_REPOSITORY_ACTION, arguments: { limit: 2 } },
+      },
     ]);
 
     await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
-    const card = await openToolCall(
-      page,
-      /GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER|repositor/i
-    );
+    const card = await openToolCall(page, /composio_execute|repositor/i);
 
     const table = card.locator('[data-slot="data-table"]').first();
     await expect(table).toBeVisible({ timeout: 20_000 });
