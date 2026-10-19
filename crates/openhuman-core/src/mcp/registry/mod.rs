@@ -488,5 +488,5 @@ mod stub;
 #[cfg(not(feature = "mcp"))]
 pub use stub::*;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mcp"))]
 pub(crate) use schemas::registry_get_parameter_contract;

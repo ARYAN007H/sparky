@@ -160,22 +160,23 @@ fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<Contr
     let controllers = builtin_controller_snapshot()
         .into_iter()
         .filter(|controller| {
-            controller.schema.namespace == "voice"
-                || matches!(
-                    controller.schema.method_name().as_str(),
-                    "mcp_clients.registry_get" | "modules.computer_status"
-                )
+            (cfg!(feature = "voice") && controller.schema.namespace == "voice")
+                || (cfg!(feature = "mcp")
+                    && controller.schema.method_name() == "mcp_clients.registry_get")
+                || controller.schema.method_name() == "modules.computer_status"
         })
         .collect();
-    let contracts = vec![
-        crate::mcp::registry::registry_get_parameter_contract(),
-        crate::modules::schemas::computer_status_parameter_contract(),
-    ];
+    let contracts = vec![crate::modules::schemas::computer_status_parameter_contract()];
+    #[cfg(feature = "mcp")]
+    let contracts = contracts
+        .into_iter()
+        .chain([crate::mcp::registry::registry_get_parameter_contract()])
+        .collect::<Vec<_>>();
     #[cfg(feature = "voice")]
     let contracts = contracts
         .into_iter()
         .chain(crate::voice::parameter_contracts())
-        .collect();
+        .collect::<Vec<_>>();
     (controllers, contracts)
 }
 
@@ -219,7 +220,16 @@ fn every_covered_required_declaration_rejects_removal_and_optional_mutants() {
             }
         }
     }
-    assert!(mutations > 0, "no required-field mutation was exercised");
+    // Voice has ten independently required fields and MCP has one. The
+    // computer-status adapter remains covered when both optional domains are
+    // disabled, but has no required field to mutate. Synthetic runner tests
+    // still exercise mutation rejection in that feature configuration.
+    let expected_mutations =
+        20 * usize::from(cfg!(feature = "voice")) + 2 * usize::from(cfg!(feature = "mcp"));
+    assert_eq!(
+        mutations, expected_mutations,
+        "covered required-field mutations"
+    );
 }
 
 #[test]
