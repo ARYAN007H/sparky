@@ -97,7 +97,7 @@ async fn fixture() -> (tinybus::Proxy, Arc<Calls>) {
             tinyjuice_bus::names::BUS_NAME,
         )
         .unwrap();
-    Ok((proxy, calls))
+    (proxy, calls)
 }
 
 fn derived_context(base: &Arc<CoreContext>, config: Config, profile: &str) -> DispatchCtx {
@@ -119,6 +119,31 @@ async fn invoke(ctx: DispatchCtx, function: &str, params: serde_json::Value) {
     )
     .await
     .unwrap_or_else(|error| panic!("{function} RPC failed: {error}"));
+}
+
+async fn invoke_for_config(
+    ctx: DispatchCtx,
+    function: &str,
+    params: serde_json::Value,
+    expected: &Config,
+    seen: &Mutex<Vec<module_stub::ObservedConfig>>,
+) {
+    let before = seen.lock().unwrap().len();
+    invoke(ctx, function, params).await;
+    let actual = seen.lock().unwrap();
+    let calls = &actual[before..];
+    assert!(
+        !calls.is_empty(),
+        "{function} must construct a ModuleClient for its caller"
+    );
+    assert!(
+        calls.iter().all(|actual| {
+            actual.workspace_dir == expected.workspace_dir
+                && actual.config_path == expected.config_path
+                && actual.min_bytes_to_compress == expected.tokenjuice.min_bytes_to_compress
+        }),
+        "{function} constructed a ModuleClient from a different caller's config"
+    );
 }
 
 fn profile_config(workspace: &std::path::Path, threshold: usize) -> Config {
@@ -178,43 +203,52 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
         configs: Arc::clone(&seen_configs),
     };
     module_stub::with_rpc_client(client_fixture, async {
-        invoke(
-            contexts[0].clone(),
-            "detect",
-            serde_json::json!({ "content": "alpha" }),
-        )
-        .await;
-        invoke(
-            contexts[0].clone(),
-            "compress",
-            serde_json::json!({ "content": "alpha" }),
-        )
-        .await;
-        invoke(contexts[1].clone(), "cache_stats", serde_json::json!({})).await;
-        invoke(
-            contexts[1].clone(),
-            "retrieve",
-            serde_json::json!({ "token": "0123456789abcdef0123456789abcdef" }),
-        )
-        .await;
+        for index in 0..2 {
+            invoke_for_config(
+                contexts[index].clone(),
+                "detect",
+                serde_json::json!({ "content": "alpha" }),
+                &configs[index],
+                &seen_configs,
+            )
+            .await;
+            invoke_for_config(
+                contexts[index].clone(),
+                "compress",
+                serde_json::json!({ "content": "alpha" }),
+                &configs[index],
+                &seen_configs,
+            )
+            .await;
+            invoke_for_config(
+                contexts[index].clone(),
+                "cache_stats",
+                serde_json::json!({}),
+                &configs[index],
+                &seen_configs,
+            )
+            .await;
+            invoke_for_config(
+                contexts[index].clone(),
+                "retrieve",
+                serde_json::json!({ "token": "0123456789abcdef0123456789abcdef" }),
+                &configs[index],
+                &seen_configs,
+            )
+            .await;
+        }
     })
     .await;
 
-    let captured = seen_configs.lock().unwrap();
-    for (index, config) in configs.iter().enumerate() {
-        assert!(
-            captured
-                .iter()
-                .any(|actual| actual.workspace_dir == config.workspace_dir),
-            "RPC operations must construct their module clients from derived config {index}"
-        );
-    }
     let methods = calls.methods.lock().unwrap();
     for method in ["Detect", "Compress", "CacheStats", "Retrieve"] {
-        assert!(
-            methods.iter().any(|actual| actual == method),
-            "{method} reached the TinyBus client"
-        );
+        for _ in 0..2 {
+            assert_eq!(
+                methods.iter().filter(|actual| actual.as_str() == method).count(),
+                2,
+                "{method} reached the TinyBus client once per derived context"
+            );
+        }
     }
     let installs = calls.installs.lock().unwrap();
     for (index, config) in configs.iter().enumerate() {

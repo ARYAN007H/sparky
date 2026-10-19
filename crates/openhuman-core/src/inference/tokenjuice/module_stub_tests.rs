@@ -19,7 +19,14 @@ pub(crate) type StubCompactor =
 #[derive(Clone)]
 pub(crate) struct RpcClientFixture {
     pub(crate) proxy: tinybus::Proxy,
-    pub(crate) configs: Arc<Mutex<Vec<crate::config::Config>>>,
+    pub(crate) configs: Arc<Mutex<Vec<ObservedConfig>>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ObservedConfig {
+    pub(crate) workspace_dir: std::path::PathBuf,
+    pub(crate) config_path: std::path::PathBuf,
+    pub(crate) min_bytes_to_compress: usize,
 }
 
 tokio::task_local! {
@@ -39,7 +46,11 @@ pub(crate) async fn with_rpc_client<F: std::future::Future>(
 pub(crate) fn rpc_client(config: &crate::config::Config) -> Option<tinybus::module::ModuleClient> {
     RPC_CLIENT
         .try_with(|fixture| {
-            fixture.configs.lock().unwrap().push(config.clone());
+            fixture.configs.lock().unwrap().push(ObservedConfig {
+                workspace_dir: config.workspace_dir.clone(),
+                config_path: config.config_path.clone(),
+                min_bytes_to_compress: config.tokenjuice.min_bytes_to_compress,
+            });
             crate::modules::ops::fixture_client(fixture.proxy.clone())
         })
         .ok()
