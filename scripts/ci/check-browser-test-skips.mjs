@@ -25,7 +25,7 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
     : "origin/main";
   let patch;
   try {
-    patch = execFileSync("git", ["diff", "--unified=0", `${base}...HEAD", "--", "app/test/e2e/specs", "app/test/playwright/specs"], { encoding: "utf8" });
+    patch = execFileSync("git", ["diff", "--unified=0", `${base}...HEAD`, "--", "app/test/e2e/specs", "app/test/playwright/specs"], { encoding: "utf8" });
   } catch (error) {
     console.error(`Could not compare browser-test skips with ${base}: ${error.message}`);
     process.exit(2);
