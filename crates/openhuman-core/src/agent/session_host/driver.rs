@@ -117,9 +117,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .await
             .map_err(|error| driver_failure(error.to_string()))?;
         if let Some(reason) = block_reason {
-            // The generic session persists only a supplied partial on driver
-            // failure. Omitting it prevents a blocked raw input from becoming
-            // durable while preserving the gate's block result.
             return Err(DriverFailure {
                 error: RuntimeError::Driver(reason),
                 partial: None,
