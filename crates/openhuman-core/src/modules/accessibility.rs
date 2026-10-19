@@ -1,4 +1,4 @@
-//! Native permissions, focus and listener operations through TinyComputer.
+//! Native permission operations through TinyComputer.
 
 use serde::{de::DeserializeOwned, Serialize};
 use tinycomputer_bus::{names::accessibility as methods, DesktopError, DesktopResponse};
@@ -57,7 +57,6 @@ impl AccessibilityClient {
         &self,
         member: &str,
         args: impl Serialize,
-        confidential: bool,
     ) -> Result<T, AccessibilityError> {
         if !self.computer_enabled {
             log::debug!("[accessibility] {member} refused, component 'computer' disabled");
@@ -69,12 +68,11 @@ impl AccessibilityClient {
                 ),
             )));
         }
-        let raw: serde_json::Value = if confidential {
-            self.client.call_confidential(MODULE, member, args).await
-        } else {
-            self.client.call(MODULE, member, args).await
-        }
-        .map_err(AccessibilityError::Bus)?;
+        let raw: serde_json::Value = self
+            .client
+            .call(MODULE, member, args)
+            .await
+            .map_err(AccessibilityError::Bus)?;
         decode(raw)
     }
 
@@ -86,8 +84,7 @@ impl AccessibilityClient {
 
     /// Read native states without requesting permission.
     pub async fn permissions(&self) -> Result<PermissionStatus, AccessibilityError> {
-        self.call(methods::ACCESSIBILITY_PERMISSIONS, (), false)
-            .await
+        self.call(methods::ACCESSIBILITY_PERMISSIONS, ()).await
     }
 
     /// Request only the permission authorized by the host.
@@ -95,7 +92,7 @@ impl AccessibilityClient {
         &self,
         kind: PermissionKind,
     ) -> Result<PermissionStatus, AccessibilityError> {
-        self.call(methods::ACCESSIBILITY_REQUEST_PERMISSION, (kind,), false)
+        self.call(methods::ACCESSIBILITY_REQUEST_PERMISSION, (kind,))
             .await
     }
 }
