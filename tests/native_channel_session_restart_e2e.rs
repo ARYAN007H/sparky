@@ -253,12 +253,36 @@ default_model = "session-model"
         .expect("seed session for custom-provider access gate");
 }
 
-struct CoreProcess(Child);
+struct CoreProcess {
+    child: Child,
+    log_path: std::path::PathBuf,
+    stopped: bool,
+}
+
+impl CoreProcess {
+    fn stop(&mut self) {
+        if self.child.try_wait().ok().flatten().is_none() {
+            self.child.kill().expect("stop core process");
+        }
+        self.child.wait().expect("reap core process");
+        self.stopped = true;
+    }
+}
 
 impl Drop for CoreProcess {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        if !self.stopped {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+            if let Ok(log) = std::fs::read_to_string(&self.log_path) {
+                let tail = log.lines().rev().take(80).collect::<Vec<_>>();
+                eprintln!(
+                    "core process was dropped before the test completed; last {} log lines:\n{}",
+                    tail.len(),
+                    tail.into_iter().rev().collect::<Vec<_>>().join("\n")
+                );
+            }
+        }
     }
 }
 
@@ -318,7 +342,14 @@ fn start_core(
         .stderr(Stdio::from(stderr))
         .spawn()
         .expect("spawn openhuman-core");
-    (CoreProcess(child), format!("http://127.0.0.1:{port}"))
+    (
+        CoreProcess {
+            child,
+            log_path: log_path.to_path_buf(),
+            stopped: false,
+        },
+        format!("http://127.0.0.1:{port}"),
+    )
 }
 
 async fn wait_until(label: &str, mut condition: impl FnMut() -> bool) {
@@ -342,7 +373,7 @@ async fn wait_healthy(base: &str, process: &mut CoreProcess, log_path: &Path) {
         {
             return;
         }
-        if let Ok(Some(exit)) = process.0.try_wait() {
+        if let Ok(Some(exit)) = process.child.try_wait() {
             let log = std::fs::read_to_string(log_path).unwrap_or_default();
             panic!("core exited before health became ready ({exit}):\n{log}");
         }
@@ -417,7 +448,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &logs.join("first.log"),
     );
     wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
-    let first_pid = first.0.id();
+    let first_pid = first.child.id();
     push_update(&mocks.state, 100, 10, FIRST_TEXT);
     wait_for_completion(&mocks.state, 1).await;
     let first_request = mocks
@@ -455,8 +486,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
             .any(|offset| *offset > 100)
     })
     .await;
-    first.0.kill().expect("stop first core process");
-    first.0.wait().expect("reap first core process");
+    first.stop();
 
     // The second process starts from the same durable workspace and gets a
     // distinct message in the same Telegram conversation.
@@ -468,7 +498,11 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &mocks.inference,
         &logs.join("second.log"),
     );
-    assert_ne!(first_pid, second.0.id(), "restart must use a fresh process");
+    assert_ne!(
+        first_pid,
+        second.child.id(),
+        "restart must use a fresh process"
+    );
     wait_healthy(&second_rpc, &mut second, &logs.join("second.log")).await;
     wait_until("second model request", || {
         mocks
@@ -503,4 +537,5 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         serde_json::to_string_pretty(&requests[1]).unwrap()
     );
     wait_for_completion(&mocks.state, 2).await;
+    second.stop();
 }
