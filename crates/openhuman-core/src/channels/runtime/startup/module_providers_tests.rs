@@ -236,6 +236,22 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
     let body: serde_json::Value = serde_json::from_slice(&send.body).expect("JSON request body");
     assert_eq!(body["chat_id"], "42");
     assert_eq!(body["text"], "nested callback delivery");
+    let edit = requests
+        .iter()
+        .find(|request| request.url.path() == "/bottoken/editMessageText")
+        .expect("one scoped Telegram editMessageText request");
+    let edit_body: serde_json::Value = serde_json::from_slice(&edit.body).expect("JSON edit body");
+    assert_eq!(edit_body["chat_id"], "42");
+    assert_eq!(edit_body["message_id"], 991);
+    assert_eq!(edit_body["text"], "updated");
+    let delete = requests
+        .iter()
+        .find(|request| request.url.path() == "/bottoken/deleteMessage")
+        .expect("one scoped Telegram deleteMessage request");
+    let delete_body: serde_json::Value =
+        serde_json::from_slice(&delete.body).expect("JSON delete body");
+    assert_eq!(delete_body["chat_id"], "42");
+    assert_eq!(delete_body["message_id"], 991);
     server.verify().await;
     runtime
         .close()
