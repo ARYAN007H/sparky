@@ -47,6 +47,7 @@ import { socketService } from '../services/socketService';
 import { store } from '../store';
 import {
   appendSubagentStreamDelta,
+  beginInferenceTurn,
   bumpInferenceHeartbeatForThread,
   cancelUnresolvedTurnTimeline,
   clearInferenceStatusForThread,
@@ -796,6 +797,17 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
             store.getState().chatRuntime.parallelRequestThreads[event.request_id] === undefined
           ) {
             dispatch(setToolTimelineForThread({ threadId: event.thread_id, entries: [] }));
+          }
+          // A turn this window did not send (one started right after a Stop,
+          // from another window, or queued) has no lifecycle yet, or a finished
+          // one: begin it here so its stream renders live, not after a reload.
+          const parallel =
+            !!event.request_id &&
+            store.getState().chatRuntime.parallelRequestThreads[event.request_id] !== undefined;
+          const lifecycle =
+            store.getState().chatRuntime.inferenceTurnLifecycleByThread[event.thread_id];
+          if (!parallel && lifecycle !== 'started' && lifecycle !== 'streaming') {
+            dispatch(beginInferenceTurn({ threadId: event.thread_id }));
           }
           dispatch(markInferenceTurnStreaming({ threadId: event.thread_id }));
           if (event.request_id) {
