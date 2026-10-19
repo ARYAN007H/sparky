@@ -426,7 +426,6 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     rpc_join.abort();
 }
 
-#[tokio::test]
 /// Full lifecycle over JSON-RPC for the `workflows` namespace:
 /// create → list → read → phase → uninstall. Workflows are scaffolded under
 /// the user-scope root (`$HOME/.openhuman/workflows/<slug>/`), which the temp
