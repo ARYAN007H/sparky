@@ -30,7 +30,7 @@ use openhuman_core::security::approval::{
 };
 use openhuman_core::security::turn_origin::{self, AgentTurnOrigin};
 use openhuman_core::security::{live_policy, SecurityPolicy};
-use openhuman_core::tools::registry::{registry_entries, registry_entries_for_config};
+use openhuman_core::tools::registry::registry_entries_for_config;
 use openhuman_rpc::server::build_core_http_router;
 use tinytools::registry::denials;
 
