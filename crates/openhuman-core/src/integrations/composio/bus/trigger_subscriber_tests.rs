@@ -127,7 +127,7 @@ async fn the_direct_path_logs_and_drops_a_deferral_and_a_terminal_outcome() {
 
 #[test]
 fn the_subscriber_names_itself_and_listens_to_composio() {
-    let subscriber = ComposioTriggerSubscriber::default();
+    let subscriber = ComposioTriggerSubscriber::new();
     assert_eq!(subscriber.name(), "composio::trigger");
     assert_eq!(subscriber.domains(), Some(&["composio"][..]));
 }
