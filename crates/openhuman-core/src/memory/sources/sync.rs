@@ -11,14 +11,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use chrono::{DateTime, Utc};
+use tinymemory_integrations::sources::SourceKind;
 use tinymemory_integrations::sources::sync::{
     self as module, RegisteredSource, SourceRegistry, SyncError, SyncState, SyncStatus, SyncUpdate,
     Syncer,
 };
-use tinymemory_integrations::sources::SourceKind;
 
-use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
+use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::memory::engine;
 use crate::memory::types::SourceStatus;
 use tinymemory_api::{Error, Result};
