@@ -180,7 +180,9 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       await advanceTourSteps(1);
       await browser.waitUntil(
         async () =>
-          String(await browser.execute(() => window.location.hash)).includes('/connections?tab=composio'),
+          String(await browser.execute(() => window.location.hash)).includes(
+            '/connections?tab=composio'
+          ),
         { timeout: 15_000, timeoutMsg: 'tour did not navigate to /connections after one step' }
       );
       expect(

@@ -1096,7 +1096,9 @@ describe('session expiry fixes (#5868)', () => {
     vi.mocked(coreStateApi.fetchCoreAppSnapshot)
       .mockReset()
       .mockResolvedValueOnce(makeSnapshot({ userId: 'u1', sessionToken: 'tok1' }))
-      .mockResolvedValueOnce(makeSnapshot({ userId: null, sessionToken: null, isAuthenticated: false }));
+      .mockResolvedValueOnce(
+        makeSnapshot({ userId: null, sessionToken: null, isAuthenticated: false })
+      );
     vi.mocked(coreStateApi.listTeams).mockReset().mockResolvedValue([]);
     vi.mocked(coreStateApi.getTeamMembers).mockReset().mockResolvedValue([]);
     vi.mocked(coreStateApi.getTeamInvites).mockReset().mockResolvedValue([]);
