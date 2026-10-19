@@ -118,6 +118,131 @@ async fn flows_resume_succeeds_when_the_graph_is_unchanged() {
     );
 }
 
+fn profile_dispatch(config: &Config, profile: &str) -> crate::core::runtime::DispatchCtx {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+
+    let root = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
+    crate::core::runtime::DispatchCtx::new(root.derive_with(
+        ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::default(),
+        )
+        .profile(profile),
+    ))
+}
+
+async fn scoped_run_status(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    run_id: &str,
+) -> String {
+    use tinyflows_bus::catalog::{self, FlowRun, RunIdRequest};
+
+    let storage = crate::flows::catalog_storage::register(ctx, config)
+        .await
+        .unwrap()
+        .storage();
+    let proxy = crate::modules::tinyflows::catalog_proxy(config)
+        .await
+        .unwrap();
+    let run: Option<FlowRun> = proxy
+        .call(
+            catalog::members::GET_RUN,
+            (RunIdRequest {
+                storage,
+                id: run_id.to_owned(),
+            },),
+        )
+        .await
+        .unwrap();
+    run.expect("run exists in this scoped Catalog").status
+}
+
+#[tokio::test]
+async fn resume_uses_the_captured_profile_scope_for_identical_run_ids() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let ctx_a = profile_dispatch(&config, "resume-owner-a");
+    let ctx_b = profile_dispatch(&config, "resume-owner-b");
+    let flow_a = crate::flows::ops::flows_create_with_context(
+        &ctx_a,
+        &config,
+        "owner-a".to_string(),
+        approval_gated_graph(),
+        false,
+    )
+    .await
+    .unwrap()
+    .value;
+    let flow_b = crate::flows::ops::flows_create_with_context(
+        &ctx_b,
+        &config,
+        "owner-b".to_string(),
+        approval_gated_graph(),
+        false,
+    )
+    .await
+    .unwrap()
+    .value;
+    let run_id = "same-opaque-run-id";
+
+    for (ctx, flow, owner) in [(&ctx_a, &flow_a, "owner-a"), (&ctx_b, &flow_b, "owner-b")] {
+        let (_session, mut events) = crate::flows::runs_adapter::start_run(
+            ctx,
+            &config,
+            flow,
+            run_id,
+            json!({ "owner": owner }),
+            serde_json::Map::new(),
+            FlowRunTrigger::Rpc,
+        )
+        .await
+        .unwrap();
+        let parked = crate::flows::runs_adapter::wait_for_outcome(&mut events, run_id, 0)
+            .await
+            .unwrap();
+        assert_eq!(parked.status, "pending_approval");
+    }
+
+    let resumed_a = flows_resume(
+        &ctx_a,
+        &config,
+        &flow_a.id,
+        run_id,
+        vec!["gate".to_string()],
+        vec![],
+    )
+    .await
+    .expect("the resume is resolved in owner A's Catalog and callback scope");
+    assert_eq!(
+        resumed_a.value["output"]["run"]["trigger"]["owner"],
+        json!("owner-a")
+    );
+    assert_eq!(scoped_run_status(&ctx_a, &config, run_id).await, "completed");
+    assert_eq!(
+        scoped_run_status(&ctx_b, &config, run_id).await,
+        "pending_approval",
+        "resuming the same opaque run id in profile A must not settle profile B's run"
+    );
+
+    let resumed_b = flows_resume(
+        &ctx_b,
+        &config,
+        &flow_b.id,
+        run_id,
+        vec!["gate".to_string()],
+        vec![],
+    )
+    .await
+    .expect("owner B retains its independently parked run");
+    assert_eq!(
+        resumed_b.value["output"]["run"]["trigger"]["owner"],
+        json!("owner-b")
+    );
+    assert_eq!(scoped_run_status(&ctx_b, &config, run_id).await, "completed");
+}
+
 /// Migration safety (T-M1 requirement #4): a `flow_runs` row written before
 /// this guard existed reads back with `graph_hash IS NULL`. That must be
 /// treated as "unknown — allow, with a warning", never as a hard refusal, so
