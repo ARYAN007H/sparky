@@ -29,9 +29,10 @@ export function untrackedSkipLines(source, fileName = "browser-spec.ts") {
   );
   if (sourceFile.parseDiagnostics.length > 0) {
     const diagnostic = sourceFile.parseDiagnostics[0];
-    const location = diagnostic.start === undefined
-      ? ""
-      : ` at line ${sourceFile.getLineAndCharacterOfPosition(diagnostic.start).line + 1}`;
+    const location =
+      diagnostic.start === undefined
+        ? ""
+        : ` at line ${sourceFile.getLineAndCharacterOfPosition(diagnostic.start).line + 1}`;
     throw new Error(
       `Could not parse ${fileName}${location}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`,
     );

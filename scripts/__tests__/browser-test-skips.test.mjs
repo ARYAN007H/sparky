@@ -83,7 +83,8 @@ test("parses TypeScript and TSX using each spec's actual language mode", () => {
 
 test("fails closed when a browser spec cannot be parsed", () => {
   assert.throws(
-    () => untrackedSkipLines("const = ;\ntest.skip('unlinked');", "broken.spec.ts"),
+    () =>
+      untrackedSkipLines("const = ;\ntest.skip('unlinked');", "broken.spec.ts"),
     /Could not parse broken\.spec\.ts at line 1/,
   );
 });
