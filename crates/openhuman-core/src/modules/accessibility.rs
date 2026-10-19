@@ -6,10 +6,7 @@ use tinycomputer_bus::{names::accessibility as methods, DesktopError, DesktopRes
 use crate::config::Config;
 use tinybus::module::{ModuleCallError, ModuleClient};
 
-pub use tinycomputer_bus::accessibility::{
-    FocusQuery, FocusTarget, FocusedTextContext, GlobeBatch, GlobeHandle, GlobeHotkeyStatus,
-    GlobeRead, GlobeStarted, PasteRequest, PermissionKind, PermissionState, PermissionStatus,
-};
+pub use tinycomputer_bus::accessibility::{PermissionKind, PermissionState, PermissionStatus};
 
 const MODULE: &str = "tinycomputer";
 
@@ -102,84 +99,6 @@ impl AccessibilityClient {
             .await
     }
 
-    /// Read focused text through confidential transport.
-    pub async fn focus(&self, query: FocusQuery) -> Result<FocusedTextContext, AccessibilityError> {
-        self.call(methods::ACCESSIBILITY_FOCUS, (query,), true)
-            .await
-    }
-
-    /// Ask the native module to validate the captured target.
-    pub async fn validate_target(&self, target: FocusTarget) -> Result<(), AccessibilityError> {
-        self.call(methods::ACCESSIBILITY_VALIDATE_TARGET, (target,), true)
-            .await
-    }
-
-    /// Insert authorized text after native target validation.
-    pub async fn paste(&self, request: PasteRequest) -> Result<(), AccessibilityError> {
-        self.call(methods::ACCESSIBILITY_PASTE, (request,), true)
-            .await
-    }
-
-    /// Start or recover the module's one listener lease.
-    pub async fn globe_start(&self) -> Result<GlobeStarted, AccessibilityError> {
-        self.call(methods::GLOBE_START, (), false).await
-    }
-
-    /// Read or acknowledge a bounded, replayable physical-key batch.
-    pub async fn globe_read(&self, request: GlobeRead) -> Result<GlobeBatch, AccessibilityError> {
-        self.call(methods::GLOBE_READ, (request,), false).await
-    }
-
-    /// Release a lease. A failed close retains module ownership for retry.
-    pub async fn globe_stop(
-        &self,
-        handle: GlobeHandle,
-    ) -> Result<GlobeHotkeyStatus, AccessibilityError> {
-        self.call(methods::GLOBE_STOP, (handle,), false).await
-    }
-
-    /// Join native cleanup and permanently close listener admission at shutdown.
-    pub async fn globe_shutdown(&self) -> Result<GlobeHotkeyStatus, AccessibilityError> {
-        self.call(methods::GLOBE_SHUTDOWN, (), false).await
-    }
-
-    /// Apply OpenHuman's permission policy before opening an audio device.
-    /// One-shot capture requests an undetermined permission; continuous capture
-    /// retains its existing denied-only gate without presenting an OS prompt.
-    pub async fn microphone_permission(
-        &self,
-        request_unknown: bool,
-    ) -> Result<(), AccessibilityError> {
-        let mut permission = self.permissions().await?.microphone;
-        if request_unknown && permission == PermissionState::Unknown {
-            permission = self
-                .request_permission(PermissionKind::Microphone)
-                .await?
-                .microphone;
-        }
-        if permission == PermissionState::Denied
-            || (request_unknown && permission == PermissionState::Unknown)
-        {
-            return Err(AccessibilityError::Operation(DesktopError::new(
-                "PERMISSION_DENIED",
-                microphone_denied_message(),
-            )));
-        }
-        Ok(())
-    }
-}
-
-/// OpenHuman's platform-specific microphone guidance.
-fn microphone_denied_message() -> &'static str {
-    if cfg!(target_os = "macos") {
-        "Microphone permission denied. Grant access in System Settings > Privacy & Security > Microphone, then restart the app."
-    } else if cfg!(target_os = "windows") {
-        "Microphone access unavailable. Check Settings > Privacy & Security > Microphone and ensure the app is allowed. If no microphone is connected, plug one in."
-    } else if cfg!(target_os = "linux") {
-        "No microphone device available. Check your audio settings and ensure a microphone is connected. If running in a Flatpak sandbox, grant microphone access via Flatseal or system settings."
-    } else {
-        "Microphone access is not supported on this platform."
-    }
 }
 
 fn decode<T: DeserializeOwned>(raw: serde_json::Value) -> Result<T, AccessibilityError> {
