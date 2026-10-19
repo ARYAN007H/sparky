@@ -34,7 +34,6 @@ pub(in crate::tools::implementations) fn security_for_tool_context(
     context: Option<&dyn ToolRunContext>,
     tool: &str,
 ) -> SecurityPolicy {
-    let mut scoped = security.clone();
     if let Some(workspace) = context.and_then(|ctx| ctx.workspace()) {
         tracing::debug!(
             tool,
@@ -42,7 +41,8 @@ pub(in crate::tools::implementations) fn security_for_tool_context(
             policy_id = %workspace.policy_id,
             "[tools:system] granting TinyAgents workspace descriptor as action dir + trusted root"
         );
-        scoped = security_scoped_to_root(&scoped, &workspace.root);
+        security_scoped_to_root(security, &workspace.root)
+    } else {
+        security.clone()
     }
-    scoped
 }
