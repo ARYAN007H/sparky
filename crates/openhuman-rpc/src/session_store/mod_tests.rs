@@ -55,6 +55,7 @@ async fn a_storage_url_installs_the_driver_backed_store() {
 
 /// A SQLite storage URL installs the driver-backed store, and two agents on
 /// the same backend keep their turn states apart.
+#[cfg(feature = "storage-sqlite")]
 async fn driver_backed_store_keeps_agents_apart(url: String, driver: &str) {
     let _turn = SLOTS.lock().await;
     let previous = crate::core_host::agent::session_store::installed();
