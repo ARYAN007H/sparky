@@ -28,6 +28,7 @@ use super::turn_events::{WebEvents, WebFailures, WebReplies, WebSummarizer};
 use super::turn_host::WebHost;
 use super::types::WebChatTaskResult;
 use crate::agent::queued_turn::QueuedPayload;
+use crate::agent::session_lease::{SessionLease, SessionLeaseKey};
 use crate::core::runtime::DispatchCtx;
 
 pub(super) type WebRunner = TurnRunner<
@@ -79,6 +80,9 @@ pub(super) struct CancelNote {
 pub(super) struct TurnSlot {
     pub(super) activity: TurnActivity,
     pub(super) session: Option<CheckedOutSession>,
+    /// Cross-surface lease survives TinyAgents' early `checkin` until the
+    /// terminal projection has finished delivering this turn.
+    pub(super) session_lease: Option<SessionLease>,
     pub(super) fork: bool,
     pub(super) config: Option<Arc<crate::config::Config>>,
     pub(super) thread_dir: Option<std::path::PathBuf>,

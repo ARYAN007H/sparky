@@ -89,6 +89,23 @@ impl WebHost {
         let ctx = Self::ctx_of(request)?;
         let id = request.request_id.as_str();
         let payload = &request.payload;
+        // The harness lock is local to this WebRuntime. Native channel and
+        // relay runners use the same agent-domain lease before checking out
+        // this durable identity, so separate surface runners cannot resume
+        // and commit the same transcript concurrently.
+        let tenant = ctx.tenant().map_err(|error| error.to_string())?;
+        let tenant_scope = crate::core::runtime::tenant::tenant_key(&tenant, "");
+        let lease = crate::agent::session_lease::SessionLease::acquire(
+            crate::agent::session_lease::SessionLeaseKey::new(
+                tenant_scope,
+                request.scope.agent_id.clone(),
+                request.thread_id.clone(),
+            ),
+            None,
+        )
+        .await
+        .map_err(|()| "agent session lease was cancelled".to_owned())?;
+        self.shared.with(id, |slot| slot.session_lease = Some(lease));
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.
