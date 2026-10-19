@@ -250,8 +250,9 @@ describe('Voice mode — Human tab capture & error mapping', () => {
   //      via WebDriver — WDIO has no W3C audio injection API for CEF).
   //   c) The mock server to handle /openai/v1/audio/transcriptions (it does).
   //
-  // The contract is tested at the RPC layer in test 6.2 (voice_stt_dispatch)
-  // and at the unit level in MicComposer.test.tsx (transcribeWithFactory mock).
+  // The malformed-audio contract is tested at the host boundary by
+  // `tests/json_rpc_e2e.rs::voice_stt_dispatch_reaches_handler_and_rejects_invalid_audio_structurally`.
+  // MicComposer.test.tsx separately covers its transcribeWithFactory behavior.
   // This skip records the gap: there is no E2E path that drives real audio
   // through MediaRecorder in the CI headless environment.
   //
