@@ -511,6 +511,10 @@ fn bus_trigger(trigger: FlowRunTrigger) -> runs::FlowRunTrigger {
     }
 }
 
+#[cfg(test)]
+#[path = "runs_adapter_tests.rs"]
+mod tests;
+
 async fn run_exists(
     config: &Config,
     storage: tinyflows_bus::catalog::CatalogStorage,

@@ -59,7 +59,7 @@ impl FlowRunDigestSubscriber {
         Self { config }
     }
 
-    async fn handle_finished(
+    pub(super) async fn handle_finished(
         &self,
         ctx: crate::core::runtime::DispatchCtx,
         flow_id: &str,

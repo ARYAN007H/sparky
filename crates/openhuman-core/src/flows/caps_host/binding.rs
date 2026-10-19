@@ -36,8 +36,9 @@ pub(crate) struct CapsHostBinding {
 }
 
 /// Bounds invocation records and cancel-before-start tombstones retained by
-/// one run binding. Once either capacity is exhausted, new ids fail closed for
-/// the remaining lifetime of the binding.
+/// one run binding. IDs only correlate requests within this binding; the
+/// callback address remains the authority boundary. Once capacity is exhausted,
+/// new ids fail closed for the remaining lifetime of the binding.
 const MAX_AGENT_RUN_RECORDS: usize = 10_000;
 const MAX_AGENT_CANCEL_TOMBSTONES: usize = 4_096;
 

@@ -219,6 +219,8 @@ impl CapsHostService {
         Ok(runs::AgentRunHandle { handle })
     }
 
+    /// Cancel one host task; the id is scoped to this callback binding and
+    /// grants no authority outside its object path.
     async fn agent_cancel(&self, request: runs::AgentCancelRequest) -> tinybus::Result<()> {
         if !valid_agent_request_id(&request.client_request_id) {
             return Err(tinybus::Error::failed(

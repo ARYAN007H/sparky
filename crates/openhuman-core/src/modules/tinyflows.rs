@@ -263,6 +263,8 @@ mod imp {
     /// Serve one callback interface on the module runtime and return an RAII
     /// registration for it. The token is created inside the spawned task so
     /// cancellation of the caller cannot leave an unowned interface behind.
+    /// CapsHost registrations advertise the v2 callback contract before their
+    /// address can be handed to the Runs module.
     pub(crate) async fn serve_registered(
         path: String,
         object: impl tinybus::service::Interface + 'static,
