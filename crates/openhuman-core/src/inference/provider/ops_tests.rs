@@ -7,6 +7,7 @@ use super::models::{
     list_configured_models, list_configured_models_from_config, synthesize_local_runtime_entry,
 };
 use super::openhuman_backend_model::PROVIDER_LABEL;
+use super::*;
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::config::Config;
 use crate::security::credentials::AuthService;
