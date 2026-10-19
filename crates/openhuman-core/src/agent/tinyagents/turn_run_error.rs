@@ -2,7 +2,7 @@
 //! caller expects, for [`TurnSpec::run`](TurnSpec::run).
 
 use crate::agent::tinyagents::journal::TurnJournal;
-use tinyagents_harness::turn_run_error::{RunFailureKind, classify_run_failure};
+use tinyagents_harness::turn_run_error::{classify_run_failure, RunFailureKind};
 use tinyinference_llm::model::ModelErrorSlot;
 
 /// Map the harness's run failure `e` onto the typed error the turn caller
@@ -30,6 +30,16 @@ pub(super) async fn map_turn_run_error(
     // non-fatal) before unwinding through the typed-error mapping below.
     if let Some(journal) = turn_journal {
         journal.finish_failed(&e.to_string()).await;
+    }
+    // A host admission refusal is a terminal policy result, not a provider
+    // failure. Preserve its typed source before consulting the provider error
+    // slot, which may still contain an earlier successful route's stale error.
+    if let tinyagents_harness::TinyAgentsError::PhysicalDispatchAdmission(refusal) = &e {
+        error_slot
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        return anyhow::Error::new(*refusal);
     }
     // The harness owns the ordering-sensitive classification; the host only
     // maps each kind onto its typed error.
