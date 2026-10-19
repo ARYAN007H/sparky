@@ -102,10 +102,8 @@ async fn run_imported_history_prefix_regression() {
             && legacy_answer < current_question,
         "the live prefix precedes imported rows, followed by this turn"
     );
-    let session_ref = tinyagents_session::transcript::SessionRef::scoped(
-        "relay-import-thread",
-        &actual_agent_id,
-    );
+    let session_ref =
+        tinyagents_session::transcript::SessionRef::scoped("relay-import-thread", &actual_agent_id);
     let original = locator
         .read_session_transcript(&session_ref.first_generation())
         .expect("original imported generation")
@@ -115,7 +113,10 @@ async fn run_imported_history_prefix_regression() {
     assert_eq!(original.messages, imported);
 
     let head = locator.head_generation(&session_ref);
-    assert_ne!(head, session_ref, "prefix adoption opens a successor generation");
+    assert_ne!(
+        head, session_ref,
+        "prefix adoption opens a successor generation"
+    );
     let transcript = locator
         .read_session_transcript(&head)
         .expect("adopted session transcript")
