@@ -18,15 +18,6 @@ function stepLog(message: string, context?: unknown): void {
   console.log(`[NotificationsE2E][${stamp}] ${message}`, JSON.stringify(context, null, 2));
 }
 
-function getUnreadCount(stats: Record<string, unknown>): number {
-  const candidates = ['unread_count', 'unread', 'total_unread'];
-  for (const key of candidates) {
-    const value = stats[key];
-    if (typeof value === 'number') return value;
-  }
-  return 0;
-}
-
 async function waitForNotificationsSections(timeout = 10_000): Promise<void> {
   await browser.waitUntil(
     async () =>
@@ -67,8 +58,6 @@ async function waitForCoreSidecar(timeout = 30_000): Promise<void> {
 
 // Module-level capture: ingest returns a server-generated UUID; share it
 // across tests so mark_read and list can reference the same notification.
-let ingestedNotifId: string | undefined;
-
 describe('Notifications', () => {
   before(async function () {
     // waitForApp() + waitForCoreSidecar(30s) cannot fit the default 30s Mocha
@@ -87,10 +76,13 @@ describe('Notifications', () => {
   });
 
 
-
-
-
   it('Notifications page renders integration notifications', async () => {
+    await callOpenhumanRpc('openhuman.notification_ingest', {
+      provider: 'e2e',
+      title: 'E2E Test Notification',
+      body: 'Created by the notifications E2E spec',
+      raw_payload: {},
+    });
     if (!supportsExecuteScript()) {
       stepLog('skipping UI test — supportsExecuteScript() is false (Appium Mac2)');
       return;

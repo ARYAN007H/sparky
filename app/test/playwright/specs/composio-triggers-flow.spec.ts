@@ -2,33 +2,13 @@ import { expect, type Page, test } from '@playwright/test';
 
 import {
   bootAuthenticatedPage,
-  callCoreRpc,
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
 
 const TOOLKIT_SLUG = 'gmail';
-const TOOLKIT_NAME = 'Gmail';
 const CONNECTION_ID = 'c1';
 const MOCK_BASE = 'http://127.0.0.1:' + (process.env.E2E_MOCK_PORT || '18473');
-
-type ActiveTrigger = {
-  id?: string;
-  slug?: string;
-  toolkit?: string;
-  connectionId?: string;
-  connection_id?: string;
-};
-
-type EnableTriggerResult = {
-  triggerId?: string;
-  trigger_id?: string;
-  slug?: string;
-  connectionId?: string;
-  connection_id?: string;
-};
-
-type DisableTriggerResult = { deleted?: boolean };
 
 async function mockFetch(path: string, init?: RequestInit) {
   const response = await fetch(MOCK_BASE + path, init);
@@ -90,29 +70,11 @@ async function openGmailManageModal(page: Page) {
   return dialog;
 }
 
-function unwrapTriggers(payload: unknown): ActiveTrigger[] {
-  const root = payload as { result?: { triggers?: ActiveTrigger[] }; triggers?: ActiveTrigger[] };
-  return root.result?.triggers ?? root.triggers ?? [];
-}
-
-function unwrapEnableTrigger(payload: unknown): EnableTriggerResult {
-  const root = payload as { result?: EnableTriggerResult } & EnableTriggerResult;
-  return root.result ?? root;
-}
-
-function unwrapDisableTrigger(payload: unknown): DisableTriggerResult {
-  const root = payload as { result?: DisableTriggerResult } & DisableTriggerResult;
-  return root.result ?? root;
-}
-
-test.describe('Composio triggers flow', () => {
+test.describe('Composio trigger section UI', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const testSlug = testInfo.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     await bootSkillsPage(page, 'pw-composio-triggers-' + testSlug);
   });
-
-
-
 
 
   test('renders the Triggers section in the Gmail modal', async ({ page }) => {

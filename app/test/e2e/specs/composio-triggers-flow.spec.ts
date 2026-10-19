@@ -1,8 +1,8 @@
 /**
  * End-to-end: client-side Composio trigger toggles (PR for backend #671).
  *
- * Drives the new `openhuman.composio_*` trigger RPC methods through the
- * running core sidecar against the shared mock backend, then opens the
+ * Opens the Composio connection modal against the shared mock backend and
+ * checks that available and active triggers render in the
  * Composio connection modal and asserts the Triggers section renders
  * the expected toggle for an ACTIVE Gmail connection.
  *
@@ -11,18 +11,16 @@
  *   - one available trigger (`GMAIL_NEW_GMAIL_MESSAGE`)
  *   - an empty active-trigger list that mutates as enable/disable run
  *
- * RPC behavior is deterministic across platforms, and the UI assertion is a
- * required part of the chain: route to Skills -> open the connected Gmail
- * modal -> verify the trigger toggles rendered.
+ * Trigger list and mutation behavior belongs to Composio Rust tests. This spec
+ * owns the rendered Triggers section.
  */
 import { waitForApp } from '../helpers/app-helpers';
-import { callOpenhumanRpc } from '../helpers/core-rpc';
 import { textExists, waitForText } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateToSkills } from '../helpers/shared-flows';
 import { clearRequestLog, setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
 
-describe('Composio trigger toggles (UI + core RPC)', () => {
+describe('Composio trigger section UI', () => {
   before(async function () {
     // waitForApp() + resetApp() can exceed the default 30s Mocha hook budget.
     this.timeout(90_000);
@@ -47,9 +45,6 @@ describe('Composio trigger toggles (UI + core RPC)', () => {
   after(async () => {
     await stopMockServer();
   });
-
-
-
 
 
   it('Triggers section renders in the Composio modal for an ACTIVE connection', async () => {

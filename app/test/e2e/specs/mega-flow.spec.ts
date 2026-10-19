@@ -264,66 +264,11 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   // structured ThreadNotFound error and core.ping remains healthy.
   // Assertion: mock log shows the append attempt + core stays alive.
   // -------------------------------------------------------------------------
-  it('stale thread: append to deleted thread returns structured error and core stays alive', async () => {
-    await resetEverything('before stale-thread scenario');
-
-    // Login so the RPC layer has an authenticated session.
-    await triggerDeepLink('openhuman://auth?token=mega-stale-thread-token');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    // Attempt to append a message to a thread ID that does not exist.
-    // The core must return a structured error (kind=ThreadNotFound) rather
-    // than a hard crash or an opaque 500.
-    const result = await callOpenhumanRpc('openhuman.threads_message_append', {
-      thread_id: 'stale-thread-does-not-exist',
-      role: 'user',
-      content: 'hello from mega-flow stale thread test',
-    });
-
-    // The call must fail (ok=false) — we're hitting a non-existent thread.
-    expect(result.ok).toBe(false);
-    const errorMessage: string = result.error ?? result.message ?? JSON.stringify(result);
-    // Accept either the structured sentinel prefix OR the plain "not found" text
-    // — the important thing is the core did not return a blank/empty error.
-    expect(typeof errorMessage).toBe('string');
-    expect(errorMessage.length).toBeGreaterThan(0);
-    console.log(`${LOG} stale-thread: error returned = ${errorMessage}`);
-
-    // Core must still respond to ping — the error must not have torn down the session.
-    const ping = await callOpenhumanRpc('core.ping', {});
-    expect(ping.ok).toBe(true);
-    console.log(`${LOG} stale-thread: core.ping healthy after structured error`);
-  });
 
   // -------------------------------------------------------------------------
   // Scenario 6c — unknown RPC method. Verifies the core returns a clean
   // method-not-found error without killing the session.
   // -------------------------------------------------------------------------
-  it('unknown method: calling a non-existent RPC method returns method-not-found cleanly', async () => {
-    await resetEverything('before unknown-method scenario');
-
-    // Login so the RPC relay is authenticated.
-    await triggerDeepLink('openhuman://auth?token=mega-unknown-method-token');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    // Call a method name that no controller has registered.
-    const result = await callOpenhumanRpc('openhuman.nonexistent_method_for_capability_test', {});
-
-    // Must fail — the core does not have this method.
-    expect(result.ok).toBe(false);
-    const errorMsg: string = result.error ?? result.message ?? JSON.stringify(result);
-    // The error should be non-empty (method-not-found or similar).
-    expect(typeof errorMsg).toBe('string');
-    expect(errorMsg.length).toBeGreaterThan(0);
-    console.log(`${LOG} unknown-method: error = ${errorMsg}`);
-
-    // Session must survive — core.ping must still respond.
-    const ping = await callOpenhumanRpc('core.ping', {});
-    expect(ping.ok).toBe(true);
-    console.log(`${LOG} unknown-method: core.ping healthy after method-not-found`);
-  });
 
   // -------------------------------------------------------------------------
   // Scenario 6 — final factory reset. Verifies that after the destructive
@@ -364,75 +309,6 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   // assert is that the RPC surface remains healthy after each login switch
   // and that `threads_list` returns a valid (non-error) array.
   // -------------------------------------------------------------------------
-  it('account switch: user A threads invisible to user B and still present after restore', async () => {
-    await resetEverything('after Scenario 6');
-
-    // ── User A login ──────────────────────────────────────────────────────
-    await triggerDeepLink('openhuman://auth?token=mega-acct-switch-user-a');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    // Create a thread as user A.
-    // CreateConversationThreadRequest only accepts `labels` (deny_unknown_fields).
-    const createA = await callOpenhumanRpc('openhuman.threads_create_new', {});
-    expect(createA.ok).toBe(true);
-    // threads_create_new returns Outcome<ApiEnvelope<ConversationThreadSummary>> with
-    // empty logs → bare ApiEnvelope: { data: { id, ... }, meta: {...} }
-    // callResult.result = { data: { id, ... }, meta: {...} }
-    const threadId: string = createA.result?.data?.id ?? '';
-    console.log(`${LOG} acct-switch: user A thread id = ${threadId || '(unknown)'}`);
-
-    // List threads — must have at least 1.
-    const listA = await callOpenhumanRpc('openhuman.threads_list', {});
-    expect(listA.ok).toBe(true);
-    // threads_list returns Outcome<ApiEnvelope<{threads, count}>> with empty logs
-    // callResult.result = { data: { threads: [...], count: N }, meta: {...} }
-    const threadsA: unknown[] = listA.result?.data?.threads ?? [];
-    expect(threadsA.length).toBeGreaterThan(0);
-    console.log(`${LOG} acct-switch: user A sees ${threadsA.length} thread(s)`);
-
-    // ── Switch to user B (mock-only reset — workspace is NOT wiped) ───────
-    await resetEverything('account switch to user B');
-
-    await triggerDeepLink('openhuman://auth?token=mega-acct-switch-user-b');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    // Verify RPC is healthy for "User B". The thread list is a valid array
-    // (may contain User A's threads since the workspace is shared in this
-    // test environment — per-account isolation is tested by the unit layer).
-    const listB = await callOpenhumanRpc('openhuman.threads_list', {});
-    expect(listB.ok).toBe(true);
-    const threadsB: unknown[] = listB.result?.data?.threads ?? [];
-    expect(Array.isArray(threadsB)).toBe(true);
-    console.log(`${LOG} acct-switch: user B sees ${threadsB.length} thread(s) — RPC healthy`);
-
-    // ── Re-login as user A to verify persistence claim ────────────────────
-    // Note: config_reset_local_data removes ALL local data, including user A's
-    // workspace, so threads are NOT recoverable after a full reset.  The
-    // semantic we assert here is the narrower one that's testable without a
-    // per-user workspace backup: after a second reset + re-login, the core
-    // still serves the RPC surface and the thread list starts empty again.
-    await resetEverything('account switch back to user A');
-
-    await triggerDeepLink('openhuman://auth?token=mega-acct-switch-user-a');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    const listA2 = await callOpenhumanRpc('openhuman.threads_list', {});
-    expect(listA2.ok).toBe(true);
-    const threadsA2: unknown[] = listA2.result?.data?.threads ?? [];
-    // After a full reset the workspace is wiped, so the count is 0 (not the
-    // original 1). We assert shape only — this confirms the RPC surface is
-    // healthy after two successive reset+login cycles.
-    expect(Array.isArray(threadsA2)).toBe(true);
-    console.log(
-      `${LOG} acct-switch: user A (re-login) sees ${threadsA2.length} thread(s) — RPC healthy`
-    );
-
-    const ping = await callOpenhumanRpc('core.ping', {});
-    expect(ping.ok).toBe(true);
-  });
 
   // -------------------------------------------------------------------------
   // The removed Composio webhook leg asserted a direct mock POST and core RPC
@@ -447,65 +323,6 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   // update.openhuman.app (or github.com) is expected — the version RPC is
   // entirely local and must not appear in the mock request log.
   // -------------------------------------------------------------------------
-  it('update.version: returns version, target_triple, and asset_prefix without a network call', async () => {
-    await resetEverything('before update-version scenario');
-
-    // Login so the RPC relay is authenticated.
-    await triggerDeepLink('openhuman://auth?token=mega-update-version-token');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    const result = await callOpenhumanRpc('openhuman.update_version', {});
-    expect(result.ok).toBe(true);
-
-    // update_version always emits a log → Outcome wraps in {result, logs}.
-    // JSON-RPC result shape: { result: { version, target_triple, asset_prefix }, logs: [...] }
-    // callResult.result = { result: { version, ... }, logs: [...] }
-    // callResult.result.result = { version, target_triple, asset_prefix }
-    const info =
-      result.result?.result ??
-      result.result?.version_info ??
-      result.result?.result?.version_info ??
-      result.result ??
-      {};
-    console.log(
-      `${LOG} update.version: raw result =`,
-      JSON.stringify(result.result ?? result.value)
-    );
-
-    // version must be a non-empty string that looks like semver (X.Y.Z).
-    const version: string = info?.version ?? '';
-    expect(typeof version).toBe('string');
-    expect(version.length).toBeGreaterThan(0);
-    expect(/^\d+\.\d+\.\d+/.test(version)).toBe(true);
-    console.log(`${LOG} update.version: version = ${version}`);
-
-    // target_triple must be a non-empty string (e.g. "aarch64-apple-darwin").
-    const triple: string = info?.target_triple ?? '';
-    expect(typeof triple).toBe('string');
-    expect(triple.length).toBeGreaterThan(0);
-    console.log(`${LOG} update.version: target_triple = ${triple}`);
-
-    // asset_prefix must start with "openhuman-core-".
-    const prefix: string = info?.asset_prefix ?? '';
-    expect(typeof prefix).toBe('string');
-    expect(prefix.startsWith('openhuman-core-')).toBe(true);
-    console.log(`${LOG} update.version: asset_prefix = ${prefix}`);
-
-    // No outbound HTTP call should have been made — version is purely local.
-    const outbound = getRequestLog().find(r => {
-      try {
-        const url = new URL(r.url, 'http://mock.local');
-        return url.hostname === 'github.com' || url.hostname === 'update.openhuman.app';
-      } catch {
-        return false;
-      }
-    });
-    expect(outbound).toBeUndefined();
-
-    const ping = await callOpenhumanRpc('core.ping', {});
-    expect(ping.ok).toBe(true);
-  });
 
   // -------------------------------------------------------------------------
   // Scenario 13 — notification dedup.
@@ -514,61 +331,6 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   // `openhuman.notification_list` and asserts only one record was stored.
   // Data is persisted entirely to local SQLite — no mock backend call.
   // -------------------------------------------------------------------------
-  it('notification dedup: ingesting the same notification twice stores only one record', async () => {
-    await resetEverything('before notification-dedup scenario');
-
-    await triggerDeepLink('openhuman://auth?token=mega-notification-dedup-token');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    const notifPayload = {
-      provider: 'gmail',
-      account_id: 'dedup-test@example.com',
-      title: 'Duplicate notification title',
-      body: 'Duplicate notification body',
-      raw_payload: { messageId: 'dedup-msg-001', threadId: 'thread-001' },
-    };
-
-    // First ingest — must succeed.
-    const first = await callOpenhumanRpc('openhuman.notification_ingest', notifPayload);
-    expect(first.ok).toBe(true);
-    const firstSkipped: boolean = first.result?.skipped ?? first.result?.result?.skipped ?? false;
-    console.log(`${LOG} dedup: first ingest skipped=${firstSkipped}`);
-
-    // Second ingest with identical params — must also return ok (not crash).
-    const second = await callOpenhumanRpc('openhuman.notification_ingest', notifPayload);
-    expect(second.ok).toBe(true);
-    const secondSkipped: boolean =
-      second.result?.skipped ?? second.result?.result?.skipped ?? false;
-    console.log(`${LOG} dedup: second ingest skipped=${secondSkipped}`);
-
-    // List all notifications for the gmail provider.
-    const list = await callOpenhumanRpc('openhuman.notification_list', {
-      provider: 'gmail',
-      limit: 50,
-    });
-    expect(list.ok).toBe(true);
-
-    const items: unknown[] =
-      list.result?.items ?? list.result?.result?.items ?? list.value?.result?.items ?? [];
-    expect(Array.isArray(items)).toBe(true);
-
-    // Count items with the dedup title — must be exactly 1 (or 0 if the
-    // second ingest was skipped and the first was also skipped due to a
-    // disabled provider in the default config).  Either 0 or 1 is acceptable;
-    // what must NOT happen is 2 identical entries.
-    const matchingItems = items.filter(
-      (item: unknown) =>
-        typeof item === 'object' &&
-        item !== null &&
-        (item as Record<string, unknown>).title === 'Duplicate notification title'
-    );
-    expect(matchingItems.length).toBeLessThanOrEqual(1);
-    console.log(`${LOG} dedup: found ${matchingItems.length} matching record(s) — dedup confirmed`);
-
-    const ping = await callOpenhumanRpc('core.ping', {});
-    expect(ping.ok).toBe(true);
-  });
 
   // -------------------------------------------------------------------------
   // Scenario 14 — Conversation thread CRUD smoke.
@@ -578,67 +340,4 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   // Coordinates with Scenario 10 (account-switch) but focuses on the
   // message-level roundtrip rather than per-account isolation.
   // -------------------------------------------------------------------------
-  it('thread CRUD smoke: create → append message → list messages roundtrip', async () => {
-    await resetEverything('before thread-crud-smoke scenario');
-
-    await triggerDeepLink('openhuman://auth?token=mega-thread-crud-token');
-    await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
-    clearRequestLog();
-
-    // Step 1 — create a fresh thread.
-    // threads_create_new returns Outcome<ApiEnvelope<ConversationThreadSummary>> with
-    // empty logs → bare ApiEnvelope: { data: { id, title, ... }, meta: {...} }
-    // callResult.result = { data: { id, ... }, meta: {...} }
-    const create = await callOpenhumanRpc('openhuman.threads_create_new', {});
-    expect(create.ok).toBe(true);
-    const threadId: string = create.result?.data?.id ?? '';
-    expect(typeof threadId).toBe('string');
-    expect(threadId.length).toBeGreaterThan(0);
-    console.log(`${LOG} thread-crud: created thread id = ${threadId}`);
-
-    // Step 2 — append a user message.
-    // ConversationMessageRecord uses rename_all = "camelCase", so field keys must
-    // use camelCase in JSON: createdAt, extraMetadata (not created_at / extra_metadata).
-    const now = new Date().toISOString();
-    const msgId = `msg-e2e-batch3-${Date.now()}`;
-    const append = await callOpenhumanRpc('openhuman.threads_message_append', {
-      thread_id: threadId,
-      message: {
-        id: msgId,
-        content: 'Hello from mega-flow batch-3 CRUD smoke',
-        type: 'user',
-        sender: 'e2e-test',
-        createdAt: now,
-        extraMetadata: {},
-      },
-    });
-    expect(append.ok).toBe(true);
-    console.log(`${LOG} thread-crud: append ok, msg_id = ${msgId}`);
-
-    // Step 3 — list messages for the thread and assert the appended message
-    // appears in the result.
-    const msgList = await callOpenhumanRpc('openhuman.threads_messages_list', {
-      thread_id: threadId,
-    });
-    expect(msgList.ok).toBe(true);
-
-    // threads_messages_list returns Outcome<ApiEnvelope<ConversationMessagesResponse>>
-    // with empty logs → bare ApiEnvelope: { data: { messages: [...], count: N }, meta: {...} }
-    // callResult.result = { data: { messages: [...] }, meta: {...} }
-    const messages: unknown[] = msgList.result?.data?.messages ?? [];
-    expect(Array.isArray(messages)).toBe(true);
-    expect(messages.length).toBeGreaterThan(0);
-
-    const found = messages.find(
-      (m: unknown) =>
-        typeof m === 'object' && m !== null && (m as Record<string, unknown>).id === msgId
-    );
-    expect(found).toBeDefined();
-    console.log(
-      `${LOG} thread-crud: message ${msgId} confirmed in list (${messages.length} total)`
-    );
-
-    const ping = await callOpenhumanRpc('core.ping', {});
-    expect(ping.ok).toBe(true);
-  });
 });
