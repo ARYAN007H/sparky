@@ -5,6 +5,32 @@ use super::*;
 async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     use std::sync::Arc;
     use tinybus::EventHandler;
+    use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
+
+    struct RecordingModel {
+        inner: Arc<tinyagents_harness::testkit::ScriptedModel>,
+        errors: Arc<std::sync::Mutex<Vec<String>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl ChatModel<()> for RecordingModel {
+        async fn invoke(
+            &self,
+            state: &(),
+            request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            match self.inner.invoke(state, request).await {
+                Ok(response) => Ok(response),
+                Err(error) => {
+                    self.errors
+                        .lock()
+                        .expect("recording model error lock")
+                        .push(error.to_string());
+                    Err(error)
+                }
+            }
+        }
+    }
 
     let _ = env_logger::builder().is_test(true).try_init();
     let _turn_lock = FORCED_ERROR_TEST_LOCK.lock().await;
@@ -12,8 +38,13 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
         "hello from mock",
     ]));
-    let _model =
-        crate::inference::provider::factory::test_provider_override::install_model(model.clone());
+    let model_errors = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let _model = crate::inference::provider::factory::test_provider_override::install_model(
+        Arc::new(RecordingModel {
+            inner: Arc::clone(&model),
+            errors: Arc::clone(&model_errors),
+        }),
+    );
     let temp = tempfile::tempdir().expect("temporary test workspace");
     let workspace_dir = temp.path().join("workspace");
     let action_dir = temp.path().join("projects");
@@ -33,20 +64,42 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     config.memory.conversations.enabled = false;
     config.agent.session_dual_write = false;
     config.agent.session_shadow_reads = false;
-    let core_context =
-        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None)
-            .derive_with(
-                crate::core::runtime::ContextOverlay::new(
-                    config,
-                    crate::core::runtime::DomainSet::full(),
-                    Default::default(),
-                )
-                .without_user_skill_roots()
-                .definitions(Arc::new(
-                    crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(
-                    ),
-                )),
-            );
+    config.components.mcp = false;
+    config.components.memory = false;
+    config.components.skills = false;
+    config.components.flows = false;
+    config.agent.chat_agent_id = Some("ptt_event_regression".to_string());
+    let mut definition =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
+            .get("orchestrator")
+            .cloned()
+            .expect("built-in orchestrator definition");
+    definition.id = "ptt_event_regression".to_string();
+    definition.tools = tinyagents_definition::ToolScope::Named(Vec::new());
+    definition.subagents.clear();
+    definition.max_iterations = 3;
+    definition.extensions.omit_memory_context = true;
+    definition.extensions.searches_connected_mcp = false;
+    let definitions = Arc::new(
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
+            .with_definitions([definition]),
+    );
+    let mut components = crate::core::runtime::ComponentSet::all();
+    components.mcp = false;
+    components.memory = false;
+    components.skills = false;
+    components.flows = false;
+    components.voice = true;
+    let core_context = crate::core::runtime::CoreContext::for_test_with_components(components)
+        .derive_with(
+            crate::core::runtime::ContextOverlay::new(
+                config,
+                crate::core::runtime::DomainSet::full(),
+                crate::tools::toolpacks::ToolGroups::none(),
+            )
+            .without_user_skill_roots()
+            .definitions(definitions),
+        );
     let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&core_context));
 
     crate::core::runtime::CoreContext::scope(core_context, async {
@@ -119,16 +172,18 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
                 assert_ne!(
                     (event.request_id.as_str(), event.event.as_str()),
                     (request_id.as_str(), "chat_error"),
-                    "PTT turn should complete successfully: {event:?}; scripted model received {} requests",
-                    model.requests().len()
+                    "PTT turn should complete successfully: {event:?}; scripted model received {} requests; invoke errors: {:?}",
+                    model.requests().len(),
+                    model_errors.lock().expect("recording model error lock").as_slice()
                 );
             }
         })
         .await
         .unwrap_or_else(|_| {
             panic!(
-                "PTT turn should finish; scripted model received {} requests",
-                model.requests().len()
+                "PTT turn should finish; scripted model received {} requests; invoke errors: {:?}",
+                model.requests().len(),
+                model_errors.lock().expect("recording model error lock").as_slice()
             )
         });
         assert_eq!(done.full_response.as_deref(), Some("hello from mock"));
