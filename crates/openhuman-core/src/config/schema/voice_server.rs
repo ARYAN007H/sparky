@@ -3,18 +3,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Activation mode for the voice server hotkey.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-#[derive(Default)]
-pub enum VoiceActivationMode {
-    /// Single press toggles recording on/off.
-    Tap,
-    /// Hold to record, release to stop.
-    #[default]
-    Push,
-}
-
 /// Which speech-to-text engine transcribes audio.
 ///
 /// Replaces the removed local whisper.cpp engine: STT is a hosted round trip
@@ -75,76 +63,15 @@ impl SttEngine {
     }
 }
 
-/// Configuration for the voice dictation server.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+/// Persisted STT routing fallback for voice providers.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct VoiceServerConfig {
-    /// Whether the voice server should start automatically with the core.
-    #[serde(default)]
-    pub auto_start: bool,
-
-    /// Hotkey combination to trigger recording (e.g. "Fn").
-    #[serde(default = "default_hotkey")]
-    pub hotkey: String,
-
-    /// Activation mode: "tap" (toggle) or "push" (hold-to-record).
-    #[serde(default)]
-    pub activation_mode: VoiceActivationMode,
-
     /// Which hosted engine transcribes audio. See [`SttEngine`]. An explicit
     /// `stt_provider` routing string (top-level or legacy `local_ai`) still
     /// wins — this field is what the `"cloud"`/unset case resolves to.
     #[serde(default)]
     pub stt_engine: SttEngine,
-
-    /// Skip LLM post-processing for transcriptions.
-    /// Default: false (cleanup enabled — matches OpenWhispr behavior).
-    #[serde(default)]
-    pub skip_cleanup: bool,
-
-    /// Minimum recording duration in seconds. Recordings shorter than
-    /// this are discarded.
-    #[serde(default = "default_min_duration")]
-    pub min_duration_secs: f32,
-
-    /// RMS energy threshold for silence detection. Recordings with peak
-    /// energy below this value are treated as silence and skipped without
-    /// reaching the STT engine, preventing hallucinated output.
-    #[serde(default = "default_silence_threshold")]
-    pub silence_threshold: f32,
-
-    /// Custom dictionary words to bias the STT engine toward. Passed as the
-    /// engine's `initial_prompt`-equivalent where one exists, improving
-    /// recognition of names, technical terms, and domain-specific vocabulary.
-    #[serde(default)]
-    pub custom_dictionary: Vec<String>,
-}
-
-fn default_hotkey() -> String {
-    "Fn".to_string()
-}
-
-fn default_min_duration() -> f32 {
-    0.3
-}
-
-fn default_silence_threshold() -> f32 {
-    0.002
-}
-
-impl Default for VoiceServerConfig {
-    fn default() -> Self {
-        Self {
-            auto_start: false,
-            hotkey: default_hotkey(),
-            activation_mode: VoiceActivationMode::default(),
-            stt_engine: SttEngine::default(),
-            skip_cleanup: false,
-            min_duration_secs: default_min_duration(),
-            silence_threshold: default_silence_threshold(),
-            custom_dictionary: Vec::new(),
-        }
-    }
 }
 
 #[cfg(test)]

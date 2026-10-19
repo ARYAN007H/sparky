@@ -4244,7 +4244,7 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
 
     // Mark A done directly via the run ledger, then B claims fine.
     let task_a = openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = (&task_a_id).to_string();
+        let ledger_arg_0 = task_a_id.to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
     .expect("get task A")
@@ -12212,10 +12212,10 @@ async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner()
 
 // ── Model resolution and voice settings ─────────────────────────────────
 
-/// E2E: retired always-on voice parameters are rejected while supported voice
-/// settings continue to round-trip over JSON-RPC.
+/// E2E: the retired dictation and voice-server config methods are absent from
+/// the JSON-RPC surface.
 #[tokio::test]
-async fn json_rpc_voice_server_settings_rejects_retired_always_on_params() {
+async fn json_rpc_retired_dictation_and_voice_server_methods_are_unknown() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
@@ -12232,65 +12232,15 @@ async fn json_rpc_voice_server_settings_rejects_retired_always_on_params() {
     let rpc_base = format!("http://{}", rpc_addr);
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let initial = post_json_rpc(
-        &rpc_base,
-        7401,
-        "openhuman.config_get_voice_server_settings",
-        json!({}),
-    )
-    .await;
-    let initial_outer = assert_no_jsonrpc_error(&initial, "get_voice_server_settings initial");
-    let initial_result = initial_outer.get("result").unwrap();
-    for retired in ["always_on_enabled", "wake_word"] {
-        assert!(
-            initial_result.get(retired).is_none(),
-            "retired voice setting {retired} was returned: {initial_outer}"
-        );
+    for (id, method) in [
+        (7401, "openhuman.config_get_dictation_settings"),
+        (7402, "openhuman.config_update_dictation_settings"),
+        (7403, "openhuman.config_get_voice_server_settings"),
+        (7404, "openhuman.config_update_voice_server_settings"),
+    ] {
+        let response = post_json_rpc(&rpc_base, id, method, json!({})).await;
+        assert_unknown_method(&response, method);
     }
-
-    let retired_update = post_json_rpc(
-        &rpc_base,
-        7402,
-        "openhuman.config_update_voice_server_settings",
-        json!({ "always_on_enabled": false }),
-    )
-    .await;
-    let error = assert_jsonrpc_error(
-        &retired_update,
-        "update_voice_server_settings retired always_on_enabled",
-    );
-    assert!(
-        error["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("unknown param 'always_on_enabled'")),
-        "retired parameter should use the standard unknown-param error: {error}"
-    );
-
-    let update = post_json_rpc(
-        &rpc_base,
-        7403,
-        "openhuman.config_update_voice_server_settings",
-        json!({ "hotkey": "F13", "min_duration_secs": 0.4 }),
-    )
-    .await;
-    assert_no_jsonrpc_error(&update, "update_voice_server_settings supported fields");
-
-    let after = post_json_rpc(
-        &rpc_base,
-        7404,
-        "openhuman.config_get_voice_server_settings",
-        json!({}),
-    )
-    .await;
-    let after_outer = assert_no_jsonrpc_error(&after, "get_voice_server_settings after update");
-    assert_eq!(after_outer["result"]["hotkey"], "F13");
-    let min_duration_secs = after_outer["result"]["min_duration_secs"]
-        .as_f64()
-        .expect("min_duration_secs should be numeric");
-    assert!(
-        (min_duration_secs - 0.4).abs() < 1e-6,
-        "supported min_duration_secs update should round-trip: {min_duration_secs}"
-    );
 
     rpc_join.abort();
 }
