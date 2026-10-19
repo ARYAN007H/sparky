@@ -97,7 +97,8 @@ fn warm_inbound_queues(config: &Config) {
         return;
     }
     let config = config.clone();
-    tokio::spawn(async move {
+    // Loading a module is process-wide; the host's own context carries it.
+    crate::core::runtime::DispatchCtx::host_default().spawn(async move {
         log::debug!("[modules] inbound event queues warm-up starting");
         if let Err(reason) = ops::ensure_loaded(&config, super::event_queues::MODULE_ID).await {
             log::warn!("[modules] inbound event queues did not load at boot: {reason}");

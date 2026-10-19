@@ -137,7 +137,8 @@ impl EventHandler<DomainEvent> for WebhookRequestSubscriber {
                     // module's first load nor a resent ingest holds up this
                     // subscriber's loop.
                     let corr = correlation_id.clone();
-                    tokio::spawn(async move {
+                    let spawner = ctx.clone();
+                    spawner.spawn(async move {
                         let config = ctx.load_config().await.ok();
                         let queued = route_agent_trigger(
                             config,

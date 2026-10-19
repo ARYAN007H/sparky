@@ -369,7 +369,7 @@ impl Deliverer {
         let runner = Arc::clone(&self.runner);
         let ctx = self.ctx.clone();
         let label = envelope.display_label.clone();
-        let mut task = tokio::spawn(async move {
+        let mut task = self.ctx.spawn(async move {
             let applied = runner.apply(&ctx, run, &envelope).await;
             if let Err(error) = &applied {
                 // Reported here, wherever the delivery stands: inside the

@@ -129,13 +129,13 @@ fn refuse_plaintext_credentials(url: &str) -> Result<(), String> {
 }
 
 /// The last resolution, read by the storage host's grant and by `Deliver`.
-static CURRENT: RwLock<Option<Arc<Resolved>>> = RwLock::new(None);
+static LAST_RESOLUTION: RwLock<Option<Arc<Resolved>>> = RwLock::new(None);
 
 /// The resolution the module was last configured with, or the shipped one.
 #[must_use]
 pub fn current() -> Arc<Resolved> {
     static SHIPPED: std::sync::OnceLock<Arc<Resolved>> = std::sync::OnceLock::new();
-    let guard = CURRENT
+    let guard = LAST_RESOLUTION
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     guard
@@ -145,7 +145,7 @@ pub fn current() -> Arc<Resolved> {
 
 fn remember(resolved: Resolved) -> Arc<Resolved> {
     let resolved = Arc::new(resolved);
-    *CURRENT
+    *LAST_RESOLUTION
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::clone(&resolved));
     resolved

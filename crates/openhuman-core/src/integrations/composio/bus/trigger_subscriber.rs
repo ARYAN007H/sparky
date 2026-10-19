@@ -190,7 +190,8 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         // Its own task: the hand-off may wait for the module's first load and
         // retries an unanswered ingest, which must never hold up this
         // subscriber's loop (a stalled loop lags and loses broadcast events).
-        tokio::spawn(async move {
+        let spawner = ctx.clone();
+        spawner.spawn(async move {
             let config = ctx.load_config().await.ok();
             route_trigger(
                 ctx,
