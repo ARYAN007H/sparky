@@ -328,7 +328,7 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     } if error_type == "provider_error"
         && context.client_id == "real-client"
         && copy_key == "chat_error.provider_unavailable"
-        && source == "provider_error"),
+        && source == "provider"),
         "{error:?}"
     );
 
