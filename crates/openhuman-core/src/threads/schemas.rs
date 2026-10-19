@@ -19,6 +19,4 @@ use crate::threads::{
 #[cfg(test)]
 use handlers::parse;
 #[cfg(test)]
-pub(crate) use schema_defs::schemas;
-#[cfg(test)]
 use serde_json::{Map, Value};
