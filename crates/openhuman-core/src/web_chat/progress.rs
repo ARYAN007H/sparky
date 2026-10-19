@@ -513,16 +513,26 @@ pub(crate) fn spawn_progress_bridge(
             tokio::time::interval(std::time::Duration::from_secs(INFERENCE_HEARTBEAT_SECS));
         beat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         beat.tick().await;
+        enum Next {
+            Progress(Option<AgentProgress>),
+            Heartbeat,
+        }
         loop {
-            tokio::select! {
+            let next = tokio::select! {
                 // Real events before the timer, so a busy turn never starves
                 // event handling to emit a beat.
                 biased;
-                maybe = rx.recv() => match maybe {
-                    Some(event) => projection.on_event(event).await,
-                    None => break,
-                },
-                _ = beat.tick() => projection.heartbeat().await,
+                event = rx.recv() => Next::Progress(event),
+                _ = beat.tick() => Next::Heartbeat,
+            };
+            match next {
+                // Keep the projection future outside `select!`: module calls
+                // can take longer than one heartbeat interval, and selecting
+                // the timer while awaiting them would cancel the progress
+                // event that already won the receive branch.
+                Next::Progress(Some(event)) => projection.on_event(event).await,
+                Next::Progress(None) => break,
+                Next::Heartbeat => projection.heartbeat().await,
             }
         }
         projection.finish().await;
