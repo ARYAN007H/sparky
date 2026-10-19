@@ -15,7 +15,6 @@ fn voice_schema_wire_contracts_are_preserved() {
         ("voice_stt_dispatch", "stt_dispatch"),
         ("voice_tts_dispatch", "tts_dispatch"),
         ("voice_set_providers", "set_providers"),
-        ("voice_server_start", "server_start"),
         ("voice_update_provider_settings", "update_provider_settings"),
         ("voice_list_models", "list_models"),
         ("voice_test_provider", "test_provider"),
@@ -52,7 +51,6 @@ fn voice_schema_wire_contracts_are_preserved() {
         expect_schema_fields(&voice_schemas(key), &expected);
     }
     assert!(voice_schemas("voice_status").inputs.is_empty());
-    expect_schema_required_inputs(&voice_schemas("voice_server_start"), &[]);
     expect_schema_required_inputs(&voice_schemas("voice_update_provider_settings"), &[]);
     assert_schema_controller_parity(
         &all_voice_controller_schemas(),
