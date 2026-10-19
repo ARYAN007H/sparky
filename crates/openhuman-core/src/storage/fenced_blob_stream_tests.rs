@@ -227,9 +227,7 @@ impl BlobStore for RejectingFencedStreams {
         content_type: Option<&str>,
         ttl: Duration,
     ) -> Result<BlobMeta> {
-        self.inner
-            .put_expiring(key, bytes, content_type, ttl)
-            .await
+        self.inner.put_expiring(key, bytes, content_type, ttl).await
     }
 
     async fn put_stream_expiring(
@@ -312,10 +310,18 @@ impl StorageBackend for StreamFallbackBackend {
 
     fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage> {
         let scoped = self.inner.for_scope(scope)?;
-        Ok(self.scoped(scope, &scoped, Arc::clone(&self.blobs) as Arc<dyn BlobStore>))
+        Ok(self.scoped(
+            scope,
+            &scoped,
+            Arc::clone(&self.blobs) as Arc<dyn BlobStore>,
+        ))
     }
 
-    fn for_scope_fenced(&self, scope: &Scope, fence: &tinystoragedrivers::Fence) -> Result<ScopedStorage> {
+    fn for_scope_fenced(
+        &self,
+        scope: &Scope,
+        fence: &tinystoragedrivers::Fence,
+    ) -> Result<ScopedStorage> {
         let scoped = self.inner.for_scope_fenced(scope, fence)?;
         let blobs: Arc<dyn BlobStore> = Arc::new(RejectingFencedStreams {
             inner: Arc::clone(&self.blobs) as Arc<dyn BlobStore>,
@@ -525,7 +531,10 @@ async fn unsupported_fenced_streams_fall_back_only_before_the_first_poll() {
             write_with_fenced_stream_rejection(StreamRejection::BeforeRead, expiring).await;
         assert!(outcome.is_ok());
         assert_eq!(bytes_read.load(Ordering::SeqCst), 3);
-        assert_eq!(inner.stream_puts.load(Ordering::SeqCst), u64::from(!expiring));
+        assert_eq!(
+            inner.stream_puts.load(Ordering::SeqCst),
+            u64::from(!expiring)
+        );
         assert_eq!(
             inner.expiring_stream_puts.load(Ordering::SeqCst),
             u64::from(expiring)

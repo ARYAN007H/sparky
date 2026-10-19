@@ -24,7 +24,7 @@
 
 use std::ops::Range;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -499,7 +499,7 @@ struct FencedBlobs {
 #[derive(Clone)]
 struct SharedBlobReader {
     reader: Arc<Mutex<tinystoragedrivers::BlobReader>>,
-    bytes_read: Arc<AtomicU64>,
+    polled: Arc<AtomicBool>,
 }
 
 impl tokio::io::AsyncRead for SharedBlobReader {
@@ -509,6 +509,7 @@ impl tokio::io::AsyncRead for SharedBlobReader {
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         let this = self.get_mut();
+        this.polled.store(true, Ordering::SeqCst);
         let mut reader = match this.reader.lock() {
             Ok(reader) => reader,
             Err(_) => {
@@ -517,13 +518,7 @@ impl tokio::io::AsyncRead for SharedBlobReader {
                 )));
             }
         };
-        let before = buf.filled().len();
-        let outcome = reader.as_mut().poll_read(cx, buf);
-        if let Poll::Ready(Ok(())) = &outcome {
-            let read = buf.filled().len().saturating_sub(before) as u64;
-            this.bytes_read.fetch_add(read, Ordering::Relaxed);
-        }
-        outcome
+        reader.as_mut().poll_read(cx, buf)
     }
 }
 
@@ -532,17 +527,17 @@ fn shared_blob_readers(
 ) -> (
     tinystoragedrivers::BlobReader,
     tinystoragedrivers::BlobReader,
-    Arc<AtomicU64>,
+    Arc<AtomicBool>,
 ) {
     let reader = Arc::new(Mutex::new(reader));
-    let bytes_read = Arc::new(AtomicU64::new(0));
+    let polled = Arc::new(AtomicBool::new(false));
     let handle = || {
         Box::pin(SharedBlobReader {
             reader: Arc::clone(&reader),
-            bytes_read: Arc::clone(&bytes_read),
+            polled: Arc::clone(&polled),
         }) as tinystoragedrivers::BlobReader
     };
-    (handle(), handle(), bytes_read)
+    (handle(), handle(), polled)
 }
 
 impl std::fmt::Debug for FencedBlobs {
@@ -593,15 +588,13 @@ impl BlobStore for FencedBlobs {
         match self.guard.admit("blobs.put_stream").await? {
             None => self.inner.put_stream(key, reader, len, content_type).await,
             Some((lease, scoped)) => {
-                let (attempt, fallback, bytes_read) = shared_blob_readers(reader);
+                let (attempt, fallback, polled) = shared_blob_readers(reader);
                 let outcome = scoped
                     .blobs()
                     .put_stream(key, attempt, len, content_type)
                     .await;
                 match outcome {
-                    Err(error)
-                        if unfenceable(&error) && bytes_read.load(Ordering::Relaxed) == 0 =>
-                    {
+                    Err(error) if unfenceable(&error) && !polled.load(Ordering::SeqCst) => {
                         tracing::debug!(
                             target: "openhuman::storage::fence",
                             op = "blobs.put_stream",
@@ -632,15 +625,13 @@ impl BlobStore for FencedBlobs {
                     .await
             }
             Some((lease, scoped)) => {
-                let (attempt, fallback, bytes_read) = shared_blob_readers(reader);
+                let (attempt, fallback, polled) = shared_blob_readers(reader);
                 let outcome = scoped
                     .blobs()
                     .put_stream_expiring(key, attempt, len, content_type, ttl)
                     .await;
                 match outcome {
-                    Err(error)
-                        if unfenceable(&error) && bytes_read.load(Ordering::Relaxed) == 0 =>
-                    {
+                    Err(error) if unfenceable(&error) && !polled.load(Ordering::SeqCst) => {
                         tracing::debug!(
                             target: "openhuman::storage::fence",
                             op = "blobs.put_stream_expiring",
