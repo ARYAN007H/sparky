@@ -999,7 +999,7 @@ fn outcome_to_host(
         SubagentOutcomeKind::Incomplete(incomplete) => SubagentRunStatus::Incomplete {
             failure_cause: outcome
                 .extensions
-                .get(super::lifecycle_outcome::CLASSIFIED_STOP_CAUSE_EXTENSION)
+                .get(lifecycle_outcome::CLASSIFIED_STOP_CAUSE_EXTENSION)
                 .and_then(|value| {
                     Some(tinyagents_harness::no_progress::ClassifiedStopCause {
                         class: value.get("class")?.as_str()?.to_string(),
