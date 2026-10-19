@@ -1,19 +1,17 @@
 //! Test-only declaration of the Cargo-built `test-mcp-stub` as an
 //! operator-trusted stdio server.
 //!
-//! TEMPORARY. tinymcp starts every stdio server that is not `operator_trusted`
-//! inside a TinyBox jail and asks TinyBox for `Enforced` isolation. TinyBox's
-//! macOS Seatbelt backend only reports best-effort enforcement and its Linux
-//! Landlock backend reports no process isolation, so no jailed server can
-//! start on either platform today. Until the host can choose the enforcement
-//! level (tinyhumansai/tinymcp#126) and TinyBox has a Linux backend with real
-//! process isolation, the e2e tests declare the stub in the operator-owned
-//! `config.toml` (`[[mcp_client.servers]]`, `operator_trusted = true`), which
-//! tinymcp starts as an ordinary child process.
-//!
 //! Registry-installed servers (`mcp.json`, the registry RPCs) are never
-//! operator-trusted, so tests of that path cannot use this helper; they are
-//! `#[ignore]`d with the same two references until the jail can start them.
+//! operator-trusted, so tinymcp starts them inside a TinyBox jail. With
+//! tinymcp 0.19.5 the host declares best-effort enforcement, which macOS
+//! Seatbelt satisfies, and tinybox v0.1.40 ships the Linux bubblewrap backend
+//! that EX63 (bubblewrap 0.13.1) runs, so the tests on the registry path start
+//! the stub jailed on both platforms and no longer need this helper.
+//!
+//! The trusted stub is still needed only where a test is not on the registry
+//! path: it declares the Cargo-built stub in the operator-owned `config.toml`
+//! (`[[mcp_client.servers]]`, `operator_trusted = true`), which tinymcp starts
+//! as an ordinary child process without a jail.
 
 #![allow(dead_code)]
 
