@@ -390,10 +390,6 @@ pub(crate) fn prepare_spawn_parallel_tasks_from_defs(
         .collect()
 }
 
-#[cfg(test)]
-#[path = "staging_tests.rs"]
-mod tests;
-
 /// Render a claim conflict as the sentence the calling model reads.
 ///
 /// The crate reports conflicts as data precisely so this phrasing — the
@@ -414,3 +410,7 @@ fn shared_workspace_conflict_message(agent_id: &str, conflict: &ClaimConflict) -
         ),
     }
 }
+
+#[cfg(test)]
+#[path = "staging_tests.rs"]
+mod tests;
