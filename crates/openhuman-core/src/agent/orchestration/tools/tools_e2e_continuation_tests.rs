@@ -236,6 +236,172 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
 }
 
+#[tokio::test]
+async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
+    use crate::agent::orchestration::subagent_sessions::{
+        DurableSubagentStatus, SubagentSessionStore,
+    };
+    use crate::agent::orchestration::tools::SpawnSubagentTool;
+    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobStatus;
+
+    let _lock = crate::config::TEST_ENV_LOCK.lock().await;
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let provider = Arc::new(TwoTurnModel::default());
+    let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    parent.session_id = "idle-reuse-e2e".into();
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);
+    parent.on_progress = Some(progress_tx);
+    let (live, _core) = core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "idle-reuse-e2e",
+        "idle-reuse-e2e-thread",
+    );
+    assert!(live.data.dispatch_ctx().resolved().is_some());
+    let tool = SpawnSubagentTool::new();
+    let first = tool
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "idle-history-first-prompt",
+                "model": "test-model",
+                "task_key": "idle-history-fixture"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "idle-reuse-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("first spawn");
+    assert!(!first.is_error, "{}", first.output());
+    wait_completed(&mut progress_rx).await;
+
+    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
+    let first_session = sessions
+        .load()
+        .expect("first session list")
+        .into_iter()
+        .find(|session| session.task_key == "idle-history-fixture")
+        .expect("first durable session");
+    assert_eq!(first_session.status, DurableSubagentStatus::Idle);
+    let original_session_id = first_session.subagent_session_id.clone();
+    let first_task_id = first_session.current_task_id.clone().expect("first task id");
+    let first_job = crate::core::runtime::slot_for::<SubAgentJobRegistry>(
+        &live.data.dispatch_ctx(),
+    )
+    .list()
+    .into_iter()
+    .find(|job| {
+        job.extensions
+            .get("task_id")
+            .and_then(serde_json::Value::as_str)
+            == Some(first_task_id.as_str())
+    })
+    .expect("first child is registered");
+    assert_eq!(first_job.status, SubAgentJobStatus::Completed);
+
+    let second = tool
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "idle-history-follow-up-prompt",
+                "model": "test-model",
+                "task_key": "idle-history-fixture"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "idle-reuse-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("follow-up spawn");
+    assert!(!second.is_error, "{}", second.output());
+    wait_completed(&mut progress_rx).await;
+    let second_session = sessions
+        .load()
+        .expect("follow-up session list")
+        .into_iter()
+        .find(|session| session.subagent_session_id == original_session_id)
+        .expect("same durable child session is reused");
+    assert_eq!(second_session.status, DurableSubagentStatus::Idle);
+    assert_ne!(second_session.current_task_id.as_deref(), Some(first_task_id.as_str()));
+    assert!(provider.saw("idle-history-first-prompt"));
+    assert!(provider.saw("idle-child-first-result"));
+    assert!(provider.saw("idle-history-follow-up-prompt"));
+    let requests = provider.seen.lock();
+    assert_eq!(requests.len(), 2, "both spawns use the injected model");
+    assert_eq!(requests[1].matches("idle-history-follow-up-prompt").count(), 1);
+}
+
+async fn wait_completed(
+    progress: &mut tokio::sync::mpsc::Receiver<crate::progress::AgentProgress>,
+) {
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted { agent_id, .. })
+                    if agent_id == "task_manager_agent" => break,
+                Some(crate::progress::AgentProgress::SubagentFailed { error, .. }) => {
+                    panic!("child failed before completion: {error}")
+                }
+                Some(_) => {}
+                None => panic!("progress stream closed before child completion"),
+            }
+        }
+    })
+    .await
+    .expect("completion is projected after durable settlement");
+}
+
+#[derive(Default)]
+struct TwoTurnModel {
+    calls: std::sync::atomic::AtomicUsize,
+    seen: Mutex<Vec<String>>,
+}
+
+impl TwoTurnModel {
+    fn saw(&self, needle: &str) -> bool {
+        self.seen.lock().iter().any(|payload| payload.contains(needle))
+    }
+}
+
+#[async_trait::async_trait]
+impl tinyinference_llm::model::ChatModel<()> for TwoTurnModel {
+    fn profile(&self) -> Option<&tinyinference_llm::model::ModelProfile> {
+        static PROFILE: std::sync::OnceLock<tinyinference_llm::model::ModelProfile> =
+            std::sync::OnceLock::new();
+        Some(PROFILE.get_or_init(|| {
+            let mut profile = tinyinference_llm::model::ModelProfile::default();
+            profile.tool_calling = true;
+            profile.parallel_tool_calls = true;
+            profile
+        }))
+    }
+
+    async fn invoke(
+        &self,
+        _state: &(),
+        request: tinyinference_llm::model::ModelRequest,
+    ) -> tinyinference_llm::Result<tinyinference_llm::model::ModelResponse> {
+        let seen = request
+            .messages
+            .iter()
+            .map(tinyinference_llm::message::Message::text)
+            .collect::<Vec<_>>()
+            .join("\n");
+        self.seen.lock().push(seen);
+        let answer = match self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) {
+            0 => "idle-child-first-result",
+            1 => "idle-child-follow-up-result",
+            call => return Err(tinyinference_llm::Error::Model(format!("unexpected call {call}"))),
+        };
+        Ok(tinyinference_llm::model::ModelResponse::assistant(answer))
+    }
+}
+
 fn core_backed_live_parent(
     workspace: &std::path::Path,
     parent: crate::agent::harness::ParentExecutionContext,
