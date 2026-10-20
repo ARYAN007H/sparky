@@ -49,7 +49,7 @@ pub use schema::{
     CapabilityProviderTrustState, ChannelsConfig, CompactionSettings, CompactionStrategy,
     ComposioConfig, ComposioDirectBaseUrls, ComposioHostCredential, ComputerConfig, Config,
     ContextConfig, CostConfig, CronConfig, CurlConfig, DashboardConfig, DecisionModel,
-    DelegateAgentConfig, DiagramViewerConfig, DictationActivationMode, DictationConfig,
+    DiagramViewerConfig, DictationActivationMode, DictationConfig,
     DiscordConfig, DockerRuntimeConfig, EmailConfig, EmbeddingRouteConfig, GitbooksConfig,
     HttpHeader, HttpRequestConfig, IMessageConfig, IntegrationToggle, IntegrationsConfig,
     LarkConfig, LegacySearchInputs, LinqConfig, LocalAiConfig, LocalJailConfig, MatrixConfig,

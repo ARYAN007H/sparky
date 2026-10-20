@@ -368,9 +368,6 @@ pub struct Config {
     pub agent_registry: crate::agent_registry::types::AgentRegistryConfig,
 
     #[serde(default)]
-    pub agents: HashMap<String, DelegateAgentConfig>,
-
-    #[serde(default)]
     pub local_ai: LocalAiConfig,
 
     /// Claude Agent SDK provider configuration — routes inference through the

@@ -90,7 +90,6 @@ impl Default for Config {
             cost: CostConfig::default(),
             legacy_memory_sources: Vec::new(),
             agent_registry: crate::agent_registry::types::AgentRegistryConfig::default(),
-            agents: HashMap::new(),
             local_ai: LocalAiConfig::default(),
             claude_agent_sdk: ClaudeAgentSdkConfig::default(),
             cloud_providers: Vec::new(),
