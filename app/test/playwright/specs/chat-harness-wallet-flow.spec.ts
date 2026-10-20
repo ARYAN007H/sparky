@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import {
   bootAuthenticatedPage,
+  callCoreRpc,
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
@@ -38,11 +39,25 @@ test.describe('Recovery Phrase wallet setup', () => {
     await waitForAppReady(page);
     await dismissWalkthroughIfPresent(page);
 
+    const status = await callCoreRpc<unknown>('openhuman.wallet_status', {});
+    expect(JSON.stringify(status)).toMatch(/"configured"\s*:\s*false/);
+
     await expect(page.getByRole('button', { name: 'Copy to Clipboard' })).toBeVisible();
     await page.getByRole('button', { name: /Reveal recovery phrase/i }).click();
     await page.locator('input[type="checkbox"]').first().check();
     await page.getByRole('button', { name: 'Save Recovery Phrase' }).click();
 
     await expect(page.getByText(/Recovery phrase saved/i)).toBeVisible();
+
+    const walletState = await callCoreRpc<unknown>('openhuman.test_support_read_workspace_file', {
+      rel_path: 'state/wallet-state.json',
+      max_bytes: 131_072,
+    });
+    const stateText = JSON.stringify(walletState);
+    expect(stateText).toMatch(/"consentGranted"\s*:\s*true/);
+    expect(stateText).toMatch(/"source"\s*:\s*"generated"/);
+    for (const chain of ['evm', 'btc', 'solana', 'tron']) {
+      expect(stateText).toMatch(new RegExp(`"chain"\\s*:\\s*"${chain}"`));
+    }
   });
 });
