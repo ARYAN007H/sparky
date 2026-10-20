@@ -150,3 +150,7 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
     }
     changed
 }
+
+#[cfg(test)]
+#[path = "tiers_tests.rs"]
+mod tests;
