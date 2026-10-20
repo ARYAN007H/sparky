@@ -307,9 +307,45 @@ trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 
 if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
-  # One process per test isolates process globals without separate target dirs.
-  suite "openhuman lib+bins (nextest)" llvm_cov --no-report --no-fail-fast \
-    "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_CORE}"
+  # The core, embed, tinyhumans and cli suites are one nextest run: one build
+  # of the product graph and one test run over the union of their filters.
+  # Run as four invocations with the same arguments, Cargo still rebuilt most
+  # of the graph between them (5-6 min each in EX63 runs 39365491098 and
+  # 39371566398), and their tests could not overlap. Every integration target
+  # still runs in its own processes, one per test, and the listing below is
+  # the same build, so the run that follows finds it fresh.
+  mkdir -p ci-out/nextest
+  expected_targets="${PWD}/ci-out/nextest/cli-expected-targets.txt"
+  : >"${expected_targets}"
+  while IFS= read -r target; do
+    [ -n "${target}" ] || continue
+    if target_features_satisfied "${target}" && target_expected_in_coverage "${target}"; then
+      printf '%s\n' "${target}" >>"${expected_targets}"
+    fi
+  done < <(integration_test_targets)
+  expected_inventory="${PWD}/ci-out/nextest/product-inventory.json"
+  # Listing executes no tests. cargo-llvm-cov supplies the same wrapper and
+  # instrumentation environment, but show-env leaves Cargo on the plain
+  # target dir while `cargo llvm-cov nextest` builds in its llvm-cov-target
+  # subdir. Without the explicit --target-dir the listing re-instrumented
+  # the whole graph a second time (578 crates, +53 GB on the EX63 scratch
+  # disk in run 39315551099, which then filled it). Listing also launches
+  # each instrumented binary; keep those profiles out of the report.
+  product_inventory() (
+    inventory_env="$(bash scripts/ci-cancel-aware.sh cargo llvm-cov show-env --sh)" || exit $?
+    eval "${inventory_env}"
+    inventory_profiles="${PWD}/ci-out/nextest/product-inventory-profraw"
+    export LLVM_PROFILE_FILE="${inventory_profiles}/list-%p.profraw"
+    bash scripts/ci-cancel-aware.sh cargo nextest list --message-format json --features "${CORE_PRODUCT_FEATURES}" \
+      --target-dir "${CARGO_LLVM_COV_TARGET_DIR}/llvm-cov-target" \
+      "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_PRODUCT}" >"${expected_inventory}"
+    rm -rf "${inventory_profiles}"
+  )
+  suite "openhuman product test inventory" product_inventory
+  NEXTEST_EXPECTED_TARGETS="${expected_targets}" \
+  NEXTEST_EXPECTED_INVENTORY="${expected_inventory}" \
+  suite "openhuman product suites (nextest)" llvm_cov --no-report --no-fail-fast \
+    "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_PRODUCT}"
 else
   # Keep the aggregate unit-test process aligned with the canonical Rust runner.
   # The isolated reaper test installs one-shot process globals, so it cannot run
