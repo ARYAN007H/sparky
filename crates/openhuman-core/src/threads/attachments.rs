@@ -268,7 +268,8 @@ pub(crate) async fn resolve_persisted_parts(
     let (max_images, image_mb) = config.multimodal.effective_limits();
     let (max_files, file_mb, _) = config.multimodal_files.effective_limits();
     if (image_count > 0 && (config.multimodal.max_images == 0 || image_count > max_images))
-        || (file_count > 0 && (config.multimodal_files.max_files == 0 || file_count > max_files))
+        || (entries.len() > 0 && config.multimodal_files.max_files == 0)
+        || file_count > max_files
     {
         return Err("stored attachment count exceeds configured limit".into());
     }
@@ -291,12 +292,17 @@ pub(crate) async fn resolve_persisted_parts(
         let media = opaque_media(&entry.part)
             .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;
         let is_image = matches!(entry.part, ContentPart::Image { .. });
+        let mime = media
+            .content_type
+            .as_deref()
+            .filter(|mime| !mime.is_empty())
+            .ok_or_else(|| "stored attachment MIME type is missing".to_string())?;
+        if is_image && !mime.starts_with("image/") {
+            return Err("stored image attachment has an invalid MIME type".into());
+        }
         let cap = if is_image { image_mb } else { file_mb } * 1024 * 1024;
         if metadata.len() > cap as u64 {
             return Err("stored attachment exceeds configured file limit".into());
-        }
-        if media.content_type.as_deref().is_none_or(|mime| mime.is_empty()) {
-            return Err("stored attachment MIME type is missing".into());
         }
         let media = opaque_media_mut(&mut entry.part)
             .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;
