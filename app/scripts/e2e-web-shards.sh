@@ -74,6 +74,10 @@ else
   runner_cmd=(bash app/scripts/e2e-web-session.sh)
 fi
 
+escape_regex() {
+  printf '%s' "$1" | sed 's/[][(){}.*+?^$|\\]/\\&/g'
+}
+
 mkdir -p "$workspace_root/lane-$lane/receipts"
 receipt_dir="$workspace_root/lane-$lane/receipts"
 overall=0
@@ -98,7 +102,7 @@ done
 for i in "${!special_titles[@]}"; do
   unit=$((i + ${#special_files[@]}))
   if (( unit % lanes + 1 == lane )); then
-    run_unit "special-$unit" test/playwright/specs/skills-search-install.spec.ts -g "${special_titles[$i]}"
+    run_unit "special-$unit" test/playwright/specs/skills-search-install.spec.ts -g "$(escape_regex "${special_titles[$i]}")"
   fi
 done
 for ((shard=1; shard<=64; shard++)); do
