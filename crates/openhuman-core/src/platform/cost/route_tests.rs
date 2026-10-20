@@ -7,12 +7,12 @@ use super::*;
 #[test]
 fn decoration_prefixes_are_order_independent() {
     for id in [
-        "chat-v1",
-        "hint:chat-v1",
-        "openhuman/chat-v1",
-        "hint:openhuman/chat-v1",
-        "openhuman/hint:chat-v1",
-        "  HINT:OpenHuman/Chat-V1  ",
+        "openrouter/test/chat-v1",
+        "hint:openrouter/test/chat-v1",
+        "openhuman/openrouter/test/chat-v1",
+        "hint:openhuman/openrouter/test/chat-v1",
+        "openhuman/hint:openrouter/test/chat-v1",
+        "  HINT:OpenHuman/OpenRouter/Test/Chat-V1  ",
     ] {
         assert_eq!(
             route_for_model(id),

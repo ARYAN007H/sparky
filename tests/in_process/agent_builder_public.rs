@@ -49,6 +49,10 @@ impl Tool for StubTool {
 }
 
 fn base_builder() -> openhuman_core::agent::SessionHostBuilder {
+    base_builder_without_model().model_name("stub-model".into())
+}
+
+fn base_builder_without_model() -> openhuman_core::agent::SessionHostBuilder {
     OpenHumanSessionHost::builder()
         .chat_model(Arc::new(StubModel))
         .tools(vec![
@@ -83,6 +87,15 @@ fn builder_validates_required_fields() {
 }
 
 #[test]
+fn builder_requires_a_model_when_no_host_policy_is_installed() {
+    let err = base_builder_without_model()
+        .build()
+        .err()
+        .expect("a bare core builder needs an explicit model");
+    assert!(err.to_string().contains("model_name or configured provider default is required"));
+}
+
+#[test]
 fn builder_applies_defaults_and_exposes_public_accessors() {
     let agent = base_builder()
         .build()
@@ -90,7 +103,7 @@ fn builder_applies_defaults_and_exposes_public_accessors() {
 
     assert_eq!(agent.tools().len(), 2);
     assert_eq!(agent.tool_specs().len(), 2);
-    assert_eq!(agent.model_name(), "openrouter/deepseek/deepseek-v4-flash");
+    assert_eq!(agent.model_name(), "stub-model");
     assert_eq!(agent.temperature(), 0.7);
     assert_eq!(agent.workspace_dir(), std::path::Path::new("."));
     assert!(agent.workflows().is_empty());
