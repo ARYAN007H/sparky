@@ -415,8 +415,19 @@ fn build_artifacts_service(
     ctx: &crate::core::runtime::DispatchCtx,
     publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
 ) -> (Artifacts, Option<Arc<dyn FileStore>>) {
-    let roots = file_roots(workspace_dir, &files, action_dir);
     let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
+    build_artifacts_service_with_scope(workspace_dir, files, action_dir, chat, scoped, publisher)
+}
+
+fn build_artifacts_service_with_scope(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    scoped: Option<crate::storage::ScopedStorage>,
+    publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
+) -> (Artifacts, Option<Arc<dyn FileStore>>) {
+    let roots = file_roots(workspace_dir, &files, action_dir);
     let file_store = scoped
         .as_ref()
         .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(scoped)) as Arc<dyn FileStore>);

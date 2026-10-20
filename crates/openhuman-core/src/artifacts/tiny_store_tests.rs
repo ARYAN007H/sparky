@@ -146,13 +146,15 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
             &context_b,
         );
         assert!(artifacts_b.get(&id).await.unwrap().is_none());
-        assert!(files_b
-            .as_ref()
-            .unwrap()
-            .metadata(&file.key)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            files_b
+                .as_ref()
+                .unwrap()
+                .metadata(&file.key)
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         let card_a = CoreContext::scope(core_a.clone(), async {
             super::super::store::get_artifact(&workspace, &id).await
@@ -191,6 +193,55 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
         assert!(
             unbound_artifacts.list().await.unwrap().is_empty(),
             "a call with no tenant must not inherit the ambient profile's records"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn missing_artifact_storage_binding_does_not_fall_back_to_ambient_records() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let (workspace, files) = temp_dirs();
+    let context_for = |profile: &'static str| {
+        let overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::kernel(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile(profile);
+        CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
+    };
+    let core_b = context_for("ambient-b");
+    let context_b = DispatchCtx::new(core_b.clone());
+
+    CoreContext::scope(core_b, async {
+        let ambient_artifacts =
+            artifacts_service(&workspace, FileRoots::new(&files), None, None, &context_b);
+        ambient_artifacts
+            .create(
+                ArtifactKind::Text,
+                "Ambient private",
+                Content::Text("only profile B".into()),
+                &Author::agent("agent-b"),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // A failed tenant binding is represented directly at the production
+        // builder seam, avoiding process-global SaaS-mode configuration.
+        let (unbound_artifacts, _) = build_artifacts_service_with_scope(
+            &workspace,
+            FileRoots::new(&files),
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(
+            unbound_artifacts.list().await.is_err(),
+            "a missing scoped binding must not expose the ambient profile's records"
         );
     })
     .await;
@@ -331,16 +382,20 @@ async fn deleting_an_artifact_removes_its_card() {
         .await
         .unwrap();
     let id = saved.record.id;
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_ok());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_ok()
+    );
 
     let (removed, notice) = artifacts.delete(&id).await.unwrap();
     assert!(removed);
     assert!(notice.is_none(), "{notice:?}");
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_err());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_err()
+    );
 }
 
 struct NoopPublisher;
