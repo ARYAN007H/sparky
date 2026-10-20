@@ -472,6 +472,11 @@ async fn clearing_the_session_preserves_a_coexisting_api_key() {
 // workspace must never outrank the key that was actually the active
 // credential a moment ago. This RPC only removes the session; it must not
 // let an unrelated leftover key silently become the effective one.
+// Multi-thread on purpose: the first `store_session` rebinds the workspace and
+// lists cron jobs through the synchronous store bridge, which blocks this
+// thread while the tinyflows module calls back into the host's document port.
+// On a current-thread runtime nothing is left to serve that callback and the
+// test hangs forever.
 #[tokio::test(flavor = "multi_thread")]
 async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_key() {
     // Reaches the connector module, whose route is process-wide: hold the module
