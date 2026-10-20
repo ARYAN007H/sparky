@@ -383,7 +383,6 @@ pub(crate) async fn persist_channel_message(
         "sourceMessageId".into(),
         serde_json::json!(provider_message_id),
     );
-    let row_id = format!("{role}:{provider_message_id}");
     let now = chrono::Utc::now().to_rfc3339();
     let workspace = workspace_dir.to_path_buf();
     ensure_thread(
@@ -399,10 +398,20 @@ pub(crate) async fn persist_channel_message(
             working_dir: None,
         },
     )?;
-    let exists = get_messages(ctx, workspace.clone(), thread_id)?
-        .iter()
-        .any(|message| message.id == row_id);
-    if !exists {
+    let existing = get_messages(ctx, workspace.clone(), thread_id)?
+        .into_iter()
+        .find(|message| {
+            message.sender == role
+                && message
+                    .extra_metadata
+                    .get("sourceMessageId")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(provider_message_id)
+        });
+    let row_id = if let Some(existing) = existing {
+        existing.id
+    } else {
+        let row_id = uuid::Uuid::new_v4().to_string();
         append_message(
             ctx,
             workspace,
@@ -416,7 +425,8 @@ pub(crate) async fn persist_channel_message(
                 created_at: now,
             },
         )?;
-    }
+        row_id
+    };
     if role == "user" {
         crate::threads::channel_projection::bind_row(
             ctx,
