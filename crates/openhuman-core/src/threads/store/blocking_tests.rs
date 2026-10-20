@@ -118,8 +118,8 @@ async fn store_errors_surface_unchanged() {
 /// recovers far enough to report the failure.
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn concurrent_operations_complete_without_stalling_the_single_async_worker() {
-    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
     use std::time::{Duration, Instant};
 
     const TICK_TARGET: u32 = 64;

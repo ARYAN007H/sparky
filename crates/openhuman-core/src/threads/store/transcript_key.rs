@@ -12,11 +12,11 @@
 //! recorded key. A thread with no record falls back to the current rule.
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Precondition};
 
 use super::backend::ConversationStore;
-use super::storage_schema::{spec, TRANSCRIPT_KEYS as COLLECTION};
+use super::storage_schema::{TRANSCRIPT_KEYS as COLLECTION, spec};
 use crate::storage::documents::Repo;
 use crate::storage::schema_support::key_of;
 use crate::storage::{self};
