@@ -34,7 +34,7 @@ async fn active_terminal_delivery_is_returned_to_its_waiting_caller() {
 
 #[tokio::test]
 async fn terminal_delivery_releases_session_profile_and_busy_guards() {
-    let dispatch = crate::core::runtime::test_support::dispatch_ctx();
+    let dispatch = crate::core::runtime::DispatchCtx::unbound();
     let profile = format!("native-runner-test-{}", uuid::Uuid::new_v4());
     let session = format!("native-session-{}", uuid::Uuid::new_v4());
     let lease = crate::agent::session_lease::SessionLease::acquire(
@@ -44,7 +44,9 @@ async fn terminal_delivery_releases_session_profile_and_busy_guards() {
     .await
     .expect("session lease");
     let profile_turn = crate::profiles::turn_gate::acquire_profile(&profile).await;
-    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start(&dispatch, &session);
+    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(
+        &dispatch, &session,
+    );
     let shared = NativeShared::default();
     shared.begin_delivery_wait("guarded-request");
     shared.with("guarded-request", |slot| {
@@ -54,20 +56,19 @@ async fn terminal_delivery_releases_session_profile_and_busy_guards() {
     });
 
     assert!(crate::agent::orchestration::busy_guard::is_busy(&dispatch, &session));
-    assert!(tokio::time::timeout(
-        std::time::Duration::from_millis(5),
-        crate::profiles::turn_gate::acquire_profile(&profile),
-    )
-    .await
-    .is_err());
+    let waiting = tokio::spawn({
+        let profile = profile.clone();
+        async move { crate::profiles::turn_gate::acquire_profile(&profile).await }
+    });
+    tokio::task::yield_now().await;
+    assert!(!waiting.is_finished(), "profile gate stays held through delivery");
 
     shared.record_delivery("guarded-request", true);
 
     assert!(!crate::agent::orchestration::busy_guard::is_busy(&dispatch, &session));
-    tokio::time::timeout(
-        std::time::Duration::from_secs(1),
-        crate::profiles::turn_gate::acquire_profile(&profile),
-    )
-    .await
-    .expect("profile gate is released after delivery");
+    let next = tokio::time::timeout(std::time::Duration::from_secs(1), waiting)
+        .await
+        .expect("profile gate is released after delivery")
+        .expect("profile waiter does not panic");
+    drop(next);
 }
