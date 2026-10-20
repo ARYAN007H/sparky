@@ -9,7 +9,6 @@
 
 use std::time::Duration;
 
-use serde_json::json;
 use tinyagents_harness::turn_runner::{QueueDisposition, TurnRequest, TurnRunnerError};
 use tinychannels_bus::web::{ChatRequestMetadata, QueueMode};
 use uuid::Uuid;
@@ -454,18 +453,18 @@ async fn start_chat_inner(
                 item_id: Some(request_id.clone()),
                 text_preview: Some(preview),
             });
-            Ok(json!({
-                "queued": true,
-                "queue_mode": mode.to_string(),
-                "client_id": client_id,
-                "thread_id": thread_id,
-                "request_id": request_id,
-                "queue_depth": queue_depth,
-                "queued_attachments": pending_attachments
+            serde_json::to_string(&crate::threads::rpc_models::QueuedChatAck {
+                queued: true,
+                queue_mode: mode.to_string(),
+                client_id,
+                thread_id,
+                request_id,
+                queue_depth,
+                queued_attachments: pending_attachments
                     .map(|input| input.parts)
                     .unwrap_or_default(),
             })
-            .to_string())
+            .map_err(|error| StartChatError::Other(format!("serialize queued chat ack: {error}")))
         }
     }
 }

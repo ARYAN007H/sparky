@@ -65,6 +65,7 @@ import {
   aiRegenerate,
   chatCancel,
   chatSend,
+  chatSendWithAck,
   editMessage,
   useRustChat,
 } from '../../services/chatService';
@@ -1584,7 +1585,7 @@ const Conversations = ({
           throw error;
         }
       }
-      await chatSend({
+      const ack = await chatSendWithAck({
         threadId,
         message: messageText,
         attachments: attachmentParts,
@@ -1593,6 +1594,10 @@ const Conversations = ({
         queueMode: 'followup',
         reasoningEffort: composerReasoningEffort,
       });
+      if (!ack.requestId) throw new Error('The core did not identify the queued follow-up');
+      if (attachmentParts.length > 0 && ack.queuedAttachments.length === 0) {
+        throw new Error('The core did not return staged attachment references for the queued follow-up');
+      }
       // Only clear the composer once the backend has accepted the queue, so a
       // failed send leaves the user's draft + attachments intact to retry.
       setInputValue('');
@@ -1602,7 +1607,8 @@ const Conversations = ({
           threadId,
           message: followupMessage,
           text: messageText,
-          attachments: attachmentParts,
+          requestId: ack.requestId,
+          attachments: ack.queuedAttachments,
         })
       );
       trackAnalyticsEvent('chat_message_sent', {

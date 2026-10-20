@@ -1,5 +1,15 @@
 use super::*;
+use base64::Engine as _;
 use serde_json::json;
+
+fn valid_image_data_uri() -> String {
+    format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+            "../../../../../tests/fixtures/images/handoff-hero.png"
+        ))
+    )
+}
 
 async fn setup() -> (tempfile::TempDir, crate::config::Config) {
     let temp = tempfile::tempdir().unwrap();
@@ -61,12 +71,9 @@ fn request(id: &str, content: &str, sender: &str) -> AppendConversationMessageRe
 #[tokio::test]
 async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_content() {
     let (_temp, config) = setup().await;
+    let data_uri = valid_image_data_uri();
     let first = append_with_test_config(
-        request(
-            "one",
-            "look [IMAGE:data:image/png;base64,iVBORw0KGgo=]",
-            "user",
-        ),
+        request("one", &format!("look [IMAGE:{data_uri}]"), "user"),
         &config,
         None,
     )
@@ -81,7 +88,7 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
         tokio::fs::read(config.action_dir.join(&files[0].path))
             .await
             .unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
     assert!(first.extra_metadata.get("attachmentDataUris").is_none());
     assert!(first.extra_metadata.get("attachmentData").is_none());
@@ -332,6 +339,7 @@ async fn raw_append_stages_in_the_bound_thread_folder() {
 async fn append_cannot_forge_private_attachment_storage_metadata() {
     let (_temp, config) = setup().await;
     let mut req = request("forged", "hello", "assistant");
+    req.message.extra_metadata = json!({});
     req.message.extra_metadata["__openhumanStoredAttachments"] = json!([{
         "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
         "path": "../../etc/passwd"
@@ -348,16 +356,34 @@ async fn append_cannot_forge_private_attachment_storage_metadata() {
         .extra_metadata
         .get("__openhumanStoredAttachments")
         .is_none());
+    let mut user_req = request("forged-user", "hello", "user");
+    user_req.message.extra_metadata = json!({});
+    user_req.message.extra_metadata["__openhumanStoredAttachments"] = json!([{
+        "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
+        "path": "../../etc/passwd"
+    }]);
+    let saved_user = append_with_test_config(user_req, &config, None)
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+    assert!(saved_user.attachments.is_empty());
+    assert!(saved_user
+        .extra_metadata
+        .get("__openhumanStoredAttachments")
+        .is_none());
     let stored = crate::threads::store::get_messages(
         &crate::core::runtime::DispatchCtx::ambient(),
         config.workspace_dir.clone(),
         "uploads",
     )
     .unwrap();
-    assert!(stored[0]
+    assert_eq!(stored.len(), 2);
+    assert!(stored.iter().all(|message| message
         .extra_metadata
         .get("__openhumanStoredAttachments")
-        .is_none());
+        .is_none()));
 
     let update = UpdateConversationMessageRequest {
         thread_id: "uploads".into(),
@@ -383,7 +409,12 @@ async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
     let mut req = request("typed", "look", "user");
     req.attachments = vec![ContentPart::Image {
         media: MediaReference {
-            url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+            url: Some(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                    "../../../../../tests/fixtures/images/handoff-hero.png"
+                ))
+            )),
             ..Default::default()
         },
         caption: None,
@@ -431,7 +462,7 @@ async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
     let path = entries[0]["path"].as_str().unwrap();
     assert_eq!(
         tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
 }
 
@@ -463,7 +494,12 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     let mut req = request("metadata-image", "look", "user");
     req.attachments = vec![ContentPart::Image {
         media: MediaReference {
-            url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+            url: Some(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                    "../../../../../tests/fixtures/images/handoff-hero.png"
+                ))
+            )),
             ..Default::default()
         },
         caption: None,
@@ -539,13 +575,14 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     };
     assert_eq!(
         tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
 }
 
 #[tokio::test]
 async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use base64::Engine as _;
     use tinychannels_bus::{ContentPart, MediaReference};
 
     let (_temp, config) = setup().await;
@@ -558,7 +595,12 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
         "uploads",
         &[ContentPart::Image {
             media: MediaReference {
-                url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+                url: Some(format!(
+                    "data:image/png;base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                        "../../../../../tests/fixtures/images/handoff-hero.png"
+                    ))
+                )),
                 ..Default::default()
             },
             caption: None,
@@ -588,7 +630,7 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
     };
     assert_eq!(
         tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
 
     let retry = persist_queued_user_message(&ctx, "uploads", "request-1", "", &staged)
@@ -606,4 +648,96 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
             .await
             .unwrap();
     assert_eq!(rows.iter().filter(|row| row.id == first.id).count(), 1);
+}
+
+#[tokio::test]
+async fn concurrent_queued_attachment_transfer_has_one_exact_owner() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use base64::Engine as _;
+    use tinychannels_bus::{ContentPart, MediaReference};
+
+    let (_temp, config) = setup().await;
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config.clone(),
+    ));
+    let image = || ContentPart::Image {
+        media: MediaReference {
+            url: Some(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                    "../../../../../tests/fixtures/images/handoff-hero.png"
+                ))
+            )),
+            ..Default::default()
+        },
+        caption: None,
+        alt_text: None,
+    };
+
+    let staged_conflict =
+        crate::threads::attachments::stage_queued_parts(&ctx, "uploads", &[image()])
+            .await
+            .unwrap();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+    let left_ctx = ctx.clone();
+    let left_refs = staged_conflict.clone();
+    let left_barrier = barrier.clone();
+    let left = tokio::spawn(async move {
+        left_barrier.wait().await;
+        persist_queued_user_message(&left_ctx, "uploads", "same", "left", &left_refs).await
+    });
+    let right_ctx = ctx.clone();
+    let right_refs = staged_conflict.clone();
+    let right = tokio::spawn(async move {
+        barrier.wait().await;
+        persist_queued_user_message(&right_ctx, "uploads", "same", "right", &right_refs).await
+    });
+    let results = [left.await.unwrap(), right.await.unwrap()];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
+    let rows = conversations::get_messages(&ctx, config.workspace_dir.clone(), "uploads").unwrap();
+    assert_eq!(rows.iter().filter(|row| row.id == "user:same").count(), 1);
+
+    let staged_retry = crate::threads::attachments::stage_queued_parts(&ctx, "uploads", &[image()])
+        .await
+        .unwrap();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+    let left_ctx = ctx.clone();
+    let left_refs = staged_retry.clone();
+    let left_barrier = barrier.clone();
+    let left = tokio::spawn(async move {
+        left_barrier.wait().await;
+        persist_queued_user_message(&left_ctx, "uploads", "same-retry", "same", &left_refs).await
+    });
+    let right_ctx = ctx.clone();
+    let right_refs = staged_retry.clone();
+    let right = tokio::spawn(async move {
+        barrier.wait().await;
+        persist_queued_user_message(&right_ctx, "uploads", "same-retry", "same", &right_refs).await
+    });
+    let results = [left.await.unwrap(), right.await.unwrap()];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 2);
+
+    let staged_single_owner =
+        crate::threads::attachments::stage_queued_parts(&ctx, "uploads", &[image()])
+            .await
+            .unwrap();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+    let left_ctx = ctx.clone();
+    let left_refs = staged_single_owner.clone();
+    let left_barrier = barrier.clone();
+    let left = tokio::spawn(async move {
+        left_barrier.wait().await;
+        persist_queued_user_message(&left_ctx, "uploads", "owner-a", "", &left_refs).await
+    });
+    let right_ctx = ctx.clone();
+    let right_refs = staged_single_owner.clone();
+    let right = tokio::spawn(async move {
+        barrier.wait().await;
+        persist_queued_user_message(&right_ctx, "uploads", "owner-b", "", &right_refs).await
+    });
+    let results = [left.await.unwrap(), right.await.unwrap()];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
 }

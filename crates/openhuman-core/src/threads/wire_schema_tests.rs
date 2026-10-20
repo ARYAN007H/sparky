@@ -9,6 +9,7 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
     for property in [
         "thread",
         "message",
+        "queuedChatAck",
         "threadsList",
         "threadMessages",
         "threadDelete",
@@ -25,6 +26,21 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         assert!(
             properties.contains_key(property),
             "schema is missing {property}"
+        );
+    }
+    let ack = &schema["$defs"]["QueuedChatAck"];
+    for field in [
+        "queued",
+        "queue_mode",
+        "client_id",
+        "thread_id",
+        "request_id",
+        "queue_depth",
+        "queued_attachments",
+    ] {
+        assert!(
+            ack["required"].as_array().unwrap().contains(&field.into()),
+            "ack schema must require serialized field {field}"
         );
     }
 }

@@ -240,6 +240,15 @@ async fn persist_queued_user_message_with_config(
         if existing.sender != "user" || existing.content != text || stored_parts != opaque_parts {
             return Err("queued message request ID conflicts with an existing row".into());
         }
+        if !opaque_parts.is_empty() {
+            crate::threads::attachments::consume_staged_parts(
+                ctx,
+                thread_id,
+                opaque_parts,
+                &row_id,
+            )
+            .await?;
+        }
         return Ok(message_to_record(existing));
     }
 
@@ -247,7 +256,7 @@ async fn persist_queued_user_message_with_config(
     let request = AppendConversationMessageRequest {
         thread_id: thread_id.to_string(),
         message: ConversationMessageRecord {
-            id: row_id,
+            id: row_id.clone(),
             content: text.to_string(),
             attachments: Vec::new(),
             message_type: "text".into(),
@@ -266,10 +275,22 @@ async fn persist_queued_user_message_with_config(
     )
     .await
     .map_err(|error| error.to_string())?;
-    outcome
+    let persisted = outcome
         .value
         .data
-        .ok_or_else(|| "queued message append returned no row".into())
+        .ok_or_else(|| "queued message append returned no row".to_string())?;
+    if persisted.id != row_id
+        || persisted.sender != "user"
+        || persisted.content != text
+        || persisted.attachments != opaque_parts
+    {
+        if !opaque_parts.is_empty() {
+            let _ = crate::threads::attachments::discard_staged_parts(ctx, thread_id, opaque_parts)
+                .await;
+        }
+        return Err("queued message request ID conflicts with a concurrently persisted row".into());
+    }
+    Ok(persisted)
 }
 
 async fn message_append_with_config(
@@ -307,6 +328,7 @@ async fn message_append_with_config(
             &request.thread_id,
             config,
             &typed_attachments,
+            &request.message.id,
             &mut request.message.extra_metadata,
         )
         .await
@@ -470,6 +492,10 @@ async fn message_append_with_config(
             }
         }
     }
+    let expected_id = request.message.id.clone();
+    let expected_sender = request.message.sender.clone();
+    let expected_content = request.message.content.clone();
+    let expected_attachments = request.message.attachments.clone();
     let message = conversations::blocking::append_message(
         ctx.clone(),
         persistence_dir.to_path_buf(),
@@ -478,16 +504,35 @@ async fn message_append_with_config(
     )
     .await
     .map_err(|err| ThreadsError::from_thread_scoped_store_error(&request.thread_id, err))?;
-    if let Some(staged_refs) = staged_refs {
-        crate::threads::attachments::consume_staged_parts(ctx, &request.thread_id, &staged_refs)
-            .await
-            .map_err(ThreadsError::Message)?;
+    let message = message_to_record(message);
+    if message.id != expected_id
+        || message.sender != expected_sender
+        || message.content != expected_content
+        || message.attachments != expected_attachments
+    {
+        if let Some(staged_refs) = &staged_refs {
+            let _ = crate::threads::attachments::discard_staged_parts(
+                ctx,
+                &request.thread_id,
+                staged_refs,
+            )
+            .await;
+        }
+        return Err(ThreadsError::Message(
+            "message ID conflicts with an existing persisted row".into(),
+        ));
     }
-    Ok(envelope(
-        message_to_record(message),
-        Some(counts([("num_messages", 1)])),
-        None,
-    ))
+    if let Some(staged_refs) = staged_refs {
+        crate::threads::attachments::consume_staged_parts(
+            ctx,
+            &request.thread_id,
+            &staged_refs,
+            &message.id,
+        )
+        .await
+        .map_err(ThreadsError::Message)?;
+    }
+    Ok(envelope(message, Some(counts([("num_messages", 1)])), None))
 }
 
 #[cfg(test)]

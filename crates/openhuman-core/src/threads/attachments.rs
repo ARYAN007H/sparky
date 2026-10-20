@@ -29,6 +29,17 @@ struct StagedAttachment {
     expires_at: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct StagedAttachmentClaim {
+    tenant: crate::core::runtime::Tenant,
+    thread_id: String,
+    message_id: String,
+    part: ContentPart,
+    #[serde(default)]
+    canceled: bool,
+}
+
 const STAGED_DIR: &str = "openhuman-staged-attachments";
 const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
@@ -254,10 +265,12 @@ pub(crate) async fn bind_staged_refs(
     thread_id: &str,
     config: &crate::config::Config,
     requested: &[ContentPart],
+    message_id: &str,
     metadata: &mut Value,
 ) -> Result<Vec<ContentPart>, String> {
     let entries = read_staged_entries(ctx, thread_id, requested, config).await?;
     validate_staged_files(ctx, thread_id, config, &entries).await?;
+    claim_staged_refs(ctx, thread_id, config, message_id, &entries).await?;
     Ok(save(
         metadata,
         entries
@@ -265,6 +278,79 @@ pub(crate) async fn bind_staged_refs(
             .map(|entry| (entry.part, entry.path))
             .collect(),
     ))
+}
+
+async fn claim_staged_refs(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    config: &crate::config::Config,
+    message_id: &str,
+    entries: &[StoredAttachment],
+) -> Result<(), String> {
+    if message_id.is_empty() {
+        return Err("staged attachment target message ID is empty".into());
+    }
+    let tenant = tenant_for(ctx)?;
+    for entry in entries {
+        let opaque_id = opaque_media(&entry.part)
+            .and_then(|media| media.opaque_id.as_deref())
+            .ok_or_else(|| "staged attachment reference is missing".to_string())?;
+        let manifest_path = staged_manifest_path(&config.workspace_dir, opaque_id)?;
+        let claim_path = manifest_path.with_extension("claim.json");
+        let claim = StagedAttachmentClaim {
+            tenant: tenant.clone(),
+            thread_id: thread_id.to_string(),
+            message_id: message_id.to_string(),
+            part: entry.part.clone(),
+            canceled: false,
+        };
+        publish_staged_claim(&claim_path, &claim).await?;
+    }
+    Ok(())
+}
+
+async fn publish_staged_claim(
+    claim_path: &std::path::Path,
+    claim: &StagedAttachmentClaim,
+) -> Result<bool, String> {
+    let bytes = serde_json::to_vec(claim)
+        .map_err(|error| format!("serialize staged attachment claim: {error}"))?;
+    let temp_path = claim_path.with_extension(format!("{}.claim-tmp", uuid::Uuid::new_v4()));
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp_path)
+        .await
+        .map_err(|error| format!("create staged attachment claim: {error}"))?;
+    use tokio::io::AsyncWriteExt;
+    file.write_all(&bytes)
+        .await
+        .map_err(|error| format!("write staged attachment claim: {error}"))?;
+    file.sync_all()
+        .await
+        .map_err(|error| format!("sync staged attachment claim: {error}"))?;
+    drop(file);
+    let result = match tokio::fs::hard_link(&temp_path, claim_path).await {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let stored: StagedAttachmentClaim = serde_json::from_slice(
+                &tokio::fs::read(claim_path)
+                    .await
+                    .map_err(|read| format!("read staged attachment claim: {read}"))?,
+            )
+            .map_err(|read| format!("decode staged attachment claim: {read}"))?;
+            if stored == *claim {
+                Ok(false)
+            } else if stored.canceled {
+                Err("staged attachment was canceled before it could be bound".into())
+            } else {
+                Err("staged attachment is already bound to another message".into())
+            }
+        }
+        Err(error) => Err(format!("publish staged attachment claim: {error}")),
+    };
+    let _ = tokio::fs::remove_file(temp_path).await;
+    result
 }
 
 /// Stage media supplied with a queued follow-up, returning only opaque refs.
@@ -443,29 +529,58 @@ pub(crate) async fn discard_staged_parts(
         .await
         .map_err(|error| format!("staged attachment configuration unavailable: {error}"))?;
     let entries = read_staged_entries(ctx, thread_id, requested, &config).await?;
+    discard_staged_entries(ctx, thread_id, &config, entries).await
+}
+
+async fn discard_staged_entries(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    config: &crate::config::Config,
+    entries: Vec<StoredAttachment>,
+) -> Result<(), String> {
     let workspace = crate::agent::attachments::thread_action_dir(
         ctx,
-        &config,
+        config,
         &config.workspace_dir,
         Some(thread_id),
     )
     .await
     .map_err(|error| format!("staged attachment workspace unavailable: {error}"))?;
+    let tenant = tenant_for(ctx)?;
     for entry in entries {
+        let Some(id) = opaque_media(&entry.part).and_then(|media| media.opaque_id.as_deref())
+        else {
+            continue;
+        };
+        let manifest_path = staged_manifest_path(&config.workspace_dir, id)?;
+        let claim_path = manifest_path.with_extension("claim.json");
+        let cancellation = StagedAttachmentClaim {
+            tenant: tenant.clone(),
+            thread_id: thread_id.to_string(),
+            message_id: String::new(),
+            part: entry.part.clone(),
+            canceled: true,
+        };
+        match publish_staged_claim(&claim_path, &cancellation).await {
+            Ok(_) => {}
+            Err(error) if error == "staged attachment is already bound to another message" => {
+                continue;
+            }
+            Err(error) => return Err(error),
+        }
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
         };
-        let path = crate::agent::attachments::resolve_path(&config, &entry.path, &scope)
+        let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
             .await
             .map_err(|error| format!("staged attachment cleanup refused: {error}"))?;
-        tokio::fs::remove_file(path)
-            .await
-            .map_err(|error| format!("remove staged attachment: {error}"))?;
-        if let Some(id) = opaque_media(&entry.part).and_then(|media| media.opaque_id.as_deref()) {
-            let manifest_path = staged_manifest_path(&config.workspace_dir, id)?;
-            let _ = tokio::fs::remove_file(manifest_path).await;
+        match tokio::fs::remove_file(path).await {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("remove staged attachment: {error}")),
         }
+        let _ = tokio::fs::remove_file(manifest_path).await;
     }
     Ok(())
 }
@@ -477,6 +592,7 @@ pub(crate) async fn consume_staged_parts(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     requested: &[ContentPart],
+    message_id: &str,
 ) -> Result<(), String> {
     if requested.is_empty() {
         return Ok(());
@@ -491,20 +607,39 @@ pub(crate) async fn consume_staged_parts(
             .and_then(|media| media.opaque_id.as_deref())
             .ok_or_else(|| "staged attachment reference is missing".to_string())?;
         let path = staged_manifest_path(&config.workspace_dir, id)?;
-        let bytes = tokio::fs::read(&path)
-            .await
-            .map_err(|_| "staged attachment is missing or expired".to_string())?;
-        let manifest: StagedAttachment = serde_json::from_slice(&bytes)
-            .map_err(|error| format!("staged attachment record is invalid: {error}"))?;
-        if manifest.tenant != tenant
-            || manifest.thread_id != thread_id
-            || manifest.attachment.part != *part
+        let claim_path = path.with_extension("claim.json");
+        let claim: StagedAttachmentClaim =
+            serde_json::from_slice(&tokio::fs::read(&claim_path).await.map_err(|_| {
+                "staged attachment is not bound to a persisted message".to_string()
+            })?)
+            .map_err(|error| format!("staged attachment claim is invalid: {error}"))?;
+        if claim.tenant != tenant
+            || claim.thread_id != thread_id
+            || claim.message_id != message_id
+            || claim.part != *part
+            || claim.canceled
         {
-            return Err("staged attachment belongs to a different scope".into());
+            return Err("staged attachment is bound to a different message or scope".into());
         }
-        tokio::fs::remove_file(path)
-            .await
-            .map_err(|error| format!("remove staged attachment record: {error}"))?;
+        match tokio::fs::read(&path).await {
+            Ok(bytes) => {
+                let manifest: StagedAttachment = serde_json::from_slice(&bytes)
+                    .map_err(|error| format!("staged attachment record is invalid: {error}"))?;
+                if manifest.tenant != tenant
+                    || manifest.thread_id != thread_id
+                    || manifest.attachment.part != *part
+                {
+                    return Err("staged attachment belongs to a different scope".into());
+                }
+                match tokio::fs::remove_file(path).await {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(format!("remove staged attachment record: {error}")),
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("read staged attachment record: {error}")),
+        }
     }
     Ok(())
 }

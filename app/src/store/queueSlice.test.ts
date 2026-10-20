@@ -10,6 +10,7 @@ import {
 import reducer, {
   clipQueuePreview,
   pendingFollowupAdded,
+  pendingFollowupCompleted,
   queueItemDelivered,
   queueItemQueued,
   queueItemRemoved,
@@ -67,7 +68,7 @@ describe('queueSlice — core run-queue items', () => {
     expect(state.itemsByThread.t1).toBeUndefined();
   });
 
-  it('keeps pending follow-ups when an item is delivered (they persist on turn end)', () => {
+  it('keeps pending follow-ups after the core delivers their queue item', () => {
     let state = reducer(
       undefined,
       pendingFollowupAdded({ threadId: 't1', message: message('m1', 'hi'), text: 'hi' })
@@ -151,13 +152,18 @@ describe('queueSlice — chat runtime lifecycle', () => {
     );
   };
 
-  it('endInferenceTurn clears the thread queue (its follow-ups are being dispatched)', () => {
+  it('keeps pending follow-ups until their own persisted terminal event', () => {
     let state = reducer(seeded(), beginInferenceTurn({ threadId: 't1' }));
     state = reducer(state, endInferenceTurn({ threadId: 't1' }));
 
     expect(state.itemsByThread.t1).toBeUndefined();
-    expect(state.pendingFollowupsByThread.t1).toBeUndefined();
+    expect(state.pendingFollowupsByThread.t1).toHaveLength(1);
     expect(state.itemsByThread.t2).toBeDefined();
+    state = reducer(
+      state,
+      pendingFollowupCompleted({ threadId: 't1', requestId: 'm1' })
+    );
+    expect(state.pendingFollowupsByThread.t1).toBeUndefined();
   });
 
   it('clearRuntimeForThread clears one thread, clearAllChatRuntime clears all', () => {

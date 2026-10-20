@@ -114,7 +114,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     "Optional reasoning (thinking) effort for this thread: 'none', 'minimal', 'low', 'medium', 'high' or 'xhigh' ('off' and 'max' are aliases). 'default' clears the thread's choice back to config; omitted leaves it unchanged. Unknown values are rejected.",
                 ),
             ],
-            outputs: vec![json_output("ack", "Acceptance payload.")],
+            outputs: vec![json_output(
+                "ack",
+                "Acceptance payload; queued follow-ups include request_id and sanitized queued_attachments (opaque refs only).",
+            )],
         },
         "cancel" => ControllerSchema {
             namespace: "channel",

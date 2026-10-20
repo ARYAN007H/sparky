@@ -20,6 +20,7 @@ pub struct RunLedgerGetWireResponse {
 pub struct ThreadWireTypes {
     pub thread: ConversationThreadSummary,
     pub message: ConversationMessageRecord,
+    pub queued_chat_ack: super::rpc_models::QueuedChatAck,
     pub threads_list: ConversationThreadsListResponse,
     pub thread_messages: ConversationMessagesResponse,
     pub thread_delete: DeleteConversationThreadResponse,

@@ -55,6 +55,7 @@ import {
 } from './chatWire';
 import { callCoreRpc } from './coreRpcClient';
 import { socketService } from './socketService';
+import type { QueuedChatAck } from '../types/threadWire.generated';
 
 const chatLog = debug('realtime:chat');
 
@@ -953,7 +954,44 @@ interface ChatSendParams {
  * one — used by `parallel` sends to register the forked turn's stream lane.
  * `undefined` if the ack carried no id.
  */
-export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
+export interface ChatSendAck {
+  requestId?: string;
+  queuedAttachments: ContentPart[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isQueuedAttachment(value: unknown): value is ContentPart {
+  if (!isRecord(value) || typeof value.kind !== 'string') return false;
+  const mediaKinds = new Set(['image', 'video', 'audio', 'file', 'sticker']);
+  if (!mediaKinds.has(value.kind)) return true;
+  if (!isRecord(value.media)) return false;
+  const media = value.media;
+  return (
+    typeof media.opaqueId === 'string' &&
+    media.opaqueId.length > 0 &&
+    media.url == null &&
+    media.path == null
+  );
+}
+
+function isQueuedChatAck(value: unknown): value is QueuedChatAck {
+  return (
+    isRecord(value) &&
+    value.queued === true &&
+    typeof value.queue_mode === 'string' &&
+    typeof value.client_id === 'string' &&
+    typeof value.thread_id === 'string' &&
+    typeof value.request_id === 'string' &&
+    typeof value.queue_depth === 'number' &&
+    Array.isArray(value.queued_attachments) &&
+    value.queued_attachments.every(isQueuedAttachment)
+  );
+}
+
+export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendAck> {
   const socket = socketService.getSocket();
   const clientId = socket?.id;
   if (!clientId) {
@@ -978,8 +1016,25 @@ export async function chatSend(params: ChatSendParams): Promise<string | undefin
     },
   });
 
-  const requestId = (result as { request_id?: unknown } | null)?.request_id;
-  return typeof requestId === 'string' ? requestId : undefined;
+  // Started turns keep the legacy scalar request_id response. Only queued
+  // turns return the typed acknowledgement object below.
+  if (typeof result === 'string') {
+    return { requestId: result, queuedAttachments: [] };
+  }
+  if (result == null) {
+    return { queuedAttachments: [] };
+  }
+  if (!isQueuedChatAck(result)) {
+    throw new Error('Core returned an invalid chat queue acknowledgement');
+  }
+  return {
+    requestId: result.request_id,
+    queuedAttachments: result.queued_attachments,
+  };
+}
+
+export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
+  return (await chatSendWithAck(params)).requestId;
 }
 
 /** `client_id` sent with a Stop issued while the socket has no id. */

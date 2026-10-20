@@ -2,7 +2,7 @@
 //! `SessionEntry`/`SessionCacheFingerprint`, the turn result
 //! (`WebChatTaskResult`), and the `channel.web_*` request param structs.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::agent::OpenHumanSessionHost;
 
@@ -156,3 +156,7 @@ pub(crate) struct VoiceNoteStoreParams {
 pub(crate) struct VoiceNoteReadParams {
     pub(super) note_id: String,
 }
+
+#[cfg(test)]
+#[path = "types_tests.rs"]
+mod tests;

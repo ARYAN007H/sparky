@@ -6,8 +6,23 @@
 //! messages, which are thread persistence (`threads::store`), not memory.
 
 use serde::{Deserialize, Serialize};
+use schemars::JsonSchema;
 
 pub use crate::core::envelope::{ApiEnvelope, ApiError, ApiMeta, EmptyRequest, PaginationMeta};
+
+/// Typed acknowledgement returned when a web chat message enters the run queue.
+/// Attachment values are sanitized opaque references minted by the core.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct QueuedChatAck {
+    pub queued: bool,
+    pub queue_mode: String,
+    pub client_id: String,
+    pub thread_id: String,
+    pub request_id: String,
+    pub queue_depth: usize,
+    pub queued_attachments: Vec<tinychannels_bus::ContentPart>,
+}
 
 /// Request to create a new conversation thread.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,3 +199,7 @@ pub struct PurgeConversationThreadsResponse {
     pub agent_threads_deleted: usize,
     pub agent_messages_deleted: usize,
 }
+
+#[cfg(test)]
+#[path = "rpc_models_tests.rs"]
+mod tests;
