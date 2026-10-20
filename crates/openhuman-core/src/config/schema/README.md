@@ -17,7 +17,7 @@ is mounted as a submodule of [`load/dirs.rs`](./load/dirs.rs) via `#[path]`.
 
 | `config.toml` section | File | Struct |
 | --- | --- | --- |
-| `[agent]`, `[orchestrator]`, `[teams.*]`, `[agents.*]` | [`agent.rs`](./agent.rs) | `AgentConfig`, `OrchestratorModelConfig`, `TeamModelConfig`, `DelegateAgentConfig` |
+| `[agent]`, `[orchestrator]`, `[teams.*]` | [`agent.rs`](./agent.rs) | `AgentConfig`, `OrchestratorModelConfig`, `TeamModelConfig` |
 | `[autonomy]` | [`autonomy.rs`](./autonomy.rs) | `AutonomyConfig`: feeds `security::SecurityPolicy` |
 | `[[capability_providers]]` | [`capability_providers.rs`](./capability_providers.rs) | `CapabilityProviderConfig` |
 | `[channels_config]`, `[sandbox]` | [`channels.rs`](./channels.rs) | `ChannelsConfig` and per-provider configs re-exported from `tinychannels_bus`; `SandboxConfig`, `ResourceLimitsConfig`, `AuditConfig`, and `SecurityConfig` (only `DaemonConfig` embeds the last one) |

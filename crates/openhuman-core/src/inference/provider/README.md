@@ -87,7 +87,7 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
 
 - `ops/`: `http_error` (HTTP error
   classification, Sentry routing, `api_error`), `models`
-  (`list_configured_models`), `provider_factory` (`ProviderRuntimeOptions`,
+  (`list_configured_models`), `provider_factory` (
   `list_providers`).
   Preserves the original `pub use ops::*` contract split out of a single `ops.rs`.
 - Claude Code CLI provider: `tinyagents_harness::providers::claude_code` in [`vendor/tinyagents`](../../../../../vendor/tinyagents/); see the [Claude Code provider guide](../../../../../docs/gitbooks/en/developing/providers/claude-code.md).
