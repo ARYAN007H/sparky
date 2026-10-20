@@ -169,6 +169,9 @@ export default async function typedImageAttachmentRoundtrip({
     throw new Error(
       "chat turn did not reference the marker-free persisted user row",
     );
+  const clientId = chatRequest.params?.client_id;
+  if (typeof clientId !== "string" || clientId.length === 0)
+    throw new Error("initial chat request did not expose its live client ID");
   if (/\[(?:ATTACHMENT|IMAGE|FILE):/i.test(chatRequest.params.message))
     throw new Error(
       "chat turn sent a staging marker in its modern user text",
@@ -215,7 +218,7 @@ export default async function typedImageAttachmentRoundtrip({
   ]);
   const editResponse = unwrap(
     await page.evaluate(
-      async ({ rpcUrl: url, token, threadId: id, messageId, attachments }) => {
+      async ({ rpcUrl: url, token, threadId: id, messageId, attachments, clientId: socketId }) => {
         const response = await fetch(url, {
           method: "POST",
           headers: { authorization: token, "content-type": "application/json" },
@@ -228,6 +231,7 @@ export default async function typedImageAttachmentRoundtrip({
               message_id: messageId,
               content: "Describe the same attached image with more detail.",
               attachments,
+              client_id: socketId,
             },
           }),
         });
@@ -239,6 +243,7 @@ export default async function typedImageAttachmentRoundtrip({
         threadId,
         messageId: persisted.id,
         attachments: persisted.attachments,
+        clientId,
       },
     ),
   );
