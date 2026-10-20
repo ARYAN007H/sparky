@@ -8,6 +8,8 @@ mod published_tinyflows;
 use env_guard::EnvVarGuard;
 use std::path::Path;
 use std::process::Command;
+#[cfg(feature = "skills")]
+use std::time::Duration;
 
 fn dump_published_prompt(agent_id: &str, workspace: &Path) -> serde_json::Value {
     let output = Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
@@ -29,6 +31,35 @@ fn dump_published_prompt(agent_id: &str, workspace: &Path) -> serde_json::Value 
         String::from_utf8_lossy(&output.stderr)
     );
     serde_json::from_slice(&output.stdout).expect("decode public prompt-dump JSON")
+}
+
+#[cfg(feature = "skills")]
+async fn prewarm_flow_authoring_in_parent(
+    ctx: &openhuman_core::core::runtime::DispatchCtx,
+    config: &openhuman_core::config::Config,
+) {
+    // Use the same public session composition that schedules optional
+    // flow-authoring prewarm during normal host construction. The prompt-dump
+    // child cannot populate this process's module runtime or resource snapshot.
+    let mut session = openhuman_core::agent::OpenHumanSessionHost::from_config_for_agent(
+        ctx,
+        config,
+        "orchestrator",
+    )
+    .expect("build a normal host session to schedule resource prewarm");
+    session.refresh_prompt_surface().await;
+
+    tokio::time::timeout(Duration::from_secs(60), async {
+        loop {
+            let discovered = openhuman_core::skills::load_workflow_metadata_for(ctx, config);
+            if discovered.iter().any(|skill| skill.id() == "flow-authoring") {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the normal host prewarm should expose the published builtin");
 }
 
 #[tokio::test]
@@ -96,6 +127,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
                 .await
                 .expect("load the same scoped Config used by the prompt dump");
         let ctx = openhuman_core::core::runtime::DispatchCtx::host_default();
+        prewarm_flow_authoring_in_parent(&ctx, &config).await;
         assert!(openhuman_core::modules::runtime::is_module_serving(
             "tinyflows"
         ));
@@ -166,6 +198,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
             std::fs::write(path, &enabled_config).expect("re-enable module in CLI config");
         }
         dump_published_prompt("workflow_builder", &workspace);
+        prewarm_flow_authoring_in_parent(&ctx, &config).await;
         let reenabled = openhuman_core::skills::load_workflow_metadata_for(&ctx, &config);
         assert!(
             reenabled.iter().any(|skill| skill.id() == "flow-authoring"),
