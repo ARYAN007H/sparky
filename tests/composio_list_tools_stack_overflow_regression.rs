@@ -3,10 +3,9 @@
 //! ## What crashed
 //!
 //! While a user chat went through
-//! `web_channel → orchestrator turn → delegate_to_integrations_agent
-//! → integrations_agent → composio_list_tools` (that specialist has since
-//! been removed — the orchestrator searches for and calls the action itself
-//! — but the sub-agent runner path below is the one every delegation takes), the
+//! `web_channel → orchestrator turn → delegation → sub-agent
+//! → composio_list_tools` (the sub-agent runner path below is the one every
+//! delegation takes), the
 //! in-process core
 //! aborted with `EXC_BAD_ACCESS (SIGBUS) — KERN_PROTECTION_FAILURE`
 //! at an address inside the **stack guard page** of a `tokio-rt-worker`
@@ -94,7 +93,7 @@
 //!     frame growth in the tower is caught long before it threatens production,
 //!   * `OPENHUMAN_WORKSPACE` pointed at a tempdir with a representative
 //!     `config.toml` so the TOML parser does real work,
-//!   * `run_subagent(critic)` exactly like a delegation tool
+//!   * `run_subagent` on a test-owned worker exactly like a delegation tool
 //!     does, with a stubbed `ChatModel`
 //!     that emits one `composio_list_tools` tool call on iteration 1
 //!     and stops on iteration 2.
@@ -116,7 +115,7 @@ use parking_lot::Mutex;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::tempdir;
-use tinyagents_definition::ModelSpec;
+use tinyagents_definition::{ModelSpec, PromptSource, ToolScope};
 use tinyinference_llm::message::AssistantMessage;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
@@ -308,7 +307,9 @@ async fn drive_subagent() {
 
     let parent = ParentExecutionContext {
         agent_definition_id: "orchestrator".into(),
-        allowed_subagent_ids: ["critic".to_string()].into_iter().collect(),
+        allowed_subagent_ids: ["stack_regression_worker".to_string()]
+            .into_iter()
+            .collect(),
         turn_model_source: openhuman_core::agent::tinyagents::TurnModelSource::from_model(model),
         all_tools: Arc::new(vec![]),
         all_tool_specs: Arc::new(vec![]),
@@ -338,14 +339,24 @@ async fn drive_subagent() {
 
     let mut def = AgentDefinitionRegistry::global()
         .expect("registry initialised")
-        .get("critic")
-        .expect("critic built-in must exist")
+        .get("vision_agent")
+        .expect("vision worker built-in must exist")
         .clone();
-    // A shipped definition with a `model.hint` would otherwise build a
-    // fresh model via the workload factory and try to hit the real
-    // backend. Override to Inherit so the stub model above receives the
-    // request — same trick used in `tests/calendar_grounding_e2e.rs`.
+    // Give the worker a test-owned identity and a narrow, neutral surface.
+    // Inherit keeps the stub model above on the real run_subagent path.
+    def.id = "stack_regression_worker".into();
+    def.display_name = Some("Stack regression worker".into());
+    def.when_to_use = "Read the supplied request for this stack regression.".into();
+    def.delegate_name = None;
+    def.subagents.clear();
+    def.max_iterations = 6;
+    def.tools = ToolScope::Named(vec!["composio_list_tools".into()]);
     def.model = ModelSpec::Inherit;
+    def.system_prompt = PromptSource::Inline(
+        "You are a read-only test worker. Use the available tool once, then report its result."
+            .into(),
+    );
+    def.extensions.prompt_builder = None;
 
     // The assertion is implicit: if the worker thread overflows its
     // stack the cargo-test process aborts (SIGABRT / SIGBUS) and no
