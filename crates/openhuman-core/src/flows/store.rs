@@ -7,6 +7,7 @@
 
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
 use tinyflows_bus::catalog::{
     self, DeleteWorkflowResult, FlowUpdateError as BusUpdateError, GetRevisionRequest,
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
@@ -87,7 +88,7 @@ pub fn create_flow(
 /// Read one workflow by id.
 pub fn get_flow(config: &Config, id: &str) -> Result<Option<Flow>> {
     let storage = super::catalog_storage::register_blocking(config)?;
-    let workflow: Option<Workflow> = call_catalog(
+    let workflow: Option<Flow> = call_catalog(
         config,
         catalog::members::GET_WORKFLOW,
         (storage, id.to_owned()),
@@ -103,7 +104,7 @@ pub fn list_flows(config: &Config) -> Result<(Vec<Flow>, usize)> {
     let mut flows = Vec::with_capacity(listed.workflows.len());
     let mut skipped = listed.skipped_rows;
     for summary in listed.workflows {
-        let workflow: Option<Workflow> = call_catalog(
+        let workflow: Option<Flow> = call_catalog(
             config,
             catalog::members::GET_WORKFLOW,
             (storage.clone(), summary.id),
@@ -144,7 +145,7 @@ pub fn set_enabled(config: &Config, id: &str, enabled: bool) -> Result<Flow> {
         id: id.to_owned(),
         enabled,
     };
-    let workflow: Workflow = call_catalog(config, catalog::members::SET_ENABLED, (request,))?;
+    let workflow: Flow = call_catalog(config, catalog::members::SET_ENABLED, (request,))?;
     Ok(workflow)
 }
 
