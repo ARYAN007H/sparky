@@ -410,47 +410,17 @@ pub async fn run_pending(config: &mut Config) {
         }
     }
 
-    // 7 -> 8: retire the two stale OpenHuman reasoning-tier `default_model`
-    // defaults to `chat-v1`. `reasoning-v1` (a former DEFAULT_MODEL) and the
-    // deprecated `reasoning-quick-v1` alias were the persisted default for older
-    // builds and drive the implicit managed turns (triage,
-    // escalation base, chat-fallback) onto a stale tier, since app updates never
-    // refresh `default_model`. Only those two values are rewritten — `default_model`
-    // round-trips arbitrary custom/BYOK ids (config-mutation contract), so anything
-    // else (including `chat-v1` and `None`) is left untouched. Guard on `== 7` so
-    // an earlier failed step doesn't get skipped.
+    // 7 -> 8: retain the generic schema sequence. Provider-specific values are
+    // handled independently by registered host normalizers above.
     if config.schema_version == 7 {
-        let previous_default_model = config.default_model.clone();
-        match normalize_default_model_tier::run(config) {
-            Ok(stats) => {
-                let previous_version = config.schema_version;
-                config.schema_version = 8;
-                if let Err(err) = config.save().await {
-                    // Roll back BOTH the version and the mutated `default_model`
-                    // so a failed save doesn't leave `load_or_init` returning a
-                    // half-migrated in-memory config; next launch retries.
-                    config.default_model = previous_default_model;
-                    config.schema_version = previous_version;
-                    log::warn!(
-                        "[migrations] normalize_default_model_tier ran but config.save failed: \
-                         {err:#} — rolled in-memory schema_version back to {previous_version}, \
-                         will retry on next launch"
-                    );
-                    return;
-                }
-                log::info!(
-                    "[migrations] schema_version bumped to 8 (normalize_default_model_tier \
-                     default_model_normalized={})",
-                    stats.default_model_normalized,
-                );
-            }
-            Err(err) => {
-                log::warn!(
-                    "[migrations] normalize_default_model_tier failed: {err:#} — \
-                     will retry on next launch"
-                );
-            }
+        let previous_version = config.schema_version;
+        config.schema_version = 8;
+        if let Err(err) = config.save().await {
+            config.schema_version = previous_version;
+            log::warn!("[migrations] schema_version 8 save failed: {err:#}");
+            return;
         }
+        log::info!("[migrations] schema_version bumped to 8");
     }
 
     // 8 -> 9: opt existing workspaces into the session shadow-read parity soak.
@@ -607,39 +577,17 @@ pub async fn run_pending(config: &mut Config) {
         log::info!("[migrations] schema_version bumped to 12");
     }
 
-    // 12 -> 13: retire the managed tier slugs (`chat-v1`, `agentic-v1`, …).
-    // The managed backend serves OpenRouter model ids only, so every persisted
-    // tier slug — `default_model`, orchestrator/team/delegate pins, model
-    // routes — is rewritten to the managed default model. Guard on `== 12` so
-    // an earlier failed step isn't skipped.
+    // 12 -> 13: retain the generic schema sequence. Provider-specific values are
+    // handled independently by registered host normalizers above.
     if config.schema_version == 12 {
-        let snapshot = config.clone();
-        match retire_managed_tier_slugs::run(config) {
-            Ok(stats) => {
-                let previous_version = config.schema_version;
-                config.schema_version = 13;
-                if let Err(err) = config.save().await {
-                    *config = snapshot;
-                    log::warn!(
-                        "[migrations] retire_managed_tier_slugs ran but config.save failed: \
-                         {err:#} — rolled in-memory schema_version back to {previous_version}, \
-                         will retry on next launch"
-                    );
-                    return;
-                }
-                log::info!(
-                    "[migrations] schema_version bumped to 13 (retire_managed_tier_slugs \
-                     rewritten={})",
-                    stats.rewritten
-                );
-            }
-            Err(err) => {
-                log::warn!(
-                    "[migrations] retire_managed_tier_slugs failed: {err:#} — \
-                     will retry on next launch"
-                );
-            }
+        let previous_version = config.schema_version;
+        config.schema_version = 13;
+        if let Err(err) = config.save().await {
+            config.schema_version = previous_version;
+            log::warn!("[migrations] schema_version 13 save failed: {err:#}");
+            return;
         }
+        log::info!("[migrations] schema_version bumped to 13");
     }
     // 13 -> 14: persist provider discriminators normalized before typed decode.
     // Saves also retain the provider-native default_model used by BYOK routing.
