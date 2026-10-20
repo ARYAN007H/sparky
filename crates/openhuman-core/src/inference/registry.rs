@@ -227,8 +227,11 @@ pub fn provider_model_is_alias(provider_id: &str, model: &str) -> bool {
 
 /// Whether the provider regards `model` as a concrete id for pass-through.
 pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
-    provider_model_hooks(provider_id)
-        .is_none_or(|hooks| (hooks.is_raw_model)(model))
+    let model = model.trim();
+    !model.is_empty()
+        && !model.starts_with("hint:")
+        && provider_model_hooks(provider_id)
+            .map_or(true, |hooks| (hooks.is_raw_model)(model))
 }
 
 /// Whether the provider says `model` supports image input.
@@ -259,9 +262,10 @@ pub fn provider_request_without_reasoning(
     provider_id: &str,
     request: tinyinference_llm::model::ModelRequest,
 ) -> tinyinference_llm::model::ModelRequest {
-    provider_model_hooks(provider_id)
-        .map(|hooks| (hooks.without_reasoning)(request))
-        .unwrap_or(request)
+    match provider_model_hooks(provider_id) {
+        Some(hooks) => (hooks.without_reasoning)(request),
+        None => request,
+    }
 }
 
 /// Registers a generic config normalizer, such as a provider-owned migration
