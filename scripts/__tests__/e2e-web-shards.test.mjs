@@ -169,9 +169,9 @@ fi
   assert.equal(calls.length, 18, "later assigned units still run after failure");
   const [, firstOutput] = calls[0].split("|");
   const [, secondOutput] = calls[1].split("|");
-  assert.notEqual(firstOutput, secondOutput);
   assert.ok(path.isAbsolute(firstOutput));
   assert.ok(fs.existsSync(path.join(firstOutput, "trace.zip")));
+  assert.notEqual(firstOutput, secondOutput);
   assert.equal(
     fs.readFileSync(path.join(workspace, "lane-4/receipts/special-3.exit"), "utf8").trim(),
     "1",
