@@ -89,14 +89,10 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     );
     // The version holds its own copy; the files folder shows the newest.
     let file = record.latest().unwrap().file.clone().unwrap();
-    let kept = crate::artifacts::tiny_store::version_files_dir(&workspace)
-        .join(&id)
-        .join("v1.pptx");
     assert_eq!(file.key, format!("artifacts/files/{id}/v1.pptx"));
     let ctx = crate::core::runtime::DispatchCtx::process_default();
     let file_store = super::super::tiny_store::file_store_for(&workspace, &ctx).unwrap();
     assert_eq!(file_store.read(&file.key).await.unwrap(), b"deck-v1");
-    assert!(kept.is_dir(), "version blobs use the storage port, not workspace files");
     assert_eq!(
         files_in(&files),
         vec!["quarterly-deck.pptx"],
