@@ -103,7 +103,7 @@ fn leave_undelivered_result(root: &std::path::Path, user: &str) {
         .for_scope(&openhuman_core::storage::scope_for_profile(id.as_str()))
         .expect("the profile's scope");
     let store: Arc<dyn CompletionStore> = Arc::new(
-        DriverCompletionStore::new(Arc::clone(scoped.documents()))
+        DriverCompletionStore::new(backend, openhuman_core::storage::scope_for_profile(id.as_str()))
             .expect("open the completion queue"),
     );
     let record = CompletionRecord::new(
