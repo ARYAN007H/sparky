@@ -16,7 +16,7 @@
 
 mod approval;
 mod bus_turn;
-mod progressive;
+pub(crate) mod progressive;
 mod reset;
 mod turn;
 

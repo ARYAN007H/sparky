@@ -480,7 +480,7 @@ pub(crate) async fn process_channel_runtime_message(
                 imported_history,
                 native_target: native_target.clone(),
             });
-            super::native_runner::run(
+            super::super::native_runner::run(
                 &ctx.dispatch_ctx(),
                 session_key.clone(),
                 request_id,
@@ -491,7 +491,7 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None if configured_agent_error.is_some() => {
             let error = configured_agent_error.expect("checked configured-agent failure");
-            super::native_runner::NativeTurnExecution {
+            super::super::native_runner::NativeTurnExecution {
                 result: Err(error),
                 delivery_succeeded: None,
                 queued: false,
@@ -516,7 +516,7 @@ pub(crate) async fn process_channel_runtime_message(
             )
             .await
             .map_err(|error| error.to_string());
-            super::native_runner::NativeTurnExecution {
+            super::super::native_runner::NativeTurnExecution {
                 result,
                 delivery_succeeded: None,
                 queued: false,
