@@ -18,7 +18,7 @@ use tinyagents_harness::{
 use tokio::sync::mpsc;
 
 use crate::{
-    agent::{host_agents::HostAgent, queued_turn::QueuedPayload, session_lease::SessionLease},
+    agent::{queued_turn::QueuedPayload, session_lease::SessionLease},
     channels::bus::NativeProgressiveReply,
     core::runtime::DispatchCtx,
 };
@@ -377,7 +377,28 @@ impl FailureClassifier for NativeFailures {
 struct NativeSummarizer;
 
 #[async_trait]
-impl Summarizer<QueuedPayload> for NativeSummarizer {}
+impl Summarizer<QueuedPayload> for NativeSummarizer {
+    async fn grounded_close(
+        &self,
+        request: &TurnRequest<QueuedPayload>,
+        reason: &str,
+    ) -> Option<TurnResult> {
+        let error = if reason.contains("idle") {
+            let idle = request
+                .idle_timeout
+                .unwrap_or_else(crate::agent::turn_policy::configured_idle_window);
+            crate::web_chat::web_errors::turn_idle_error_message(idle.as_secs())
+        } else {
+            let deadline = request.deadline.unwrap_or_default();
+            crate::web_chat::web_errors::turn_timeout_error_message(deadline.as_secs())
+        };
+        let (failure_type, message) = NativeFailures.classify(&error);
+        Some(TurnResult {
+            reply: message,
+            data: serde_json::json!({"failure_type": failure_type}),
+        })
+    }
+}
 
 struct NativeRuntime {
     shared: Arc<NativeShared>,
@@ -446,7 +467,7 @@ pub(crate) async fn run(
         },
         host_authored: false,
         disposition: QueueDisposition::Interrupt,
-        deadline: Some(crate::agent::session_host::turn_backstop::configured_backstop()),
+        deadline: crate::agent::session_host::turn_backstop::configured_backstop(),
         idle_timeout: Some(crate::agent::turn_policy::configured_idle_window()),
     };
     let runner_result = runtime.runner.run(request).await;
