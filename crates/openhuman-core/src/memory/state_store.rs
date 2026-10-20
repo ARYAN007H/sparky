@@ -5,8 +5,10 @@
 //!
 //! Each used to be `<workspace>/memory/<name>.json`. Each is now one
 //! `tsd.kv` entry (owner `memory`, namespace `state`, key `<name>`) in the
-//! acting scope; the first read in a backend imports the legacy file once
-//! ([`StateKv::import_file`]) and leaves it in place.
+//! acting scope; pending deletions are the exception, stored in a stable
+//! workspace scope so retries survive the end of profile context. The first
+//! read in a backend imports the legacy file once ([`StateKv::import_file`])
+//! and leaves it in place.
 
 use std::path::{Path, PathBuf};
 
@@ -16,10 +18,10 @@ use serde::Serialize;
 use sha2::Digest;
 
 use crate::storage::state_kv::StateKv;
-use crate::storage::StorageBackend;
 
 const OWNER: &str = "memory";
 const NS: &str = "state";
+const QUEUE_MIGRATION: &str = "pending_deletions_scope_migration_v1";
 
 /// The legacy file of state value `name` in `workspace_dir`.
 #[must_use]
@@ -39,8 +41,57 @@ fn open_quarantining<T: DeserializeOwned>(workspace_dir: &Path, name: &str) -> R
     Ok(kv)
 }
 
+fn profile_layout_for_workspace(
+    workspace_dir: &Path,
+) -> Option<crate::config::schema::ProfileLayout> {
+    use crate::config::schema::profile_layout::{
+        PROFILE_CONFIG_FILE, PROFILE_WORKSPACE_DIR, USERS_DIR,
+    };
+
+    if let Some(profile) = crate::config::schema::ProfileLayout::of_workspace(workspace_dir) {
+        return Some(profile);
+    }
+    if workspace_dir.file_name()? != std::ffi::OsStr::new(PROFILE_WORKSPACE_DIR) {
+        return None;
+    }
+    let profile_dir = workspace_dir.parent()?;
+    if profile_dir.parent()?.file_name()? != std::ffi::OsStr::new(USERS_DIR) {
+        return None;
+    }
+    Some(crate::config::schema::ProfileLayout::at(
+        profile_dir.to_path_buf(),
+    ))
+}
+
+fn stable_workspace_identity(workspace_dir: &Path) -> Result<PathBuf> {
+    // Layout v1 and v2 use `workspace/` and `files/` under the same profile.
+    // Hash the canonical profile directory when known, so a layout migration
+    // does not change the queue's scope. For ordinary/custom workspaces use a
+    // lexically normalized absolute path; filesystem canonicalization would
+    // change identity when a not-yet-created workspace first appears.
+    let path = profile_layout_for_workspace(workspace_dir)
+        .map(|profile| profile.dir)
+        .unwrap_or_else(|| workspace_dir.to_path_buf());
+    let absolute = if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                normalized.pop();
+            }
+            component => normalized.push(component.as_os_str()),
+        }
+    }
+    Ok(normalized)
+}
+
 fn workspace_scope(workspace_dir: &Path) -> Result<crate::storage::Scope> {
-    let path = std::fs::canonicalize(workspace_dir).unwrap_or_else(|_| workspace_dir.to_path_buf());
+    let path = stable_workspace_identity(workspace_dir)?;
     let digest = sha2::Sha256::digest(path.to_string_lossy().as_bytes());
     let suffix = digest
         .iter()
@@ -55,9 +106,87 @@ fn open_workspace_quarantining<T: DeserializeOwned>(
     name: &str,
 ) -> Result<StateKv> {
     let scope = workspace_scope(workspace_dir)?;
-    let kv = StateKv::open_in_scope(workspace_dir, &scope, OWNER, NS)?;
+    let backend = crate::storage::local::backend_for(workspace_dir)?;
+    let kv = StateKv::on_backend(&backend, &scope, OWNER, NS)?;
     kv.import_file_quarantining::<T>(name, &legacy_path(workspace_dir, name))?;
+    if name == "pending_deletions" {
+        migrate_existing_queue_scopes(workspace_dir, &backend, &scope, &kv)?;
+    }
     Ok(kv)
+}
+
+fn legacy_queue_scopes(workspace_dir: &Path) -> Vec<crate::storage::Scope> {
+    let known_profile = profile_layout_for_workspace(workspace_dir)
+        .and_then(|profile| profile.dir.file_name()?.to_str().map(str::to_owned));
+    let mut scopes = vec![crate::storage::Scope::local()];
+    if let Some(profile) = &known_profile {
+        scopes.push(crate::storage::scope_for_profile(profile));
+    }
+
+    // A task may still carry the old profile/agent scope for a custom
+    // workspace that the profile-layout helper cannot identify. Only inspect
+    // that task's own scope, and when the path did identify a profile require
+    // it to match; never enumerate other tenants on a shared backend.
+    if let Ok(tenant) = crate::core::runtime::DispatchCtx::ambient().tenant() {
+        match (tenant.profile, tenant.agent) {
+            (Some(profile), _) if known_profile.as_ref().is_none_or(|known| known == &profile) => {
+                scopes.push(crate::storage::scope_for_profile(&profile));
+            }
+            (None, Some(agent)) => scopes.push(crate::storage::scope_for_agent(&agent)),
+            _ => {}
+        }
+    }
+
+    scopes.sort_by(|left, right| left.as_str().cmp(right.as_str()));
+    scopes.dedup();
+    scopes
+}
+
+fn migrate_existing_queue_scopes(
+    workspace_dir: &Path,
+    backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
+    target_scope: &crate::storage::Scope,
+    target: &StateKv,
+) -> Result<()> {
+    if target.get::<String>(QUEUE_MIGRATION)?.as_deref() == Some("complete") {
+        return Ok(());
+    }
+    target.insert_if_absent(QUEUE_MIGRATION, &"in_progress")?;
+
+    for source_scope in legacy_queue_scopes(workspace_dir) {
+        if &source_scope == target_scope {
+            continue;
+        }
+        let source = StateKv::on_backend(backend, &source_scope, OWNER, NS)?;
+        let Some(previous) = source.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
+        else {
+            continue;
+        };
+        let transferred = previous.clone();
+        target.update::<Vec<super::deletion::PendingDeletion>, _>(
+            "pending_deletions",
+            move |pending| {
+                let mut changed = false;
+                for deletion in &previous {
+                    if !pending.contains(deletion) {
+                        pending.push(deletion.clone());
+                        changed = true;
+                    }
+                }
+                ((), changed)
+            },
+        )?;
+        source.update::<Vec<super::deletion::PendingDeletion>, _>(
+            "pending_deletions",
+            move |pending| {
+                let before = pending.len();
+                pending.retain(|deletion| !transferred.contains(deletion));
+                let changed = before != pending.len();
+                ((), changed)
+            },
+        )?;
+    }
+    target.put(QUEUE_MIGRATION, &"complete")
 }
 
 /// A workspace-owned state value in a deterministic local module scope. Use
@@ -135,38 +264,7 @@ pub(crate) fn import_all(
             names.push(name);
         }
     }
-    // Earlier versions imported this queue with the rest of memory state in
-    // `local`. Move any such durable entries to the workspace-owned scope
-    // before the layout migrator archives the old files. Remove the source
-    // only after the target write succeeds so an interrupted migration can
-    // retry without losing owed deletions.
-    if let Some(previous) =
-        local_kv.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
-    {
-        let transferred = previous.clone();
-        queue_kv.update::<Vec<super::deletion::PendingDeletion>, _>(
-            "pending_deletions",
-            move |pending| {
-                let mut changed = false;
-                for deletion in &previous {
-                    if !pending.contains(deletion) {
-                        pending.push(deletion.clone());
-                        changed = true;
-                    }
-                }
-                ((), changed)
-            },
-        )?;
-        local_kv.update::<Vec<super::deletion::PendingDeletion>, _>(
-            "pending_deletions",
-            move |pending| {
-                let before = pending.len();
-                pending.retain(|deletion| !transferred.contains(deletion));
-                let changed = before != pending.len();
-                ((), changed)
-            },
-        )?;
-    }
+    migrate_existing_queue_scopes(workspace_dir, backend, &queue_scope, &queue_kv)?;
     names.sort();
     Ok(names)
 }
