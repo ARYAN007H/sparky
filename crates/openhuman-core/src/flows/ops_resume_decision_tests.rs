@@ -298,8 +298,12 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
     )
     .await
     .expect_err("resuming an already-completed run must be a clear error, not a silent no-op");
+    let expected = "flow run is not parked for approval (status: completed)";
+    if !err.contains(expected) {
+        eprintln!("ResumeRun nonparked-status diagnostic: {err}");
+    }
     assert!(
-        err.contains("flow run is not parked for approval (status: completed)"),
+        err.contains(expected),
         "expected a clear non-paused-run error, got: {err}"
     );
 }
