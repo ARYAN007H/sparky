@@ -9,7 +9,6 @@
 
 use std::time::Duration;
 
-use serde_json::json;
 use tinyagents_harness::turn_runner::{QueueDisposition, TurnRequest, TurnRunnerError};
 use tinychannels_bus::web::{ChatRequestMetadata, QueueMode};
 use uuid::Uuid;
