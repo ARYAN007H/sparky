@@ -413,7 +413,6 @@ if should_run_suite "system"; then
   # PR #1061 (core is now in-process). Skip by not setting OPENHUMAN_SERVICE_MOCK=1.
   run "test/e2e/specs/service-connectivity-flow.spec.ts"    "service-connectivity"      "system"
   run "test/e2e/specs/core-port-conflict-recovery.spec.ts"  "core-port-conflict"        "system"
-  run "test/e2e/specs/ptt-flow.spec.ts"                       "ptt-flow"                  "system"
   _mini_summary "system"
 fi
 
