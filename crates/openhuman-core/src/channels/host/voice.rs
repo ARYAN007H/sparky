@@ -282,6 +282,35 @@ impl ChannelVoiceHost {
         tenant: &crate::core::runtime::Tenant,
     ) -> HostVoiceReplyPolicy {
         let policy = resolve_policy(&self.config.channel_voice, scope, tenant);
+        let requested = turn_key(tenant, &scope.channel, &scope.conversation, &scope.turn_id);
+        let turns = TURNS.lock();
+        let same_scope_except_tenant = turns.iter().any(|(key, _)| {
+            key.channel == requested.channel
+                && key.conversation == requested.conversation
+                && key.turn_id == requested.turn_id
+        });
+        let same_scope_except_channel = turns.iter().any(|(key, _)| {
+            key.tenant == requested.tenant
+                && key.conversation == requested.conversation
+                && key.turn_id == requested.turn_id
+        });
+        let same_scope_except_conversation = turns.iter().any(|(key, _)| {
+            key.tenant == requested.tenant
+                && key.channel == requested.channel
+                && key.turn_id == requested.turn_id
+        });
+        let same_scope_except_turn = turns.iter().any(|(key, _)| {
+            key.tenant == requested.tenant
+                && key.channel == requested.channel
+                && key.conversation == requested.conversation
+        });
+        tracing::debug!(
+            "{LOG_PREFIX} policy key_match tenant={} channel={} conversation={} turn={}",
+            same_scope_except_channel && same_scope_except_conversation && same_scope_except_turn,
+            same_scope_except_tenant && same_scope_except_conversation && same_scope_except_turn,
+            same_scope_except_tenant && same_scope_except_channel && same_scope_except_turn,
+            same_scope_except_tenant && same_scope_except_channel && same_scope_except_conversation,
+        );
         tracing::debug!(
             "{LOG_PREFIX} policy channel={} mode={:?} inbound_voice={}",
             scope.configured_instance,
