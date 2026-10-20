@@ -18,7 +18,7 @@ use crate::web_chat::{SubagentProgressDetail, WebChannelEvent};
 
 use super::{
     cap_wire_args, cap_wire_output, ledger_append_event, ledger_upsert_agent_run,
-    ledger_upsert_telemetry, publish_seq_stamped, subagent_worktree_detail,
+    ledger_upsert_telemetry, publish_seq_stamped,
 };
 
 /// Bundles the progress bridge's per-turn identity fields (read-only for the

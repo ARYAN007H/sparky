@@ -485,27 +485,11 @@ pub enum DomainEvent {
         elapsed_ms: u64,
     },
 
-    // ── Workspace isolation ─────────────────────────────────────────────
-    /// A TinyAgents workspace descriptor was prepared for an isolated run.
-    WorkspacePrepared {
-        /// Audit identity of the policy that produced the workspace.
-        policy_id: String,
-        /// Allowed workspace root.
-        root: String,
-    },
     /// A TinyAgents workspace descriptor blocked an out-of-root path.
     WorkspaceViolation {
         /// Path that failed the descriptor's allowed-root policy.
         path: String,
     },
-    /// A TinyAgents workspace descriptor was cleaned up.
-    WorkspaceCleanup {
-        /// Audit identity of the policy whose workspace was cleaned up.
-        policy_id: String,
-        /// Cleanup error, when cleanup failed.
-        error: Option<String>,
-    },
-
     // ── Approval ────────────────────────────────────────────────────────
     /// Agent attempted a tool call that produces an external side effect;
     /// awaiting user approval. Published by `ApprovalGate` before parking the
@@ -1369,9 +1353,7 @@ impl DomainEvent {
 
             Self::ToolExecutionStarted { .. } | Self::ToolExecutionCompleted { .. } => "tool",
 
-            Self::WorkspacePrepared { .. }
-            | Self::WorkspaceViolation { .. }
-            | Self::WorkspaceCleanup { .. } => "workspace",
+            Self::WorkspaceViolation { .. } => "workspace",
 
             Self::WebhookIncomingRequest { .. }
             | Self::WebhookReceived { .. }
@@ -1495,9 +1477,7 @@ impl DomainEvent {
             Self::WorkflowsChanged { .. } => "WorkflowsChanged",
             Self::ToolExecutionStarted { .. } => "ToolExecutionStarted",
             Self::ToolExecutionCompleted { .. } => "ToolExecutionCompleted",
-            Self::WorkspacePrepared { .. } => "WorkspacePrepared",
             Self::WorkspaceViolation { .. } => "WorkspaceViolation",
-            Self::WorkspaceCleanup { .. } => "WorkspaceCleanup",
             Self::WebhookIncomingRequest { .. } => "WebhookIncomingRequest",
             Self::WebhookReceived { .. } => "WebhookReceived",
             Self::WebhookRegistered { .. } => "WebhookRegistered",
@@ -1581,8 +1561,6 @@ impl DomainEvent {
             | Self::ChannelDisconnected { channel, .. } => Some(channel.as_str()),
             Self::ToolExecutionStarted { tool_name, .. }
             | Self::ToolExecutionCompleted { tool_name, .. } => Some(tool_name.as_str()),
-            Self::WorkspacePrepared { policy_id, .. }
-            | Self::WorkspaceCleanup { policy_id, .. } => Some(policy_id.as_str()),
             Self::WorkspaceViolation { path } => Some(path.as_str()),
             Self::RunQueueMessageQueued { thread_id, .. }
             | Self::RunQueueFollowupDispatched { thread_id, .. }
