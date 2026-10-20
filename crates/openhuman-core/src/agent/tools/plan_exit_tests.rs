@@ -51,7 +51,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
         )
         .await
         .unwrap();
-    assert!(!result.is_error);
+    assert!(result.is_error, "a parked review must refuse plan exit");
     assert_eq!(
         crate::threads::run_mode::get_mode(
             &crate::core::runtime::DispatchCtx::ambient(),
