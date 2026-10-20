@@ -209,6 +209,17 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     let session = host.bound_session_ref().expect("bound session").clone();
     assert!(!host.bound_history_is_authoritative().unwrap());
 
+    let absent = host
+        .adopt_legacy_history_if_needed(|| async {
+            Err(anyhow::anyhow!("legacy store unavailable"))
+        })
+        .await;
+    assert!(absent.is_err(), "legacy read failure must stop first admission");
+    assert!(
+        !locator.session_exists(&session),
+        "failed legacy read must not create an absent session"
+    );
+
     // Merely opening the exact transcript handle does not count as a durable
     // turn and must not suppress the one-time legacy import.
     let now = chrono::Utc::now().to_rfc3339();
