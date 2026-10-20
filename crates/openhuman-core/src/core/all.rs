@@ -55,11 +55,14 @@ impl RegisteredController {
 }
 
 /// A controller whose runtime path and validation seam share one typed parser.
+type BoundInvoke = dyn Fn(DispatchCtx, Map<String, Value>) -> ControllerFuture + Send + Sync;
+type BoundDecode = dyn Fn(Map<String, Value>) -> Result<(), String> + Send + Sync;
+
 #[derive(Clone)]
 pub struct BoundRegisteredController {
     pub schema: ControllerSchema,
-    invoke: Arc<dyn Fn(DispatchCtx, Map<String, Value>) -> ControllerFuture + Send + Sync>,
-    decode: Arc<dyn Fn(Map<String, Value>) -> Result<(), String> + Send + Sync>,
+    invoke: Arc<BoundInvoke>,
+    decode: Arc<BoundDecode>,
 }
 
 impl BoundRegisteredController {
@@ -69,11 +72,10 @@ impl BoundRegisteredController {
         parse: fn(Map<String, Value>) -> Result<P, String>,
         run: fn(DispatchCtx, P) -> ControllerFuture,
     ) -> Self {
-        let decode =
-            Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
+        let decode = Arc::new(move |params| parse(params).map(|_| ())) as Arc<BoundDecode>;
         let invoke = Arc::new(move |ctx: DispatchCtx, params: Map<String, Value>| {
             Box::pin(async move { run(ctx, parse(params)?).await }) as ControllerFuture
-        }) as Arc<dyn Fn(_, _) -> _ + Send + Sync>;
+        }) as Arc<BoundInvoke>;
         Self {
             schema,
             invoke,
@@ -88,14 +90,13 @@ impl BoundRegisteredController {
         parse: fn(Map<String, Value>) -> Result<P, String>,
         run: fn(DispatchCtx, G, P) -> ControllerFuture,
     ) -> Self {
-        let decode =
-            Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
+        let decode = Arc::new(move |params| parse(params).map(|_| ())) as Arc<BoundDecode>;
         let invoke = Arc::new(move |ctx: DispatchCtx, params: Map<String, Value>| {
             Box::pin(async move {
                 let gated = gate(ctx.clone()).await?;
                 run(ctx, gated, parse(params)?).await
             }) as ControllerFuture
-        }) as Arc<dyn Fn(_, _) -> _ + Send + Sync>;
+        }) as Arc<BoundInvoke>;
         Self {
             schema,
             invoke,
