@@ -61,14 +61,6 @@ fn failing_parse(_params: Map<String, Value>) -> Result<Parsed, String> {
     Err("parser rejected".to_owned())
 }
 
-fn unused_contract_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    panic!("schema contract verification must not invoke controller handlers")
-}
-
-fn accept_contract_example(_params: Map<String, Value>) -> Result<(), String> {
-    Ok(())
-}
-
 fn schema() -> ControllerSchema {
     ControllerSchema {
         namespace: "bound_test",
@@ -322,22 +314,13 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
         );
     }
 
-    let required_contract = ControllerParamContract {
-        method: "composio.execute",
-        required: &["tool"],
-        handler: unused_contract_handler,
-        examples: vec![json!({"tool":"GMAIL_SEND_EMAIL"})],
-        parse: accept_contract_example,
-    };
-    verify_parameter_schema(&entry.schema, &required_contract)
+    required_input_contract(&entry.schema, &["tool"])
         .expect("independent required-field contract matches production schema");
     let mut missing_required = entry.schema.clone();
     missing_required.inputs.retain(|field| field.name != "tool");
-    assert!(
-        verify_parameter_schema(&missing_required, &required_contract)
-            .unwrap_err()
-            .contains("required inputs mismatch")
-    );
+    assert!(required_input_contract(&missing_required, &["tool"])
+        .unwrap_err()
+        .contains("required inputs mismatch"));
     let mut optional_required = entry.schema.clone();
     optional_required
         .inputs
@@ -345,11 +328,9 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
         .find(|field| field.name == "tool")
         .expect("tool schema field")
         .required = false;
-    assert!(
-        verify_parameter_schema(&optional_required, &required_contract)
-            .unwrap_err()
-            .contains("required inputs mismatch")
-    );
+    assert!(required_input_contract(&optional_required, &["tool"])
+        .unwrap_err()
+        .contains("required inputs mismatch"));
 
     for example in [
         json!({"tool":"GMAIL_SEND_EMAIL"}),
