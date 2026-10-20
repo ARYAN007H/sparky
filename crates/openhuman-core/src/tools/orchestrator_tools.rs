@@ -5,21 +5,15 @@
 //! `[subagents]` allowlist constrain that tool; they do not create additional
 //! model-facing tools.
 //!
-//! For [`SubagentEntry::Skills`] wildcard expansions we synthesise one
+//! For [`SubagentEntry::Skills`] wildcard expansions we synthesize one
 //! `ToolExposure::Deferred` [`ComposioActionTool`] per action of every
 //! connected Composio toolkit. Those never reach the wire: a belt that opted
 //! into discovery (`tool_search` in its `[tools] named`) finds them through
-//! the harness's `tool_search` bridge and calls them directly, so "send this
-//! email" is one search and one call. There is no `delegate_to_integrations_
-//! agent` any more — routing a single action through a sub-agent spawn cost a
-//! blocking agentic round-trip and a second prompt for work the parent could
-//! do in one call.
+//! the harness's `tool_search` bridge and calls them directly.
 //!
 //! Called from [`crate::agent::session_host::builder`] at
-//! agent-build time, with the orchestrator's own definition, the global
-//! definition and the current list of connected Composio integrations.
-//!
-//! [`AgentDefinition::when_to_use`]: crate::agent_registry::host_definition::AgentDefinition::when_to_use
+//! agent-build time, with the orchestrator's own definition and the current
+//! list of connected Composio integrations.
 //! [`SubagentEntry::AgentId`]: tinyagents_definition::SubagentEntry::AgentId
 //! [`SubagentEntry::Skills`]: tinyagents_definition::SubagentEntry::Skills
 
@@ -30,15 +24,10 @@ use tinyagents_definition::SubagentEntry;
 
 use tinytools::Tool;
 
-/// Synthesise the delegation tool list for an agent based on its
-/// declarative `subagents` field.
+/// Return deferred integration actions for the agent's skills wildcard.
 ///
-/// Each [`SubagentEntry::AgentId`] is resolved against `registry` and
-/// rendered as an [`ArchetypeDelegationTool`] whose `name()` defaults to
-/// `delegate_{target.id}` (overridable via the target agent's
-/// `delegate_name` field) and whose `description()` is the target's
-/// `when_to_use` — so editing an agent's TOML description immediately
-/// updates the tool schema the orchestrator LLM sees, with zero drift.
+/// `AgentId` entries only configure the `spawn_subagent` allowlist; they do
+/// not create additional model-facing tools.
 ///
 /// Each [`SubagentEntry::Skills`] wildcard expands to the connected
 /// integrations' actions as `Deferred` tools
@@ -52,10 +41,7 @@ use tinytools::Tool;
 /// `connected_integrations` slice produces zero tools, which is the correct
 /// behaviour when the user has not yet connected any integrations.
 ///
-/// Returns an empty Vec when `definition.subagents` is empty — callers
-/// (notably the builder) handle this by not extending the visible-tool
-/// set, so non-delegating agents behave identically to how they did
-/// before this module existed.
+/// Returns an empty Vec when there are no connected integration actions.
 pub fn collect_orchestrator_tools(
     definition: &AgentDefinition,
     connected_integrations: &[ConnectedIntegration],
@@ -86,10 +72,8 @@ pub fn collect_orchestrator_tools(
                 // never sees them — the session builder leaves them
                 // prompt-hidden, which the direct-call gate refuses. Approval
                 // and channel permission apply per call. This used to sit
-                // beside a collapsed `delegate_to_integrations_agent` tool
-                // that spawned `integrations_agent` per toolkit; with the
-                // actions searchable that spawn only added a blocking
-                // sub-agent round-trip, so the delegation tool is gone.
+                // beside a per-toolkit sub-agent route; searchable actions
+                // are directly callable through the harness.
                 let actions = collect_deferred_integration_actions(connected_integrations);
                 if !actions.is_empty() {
                     log::debug!(
