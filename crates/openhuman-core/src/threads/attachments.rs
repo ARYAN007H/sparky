@@ -6,14 +6,14 @@
 //! when a turn is about to execute.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinychannels_bus::{ContentPart, MediaReference};
 use tinystoragedrivers::{CollectionSpec, Precondition};
 
 use crate::agent::attachments::Attachment;
 use crate::storage::{
     self,
-    documents::{compare_and_swap, Repo},
+    documents::{Repo, compare_and_swap},
 };
 
 const STORAGE_KEY: &str = "__openhumanStoredAttachments";
@@ -389,7 +389,9 @@ fn claim_staged_record(
         };
         let record: StagedAttachment = serde_json::from_value(stored.doc)
             .map_err(|error| tinystoragedrivers::StorageError::invalid_input(error.to_string()))?;
-        if record.tenant != tenant || record.thread_id != thread_id || record.attachment.part != part
+        if record.tenant != tenant
+            || record.thread_id != thread_id
+            || record.attachment.part != part
         {
             return Err(tinystoragedrivers::StorageError::conflict(
                 "staged attachment belongs to a different scope",
@@ -398,7 +400,11 @@ fn claim_staged_record(
         if record.claim.as_ref() == Some(&claim) {
             return Ok(false);
         }
-        if record.claim.as_ref().is_some_and(|existing| existing.canceled) {
+        if record
+            .claim
+            .as_ref()
+            .is_some_and(|existing| existing.canceled)
+        {
             return Err(tinystoragedrivers::StorageError::conflict(
                 "staged attachment was canceled before it could be bound",
             ));
@@ -670,7 +676,9 @@ fn cancel_staged_record(
         };
         let record: StagedAttachment = serde_json::from_value(stored.doc)
             .map_err(|error| tinystoragedrivers::StorageError::invalid_input(error.to_string()))?;
-        if record.tenant != tenant || record.thread_id != thread_id || record.attachment.part != part
+        if record.tenant != tenant
+            || record.thread_id != thread_id
+            || record.attachment.part != part
         {
             return Err(tinystoragedrivers::StorageError::conflict(
                 "staged attachment belongs to a different scope",

@@ -48,17 +48,18 @@ fn public_projection_hides_paths_but_keeps_opaque_attachment_refs() {
         vec![(part.clone(), "uploads/thread/a.png".into())],
     );
     assert_eq!(public, vec![part]);
-    assert!(metadata[STORAGE_KEY][0]["path"]
-        .as_str()
-        .unwrap()
-        .contains("uploads/"));
+    assert!(
+        metadata[STORAGE_KEY][0]["path"]
+            .as_str()
+            .unwrap()
+            .contains("uploads/")
+    );
 
     let projected = public_refs(&metadata);
     assert_eq!(projected, public);
     strip_private_metadata(&mut metadata);
     assert_eq!(metadata, json!({"keep": true}));
 }
-
 
 fn claim(message_id: &str, part: ContentPart, canceled: bool) -> StagedAttachmentClaim {
     StagedAttachmentClaim {
@@ -85,7 +86,10 @@ fn staged_record(part: ContentPart, path: &str) -> StagedAttachment {
     StagedAttachment {
         tenant: crate::core::runtime::Tenant::default(),
         thread_id: "thread".into(),
-        attachment: StoredAttachment { part, path: path.into() },
+        attachment: StoredAttachment {
+            part,
+            path: path.into(),
+        },
         expires_at: chrono::Utc::now().timestamp() + 60,
         claim: None,
     }
@@ -96,12 +100,15 @@ fn insert_record(repo: &Repo, record: &StagedAttachment) {
         opaque_media(&record.attachment.part)
             .and_then(|media| media.opaque_id.as_deref())
             .unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
     let body = serde_json::to_value(record).unwrap();
     repo.run(|docs| async move {
-        docs.put(STAGED_COLLECTION, &id, body, Precondition::Absent).await?;
+        docs.put(STAGED_COLLECTION, &id, body, Precondition::Absent)
+            .await?;
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[tokio::test]
@@ -147,7 +154,10 @@ async fn staged_claim_and_cancellation_have_one_atomic_document_winner() {
     if winner.canceled {
         assert!(claim_staged_record(&repo, &bound.tenant, "thread", &id, &part, &bound).is_err());
     } else {
-        assert!(!cancel_staged_record(&repo, &canceled.tenant, "thread", &id, &part, &canceled).unwrap());
+        assert!(
+            !cancel_staged_record(&repo, &canceled.tenant, "thread", &id, &part, &canceled)
+                .unwrap()
+        );
         assert!(!claim_staged_record(&repo, &bound.tenant, "thread", &id, &part, &bound).unwrap());
     }
 }
@@ -161,32 +171,73 @@ async fn multipart_claim_failure_keeps_prior_claim_owned_by_retry() {
     let repo = test_repo(&config.workspace_dir);
     let first_id = uuid::Uuid::new_v4().simple().to_string();
     let second_id = uuid::Uuid::new_v4().simple().to_string();
-    let first = image(MediaReference { opaque_id: Some(first_id.clone()), ..Default::default() });
-    let second = image(MediaReference { opaque_id: Some(second_id.clone()), ..Default::default() });
+    let first = image(MediaReference {
+        opaque_id: Some(first_id.clone()),
+        ..Default::default()
+    });
+    let second = image(MediaReference {
+        opaque_id: Some(second_id.clone()),
+        ..Default::default()
+    });
     insert_record(&repo, &staged_record(first.clone(), "first.png"));
     insert_record(&repo, &staged_record(second.clone(), "second.png"));
     let second_claim = claim("", second.clone(), true);
-    assert!(cancel_staged_record(
-        &repo, &second_claim.tenant, "thread", &staged_doc_id(&second_id).unwrap(),
-        &second, &second_claim,
-    ).unwrap());
+    assert!(
+        cancel_staged_record(
+            &repo,
+            &second_claim.tenant,
+            "thread",
+            &staged_doc_id(&second_id).unwrap(),
+            &second,
+            &second_claim,
+        )
+        .unwrap()
+    );
     let entries = vec![
-        StoredAttachment { part: first.clone(), path: "first.png".into() },
-        StoredAttachment { part: second.clone(), path: "second.png".into() },
+        StoredAttachment {
+            part: first.clone(),
+            path: "first.png".into(),
+        },
+        StoredAttachment {
+            part: second.clone(),
+            path: "second.png".into(),
+        },
     ];
-    assert!(claim_staged_refs(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "thread", &config, "user:req", &entries,
-    ).await.is_err());
+    assert!(
+        claim_staged_refs(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "thread",
+            &config,
+            "user:req",
+            &entries,
+        )
+        .await
+        .is_err()
+    );
     let first_claim = claim("user:req", first.clone(), false);
-    assert!(!claim_staged_record(
-        &repo, &first_claim.tenant, "thread", &staged_doc_id(&first_id).unwrap(),
-        &first, &first_claim,
-    ).unwrap());
+    assert!(
+        !claim_staged_record(
+            &repo,
+            &first_claim.tenant,
+            "thread",
+            &staged_doc_id(&first_id).unwrap(),
+            &first,
+            &first_claim,
+        )
+        .unwrap()
+    );
     let other = claim("user:other", first.clone(), false);
-    assert!(claim_staged_record(
-        &repo, &other.tenant, "thread", &staged_doc_id(&first_id).unwrap(), &first, &other,
-    ).is_err());
+    assert!(
+        claim_staged_record(
+            &repo,
+            &other.tenant,
+            "thread",
+            &staged_doc_id(&first_id).unwrap(),
+            &first,
+            &other,
+        )
+        .is_err()
+    );
 }
 
 #[tokio::test]
@@ -204,24 +255,47 @@ async fn discarding_claimed_attachment_preserves_row_owned_file() {
     let repo = test_repo(&config.workspace_dir);
     insert_record(&repo, &staged_record(part.clone(), "committed.png"));
     let bound = claim("user:req", part.clone(), false);
-    assert!(claim_staged_record(
-        &repo, &bound.tenant, "thread", &staged_doc_id(&opaque_id).unwrap(), &part, &bound,
-    ).unwrap());
+    assert!(
+        claim_staged_record(
+            &repo,
+            &bound.tenant,
+            "thread",
+            &staged_doc_id(&opaque_id).unwrap(),
+            &part,
+            &bound,
+        )
+        .unwrap()
+    );
     let workspace = crate::agent::attachments::thread_action_dir(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &config.workspace_dir,
         Some("thread"),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     tokio::fs::create_dir_all(&workspace).await.unwrap();
     let file_path = workspace.join("committed.png");
-    tokio::fs::write(&file_path, b"row-owned bytes").await.unwrap();
+    tokio::fs::write(&file_path, b"row-owned bytes")
+        .await
+        .unwrap();
     discard_staged_entries(
         &crate::core::runtime::DispatchCtx::ambient(),
-        "thread", &config,
-        vec![StoredAttachment { part: part.clone(), path: "committed.png".into() }],
-    ).await.unwrap();
-    assert_eq!(tokio::fs::read(file_path).await.unwrap(), b"row-owned bytes");
-    let stored = get_staged_record(&repo, &staged_doc_id(&opaque_id).unwrap()).unwrap().unwrap();
+        "thread",
+        &config,
+        vec![StoredAttachment {
+            part: part.clone(),
+            path: "committed.png".into(),
+        }],
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        tokio::fs::read(file_path).await.unwrap(),
+        b"row-owned bytes"
+    );
+    let stored = get_staged_record(&repo, &staged_doc_id(&opaque_id).unwrap())
+        .unwrap()
+        .unwrap();
     assert_eq!(stored.claim, Some(bound));
 }
