@@ -16,7 +16,6 @@ and UI-facing projections.
 
 ## Key files
 
-- `command_center/`: background agent run views and control verbs.
 - `running_subagents.rs` and `running_subagents/`: detached run metadata,
   registry, steering, wait, task ledger, and boot reconciliation.
 - `background_completions.rs`, `completion_notice.rs`, and
@@ -25,14 +24,12 @@ and UI-facing projections.
 - `subagent_control.rs`: manual cancel and steer RPCs.
 - `subagent_sessions/`: durable session reuse and deduplication.
 - `parent_context/builder.rs`: construction for tasks without a parent turn.
-- `delegation.rs`: live TinyAgents delegation graph adapter.
 - `tools.rs`: callable sub-agent tools.
 
 ## RPC
 
 | Namespace | Surface |
 | --- | --- |
-| `agent_work` | Background run list and controls |
 | `subagent` | Cancel and steer |
 
 ## Tools
@@ -40,7 +37,7 @@ and UI-facing projections.
 The module exposes `spawn_subagent`, `spawn_async_subagent`,
 `steer_subagent`, `continue_subagent`,
 `close_subagent`, `wait_subagent`, `wait`, `wait_loop`, and `list_subagents`.
-`delegate_graph` and archetype delegates provide optional delegation tools.
+Archetype delegates provide focused synchronous calls over the live sub-agent host.
 Execution routes through `agent::subagent_host::run_subagent`.
 
 ## Persistence and policy

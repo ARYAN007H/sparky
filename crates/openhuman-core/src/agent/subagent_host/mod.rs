@@ -59,7 +59,6 @@ pub use autonomous::{definition_iter_cap, subagent_iter_cap_with_autonomous_lift
 pub(crate) use lifecycle::detached_subagent_parent;
 pub(crate) use lifecycle::load_subagent_checkpoint;
 pub(crate) use lifecycle::load_terminal_outcome;
-pub(crate) use lifecycle::run_configured_delegate_via_driver_tool;
 pub(crate) use lifecycle::run_subagent_via_driver_tool;
 pub(crate) use lifecycle::spawn_async_via_driver_tool;
 #[cfg(test)]

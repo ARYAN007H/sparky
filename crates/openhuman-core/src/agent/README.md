@@ -179,7 +179,7 @@ its `AgentStores`. See [session_host/README.md](session_host/README.md).
 A parent agent delegates by calling a tool. `spawn_subagent`
 ([`orchestration/tools/spawn_subagent.rs`](./orchestration/tools/spawn_subagent.rs)) and its siblings
 (`spawn_async_subagent`, `continue_subagent`,
-`steer_subagent`, `wait_subagent`, `close_subagent`, `delegate`) look up the
+`steer_subagent`, `wait_subagent`, `close_subagent`) look up the
 target `AgentDefinition` and call `subagent_host::run_subagent_with_parent`.
 
 ```text
@@ -293,12 +293,12 @@ Delegation and coordination:
 | Path | What it does |
 | --- | --- |
 | `subagent_host/` | Runs a child agent: definition, model and tool narrowing, prompt, checkpoints, progress ([README](subagent_host/README.md)) |
-| `orchestration/` | Spawn/steer/wait tools, command center, background delivery ([README](orchestration/README.md)) |
+| `orchestration/` | Spawn/steer/wait tools and background delivery ([README](orchestration/README.md)) |
 | `triage/` | Classifies `TriggerEnvelope`s and escalates ([README](triage/README.md)) |
 | `goals/` | Host adapters around `tinyagents_graph::goals` and the `goal_*` tools ([README](goals/README.md)) |
 | `todos/` | Session-scoped todo list over the TinyAgents todo store ([README](todos/README.md)) |
 | [`../plan_review/`](../plan_review/) | `request_plan_review` gate that parks a web-chat turn until the user decides |
-| [`tools.rs`](./tools.rs), `tools/` | Loop control tools: `delegate`, `plan_exit`, `todo`, `run_workflow`/`await_workflow` (with `skills`) ([README](tools/README.md)) |
+| [`tools.rs`](./tools.rs), `tools/` | Loop control tools: `plan_exit`, `todo`, `run_workflow`/`await_workflow` (with `skills`) ([README](tools/README.md)) |
 
 Definitions, prompts and context:
 
@@ -365,7 +365,6 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 | `ai` | `artifacts/` | `list_artifacts`, `get_artifact`, `delete_artifact`, `regenerate` |
 | `run_ledger` | `../sessions/` | `list`, `get`, `events` |
 | `session_import` | `../storage/import/` | `run` |
-| `agent_work` | [`orchestration/command_center`](./orchestration/command_center/) | `list`, `control` |
 | `subagent` | [`orchestration/subagent_control.rs`](./orchestration/subagent_control.rs) | `cancel`, `steer` for running sub-agents |
 
 `agent.chat` and `agent.chat_simple` load config and call

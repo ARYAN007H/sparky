@@ -7,7 +7,7 @@ fn profile_capabilities_deny_the_registered_spawn_tool() {
     for name in tinyagents_definition::SPAWN_TOOL_NAMES
         .iter()
         .copied()
-        .chain(["delegate", "delegate_graph", "continue_subagent"])
+        .chain(["continue_subagent"])
     {
         assert!(
             !capabilities.admits_capability(name),

@@ -279,8 +279,7 @@ without fencing).
   catalog and drafts (`flows::store`, `flows::draft_store`,
   `FlowCatalogDocuments`), per-flow engine state and dedup settlement
   (`flows::tinyflows::state::FlowState`), and the flow-run checkpointer
-  (`DriverCheckpointer`). The delegation graph's checkpointer uses
-  tinyagents-graph's `DriverCheckpointer`.
+  (`DriverCheckpointer`).
 - `block_on_anyhow(future)`: `block_on` for those stores, whose errors are
   `anyhow::Error` (a typed `FlowUpdateError` passes through unchanged).
 - Approvals (`security::approval`), through `store_documents.rs`.

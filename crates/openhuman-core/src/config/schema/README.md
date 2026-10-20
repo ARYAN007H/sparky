@@ -17,7 +17,7 @@ is mounted as a submodule of [`load/dirs.rs`](./load/dirs.rs) via `#[path]`.
 
 | `config.toml` section | File | Struct |
 | --- | --- | --- |
-| `[agent]`, `[orchestrator]`, `[teams.*]`, `[agents.*]` | [`agent.rs`](./agent.rs) | `AgentConfig`, `OrchestratorModelConfig`, `TeamModelConfig`, `DelegateAgentConfig` |
+| `[agent]`, `[orchestrator]`, `[teams.*]` | [`agent.rs`](./agent.rs) | `AgentConfig`, `OrchestratorModelConfig`, `TeamModelConfig` |
 | `[autonomy]` | [`autonomy.rs`](./autonomy.rs) | `AutonomyConfig`: feeds `security::SecurityPolicy` |
 | `[[capability_providers]]` | [`capability_providers.rs`](./capability_providers.rs) | `CapabilityProviderConfig` |
 | `[channels_config]`, `[sandbox]` | [`channels.rs`](./channels.rs) | `ChannelsConfig` and per-provider configs re-exported from `tinychannels_bus`; `SandboxConfig`, `ResourceLimitsConfig`, `AuditConfig`, and `SecurityConfig` (only `DaemonConfig` embeds the last one) |
@@ -66,6 +66,11 @@ format and are migrated on load ([`tools/search_migrate.rs`](./tools/search_migr
 `load/migrate.rs::migrate_search_settings`); Parallel keeps its key as a
 direct-only provider, and a keyless managed-Parallel selection is dropped. Seltz and SearXNG keep their options in their own sections, but only
 the `providers` map decides whether they are on.
+
+The parser drops the retired top-level `[agents]` delegate table before typed
+decoding, so existing config files with stale `[agents.*]` entries continue to
+load. Agent definitions now come from the agent registry and live sub-agent
+tools.
 
 Most sections have a matching `*_tests.rs` (some further split into several
 `*_tests.rs` siblings, e.g. [`types_model_pin_tests.rs`](./types_model_pin_tests.rs)); this is the repo's

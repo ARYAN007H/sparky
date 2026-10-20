@@ -103,7 +103,7 @@ impl Tool for NamedTopologyTool {
 }
 
 #[test]
-fn capability_diagnostics_only_projects_live_delegation_graph() {
+fn capability_diagnostics_omit_retired_graphs() {
     let names = [
         "agent_teams:member",
         "delegation",
@@ -121,7 +121,10 @@ fn capability_diagnostics_only_projects_live_delegation_graph() {
         .iter()
         .map(|diagnostic| diagnostic.name.as_str())
         .collect();
-    assert_eq!(reused_names, vec!["delegation"]);
+    assert!(
+        reused_names.is_empty(),
+        "retired graph diagnostics: {reused_names:?}"
+    );
 }
 
 #[tokio::test]

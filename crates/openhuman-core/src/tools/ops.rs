@@ -1,11 +1,9 @@
 #[cfg(feature = "mcp")]
 use super::implementations::network::{McpListServersTool, McpListToolsTool};
 use super::*;
-use crate::config::{Config, DelegateAgentConfig};
+use crate::config::Config;
 use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::security::{AuditLogger, SecurityPolicy};
-use crate::tools::delegate::DelegateTool;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tinyagents_harness::tools::{CurrentTimeTool, ResolveTimeTool};
 use tinytools::Tool;
@@ -54,7 +52,6 @@ pub fn all_tools(
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     action_dir: &std::path::Path,
-    agents: &HashMap<String, DelegateAgentConfig>,
     root_config: &crate::config::Config,
 ) -> Vec<Box<dyn Tool>> {
     all_tools_with_runtime(
@@ -65,7 +62,6 @@ pub fn all_tools(
         browser_config,
         http_config,
         action_dir,
-        agents,
         root_config,
         None,
     )
@@ -82,7 +78,6 @@ pub fn all_tools_with_runtime(
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     action_dir: &std::path::Path,
-    agents: &HashMap<String, DelegateAgentConfig>,
     root_config: &crate::config::Config,
     approval_workspace_root: Option<&std::path::Path>,
 ) -> Vec<Box<dyn Tool>> {
@@ -428,7 +423,6 @@ pub fn all_tools_with_runtime(
         browser_config,
         http_config,
         action_dir,
-        agents,
         approval_workspace_root,
     };
 
@@ -471,29 +465,8 @@ pub fn all_tools_with_runtime(
     // Image metadata is always available for user-provided images.
     tools.push(Box::new(ImageInfoTool::new(security.clone())));
 
-    // Add delegation tool when agents are configured
-    if !agents.is_empty() {
-        let delegate_agents: HashMap<String, DelegateAgentConfig> = agents
-            .iter()
-            .map(|(name, cfg)| (name.clone(), cfg.clone()))
-            .collect();
-        tools.push(Box::new(DelegateTool::new_with_options(
-            delegate_agents,
-            security.clone(),
-            crate::inference::provider::ProviderRuntimeOptions {
-                auth_profile_override: None,
-                openhuman_dir: root_config
-                    .config_path
-                    .parent()
-                    .map(std::path::PathBuf::from),
-                secrets_encrypt: root_config.secrets.encrypt,
-                reasoning_enabled: root_config.runtime.reasoning_enabled,
-            },
-        )));
-    }
-
-    // Sources placed after the delegation tool (a host's place and market-data
-    // tools), ahead of the Composio tools.
+    // Keep hosted tools using the former post-delegate slot in their stable
+    // catalogue position after image metadata and before Composio.
     tools.extend(crate::tools::sources::build_registered_tool_sources(
         &source_ctx,
         Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),

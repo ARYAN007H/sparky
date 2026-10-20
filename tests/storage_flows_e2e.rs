@@ -78,10 +78,6 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     .await
     .unwrap();
 
-    // The delegation graph's checkpointer lives on the backend too.
-    let delegation_config = config.clone();
-    openhuman_core::agent::orchestration::open_delegation_checkpointer(&delegation_config).unwrap();
-
     // A job's scheduling policy lives on the backend too.
     let policy_config = config.clone();
     tokio::task::spawn_blocking(move || {
@@ -153,7 +149,6 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
         .unwrap()
         .value
         .is_empty());
-    openhuman_core::agent::orchestration::open_delegation_checkpointer(&config).unwrap();
 }
 
 /// The stores tinyflows used to write (`jobs.db`, `flows.db`, `checkpoints.db`,

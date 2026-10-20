@@ -184,19 +184,6 @@ pub(super) fn check_config_semantics(config: &Config, items: &mut Vec<Diagnostic
             "no channels configured - configure one in the UI",
         ));
     }
-
-    // Delegate agents
-    let mut agent_names: Vec<_> = config.agents.keys().collect();
-    agent_names.sort();
-    for name in agent_names {
-        let agent = config.agents.get(name).unwrap();
-        if agent.model.trim().is_empty() {
-            items.push(DiagnosticItem::warn(
-                cat,
-                format!("delegate agent \"{name}\" has empty model"),
-            ));
-        }
-    }
 }
 
 pub(super) fn embedding_provider_validation_error(name: &str) -> Option<String> {

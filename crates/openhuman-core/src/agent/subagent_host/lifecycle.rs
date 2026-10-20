@@ -29,7 +29,6 @@ mod checkpoint;
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
 pub(super) use driver_adapter::outcome_to_host;
-use driver_adapter::HostInvocation;
 
 #[path = "lifecycle/driver_result.rs"]
 mod driver_result;
@@ -159,55 +158,6 @@ pub(crate) async fn run_subagent_via_driver_tool(
     )
     .await?;
     resolve_inline_driver_outcome(tool_result, &bundle, &task_key, &fallback_agent_id).await
-}
-
-/// Runs the configured one-shot `delegate` executor inside the shared Tiny
-/// subagent job lifecycle. Its captured Tool still owns config lookup, model
-/// routing, security checks and response formatting; this adapter supplies the
-/// authenticated parent, cancellation, stable target identity and Jobs record.
-pub(crate) async fn run_configured_delegate_via_driver_tool(
-    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-    tool: Arc<dyn tinytools::Tool>,
-    arguments: serde_json::Value,
-    agent_id: String,
-) -> Result<tinytools::ToolResult, SubagentRunError> {
-    let task_id = format!("delegate-{}", uuid::Uuid::new_v4());
-    let mut options = SubagentRunOptions::default();
-    options.task_id = Some(task_id.clone());
-    options.thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
-    options.run_context = parent.data.clone();
-    let input = arguments
-        .get("prompt")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_owned();
-    let request = HostRequest {
-        invocation: HostInvocation::ConfiguredTool {
-            agent_id,
-            tool,
-            arguments,
-        },
-        options,
-    };
-    let (tool_result, bundle) =
-        invoke_driver_tool_with_request(parent, request, input, "inline", None, None, None).await?;
-    let task_key = SubagentTaskKey::from_context(
-        parent,
-        task_id,
-        parent.thread_id().map(|id| id.as_str().to_owned()),
-    );
-    decode_driver_job_result(tool_result, &bundle, &task_key)?;
-    let result = bundle
-        .configured_tool_result
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&task_key)
-        .ok_or_else(|| {
-            SubagentRunError::Provider(anyhow::anyhow!(
-                "driver-backed configured delegate completed without a host result"
-            ))
-        });
-    result
 }
 
 /// Continues a host-authorized pause through TinyAgents' registered Jobs
@@ -343,7 +293,7 @@ async fn invoke_async_spawn_driver_tool(
     invoke_driver_tool_with_request(
         parent,
         HostRequest {
-            invocation: HostInvocation::Agent(definition),
+            invocation: definition,
             options,
         },
         input,
@@ -671,7 +621,7 @@ impl OpenHumanSubagentHost {
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
-            invocation: HostInvocation::Agent(self.definition),
+            invocation: self.definition,
             options: self.options,
         };
         let driver = OpenHumanDriverBundle::with_in_flight_for(

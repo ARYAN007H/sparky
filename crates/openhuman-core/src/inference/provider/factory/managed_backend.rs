@@ -132,30 +132,3 @@ pub(crate) fn make_openhuman_backend_model(
 ) -> anyhow::Result<ManagedChatModel> {
     managed_chat_model(role, config, None, None, true, None, &EgressLedger::none())
 }
-
-/// The managed model for a caller that holds runtime options rather than a
-/// [`Config`] (the configured `delegate` tool): `model` is used verbatim, with
-/// no tier translation and no egress emission, exactly as that tool always did.
-pub(crate) fn make_openhuman_backend_model_for_options(
-    options: &crate::inference::provider::ProviderRuntimeOptions,
-    model: &str,
-    thread_id: Option<&str>,
-) -> anyhow::Result<ManagedChatModel> {
-    let Some(entry) = crate::inference::registry::chat_model(PROVIDER_OPENHUMAN) else {
-        return Err(managed_unavailable_error());
-    };
-    let mut config = Config::default();
-    if let Some(dir) = options.openhuman_dir.as_ref() {
-        config.config_path = dir.join("config.toml");
-    }
-    config.secrets.encrypt = options.secrets_encrypt;
-    (entry.build)(&crate::inference::registry::ChatModelRequest {
-        role: "delegate",
-        config: &config,
-        model_override: Some(model),
-        default_model: Some(model),
-        native_tool_calling: true,
-        thread_id,
-        egress: &EgressLedger::none(),
-    })
-}

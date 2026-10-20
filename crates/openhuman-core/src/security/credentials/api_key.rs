@@ -80,7 +80,7 @@ pub fn get_api_key(config: &Config) -> Result<Option<String>> {
 }
 
 /// [`get_api_key`] against an explicit credential state directory — for
-/// callers that hold `ProviderRuntimeOptions` rather than a `Config`.
+/// callers that resolve credentials for the configured runtime.
 ///
 /// Requires the [`API_KEY_KIND_META`] marker, not just a profile named
 /// [`API_KEY_PROVIDER`]. The generic `auth_store_provider_credentials`

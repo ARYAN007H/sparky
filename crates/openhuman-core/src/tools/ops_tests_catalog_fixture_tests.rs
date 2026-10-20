@@ -122,7 +122,6 @@ fn full_tool_catalog_names() -> Vec<String> {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
 

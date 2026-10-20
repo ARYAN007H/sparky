@@ -563,18 +563,6 @@ fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> Co
             );
         }
 
-        // ── Graphs: structure-only topology reports ─────────────────────────
-        let reports = crate::agent::tinyagents::tool_registration::host_graph_topologies();
-        let graph_count = reports.len();
-        for report in &reports {
-            let mut meta = ComponentMetadata::new(report.name, ComponentKind::Graph)
-                .with_tag(if report.ok { "ok" } else { "invalid" });
-            if !report.ok {
-                meta = meta.with_description("structural validation failed".to_string());
-            }
-            components.push(meta);
-        }
-
         // ── Agents: built-in archetypes ─────────────────────────────────────
         let agent_defs = crate::agent_registry::agents::load_builtins()
             .map_err(|e| format!("loading built-in agents for registry snapshot: {e}"))?;
@@ -601,7 +589,6 @@ fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> Co
         tracing::debug!(
             models = model_count,
             tools = tool_count,
-            graphs = graph_count,
             agents = agent_count,
             total = snapshot.len(),
             "[registry][rpc][agent] registry_snapshot export"
@@ -612,7 +599,6 @@ fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> Co
             "counts": {
                 "model": model_count,
                 "tool": tool_count,
-                "graph": graph_count,
                 "agent": agent_count,
                 "total": snapshot.len(),
             },

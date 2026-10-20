@@ -143,11 +143,6 @@ name = "storage_agent_scopes_e2e"
 path = "../../tests/storage_agent_scopes_e2e.rs"
 
 [[test]]
-# Its own binary: the delegation graph's checkpointer on every driver.
-name = "storage_delegation_e2e"
-path = "../../tests/storage_delegation_e2e.rs"
-
-[[test]]
 # Its own binary: it boots a core with `[components]` switches off.
 name = "components_e2e"
 path = "../../tests/components_e2e.rs"

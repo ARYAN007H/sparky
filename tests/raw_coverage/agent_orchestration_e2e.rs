@@ -1,7 +1,5 @@
-//! JSON-RPC E2E coverage for the agent-orchestration controllers that no e2e
-//! target reached: detached sub-agent control, the command
-//! center's `agent_work_control`, the
-//! detached sub-agent controls (`subagent_cancel` / `subagent_steer`).
+//! JSON-RPC E2E coverage for detached sub-agent control
+//! (`subagent_cancel` / `subagent_steer`).
 //!
 //! Every case boots the real Axum JSON-RPC router over HTTP against an
 //! isolated `HOME` and asserts on the **content** of the response. Nothing
@@ -222,99 +220,6 @@ fn str_at<'a>(value: &'a Value, pointer: &str) -> &'a str {
         .pointer(pointer)
         .and_then(Value::as_str)
         .unwrap_or_else(|| panic!("expected a string at {pointer} in {value}"))
-}
-
-// ── agent_work_control ──────────────────────────────────────────────────────
-
-/// `agent_work_control` is the command center's only write. Its guards run in a
-/// deliberate order — the message requirement is checked BEFORE the run is
-/// looked up — so a `continue` with no message is rejected on its own terms
-/// rather than as a missing run.
-#[tokio::test]
-async fn agent_work_control_validates_verb_and_message_before_touching_the_ledger() {
-    let _lock = env_lock_async().await;
-    let h = setup().await;
-
-    let unknown_verb = h
-        .err(
-            3201,
-            "openhuman.agent_work_control",
-            json!({ "runId": "run-1", "action": "detonate" }),
-        )
-        .await;
-    assert!(
-        unknown_verb.contains("detonate"),
-        "an unknown verb is quoted back: {unknown_verb}"
-    );
-
-    // `continue` and `follow_up` both require a message. The run does not
-    // exist, so a "run not found" here would prove the guard ran too late.
-    for (id, action) in [(3202, "continue"), (3203, "follow_up")] {
-        let no_message = h
-            .err(
-                id,
-                "openhuman.agent_work_control",
-                json!({ "runId": "run-does-not-exist", "action": action }),
-            )
-            .await;
-        assert!(
-            no_message.to_lowercase().contains("message"),
-            "{action} without a message is rejected for the message, not the run: {no_message}"
-        );
-        assert!(
-            !no_message.contains("run-does-not-exist"),
-            "the message guard runs before the ledger lookup: {no_message}"
-        );
-
-        // A whitespace-only message is not a message.
-        let blank_message = h
-            .err(
-                id + 10,
-                "openhuman.agent_work_control",
-                json!({ "runId": "run-does-not-exist", "action": action, "message": "   " }),
-            )
-            .await;
-        assert!(
-            blank_message.to_lowercase().contains("message"),
-            "{action} treats a blank message as absent: {blank_message}"
-        );
-    }
-
-    // `stop` needs no message, so it reaches the ledger and fails there.
-    let unknown_run = h
-        .err(
-            3204,
-            "openhuman.agent_work_control",
-            json!({ "runId": "run-does-not-exist", "action": "stop" }),
-        )
-        .await;
-    assert!(
-        unknown_run.contains("run-does-not-exist"),
-        "a verb needing no message reaches the lookup and names the run: {unknown_run}"
-    );
-
-    for (id, key) in [(3205, "runId"), (3206, "action")] {
-        let params = if key == "runId" {
-            json!({ "action": "stop" })
-        } else {
-            json!({ "runId": "run-1" })
-        };
-        let missing = h.err(id, "openhuman.agent_work_control", params).await;
-        assert!(
-            missing.contains(key),
-            "the required `{key}` param is named: {missing}"
-        );
-    }
-
-    // The read side agrees there is nothing to control.
-    let view = h.ok(3207, "openhuman.agent_work_list", json!({})).await;
-    assert_eq!(
-        view.get("total").and_then(Value::as_u64),
-        Some(0),
-        "a fresh workspace has no background agent runs: {view}"
-    );
-
-    h.join.abort();
 }
 
 // ── subagent: cancel / steer ────────────────────────────────────────────────
