@@ -52,7 +52,7 @@ fn list_resources_includes_core_and_agent_uris() {
         "openhuman://prompts/soul",
         "openhuman://prompts/user",
         "openhuman://prompts/agents/orchestrator",
-        "openhuman://prompts/agents/planner",
+        "openhuman://prompts/agents/vision_agent",
     ] {
         assert!(uris.contains(&expected), "missing URI {expected}");
     }
@@ -74,6 +74,16 @@ fn read_resource_returns_minus_32002_for_unknown_uri() {
         .expect_err("should fail for unknown URI");
     assert_eq!(err.code(), -32002);
     assert!(err.message().contains("nonexistent"));
+}
+
+#[test]
+fn read_resource_does_not_expose_retired_workflow_agents() {
+    for agent in ["planner", "critic"] {
+        let uri = format!("openhuman://prompts/agents/{agent}");
+        let err = read_resource(&uri).expect_err("retired agent prompt is not exposed");
+        assert_eq!(err.code(), -32002);
+        assert!(err.message().contains(agent));
+    }
 }
 
 #[test]

@@ -193,7 +193,7 @@ pub(crate) async fn run_subagent_delegation_with_parent_context(
     let config_thread_id = thread_id.clone();
     let config_factory =
         move |_state: &(), parent: &RunContext<OpenHumanRunContext>, _args: &serde_json::Value| {
-            let mut delegation_config = DelegationConfig {
+            DelegationConfig {
                 max_revisions,
                 checkpointer: Some(Arc::clone(&config_checkpointer)),
                 thread_id: Some(config_thread_id.clone()),
@@ -201,8 +201,7 @@ pub(crate) async fn run_subagent_delegation_with_parent_context(
                 // Automated delegation: preserve the host's existing worker-output
                 // review policy while the generic tool owns graph lifecycle mechanics.
                 ..DelegationConfig::default()
-            };
-            delegation_config
+            }
         };
     let result_agent_id = invocation_agent_id.clone();
     let tool = tinyagents_orchestration::subagent::DelegationTool::new(config_factory, run_stage)

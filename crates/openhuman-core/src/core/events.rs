@@ -1575,7 +1575,7 @@ impl DomainEvent {
             Self::SubagentSpawned { agent_id, .. }
             | Self::SubagentCompleted { agent_id, .. }
             | Self::SubagentFailed { agent_id, .. }
-            | Self::SubagentAwaitingUser { agent_id, .. }
+            | Self::SubagentAwaitingUser { agent_id, .. } => Some(agent_id.as_str()),
             Self::ChannelMessageReceived { channel, .. }
             | Self::ChannelConnected { channel, .. }
             | Self::ChannelDisconnected { channel, .. } => Some(channel.as_str()),
