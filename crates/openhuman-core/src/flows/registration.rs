@@ -89,7 +89,7 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         // invariant.
         Box::new(GetToolOutputSampleTool::new(config.clone())),
         // Ground an `agent` node's `agent_ref` in real registered agent-kind ids
-        // (code_executor / critic / …) — the agent analogue of
+        // (workflow_builder / image_agent / …) — the agent analogue of
         // search_tool_catalog. Read-only.
         Box::new(ListAgentDefinitionsTool::new(host.clone())),
         // Steer toolkit choice toward what's already connected + surface which

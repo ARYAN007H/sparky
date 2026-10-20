@@ -38,7 +38,7 @@ pub(crate) fn subagent_prompt_protocol(
 /// Matches TinyAgents' spawn-tool list, the host's `delegate` and
 /// `continue_subagent` tools, and every synthesised per-archetype `delegate_*` tool
 ///   ([`crate::tools::orchestrator_tools::collect_orchestrator_tools`]
-///   emits `delegate_code_executor`, `delegate_planner`, …).
+///   emits tools for each configured delegation target).
 ///
 /// The shared static names stay aligned with TinyAgents; registry lookup is
 /// needed only for host-defined, unprefixed `delegate_name` overrides.
@@ -299,7 +299,7 @@ pub(super) fn load_prompt_source(
             // file write — so we re-use that scaffolding by reading from
             // `<workspace>/<filename>` after the parent agent has
             // bootstrapped its workspace files. For sub-agent
-            // archetype prompts (e.g. `archetypes/critic.md`),
+            // archetype prompts (e.g. `archetypes/<agent_id>.md`),
             // we look up by basename in the workspace, then accept
             // missing files as an empty body (the runner will fall
             // back to a generic role hint).

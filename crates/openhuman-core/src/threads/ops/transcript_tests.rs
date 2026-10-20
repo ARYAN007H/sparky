@@ -264,7 +264,7 @@ async fn changing_the_chat_agent_does_not_strand_an_existing_threads_turns() {
     // A thread with no recorded key falls back to the current rule.
     let other = tempfile::tempdir().unwrap();
     let unrecorded_before = ctx_with_chat_agent(other.path(), None, None);
-    let unrecorded_after = ctx_with_chat_agent(other.path(), None, Some("planner"));
+    let unrecorded_after = ctx_with_chat_agent(other.path(), None, Some("summarizer"));
     write_thread(&unrecorded_before).await;
     let page = transcript_get(&unrecorded_after, request())
         .await
