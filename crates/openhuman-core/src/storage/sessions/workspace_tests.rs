@@ -74,11 +74,40 @@ async fn artifact_scope_uses_the_carried_profile_when_ambient_profile_differs() 
             .expect("the explicit artifact owner has a storage scope");
         assert_eq!(
             scoped.scope(),
-            &session_scope("artifact-owner~default"),
-            "artifact storage follows the carried call context, not the ambient profile"
+            &crate::storage::scope_for_profile("artifact-owner"),
+            "artifacts share the profile scope and follow the carried context"
         );
     })
     .await;
+}
+
+#[test]
+fn artifact_scope_uses_agent_scope_only_for_unprofiled_named_agents() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let ws = scratch();
+    let context_for = |agent: Option<&str>| {
+        let mut overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::kernel(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        );
+        if let Some(agent) = agent {
+            overlay = overlay.session_agent(agent);
+        }
+        DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay))
+    };
+
+    let named_agent = artifact_scoped_for_in(&ws.path(), &context_for(Some("writer")))
+        .expect("an unprofiled named agent has a local scope");
+    assert_eq!(
+        named_agent.scope(),
+        &crate::storage::scope_for_agent("writer")
+    );
+
+    let default_agent = artifact_scoped_for_in(&ws.path(), &context_for(None))
+        .expect("the default agent has the local scope");
+    assert!(default_agent.scope().is_local());
 }
 
 #[test]
