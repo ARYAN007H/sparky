@@ -11,6 +11,8 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -274,6 +276,32 @@ test("source parity proof accepts only its exact clean test-only Git pair", () =
   }
 });
 
+test("the existing exact-drift exemption is proof-checked and keeps ahead visible", () => {
+  const fixture = sourceParityFixture();
+  try {
+    const actual = execFileSync("git", ["describe", "--tags", "--abbrev=8", "HEAD"], { cwd: fixture.root, encoding: "utf8" }).trim();
+    const exemption = { id: "tinyx", expect: actual, reason: "reviewed test-only owner commit", sourceParity: fixture.parity };
+    const sourceParityContext = {
+      repoPath: fixture.root,
+      assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+      actualHead: fixture.candidateCommit,
+    };
+    const accepted = classifyPin({ ...base, actual, exemption, sourceParityContext });
+    assert.equal(accepted.ok, true);
+    assert.equal(accepted.kind, "exempt");
+    const altered = classifyPin({
+      ...base,
+      actual,
+      exemption: { ...exemption, sourceParity: { ...fixture.parity, candidateCommit: "f".repeat(40) } },
+      sourceParityContext,
+    });
+    assert.equal(altered.ok, false);
+    assert.equal(altered.kind, "invalid-source-parity");
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("source parity proof rejects production, manifest, build, lock, and unknown changes", () => {
   for (const changedFile of ["src/lib.rs", "Cargo.toml", "build.rs", "Cargo.lock", "unknown.txt"]) {
     const fixture = sourceParityFixture();
@@ -292,6 +320,52 @@ test("source parity proof rejects production, manifest, build, lock, and unknown
       assert.equal(result.ok, false, `${changedFile} was incorrectly accepted`);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("source parity proof rejects descendants, dirty files, asset drift, renames, symlinks, and gitlinks", () => {
+  const fixture = sourceParityFixture();
+  try {
+    writeFileSync(join(fixture.root, "src/tests.rs"), "#[test] fn later() {}\n");
+    fixture.git(["add", "."]);
+    fixture.git(["commit", "-qm", "later test change"]);
+    const descendant = execFileSync("git", ["rev-parse", "HEAD"], { cwd: fixture.root, encoding: "utf8" }).trim();
+    const input = {
+      repoPath: fixture.root,
+      version: "1.0.0",
+      assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+      proof: fixture.parity,
+    };
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: descendant }).ok, false, "descendant commits must not inherit an attestation");
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: descendant, proof: { ...fixture.parity, candidateCommit: descendant } }).ok, false, "a changed test blob cannot silently widen the pair");
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, assets: [] }).ok, false, "registry asset changes invalidate the proof");
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+
+  for (const kind of ["dirty", "symlink", "rename", "gitlink"]) {
+    const f = sourceParityFixture();
+    try {
+      if (kind === "dirty") {
+        writeFileSync(join(f.root, "production.rs"), "untracked production input\n");
+        assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: f.candidateCommit, proof: f.parity }).ok, false);
+        continue;
+      }
+      if (kind === "symlink") {
+        unlinkSync(join(f.root, "src/tests.rs"));
+        symlinkSync("lib.rs", join(f.root, "src/tests.rs"));
+        f.git(["add", "-A"]);
+      } else if (kind === "rename") {
+        f.git(["mv", "src/tests.rs", "src/renamed.rs"]);
+      } else {
+        f.git(["update-index", "--add", "--cacheinfo", `160000,${f.releaseCommit},nested-module`]);
+      }
+      f.git(["commit", "-qm", `${kind} change`]);
+      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
+      assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: head, proof: f.parity }).ok, false, `${kind} changes must fail closed`);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
     }
   }
 });
