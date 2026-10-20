@@ -34,9 +34,7 @@ pub(super) async fn agent_node_role(
             };
             let effective_iteration_cap = definition
                 .as_ref()
-                .map(|definition| {
-                    u32::try_from(definition.max_iterations).unwrap_or(u32::MAX)
-                })
+                .map(|definition| u32::try_from(definition.max_iterations).unwrap_or(u32::MAX))
                 .unwrap_or(1);
             let override_model = match crate::modules::tinyflows::portability_proxy(config).await {
                 Ok(proxy) => proxy
