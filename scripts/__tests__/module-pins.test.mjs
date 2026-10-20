@@ -406,7 +406,7 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
   for (const tagChange of ["moved", "missing"]) {
     const f = sourceParityFixture();
     try {
-      f.git(tagChange === "moved" ? ["tag", "-f", "v1.0.0", f.candidateCommit] : ["tag", "-d", "v1.0.0"]);
+      f.git(tagChange === "moved" ? ["tag", "-f", "-a", "-m", "moved", "v1.0.0", f.candidateCommit] : ["tag", "-d", "v1.0.0"]);
       assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: f.candidateCommit, proof: f.parity }).ok, false, `${tagChange} release tags must fail closed`);
     } finally {
       rmSync(f.root, { recursive: true, force: true });
