@@ -224,6 +224,38 @@ async fn flows_update_rebinds_schedule_cron_job_when_trigger_schedule_changes() 
 }
 
 #[tokio::test]
+async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let created = flows_create(
+        &config,
+        "scheduled".to_string(),
+        schedule_trigger_graph("0 9 * * *"),
+        false,
+    )
+    .await
+    .unwrap();
+    flows_set_enabled(&config, &created.value.id, true)
+        .await
+        .unwrap();
+    let original_job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
+        .unwrap()
+        .expect("cron job bound on enable");
+
+    let mut graph = schedule_trigger_graph("0 9 * * *");
+    graph["nodes"][0]["config"]["inputs"] = json!({"team": "platform"});
+    flows_update(&config, &created.value.id, None, Some(graph), None, None)
+        .await
+        .unwrap();
+
+    let job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
+        .unwrap()
+        .expect("schedule job remains bound after input-only edit");
+    assert_eq!(job.id, original_job.id, "input edits must preserve the binding");
+    assert_eq!(job.expression, original_job.expression);
+}
+
+#[tokio::test]
 async fn flows_update_does_not_rebind_when_graph_is_not_supplied() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);

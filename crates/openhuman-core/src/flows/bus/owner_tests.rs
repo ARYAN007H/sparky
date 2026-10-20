@@ -51,7 +51,7 @@ async fn a_cached_owner_is_dropped_once_its_scope_loses_the_flow() {
         workspace_dir: dir.path().to_path_buf(),
         ..Config::default()
     };
-    crate::flows::store::upsert_flow(&config, &local_flow("owner-test-revalidate")).unwrap();
+    crate::flows::test_support::seed_flow(&config, &local_flow("owner-test-revalidate")).unwrap();
 
     // Found in `local`, and remembered there.
     assert_eq!(

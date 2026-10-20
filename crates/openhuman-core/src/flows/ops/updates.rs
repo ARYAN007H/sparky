@@ -1,4 +1,5 @@
 use super::*;
+use tinyflows_catalog::graph_policy::{enforce_side_effect_approval, trigger_is_automatic};
 
 /// Maps the Catalog bus [`FlowUpdateError`](tinyflows_bus::catalog::FlowUpdateError) to the RPC
 /// error string. A concurrency conflict is encoded as a JSON object the UI can
@@ -227,9 +228,8 @@ async fn flows_update_inner(
     }
 
     if graph_changed && updated.enabled {
-        let trigger_unchanged = bus::extract_trigger_kind(&existing)
-            == bus::extract_trigger_kind(&updated)
-            && bus::extract_trigger_config(&existing) == bus::extract_trigger_config(&updated);
+        let trigger_unchanged = existing.graph.trigger().map(|trigger| &trigger.config)
+            == updated.graph.trigger().map(|trigger| &trigger.config);
         if !trigger_unchanged {
             tracing::debug!(target: "flows", flow_id = %id, "[flows] flows_update: trigger changed on an enabled flow — rebinding automatic-dispatch trigger");
             unbind_trigger(config, &existing);

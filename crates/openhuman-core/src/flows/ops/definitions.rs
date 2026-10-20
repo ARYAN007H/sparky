@@ -1,4 +1,5 @@
 use super::*;
+use tinyflows_catalog::graph_policy::{enforce_side_effect_approval, trigger_is_automatic};
 
 /// Publishes a [`DomainEvent::FlowChanged`](crate::core::events::DomainEvent::FlowChanged)
 /// so an open Workflows list/canvas refetches (bridged to a `flow:changed`
