@@ -1,6 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { bootRuntimeReadyGuestPage, callCoreRpc, waitForAppReady } from '../helpers/core-rpc';
+import {
+  bootRuntimeReadyGuestPage,
+  callCoreRpc,
+  signInViaBypassUser,
+  waitForAppReady,
+} from '../helpers/core-rpc';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 
@@ -83,21 +88,15 @@ test.describe('Logout -> re-login onboarding overlay', () => {
 
   test('same-account completed onboarding survives UI logout and re-login', async ({ page }) => {
     const userId = 'pw-logout-relogin-completed-user';
-    const tokenPayload = Buffer.from(
-      JSON.stringify({ sub: userId, userId, exp: Math.floor(Date.now() / 1000) + 3600 })
-    ).toString('base64url');
-    const token = `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.${tokenPayload}.sig`;
-
-    await callCoreRpc('openhuman.auth_store_session', { token });
+    await signInViaBypassUser(page, userId);
     await callCoreRpc('openhuman.config_set_onboarding_completed', { value: true });
-    await page.goto('/#/chat');
     await waitForAppReady(page);
     await expect.poll(readOnboardingCompleted).toBe(true);
 
     await logoutViaSettings(page);
     await expect(page.getByTestId('onboarding-layout')).toHaveCount(0);
 
-    await callCoreRpc('openhuman.auth_store_session', { token });
+    await signInViaBypassUser(page, userId);
     await page.goto('/#/onboarding/welcome');
     await waitForAppReady(page);
     await expect
