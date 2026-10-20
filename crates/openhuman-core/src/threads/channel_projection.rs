@@ -227,7 +227,9 @@ fn channel_activity_metadata(
         .as_object_mut()
         .ok_or_else(|| anyhow!("channelActivity metadata is not an object"))?;
     match &event.event {
-        Kind::ReadReceipt { actor, timestamp, .. } => {
+        Kind::ReadReceipt {
+            actor, timestamp, ..
+        } => {
             let actor_id = actor.as_ref().map(|actor| actor.id.as_str()).unwrap_or("");
             let read_receipts = activity
                 .entry("readReceipts")
@@ -242,7 +244,9 @@ fn channel_activity_metadata(
                 read_receipts.push(json!({"actorId": actor_id, "timestamp": timestamp}));
             }
         }
-        Kind::ReactionAdded { actor, reaction, .. } => {
+        Kind::ReactionAdded {
+            actor, reaction, ..
+        } => {
             let reactions = activity
                 .entry("reactions")
                 .or_insert_with(|| json!([]))
@@ -257,7 +261,9 @@ fn channel_activity_metadata(
                 reactions.push(value);
             }
         }
-        Kind::ReactionRemoved { actor, reaction, .. } => {
+        Kind::ReactionRemoved {
+            actor, reaction, ..
+        } => {
             let reactions = activity
                 .entry("reactions")
                 .or_insert_with(|| json!([]))
@@ -265,8 +271,7 @@ fn channel_activity_metadata(
                 .ok_or_else(|| anyhow!("channelActivity.reactions is not an array"))?;
             reactions.retain(|existing| {
                 existing.get("actorId").and_then(Value::as_str) != Some(&actor.id)
-                    || existing.get("value").and_then(Value::as_str)
-                        != Some(&reaction.value)
+                    || existing.get("value").and_then(Value::as_str) != Some(&reaction.value)
                     || existing.get("customEmojiId").and_then(Value::as_str)
                         != reaction.custom_emoji_id.as_deref()
             });
@@ -338,8 +343,7 @@ fn bind_row_in(repo: &Repo, key: MessageBindingKey, thread_id: &str, row_id: &st
         binding.row_id = Some(row_id);
         let body: Value = serde_json::to_value(binding)
             .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
-        docs.put(COLLECTION, &id, json!(body), precondition)
-            .await?;
+        docs.put(COLLECTION, &id, json!(body), precondition).await?;
         Ok(())
     })?;
     Ok(())

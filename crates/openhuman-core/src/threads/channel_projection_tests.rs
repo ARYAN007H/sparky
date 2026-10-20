@@ -184,7 +184,13 @@ fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
     let metadata = channel_activity_metadata(&json!({"existing": true}), &added).unwrap();
     let metadata = channel_activity_metadata(&metadata, &added).unwrap();
     assert_eq!(metadata["existing"], true);
-    assert_eq!(metadata["channelActivity"]["reactions"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        metadata["channelActivity"]["reactions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 
     let read = event(ChannelEventKind::ReadReceipt {
         message_id: "provider-target".into(),
@@ -195,7 +201,10 @@ fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
         timestamp: Some(42),
     });
     let metadata = channel_activity_metadata(&metadata, &read).unwrap();
-    assert_eq!(metadata["channelActivity"]["readReceipts"][0]["actorId"], "bob");
+    assert_eq!(
+        metadata["channelActivity"]["readReceipts"][0]["actorId"],
+        "bob"
+    );
 
     let removed = event(ChannelEventKind::ReactionRemoved {
         message_id: "provider-target".into(),
@@ -207,5 +216,8 @@ fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
         reaction,
     });
     let metadata = channel_activity_metadata(&metadata, &removed).unwrap();
-    assert!(metadata["channelActivity"]["reactions"].as_array().unwrap().is_empty());
+    assert!(metadata["channelActivity"]["reactions"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 }

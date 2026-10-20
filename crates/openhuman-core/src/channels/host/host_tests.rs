@@ -10,14 +10,19 @@ use crate::config::Config;
 
 #[test]
 fn typed_channel_projection_uses_the_target_message_id_not_the_event_id() {
-    use tinychannels_bus::{ChannelEvent, ChannelEventKind, ChannelRef, ConversationKind, ConversationRef};
+    use tinychannels_bus::{
+        ChannelEvent, ChannelEventKind, ChannelRef, ConversationKind, ConversationRef,
+    };
 
     let event = ChannelEvent {
         version: 2,
         event_id: "event-99".into(),
         source_event_id: Some("source-99".into()),
         source_timestamp: None,
-        channel: ChannelRef { id: "telegram".into(), account_id: Some("bot-1".into()) },
+        channel: ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("bot-1".into()),
+        },
         conversation: Some(ConversationRef {
             kind: ConversationKind::Group,
             id: "group-1".into(),

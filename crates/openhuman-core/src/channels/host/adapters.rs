@@ -343,7 +343,8 @@ impl OpenHumanEventSink {
         if domain == "channel" && kind == "channel_event" {
             let event: tinychannels_bus::ChannelEvent = serde_json::from_value(payload)
                 .map_err(|error| anyhow::anyhow!("invalid typed channel event: {error}"))?;
-            if let Some(projected) = project_channel_event(ctx, event).await
+            if let Some(projected) = project_channel_event(ctx, event)
+                .await
                 .map_err(|error| anyhow::anyhow!("project typed channel event: {error}"))?
             {
                 crate::web_chat::publish_web_channel_event_in(ctx, projected);
@@ -371,7 +372,8 @@ async fn project_channel_event(
         &event.channel,
         conversation,
         target_message_id,
-    )? else {
+    )?
+    else {
         // Missing/incomplete/ambiguous ownership is not displayable.
         return Ok(None);
     };
