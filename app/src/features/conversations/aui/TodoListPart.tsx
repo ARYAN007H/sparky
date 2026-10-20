@@ -8,8 +8,8 @@ import {
 } from '../../../components/assistant-ui/elements/todo-list';
 import { useDisclosure } from '../../../components/assistant-ui/lib/useDisclosure';
 import { useT } from '../../../lib/i18n/I18nContext';
-import type { TodoItem as CoreTodoItemWire } from '../../../types/threadWire.generated';
 import type { CoreTodoStatus } from '../../../store/threadTodosSlice';
+import type { TodoItem as CoreTodoItemWire } from '../../../types/threadWire.generated';
 
 /**
  * Adapts the core wire shape of a `todo` tool call — `{content, status,

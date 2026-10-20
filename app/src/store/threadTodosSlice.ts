@@ -10,6 +10,7 @@
  * event/RPC pair, not tool-call bookkeeping.
  */
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+
 import type { TodoItem as TodoItemWire } from '../types/threadWire.generated';
 
 /** Core wire status for one todo item (`DomainEvent::ThreadTodosChanged`). */
