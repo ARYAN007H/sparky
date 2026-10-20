@@ -144,13 +144,15 @@ fn select_demotion(
     backend_error_code_owned: bool,
 ) -> HostDemotion {
     let decision = demote_decision(facts, provider_is_managed);
-    if let Some(kind @ (DemotionKind::BudgetExhausted
-    | DemotionKind::NoModelLoaded
-    | DemotionKind::CustomUpstreamBadRequest
-    | DemotionKind::AccessPolicyDenied
-    | DemotionKind::ConfigurationRejected
-    | DemotionKind::ContextWindowExceeded
-    | DemotionKind::QuotaExhausted)) = decision
+    if let Some(
+        kind @ (DemotionKind::BudgetExhausted
+        | DemotionKind::NoModelLoaded
+        | DemotionKind::CustomUpstreamBadRequest
+        | DemotionKind::AccessPolicyDenied
+        | DemotionKind::ConfigurationRejected
+        | DemotionKind::ContextWindowExceeded
+        | DemotionKind::QuotaExhausted),
+    ) = decision
     {
         HostDemotion::Provider(kind)
     } else if backend_error_code_owned {
@@ -196,34 +198,36 @@ impl ErrorReporter for HostErrorReporter<'_> {
         ) {
             match decision {
                 HostDemotion::Provider(kind) => match kind {
-                DemotionKind::BudgetExhausted => demote("budget", "budget-exhausted 400", false),
-                DemotionKind::NoModelLoaded => demote(
-                    "provider_user_state",
-                    "local_provider_no_model_loaded",
-                    false,
-                ),
-                DemotionKind::CustomUpstreamBadRequest => demote(
-                    "provider_user_state",
-                    "custom_openai_upstream_bad_request",
-                    false,
-                ),
-                DemotionKind::AccessPolicyDenied => demote(
-                    "provider_access_policy",
-                    "provider access-policy 403",
-                    false,
-                ),
-                DemotionKind::ConfigurationRejected => demote(
-                    "provider_config_rejection",
-                    "provider config-rejection",
-                    false,
-                ),
-                DemotionKind::ContextWindowExceeded => {
-                    demote("context_window_exceeded", "context-window exceeded", true)
-                }
-                DemotionKind::QuotaExhausted => {
-                    demote("quota_exhausted", "provider monthly-quota exhausted", false)
-                }
-                _ => unreachable!("only precedence-preserving decisions enter this arm"),
+                    DemotionKind::BudgetExhausted => {
+                        demote("budget", "budget-exhausted 400", false)
+                    }
+                    DemotionKind::NoModelLoaded => demote(
+                        "provider_user_state",
+                        "local_provider_no_model_loaded",
+                        false,
+                    ),
+                    DemotionKind::CustomUpstreamBadRequest => demote(
+                        "provider_user_state",
+                        "custom_openai_upstream_bad_request",
+                        false,
+                    ),
+                    DemotionKind::AccessPolicyDenied => demote(
+                        "provider_access_policy",
+                        "provider access-policy 403",
+                        false,
+                    ),
+                    DemotionKind::ConfigurationRejected => demote(
+                        "provider_config_rejection",
+                        "provider config-rejection",
+                        false,
+                    ),
+                    DemotionKind::ContextWindowExceeded => {
+                        demote("context_window_exceeded", "context-window exceeded", true)
+                    }
+                    DemotionKind::QuotaExhausted => {
+                        demote("quota_exhausted", "provider monthly-quota exhausted", false)
+                    }
+                    _ => unreachable!("only precedence-preserving decisions enter this arm"),
                 },
                 _ => unreachable!("precedence arm only selects provider demotions"),
             }

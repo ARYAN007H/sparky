@@ -425,11 +425,11 @@ fn quota_demotion_precedes_backend_owned_error_code_guard() {
         extensions,
     );
     crate::core::runtime::CoreContext::sync_scope(context, || {
-    let facts = tinyinference_llm::failure::http::classify_http_failure(
-        PROVIDER,
-        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-        BODY,
-    );
+        let facts = tinyinference_llm::failure::http::classify_http_failure(
+            PROVIDER,
+            StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+            BODY,
+        );
         assert!(is_backend_error_code_owned(PROVIDER, BODY));
         assert_eq!(
             select_demotion(&facts, true, is_backend_error_code_owned(PROVIDER, BODY)),

@@ -102,9 +102,7 @@ fn classify_string_keeps_context_and_quota_failures_terminal_even_with_500_statu
 
 #[test]
 fn classify_string_keeps_non_retryable_rate_limit_distinct() {
-    let err = classify_error(
-        "HTTP 429: monthly quota exhausted; Retry-After: 2".to_string(),
-    );
+    let err = classify_error("HTTP 429: monthly quota exhausted; Retry-After: 2".to_string());
     assert!(
         matches!(err, ArmError::Fatal(_)),
         "billing rate limit remains terminal despite Retry-After"
