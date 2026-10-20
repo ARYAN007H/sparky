@@ -297,7 +297,10 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
         })
         .await
         .unwrap());
-    assert_eq!(resumed.turn("after restart").await.unwrap(), "reply after restart");
+    assert_eq!(
+        resumed.turn("after restart").await.unwrap(),
+        "reply after restart"
+    );
     let resumed_request = second_model
         .requests()
         .into_iter()
