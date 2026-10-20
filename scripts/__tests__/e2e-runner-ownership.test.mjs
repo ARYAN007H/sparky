@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { checkOwnership } from "../ci/check-e2e-runner-ownership.mjs";
 
+fs.mkdirSync(path.join(process.cwd(), "target"), { recursive: true });
 const fixtureRoot = fs.mkdtempSync(path.join(process.cwd(), "target", "e2e-ownership-test-"));
 const roots = ["app/test/e2e/specs", "app/test/playwright/specs"];
 
