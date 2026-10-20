@@ -546,12 +546,12 @@ fn classify_connection_drop_routes_to_network_retryable() {
 
 #[test]
 fn classify_managed_sse_badrequest_not_misread_as_network() {
-    // A managed 400 frame carries errorCode → must stay provider_request_rejected
-    // (claimed by the errorCode short-circuit before the transport arm).
-    let c = classify_inference_error(
-        "OpenHuman streaming API error: {\"error\":{\"message\":\"Message has tool role, \
-         but there was no previous assistant message with a tool call!\",\
-         \"type\":\"stream_error\",\"errorCode\":\"BAD_REQUEST\"}}",
+    // Host classification supplies the semantic kind before generic transport
+    // copy selection, so a streaming rejection is not mistaken for a drop.
+    let c = classify_with_backend_metadata(
+        "generic streaming response: Message has tool role, but there was no previous assistant message with a tool call!",
+        BackendErrorKind::BadRequest,
+        false,
     );
     assert_eq!(c.error_type, "provider_request_rejected");
 }
@@ -569,10 +569,10 @@ fn classify_managed_tool_ordering_400_gets_cleared_resend_copy() {
     // message) arrives as a BAD_REQUEST SSE frame — must read "we cleared it,
     // send again" (not "try a different model") and be retryable, since the
     // de-poison guard already evicted the bad warm session.
-    let c = classify_inference_error(
-        "OpenHuman streaming API error: {\"error\":{\"message\":\"Message at index 3 has role \
-         'tool' but is not preceded by an assistant message with a matching tool_call\",\
-         \"type\":\"stream_error\",\"errorCode\":\"BAD_REQUEST\"}}",
+    let c = classify_with_backend_metadata(
+        "generic streaming response: Message at index 3 has role 'tool' but is not preceded by an assistant message with a matching tool_call",
+        BackendErrorKind::BadRequest,
+        false,
     );
     assert_eq!(c.error_type, "provider_request_rejected");
     assert!(c.retryable, "post-eviction resend works → retryable");

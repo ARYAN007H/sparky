@@ -413,12 +413,10 @@ fn classify_inference_error_byo_no_code_keeps_user_actionable_copy() {
 }
 
 #[test]
-fn classify_inference_error_byo_with_error_code_token_is_not_managed() {
-    // CodeRabbit: a BYO / direct-provider error whose body happens to carry an
-    // `errorCode`-shaped field must NOT be classified on the managed-code
-    // branch — the managed-envelope gate keeps it on the substring ladder so
-    // the user-actionable BYO copy is preserved (and FE Sentry is unaffected).
-    let raw = r#"custom_openai API error (429 Too Many Requests): {"error":{"errorCode":"RATE_LIMITED","message":"slow down"}}"#;
+fn classify_byo_rate_limit_keeps_provider_copy() {
+    // Direct-provider failures use the generic copy ladder when no hosted
+    // classifier metadata is installed.
+    let raw = "custom_openai API error (429 Too Many Requests): slow down";
     let classified = classify_inference_error(raw);
     // Still classified as rate_limited via the substring ladder, but through
     // the BYO path: the message uses the existing substring-arm copy ("This is
