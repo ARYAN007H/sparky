@@ -41,7 +41,8 @@ struct MockState {
     update_offsets: Mutex<Vec<i64>>,
     completions: Mutex<Vec<Value>>,
     sent_messages: Mutex<Vec<Value>>,
-    transcription_uploads: Mutex<Vec<usize>>,
+    transcription_uploads: Mutex<Vec<Vec<u8>>>,
+    voice_file_requests: Mutex<Vec<String>>,
     speech_requests: Mutex<Vec<String>>,
     sent_voice_uploads: Mutex<Vec<Vec<u8>>>,
 }
@@ -156,7 +157,20 @@ async fn get_me() -> Json<Value> {
     Json(json!({ "ok": true, "result": { "id": 9, "is_bot": true, "username": "test_bot" } }))
 }
 
-async fn get_voice_file() -> Json<Value> {
+async fn get_voice_file(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    state
+        .voice_file_requests
+        .lock()
+        .expect("voice file requests")
+        .push(
+            body.get("file_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
+        );
     Json(json!({ "ok": true, "result": { "file_path": "voice/input.oga", "file_size": 2575 } }))
 }
 
@@ -182,7 +196,7 @@ async fn transcribe_voice(State(state): State<Arc<MockState>>, body: Bytes) -> J
         .transcription_uploads
         .lock()
         .expect("STT uploads")
-        .push(body.len());
+        .push(body.to_vec());
     Json(json!({ "text": "the dictated voice request" }))
 }
 
@@ -814,8 +828,19 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
             .transcription_uploads
             .lock()
             .expect("STT uploads")[0]
-            > 0,
+            .windows(4)
+            .any(|window| window == b"OggS"),
         "the cloud STT mock receives the downloaded audio multipart payload"
+    );
+    assert_eq!(
+        mocks
+            .state
+            .voice_file_requests
+            .lock()
+            .expect("voice file requests")
+            .as_slice(),
+        &["fixture-voice-file"],
+        "the real Telegram voice file ID is resolved before scoped transcription"
     );
     assert_eq!(
         mocks
