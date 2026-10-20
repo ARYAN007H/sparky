@@ -158,7 +158,7 @@ Every storage test target runs the same body once per driver, and each run is a 
 | `sqlite`, `file` | When `storage-sqlite` or `storage-file` is compiled in, on temp directories                             |
 | `mongodb`        | When `storage-mongodb` is compiled in and `TSD_MONGO_URL` is set. Each case uses a database of its own. |
 
-The targets are `storage_approvals_e2e`, `storage_domains_e2e`, `storage_flows_e2e`, `storage_secrets_e2e`, `storage_scope_e2e`, `storage_agent_scopes_e2e`, `storage_delegation_e2e` and `cli_storage_url_e2e`. Run one locally with the drivers you want:
+The targets are `storage_approvals_e2e`, `storage_domains_e2e`, `storage_flows_e2e`, `storage_secrets_e2e`, `storage_scope_e2e`, `storage_agent_scopes_e2e` and `cli_storage_url_e2e`. Run one locally with the drivers you want:
 
 ```bash
 cargo test -p openhuman-cli --features storage-sqlite,storage-file --test storage_approvals_e2e

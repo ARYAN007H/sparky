@@ -10,7 +10,7 @@ The adapter seam between OpenHuman and the vendored [`tinyagents`](../../../../.
 - Route workloads to model tiers and record the resolved provider/model for audit ([`routes.rs`](./routes.rs), canonical TinyInference response metadata).
 - Let TinyAgents stop repetitive visible model streams in its agent loop; the OpenHuman session driver turns `GenerationStalled` into a bounded partial containing completed tool evidence.
 - Make turns durable and replayable: a JSONL event journal plus status store ([`journal.rs`](./journal.rs)), a startup sweep for orphaned runs ([`reaper.rs`](./reaper.rs)), and a read-only RPC surface over both (`replay/`).
-- Provide graph-layer helpers for multi-stage sub-agent orchestration (`orchestration.rs`, `delegation.rs`) (graph structure export lives in `tinyagents_orchestration::topology`).
+- Adapt TinyAgents' generic async sub-agent lifecycle to OpenHuman's actor context, execution policy, and product projections.
 - Pick which tools a turn even considers: `discovery/` holds the process-wide tool-search ranker slot (see [Tool search](#tool-search) below).
 - Host adapters (`host/`) for the crate's ten host-capability traits. Not yet wired into the live turn path; see [Host adapters](#host-adapters) below.
 
