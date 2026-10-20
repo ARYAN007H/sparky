@@ -16,7 +16,6 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use tinybus::EventHandler;
-use tinyflows::model::TriggerKind;
 use tinyflows_catalog::Flow;
 use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
@@ -36,17 +35,6 @@ where
             .map_err(anyhow::Error::msg)
     })
     .map_err(|error| error.to_string())
-}
-
-// Temporary reproduction of the pre-cleanup helper for the red regression
-// run: it compares the full trigger config, including pinned inputs.
-pub(crate) fn extract_trigger_kind(flow: &Flow) -> Option<TriggerKind> {
-    let trigger = flow.graph.trigger()?;
-    serde_json::from_value(trigger.config.get("trigger_kind")?.clone()).ok()
-}
-
-pub(crate) fn extract_trigger_config(flow: &Flow) -> Option<&Value> {
-    Some(&flow.graph.trigger()?.config)
 }
 
 /// Ask TinyFlows for normalized trigger metadata used by host bindings.
