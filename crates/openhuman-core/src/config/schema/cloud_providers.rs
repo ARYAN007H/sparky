@@ -95,10 +95,8 @@ pub(crate) fn is_hosted_auth_style_for(
         .is_some_and(|classify| classify(style))
 }
 
-impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
-    for BuiltinCloudProvider
-{
-    fn from(preset: &'static tinyinference_providers::builtin::BuiltinCloudProvider) -> Self {
+impl From<&tinyinference_providers::builtin::BuiltinCloudProvider> for BuiltinCloudProvider {
+    fn from(preset: &tinyinference_providers::builtin::BuiltinCloudProvider) -> Self {
         Self {
             slug: preset.slug,
             label: preset.label,
