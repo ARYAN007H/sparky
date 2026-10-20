@@ -57,6 +57,24 @@ fn mirror_policy_reports_inbound_voice_from_recorded_envelope() {
 }
 
 #[test]
+fn voice_facts_are_correlated_with_the_runner_request_id() {
+    let tenant = crate::core::runtime::Tenant::default();
+    let inbound = envelope("voice-conversation", "provider-message-id", true);
+    record_inbound_envelope(&inbound, &tenant);
+
+    let policy = resolve_policy(
+        &ChannelVoiceConfig::default(),
+        &scope("telegram", "voice-conversation", "telegram:provider-message-id:runner-uuid"),
+        &tenant,
+    );
+
+    assert!(
+        policy.inbound_has_voice,
+        "reply policy is queried with the runner request ID, not the provider message ID"
+    );
+}
+
+#[test]
 fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
     let mut voice = envelope("shared-conversation", "shared-turn", true);
     voice.channel = ChannelRef {
