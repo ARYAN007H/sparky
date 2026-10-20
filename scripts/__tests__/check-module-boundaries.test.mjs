@@ -351,8 +351,8 @@ test('host boundary audit ignores writer features unified only by unrelated work
               features: {
                 default: ['read'],
                 read: [],
-                linked-modules: [],
-                flow-write: [],
+                'linked-modules': [],
+                'flow-write': [],
               },
             }],
           });
