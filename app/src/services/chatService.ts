@@ -1034,9 +1034,6 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
   if (typeof result === 'string') {
     return { requestId: result, queuedAttachments: [] };
   }
-  if (isStartedChatAck(result)) {
-    return { requestId: result.request_id, queuedAttachments: [] };
-  }
   if (result == null) {
     return { queuedAttachments: [] };
   }

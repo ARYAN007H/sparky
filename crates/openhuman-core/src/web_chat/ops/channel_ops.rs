@@ -306,13 +306,15 @@ pub async fn channel_web_chat_with_attachments(
         return Ok(Outcome::single_log(parsed, "web channel message queued"));
     }
 
-    Ok(Outcome::single_log(
-        crate::threads::rpc_models::StartedChatAck {
+    let accepted = serde_json::to_value(crate::threads::rpc_models::StartedChatAck {
             accepted: true,
             client_id: client_id.trim().to_owned(),
             thread_id: thread_id.trim().to_owned(),
             request_id: result,
-        },
+        })
+        .map_err(|error| format!("serialize started chat ack: {error}"))?;
+    Ok(Outcome::single_log(
+        accepted,
         "web channel request accepted",
     ))
 }
