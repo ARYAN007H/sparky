@@ -256,7 +256,6 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         DurableSubagentStatus, SubagentSessionStore,
     };
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use crate::core::runtime::DispatchCtx;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
     use tinyagents_tasks::CompletionStatus;
@@ -448,17 +447,9 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
 
     let mut repeated_params = serde_json::Map::new();
     repeated_params.insert("taskId".into(), json!(task_id));
-    let repeated = (controller.handler)(
-        DispatchCtx::new(Arc::clone(
-            live.data
-                .dispatch_ctx()
-                .resolved()
-                .expect("RPC uses the spawned parent's core"),
-        )),
-        repeated_params,
-    )
-    .await
-    .expect("repeated cancel RPC result");
+    let repeated = (controller.handler)(live.data.dispatch_ctx(), repeated_params)
+        .await
+        .expect("repeated cancel RPC result");
     assert_eq!(response_field(&repeated, "cancelled"), Some(json!(false)));
     assert_eq!(response_field(&repeated, "outcome"), Some(json!("unknown")));
     let deliveries_after_repeat = pending_for_ctx(
