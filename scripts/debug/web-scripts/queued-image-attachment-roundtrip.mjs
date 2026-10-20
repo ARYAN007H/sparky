@@ -461,7 +461,23 @@ export default async function queuedImageAttachmentRoundtrip({
     throw new Error("queued model input contains a legacy marker");
   }
   if (!input.includes(IMAGE_BYTES.toString("base64"))) {
-    throw new Error("queued model input did not contain the actual PNG bytes");
+    const userMessages =
+      JSON.parse(imageRequest.body).messages?.filter((message) => message.role === "user") ?? [];
+    const mediaShape = userMessages.map((message) => ({
+      contentType: typeof message.content,
+      content: Array.isArray(message.content)
+        ? message.content.map((part) => ({
+            type: part.type,
+            text: part.text,
+            image_url: part.image_url
+              ? { urlPrefix: String(part.image_url.url ?? "").slice(0, 48), detail: part.image_url.detail }
+              : undefined,
+          }))
+        : String(message.content).slice(0, 240),
+    }));
+    throw new Error(
+      `queued model input did not contain the uploaded PNG bytes; user content shape: ${JSON.stringify(mediaShape)}`,
+    );
   }
 
   await page.reload();
