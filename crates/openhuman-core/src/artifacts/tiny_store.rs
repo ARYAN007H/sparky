@@ -145,11 +145,10 @@ impl ArtifactStore for LegacyFileImportStore {
     }
 
     async fn get(&self, id: &str) -> anyhow::Result<Option<ArtifactRecord>> {
-        self.records
-            .get(id)
-            .await?
-            .map(|record| self.import_record(record))
-            .transpose()
+        match self.records.get(id).await? {
+            Some(record) => self.import_record(record).await.map(Some),
+            None => Ok(None),
+        }
     }
 
     async fn upsert(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
