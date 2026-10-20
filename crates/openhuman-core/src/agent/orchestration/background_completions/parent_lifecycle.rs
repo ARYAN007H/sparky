@@ -46,11 +46,9 @@ pub(crate) fn discard_for_thread(
     removed
 }
 
-/// Task id of the durable "this thread was deleted" marker. The router's
-/// cancelled-parent marker cannot tell a delete from a Stop (a Stop is lifted
-/// when the user returns), so a delete also leaves this one, which nothing
-/// lifts. It is stored `Pending` (with no parent, so nothing ever claims it):
-/// compaction only drops settled records, and a deletion must outlive them.
+/// Task id used by the legacy durable "this thread was deleted" marker.
+/// Current deletions use the router's `ParentDeleted` lifecycle state; this
+/// marker remains readable for rows written by older host versions.
 fn deleted_marker_id(thread_id: &str) -> String {
     format!("\u{1}host-thread-deleted:{thread_id}")
 }
