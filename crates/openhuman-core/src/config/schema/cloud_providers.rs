@@ -139,7 +139,14 @@ fn hosted_has_slug(slug: &str) -> bool {
         .any(|(_, preset)| preset.slug == slug)
 }
 
-fn provider_presets(hosted: &[BuiltinCloudProvider]) -> BuiltinPresets {
+/// Generic provider catalog extended with the host's registered preset
+/// metadata. Host auth policy remains in the owning host registry.
+pub fn builtin_presets() -> BuiltinPresets {
+    let hosted = HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
+        .collect::<Vec<_>>();
     BuiltinPresets::new(hosted.iter().map(|preset| UpstreamBuiltinCloudProvider {
         slug: preset.slug,
         label: preset.label,
@@ -170,41 +177,6 @@ pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
         .map(BuiltinCloudProvider::from)
 }
 
-/// Whether `slug` matches a built-in cloud provider preset.
-///
-/// The chat factory uses this to decide capability defaults (e.g. whether the
-/// provider exposes the OpenAI Responses API) only for providers we ship and
-/// therefore know the API surface of. Custom / user-defined slugs are treated
-/// as unknown and keep the permissive defaults.
-pub fn is_builtin_cloud_slug(slug: &str) -> bool {
-    builtin_cloud_provider(slug).is_some()
-}
-
-/// Whether a built-in cloud provider exposes the OpenAI **Responses API**
-/// (`/v1/responses`).
-///
-/// Only OpenAI's first-party endpoint serves `/responses`; every other built-in
-/// preset (DeepSeek, Groq, Mistral, Fireworks, …) is chat-completions-only.
-/// Enabling the chat-completions-404 → `/responses` fallback for those
-/// guarantees a second 404 against an endpoint that does not exist, which floods
-/// Sentry with an empty-body `"<provider> Responses API error:"` event
-/// (TAURI-RUST-5EN — same class as the local-provider TAURI-RUST-59Y fix). The
-/// factory consults this to build chat-completions-only built-ins with
-/// `new_no_responses_fallback`.
-///
-/// Custom / unknown slugs are intentionally NOT covered here (see
-/// [`is_builtin_cloud_slug`]): a user-defined OpenAI-compatible endpoint may be
-/// a genuine OpenAI proxy that does support `/responses`, so the factory keeps
-/// the fallback for those.
-pub fn builtin_cloud_supports_responses_api(slug: &str) -> bool {
-    let hosted = HOSTED_PRESETS
-        .entries_context_first()
-        .into_iter()
-        .map(|(_, preset)| preset)
-        .collect::<Vec<_>>();
-    provider_presets(&hosted).builtin_cloud_supports_responses_api(slug)
-}
-
 /// Whether `host` is the authority host of any built-in cloud **inference**
 /// provider (e.g. `openrouter.ai`, `api.openai.com`, `api.groq.com`).
 ///
@@ -223,15 +195,6 @@ pub fn builtin_cloud_supports_responses_api(slug: &str) -> bool {
 /// The backend-URL resolver uses this to treat such hosts as non-backend and
 /// fall back to the default backend chain — the cloud analogue of the local-AI
 /// guard that fixed the Ollama case (OPENHUMAN-TAURI-51/-80/-7Z).
-pub fn host_is_builtin_cloud_provider(host: &str) -> bool {
-    let hosted = HOSTED_PRESETS
-        .entries_context_first()
-        .into_iter()
-        .map(|(_, preset)| preset)
-        .collect::<Vec<_>>();
-    provider_presets(&hosted).host_is_builtin_cloud_provider(host)
-}
-
 /// Whether an endpoint **host** is a known cloud host that does NOT serve the
 /// OpenAI Responses API (`/v1/responses`) — i.e. it is chat-completions-only,
 /// regardless of which user slug points at it.
@@ -244,15 +207,6 @@ pub fn host_is_builtin_cloud_provider(host: &str) -> bool {
 /// `integrate.api.nvidia.com` must never attempt `/responses` (TAURI-RUST-5A1),
 /// while a genuinely unknown proxy host keeps the permissive fallback so a real
 /// OpenAI proxy still gets `/responses`.
-pub fn endpoint_host_is_chat_completions_only(endpoint: &str) -> bool {
-    let hosted = HOSTED_PRESETS
-        .entries_context_first()
-        .into_iter()
-        .map(|(_, preset)| preset)
-        .collect::<Vec<_>>();
-    provider_presets(&hosted).endpoint_host_is_chat_completions_only(endpoint)
-}
-
 /// Authentication header style for a cloud provider.
 ///
 /// Wire format is lowercase (e.g. `"bearer"`). Determines which HTTP headers

@@ -1,9 +1,7 @@
 //! Tests for the surrounding module.
 
 use super::{
-    builtin_cloud_providers, builtin_cloud_supports_responses_api,
-    endpoint_host_is_chat_completions_only, host_is_builtin_cloud_provider, is_builtin_cloud_slug,
-    is_slug_reserved, AuthStyle,
+    builtin_cloud_providers, builtin_presets, is_slug_reserved, AuthStyle,
 };
 use tinyinference_providers::builtin::endpoint_host;
 
@@ -106,11 +104,11 @@ fn builtin_cloud_provider_slugs_are_unique() {
 #[test]
 fn is_builtin_cloud_slug_matches_presets_only() {
     for slug in ["openai", "deepseek", "groq", "mistral"] {
-        assert!(is_builtin_cloud_slug(slug), "{slug} is a built-in preset");
+        assert!(builtin_presets().is_builtin_cloud_slug(slug), "{slug} is a built-in preset");
     }
     for slug in ["my-proxy", "custom-openai", "totally-unknown", ""] {
         assert!(
-            !is_builtin_cloud_slug(slug),
+            !builtin_presets().is_builtin_cloud_slug(slug),
             "{slug:?} is not a built-in preset"
         );
     }
@@ -118,14 +116,14 @@ fn is_builtin_cloud_slug_matches_presets_only() {
 
 #[test]
 fn builtin_responses_capabilities_follow_provider_catalog() {
-    assert!(builtin_cloud_supports_responses_api("openai"));
+    assert!(builtin_presets().builtin_cloud_supports_responses_api("openai"));
     // The merged provider catalog documents these OpenAI-compatible gateways
     // as supporting /responses too. Preserve that upstream protocol contract.
-    assert!(builtin_cloud_supports_responses_api("openrouter"));
-    assert!(builtin_cloud_supports_responses_api("xai"));
+    assert!(builtin_presets().builtin_cloud_supports_responses_api("openrouter"));
+    assert!(builtin_presets().builtin_cloud_supports_responses_api("xai"));
     for slug in ["deepseek", "groq", "mistral", "fireworks", "together"] {
         assert!(
-            !builtin_cloud_supports_responses_api(slug),
+            !builtin_presets().builtin_cloud_supports_responses_api(slug),
             "{slug} is chat-completions-only and must not advertise the Responses API"
         );
     }
@@ -184,7 +182,7 @@ fn responses_api_capability_is_coupled_to_the_preset_list() {
     for provider in builtin_cloud_providers().iter() {
         let expected = provider.slug == "openai";
         assert_eq!(
-            builtin_cloud_supports_responses_api(provider.slug),
+            builtin_presets().builtin_cloud_supports_responses_api(provider.slug),
             expected,
             "built-in {} Responses-API capability drifted from the openai-only invariant",
             provider.slug
@@ -230,7 +228,7 @@ fn host_is_builtin_cloud_provider_recognises_inference_hosts() {
         "API.OPENAI.COM", // case-insensitive
     ] {
         assert!(
-            host_is_builtin_cloud_provider(host),
+            builtin_presets().host_is_builtin_cloud_provider(host),
             "{host} is a built-in cloud inference host"
         );
     }
@@ -241,7 +239,7 @@ fn host_is_builtin_cloud_provider_recognises_inference_hosts() {
         "",
     ] {
         assert!(
-            !host_is_builtin_cloud_provider(host),
+            !builtin_presets().host_is_builtin_cloud_provider(host),
             "{host:?} is not a built-in cloud inference host"
         );
     }
@@ -249,7 +247,7 @@ fn host_is_builtin_cloud_provider_recognises_inference_hosts() {
     for provider in builtin_cloud_providers().iter() {
         let host = endpoint_host(provider.endpoint).expect("preset endpoint has a host");
         assert!(
-            host_is_builtin_cloud_provider(&host),
+            builtin_presets().host_is_builtin_cloud_provider(&host),
             "{} ({host}) must be recognised",
             provider.slug
         );
@@ -262,7 +260,7 @@ fn host_is_builtin_cloud_provider_recognises_inference_hosts() {
 /// the slug is not builtin.
 #[test]
 fn nvidia_host_is_chat_completions_only_regardless_of_slug() {
-    assert!(endpoint_host_is_chat_completions_only(
+    assert!(builtin_presets().endpoint_host_is_chat_completions_only(
         "https://integrate.api.nvidia.com/v1"
     ));
     // Other chat-only built-in hosts too.
@@ -272,7 +270,7 @@ fn nvidia_host_is_chat_completions_only_regardless_of_slug() {
         "https://api.mistral.ai/v1",
     ] {
         assert!(
-            endpoint_host_is_chat_completions_only(endpoint),
+            builtin_presets().endpoint_host_is_chat_completions_only(endpoint),
             "{endpoint} is a chat-completions-only built-in host"
         );
     }
@@ -282,7 +280,7 @@ fn nvidia_host_is_chat_completions_only_regardless_of_slug() {
 fn openai_host_and_unknown_proxies_keep_the_responses_fallback() {
     // OpenAI's first-party host serves /responses — must NOT be gated off,
     // even via a custom proxy slug pointed at it.
-    assert!(!endpoint_host_is_chat_completions_only(
+    assert!(!builtin_presets().endpoint_host_is_chat_completions_only(
         "https://api.openai.com/v1"
     ));
     // Genuinely unknown proxy hosts keep the permissive default (they may be
@@ -293,7 +291,7 @@ fn openai_host_and_unknown_proxies_keep_the_responses_fallback() {
         "",
     ] {
         assert!(
-            !endpoint_host_is_chat_completions_only(endpoint),
+            !builtin_presets().endpoint_host_is_chat_completions_only(endpoint),
             "{endpoint:?} is an unknown host and must keep the fallback"
         );
     }
@@ -311,8 +309,8 @@ fn host_gate_agrees_with_slug_capability_for_every_builtin() {
         if provider.auth_style != AuthStyle::Bearer {
             continue;
         }
-        let host_chat_only = endpoint_host_is_chat_completions_only(provider.endpoint);
-        let slug_supports = builtin_cloud_supports_responses_api(provider.slug);
+        let host_chat_only = builtin_presets().endpoint_host_is_chat_completions_only(provider.endpoint);
+        let slug_supports = builtin_presets().builtin_cloud_supports_responses_api(provider.slug);
         assert_eq!(
             host_chat_only, !slug_supports,
             "host gate for built-in {} disagrees with its slug capability",

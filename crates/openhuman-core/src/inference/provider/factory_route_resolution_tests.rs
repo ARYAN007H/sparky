@@ -556,6 +556,17 @@ fn local_only_defers_reresolving_sentinels() {
 }
 
 #[test]
+fn local_only_does_not_treat_unresolved_route_sentinels_as_local() {
+    use crate::config::PrivacyMode;
+    for route in ["cloud:gpt-4o", ":gpt-4o"] {
+        assert!(
+            local_only_violation(PrivacyMode::LocalOnly, route).is_some(),
+            "an unresolved route must remain blocked under LocalOnly: {route}"
+        );
+    }
+}
+
+#[test]
 fn standard_mode_permits_external() {
     use crate::config::PrivacyMode;
     assert_eq!(
