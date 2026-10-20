@@ -114,26 +114,26 @@ export interface AgentRun {
   /**
    * Identifier of the agent definition driving this run.
    */
-  agentId?: string | null;
+  agentId: string | null;
   /**
    * Inline resumable checkpoint state, if small enough to store directly.
    */
-  checkpoint?: {
+  checkpoint: {
     [k: string]: any;
   };
   /**
    * Filesystem path to a resumable checkpoint for this run, if persisted
    * out-of-band from `checkpoint`.
    */
-  checkpointPath?: string | null;
+  checkpointPath: string | null;
   /**
    * When the run reached a terminal status, if it has.
    */
-  completedAt?: string | null;
+  completedAt: string | null;
   /**
    * Error message, if the run ended in `Failed`.
    */
-  error?: string | null;
+  error: string | null;
   /**
    * Caller-supplied stable identifier.
    */
@@ -151,15 +151,15 @@ export interface AgentRun {
   /**
    * The run that spawned this one, if any.
    */
-  parentRunId?: string | null;
+  parentRunId: string | null;
   /**
    * The parent conversation thread this run is nested under, if any.
    */
-  parentThreadId?: string | null;
+  parentThreadId: string | null;
   /**
    * Opaque reference to the prompt/instructions this run was given.
    */
-  promptRef?: string | null;
+  promptRef: string | null;
   startedAt: string;
   /**
    * Current lifecycle state.
@@ -176,17 +176,17 @@ export interface AgentRun {
   /**
    * Human-readable summary of the run's outcome, once known.
    */
-  summary?: string | null;
+  summary: string | null;
   /**
    * Aggregated token/cost telemetry for this run, when joined from
    * `run_telemetry`.
    */
-  telemetry?: RunTelemetry | null;
+  telemetry: RunTelemetry | null;
   updatedAt: string;
   /**
    * The worker thread id this run executes on, for `WorkerThread` runs.
    */
-  workerThreadId?: string | null;
+  workerThreadId: string | null;
 }
 /**
  * Aggregated token, cost, and status telemetry for a single run.
@@ -200,24 +200,24 @@ export interface RunTelemetry {
   /**
    * Total wall-clock time spent executing the run so far, in milliseconds.
    */
-  elapsedMs?: number | null;
+  elapsedMs: number | null;
   /**
    * Most recent error message, if any step of the run failed.
    */
-  error?: string | null;
+  error: string | null;
   inputTokens: number;
-  model?: string | null;
+  model: string | null;
   outputTokens: number;
-  provider?: string | null;
+  provider: string | null;
   runId: string;
   /**
    * Number of tool calls made so far.
    */
   toolCount: number;
-  updatedAt?: string | null;
+  updatedAt: string | null;
 }
 export interface RunLedgerGetWireResponse {
-  run?: AgentRun | null;
+  run: AgentRun | null;
 }
 /**
  * Response shape for `super::ops::list_agent_runs`.
@@ -264,10 +264,10 @@ export interface TurnState {
   phase?: TurnPhase | null;
   requestId: string;
   startedAt: string;
-  streamingText?: string;
-  thinking?: string;
+  streamingText: string;
+  thinking: string;
   threadId: string;
-  toolTimeline?: ToolTimelineEntry[];
+  toolTimeline: ToolTimelineEntry[];
   /**
    * Ordered, interleaved record of the agent's narration, reasoning, and
    * tool calls for the "View processing" panel. `#[serde(default)]` so
@@ -380,7 +380,7 @@ export interface SubagentActivity {
    */
   status?: string | null;
   taskId: string;
-  toolCalls?: SubagentToolCall[];
+  toolCalls: SubagentToolCall[];
   /**
    * Ordered reasoning/narration/tool transcript for this sub-agent — what
    * the inline "Agentic task insights" thoughts render from. Persisted (not
@@ -464,7 +464,7 @@ export interface ListTurnStatesResponse {
 export interface ConversationMessageRecord {
   content: string;
   createdAt: string;
-  extraMetadata?: {
+  extraMetadata: {
     [k: string]: any;
   };
   id: string;
@@ -526,7 +526,7 @@ export interface ConversationThreadSummary {
   createdAt: string;
   id: string;
   isActive: boolean;
-  labels?: string[];
+  labels: string[];
   lastMessageAt: string;
   messageCount: number;
   parentThreadId?: string | null;
