@@ -102,9 +102,18 @@ pub async fn edit_message(
     // Stage and validate uploads before cancellation or truncation. The folded
     // marker form is deliberately discarded: edits reuse these scoped opaque
     // refs when the replacement row is persisted below.
+    if !request.attachments.is_empty() && request.content.trim().is_empty() {
+        return Err(ThreadsError::Message(
+            "edited attachment messages require text".into(),
+        ));
+    }
     crate::agent::attachments::parts::fold_into_message(&request.content, &request.attachments)
         .map_err(|e| ThreadsError::Message(e.to_string()))?;
-    let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
+    let dir = ctx
+        .load_config()
+        .await
+        .map_err(|error| ThreadsError::Message(format!("load config: {error}")))?
+        .workspace_dir;
     // The request's own tenant picks the store key, so a SaaS profile edits
     // the transcript its turns were written to.
     let store = transcript_store(ctx, &thread_id)
@@ -118,91 +127,99 @@ pub async fn edit_message(
             .map_err(ThreadsError::Message)?
     };
 
-    crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
-        .await
-        .map_err(ThreadsError::Message)?;
+    let edit_result = async {
+        crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
+            .await
+            .map_err(ThreadsError::Message)?;
 
-    // Correlate through the next assistant reply, if any — see the module
-    // doc's mapping section. `None` means the edited message has no reply
-    // yet, so there is nothing to cut on the model side.
-    let cut_request_id = next_reply_request_id_after(ctx, &dir, &thread_id, &request.message_id)
-        .await
-        .map_err(ThreadsError::Message)?;
+        // Correlate through the next assistant reply, if any — see the module
+        // doc's mapping section. `None` means the edited message has no reply
+        // yet, so there is nothing to cut on the model side.
+        let cut_request_id =
+            next_reply_request_id_after(ctx, &dir, &thread_id, &request.message_id)
+                .await
+                .map_err(ThreadsError::Message)?;
 
-    if let Some(cut_request_id) = &cut_request_id {
-        let store_owned = store.clone();
-        let thread_id_owned = thread_id.clone();
-        let cut_request_id_owned = cut_request_id.clone();
-        ctx.spawn_blocking(move || {
-            truncate_transcript_before_turn(&store_owned, &thread_id_owned, &cut_request_id_owned)
-        })
-        .await
-        .map_err(|e| ThreadsError::Message(format!("truncate transcript task: {e}")))?
-        .map_err(ThreadsError::Message)?;
-        clear_dropped_turn_states(&dir, &thread_id, cut_request_id).await;
-    }
-
-    // Truncate the message log at the edited message itself (inclusive) —
-    // it and everything after it is replaced by the fresh turn below.
-    super::delete_after(ctx, &thread_id, &request.message_id).await?;
-
-    crate::web_chat::invalidate_thread_sessions(ctx, &thread_id).await;
-
-    let new_request_id = if staged_parts.is_empty() {
-        crate::web_chat::start_chat(
-            ctx,
-            &client_id,
-            &thread_id,
-            &request.content,
-            None,
-            None,
-            None,
-            None,
-            crate::web_chat::ChatRequestMetadata::default(),
-        )
-        .await
-        .map_err(|e| ThreadsError::Message(e.to_string()))?
-    } else {
-        if request.content.trim().is_empty() {
-            return Err(ThreadsError::Message(
-                "edited attachment messages require text".into(),
-            ));
+        if let Some(cut_request_id) = &cut_request_id {
+            let store_owned = store.clone();
+            let thread_id_owned = thread_id.clone();
+            let cut_request_id_owned = cut_request_id.clone();
+            ctx.spawn_blocking(move || {
+                truncate_transcript_before_turn(
+                    &store_owned,
+                    &thread_id_owned,
+                    &cut_request_id_owned,
+                )
+            })
+            .await
+            .map_err(|e| ThreadsError::Message(format!("truncate transcript task: {e}")))?
+            .map_err(ThreadsError::Message)?;
+            clear_dropped_turn_states(&dir, &thread_id, cut_request_id).await;
         }
-        let row = super::persist_queued_user_message(
-            ctx,
-            &thread_id,
-            &request.message_id,
-            &request.content,
-            &staged_parts,
-        )
-        .await
-        .map_err(ThreadsError::Message)?;
-        let started = crate::web_chat::channel_web_chat_with_stored_attachments(
-            ctx,
-            &client_id,
-            &thread_id,
-            &request.content,
-            None,
-            None,
-            None,
-            None,
-            None,
-            crate::web_chat::ChatRequestMetadata::default(),
-            None,
-            Some(crate::agent::queued_turn::StoredAttachmentInput {
-                persisted_message_id: row.id,
-                parts: row.attachments,
-            }),
-        )
-        .await
-        .map_err(ThreadsError::Message)?;
-        started
-            .value
-            .get("request_id")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| ThreadsError::Message("edited chat returned no request ID".into()))?
-    };
+
+        // Truncate the message log at the edited message itself (inclusive) —
+        // it and everything after it is replaced by the fresh turn below.
+        super::delete_after(ctx, &thread_id, &request.message_id).await?;
+
+        crate::web_chat::invalidate_thread_sessions(ctx, &thread_id).await;
+
+        if staged_parts.is_empty() {
+            crate::web_chat::start_chat(
+                ctx,
+                &client_id,
+                &thread_id,
+                &request.content,
+                None,
+                None,
+                None,
+                None,
+                crate::web_chat::ChatRequestMetadata::default(),
+            )
+            .await
+            .map_err(|e| ThreadsError::Message(e.to_string()))
+        } else {
+            let row = super::persist_queued_user_message(
+                ctx,
+                &thread_id,
+                &request.message_id,
+                &request.content,
+                &staged_parts,
+            )
+            .await
+            .map_err(ThreadsError::Message)?;
+            let started = crate::web_chat::channel_web_chat_with_stored_attachments(
+                ctx,
+                &client_id,
+                &thread_id,
+                &request.content,
+                None,
+                None,
+                None,
+                None,
+                None,
+                crate::web_chat::ChatRequestMetadata::default(),
+                None,
+                Some(crate::agent::queued_turn::StoredAttachmentInput {
+                    persisted_message_id: row.id,
+                    parts: row.attachments,
+                }),
+            )
+            .await
+            .map_err(ThreadsError::Message)?;
+            started
+                .value
+                .get("request_id")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .ok_or_else(|| ThreadsError::Message("edited chat returned no request ID".into()))
+        }
+    }
+    .await;
+    if edit_result.is_err() && !staged_parts.is_empty() {
+        let _ = crate::threads::attachments::discard_staged_parts(ctx, &thread_id, &staged_parts)
+            .await;
+    }
+    let new_request_id = edit_result?;
 
     Ok(Outcome::single_log(
         json!(EditOrRegenerateResponse {
