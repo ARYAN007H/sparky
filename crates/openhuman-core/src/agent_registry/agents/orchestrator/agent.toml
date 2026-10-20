@@ -31,12 +31,9 @@ omit_identity = false
 omit_memory_context = false
 omit_safety_preamble = true
 
-# Delegation surface. The `collect_orchestrator_tools` helper reads this
-# at agent-build time and synthesises one `delegate_*` tool per named
-# specialist. The tool name and target `when_to_use` description are both
-# preserved in the model-facing routing surface. Archetype routes that are
-# withheld by a tool pack are described in the orchestrator prompt's live
-# specialist roster, using the registry's current `when_to_use` text.
+# Specialist routing surface. This allowlist constrains the `agent_id` enum
+# for the single `spawn_subagent` tool. Every named specialist is reached by
+# that tool; no per-specialist dispatch aliases are generated.
 #
 # `{ skills = "*" }` contributes deferred Composio actions, discovered through
 # `tool_search` and called directly; it does not spawn a sub-agent.
@@ -84,12 +81,12 @@ allowlist = [
     # a dedicated multimodal model (`MODEL_MEDIA_UNDERSTANDING`), so it can
     # actually see the image.
     "vision_agent",
-    # Image-generation specialist. Synthesised into a `delegate_create_image`
-    # tool. Route make/generate/edit an image requests here — it owns prompt
+    # Image-generation specialist. Route make/generate/edit an image requests
+    # here — it owns prompt
     # craft, model selection, and saving the result to the workspace.
     "image_agent",
-    # Video-generation specialist. Synthesised into a `delegate_create_video`
-    # tool. Route make/generate a video or animate this image requests here —
+    # Video-generation specialist. Route make/generate a video or animate this
+    # image requests here —
     # generation is async (minutes) and the agent blocks until the clip is saved.
     "video_agent",
     # Deck specialist. Owns presentation grounding, citations, image
@@ -105,11 +102,8 @@ allowlist = [
     # or flow" request here — it grounds nodes in real tool slugs + connections,
     # can sandbox dry-run a draft, and returns a workflow PROPOSAL for the user
     # to review and save. It never creates/enables/runs a real flow itself.
-    # Delegations run ASYNC by default: `build_workflow` returns an
-    # [async_subagent_ref] immediately and the proposal arrives as a follow-up
-    # turn; iterate on it via continue_subagent with the subagent_session_id
-    # from that ref / the [active_subagents] roster — never re-delegate the
-    # same build from scratch.
+    # Calls run asynchronously. Reuse the same task_key to continue this
+    # proposal or answer a clarification without creating another child.
     "workflow_builder",
     # Workflow-discovery specialist (the "Flow Scout"). Synthesised into a
     # `discover_workflows` tool at agent-build time. Route "what workflows
@@ -167,7 +161,7 @@ named = [
     # is a no-op with a schema cost: it ends the turn with the question as the
     # reply, which is exactly what asking in prose does. It stays on the
     # sub-agent belts, where a headless child has no other way to pause into
-    # `awaiting_user` for `continue_subagent`.
+    # `awaiting_user`; the parent resumes it with spawn_subagent and task_key.
 # Direct coding surface. The Master Agent owns the normal inspect → edit →
 # verify loop in the action sandbox. `apply_patch` is the one edit mechanism
 # for existing files, `file_write` creates new files, and `shell` runs builds
@@ -305,6 +299,6 @@ named = [
     # NOTE: `generate_presentation` is intentionally NOT listed here — deck
     # generation policy (grounding, citations, image verification) belongs to
     # `presentation_agent`, which the orchestrator reaches via
-    # `delegate_make_presentation`. Listing it directly is asserted against in
+    # `spawn_subagent(agent_id = "presentation_agent")`. Listing it directly is asserted against in
     # tests/in_process/orchestrator_presentation_wiring.rs.
 ]
