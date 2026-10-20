@@ -797,11 +797,16 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         module_paths.iter().any(|path| path == artifact_dir),
         "TinyChannels must resolve to the standard runner's staged release path: {artifact:?}"
     );
+    let module_cache = tempdir().expect("isolated module cache");
+    let _module_cache_guard = EnvVarGuard::set_to_path("XDG_CACHE_HOME", module_cache.path());
+    let module_data = tempdir().expect("isolated module data directory");
+    let _module_data_guard = EnvVarGuard::set_to_path("XDG_DATA_HOME", module_data.path());
 
     let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
     let mock_origin = format!("http://{}", mock_addr);
     write_min_config(&openhuman_home, &mock_origin);
-    for config_dir in [&openhuman_home, &openhuman_home.join("users/local")] {
+    let local_openhuman_home = openhuman_home.join("users/local");
+    for config_dir in [&openhuman_home, &local_openhuman_home] {
         let config_path = config_dir.join("config.toml");
         let mut config_text = std::fs::read_to_string(&config_path).expect("minimal config exists");
         config_text.push_str("\n[modules]\nsource = \"release\"\nallow_download = false\n");
@@ -931,6 +936,23 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
     );
     assert_eq!(status_b.get("connected").and_then(Value::as_bool), Some(true));
     assert_eq!(status_b.get("has_credentials").and_then(Value::as_bool), Some(true));
+
+    let modules_response =
+        post_json_rpc(&rpc_base, 7159, "openhuman.modules_list", json!({})).await;
+    let modules_response = assert_no_jsonrpc_error(&modules_response, "modules_list after Telegram");
+    let tinychannels = modules_response
+        .get("modules")
+        .or_else(|| modules_response.pointer("/result/modules"))
+        .and_then(Value::as_array)
+        .and_then(|modules| {
+            modules
+                .iter()
+                .find(|module| module.get("id").and_then(Value::as_str) == Some("tinychannels"))
+        })
+        .unwrap_or_else(|| panic!("modules_list omitted TinyChannels: {modules_response}"));
+    assert_eq!(tinychannels.get("version").and_then(Value::as_str), Some("0.1.36"));
+    assert_eq!(tinychannels.get("state").and_then(Value::as_str), Some("ready"));
+    assert_eq!(tinychannels.get("source").and_then(Value::as_str), Some("release"));
 
     mock_join.abort();
     rpc_join.abort();
