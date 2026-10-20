@@ -39,6 +39,7 @@ pub struct ThreadWireTypes {
     pub run_event_list: tinyagents_session::run_ledger::types::RunEventListResponse,
     pub turn_citation: crate::memory::types::TurnCitation,
     pub queue_mode: tinychannels_bus::web::QueueMode,
+    pub artifact_kind: crate::agent::artifacts::types::ArtifactKind,
 }
 
 /// Serialize the authoritative core/session record schemas for TypeScript codegen.

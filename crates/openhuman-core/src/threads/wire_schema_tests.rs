@@ -64,6 +64,7 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         "runTelemetry",
         "turnCitation",
         "queueMode",
+        "artifactKind",
     ] {
         assert!(
             properties.contains_key(property),
@@ -78,6 +79,16 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
             "interrupt".to_owned(),
             "parallel".to_owned(),
             "steer".to_owned(),
+        ]
+    );
+    assert_eq!(
+        schema_string_values(&schema, &properties["artifactKind"]),
+        vec![
+            "document".to_owned(),
+            "image".to_owned(),
+            "other".to_owned(),
+            "presentation".to_owned(),
+            "video".to_owned(),
         ]
     );
     let citation_schema = resolve_schema(&schema, &properties["turnCitation"]);

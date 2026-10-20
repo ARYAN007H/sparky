@@ -643,6 +643,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     'presentation',
     'document',
     'image',
+    'video',
     'other',
   ]);
   const isValidArtifactKind = (k: unknown): k is ArtifactKind =>
