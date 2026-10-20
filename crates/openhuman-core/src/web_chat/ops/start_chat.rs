@@ -260,6 +260,36 @@ pub(super) fn start_chat_with_stored_attachments<'a>(
     voice_note_id: Option<String>,
     stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
 ) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
+    start_chat_with_attachments(
+        ctx,
+        client_id,
+        thread_id,
+        message,
+        model_override,
+        temperature,
+        locale,
+        queue_mode,
+        metadata,
+        voice_note_id,
+        stored_attachments,
+        None,
+    )
+}
+
+pub(super) fn start_chat_with_attachments<'a>(
+    ctx: &'a crate::core::runtime::DispatchCtx,
+    client_id: &'a str,
+    thread_id: &'a str,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    locale: Option<String>,
+    queue_mode: Option<String>,
+    metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
+    stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
+    attachment_uploads: Option<Vec<tinychannels_bus::ContentPart>>,
+) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
     Box::pin(start_chat_inner(
         ctx,
         client_id,
@@ -272,6 +302,7 @@ pub(super) fn start_chat_with_stored_attachments<'a>(
         metadata,
         voice_note_id,
         stored_attachments,
+        attachment_uploads,
     ))
 }
 
@@ -288,6 +319,7 @@ async fn start_chat_inner(
     metadata: ChatRequestMetadata,
     voice_note_id: Option<String>,
     stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
+    attachment_uploads: Option<Vec<tinychannels_bus::ContentPart>>,
 ) -> Result<String, StartChatError> {
     let client_id = client_id.trim().to_string();
     let thread_id = thread_id.trim().to_string();
@@ -305,6 +337,16 @@ async fn start_chat_inner(
     // A profile this node no longer hosts (its lease was lost or released)
     // starts no new turn here. No-op outside SaaS.
     crate::profiles::host::ensure_hosted(ctx).map_err(StartChatError::Other)?;
+
+    let pending_attachments = match attachment_uploads {
+        Some(parts) if !parts.is_empty() => Some(
+            crate::threads::attachments::stage_queued_parts(ctx, &thread_id, &parts)
+                .await
+                .map(|parts| crate::agent::queued_turn::PendingAttachmentInput { parts })
+                .map_err(StartChatError::Other)?,
+        ),
+        _ => None,
+    };
 
     let mode = parse_mode(queue_mode.as_deref());
     let request_id = Uuid::new_v4().to_string();
@@ -332,6 +374,7 @@ async fn start_chat_inner(
             metadata,
             queued_at_ms,
             stored_attachments,
+            pending_attachments: pending_attachments.clone(),
         },
         host_authored: false,
         disposition: disposition(mode),
@@ -404,6 +447,9 @@ async fn start_chat_inner(
                 "thread_id": thread_id,
                 "request_id": request_id,
                 "queue_depth": queue_depth,
+                "queued_attachments": pending_attachments
+                    .map(|input| input.parts)
+                    .unwrap_or_default(),
             })
             .to_string())
         }
