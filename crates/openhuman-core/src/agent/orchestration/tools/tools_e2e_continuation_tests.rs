@@ -19,6 +19,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         Box::new(tinyagents_harness_tools::AskClarificationTool::new());
     let ask_spec = Arc::new(ask_tool.spec());
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);
+    parent.on_progress = Some(progress_tx);
     parent.all_tools = Arc::new(vec![ask_tool]);
     parent.all_tool_specs = Arc::new(vec![ask_spec.clone()]);
     parent.visible_tool_specs = Arc::new(vec![ask_spec]);
@@ -85,6 +87,20 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     .expect("child reaches its clarification checkpoint")
     .expect("registered child remains available");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentAwaitingUser {
+                    task_id: event_task_id,
+                    ..
+                }) if event_task_id == task_id => break,
+                Some(_) => {}
+                None => panic!("parent progress stream closed before the pause was projected"),
+            }
+        }
+    })
+    .await
+    .expect("host pause projection follows durable checkpoint persistence");
     assert_eq!(
         provider.calls.load(std::sync::atomic::Ordering::SeqCst),
         1,
