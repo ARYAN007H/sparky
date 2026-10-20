@@ -873,7 +873,7 @@ async fn credential_channel_describe_fields_are_wired_over_json_rpc_e2e() {
 }
 
 #[tokio::test]
-async fn yuanbao_credential_connect_and_disconnect_roundtrip_over_json_rpc_e2e() {
+async fn credential_yuanbao_connect_and_disconnect_roundtrip_over_json_rpc_e2e() {
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -1111,7 +1111,7 @@ async fn credential_channels_reject_missing_required_fields_over_json_rpc_e2e() 
 }
 
 #[tokio::test]
-async fn email_connect_refusal_does_not_store_credentials_over_json_rpc_e2e() {
+async fn credential_email_connect_refusal_does_not_store_credentials_over_json_rpc_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
@@ -1133,7 +1133,7 @@ async fn email_connect_refusal_does_not_store_credentials_over_json_rpc_e2e() {
         .local_addr()
         .expect("IMAP fixture address")
         .port();
-    let accept_task = tokio::spawn(async move {
+    let mut accept_task = tokio::spawn(async move {
         let (socket, _) = imap_listener.accept().await.expect("accept IMAP probe");
         drop(socket); // Refuse the TLS handshake before any credentials can be sent.
     });
@@ -1159,10 +1159,14 @@ async fn email_connect_refusal_does_not_store_credentials_over_json_rpc_e2e() {
         response.get("error").is_some(),
         "Email connect should surface the local IMAP verifier refusal: {response}"
     );
-    tokio::time::timeout(Duration::from_secs(5), accept_task)
+    if tokio::time::timeout(Duration::from_secs(5), &mut accept_task)
         .await
-        .expect("email verifier should reach the test-owned IMAP endpoint")
-        .expect("IMAP fixture task should not panic");
+        .is_err()
+    {
+        accept_task.abort();
+        panic!("email verifier should reach the test-owned IMAP endpoint");
+    }
+    accept_task.await.expect("IMAP fixture task should not panic");
 
     let error_text = response.get("error").expect("RPC error").to_string();
     for secret in ["e2e-email-password", "e2e@example.invalid"] {
@@ -1198,7 +1202,7 @@ async fn email_connect_refusal_does_not_store_credentials_over_json_rpc_e2e() {
 }
 
 #[tokio::test]
-async fn email_disconnect_clears_config_over_json_rpc_e2e() {
+async fn credential_email_disconnect_clears_config_over_json_rpc_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
