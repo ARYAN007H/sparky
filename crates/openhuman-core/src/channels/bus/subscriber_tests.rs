@@ -60,8 +60,52 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
     )
     .await
     .expect("the shared runner accepts the inbound channel turn");
-    while !block.started.load(std::sync::atomic::Ordering::SeqCst) {
-        tokio::task::yield_now().await;
+    let startup = tokio::time::timeout(Duration::from_secs(15), async {
+        while !block.started.load(std::sync::atomic::Ordering::SeqCst) {
+            match event_rx.try_recv() {
+                Ok(event) if event.context().request_id == request_id => {
+                    match event.wire_event() {
+                        WebChannelEvent::ChatError { message, .. } => {
+                            return Err(format!(
+                                "shared runner failed before entering controlled turn: {}",
+                                message.as_deref().unwrap_or("no error message")
+                            ));
+                        }
+                        WebChannelEvent::ChatDone { .. }
+                        | WebChannelEvent::ChatCancelled { .. } => {
+                            return Err(format!(
+                                "shared runner terminated before entering controlled turn: {}",
+                                event.wire_event().event_name()
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(_) | Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Lagged(skipped)) => {
+                    return Err(format!(
+                        "subscriber startup diagnostics lagged by {skipped} events"
+                    ));
+                }
+                Err(tokio::sync::broadcast::error::TryRecvError::Closed) => {
+                    return Err("web event stream closed before turn startup".into());
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        Ok(())
+    })
+    .await;
+    match startup {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => {
+            crate::web_chat::set_test_run_chat_task_block(None).await;
+            panic!("{error}");
+        }
+        Err(_) => {
+            crate::web_chat::set_test_run_chat_task_block(None).await;
+            panic!("shared runner did not enter the controlled turn within 15 virtual seconds");
+        }
     }
 
     let producer_request_id = request_id.clone();
