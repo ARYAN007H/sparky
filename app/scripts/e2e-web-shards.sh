@@ -158,7 +158,10 @@ if [[ "$selection" == required ]]; then
     fi
   done
 fi
-(( ${#shard_files[@]} > 0 || "$selection" == all )) || { echo "$selection selection has no ordinary shard files" >&2; exit 2; }
+if [[ "$selection" != all ]] && (( ${#shard_files[@]} == 0 )); then
+  echo "$selection selection has no ordinary shard files" >&2
+  exit 2
+fi
 for ((shard=1; shard<=64; shard++)); do
   if (( (shard - 1) % lanes + 1 == lane )); then
     if [[ "$selection" == all ]]; then
