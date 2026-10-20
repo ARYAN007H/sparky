@@ -254,7 +254,7 @@ export function validateTestOnlySourceParity({
       .sort().join(""));
     const releaseTreeHash = treeHash(releaseEntries);
     const candidateTreeHash = treeHash(candidateEntries);
-    if (releaseTreeHash !== proof.unchangedTreeSha256 || candidateTreeHash !== proof.unchangedTreeSha256) throw new Error("other source, manifest, lock, build input, or gitlink differs from the release tree");
+    if (releaseTreeHash !== proof.unchangedTreeSha256 || candidateTreeHash !== proof.unchangedTreeSha256) throw new Error(`other source, manifest, lock, build input, or gitlink differs from the release tree (${releaseTreeHash}/${candidateTreeHash})`);
 
     const binding = proof.binding;
     if (!binding || Object.keys(binding).sort().join(",") !== "moduleBlob,modulePath,testPath" || !/^[0-9a-f]{40}$/.test(binding.moduleBlob)) throw new Error("module binding proof is malformed");
