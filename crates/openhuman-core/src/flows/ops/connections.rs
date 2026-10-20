@@ -262,7 +262,7 @@ pub async fn compute_required_connections(
         }
     };
 
-    for node in super::super::host_gates::graph_json::nodes(graph) {
+    for node in crate::flows::host_gates::nodes(graph) {
         if node.kind == "tool_call" {
             if let Some(slug) = node.config.get("slug").and_then(Value::as_str) {
                 // Native OpenHuman tools (`oh:<name>`) need no connection.
@@ -276,7 +276,7 @@ pub async fn compute_required_connections(
         }
     }
     // An app_event trigger names its toolkit directly.
-    if let Some(trigger) = super::super::host_gates::graph_json::nodes(graph)
+    if let Some(trigger) = crate::flows::host_gates::nodes(graph)
         .find(|node| node.kind == "trigger")
     {
         if let Some(tk) = trigger.config.get("toolkit").and_then(Value::as_str) {

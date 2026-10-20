@@ -144,6 +144,7 @@ async fn flows_update_inner(
             existing.graph.clone()
         }
     };
+    let forced_automatic_disarm = disarm_automatic;
     // B29 Rule 1 analogue: disarm every manual/none → automatic trigger
     // transition, unconditionally. `now_auto` is safe to compute here (it
     // only depends on `graph`, THIS call's own incoming graph — never

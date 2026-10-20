@@ -137,13 +137,7 @@ impl FlowRunDigestSubscriber {
             tracing::warn!(target: "flows", %flow_id, %run_id, "[flows] digest: run row not found — skipping");
             return;
         };
-        let run: FlowRun = match store::roundtrip(wire_run) {
-            Ok(run) => run,
-            Err(error) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, %error, "[flows] digest: failed to decode run — skipping");
-                return;
-            }
-        };
+        let run: FlowRun = wire_run;
 
         let digest = render_run_digest(&flow_name, &run);
         let mut meta = flow_meta(flow_id, &[FLOW_RUN_DIGEST_TAG.to_string()]);

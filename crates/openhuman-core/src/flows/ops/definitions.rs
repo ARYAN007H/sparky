@@ -15,42 +15,11 @@ pub(super) fn publish_flow_changed(flow_id: &str, kind: &str, actor: &str) {
 
 /// Creates a new flow from a name and a raw graph JSON value.
 ///
-/// Issue B29 (save/enable safety) — two server-side rules apply here,
-/// authoritative regardless of what the caller passed, so no creation path
-/// (prompt bar, scratch/template modal, proposal "save & enable", copilot
-/// `save_workflow`, …) can silently hand the user an armed, unattended
-/// automation:
-///
-/// - **Rule 1** ([`trigger_is_automatic`]): a graph whose trigger fires
-///   without a human in the loop (`schedule` / `app_event` / `webhook`)
-///   persists **disabled**. The user arms it explicitly via
-///   `flows_set_enabled` — the same toggle already used everywhere else. A
-///   `manual` trigger (or no trigger-kind discriminator at all) still
-///   persists enabled: it only ever runs via an explicit `flows_run`, so
-///   there is no surprise, and gating it would just add friction.
-///
-///   This means a caller that represents an explicit user-arming action
-///   (e.g. `WorkflowProposalCard`'s "Save & enable" click,
-///   `app/src/components/chat/WorkflowProposalCard.tsx`) must check the
-///   returned [`Flow`]'s `enabled` field and follow up with
-///   `flows_set_enabled(id, true)` when it comes back `false` — otherwise
-///   the button's own label lies to the user. That follow-up call is a
-///   legitimate, explicit enable, not the silent copilot auto-arm this rule
-///   exists to prevent (the copilot's `save_workflow` path has no such
-///   follow-up and stays disabled).
-/// - **Rule 2** ([`graph_has_outbound_side_effect`]): a graph containing any
-///   `tool_call` / `http_request` / `code` node — the three kinds that can
-///   produce a real outbound effect — forces `require_approval: true`,
-///   overriding whatever the caller passed. A read-only graph (only
-///   `trigger` / `agent` / `transform` / `condition` / data-flow nodes) is
-///   unaffected.
-///
-/// An enabled flow still has its automatic-dispatch side effect bound
-/// immediately (e.g. the schedule-trigger cron job registered), reusing the
-/// same [`bind_trigger`] helper `flows_set_enabled` uses — but per Rule 1
-/// that now only happens for a `manual`-triggered (or trigger-kind-less)
-/// flow. Best-effort, same as `flows_set_enabled`: a binding failure is
-/// logged, not fatal to create.
+/// Catalog.PutWorkflow validates and persists the graph, applies automatic-
+/// trigger disarm and outbound-action approval policy, and returns its
+/// authoritative `born_disabled` / `approval_forced` results for the host RPC
+/// logs. OpenHuman binds the automatic-dispatch trigger only when the saved
+/// result is enabled.
 pub async fn flows_create(
     config: &Config,
     name: String,
@@ -163,7 +132,7 @@ pub async fn flows_get(config: &Config, id: &str) -> Result<Outcome<Flow>, Strin
     Ok(Outcome::single_log(flow, format!("flow loaded: {id}")))
 }
 
-/// Loads a saved flow's portable [`WorkflowGraph`] by id, for the
+/// Loads a saved flow's portable JSON graph by id, for the
 /// `sub_workflow`-by-`workflow_id` resolver capability through the compiled
 /// TinyFlows module's Catalog contract.
 ///

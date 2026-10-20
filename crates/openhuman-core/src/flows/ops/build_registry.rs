@@ -36,15 +36,13 @@ pub(super) fn register_build_turn(
         .lock()
         .unwrap_or_else(|error| error.into_inner())
         .insert(thread_id.clone(), BuildTurn { request_id, token });
-    if let Some(displaced) = displaced {
-        if !displaced.token.is_cancelled() {
-            tracing::debug!(
-                target: "flows",
-                thread_id = %thread_id,
-                "[flows] cancelling displaced builder turn"
-            );
-            displaced.token.cancel();
-        }
+    if let Some(displaced) = displaced.filter(|turn| !turn.token.is_cancelled()) {
+        tracing::debug!(
+            target: "flows",
+            thread_id = %thread_id,
+            "[flows] cancelling displaced builder turn"
+        );
+        displaced.token.cancel();
     }
 }
 
@@ -62,17 +60,15 @@ pub(super) fn cancel_build_turn_scoped(thread_id: &str, request_id: Option<&str>
         );
         return false;
     };
-    if let Some(request_id) = request_id {
-        if turn.request_id.as_deref() != Some(request_id) {
-            tracing::debug!(
-                target: "flows",
-                thread_id,
-                request_id,
-                active_request_id = turn.request_id.as_deref().unwrap_or("<none>"),
-                "[flows] builder cancellation ignored: request id does not match"
-            );
-            return false;
-        }
+    if request_id.is_some_and(|request_id| turn.request_id.as_deref() != Some(request_id)) {
+        tracing::debug!(
+            target: "flows",
+            thread_id,
+            request_id = request_id.unwrap_or_default(),
+            active_request_id = turn.request_id.as_deref().unwrap_or("<none>"),
+            "[flows] builder cancellation ignored: request id does not match"
+        );
+        return false;
     }
     turn.token.cancel();
     tracing::info!(

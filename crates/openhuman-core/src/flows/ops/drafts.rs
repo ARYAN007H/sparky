@@ -123,8 +123,7 @@ pub(crate) async fn flows_draft_promote_with_context(
         match response {
             tinyflows_bus::catalog::PromoteDraftResponse::Error(error) => Err(error.message),
             tinyflows_bus::catalog::PromoteDraftResponse::Ok(result) => {
-                let flow: Flow = crate::flows::store::roundtrip(result.workflow)
-                    .map_err(|error| error.to_string())?;
+                let flow: Flow = result.workflow;
                 let mut logs = result
                     .metadata
                     .get("logs")

@@ -36,11 +36,7 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 #[cfg(test)]
 use tinyflows::model::{NodeKind, WorkflowGraph};
-// Generic graph analysis used for UI notes and authoring summaries comes from
-// the TinyFlows bus. OpenHuman-specific save and dispatch policy stays here.
-// The save/run safety predicates are `tinyflows-catalog`'s: whether a graph
-// fires unattended, whether it can act on the world, and whether it has work
-// are graph properties. Import them only at their host policy call sites.
+// Graphs and Catalog/Runs records cross the module boundary as bus DTOs.
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::flows::bus;
@@ -49,9 +45,11 @@ use crate::flows::store;
 use crate::security::approval::{ApprovalChatContext, ApprovalTurnContext};
 use crate::security::turn_origin::{with_origin, AgentTurnOrigin};
 mod build_registry;
-use tinyflows_bus::catalog::{FlowRun, FlowSuggestion, SuggestionStatus, Workflow as Flow};
+use tinyflows_bus::catalog::{FlowRun, FlowSuggestion, SuggestionStatus};
 use tinyflows_bus::runs::FlowRunTrigger;
 use tokio_util::sync::CancellationToken;
+
+pub(crate) use tinyflows_bus::catalog::Workflow as Flow;
 
 
 /// Overall safety bound on a single `flows_run` / `flows_resume`. Individual

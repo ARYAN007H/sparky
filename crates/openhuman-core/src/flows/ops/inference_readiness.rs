@@ -140,7 +140,7 @@ pub(super) async fn evaluate_inference_readiness(
     graph: &Value,
 ) -> Option<InferenceReadinessEvaluation> {
     let mut roles = Vec::new();
-    for node in crate::flows::host_gates::graph_json::nodes(graph)
+    for node in crate::flows::host_gates::nodes(graph)
         .filter(|node| node.kind == "agent")
     {
         roles.push((node.id.to_owned(), agent_node_role(config, node.config).await));
