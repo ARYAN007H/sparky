@@ -133,32 +133,51 @@ async fn an_unknown_artifact_is_not_found() {
 }
 
 #[tokio::test]
-async fn an_artifact_made_before_versioning_opens_from_its_legacy_record() {
+async fn a_legacy_preview_reads_its_record_from_the_carried_profile() {
     use crate::artifacts::store::{create_artifact, finalize_artifact};
     use crate::artifacts::types::ArtifactKind as LegacyKind;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
     let workspace = tempfile::tempdir().unwrap();
     let config = config_in(workspace.path());
     let files = config.files_dir();
     std::fs::create_dir_all(&files).unwrap();
-    // Only the legacy record: no versioned one.
-    let (meta, path) = create_artifact(
-        workspace.path(),
-        files.clone(),
-        LegacyKind::Document,
-        "Old notes",
-        "md",
-        None,
-    )
-    .await
-    .unwrap();
-    std::fs::write(&path, "# from before").unwrap();
-    finalize_artifact(workspace.path(), &meta.id, 13, None)
+    let context_for = |profile: &'static str| {
+        let overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::kernel(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile(profile);
+        CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
+    };
+    let core_a = context_for("preview-a");
+    let core_b = context_for("preview-b");
+    let ctx_a = DispatchCtx::new(core_a.clone());
+    // Only profile A has the legacy record; there is no versioned record.
+    let meta = CoreContext::scope(core_a, async {
+        let (meta, path) = create_artifact(
+            workspace.path(),
+            files.clone(),
+            LegacyKind::Document,
+            "Old notes",
+            "md",
+            None,
+        )
         .await
         .unwrap();
+        std::fs::write(&path, "# from before").unwrap();
+        finalize_artifact(workspace.path(), &meta.id, 13, None)
+            .await
+            .unwrap();
+        meta
+    })
+    .await;
 
-    let ctx = crate::core::runtime::DispatchCtx::process_default();
-    let body = read_body(&config, &meta.id, &ctx).await.unwrap();
+    let body = CoreContext::scope(core_b, async {
+        read_body(&config, &meta.id, &ctx_a).await.unwrap()
+    })
+    .await;
     assert_eq!(body.title, "Old notes");
     assert_eq!(body.kind, "file");
     assert_eq!(body.body, "# from before");
