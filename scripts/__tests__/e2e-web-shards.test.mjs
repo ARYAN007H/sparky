@@ -66,6 +66,22 @@ test("CI Full requires every Playwright lane and manual workflow shares the arti
   assert.match(manual, /e2e-web-shards\.sh --lane=\$\{\{ matrix\.lane \}\} --lanes=4/);
 });
 
+test("failure artifact names are unique across all four Playwright lanes", () => {
+  const workflows = [
+    ["CI Full", fs.readFileSync(path.join(repoRoot, ".github/workflows/ci-full.yml"), "utf8")],
+    ["manual Playwright", fs.readFileSync(path.join(repoRoot, ".github/workflows/e2e-playwright.yml"), "utf8")],
+  ];
+
+  for (const [workflow, source] of workflows) {
+    const match = source.match(/name: (e2e-playwright-failure-logs-[^\r\n]+)/);
+    assert.ok(match, `${workflow} must upload its failure artifact`);
+    const names = Array.from({ length: 4 }, (_, index) =>
+      match[1].replace(/\$\{\{\s*matrix\.lane\s*\}\}/g, String(index + 1)),
+    );
+    assert.equal(new Set(names).size, 4, `${workflow} artifact names must be unique per lane`);
+  }
+});
+
 test("failed units retain failure while later units run in distinct workspaces", () => {
   const runner = path.join(fixtureRoot, "runner.sh");
   fs.writeFileSync(
