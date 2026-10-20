@@ -5,7 +5,7 @@ use tinyagents_harness::run_queue::QueueLane;
 use tinyagents_orchestration::steering::{steer_detached, SteerAccess, SteerError};
 
 use super::cancel::now_ms;
-use super::registry::{control_admits, owner_key, registry};
+use super::registry::{RunningSubagentMetadata, control_admits, owner_key, registry};
 
 /// Inject an instruction into a detached sub-agent owned by `parent_session`.
 pub async fn steer(
@@ -22,7 +22,7 @@ pub async fn steer(
         SteerAccess::Owner(&owner),
         text,
         lane,
-        |metadata, lane, text| async move {
+        |metadata: RunningSubagentMetadata, lane: QueueLane, text: String| async move {
             metadata
                 .run_queue
                 .push(
@@ -75,7 +75,7 @@ pub(crate) async fn steer_control(
         SteerAccess::Trusted,
         text,
         lane,
-        |metadata, lane, text| async move {
+        |metadata: RunningSubagentMetadata, lane: QueueLane, text: String| async move {
             metadata
                 .run_queue
                 .push(

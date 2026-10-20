@@ -103,7 +103,9 @@ struct OpenHumanGoalTool {
 
 impl OpenHumanGoalTool {
     fn new(kind: GoalToolKind, workspace_dir: &Path) -> Self {
-        let metadata_store = tinyagents_session::port::InMemorySessionStores::new().kv;
+        let metadata_store = tinyagents_session::port::InMemorySessionStores::new()
+            .for_agent("metadata")
+            .kv;
         Self {
             kind,
             workspace_dir: workspace_dir.to_path_buf(),
