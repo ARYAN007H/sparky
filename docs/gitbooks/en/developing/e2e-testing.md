@@ -177,11 +177,11 @@ runs on a pull request to `main`.
 on every push to it. Its final gate requires the Playwright matrix, native
 desktop suite and Rust E2E:
 
-| Lane              | Job                                   | Platform                                                                   |
-| ----------------- | ------------------------------------- | -------------------------------------------------------------------------- |
-| Rust mock backend | `rust-e2e`                            | Linux                                                                      |
+| Lane              | Job                                   | Platform                                                                            |
+| ----------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Rust mock backend | `rust-e2e`                            | Linux                                                                               |
 | Playwright web    | `playwright-e2e`                      | Four required Linux jobs, 16 ordinary shards per job plus round-robin special cases |
-| Desktop           | `e2e-desktop`, via `e2e-reusable.yml` | Four Linux suite groups                                                    |
+| Desktop           | `e2e-desktop`, via `e2e-reusable.yml` | Four Linux suite groups                                                             |
 
 Playwright builds its web bundle and standalone core once, then uploads the same artifact to all four required lanes. The required selection runs 109 of the 110 discovered specs: all 48 active browser owners from the consolidation inventory and their assertion recipients remain required, as do every other healthy browser spec. It schedules 64 ordinary shards and nine isolated cases (Connections aliases, Connections deep links, and seven Skills search/install cases), each with its own core and workspace: 73 required units total. A separate `playwright-legacy-diagnostic` job runs the unchanged `aui-tool-result-elements.spec.ts` as one file-atomic unit. Its component compatibility blocker is tracked in [issue #236](https://github.com/senamakel/openhuman/issues/236#issuecomment-6284472501). Only this diagnostic job is advisory; it is excluded from the final gate, while all four required lanes remain strict. The scheduler continues through assigned units to collect failures and exits nonzero if any required unit fails. CI Full therefore runs 74 fresh Playwright units across the required and diagnostic jobs, without claiming the legacy diagnostic passed. Manual Playwright selects all 110 specs strictly, using the same 64 shards and nine isolated cases (73 units); it has no advisory selection.
 
