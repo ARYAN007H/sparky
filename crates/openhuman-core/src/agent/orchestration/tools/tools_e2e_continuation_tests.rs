@@ -426,9 +426,15 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
 
     let mut repeated_params = serde_json::Map::new();
     repeated_params.insert("taskId".into(), json!(task_id));
-    let repeated = (controller.handler)(DispatchCtx::new(Arc::clone(
-        live.data.dispatch_ctx().resolved().expect("RPC uses the spawned parent's core"),
-    )), repeated_params)
+    let repeated = (controller.handler)(
+        DispatchCtx::new(Arc::clone(
+            live.data
+                .dispatch_ctx()
+                .resolved()
+                .expect("RPC uses the spawned parent's core"),
+        )),
+        repeated_params,
+    )
         .await
         .expect("repeated cancel RPC result");
     assert_eq!(response_field(&repeated, "cancelled"), Some(json!(false)));
