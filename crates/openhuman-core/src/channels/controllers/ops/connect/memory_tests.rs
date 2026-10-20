@@ -4,6 +4,7 @@ use crate::threads::store::{
     ConversationMessage, ConversationMessagePatch, CreateConversationThread,
 };
 use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::{
@@ -192,6 +193,31 @@ async fn clears_stamped_and_legacy_channel_conversations_without_mutating_legacy
 }
 
 #[tokio::test]
+async fn channel_cleanup_reads_legacy_threads_after_state_migration() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().to_path_buf();
+    use_linked_channel_module(&mut config).await;
+    let engine = Arc::new(ReferenceEngine::new());
+    crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
+    engine
+        .store(conversation("discord-legacy", None))
+        .await
+        .unwrap();
+
+    let legacy_file = config.workspace_dir.join("memory/channel_threads.json");
+    std::fs::create_dir_all(legacy_file.parent().unwrap()).unwrap();
+    std::fs::write(&legacy_file, br#"{"discord":["discord-legacy"]}"#).unwrap();
+    let imported: Option<BTreeMap<String, BTreeSet<String>>> =
+        crate::memory::state_store::load(&config.workspace_dir, "channel_threads").unwrap();
+    assert!(imported.is_some());
+    std::fs::remove_file(&legacy_file).unwrap();
+
+    assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 1);
+    assert!(engine.is_empty());
+}
+
+#[tokio::test]
 async fn stamped_channel_forget_isolated_to_the_configured_account() {
     let current_tmp = tempfile::TempDir::new().unwrap();
     let other_tmp = tempfile::TempDir::new().unwrap();
@@ -266,11 +292,8 @@ async fn missing_or_corrupt_legacy_map_does_not_block_stamped_forget() {
         assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 1);
         assert!(engine.is_empty());
         if corrupt {
-            assert!(!legacy_file.exists());
-            assert_eq!(
-                std::fs::read(legacy_file.with_extension("json.corrupt")).unwrap(),
-                corrupt_bytes
-            );
+            assert_eq!(std::fs::read(&legacy_file).unwrap(), corrupt_bytes);
+            assert!(!legacy_file.with_extension("json.corrupt").exists());
         } else {
             assert!(!legacy_file.exists());
         }

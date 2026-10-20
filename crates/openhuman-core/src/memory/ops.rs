@@ -498,21 +498,29 @@ fn channel_key(channel: &str) -> String {
     channel.trim().to_ascii_lowercase()
 }
 
-/// Reads only the legacy map written by prior releases. Corrupt JSON keeps the
-/// existing quarantine behavior; current code never creates or updates it.
+/// Reads only the legacy map written by prior releases. Corrupt JSON is skipped
+/// without moving the source; current code never creates or updates it.
 #[cfg(feature = "channels")]
 fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
-    let all = match super::state_store::load::<BTreeMap<String, BTreeSet<String>>>(
+    // Prefer the workspace state value, which may have imported and removed
+    // the old file. If no value is available (including a failed import),
+    // retain the legacy read path. Malformed JSON is skipped without moving
+    // or rewriting its source.
+    if let Ok(Some(all)) = super::state_store::load_strict::<BTreeMap<String, BTreeSet<String>>>(
         workspace,
         "channel_threads",
     ) {
-        Ok(Some(all)) => all,
-        Ok(None) => return BTreeSet::new(),
-        Err(error) => {
-            tracing::warn!(%error, "[memory:channels] reading legacy channel map failed");
-            return BTreeSet::new();
-        }
+        return all.get(&channel_key(channel)).cloned().unwrap_or_default();
+    }
+    let file = workspace.join("memory").join("channel_threads.json");
+    let Ok(text) = std::fs::read_to_string(&file) else {
+        return BTreeSet::new();
     };
+    let all: BTreeMap<String, BTreeSet<String>> =
+        serde_json::from_str(&text).unwrap_or_else(|error| {
+            tracing::warn!(%error, "[memory:channels] legacy channel map unparsable; skipped");
+            BTreeMap::new()
+        });
     all.get(&channel_key(channel)).cloned().unwrap_or_default()
 }
 
