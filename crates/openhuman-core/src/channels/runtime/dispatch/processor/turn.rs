@@ -423,15 +423,6 @@ pub(crate) async fn process_channel_runtime_message(
     // Slack channel cannot use it from their own session — distinct senders
     // produce distinct origins, and the wallet preparer / parked-approval
     // gates compare these for equality before honouring confirmations.
-    let turn_origin = crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
-        sender_name: msg.sender_name.clone(),
-        channel: msg.channel.clone(),
-        sender: Some(msg.sender.clone()),
-        reply_target: msg.reply_target.clone(),
-        message_id: msg.id.clone(),
-        history_key: Some(history_key.clone()),
-    };
-
     // Sub-issue 2 of #3098: give the agent turn an `ApprovalTurnContext` for
     // every channel with the `chat_approvals` capability (served by
     // `ChannelApprovalSurfaceSubscriber`). Without a chat context the gate's
@@ -466,6 +457,37 @@ pub(crate) async fn process_channel_runtime_message(
             }
         }
         None => None,
+    };
+    let channel_session = selected_host.as_ref().and_then(|host| {
+        let account_id = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .filter(|account| !account.trim().is_empty())?;
+        Some(tinyflows_bus::schedule::types::ChannelSessionIdentity {
+            tenant_key: crate::core::runtime::tenant::tenant_key(&tenant, ""),
+            agent_id: host.definition.id.clone(),
+            session_key: canonical_session_key.clone(),
+            provider: envelope.channel.id.clone(),
+            account_id: Some(account_id.to_owned()),
+            conversation: tinyflows_bus::schedule::types::ChannelConversationIdentity {
+                kind: envelope.conversation.kind.as_session_segment().to_string(),
+                id: envelope.conversation.id.clone(),
+                scope_id: envelope.conversation.scope_id.clone(),
+                parent_id: envelope.conversation.parent_id.clone(),
+                thread_id: envelope.conversation.thread_id.clone(),
+                topic_id: envelope.conversation.topic_id.clone(),
+            },
+        })
+    });
+    let turn_origin = crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        sender_name: msg.sender_name.clone(),
+        channel: msg.channel.clone(),
+        sender: Some(msg.sender.clone()),
+        reply_target: msg.reply_target.clone(),
+        message_id: msg.id.clone(),
+        history_key: Some(history_key.clone()),
+        channel_session,
     };
     let execution = match selected_host {
         Some(host) => {

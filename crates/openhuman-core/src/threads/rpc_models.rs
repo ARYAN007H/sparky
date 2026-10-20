@@ -5,8 +5,8 @@
 //! nothing on the wire moved. These types describe chat threads and their
 //! messages, which are thread persistence (`threads::store`), not memory.
 
-use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 pub use crate::core::envelope::{ApiEnvelope, ApiError, ApiMeta, EmptyRequest, PaginationMeta};
 

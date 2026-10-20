@@ -9,7 +9,7 @@
 //!   announced on the web channel as a `proactive_message` event addressed to
 //!   that thread. Re-delivering the same run lands on the same row.
 //! - Channel origin: the reply is sent to the origin's reply target, then
-//!   appended to that chat's history so its next turn sees it.
+//!   appended to its durable agent transcript so the next turn sees it.
 
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
@@ -39,7 +39,7 @@ pub(crate) fn origin_request_id(job_id: &str, run_id: &str) -> String {
 
 /// Everything the web agent-transcript append needs about one delivered reply.
 pub(crate) struct TranscriptAppend<'a> {
-    pub thread_id: &'a str,
+    pub session_key: &'a str,
     /// The agent that owns the thread's session (its transcript is keyed by
     /// thread id and agent id).
     pub agent_id: &'a str,
@@ -62,7 +62,7 @@ const TRANSCRIPT_APPEND_TIMEOUT: std::time::Duration = std::time::Duration::from
 /// waits for any live turn of the session (the per-session turn lock), dedupes
 /// on the idempotency key and records `{kind: "cron", job_id, run_id}`
 /// provenance. The session is addressed exactly as the session host does it
-/// (`SessionRef::scoped(thread_id, agent_id)`) in `transcripts`, the store
+/// (`SessionRef::scoped(session_key, agent_id)`) in `transcripts`, the store
 /// the host wrote it to, which the caller resolved from the job's tenant
 /// ([`origin_transcripts`]). A thread that never had an agent turn has no
 /// transcript (`NoSession`) and is skipped. Must never be called from inside a
@@ -75,7 +75,7 @@ pub(crate) async fn append_to_origin_transcript(
         append_background_message_in, BackgroundAppend, BackgroundAppendOutcome, SessionRef,
         TranscriptMessage,
     };
-    let session = SessionRef::scoped(append.thread_id.to_string(), append.agent_id.to_string());
+    let session = SessionRef::scoped(append.session_key.to_string(), append.agent_id.to_string());
     let options = BackgroundAppend::new(
         append.idempotency_key,
         serde_json::json!({
@@ -161,6 +161,18 @@ pub(crate) async fn deliver_to_origin(
         ));
     };
     let text = output.trim();
+    if let JobOrigin::Channel {
+        channel,
+        channel_session,
+        ..
+    } = origin
+    {
+        let identity = channel_session
+            .as_deref()
+            .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
+        super::origin_context::validated_channel_session(ctx, config, channel, identity)
+            .map_err(|error| anyhow!("invalid channel origin: {error}"))?;
+    }
 
     // The job's tenant: a hosted profile's or an embedded agent's host routes
     // the reply itself; otherwise it keys the transcript store below.
@@ -191,6 +203,14 @@ pub(crate) async fn deliver_to_origin(
         })
         .await
         .map_err(|e| anyhow!("the host could not deliver the reply: {e}"))?;
+        if let JobOrigin::Channel {
+            channel,
+            channel_session: Some(identity),
+            ..
+        } = origin
+        {
+            append_channel_transcript(ctx, config, channel, identity, job, run_id, text).await?;
+        }
         return Ok(DeliveryStatus::Delivered);
     }
 
@@ -214,21 +234,39 @@ pub(crate) async fn deliver_to_origin(
         JobOrigin::Channel {
             channel,
             reply_target,
-            history_key,
-            thread_id,
+            channel_session,
             ..
         } => {
+            let identity = channel_session
+                .as_deref()
+                .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
+            let (session_key, agent_id, _tenant) =
+                super::origin_context::validated_channel_session(ctx, config, channel, identity)
+                    .map_err(|error| anyhow!("invalid channel origin: {error}"))?;
             let text = strip_openhuman_link_markup(text);
             channel_bridge::send_to_channel(
                 channel,
+                identity,
                 reply_target,
-                thread_id.as_deref(),
                 &text,
                 &origin_request_id(&job.id, run_id),
             )
             .await
             .map_err(|e| anyhow!(e))?;
-            channel_bridge::append_assistant_message(history_key, &text);
+            let transcripts = origin_channel_transcripts(ctx, config, identity, &agent_id)?;
+            append_to_origin_transcript(
+                transcripts.as_ref(),
+                &TranscriptAppend {
+                    session_key: &session_key,
+                    agent_id: &agent_id,
+                    text: &text,
+                    idempotency_key: &origin_request_id(&job.id, run_id),
+                    job_id: &job.id,
+                    run_id,
+                },
+            )
+            .await
+            .map_err(|error| anyhow!("could not persist channel origin reply: {error}"))?;
             tracing::debug!(
                 job_id = %job.id,
                 run_id = %run_id,
@@ -238,6 +276,56 @@ pub(crate) async fn deliver_to_origin(
             Ok(DeliveryStatus::Delivered)
         }
     }
+}
+
+async fn append_channel_transcript(
+    ctx: &DispatchCtx,
+    config: &Config,
+    channel: &str,
+    identity: &tinyflows_bus::schedule::types::ChannelSessionIdentity,
+    job: &CronJob,
+    run_id: &str,
+    text: &str,
+) -> Result<()> {
+    let (session_key, agent_id, _) =
+        super::origin_context::validated_channel_session(ctx, config, channel, identity)
+            .map_err(|error| anyhow!("invalid channel origin: {error}"))?;
+    let transcripts = origin_channel_transcripts(ctx, config, identity, &agent_id)?;
+    append_to_origin_transcript(
+        transcripts.as_ref(),
+        &TranscriptAppend {
+            session_key: &session_key,
+            agent_id: &agent_id,
+            text,
+            idempotency_key: &origin_request_id(&job.id, run_id),
+            job_id: &job.id,
+            run_id,
+        },
+    )
+    .await
+    .map_err(|error| anyhow!("could not persist channel origin reply: {error}"))
+}
+
+fn origin_channel_transcripts(
+    ctx: &DispatchCtx,
+    config: &Config,
+    identity: &tinyflows_bus::schedule::types::ChannelSessionIdentity,
+    agent_id: &str,
+) -> Result<std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator>> {
+    let core = ctx
+        .core()
+        .ok_or_else(|| anyhow!("channel origin has no resolved core context"))?;
+    let tenant = ctx
+        .tenant()
+        .map_err(|error| anyhow!("could not resolve channel origin tenant: {error}"))?;
+    if identity.tenant_key != crate::core::runtime::tenant_key(&tenant, "") {
+        return Err(anyhow!("channel origin belongs to a different tenant"));
+    }
+    Ok(crate::agent::session_store::transcripts_or_files_in(
+        core,
+        &crate::agent::session_store::agent_key_for(&tenant, agent_id),
+        &config.workspace_dir,
+    ))
 }
 
 async fn deliver_to_web_thread(
@@ -304,7 +392,7 @@ async fn deliver_to_web_thread(
     if let Err(e) = append_to_origin_transcript(
         transcripts.as_ref(),
         &TranscriptAppend {
-            thread_id,
+            session_key: thread_id,
             agent_id: &agent_id,
             text,
             idempotency_key: &request_id,

@@ -1,30 +1,14 @@
-//! Cron's handle on the channel runtime, for jobs bound to a channel
-//! conversation.
-//!
-//! Cron runs outside the channel runtime, but a channel-origin job needs two
-//! things that live in it: the per-chat conversation history (read for the
-//! context tail, appended to after a reminder is delivered) and the live
-//! channel instances (to send through). The runtime registers both here when
-//! it starts; nothing registers in a core with no channels, and every accessor
-//! then answers "unavailable" instead of failing.
+//! Cron's handle on the live channel send adapters. Conversation context and
+//! delivered replies are stored in durable agent transcripts, not here.
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
-use tinychannels_bus::SendMessage;
-use tinychannels_runtime::context::ChatMessage;
-use tinychannels_runtime::Channel;
-
-/// Same shape as `channels::context::ConversationHistoryMap`, spelled out so
-/// cron does not depend on the feature-gated `channels` module.
-pub type ChannelHistories = Arc<Mutex<HashMap<String, Vec<ChatMessage>>>>;
-
-/// How many messages a chat's history keeps; matches the channel processor's
-/// own trimming so a delivered reminder never grows it past that bound.
-pub const MAX_HISTORY_MESSAGES: usize = 40;
+use std::sync::{Arc, RwLock};
+use tinybus::module::ModuleObjectClient;
+use tinychannels_bus::module_progressive::ProgressiveResult;
+use tinychannels_bus::{ChannelRef, ConversationKind, ConversationRef};
 
 #[derive(Clone)]
 struct Bridge {
-    histories: ChannelHistories,
-    channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+    module_objects: Arc<HashMap<String, ModuleObjectClient>>,
 }
 
 fn slot() -> &'static RwLock<Option<Bridge>> {
@@ -36,65 +20,20 @@ fn current() -> Option<Bridge> {
     slot().read().ok().and_then(|guard| guard.clone())
 }
 
-/// Register the running channel runtime's histories and channels. The latest
+/// Register the running channel runtime's send adapters. The latest
 /// registration wins (the runtime restarts on logout/login).
-pub fn register_channel_bridge(
-    histories: ChannelHistories,
-    channels: Arc<HashMap<String, Arc<dyn Channel>>>,
-    max_history: usize,
-) {
-    MAX_HISTORY.store(max_history.max(1), std::sync::atomic::Ordering::Relaxed);
+pub fn register_channel_bridge(module_objects: Arc<HashMap<String, ModuleObjectClient>>) {
     if let Ok(mut guard) = slot().write() {
-        *guard = Some(Bridge {
-            histories,
-            channels,
-        });
-        tracing::debug!(max_history, "[cron] channel bridge registered");
+        *guard = Some(Bridge { module_objects });
+        tracing::debug!("[cron] channel delivery bridge registered");
     }
 }
 
-static MAX_HISTORY: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(MAX_HISTORY_MESSAGES);
-
-/// The `(role, text)` messages of one chat's history, oldest first. Empty when
-/// no channel runtime is registered or the chat has no history.
-pub fn history_messages(history_key: &str) -> Vec<(String, String)> {
-    let Some(bridge) = current() else {
-        tracing::debug!("[cron] channel history requested but no channel bridge registered");
-        return Vec::new();
-    };
-    let histories = bridge.histories.lock().unwrap_or_else(|e| e.into_inner());
-    histories
-        .get(history_key)
-        .map(|turns| {
-            turns
-                .iter()
-                .map(|m| (m.role.clone(), m.content.clone()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// Append an assistant message to one chat's history and trim it the way the
-/// channel processor does, so the chat's next turn sees what was delivered.
-/// Returns `false` when no channel runtime is registered.
-pub fn append_assistant_message(history_key: &str, text: &str) -> bool {
-    let Some(bridge) = current() else {
-        tracing::debug!("[cron] channel history append skipped: no channel bridge registered");
-        return false;
-    };
-    let max = MAX_HISTORY.load(std::sync::atomic::Ordering::Relaxed);
-    let mut histories = bridge.histories.lock().unwrap_or_else(|e| e.into_inner());
-    let turns = histories.entry(history_key.to_string()).or_default();
-    turns.push(ChatMessage::assistant(text));
-    while turns.len() > max {
-        turns.remove(0);
+/// Release callback objects when the channel runtime shuts down.
+pub fn clear_channel_bridge() {
+    if let Ok(mut guard) = slot().write() {
+        *guard = None;
     }
-    tracing::debug!(
-        history_len = turns.len(),
-        "[cron] appended delivered reply to channel history"
-    );
-    true
 }
 
 /// Send `text` to `reply_target` on the named channel through the registered
@@ -102,26 +41,75 @@ pub fn append_assistant_message(history_key: &str, text: &str) -> bool {
 /// fails.
 pub async fn send_to_channel(
     channel: &str,
+    identity: &tinyflows_bus::schedule::types::ChannelSessionIdentity,
     reply_target: &str,
-    thread_id: Option<&str>,
     text: &str,
     idempotency_key: &str,
 ) -> Result<(), String> {
     let Some(bridge) = current() else {
         return Err("channel runtime is not running".to_string());
     };
-    let key = channel.trim().to_ascii_lowercase();
-    let Some(ch) = bridge.channels.get(&key) else {
-        return Err(format!("channel '{key}' is not available"));
+    let provider = tinychannels_bus::provider_id(channel);
+    if identity.provider != provider {
+        return Err("channel origin provider does not match the captured session".into());
+    }
+    let account_id = identity
+        .account_id
+        .as_deref()
+        .filter(|account| tinychannels_bus::provider_id(account) == provider)
+        .ok_or_else(|| "channel origin has no configured account identity".to_string())?;
+    if identity.conversation.id != reply_target {
+        return Err("channel origin recipient does not match the captured conversation".into());
+    }
+    let Some(object) = bridge.module_objects.get(account_id).cloned() else {
+        return Err("configured channel module is unavailable".into());
     };
-    // Run-specific key: a retry after an ambiguous send must not duplicate the
-    // reminder, while identical reminders from different runs must not collide
-    // (the content-derived default key would reuse one key for both).
-    let mut message = SendMessage::new(text, reply_target).in_thread(thread_id.map(str::to_string));
-    message.idempotency_key = Some(idempotency_key.to_string());
-    ch.send(&message)
-        .await
-        .map_err(|e| format!("channel send failed: {e}"))
+    let channel_ref = ChannelRef {
+        id: identity.provider.clone(),
+        account_id: Some(account_id.to_string()),
+    };
+    let conversation = conversation_ref(&identity.conversation)?;
+    let reply = crate::channels::bus::NativeProgressiveReply::open(
+        object,
+        channel_ref,
+        conversation,
+        idempotency_key.to_string(),
+        std::time::Duration::from_secs(60),
+    )
+    .await
+    .map_err(|_| "channel progressive output could not be opened".to_string())?;
+    match reply.finish(text).await {
+        Ok(result) if crate::channels::runtime::dispatch::delivery_succeeded(&result) => Ok(()),
+        Ok(
+            ProgressiveResult::DeliveryBatch { .. }
+            | ProgressiveResult::DeliveryOutcome { .. }
+            | ProgressiveResult::DeliveryOutcomes { .. }
+            | ProgressiveResult::DeliveryUnsupported { .. },
+        ) => Err("channel provider did not confirm complete delivery".into()),
+        Ok(_) => Err("channel provider returned an invalid delivery result".into()),
+        Err(_) => Err("channel progressive delivery failed".into()),
+    }
+}
+
+fn conversation_ref(
+    identity: &tinyflows_bus::schedule::types::ChannelConversationIdentity,
+) -> Result<ConversationRef, String> {
+    let kind = match identity.kind.as_str() {
+        "dm" => ConversationKind::Dm,
+        "group" => ConversationKind::Group,
+        "channel" => ConversationKind::Channel,
+        "thread" => ConversationKind::Thread,
+        "unknown" => ConversationKind::Unknown,
+        _ => return Err("channel origin conversation kind is invalid".into()),
+    };
+    Ok(ConversationRef {
+        kind,
+        id: identity.id.clone(),
+        scope_id: identity.scope_id.clone(),
+        parent_id: identity.parent_id.clone(),
+        thread_id: identity.thread_id.clone(),
+        topic_id: identity.topic_id.clone(),
+    })
 }
 
 #[cfg(test)]

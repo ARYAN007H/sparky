@@ -19,6 +19,7 @@ async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
         reply_target: "-100".into(),
         message_id: "spawned-turn".into(),
         history_key: None,
+        channel_session: None,
     };
     let thread = params("spawned-turn", "hello").thread_id();
     CoreContext::scope(context, async {

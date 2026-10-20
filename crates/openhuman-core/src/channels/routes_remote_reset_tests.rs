@@ -4,10 +4,7 @@ use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use tinyagents_session::transcript::{
-    SessionRef, TranscriptHistory, TranscriptLocator, TranscriptMessage, TranscriptMeta,
-    TranscriptRead,
-};
+use tinyagents_session::transcript::{SessionRef, TranscriptMessage, TranscriptMeta};
 
 struct ConfiguredChannel;
 
@@ -135,7 +132,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     let tmp = tempfile::TempDir::new().unwrap();
     let workspace = tmp.path();
     let (alice_core, alice_runtime) = tenant_runtime("remote-reset-alice", workspace);
-    let (bob_core, bob_runtime) = tenant_runtime("remote-reset-bob", workspace);
+    let (bob_core, _bob_runtime) = tenant_runtime("remote-reset-bob", workspace);
     let alice_dispatch = DispatchCtx::new(Arc::clone(&alice_core));
     let bob_dispatch = DispatchCtx::new(Arc::clone(&bob_core));
     let alice_tenant = alice_dispatch.tenant().unwrap();
