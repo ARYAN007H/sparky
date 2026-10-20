@@ -124,6 +124,7 @@ impl AgentTurnHost {
         // Keep the large agent future behind a pointer while the origin scope
         // is active. The origin is explicit and independent from RPC metadata.
         let origin = request.origin;
+        let scoped_origin = origin.clone();
         let message = request.message;
         let input = request.message_input;
         let approval = request.approval;
@@ -134,14 +135,14 @@ impl AgentTurnHost {
                         .run_single_with_approval_and_message(
                             &message,
                             input,
-                            Some(origin.clone()),
+                            Some(scoped_origin.clone()),
                             approval,
                         )
                         .await
                 }
                 None => {
                     session
-                        .run_single_with_approval(&message, Some(origin.clone()), approval)
+                        .run_single_with_approval(&message, Some(scoped_origin.clone()), approval)
                         .await
                 }
             }
