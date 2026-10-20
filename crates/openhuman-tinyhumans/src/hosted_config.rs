@@ -1,5 +1,5 @@
 use openhuman_embed::__host::config::schema::cloud_providers::{
-    register_hosted_auth_style, register_hosted_cloud_preset, AuthStyle,
+    register_hosted_cloud_provider_policy, register_hosted_cloud_preset, AuthStyle,
     BuiltinCloudProvider,
 };
 use std::sync::Arc;
@@ -14,5 +14,5 @@ pub(crate) fn register() {
             auth_style: AuthStyle::OpenhumanJwt,
         },
     );
-    register_hosted_auth_style(Arc::new(|style| style == AuthStyle::OpenhumanJwt));
+    register_hosted_cloud_provider_policy(Arc::new(|style| style == AuthStyle::OpenhumanJwt));
 }

@@ -20,9 +20,9 @@ use crate::core::slots::HookSlot;
 
 static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
     HookSlot::new("config::hosted_cloud_presets");
-pub type HostedAuthStyleClassifier = Arc<dyn Fn(AuthStyle) -> bool + Send + Sync>;
-static HOSTED_AUTH_STYLE: HookSlot<HostedAuthStyleClassifier> =
-    HookSlot::new("config::hosted_auth_style");
+pub type HostedCloudProviderClassifier = Arc<dyn Fn(&str, AuthStyle) -> bool + Send + Sync>;
+static HOSTED_CLOUD_PROVIDER: HookSlot<HostedCloudProviderClassifier> =
+    HookSlot::new("config::hosted_cloud_provider");
 
 /// A built-in cloud provider preset in the host's [`AuthStyle`] vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,15 +40,15 @@ pub fn register_hosted_cloud_preset(id: impl Into<String>, preset: BuiltinCloudP
 
 /// Register host-owned auth-style classification without making it core
 /// inference policy.
-pub fn register_hosted_auth_style(classifier: HostedAuthStyleClassifier) {
-    HOSTED_AUTH_STYLE.register("default", classifier);
+pub fn register_hosted_cloud_provider_policy(classifier: HostedCloudProviderClassifier) {
+    HOSTED_CLOUD_PROVIDER.register("default", classifier);
 }
 
 /// Whether the installed host treats this compatibility auth style as hosted.
-pub fn is_hosted_auth_style(style: AuthStyle) -> bool {
-    HOSTED_AUTH_STYLE
+pub fn is_hosted_cloud_provider(slug: &str, style: AuthStyle) -> bool {
+    HOSTED_CLOUD_PROVIDER
         .get("default")
-        .is_some_and(|classify| classify(style))
+        .is_some_and(|classify| classify(slug, style))
 }
 
 impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
