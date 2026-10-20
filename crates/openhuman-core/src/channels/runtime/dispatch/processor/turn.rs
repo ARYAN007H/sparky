@@ -2,7 +2,7 @@
 //! assembly, dispatching the agentic turn over the native bus, and
 //! delivering the draft/final reply.
 
-use crate::channels::context::{ChannelRuntimeContext, is_context_window_overflow_error};
+use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
 #[cfg(test)]
 use crate::channels::routes::get_or_create_turn_model_source;
 use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
@@ -18,15 +18,15 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    REPLY_LOG_TRUNCATE_CHARS, build_channel_context_block, log_worker_join_result,
-    spawn_typing_task,
+    build_channel_context_block, log_worker_join_result, spawn_typing_task,
+    REPLY_LOG_TRUNCATE_CHARS,
 };
 use super::super::host_agent::{self, HostRoute};
-use super::RuntimeChannelMessage;
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 #[cfg(test)]
 use super::bus_turn::dispatch_bus_turn;
 use super::reset_durable_channel_session;
+use super::RuntimeChannelMessage;
 
 pub(crate) async fn process_channel_message(
     ctx: Arc<ChannelRuntimeContext>,

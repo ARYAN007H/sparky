@@ -2,17 +2,17 @@
 use crate::backend::{BackendApiError, BackendClient};
 use crate::modules::channel_runtime::ChannelRuntimeLease;
 use crate::security::credentials::session_support::{
-    BackendCredential, get_session_token, is_local_session_token,
+    get_session_token, is_local_session_token, BackendCredential,
 };
+use serde_json::json;
 #[cfg(test)]
 use serde_json::Value;
-use serde_json::json;
 use tinybus::module::ModuleCallError;
 use tinychannels_bus::module_progressive::{
     ChannelOutputEvent, ProgressiveCommand, ProgressiveEvent, ProgressiveResult,
     ProgressiveTransportRequest, ProgressiveTransportResult,
 };
-use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, methods};
+use tinychannels_bus::{methods, ChannelBackendRequest, ChannelBackendResult};
 
 /// Transport refusals are typed facts; recovery and retry budgets belong to the module.
 pub(super) fn map_backend_error(error: anyhow::Error) -> ProgressiveTransportResult {

@@ -9,8 +9,8 @@ mod subscriber;
 #[cfg(test)]
 mod thread_id;
 
-pub use subscriber::ChannelInboundSubscriber;
 pub(crate) use delivery::NativeProgressiveReply;
+pub use subscriber::ChannelInboundSubscriber;
 
 #[cfg(test)]
 pub(crate) use thread_id::derive_inbound_thread_id;
