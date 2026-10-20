@@ -119,7 +119,7 @@ fn workspace_scope_is_stable_before_creation_and_across_profile_layouts() {
     let v1 = ProfileLayout::with_version(profile_dir.clone(), LayoutVersion::V1);
     let v1_scope = super::workspace_scope(&v1.workspace_dir).unwrap();
     std::fs::create_dir_all(&v1.workspace_dir).unwrap();
-    ProfileLayout::mark_v2(&profile_dir).unwrap();
+    LayoutVersion::mark_v2(&profile_dir).unwrap();
     let v2 = ProfileLayout::with_version(profile_dir, LayoutVersion::V2);
     assert_eq!(super::workspace_scope(&v2.workspace_dir).unwrap(), v1_scope);
 }
@@ -134,8 +134,8 @@ async fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_
     let bob_dir = tmp.path().join("users").join("bob");
     std::fs::create_dir_all(&alice_dir).unwrap();
     std::fs::create_dir_all(&bob_dir).unwrap();
-    ProfileLayout::mark_v2(&alice_dir).unwrap();
-    ProfileLayout::mark_v2(&bob_dir).unwrap();
+    LayoutVersion::mark_v2(&alice_dir).unwrap();
+    LayoutVersion::mark_v2(&bob_dir).unwrap();
     let alice_workspace = ProfileLayout::with_version(alice_dir, LayoutVersion::V2).workspace_dir;
     let bob_workspace = ProfileLayout::with_version(bob_dir, LayoutVersion::V2).workspace_dir;
 
