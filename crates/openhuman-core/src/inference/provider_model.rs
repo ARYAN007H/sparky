@@ -1,13 +1,12 @@
 //! Provider-neutral helpers for resolving model ids against registered model
 //! vocabularies.
 
-use crate::config::{Config, WORKLOAD_ROLES};
+use crate::config::Config;
 
 /// The workload role represented by a provider-specific model alias, defaulting
 /// to the generic `chat` role for concrete and unknown ids.
 pub fn role_for_model(provider_id: &str, model: &str) -> String {
     crate::inference::registry::provider_model_role(provider_id, model)
-        .or_else(|| WORKLOAD_ROLES.contains(&model.trim()).then(|| model.trim().to_string()))
         .unwrap_or_else(|| "chat".to_string())
 }
 
@@ -23,9 +22,7 @@ pub fn resolve_model_hint(provider_id: &str, hint: &str, config: &Config) -> Str
     if trimmed.is_empty() {
         return trimmed.to_string();
     }
-    let Some(role) = crate::inference::registry::provider_model_role(provider_id, trimmed)
-        .or_else(|| WORKLOAD_ROLES.contains(&trimmed).then(|| trimmed.to_string()))
-    else {
+    let Some(role) = crate::inference::registry::provider_model_role(provider_id, trimmed) else {
         return trimmed.to_string();
     };
 
