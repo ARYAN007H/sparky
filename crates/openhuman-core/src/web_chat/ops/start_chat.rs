@@ -232,6 +232,34 @@ pub(super) fn start_chat_with_voice_note<'a>(
     metadata: ChatRequestMetadata,
     voice_note_id: Option<String>,
 ) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
+    start_chat_with_stored_attachments(
+        ctx,
+        client_id,
+        thread_id,
+        message,
+        model_override,
+        temperature,
+        locale,
+        queue_mode,
+        metadata,
+        voice_note_id,
+        None,
+    )
+}
+
+pub(super) fn start_chat_with_stored_attachments<'a>(
+    ctx: &'a crate::core::runtime::DispatchCtx,
+    client_id: &'a str,
+    thread_id: &'a str,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    locale: Option<String>,
+    queue_mode: Option<String>,
+    metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
+    stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
+) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
     Box::pin(start_chat_inner(
         ctx,
         client_id,
@@ -243,6 +271,7 @@ pub(super) fn start_chat_with_voice_note<'a>(
         queue_mode,
         metadata,
         voice_note_id,
+        stored_attachments,
     ))
 }
 
@@ -258,6 +287,7 @@ async fn start_chat_inner(
     queue_mode: Option<String>,
     metadata: ChatRequestMetadata,
     voice_note_id: Option<String>,
+    stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
 ) -> Result<String, StartChatError> {
     let client_id = client_id.trim().to_string();
     let thread_id = thread_id.trim().to_string();
@@ -301,6 +331,7 @@ async fn start_chat_inner(
             locale,
             metadata,
             queued_at_ms,
+            stored_attachments,
         },
         host_authored: false,
         disposition: disposition(mode),
