@@ -326,9 +326,7 @@ fn hosted_roots_share_only_an_unconfigured_process_harness() {
     assert_eq!(first, second, "all roots enter the same durable harness");
     assert!(
         root_hosted_harness()
-            .preview_model_profile_for_request(
-                &tinyagents_harness::host::ModelResolveRequest::default()
-            )
+            .preview_model_profile_for_request(&ModelRequest::default())
             .is_none(),
         "models are invocation-local overlays, never mutable shared root state"
     );

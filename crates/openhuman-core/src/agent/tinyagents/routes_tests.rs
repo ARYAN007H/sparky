@@ -64,7 +64,7 @@ async fn run_recorded_route(
     let mut harness: AgentHarness<(), crate::agent::tinyagents::host::OpenHumanRunContext> =
         AgentHarness::new();
     let served_route = route.clone();
-    let successful = Arc::new(RouteRecordingModel::new(
+    let successful: Arc<dyn ChatModel<()>> = Arc::new(RouteRecordingModel::new(
         successful_model,
         served_route.clone(),
     ));

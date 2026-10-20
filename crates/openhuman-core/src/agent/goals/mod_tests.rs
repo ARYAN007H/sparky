@@ -94,12 +94,11 @@ async fn goal_tool_with_context_uses_the_business_goal_store() {
     crate::core::runtime::CoreContext::scope(context, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
         let mut tools = goal_tools(workspace.path());
-        let set = tools
+        let thread = ThreadContext("goal-tool-business-store");
+        let result = tools
             .iter_mut()
             .find(|tool| tool.name() == "goal_set")
-            .expect("goal_set tool");
-        let thread = ThreadContext("goal-tool-business-store");
-        let result = set
+            .expect("goal_set tool")
             .execute_with_context(
                 serde_json::json!({ "objective": "persist through the host store" }),
                 ToolCallOptions::default(),
@@ -116,11 +115,10 @@ async fn goal_tool_with_context_uses_the_business_goal_store() {
             .expect("goal was persisted");
         assert_eq!(stored.objective, "persist through the host store");
 
-        let complete = tools
+        let result = tools
             .iter_mut()
             .find(|tool| tool.name() == "goal_complete")
-            .expect("goal_complete tool");
-        let result = complete
+            .expect("goal_complete tool")
             .execute_with_context(
                 serde_json::json!({}),
                 ToolCallOptions::default(),
@@ -139,7 +137,10 @@ async fn goal_tool_with_context_uses_the_business_goal_store() {
             tinyagents_harness_tools::goals::ThreadGoalStatus::Complete
         );
 
-        let no_thread = set
+        let no_thread = tools
+            .iter_mut()
+            .find(|tool| tool.name() == "goal_set")
+            .expect("goal_set tool")
             .execute(serde_json::json!({ "objective": "no thread" }))
             .await
             .expect("execute without a thread");

@@ -131,7 +131,7 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
             )
             .await
             .unwrap();
-        let id = created.record.id;
+        let id = created.record.id.clone();
         let file = created.record.latest().unwrap().file.as_ref().unwrap();
         assert_eq!(
             files_a.as_ref().unwrap().read(&file.key).await.unwrap(),
