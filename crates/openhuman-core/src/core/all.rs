@@ -296,10 +296,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::desktop::app_state::all_app_state_registered_controllers(),
     );
     // Composio integration controllers
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Integrations,
-        crate::integrations::composio::all_composio_registered_controllers(),
+        crate::integrations::composio::all_composio_controller_entries(),
     );
     // Scheduled job management
     push(

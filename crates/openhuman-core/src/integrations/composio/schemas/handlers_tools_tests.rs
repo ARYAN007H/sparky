@@ -70,7 +70,10 @@ fn execute_parser_preserves_tool_first_errors_and_connection_type_error() {
         ("tool".into(), json!("  ")),
         ("connection_id".into(), json!(7)),
     ]);
-    assert_eq!(parse_execute(empty_tool).unwrap_err(), "'tool' must not be empty");
+    assert_eq!(
+        parse_execute(empty_tool).unwrap_err(),
+        "'tool' must not be empty"
+    );
 
     let invalid_connection = Map::from_iter([
         ("tool".into(), json!("GMAIL_SEND_EMAIL")),

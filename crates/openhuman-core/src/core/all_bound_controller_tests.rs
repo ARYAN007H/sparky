@@ -220,7 +220,11 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
         .filter(|grouped| grouped.controller.is_bound())
         .map(|grouped| grouped.controller.schema.method_name())
         .collect();
-    assert_eq!(bound_methods, ["threads.upsert"], "staged bound inventory");
+    assert_eq!(
+        bound_methods,
+        ["composio.execute", "threads.upsert"],
+        "staged bound inventory"
+    );
     assert!(
         entry.is_bound(),
         "threads.upsert must be bound at the production registration site"
