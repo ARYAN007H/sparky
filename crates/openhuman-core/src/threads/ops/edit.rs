@@ -99,16 +99,13 @@ pub async fn edit_message(
             "voice notes must be sent through channel.web_chat".into(),
         ));
     }
-    // Stage and validate uploads before cancellation or truncation. The folded
-    // marker form is deliberately discarded: edits reuse these scoped opaque
-    // refs when the replacement row is persisted below.
+    // Stage and validate uploads before cancellation or truncation. The staged
+    // opaque refs are reused when the replacement row is persisted below.
     if !request.attachments.is_empty() && request.content.trim().is_empty() {
         return Err(ThreadsError::Message(
             "edited attachment messages require text".into(),
         ));
     }
-    crate::agent::attachments::parts::fold_into_message(&request.content, &request.attachments)
-        .map_err(|e| ThreadsError::Message(e.to_string()))?;
     let dir = ctx
         .load_config()
         .await
@@ -122,6 +119,8 @@ pub async fn edit_message(
     let staged_parts = if request.attachments.is_empty() {
         Vec::new()
     } else {
+        // This is the only staging pass. The marker-form intermediate stays
+        // inside the staging helper and is never persisted or sent to a turn.
         crate::threads::attachments::stage_queued_parts(ctx, &thread_id, &request.attachments)
             .await
             .map_err(ThreadsError::Message)?
