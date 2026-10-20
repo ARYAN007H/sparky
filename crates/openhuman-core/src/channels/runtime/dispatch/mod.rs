@@ -21,8 +21,8 @@ pub(crate) use processor::progressive::{
 };
 
 pub(crate) use processor::{
-    process_channel_message, process_channel_runtime_message, run_message_dispatch_loop,
-    RuntimeChannelMessage,
+    process_channel_message, process_channel_runtime_message, reset_durable_channel_session,
+    run_message_dispatch_loop, RuntimeChannelMessage,
 };
 
 // `channel_has_approval_surface` stays pub(crate) on processor; re-export so
