@@ -347,7 +347,6 @@ impl ArtifactObserver for LegacyUiBridge {
     async fn on_event(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
         self.ctx.enter(self.on_event_in_scope(event)).await
     }
-
 }
 
 /// The folders a file version may point into: its own kept copy, the agent's
@@ -476,9 +475,10 @@ pub(super) fn build_artifacts_service_with_scope(
         .as_ref()
         .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(scoped)) as Arc<dyn FileStore>);
     let mut records: Arc<dyn ArtifactStore> = match scoped.as_ref() {
-        Some(scoped) => Arc::new(
-            super::version_documents::DocumentArtifactStore::over(workspace_dir, scoped),
-        ),
+        Some(scoped) => Arc::new(super::version_documents::DocumentArtifactStore::over(
+            workspace_dir,
+            scoped,
+        )),
         None => Arc::new(UnavailableArtifactStore),
     };
     if let Some(store) = file_store.as_ref() {
