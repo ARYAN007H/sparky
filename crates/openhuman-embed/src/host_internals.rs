@@ -123,6 +123,9 @@ pub mod config {
     pub mod ops {
         pub use openhuman_core::config::ops::{load_config_in, load_config_with_timeout};
     }
+    pub mod migrations {
+        pub use openhuman_core::config::migrations::run_pending;
+    }
     pub mod rpc {
         pub use openhuman_core::config::rpc::load_config_with_timeout;
     }
