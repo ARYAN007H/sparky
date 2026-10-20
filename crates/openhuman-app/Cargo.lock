@@ -6798,7 +6798,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-bus"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -7169,7 +7169,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-api"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7183,7 +7183,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-integrations"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7208,7 +7208,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-tools"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "async-lock",
  "async-trait",
@@ -7228,7 +7228,7 @@ dependencies = [
 
 [[package]]
 name = "tinyredact"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "log",
  "regex",
