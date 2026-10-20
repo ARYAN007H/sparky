@@ -41,9 +41,8 @@ use crate::flows::{
     FLOWS_TAG,
 };
 use crate::memory::types::{FetchParams, RecallParams};
-use crate::memory::MemoryError;
 use crate::security::approval::{
-    redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
+    redact_args, summarize_action, GateOutcome,
 };
 #[cfg(test)]
 use crate::security::turn_origin;
