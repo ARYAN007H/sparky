@@ -121,18 +121,21 @@ impl CompletionTarget {
     pub(crate) async fn awaiting_input(
         &self,
         task_id: &str,
+        task_key: &str,
         agent_id: &str,
         question: &str,
         checkpointed: bool,
     ) {
         let record_id = awaiting_input_record_id(task_id);
-        let summary = crate::agent::orchestration::tools::awaiting_user::awaiting_user_envelope(
-            task_id,
-            agent_id,
-            None,
-            question,
+        let summary = tinyagents_orchestration::subagent::SubagentAwaitingUser {
+            task_id: task_id.to_owned(),
+            task_key: task_key.to_owned(),
+            agent_id: agent_id.to_owned(),
+            worker_thread_id: None,
+            question: question.to_owned(),
             checkpointed,
-        );
+        }
+        .render();
         record_outcome_with_parent_epoch(
             &self.ctx,
             &self.workspace_dir,
