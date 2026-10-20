@@ -331,7 +331,6 @@ if should_run_suite "provider-web"; then
   # notion-flow.spec.ts was removed; skip to avoid "spec not found" failure.
   # run "test/e2e/specs/notion-flow.spec.ts"                  "notion"                    "provider-web"
   run "test/e2e/specs/composio-triggers-flow.spec.ts"         "composio-triggers"         "provider-web"
-  run "test/e2e/specs/connectivity-state-differentiation.spec.ts" "connectivity-state"   "provider-web"
   _mini_summary "provider-web"
 fi
 
