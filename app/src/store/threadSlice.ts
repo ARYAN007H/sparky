@@ -492,7 +492,20 @@ const threadSlice = createSlice({
       const rowId = event.openhuman_message_id;
       if (!rowId || !event.thread_id) return;
       const thread = (state.channelActivityByThreadId[event.thread_id] ??= {});
-      const activity = (thread[rowId] ??= { reactions: [], readReceipts: [] });
+      if (!thread[rowId]) {
+        const prior = state.messagesByThreadId[event.thread_id]?.find(message => message.id === rowId);
+        const persisted = prior?.extraMetadata?.channelActivity;
+        const saved = persisted && typeof persisted === 'object' ? persisted : undefined;
+        thread[rowId] = {
+          reactions: Array.isArray((saved as ChannelActivity | undefined)?.reactions)
+            ? (saved as ChannelActivity).reactions.map(item => ({ ...item }))
+            : [],
+          readReceipts: Array.isArray((saved as ChannelActivity | undefined)?.readReceipts)
+            ? (saved as ChannelActivity).readReceipts.map(item => ({ ...item }))
+            : [],
+        };
+      }
+      const activity = thread[rowId];
       const providerEvent = event.channel_event;
       if (providerEvent.type === 'reaction_added') {
         const reaction = {
@@ -828,6 +841,7 @@ const threadSlice = createSlice({
 });
 
 export const {
+  applyChannelEvent,
   clearCreateThreadError,
   setSelectedThread,
   invalidateThreadSelection,

@@ -624,6 +624,45 @@ const ThreadScrollToBottom: FC = () => {
   return <ScrollAnchor label={t('chat.message.scrollToBottom')} />;
 };
 
+const ChannelMessageActivity: FC = () => {
+  const metadata = useAuiState(state => state.message.metadata?.custom) as
+    | { extraMetadata?: Record<string, unknown> }
+    | undefined;
+  const activity = metadata?.extraMetadata?.channelActivity;
+  if (!activity || typeof activity !== 'object') return null;
+  const value = activity as {
+    reactions?: Array<{ value?: unknown; customEmojiId?: unknown }>;
+    readReceipts?: unknown[];
+  };
+  const reactionCounts = new Map<string, number>();
+  for (const reaction of value.reactions ?? []) {
+    if (typeof reaction.value !== 'string' || reaction.value.length === 0) continue;
+    reactionCounts.set(reaction.value, (reactionCounts.get(reaction.value) ?? 0) + 1);
+  }
+  const readCount = value.readReceipts?.length ?? 0;
+  if (reactionCounts.size === 0 && readCount === 0) return null;
+  return (
+    <div data-slot="aui_channel-message-activity" className="mt-1 flex flex-wrap gap-1">
+      {[...reactionCounts].map(([reaction, count]) => (
+        <span
+          key={reaction}
+          data-testid="channel-message-reaction"
+          className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+          {reaction} {count}
+        </span>
+      ))}
+      {readCount > 0 && (
+        <span
+          data-testid="channel-message-read-receipts"
+          aria-hidden="true"
+          className="text-muted-foreground px-1 py-0.5 text-xs">
+          ✓✓ {readCount}
+        </span>
+      )}
+    </div>
+  );
+};
+
 const ThreadWelcome: FC = () => {
   const { t } = useT();
   return (
@@ -1305,6 +1344,7 @@ const AssistantMessage: FC = () => {
             <MessageVoiceNote note={voiceNote} withTranscript={false} />
           </div>
         ) : null}
+        <ChannelMessageActivity />
       </div>
 
       <div
@@ -1529,6 +1569,7 @@ const UserMessage: FC = () => {
         data-slot="aui_user-branch-picker"
         className="col-span-full col-start-1 -me-1 justify-end"
       />
+      <ChannelMessageActivity />
     </MessagePrimitive.Root>
   );
 };
