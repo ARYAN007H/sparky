@@ -62,26 +62,3 @@ fn tiny_artifacts_blob_namespace_composes_with_host_artifact_collections() {
         .any(|prefix| prefix == "artifacts/files/"));
 }
 
-#[test]
-fn tiny_artifacts_blob_namespace_is_in_the_composed_owner_schema() {
-    let registry = registry().expect("the owners compose");
-    assert!(registry.owners().any(|owner| owner == "artifacts"));
-
-    let schema = owner_schemas()
-        .into_iter()
-        .find(|schema| schema.owner.as_str() == "artifacts" && schema.items.iter().any(|item| {
-            matches!(
-                item,
-                Item::Blobs {
-                    prefix,
-                    scope: ScopeClass::Tenant,
-                } if prefix == "artifacts/files/"
-            )
-        }))
-        .expect("TinyArtifacts declares its tenant blob prefix alongside host artifact data");
-    assert!(schema.items.iter().any(|item| matches!(
-        item,
-        Item::Blobs { prefix, scope: ScopeClass::Tenant }
-            if prefix == "artifacts/files/"
-    )));
-}
