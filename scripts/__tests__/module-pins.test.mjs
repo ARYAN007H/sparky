@@ -408,7 +408,7 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
   // proves its own invariant rather than failing the earlier HEAD check.
   for (const [name, overrides, diagnostic] of [
     ["asset map", { assets: [] }, /registry version or artifact asset map changed/],
-    ["registry version", { version: "1.1.0", proof: { tag: "v1.1.0" } }, /release tag does not match/],
+    ["registry version", { version: "1.1.0" }, /release tag does not match/],
     ["unknown field", { proof: { unknown: true } }, /proof fields are missing or unknown/],
     ["whole-tree digest", { proof: { unchangedTreeSha256: "f".repeat(64) } }, /other source, manifest, lock, build input, or gitlink differs/],
     ["mode", { proof: { testFile: { candidateMode: "100755" } } }, /regular non-executable/],
