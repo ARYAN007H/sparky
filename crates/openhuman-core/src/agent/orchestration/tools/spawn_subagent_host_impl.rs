@@ -234,6 +234,193 @@ impl SpawnSubagentTool {
         let reuse_decision = subagent_sessions::reuse_decision(reusable.as_ref(), force_fresh);
         let follow_up_prompt = reusable_follow_up_message(&prompt, context.as_deref());
 
+        if let Some(session) = reusable
+            .as_ref()
+            .filter(|session| session.status == DurableSubagentStatus::AwaitingUser)
+        {
+            let Some(task_id) = session.current_task_id.as_deref() else {
+                return Ok(ToolResult::error(
+                    "spawn_subagent: paused reusable session has no current task id",
+                ));
+            };
+            let checkpoint_dir = parent.workspace_dir.join(".openhuman/subagent_checkpoints");
+            let checkpoint = match crate::agent::subagent_host::load_subagent_checkpoint(
+                &checkpoint_dir,
+                task_id,
+            ) {
+                Ok(checkpoint) => checkpoint,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: failed to load paused checkpoint for task '{task_id}': {error}"
+                    )));
+                }
+            };
+            let Some(original_key) = checkpoint.task_key.clone() else {
+                return Ok(ToolResult::error(
+                    "spawn_subagent: paused checkpoint omitted its original task key",
+                ));
+            };
+            if checkpoint.agent_id != definition.id || original_key.task_id != task_id {
+                return Ok(ToolResult::error(
+                    "spawn_subagent: paused checkpoint does not match the reusable session",
+                ));
+            }
+            let checkpoint_resume = crate::agent::subagent_host::checkpoint_resume(&checkpoint);
+            let completion_target = match crate::agent::orchestration::background_completions::CompletionTarget::new(
+                dispatch.clone(),
+                parent.workspace_dir.clone(),
+                parent_session.clone(),
+                parent_thread_id.clone(),
+            ) {
+                Ok(target) => target,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: parent lifecycle admission failed: {error}"
+                    )));
+                }
+            };
+            if let Some(thread_id) = parent_thread_id.as_deref() {
+                if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
+                    &dispatch,
+                    &parent.workspace_dir,
+                    thread_id,
+                    task_id,
+                ) {
+                    return Ok(ToolResult::error(
+                        "spawn_subagent: parent thread is stopped or deleted",
+                    ));
+                }
+            }
+            let resumed_session = match subagent_sessions::upsert_running(
+                &store,
+                SubagentSessionUpsert {
+                    selector: selector.clone(),
+                    display_name: Some(definition.display_name().to_string()),
+                    task_title: task_title.clone(),
+                    worker_thread_id: session.worker_thread_id.clone(),
+                    task_id: task_id.to_owned(),
+                    lifecycle_key: Some(original_key.clone()),
+                    parent_epoch: completion_target.parent_epoch(),
+                },
+                Some(session),
+            ) {
+                Ok(session) => session,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: failed to resume paused session: {error}"
+                    )));
+                }
+            };
+
+            crate::agent::orchestration::subagent_events::publish_subagent_spawned(
+                parent_session.clone(),
+                definition.id.clone(),
+                "async".to_string(),
+                task_id.to_owned(),
+                follow_up_prompt.chars().count(),
+            );
+            if let Some(progress) = progress_sink.as_ref() {
+                let _ = progress
+                    .send(AgentProgress::SubagentSpawned {
+                        agent_id: definition.id.clone(),
+                        task_id: task_id.to_owned(),
+                        mode: "async".to_string(),
+                        dedicated_thread: session.worker_thread_id.is_some(),
+                        prompt_chars: follow_up_prompt.chars().count(),
+                        prompt: follow_up_prompt.clone(),
+                        worker_thread_id: session.worker_thread_id.clone(),
+                        display_name: Some(definition.display_name().to_string()),
+                        parent_call_id: crate::tools::host_extensions::tool_call_id(tool_context),
+                    })
+                    .await;
+            }
+
+            let completion = completion::make_completion(
+                dispatch.clone().into_core(),
+                detached_parent.data.origin.clone(),
+                progress_sink.clone(),
+                parent.workspace_dir.clone(),
+                dispatch.clone(),
+                definition.id.clone(),
+                task_id.to_owned(),
+                task_key.clone(),
+                parent_session.clone(),
+                completion_target.clone(),
+                session.worker_thread_id.clone(),
+                store.clone(),
+                resumed_session.subagent_session_id.clone(),
+                parent_thread_id.clone(),
+            );
+            let options = SubagentRunOptions {
+                skill_filter_override: checkpoint.skill_filter_override,
+                context: context.clone(),
+                model_override: checkpoint.model_override,
+                task_id: Some(task_id.to_owned()),
+                thread_id: Some(
+                    session
+                        .worker_thread_id
+                        .clone()
+                        .unwrap_or_else(|| resumed_session.subagent_session_id.clone()),
+                ),
+                run_context: detached_parent.data.child(),
+                worker_thread_id: session.worker_thread_id.clone(),
+                initial_history: None,
+                checkpoint_dir: Some(checkpoint_dir),
+                workspace_descriptor: workspace_descriptor.clone(),
+                run_queue: None,
+                message_run_queue: None,
+            };
+            if let Err(error) = crate::agent::subagent_host::resume_async_via_driver_tool(
+                &detached_parent,
+                original_key,
+                checkpoint_resume,
+                definition.clone(),
+                follow_up_prompt,
+                options,
+                completion,
+            )
+            .await
+            {
+                let message = error.to_string();
+                let _ = subagent_sessions::mark_failed(
+                    &store,
+                    &resumed_session.subagent_session_id,
+                    task_id,
+                    message.clone(),
+                );
+                completion_target
+                    .failed(task_id, &definition.id, &message)
+                    .await;
+                crate::agent::orchestration::subagent_events::publish_subagent_failed(
+                    parent_session,
+                    task_id.to_owned(),
+                    definition.id.clone(),
+                    message.clone(),
+                );
+                if let Some(progress) = progress_sink {
+                    let _ = progress
+                        .send(AgentProgress::SubagentFailed {
+                            agent_id: definition.id,
+                            task_id: task_id.to_owned(),
+                            error: message,
+                        })
+                        .await;
+                }
+                return Ok(ToolResult::error(format!(
+                    "spawn_subagent: failed to resume detached sub-agent: {error}"
+                )));
+            }
+            return Ok(accepted_spawn_result(
+                task_id,
+                &resumed_session.subagent_session_id,
+                &definition.id,
+                session.worker_thread_id.as_deref(),
+                true,
+                reuse_decision.as_str(),
+                &task_key,
+            ));
+        }
+
         if let Some(session) = reusable.as_ref() {
             if session.status == DurableSubagentStatus::Running {
                 if let Some(ref running_task_id) = session.current_task_id {
