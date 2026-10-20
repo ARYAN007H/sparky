@@ -246,9 +246,9 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             .await
             .unwrap_or_else(|_| {
                 fail(format!(
-                    "{CONCURRENT_TURNS} turns did not overlap: at most {} of them were \
-                     ever in flight at the provider together ({} waiting at the gate \
-                     after {CONCURRENT_HANG_GUARD:?}); the gate opens only when all \
+                    "{CONCURRENT_TURNS} turns did not overlap: the most ever in flight \
+                     at the provider together was {} ({} waiting at the gate after \
+                     {CONCURRENT_HANG_GUARD:?}); the gate opens only when all \
                      {CONCURRENT_TURNS} are, so turns serialized or are capped",
                     provider_server.peak_in_flight(),
                     provider_server.in_flight(),
