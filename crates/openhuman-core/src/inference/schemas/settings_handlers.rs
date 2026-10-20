@@ -69,7 +69,12 @@ pub(super) fn handle_inference_resolve_model(
     Box::pin(async move {
         let p = deserialize_params::<InferenceResolveModelParams>(params)?;
         let config = ctx.load_config().await?;
-        let resolved = crate::inference::provider_model::resolve_provider_model_hint(
+        let resolved_context = ctx.resolved();
+        let extensions = resolved_context
+            .as_deref()
+            .map(crate::core::runtime::CoreContext::extensions);
+        let resolved = crate::inference::provider_model::resolve_provider_model_hint_for(
+            extensions,
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
             &p.hint,
             &config,
@@ -80,7 +85,11 @@ pub(super) fn handle_inference_resolve_model(
         // vision tiers (and their `hint:` aliases) and `false` for every other
         // tier; custom/BYOK models are covered by the user's per-model
         // `model_registry.vision` flag.
-        let vision = crate::inference::model_context::model_supports_vision(&resolved, &config);
+        let vision = crate::inference::model_context::model_supports_vision_in(
+            extensions,
+            &resolved,
+            &config,
+        );
         to_json(Outcome::new(
             serde_json::json!({ "model": resolved, "vision": vision }),
             vec![],
