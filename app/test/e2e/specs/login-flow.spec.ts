@@ -33,7 +33,6 @@ import { buildBypassJwt, triggerAuthDeepLink, triggerDeepLink } from '../helpers
 import {
   dumpAccessibilityTree,
   hasAppChrome,
-  textExists,
   waitForWebView,
   waitForWindowVisible,
 } from '../helpers/element-helpers';
@@ -62,25 +61,6 @@ async function waitForRequest(method, urlFragment, timeout = 15_000) {
   return undefined;
 }
 
-/**
- * Wait until one of the candidate texts appears on screen.
- * Returns the matched text or null on timeout.
- */
-async function waitForAnyText(candidates, timeout = 15_000) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    for (const text of candidates) {
-      if (await textExists(text)) return text;
-    }
-    await browser.pause(500);
-  }
-  return null;
-}
-
-// Track whether onboarding was walked through in the UI so Phase 3 can
-// decide whether to require the onboarding-complete backend call.
-let hadOnboardingWalkthrough = false;
-
 describe('Login flow — complete with mock data (Linux)', () => {
   before(async () => {
     await startMockServer();
@@ -93,7 +73,6 @@ describe('Login flow — complete with mock data (Linux)', () => {
     // Welcome screen.
     await resetApp('e2e-login-flow', { skipAuth: true });
     clearRequestLog();
-    hadOnboardingWalkthrough = false;
   });
 
   after(async () => {

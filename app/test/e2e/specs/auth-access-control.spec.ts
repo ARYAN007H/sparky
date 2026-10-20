@@ -26,7 +26,6 @@ import { type AuthStateResponse, authStateValue } from '../helpers/auth-state';
 import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import {
-  clickTestId,
   dumpAccessibilityTree,
   hasAppChrome,
   textExists,
@@ -37,7 +36,6 @@ import {
 import { resetApp } from '../helpers/reset-app';
 import {
   navigateToHome,
-  navigateToSettings,
   navigateViaHash,
   waitForHomePage,
   walkOnboarding,
@@ -57,15 +55,6 @@ import {
 
 // waitForHomePage imported from shared-flows
 
-async function waitForTextToDisappear(text, timeout = 10_000) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    if (!(await textExists(text))) return true;
-    await browser.pause(500);
-  }
-  return false;
-}
-
 async function waitForRequest(method, urlFragment, timeout = 15_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -75,23 +64,6 @@ async function waitForRequest(method, urlFragment, timeout = 15_000) {
     await browser.pause(500);
   }
   return undefined;
-}
-
-async function expectBillingMarkers(markers) {
-  const results = [];
-  for (const marker of markers) {
-    results.push([marker, await textExists(marker)]);
-  }
-  const missing = results.filter(([, found]) => !found).map(([marker]) => marker);
-  if (missing.length > 0) {
-    console.log('[AuthAccess] Billing request log:', JSON.stringify(getRequestLog(), null, 2));
-    const tree = await dumpAccessibilityTree();
-    console.log('[AuthAccess] Billing page tree:\n', tree.slice(0, 6000));
-  }
-  for (const [marker, found] of results) {
-    expect(found).toBe(true);
-    console.log(`[AuthAccess] Billing marker verified: ${marker}`);
-  }
 }
 
 /** Install content-free counters before a native auth expiry can be emitted. */
