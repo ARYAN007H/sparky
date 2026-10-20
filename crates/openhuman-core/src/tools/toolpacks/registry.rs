@@ -21,8 +21,6 @@ pub const PACKS: &[ToolPack] = &[
         id: "workflows",
         summary: "Saved automation workflows: build, discover, run, inspect runs.",
         tools: &[
-            "build_workflow",
-            "discover_workflows",
             "run_workflow",
             "await_workflow",
             "describe_workflow",
@@ -149,16 +147,10 @@ pub const PACKS: &[ToolPack] = &[
     },
     ToolPack {
         id: "skills",
-        // The install hand-off (`setup_skills`) is a member like the other
-        // packed hand-offs (`build_workflow`, `manage_tasks`): it cost ~270
-        // tokens on every orchestrator request for a family used a few times a
-        // week. Packed, it no longer closes this pack to the orchestrator
-        // (`ops::closed_by_direct_handoff` keys on UNPACKED hand-offs), so the
-        // listing offers the hand-off beside the raw registry tools. Running an
-        // installed skill is the orchestrator's own `run_workflow`.
-        summary: "Skills: install or find agent skills (setup_skills hands the whole request to the installer), browse registries, read resources.",
+        // Skill installation and registry work are routed through
+        // `spawn_subagent` to the `skill_setup` specialist.
+        summary: "Skills: find and install agent skills, browse registries, read resources.",
         tools: &[
-            "setup_skills",
             // In the pack, not outside it. A search tool advertised while the
             // tool it hands off to (`describe_workflow`) stays
             // withheld would cost 748 B on every wildcard agent to produce an id
@@ -200,11 +192,6 @@ pub const PACKS: &[ToolPack] = &[
         tools: &[
             "generate_document",
             "generate_presentation",
-            // The delegate, not just the leaf tools: an orchestrator that can
-            // see `make_presentation` pays its schema on every turn to route a
-            // request that arrives in a small minority of them, and the pack
-            // it would route into is already withheld.
-            "make_presentation",
         ],
         owners: &["presentation_agent"],
         guide: "",
@@ -352,7 +339,7 @@ pub const PACKS: &[ToolPack] = &[
     ToolPack {
         id: "tasks",
         summary: "Task sources, workflows, artifacts: add, preview, fetch, update, remove.",
-        tools: &["manage_tasks"],
+        tools: &[],
         owners: &["task_manager_agent"],
         guide: "",
     },

@@ -26,7 +26,7 @@ fn workflow_builder_is_registered_worker_with_bounded_authoring_scope() {
     // through the single `memory` tool.
     let def = find("workflow_builder");
     assert_eq!(def.agent_tier, AgentTier::Worker);
-    assert_eq!(def.delegate_name.as_deref(), Some("build_workflow"));
+    assert!(def.delegate_name.is_none());
     assert_eq!(def.sandbox_mode, SandboxMode::None);
     // Graph authoring is multi-step structured reasoning — reasoning tier.
     assert!(
@@ -124,7 +124,7 @@ fn workflow_builder_is_registered_worker_with_bounded_authoring_scope() {
             .subagents
             .iter()
             .any(|entry| matches!(entry, SubagentEntry::AgentId(id) if id == "workflow_builder")),
-        "orchestrator must allow `workflow_builder` so build_workflow can spawn it"
+        "orchestrator must allow `workflow_builder` for spawn_subagent"
     );
 }
 
@@ -139,7 +139,7 @@ fn flow_discovery_is_registered_readonly_reasoning_scout() {
     // foothold.
     let def = find("flow_discovery");
     assert_eq!(def.agent_tier, AgentTier::Reasoning);
-    assert_eq!(def.delegate_name.as_deref(), Some("discover_workflows"));
+    assert!(def.delegate_name.is_none());
     assert_eq!(def.sandbox_mode, SandboxMode::ReadOnly);
     assert!(
         def.subagents.is_empty(),
@@ -188,15 +188,14 @@ fn flow_discovery_is_registered_readonly_reasoning_scout() {
         ToolScope::Wildcard => panic!("flow_discovery must have a Named tool scope"),
     }
 
-    // Reachable by delegation from the orchestrator so `discover_workflows`
-    // can spawn it.
+    // Reachable from the orchestrator through the shared spawn tool.
     let orchestrator = find("orchestrator");
     assert!(
         orchestrator
             .subagents
             .iter()
             .any(|entry| matches!(entry, SubagentEntry::AgentId(id) if id == "flow_discovery")),
-        "orchestrator must allow `flow_discovery` so discover_workflows can spawn it"
+        "orchestrator must allow `flow_discovery` for spawn_subagent"
     );
 }
 
