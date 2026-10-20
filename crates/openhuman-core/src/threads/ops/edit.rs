@@ -101,9 +101,9 @@ pub async fn edit_message(
     }
     // Stage and validate uploads before cancellation or truncation. The staged
     // opaque refs are reused when the replacement row is persisted below.
-    if !request.attachments.is_empty() && request.content.trim().is_empty() {
+    if request.attachments.is_empty() && request.content.trim().is_empty() {
         return Err(ThreadsError::Message(
-            "edited attachment messages require text".into(),
+            "edited message requires text or attachments".into(),
         ));
     }
     let dir = ctx
