@@ -233,20 +233,7 @@ impl ToolDispatch<(), OpenHumanRunContext> for LiveSubagentControlDispatch {
 }
 
 fn live_dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
-    let fallback = dispatch_selector(tool_sets.clone());
-    Arc::new(move |name, adapter| {
-        if matches!(
-            name,
-            "list_subagents" | "wait_subagent" | "steer_subagent" | "close_subagent"
-        ) {
-            return Some(Arc::new(LiveSubagentControlDispatch {
-                name: name.to_owned(),
-                adapter,
-                tool_sets: tool_sets.clone(),
-            }));
-        }
-        fallback(name, adapter)
-    })
+    dispatch_selector(tool_sets)
 }
 
 /// Names among the candidate tools that spawn or delegate to a sub-agent.
@@ -516,16 +503,9 @@ fn subagent_control_dispatches(
 
 fn turn_dispatch_selector(
     tool_sets: Vec<SharedToolSet>,
-    run_context: &OpenHumanRunContext,
+    _run_context: &OpenHumanRunContext,
 ) -> DispatchSelector {
-    let aliases = subagent_control_dispatches(&tool_sets, run_context);
-    let fallback = dispatch_selector(tool_sets);
-    Arc::new(move |name, adapter| {
-        aliases
-            .get(name)
-            .cloned()
-            .or_else(|| fallback(name, adapter))
-    })
+    dispatch_selector(tool_sets)
 }
 
 /// The admission rules for one turn.
