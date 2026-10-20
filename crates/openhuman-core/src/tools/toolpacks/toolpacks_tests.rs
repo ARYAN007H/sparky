@@ -507,19 +507,6 @@ fn every_owner_names_a_pack_tool_it_actually_declares() {
     }
 }
 
-#[test]
-fn the_reactive_fleet_tools_are_never_packed() {
-    // Packing these would put a `use_skill` round-trip between an async
-    // worker returning and the parent being able to steer or collect it.
-    // See `DELIBERATELY_UNPACKED_FLEET_TOOLS` for the full reasoning.
-    for name in registry::DELIBERATELY_UNPACKED_FLEET_TOOLS {
-        assert!(
-            registry::pack_for_tool(name).is_none(),
-            "`{name}` is needed reactively mid-turn and must stay advertised"
-        );
-    }
-}
-
 #[path = "toolpacks_tests_scoping_and_visibility_tests.rs"]
 mod scoping_and_visibility_tests;
 

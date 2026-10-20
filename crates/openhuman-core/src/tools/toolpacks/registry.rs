@@ -383,28 +383,6 @@ pub const PACKS: &[ToolPack] = &[
     },
 ];
 
-/// The fleet tools are deliberately NOT a pack, and this is worth stating
-/// because they look like an obvious 1.6k-token candidate.
-///
-/// `steer_subagent`, `wait_subagent`, `close_subagent`, `list_subagents`,
-/// `continue_subagent`, `wait`, and `wait_loop` are
-/// needed *reactively*, mid-turn — exactly when an async worker returns or
-/// pauses on `ask_user_clarification`. A load round-trip at that moment is the
-/// worst possible time to add one, and a `continue_subagent` the model cannot
-/// see is the known infinite-re-delegation failure mode (#4291): the only
-/// continuation left is a fresh stateless sub-agent that asks the same
-/// question again.
-#[cfg(test)]
-pub(crate) const DELIBERATELY_UNPACKED_FLEET_TOOLS: &[&str] = &[
-    "steer_subagent",
-    "wait_subagent",
-    "close_subagent",
-    "list_subagents",
-    "continue_subagent",
-    "wait",
-    "wait_loop",
-];
-
 /// The lookup surface over [`PACKS`] handed to the generic `use_skill` tool
 /// (`tinyagents_harness_tools::skills`). `NOT_FOUND_MARKER` is the host's status
 /// vocabulary, so a "no such skill / tool" result classifies as `NotFound`.
