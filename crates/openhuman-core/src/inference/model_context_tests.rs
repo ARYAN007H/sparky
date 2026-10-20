@@ -1,31 +1,11 @@
 use super::*;
 #[test]
-fn tier_aliases_resolve() {
-    assert_eq!(context_window_for_model("reasoning-v1"), Some(1_000_000));
-    assert_eq!(context_window_for_model("agentic-v1"), Some(200_000));
-    // chat-v1 is backed by DeepSeek v4 Flash (~1M), the same model as
-    // summarization-v1 — not a 128K model (issue #4706).
-    assert_eq!(context_window_for_model("chat-v1"), Some(1_000_000));
-    // Burst tier — 128k on the managed backend. Matched on the alias, not
-    // the local-gemma 8k substring arm.
-    assert_eq!(context_window_for_model("burst-v1"), Some(128_000));
-    // reasoning-quick-v1 is the legacy alias of chat-v1 (backend renamed it
-    // 2026-05), so it resolves to the same ~1M flash window.
-    assert_eq!(
-        context_window_for_model("reasoning-quick-v1"),
-        Some(1_000_000)
-    );
-    // summarization-v1 maps to a ~1M-token flash model so the extractor can
-    // single-shot whole oversized payloads.
-    assert_eq!(
-        context_window_for_model("summarization-v1"),
-        Some(1_000_000)
-    );
-    // The three flash-backed tiers share one window and must not drift.
-    assert_eq!(
-        context_window_for_model("chat-v1"),
-        context_window_for_model("summarization-v1")
-    );
+fn generic_model_window_patterns_retain_conservative_estimates() {
+    assert_eq!(context_window_for_model("chat"), Some(1_000_000));
+    assert_eq!(context_window_for_model("gemma-3n-e2b"), Some(8_192));
+    assert_eq!(context_window_for_model("custom-mini:1b"), Some(8_192));
+    assert_eq!(context_window_for_model("llama3:1b"), Some(8_192));
+    assert_eq!(context_window_for_model("custom-model-270m"), Some(8_192));
 }
 
 #[test]

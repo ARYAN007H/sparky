@@ -45,6 +45,18 @@ pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
         return Some(window);
     }
 
+    // These generic estimates predate the hosted tier policy and apply to
+    // concrete model ids regardless of which provider owns them.
+    if normalized == "chat" {
+        return Some(1_000_000);
+    }
+    if normalized.starts_with("gemma")
+        || normalized.contains(":1b")
+        || normalized.contains("270m")
+    {
+        return Some(8_192);
+    }
+
     if let Some(price) = tinyagents_registry::pricing::lookup(normalized) {
         tracing::debug!(
             model = normalized,

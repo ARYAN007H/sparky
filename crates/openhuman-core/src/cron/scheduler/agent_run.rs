@@ -114,7 +114,7 @@ pub(super) async fn run_agent_job_for_run(
                                     model = %m,
                                     "[cron] resolved Hint via workload factory"
                                 );
-                                m
+                                Some(m)
                             }
                             Err(e) => {
                                 tracing::warn!(

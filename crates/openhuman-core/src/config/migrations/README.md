@@ -1,12 +1,12 @@
 # migrations
 
-Startup data-migration runner gated by `Config::schema_version`. Each migration is a one-shot, idempotent transformation of on-disk data (the persisted `config.toml` and session transcripts). The runner, `run_pending`, is invoked from `Config::load_or_init` and is a fast no-op for workspaces whose `schema_version` already matches `CURRENT_SCHEMA_VERSION`. Failures are logged but never block startup; the next launch retries from the same starting version.
+Startup data-migration runner gated by `Config::schema_version`. Each migration is a one-shot, idempotent transformation of on-disk data (the persisted `config.toml` and session transcripts). The runner, `run_pending`, is invoked from `Config::load_or_init`; schema steps are skipped for current configs, but registered host normalizers still run on every load. Failures are logged but never block startup; schema steps retry from the same starting version on the next launch.
 
 > Not to be confused with the sibling `crates/openhuman-core/src/config/migration_helpers/` (singular), which is a **user-triggered RPC** (`migrate.openclaw` / `migrate.hermes`) that imports memory from another assistant's workspace. This module (`migrations`, plural) is the **automatic schema-version runner** that fires once per workspace on the first launch of a new build.
 
 ## Responsibilities
 
-- Maintain `CURRENT_SCHEMA_VERSION` (currently `11`) as the target schema version, bumped alongside every new migration.
+- Maintain `CURRENT_SCHEMA_VERSION` (currently `14`) as the target schema version, bumped alongside every new migration.
 - Run pending migrations in order, each guarded by an exact `schema_version ==` check so a failed earlier step is never skipped (the 0→1 step uses `< 1`).
 - Run registered host config normalization for brand-new and already-versioned configs; bare core has no provider normalizer.
 - Persist each version bump via `Config::save()` **only after** the migration reports success; on a save failure, roll the in-memory `schema_version` back so the next launch retries the same gate.

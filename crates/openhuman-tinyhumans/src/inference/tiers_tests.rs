@@ -153,3 +153,21 @@ fn hosted_vision_capabilities_cover_managed_aliases_and_media_models() {
         assert!(!supports_vision(model), "{model} should remain text-only");
     }
 }
+
+#[test]
+fn hosted_tier_context_windows_retain_the_legacy_alias_metadata() {
+    for (model, expected) in [
+        ("reasoning-v1", 1_000_000),
+        ("hint:reasoning", 1_000_000),
+        ("chat-v1", 1_000_000),
+        ("hint:chat", 1_000_000),
+        ("reasoning-quick-v1", 1_000_000),
+        ("summarization-v1", 1_000_000),
+        ("agentic-v1", 200_000),
+        ("hint:coding", 200_000),
+        ("burst-v1", 128_000),
+    ] {
+        assert_eq!(super::context_window(model), Some(expected), "{model}");
+    }
+    assert_eq!(super::context_window("chat"), None);
+}
