@@ -1975,7 +1975,7 @@ const chatRuntimeSlice = createSlice({
       // event-seen map, so guard here.
       const existing = entries.find(e => e.id === rowId);
       if (existing) {
-        // ...with one exception. `continue_subagent` republishes
+        // ...with one exception. Resuming a paused task republishes
         // `subagent_spawned` for the SAME task/agent when it resumes a paused
         // child (continue_subagent.rs:330), and that is the only signal the
         // frontend gets that the pause is over. Swallowing it left the row
@@ -2005,6 +2005,10 @@ const chatRuntimeSlice = createSlice({
             existing.subagent.status = 'running';
             existing.subagent.awaitingQuestion = undefined;
             existing.subagent.spawnEventId = spawnEventId;
+            // A resumed task belongs to the latest spawn call in the parent
+            // transcript. Keep its live card attached to that call so the
+            // previous call's card does not claim the resumed work.
+            if (parentCallId) existing.subagent.parentCallId = parentCallId;
           }
         }
         return;
