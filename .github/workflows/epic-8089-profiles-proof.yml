@@ -68,7 +68,13 @@ jobs:
           test "$(git rev-parse HEAD^{tree})" = d0ba2a451a65c9bed2995612f87f9c4bbc9cc988
           test "$(git rev-parse HEAD:crates/openhuman-core/src/profiles/schemas.rs)" = 9fe5cc0386f733d191b49df205351e82fd122f5e
           test -z "$(git status --porcelain=v1)"
-          git submodule status --recursive
+          mkdir -p target/profiles-proof
+          git submodule status --recursive > target/profiles-proof/submodules.txt
+          if grep -Eq '^[+-U]' target/profiles-proof/submodules.txt; then
+            cat target/profiles-proof/submodules.txt
+            echo "recursive submodules are not at their recorded pins"
+            exit 1
+          fi
 
       - name: Apply exactly the selected mutation
         if: matrix.case != 'baseline'
@@ -119,10 +125,12 @@ jobs:
           sha256sum target/profiles-proof/mutation.patch > target/profiles-proof/mutation.patch.sha256
           {
             printf 'case=%s\n' '${{ matrix.case }}'
+            printf 'source_head=b417d16e0514491da6b8a36b82b49ab15bf56c5d\n'
             printf 'baseline_commit=b417d16e0514491da6b8a36b82b49ab15bf56c5d\n'
             printf 'baseline_tree=d0ba2a451a65c9bed2995612f87f9c4bbc9cc988\n'
             printf 'source_tree=%s\n' "$actual_tree"
             printf 'schemas_blob=%s\n' "$actual_blob"
+            cat target/profiles-proof/mutation.patch.sha256
             printf 'features=default,voice,inference\n'
           } > target/profiles-proof/receipt.txt
           git status --short
@@ -135,6 +143,7 @@ jobs:
           export TMPDIR="$GITHUB_WORKSPACE/target/build-tmp"
           build_json=target/profiles-proof/build.jsonl
           build_stderr=target/profiles-proof/build.stderr
+          printf 'build_command=RUST_MIN_STACK=33554432 TMPDIR=%s CARGO_BUILD_JOBS=1 bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features voice,inference --no-run --message-format=json\n' "$TMPDIR" >> target/profiles-proof/receipt.txt
           set +e
           bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features voice,inference --no-run --message-format=json > "$build_json" 2> "$build_stderr"
           build_exit=$?
@@ -177,6 +186,7 @@ jobs:
           "$binary" --list > target/profiles-proof/test-list.txt
           printf 'immutable_binary=%s\n' "$binary" >> target/profiles-proof/receipt.txt
           cat target/profiles-proof/test-binary.sha256 >> target/profiles-proof/receipt.txt
+          printf '%s\n' "$binary --list" > target/profiles-proof/test-list-command.txt
 
       - name: Run the raw contract from the immutable binary
         shell: bash
@@ -187,6 +197,7 @@ jobs:
           binary=target/debug/proof-binaries/profiles-${{ matrix.case }}
           raw_filter=core::all::profiles_controller_tests::raw_profiles_operator_registry_matches_its_independent_contract
           raw_log=target/profiles-proof/raw-contract.log
+          printf 'raw_command=%s %s --exact --test-threads=1\nexpected_raw_exit=%s\n' "$binary" "$raw_filter" "$EXPECTED_RUNTIME_EXIT" >> target/profiles-proof/receipt.txt
           set +e
           "$binary" "$raw_filter" --exact --test-threads=1 > "$raw_log" 2>&1
           raw_exit=$?
@@ -219,6 +230,7 @@ jobs:
           binary=target/debug/proof-binaries/profiles-${{ matrix.case }}
           control_filter=profiles::schemas::tests::credential_schema_and_parser_keep_field_order_defaults_and_kinds
           control_log=target/profiles-proof/direct-parser-control.log
+          printf 'direct_parser_control_command=%s %s --exact --test-threads=1\n' "$binary" "$control_filter" >> target/profiles-proof/receipt.txt
           set +e
           "$binary" "$control_filter" --exact --test-threads=1 > "$control_log" 2>&1
           control_exit=$?
