@@ -543,7 +543,16 @@ pub(crate) fn discard_for_thread(
     // in-memory fence. Durable lifecycle markers and settled completion history
     // both remain in the store after compaction, so a previously used thread
     // still gets a permanent delete marker after a restart.
-    let has_history = !entry.store.list(Some(thread_id)).is_empty();
+    let has_history = match entry.store.try_list(Some(thread_id)) {
+        Ok(records) => !records.is_empty(),
+        Err(error) => {
+            log::warn!(
+                "[background_completions] could not inspect thread history before delete \
+                 thread_id={thread_id} error={error}"
+            );
+            true
+        }
+    };
     let has_legacy_delete_marker = is_marked_deleted(&entry, thread_id);
     if !seen && !has_history && !has_legacy_delete_marker {
         return 0;
