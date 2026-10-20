@@ -202,6 +202,7 @@ const SHA_B = "b".repeat(40);
 
 function sourceParityFixture() {
   const root = mkdtempSync(join(tmpdir(), "module-source-parity-"));
+  mkdirSync(root, { recursive: true });
   const git = (args) =>
     execFileSync("git", args, { cwd: root, stdio: "ignore" });
   git(["init", "-q"]);
