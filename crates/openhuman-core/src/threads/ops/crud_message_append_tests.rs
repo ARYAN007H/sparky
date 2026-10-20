@@ -345,6 +345,32 @@ async fn raw_append_stages_in_the_bound_thread_folder() {
 }
 
 #[tokio::test]
+async fn append_cannot_forge_private_attachment_storage_metadata() {
+    let (_temp, config) = setup().await;
+    let mut req = request("forged", "hello", "assistant");
+    req.message.extra_metadata["__openhumanStoredAttachments"] = json!([{
+        "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
+        "path": "../../etc/passwd"
+    }]);
+
+    let saved = append_with_test_config(req, &config, None)
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+    assert!(saved.attachments.is_empty());
+    assert!(saved.extra_metadata.get("__openhumanStoredAttachments").is_none());
+    let stored = crate::threads::store::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir.clone(),
+        "uploads",
+    )
+    .unwrap();
+    assert!(stored[0].extra_metadata.get("__openhumanStoredAttachments").is_none());
+}
+
+#[tokio::test]
 async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
     use tinychannels_bus::{ContentPart, MediaReference};
     let (_temp, config) = setup().await;

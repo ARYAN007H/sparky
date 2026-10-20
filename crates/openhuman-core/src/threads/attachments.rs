@@ -211,9 +211,10 @@ pub(crate) fn validate_opaque_parts(parts: &[ContentPart]) -> Result<(), String>
             thumbnail: Some(thumb),
             ..
         } = part
-            && (thumb.path.is_some() || thumb.url.is_some() || thumb.local_cache_path.is_some())
         {
-            return Err("stored attachment thumbnail must not include a path or URL".into());
+            if thumb.path.is_some() || thumb.url.is_some() || thumb.local_cache_path.is_some() {
+                return Err("stored attachment thumbnail must not include a path or URL".into());
+            }
         }
     }
     Ok(())
