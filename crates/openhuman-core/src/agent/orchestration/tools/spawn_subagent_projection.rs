@@ -9,32 +9,6 @@
 // reaching this guard — see the `has_delivery_thread` checks in `spawn_subagent_surface.rs` and
 // `subagent_dispatch_host.rs::dispatch_subagent`. Only a *direct* `spawn_subagent` call lands
 // here.
-fn refuse_missing_delivery_thread(
-    parent_thread_id: Option<&str>,
-    parent_agent_id: &str,
-    requested_agent_id: &str,
-) -> Option<ToolResult> {
-    if parent_thread_id.is_none() {
-        log::warn!(
-            "[spawn_subagent] refusing fire-and-forget spawn with no delivery thread \
-                 parent={} requested={} — directing caller to synchronous delegation (flow node / \
-                 CLI / cron context, background result would be discarded)",
-            parent_agent_id,
-            requested_agent_id
-        );
-        return Some(ToolResult::error(
-            "spawn_subagent: no parent chat thread available to deliver the result \
-                 into (this looks like a flow node, CLI, or cron run rather than an interactive \
-                 chat turn). Fire-and-forget delegation has nowhere to land its result here and \
-                 the sub-agent's work would be silently discarded. Use synchronous delegation \
-                 instead: a `delegate_*` tool with `blocking: true` runs the sub-agent inline \
-                 and hands you its output in this turn. For parallel work, model it as \
-                 parallel flow nodes rather than background sub-agents.",
-        ));
-    }
-    None
-}
-
 // The follow-up vocabulary offered back to the parent is limited to
 // the fleet tools visible on *this turn* (see `fleet_tools`), not
 // just the parent definition's static scope: a hide or named
