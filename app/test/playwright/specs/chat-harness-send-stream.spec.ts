@@ -1,15 +1,15 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import {
-  bootAuthenticatedPage,
-  dismissWalkthroughIfPresent,
-  waitForAppReady,
-} from '../helpers/core-rpc';
-import {
   inFlightThreadKey,
   persistedThreadMessages,
   selectedThreadTranscript,
 } from '../helpers/chat-transcript';
+import {
+  bootAuthenticatedPage,
+  dismissWalkthroughIfPresent,
+  waitForAppReady,
+} from '../helpers/core-rpc';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-send-stream';
@@ -161,13 +161,16 @@ test.describe('Chat Harness - Send Stream', () => {
       .toBe(true);
 
     await expect
-      .poll(async () => {
-        try {
-          return (await selectedThreadTranscript(page)).content;
-        } catch {
-          return '';
-        }
-      }, { timeout: 10_000 })
+      .poll(
+        async () => {
+          try {
+            return (await selectedThreadTranscript(page)).content;
+          } catch {
+            return '';
+          }
+        },
+        { timeout: 10_000 }
+      )
       .toContain(CANARY);
     const durable = await selectedThreadTranscript(page);
     expect(durable.threadId).toBe(threadId);

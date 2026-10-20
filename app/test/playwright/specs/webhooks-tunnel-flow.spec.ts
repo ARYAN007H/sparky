@@ -111,5 +111,4 @@ test.describe('Webhook tunnel CRUD (UI + core RPC + mock backend)', () => {
     // Connections surface, not the former trigger-history controls.
     await expect(page.getByTestId('two-pane-nav-composio')).toBeVisible();
   });
-
 });

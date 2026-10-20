@@ -1,4 +1,11 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Page, test, type TestInfo } from '@playwright/test';
+
+import {
+  bootRuntimeReadyGuestPage,
+  dismissWalkthroughIfPresent,
+  signInViaBypassUser,
+  waitForAppReady,
+} from '../helpers/core-rpc';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 
@@ -7,17 +14,14 @@ async function attachCheckpoint(page: Page, testInfo: TestInfo, name: string): P
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
   });
-  await testInfo.attach(`${name}.html`, {
-    body: await page.content(),
-    contentType: 'text/html',
-  });
+  await testInfo.attach(`${name}.html`, { body: await page.content(), contentType: 'text/html' });
   const response = await fetch(`${MOCK_ADMIN_BASE}/__admin/requests`);
   expect(response.ok, 'mock request log is available for the checkpoint').toBe(true);
   const payload: unknown = await response.json();
   expect(payload && typeof payload === 'object' && 'data' in payload).toBe(true);
   const requests = (payload as { data: unknown }).data;
   expect(Array.isArray(requests), 'mock request log contains a data array').toBe(true);
-  const safeRequests = (requests as Array<Record<string, unknown>>).map((request) => {
+  const safeRequests = (requests as Array<Record<string, unknown>>).map(request => {
     const safe = { ...request };
     for (const key of Object.keys(safe)) {
       if (/authorization|token|credential|secret/i.test(key)) safe[key] = '[redacted]';
@@ -29,13 +33,6 @@ async function attachCheckpoint(page: Page, testInfo: TestInfo, name: string): P
     contentType: 'application/json',
   });
 }
-
-import {
-  bootRuntimeReadyGuestPage,
-  dismissWalkthroughIfPresent,
-  signInViaBypassUser,
-  waitForAppReady,
-} from '../helpers/core-rpc';
 
 async function bootReviewedFlow(page: import('@playwright/test').Page, userId: string) {
   await bootRuntimeReadyGuestPage(page);
@@ -50,7 +47,9 @@ async function bootReviewedFlow(page: import('@playwright/test').Page, userId: s
 }
 
 test.describe('Agent review - canonical shell + privacy flow', () => {
-  test('reaches the shell and opens the privacy panel with review artifacts', async ({ page }, testInfo) => {
+  test('reaches the shell and opens the privacy panel with review artifacts', async ({
+    page,
+  }, testInfo) => {
     await bootReviewedFlow(page, 'pw-agent-review');
 
     // The composer is the durable readiness marker for the unified chat shell;

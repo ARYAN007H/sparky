@@ -1,11 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 
+import { inFlightThreadKey, persistedThreadMessages } from '../helpers/chat-transcript';
 import {
   bootAuthenticatedPage,
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
-import { inFlightThreadKey, persistedThreadMessages } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-cancel';
@@ -141,17 +141,21 @@ test.describe('Chat Harness - Cancel', () => {
     await expect.poll(() => inFlightThreadKey(threadId)).toBeUndefined();
     await expect.poll(async () => page.locator('#root').innerText()).toContain('one two');
     await expect
-      .poll(async () => {
-        const messages = await persistedThreadMessages(threadId);
-        return messages.some(
-          message => message.sender === 'user' && message.content === PROMPT
-        ) && messages.some(
-          message =>
-            message.sender === 'agent' &&
-            message.content.includes('one two') &&
-            message.extraMetadata.stopped === true
-        );
-      }, { timeout: 10_000 })
+      .poll(
+        async () => {
+          const messages = await persistedThreadMessages(threadId);
+          return (
+            messages.some(message => message.sender === 'user' && message.content === PROMPT) &&
+            messages.some(
+              message =>
+                message.sender === 'agent' &&
+                message.content.includes('one two') &&
+                message.extraMetadata.stopped === true
+            )
+          );
+        },
+        { timeout: 10_000 }
+      )
       .toBe(true);
     const messages = await persistedThreadMessages(threadId);
     const stopped = messages.find(

@@ -55,9 +55,7 @@ describe('Settings - Data Management', function () {
     const frontendUserId = await browser.execute(() => {
       const readState = (
         window as unknown as {
-          __OPENHUMAN_CORE_STATE__?: () => {
-            snapshot?: { auth?: { userId?: string | null } };
-          };
+          __OPENHUMAN_CORE_STATE__?: () => { snapshot?: { auth?: { userId?: string | null } } };
         }
       ).__OPENHUMAN_CORE_STATE__;
       return readState?.()?.snapshot?.auth?.userId ?? null;

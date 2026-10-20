@@ -63,7 +63,9 @@ test.describe('Runtime picker -> login -> logout', () => {
     await expect(page.getByTestId('welcome-card-self')).toBeVisible();
     await expect(page.getByTestId('welcome-cta-self')).toBeVisible();
     await expect(page.getByTestId('welcome-cta-tinyhumans')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Google|GitHub|Twitter|Discord/i }).first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Google|GitHub|Twitter|Discord/i }).first()
+    ).toBeVisible();
   });
 
   test('self-hosted choice completes the current custom setup wizard', async ({ page }) => {

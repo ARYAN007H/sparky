@@ -41,7 +41,9 @@ test.describe('Guided tour gates', () => {
     await waitForAppReady(page);
   });
 
-  test('follows the current seven-step route and ends with its seeded welcome note', async ({ page }) => {
+  test('follows the current seven-step route and ends with its seeded welcome note', async ({
+    page,
+  }) => {
     await armWalkthrough(page);
 
     const steps = [

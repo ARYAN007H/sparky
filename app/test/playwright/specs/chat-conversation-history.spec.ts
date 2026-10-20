@@ -1,13 +1,13 @@
 import { expect, type Page, test } from '@playwright/test';
 
+import { selectedThreadTranscript } from '../helpers/chat-transcript';
+import { persistedThreadMessages } from '../helpers/chat-transcript';
 import {
   bootAuthenticatedPage,
   callCoreRpc,
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
-import { selectedThreadTranscript } from '../helpers/chat-transcript';
-import { persistedThreadMessages } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-conversation-history';

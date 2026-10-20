@@ -27,7 +27,7 @@ const ROUTES: RouteEntry[] = [
   { route: '/skills', expectedHash: '/connections' }, // back-compat redirect
   { route: '/activity', expectedHash: '/settings/account' }, // back-compat redirect
   { route: '/intelligence', expectedHash: '/settings/account' }, // back-compat redirect
-      // Settings is a routed page and the /settings index resolves to Account.
+  // Settings is a routed page and the /settings index resolves to Account.
   { route: '/settings', expectedHash: '/settings/account' },
 ];
 

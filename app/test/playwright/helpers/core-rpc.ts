@@ -216,7 +216,10 @@ export async function signInViaBypassUser(
 }
 
 /** Re-authenticate the same local test user without resetting persisted config. */
-export async function signInViaBypassUserPreservingConfig(page: Page, userId: string): Promise<void> {
+export async function signInViaBypassUserPreservingConfig(
+  page: Page,
+  userId: string
+): Promise<void> {
   await callCoreRpc('openhuman.auth_store_session', {
     token: buildBypassJwt(userId),
     userId,

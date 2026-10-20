@@ -54,9 +54,7 @@ async function expectLandedInChat(page: Page): Promise<void> {
       page.evaluate(() => {
         const state = (
           window as typeof window & {
-            __OPENHUMAN_CORE_STATE__?: () => {
-              snapshot?: { onboardingCompleted?: boolean };
-            };
+            __OPENHUMAN_CORE_STATE__?: () => { snapshot?: { onboardingCompleted?: boolean } };
           }
         ).__OPENHUMAN_CORE_STATE__?.();
         return state?.snapshot?.onboardingCompleted;

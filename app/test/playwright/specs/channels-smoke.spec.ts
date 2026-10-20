@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  callCoreRpc,
   bootAuthenticatedPage,
+  callCoreRpc,
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
@@ -30,7 +30,7 @@ async function telegramConnected(): Promise<boolean> {
       : unwrapped;
   expect(Array.isArray(entries), 'channels_status returns channel status entries').toBe(true);
   const telegram = (entries as TelegramStatus[]).find(
-    (entry) =>
+    entry =>
       (entry.channel_id ?? entry.channel) === 'telegram' &&
       (entry.auth_mode ?? entry.authMode) === 'bot_token'
   );

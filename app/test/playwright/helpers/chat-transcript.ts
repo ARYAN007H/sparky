@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
-import { callCoreRpc } from './core-rpc';
 import { waitForSelectedThreadId } from './chat-drive';
+import { callCoreRpc } from './core-rpc';
 
 export interface PersistedThreadMessage {
   content: string;
@@ -25,11 +25,9 @@ export async function persistedThreadMessages(threadId: string): Promise<Persist
   return messages as PersistedThreadMessage[];
 }
 
-export async function selectedThreadTranscript(page: Page): Promise<{
-  threadId: string;
-  content: string;
-  total: number;
-}> {
+export async function selectedThreadTranscript(
+  page: Page
+): Promise<{ threadId: string; content: string; total: number }> {
   const threadId = await waitForSelectedThreadId(page);
   const response = await callCoreRpc<unknown>('openhuman.threads_transcript_get', {
     thread_id: threadId,
@@ -48,11 +46,7 @@ export async function selectedThreadTranscript(page: Page): Promise<{
   expect((data as { hasMore: unknown }).hasMore).toBe(false);
   expect(Array.isArray((data as { items: unknown }).items)).toBe(true);
   expect((data as { total: number }).total).toBeGreaterThan(0);
-  return {
-    threadId,
-    content: JSON.stringify(data),
-    total: (data as { total: number }).total,
-  };
+  return { threadId, content: JSON.stringify(data), total: (data as { total: number }).total };
 }
 
 export async function inFlightThreadKeys(): Promise<string[]> {

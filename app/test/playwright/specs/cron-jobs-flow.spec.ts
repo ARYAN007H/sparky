@@ -53,10 +53,7 @@ test.describe('Cron jobs settings panel', () => {
     const morningId = morning.id;
     expect(morningId, 'morning_briefing has a generated id').toBeTruthy();
     if (morning.enabled === false) {
-      await callCoreRpc('openhuman.cron_update', {
-        job_id: morningId,
-        patch: { enabled: true },
-      });
+      await callCoreRpc('openhuman.cron_update', { job_id: morningId, patch: { enabled: true } });
     }
 
     await openCronJobsPanel(page);
@@ -83,10 +80,7 @@ test.describe('Cron jobs settings panel', () => {
     ) as { id?: string };
     const removableId = removable.id;
     expect(removableId, 'cron_add returns a generated id').toBeTruthy();
-    await callCoreRpc('openhuman.cron_update', {
-      job_id: removableId,
-      patch: { enabled: false },
-    });
+    await callCoreRpc('openhuman.cron_update', { job_id: removableId, patch: { enabled: false } });
     await page.getByTestId('cron-refresh').click();
     const removableRow = page.getByTestId(`cron-job-row-${removableId}`);
     await expect(removableRow).toBeVisible();
