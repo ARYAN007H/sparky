@@ -11,6 +11,7 @@ fn channel_turn(history_key: Option<&str>) -> AgentTurnOrigin {
         reply_target: "42".into(),
         message_id: "m1".into(),
         history_key: history_key.map(str::to_string),
+        channel_session: None,
     }
 }
 
@@ -44,6 +45,7 @@ fn channel_turn_maps_to_channel_origin_with_history_key() {
             history_key: "telegram_alice_42".into(),
             sender: Some("alice".into()),
             thread_id: None,
+            channel_session: None,
         })
     );
 }
@@ -116,6 +118,7 @@ fn channel_origin_job_runs_as_external_channel_turn() {
         history_key: "k".into(),
         sender: Some("alice".into()),
         thread_id: None,
+        channel_session: None,
     }));
     match turn_origin_for_job_run(&job, "run-1") {
         AgentTurnOrigin::ExternalChannel {
