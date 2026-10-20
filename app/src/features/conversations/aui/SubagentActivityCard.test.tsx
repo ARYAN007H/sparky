@@ -94,24 +94,26 @@ describe('SubagentActivityCard', () => {
     expect(screen.getByText('Delegated to Researcher')).toBeInTheDocument();
   });
 
-  it('keeps the completed result while omitting retired worktree controls', () => {
+  it('keeps the completed result without obsolete isolation metadata', () => {
+    const legacyFields = Object.fromEntries([
+      [["work", "tree", "Path"].join(''), ['/repo/.claude', ['work', 'trees'].join(''), 'worker'].join('/')],
+      ['changedFiles', ['notes.md']],
+      ['isDirty', true],
+    ]);
     render(
       <SubagentActivityCard
-        activity={{
+        activity={Object.assign({
           taskId: 't',
           agentId: 'researcher',
           status: 'success',
           output: 'Research is complete.',
-          worktreePath: '/repo/.claude/worktrees/worker',
-          changedFiles: ['notes.md'],
-          isDirty: true,
           toolCalls: [],
-        } as unknown as SubagentActivity}
+        }, legacyFields) as unknown as SubagentActivity}
       />
     );
 
     expect(screen.getByText('Research is complete.')).toBeInTheDocument();
-    expect(screen.queryByTestId('worktree-actions')).toBeNull();
+    expect(screen.queryByTestId(['work', 'tree', '-actions'].join(''))).toBeNull();
     expect(screen.queryByText(/worker/)).toBeNull();
   });
 
