@@ -37,6 +37,7 @@ import {
   toplevelProvesSubmodule,
   validateTestOnlySourceParity,
 } from "../lib/module-pins.mjs";
+import { classifyStatus } from "../lib/module-pin-status.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const PINS_CLI = join(REPO_ROOT, "scripts/ci/check-module-pins.mjs");
@@ -289,6 +290,9 @@ test("the existing exact-drift exemption is proof-checked and keeps ahead visibl
     const accepted = classifyPin({ ...base, version: "1.0.0", actual, exemption, sourceParityContext });
     assert.equal(accepted.ok, true);
     assert.equal(accepted.kind, "exempt");
+    const status = classifyStatus({ ...base, version: "1.0.0", actual, exemption, sourceParityContext });
+    assert.equal(status.kind, "exempt");
+    assert.ok(status.message.includes(actual), "the advisory status keeps the actual ahead description visible");
     const altered = classifyPin({
       ...base,
       version: "1.0.0",
@@ -307,6 +311,15 @@ test("the existing exact-drift exemption is proof-checked and keeps ahead visibl
     });
     assert.equal(missing.ok, false, "a malformed present proof must not fall back to a reason-only exemption");
     assert.equal(missing.kind, "invalid-source-parity");
+    const invalidStatus = classifyStatus({
+      ...base,
+      version: "1.0.0",
+      actual,
+      exemption: { ...exemption, sourceParity: null },
+      sourceParityContext,
+    });
+    assert.notEqual(invalidStatus.kind, "exempt");
+    assert.match(invalidStatus.message, /source-parity exemption is invalid/);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
