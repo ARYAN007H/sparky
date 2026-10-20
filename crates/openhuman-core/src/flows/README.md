@@ -369,10 +369,8 @@ pnpm debug rust flows
 ```
 
 Related docs: [docs/gitbooks/en/features/workflows.md](../../../../docs/gitbooks/en/features/workflows.md)
-(user-facing feature), [docs/gitbooks/en/developing/architecture/flows-on-tinyagents.md](../../../../docs/gitbooks/en/developing/architecture/flows-on-tinyagents.md)
-(run pipeline and security model; it still describes lowering onto
-`tinyagents`, while the vendored crate now carries its own runtime under
-[`vendor/tinyflows/crates/tinyflows/src/graph/`](../../../../vendor/tinyflows/crates/tinyflows/src/graph/)), and
+(user-facing feature), [docs/gitbooks/en/developing/architecture/flows-on-tinyflows.md](../../../../docs/gitbooks/en/developing/architecture/flows-on-tinyflows.md)
+(module boundary, run lifecycle, storage migration, and host policy), and
 [../cron/README.md](../cron/README.md) (`JobType::Flow`).
 
 ## Further reading
