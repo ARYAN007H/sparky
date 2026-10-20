@@ -39,11 +39,11 @@ jobs:
             expected_schema_blob: 9fe5cc038664da876b648f3df69868b7f27e87ea
             expected_runtime_exit: 0
           - case: schema-required
-            expected_tree: fbb4b509861753eb92ba82aebedb50e64eac4e85
+            expected_tree: 7e16573d830461ebbfcd8930c9c28daa73ac719f
             expected_schema_blob: 7eb8084dd6f3912367a3f469b598014e711ec1a0
             expected_runtime_exit: 101
           - case: parser-wiring
-            expected_tree: fb9fb829da80b630cb0fab0f814893bf44f57ef7
+            expected_tree: 98fc6db2078393f88ba6c974e7c36ee6a838ada2
             expected_schema_blob: 67cf3fce9c94cd0105f427f6f53e41238db30e1d
             expected_runtime_exit: 101
     steps:
@@ -101,11 +101,11 @@ jobs:
               new = '''inputs: vec![FieldSchema { required: false, ..string_field("user_id", "The gateway's id for the user.") }],'''
           elif os.environ["PROFILES_PROOF_CASE"] == "parser-wiring":
               old = '''        parse_credential,
-                  run_set_credential,'''
+        run_set_credential,'''
               new = '''        |_params: Map<String, Value>| -> Result<CredentialParams, String> {
-                      Err("mutation parser failure".to_owned())
-                  },
-                  run_set_credential,'''
+            Err("mutation parser failure".to_owned())
+        },
+        run_set_credential,'''
           else:
               raise SystemExit("unrecognized Profiles proof mutation")
           if source.count(old) != 1:
@@ -287,3 +287,13 @@ jobs:
           path: target/profiles-proof/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload the baseline test binary for local verification
+        if: matrix.case == 'baseline'
+        uses: actions/upload-artifact@v7
+        with:
+          name: profiles-proof-baseline-binary
+          path: target/debug/proof-binaries/profiles-baseline
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 1
