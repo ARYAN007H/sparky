@@ -117,6 +117,8 @@ pub enum BackendErrorKind {
 /// display semantics and the optional canonical backend token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackendErrorClassification {
+    /// Whether this classifier owns the provider identity itself.
+    pub provider_owned: bool,
     /// Whether the backend owns the response for duplicate-report purposes.
     pub backend_owned: bool,
     /// Whether this client should still report the event (for known client bugs).
@@ -140,6 +142,11 @@ static BACKEND_ERROR_CLASSIFIER: HookSlot<BackendErrorCodeClassifier> =
 /// Registers a backend error classifier process-wide.
 pub fn register_backend_error_classifier(classifier: BackendErrorCodeClassifier) {
     BACKEND_ERROR_CLASSIFIER.register("default", classifier);
+}
+
+/// Removes the process-wide backend error classifier.
+pub fn unregister_backend_error_classifier() -> bool {
+    BACKEND_ERROR_CLASSIFIER.unregister("default")
 }
 
 /// Registers a backend error classifier for a CoreContext.
