@@ -181,8 +181,8 @@ fn a_stateless_runtime_keeps_every_conversation_in_its_session_store() {
             let written: Vec<_> = files_under(&scratch)
                 .into_iter()
                 .filter(|path| !baseline.contains(path))
-            eprintln!("DBGWRITTEN {written:?}");
                 .collect();
+            eprintln!("DBGWRITTEN {written:?}");
             assert!(
                 written.is_empty(),
                 "a stateless workspace must remain empty, found: {written:?}"
