@@ -33,7 +33,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::artifacts::production::Production;
 use crate::artifacts::read_artifact_bytes;
@@ -50,8 +50,8 @@ mod tests;
 use crate::tools::implementations::document::format::spec::SlideImage;
 
 use self::types::{
-    validate_input, GeneratePresentationInput, GeneratePresentationOutput, SlideImageRequest,
-    SlideImageSource, MAX_IMAGE_BYTES,
+    GeneratePresentationInput, GeneratePresentationOutput, MAX_IMAGE_BYTES, SlideImageRequest,
+    SlideImageSource, validate_input,
 };
 
 /// Generation timeout. `ppt-rs` typically completes the full 64-slide

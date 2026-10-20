@@ -50,7 +50,13 @@ async fn legacy_path_refs_are_guarded_and_imported_as_opaque_file_keys() {
         files: blobs.clone(),
         roots: guarded_roots(vec![source_root]),
     };
-    let mut version = ArtifactVersion::new(1, source.display().to_string(), ArtifactAuthor::Agent, "agent", 1);
+    let mut version = ArtifactVersion::new(
+        1,
+        source.display().to_string(),
+        ArtifactAuthor::Agent,
+        "agent",
+        1,
+    );
     version.file = Some(FileRef {
         key: source.display().to_string(),
         size_bytes: 12,
@@ -151,7 +157,13 @@ async fn an_image_filed_through_the_service_gets_a_card_and_a_copy_in_files() {
     std::fs::create_dir_all(&action).unwrap();
     std::fs::write(action.join("chart.png"), b"png-bytes").unwrap();
     let ctx = crate::core::runtime::DispatchCtx::process_default();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None, &ctx);
+    let artifacts = artifacts_service(
+        &workspace,
+        FileRoots::new(&files),
+        Some(&action),
+        None,
+        &ctx,
+    );
 
     let saved = artifacts
         .create(
@@ -215,16 +227,20 @@ async fn deleting_an_artifact_removes_its_card() {
         .await
         .unwrap();
     let id = saved.record.id;
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_ok());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_ok()
+    );
 
     let (removed, notice) = artifacts.delete(&id).await.unwrap();
     assert!(removed);
     assert!(notice.is_none(), "{notice:?}");
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_err());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_err()
+    );
 }
 
 struct NoopPublisher;
@@ -309,7 +325,13 @@ async fn a_protected_file_inside_the_working_folder_is_refused() {
     std::fs::create_dir_all(&ssh).unwrap();
     std::fs::write(ssh.join("id_ed25519"), b"PRIVATE").unwrap();
     let ctx = crate::core::runtime::DispatchCtx::process_default();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None, &ctx);
+    let artifacts = artifacts_service(
+        &workspace,
+        FileRoots::new(&files),
+        Some(&action),
+        None,
+        &ctx,
+    );
 
     let err = artifacts
         .create(

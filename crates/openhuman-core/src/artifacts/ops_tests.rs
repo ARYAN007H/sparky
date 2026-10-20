@@ -187,39 +187,45 @@ async fn delete_missing_id_error() {
 async fn regenerate_rejects_empty_id() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    assert!(ai_regenerate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        "",
-        "t",
-        "c"
-    )
-    .await
-    .is_err());
+    assert!(
+        ai_regenerate(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            "",
+            "t",
+            "c"
+        )
+        .await
+        .is_err()
+    );
 }
 
 #[tokio::test]
 async fn regenerate_requires_thread_and_client() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    assert!(ai_regenerate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        "id",
-        "",
-        "c"
-    )
-    .await
-    .is_err());
-    assert!(ai_regenerate(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        "id",
-        "t",
-        ""
-    )
-    .await
-    .is_err());
+    assert!(
+        ai_regenerate(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            "id",
+            "",
+            "c"
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        ai_regenerate(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            "id",
+            "t",
+            ""
+        )
+        .await
+        .is_err()
+    );
 }
 
 #[tokio::test]

@@ -64,15 +64,7 @@ pub async fn read_body(
         Some(record) => record,
         // An artifact made before versioning has only its legacy record: show
         // the file that record vouches for.
-        None => {
-            legacy_record(
-                &config.workspace_dir,
-                &files,
-                id,
-                file_store.as_ref(),
-            )
-            .await?
-        }
+        None => legacy_record(&config.workspace_dir, &files, id, file_store.as_ref()).await?,
     };
     let converter = DocumentConverter::for_config(config);
     let display_path = match super::store::get_artifact(&config.workspace_dir, id).await {
@@ -111,7 +103,8 @@ async fn legacy_record(
         size_bytes: meta.size_bytes,
         media_type: None,
     };
-    let file_store = file_store.ok_or_else(|| "artifact file storage is unavailable".to_string())?;
+    let file_store =
+        file_store.ok_or_else(|| "artifact file storage is unavailable".to_string())?;
     let parent = Path::new(&path)
         .parent()
         .ok_or_else(|| "legacy artifact file has no parent folder".to_string())?;
@@ -120,10 +113,13 @@ async fn legacy_record(
         file_store.as_ref(),
         &roots,
         &legacy_ref,
-        &format!("artifacts/files/{id}/v1.{}", Path::new(&path)
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .unwrap_or("bin")),
+        &format!(
+            "artifacts/files/{id}/v1.{}",
+            Path::new(&path)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("bin")
+        ),
     )
     .await
     .map_err(|e| e.to_string())?;

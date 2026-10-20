@@ -30,8 +30,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tiny_artifacts::{
-    ArtifactEvent, ArtifactEventKind, ArtifactKind, ArtifactObserver, ArtifactRecord, ArtifactStore,
-    Artifacts, Author, Content, FileRef, FileStore,
+    ArtifactEvent, ArtifactEventKind, ArtifactKind, ArtifactObserver, ArtifactRecord,
+    ArtifactStore, Artifacts, Author, Content, FileRef, FileStore,
 };
 
 use super::files::FileRoots;
@@ -120,13 +120,9 @@ impl LegacyFileImportStore {
                 .and_then(|ext| ext.to_str())
                 .unwrap_or("bin");
             let key = format!("artifacts/files/{}/v{}.{}", record.id, version.version, ext);
-            let imported = tiny_artifacts::import_legacy_file(
-                self.files.as_ref(),
-                &self.roots,
-                &legacy,
-                &key,
-            )
-            .await?;
+            let imported =
+                tiny_artifacts::import_legacy_file(self.files.as_ref(), &self.roots, &legacy, &key)
+                    .await?;
             version.body = imported.key.clone();
             version.file = Some(imported);
             changed = true;
@@ -216,9 +212,10 @@ impl LegacyUiBridge {
                         == Some(ext.clone())
                 });
                 if let Some(owned) = owned {
-                    let file_store = self.file_store.as_ref().ok_or_else(|| {
-                        anyhow::anyhow!("artifact file storage is unavailable")
-                    })?;
+                    let file_store = self
+                        .file_store
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("artifact file storage is unavailable"))?;
                     let bytes = file_store.read(&file.key).await?;
                     tokio::fs::write(owned, &bytes).await?;
                     let size = bytes.len() as u64;
@@ -248,9 +245,10 @@ impl LegacyUiBridge {
         .map_err(anyhow::Error::msg)?;
         let size = if record.holds_file() {
             if let Some(file) = latest.file.as_ref() {
-                let file_store = self.file_store.as_ref().ok_or_else(|| {
-                    anyhow::anyhow!("artifact file storage is unavailable")
-                })?;
+                let file_store = self
+                    .file_store
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("artifact file storage is unavailable"))?;
                 let bytes = file_store.read(&file.key).await?;
                 tokio::fs::write(&dest, &bytes).await?;
                 bytes.len() as u64
@@ -445,19 +443,16 @@ pub fn registered_tools(
     let service = {
         let workspace_dir = workspace_dir.to_path_buf();
         let action_dir = action_dir.to_path_buf();
-        Arc::new(move |chat: Option<&ApprovalChatContext>, ctx: &crate::core::runtime::DispatchCtx| {
-            let mut service = artifacts_service(
-                &workspace_dir,
-                files.clone(),
-                Some(&action_dir),
-                chat,
-                ctx,
-            );
-            if let Some(publisher) = &publisher {
-                service = service.with_publisher(publisher.clone());
-            }
-            Arc::new(service)
-        })
+        Arc::new(
+            move |chat: Option<&ApprovalChatContext>, ctx: &crate::core::runtime::DispatchCtx| {
+                let mut service =
+                    artifacts_service(&workspace_dir, files.clone(), Some(&action_dir), chat, ctx);
+                if let Some(publisher) = &publisher {
+                    service = service.with_publisher(publisher.clone());
+                }
+                Arc::new(service)
+            },
+        )
     };
     let author = Author::agent(AGENT_AUTHOR_ID);
     let mut tools: Vec<Box<dyn tinytools::Tool>> = Vec::new();

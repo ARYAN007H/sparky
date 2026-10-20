@@ -29,20 +29,20 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolContent, ToolPolicy, ToolResult,
     ToolRunContext, ToolScope, ToolTimeout,
 };
 use tokio::io::AsyncWriteExt;
 
-use crate::artifacts::production::Production;
 use crate::artifacts::ArtifactKind;
+use crate::artifacts::production::Production;
 use crate::security::approval::ApprovalChatContext;
 use crate::tools::host_extensions::tool_call_id;
 use tinyagents_harness::tinyinference_video::ProgressFn;
 
-use super::progress::{video_status_observer, JobStateSlot};
+use super::progress::{JobStateSlot, video_status_observer};
 
 const FILE_REFERENCE_FIELDS: [&str; 8] = [
     "references",
@@ -569,7 +569,8 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         };
         let job_state = JobStateSlot::default();
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        let dispatch_ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        let dispatch_ctx =
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
         let per_call_inner = self.per_call.as_ref().map(|build| {
             build(
                 video_status_observer(job_state.clone()),
@@ -590,7 +591,13 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         }
         let call_id = tool_call_id(context);
         Ok(self
-            .attach_artifacts(result, &args, call_id, approval.chat.as_ref(), &dispatch_ctx)
+            .attach_artifacts(
+                result,
+                &args,
+                call_id,
+                approval.chat.as_ref(),
+                &dispatch_ctx,
+            )
             .await)
     }
 }

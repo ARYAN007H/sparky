@@ -2,8 +2,8 @@ use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
@@ -67,15 +67,13 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 FieldSchema {
                     name: "limit",
                     ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
-                    comment:
-                        "Maximum number of artifacts to return; defaults to 50, capped at 200.",
+                    comment: "Maximum number of artifacts to return; defaults to 50, capped at 200.",
                     required: false,
                 },
                 FieldSchema {
                     name: "thread_id",
                     ty: TypeSchema::Option(Box::new(TypeSchema::String)),
-                    comment:
-                        "When set, return only artifacts whose meta.json was written for this \
+                    comment: "When set, return only artifacts whose meta.json was written for this \
                          chat thread (#3226). Lets ChatFilesPanel repopulate from disk on a \
                          fresh redux slice / new device. Absent (or null) returns all artifacts.",
                     required: false,
@@ -457,7 +455,7 @@ fn handle_save_artifact_version(ctx: DispatchCtx, params: Map<String, Value>) ->
                 &body,
                 &ctx,
             )
-                .await?,
+            .await?,
         )
     })
 }
@@ -485,7 +483,7 @@ fn handle_share_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
                 return Err(format!(
                     "invalid 'public': expected bool, got {}",
                     type_name(other)
-                ))
+                ));
             }
         };
         to_json(
@@ -496,7 +494,7 @@ fn handle_share_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
                 public,
                 &ctx,
             )
-                .await?,
+            .await?,
         )
     })
 }

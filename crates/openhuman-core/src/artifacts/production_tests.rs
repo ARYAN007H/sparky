@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore};
 use tiny_artifacts::FileStore;
+use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore};
 
 use super::*;
 use crate::artifacts::store::get_artifact;
