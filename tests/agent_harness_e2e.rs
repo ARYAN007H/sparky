@@ -310,7 +310,9 @@ async fn scripted_chat_completions(
     use axum::response::IntoResponse;
 
     let streaming = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
-    let authorization = headers.get(AUTHORIZATION).and_then(|value| value.to_str().ok());
+    let authorization = headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok());
     with_captured_proxy_requests(|requests| {
         requests.push(json!({
             "path": uri.path(),
@@ -922,7 +924,10 @@ fn start_capture_proxy(
     let mut child = Command::new("node")
         .arg(script)
         .env("CAPTURE_HOST", "127.0.0.1")
-        .env("CAPTURE_PORT", requested_port.map_or_else(|| "0".into(), |p| p.to_string()))
+        .env(
+            "CAPTURE_PORT",
+            requested_port.map_or_else(|| "0".into(), |p| p.to_string()),
+        )
         .env("CAPTURE_UPSTREAM", upstream)
         .env("CAPTURE_ALL", "1")
         .env("CAPTURE_ALL_DIR", capture_dir.join("requests"))
@@ -952,7 +957,10 @@ fn start_capture_proxy(
         .parse()
         .unwrap_or_else(|_| panic!("capture proxy reported an invalid port: {startup}"));
     if let Some(expected) = requested_port {
-        assert_eq!(proxy.port, expected, "capture proxy changed the configured port");
+        assert_eq!(
+            proxy.port, expected,
+            "capture proxy changed the configured port"
+        );
     }
     proxy
 }
@@ -994,7 +1002,9 @@ fn managed_capture_identity() -> Value {
 }
 
 async fn run_managed_capture_turn(api_origin: String, home: PathBuf) -> Vec<Value> {
-    reset_script(vec![text_completion("The managed gateway request is stable.")]);
+    reset_script(vec![text_completion(
+        "The managed gateway request is stable.",
+    )]);
     with_captured_proxy_requests(|requests| requests.clear());
     let stack = boot_stack_with_capture_endpoint(api_origin, home).await;
     let mut events = spawn_sse_collector(format!(
@@ -1010,19 +1020,19 @@ async fn run_managed_capture_turn(api_origin: String, home: PathBuf) -> Vec<Valu
         "Compare the managed inference request shape.",
     )
     .await;
-    let terminal = wait_for_terminal_request(
-        &mut events,
-        Duration::from_secs(60),
-        Some(&request_id),
-    )
-    .await;
+    let terminal =
+        wait_for_terminal_request(&mut events, Duration::from_secs(60), Some(&request_id)).await;
     assert_eq!(
         terminal.get("event").and_then(Value::as_str),
         Some("chat_done"),
         "managed capture turn failed: {}",
-        terminal.get("event").and_then(Value::as_str).unwrap_or("missing")
+        terminal
+            .get("event")
+            .and_then(Value::as_str)
+            .unwrap_or("missing")
     );
-    let _suggestions = wait_for_event(&mut events, "chat_suggestions", Duration::from_secs(30)).await;
+    let _suggestions =
+        wait_for_event(&mut events, "chat_suggestions", Duration::from_secs(30)).await;
     drop(events);
     stack.shutdown_and_wait().await;
 
@@ -1044,7 +1054,10 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
     let (capture_root, _temp_guard) = match std::env::var_os("OPENHUMAN_MANAGED_CAPTURE_DIR") {
         Some(path) => (PathBuf::from(path), None),
         None => {
-            assert_eq!(phase, "self-contained", "capture phases need a persistent artifact root");
+            assert_eq!(
+                phase, "self-contained",
+                "capture phases need a persistent artifact root"
+            );
             let temp = tempdir().expect("managed capture artifact tempdir");
             (temp.path().to_path_buf(), Some(temp))
         }
@@ -1057,51 +1070,46 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
     let endpoint_file = capture_root.join("endpoints.json");
     let identity = managed_capture_identity();
 
-    let (mock_origin, requested_proxy_port) = match phase.as_str() {
-        "after" => {
-            let endpoints: Value = serde_json::from_slice(
-                &std::fs::read(&endpoint_file).expect("before phase endpoint metadata"),
-            )
-            .expect("before phase endpoint metadata JSON");
-            assert_eq!(endpoints.get("identity"), Some(&identity));
-            (
-                endpoints
-                    .get("mock_origin")
-                    .and_then(Value::as_str)
-                    .expect("recorded mock origin")
-                    .to_owned(),
-                Some(
-                    endpoints
-                        .get("proxy_port")
-                        .and_then(Value::as_u64)
-                        .expect("recorded capture proxy port") as u16,
-                ),
-            )
-        }
-        _ => {
-            let mut entries = std::fs::read_dir(&capture_root).expect("read fresh capture root");
-            assert!(entries.next().is_none(), "before capture root must start empty");
-            let (mock_addr, mock_join) = serve_on_ephemeral(scripted_upstream_router()).await;
-            (format!("http://{mock_addr}"), None)
-        }
-    };
-
-    let mock_addr: SocketAddr = mock_origin
-        .strip_prefix("http://")
-        .expect("loopback mock origin")
-        .parse()
-        .expect("mock socket address");
-    let (actual_mock_addr, mock_join) = if phase == "after" {
-        serve_on_address(scripted_upstream_router(), mock_addr).await
+    let endpoints = if phase == "after" {
+        let endpoints: Value = serde_json::from_slice(
+            &std::fs::read(&endpoint_file).expect("before phase endpoint metadata"),
+        )
+        .expect("before phase endpoint metadata JSON");
+        assert_eq!(endpoints.get("identity"), Some(&identity));
+        Some(endpoints)
     } else {
-        (mock_addr, {
-            // The baseline branch created this listener above; this placeholder is replaced
-            // below by the shared listener setup used by both phases.
-            unreachable!("baseline mock listener is created below")
-        })
+        let mut entries = std::fs::read_dir(&capture_root).expect("read fresh capture root");
+        assert!(
+            entries.next().is_none(),
+            "before capture root must start empty"
+        );
+        None
     };
-    let actual_mock_origin = format!("http://{actual_mock_addr}");
-    assert_eq!(actual_mock_origin, mock_origin);
+    let (actual_mock_addr, mock_join) = match endpoints.as_ref() {
+        Some(endpoints) => {
+            let address = endpoints
+                .get("mock_origin")
+                .and_then(Value::as_str)
+                .and_then(|origin| origin.strip_prefix("http://"))
+                .and_then(|address| address.parse::<SocketAddr>().ok())
+                .expect("recorded loopback mock origin");
+            serve_on_address(scripted_upstream_router(), address).await
+        }
+        None => serve_on_ephemeral(scripted_upstream_router()).await,
+    };
+    let mock_origin = format!("http://{actual_mock_addr}");
+    if let Some(endpoints) = endpoints.as_ref() {
+        assert_eq!(
+            endpoints.get("mock_origin").and_then(Value::as_str),
+            Some(mock_origin.as_str())
+        );
+    }
+    let requested_proxy_port = endpoints.as_ref().map(|endpoints| {
+        endpoints
+            .get("proxy_port")
+            .and_then(Value::as_u64)
+            .expect("recorded capture proxy port") as u16
+    });
 
     let capture_phase = match phase.as_str() {
         "before" => "before",
@@ -1110,6 +1118,15 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
     };
     let capture_dir = capture_root.join("captures").join(capture_phase);
     let request_dir = capture_dir.join("requests");
+    if request_dir.exists() {
+        assert!(
+            std::fs::read_dir(&request_dir)
+                .expect("read fresh request capture directory")
+                .next()
+                .is_none(),
+            "capture phase request directory must start empty"
+        );
+    }
     std::fs::create_dir_all(&request_dir).expect("create raw request capture directory");
     let proxy = start_capture_proxy(&mock_origin, &capture_dir, requested_proxy_port);
     let proxy_origin = format!("http://127.0.0.1:{}", proxy.port);
@@ -1135,34 +1152,52 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
         }
         std::fs::create_dir_all(&home).expect("create managed capture profile");
         let metadata = run_managed_capture_turn(proxy_origin.clone(), home).await;
-        assert!(!metadata.is_empty(), "the mock saw no managed inference requests");
-        assert!(metadata.iter().all(|request| {
-            request.get("path").and_then(Value::as_str) == Some("/openai/v1/chat/completions")
-                && request.get("authorization_present") == Some(&json!(true))
-                && request.get("authorization_bearer") == Some(&json!(true))
-        }), "the proxy did not forward the managed path and bearer presence");
+        assert!(
+            !metadata.is_empty(),
+            "the mock saw no managed inference requests"
+        );
+        assert!(
+            metadata.iter().all(|request| {
+                request.get("path").and_then(Value::as_str) == Some("/openai/v1/chat/completions")
+                    && request.get("authorization_present") == Some(&json!(true))
+                    && request.get("authorization_bearer") == Some(&json!(true))
+            }),
+            "the proxy did not forward the managed path and bearer presence"
+        );
 
         let files = capture_request_files(&request_dir);
-        assert!(files.len() > prior_count, "the host turn produced no raw inference capture");
+        assert!(
+            files.len() > prior_count,
+            "the host turn produced no raw inference capture"
+        );
         let batch = capture_request_bodies(&files[prior_count..]);
         assert!(!batch.is_empty());
-        assert!(batch.iter().any(|body| {
-            let request: Value = serde_json::from_slice(body).expect("captured request JSON");
-            request.get("thread_id").and_then(Value::as_str) == Some("managed-capture-thread")
-                && request
-                    .get("prompt_cache_key")
-                    .and_then(Value::as_str)
-                    .is_some_and(|key| !key.is_empty())
-        }), "the captured turn did not carry its generated thread and prompt-cache identity");
+        assert!(
+            batch.iter().any(|body| {
+                let request: Value = serde_json::from_slice(body).expect("captured request JSON");
+                request.get("thread_id").and_then(Value::as_str) == Some("managed-capture-thread")
+                    && request
+                        .get("prompt_cache_key")
+                        .and_then(Value::as_str)
+                        .is_some_and(|key| !key.is_empty())
+            }),
+            "the captured turn did not carry its generated thread and prompt-cache identity"
+        );
         prior_count = files.len();
         batches.push(batch);
     }
-    assert!(batches[0] == batches[1], "raw request bytes changed between restored identical turns");
+    assert!(
+        batches[0] == batches[1],
+        "raw request bytes changed between restored identical turns"
+    );
     if phase == "after" {
         let before = capture_request_bodies(&capture_request_files(
             &capture_root.join("captures/before/requests"),
         ));
-        assert!(before == batches[0], "managed request bytes changed from before to after migration");
+        assert!(
+            before == batches[0],
+            "managed request bytes changed from before to after migration"
+        );
     }
     drop(proxy);
     mock_join.abort();
