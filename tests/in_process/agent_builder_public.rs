@@ -76,6 +76,7 @@ fn builder_validates_required_fields() {
 
     let err = OpenHumanSessionHost::builder()
         .chat_model(Arc::new(StubModel))
+        .model_name("stub-model".into())
         .tools(vec![Box::new(StubTool("alpha"))])
         .build()
         .err()
