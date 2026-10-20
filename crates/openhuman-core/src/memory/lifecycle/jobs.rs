@@ -54,7 +54,7 @@ struct FileQueueStore {
 
 impl QueueStore for FileQueueStore {
     fn load(&self) -> QueueState {
-        match super::super::state_store::load_workspace_strict(&self.workspace_dir, STATE) {
+        match super::super::state_store::load_strict(&self.workspace_dir, STATE) {
             Ok(Some(queue)) => queue,
             Ok(None) => QueueState::default(),
             Err(error) => {
@@ -65,7 +65,7 @@ impl QueueStore for FileQueueStore {
     }
 
     fn save(&self, state: &QueueState) -> std::result::Result<(), String> {
-        super::super::state_store::save_workspace(&self.workspace_dir, STATE, state)
+        super::super::state_store::save(&self.workspace_dir, STATE, state)
             .map_err(|error| error.to_string())
     }
 }

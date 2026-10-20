@@ -498,8 +498,8 @@ fn channel_key(channel: &str) -> String {
     channel.trim().to_ascii_lowercase()
 }
 
-/// Reads only the legacy map written by prior releases. Corrupt JSON keeps the
-/// existing quarantine behavior; current code never creates or updates it.
+/// Reads only the legacy map written by prior releases. Corrupt JSON is skipped
+/// without moving the source; current code never creates or updates it.
 #[cfg(feature = "channels")]
 fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     // Prefer the workspace state value, which may have imported and removed

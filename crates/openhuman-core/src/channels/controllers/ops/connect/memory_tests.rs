@@ -292,11 +292,8 @@ async fn missing_or_corrupt_legacy_map_does_not_block_stamped_forget() {
         assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 1);
         assert!(engine.is_empty());
         if corrupt {
-            assert!(!legacy_file.exists());
-            assert_eq!(
-                std::fs::read(legacy_file.with_extension("json.corrupt")).unwrap(),
-                corrupt_bytes
-            );
+            assert_eq!(std::fs::read(&legacy_file).unwrap(), corrupt_bytes);
+            assert!(!legacy_file.with_extension("json.corrupt").exists());
         } else {
             assert!(!legacy_file.exists());
         }

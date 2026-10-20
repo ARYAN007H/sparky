@@ -260,21 +260,6 @@ pub(crate) fn load_workspace<T: DeserializeOwned + Send + 'static>(
     open_workspace_quarantining::<T>(workspace_dir, name)?.get(name)
 }
 
-/// Reads a workspace-owned state value without quarantining malformed legacy
-/// bytes. Host-owned readers use this when the legacy file is a read-only
-/// compatibility source; the returned error is logged and the original file
-/// remains available for diagnosis or a later explicit migration.
-pub(crate) fn load_workspace_strict<T: DeserializeOwned + Send + 'static>(
-    workspace_dir: &Path,
-    name: &str,
-) -> Result<Option<T>> {
-    let scope = workspace_scope(workspace_dir)?;
-    let backend = crate::storage::local::backend_for(workspace_dir)?;
-    let kv = StateKv::on_backend(&backend, &scope, OWNER, NS)?;
-    kv.import_file_strict(name, &legacy_path(workspace_dir, name))?;
-    kv.get(name)
-}
-
 /// Stores a workspace-owned state value in its deterministic local module scope.
 pub(crate) fn save_workspace<T>(workspace_dir: &Path, name: &str, value: &T) -> Result<()>
 where
