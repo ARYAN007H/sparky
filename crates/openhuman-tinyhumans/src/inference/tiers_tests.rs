@@ -122,6 +122,28 @@ fn hosted_normalizer_seeds_its_preset_using_the_configured_api_url_once() {
 }
 
 #[test]
+fn hosted_normalizer_selects_existing_managed_entry_for_legacy_managed_endpoint() {
+    let mut config = Config::default();
+    config.primary_cloud = None;
+    config.inference_url = Some("https://api.managed.test/v1".into());
+    config.resolved_endpoints.managed_hosts = vec![".managed.test".into()];
+    let managed_id = "p_existing_openhuman".to_string();
+    config.cloud_providers.push(
+        openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
+            id: managed_id.clone(),
+            slug: "openhuman".into(),
+            endpoint: "https://api.managed.test/v1".into(),
+            ..Default::default()
+        },
+    );
+
+    assert!(normalize_with_hosted_registration(&mut config));
+    assert_eq!(config.primary_cloud.as_deref(), Some(managed_id.as_str()));
+    assert!(!normalize_with_hosted_registration(&mut config));
+    assert_eq!(config.primary_cloud.as_deref(), Some(managed_id.as_str()));
+}
+
+#[test]
 fn managed_tier_vocabulary_maps_aliases_and_leaves_concrete_ids_raw() {
     for (model, role) in [
         ("reasoning-v1", "reasoning"),
