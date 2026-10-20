@@ -2,12 +2,13 @@
 //! delivered replies are stored in durable agent transcripts, not here.
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use tinychannels_bus::SendMessage;
-use tinychannels_runtime::Channel;
+use tinybus::module::ModuleObjectClient;
+use tinychannels_bus::module_progressive::ProgressiveResult;
+use tinychannels_bus::{ChannelRef, ConversationKind, ConversationRef};
 
 #[derive(Clone)]
 struct Bridge {
-    channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+    module_objects: Arc<HashMap<String, ModuleObjectClient>>,
 }
 
 fn slot() -> &'static RwLock<Option<Bridge>> {
@@ -21,10 +22,17 @@ fn current() -> Option<Bridge> {
 
 /// Register the running channel runtime's send adapters. The latest
 /// registration wins (the runtime restarts on logout/login).
-pub fn register_channel_bridge(channels: Arc<HashMap<String, Arc<dyn Channel>>>) {
+pub fn register_channel_bridge(module_objects: Arc<HashMap<String, ModuleObjectClient>>) {
     if let Ok(mut guard) = slot().write() {
-        *guard = Some(Bridge { channels });
+        *guard = Some(Bridge { module_objects });
         tracing::debug!("[cron] channel delivery bridge registered");
+    }
+}
+
+/// Release callback objects when the channel runtime shuts down.
+pub fn clear_channel_bridge() {
+    if let Ok(mut guard) = slot().write() {
+        *guard = None;
     }
 }
 
@@ -33,26 +41,75 @@ pub fn register_channel_bridge(channels: Arc<HashMap<String, Arc<dyn Channel>>>)
 /// fails.
 pub async fn send_to_channel(
     channel: &str,
+    identity: &tinyflows_bus::schedule::types::ChannelSessionIdentity,
     reply_target: &str,
-    thread_id: Option<&str>,
     text: &str,
     idempotency_key: &str,
 ) -> Result<(), String> {
     let Some(bridge) = current() else {
         return Err("channel runtime is not running".to_string());
     };
-    let key = channel.trim().to_ascii_lowercase();
-    let Some(ch) = bridge.channels.get(&key) else {
-        return Err(format!("channel '{key}' is not available"));
+    let provider = tinychannels_bus::provider_id(channel);
+    if identity.provider != provider {
+        return Err("channel origin provider does not match the captured session".into());
+    }
+    let account_id = identity
+        .account_id
+        .as_deref()
+        .filter(|account| tinychannels_bus::provider_id(account) == provider)
+        .ok_or_else(|| "channel origin has no configured account identity".to_string())?;
+    if identity.conversation.id != reply_target {
+        return Err("channel origin recipient does not match the captured conversation".into());
+    }
+    let Some(object) = bridge.module_objects.get(account_id).cloned() else {
+        return Err("configured channel module is unavailable".into());
     };
-    // Run-specific key: a retry after an ambiguous send must not duplicate the
-    // reminder, while identical reminders from different runs must not collide
-    // (the content-derived default key would reuse one key for both).
-    let mut message = SendMessage::new(text, reply_target).in_thread(thread_id.map(str::to_string));
-    message.idempotency_key = Some(idempotency_key.to_string());
-    ch.send(&message)
-        .await
-        .map_err(|e| format!("channel send failed: {e}"))
+    let channel_ref = ChannelRef {
+        id: identity.provider.clone(),
+        account_id: Some(account_id.to_string()),
+    };
+    let conversation = conversation_ref(&identity.conversation)?;
+    let reply = crate::channels::bus::NativeProgressiveReply::open(
+        object,
+        channel_ref,
+        conversation,
+        idempotency_key.to_string(),
+        std::time::Duration::from_secs(60),
+    )
+    .await
+    .map_err(|_| "channel progressive output could not be opened".to_string())?;
+    match reply.finish(text).await {
+        Ok(result) if crate::channels::runtime::dispatch::delivery_succeeded(&result) => Ok(()),
+        Ok(ProgressiveResult::DeliveryBatch { .. }
+        | ProgressiveResult::DeliveryOutcome { .. }
+        | ProgressiveResult::DeliveryOutcomes { .. }
+        | ProgressiveResult::DeliveryUnsupported { .. }) => {
+            Err("channel provider did not confirm complete delivery".into())
+        }
+        Ok(_) => Err("channel provider returned an invalid delivery result".into()),
+        Err(_) => Err("channel progressive delivery failed".into()),
+    }
+}
+
+fn conversation_ref(
+    identity: &tinyflows_bus::schedule::types::ChannelConversationIdentity,
+) -> Result<ConversationRef, String> {
+    let kind = match identity.kind.as_str() {
+        "dm" => ConversationKind::Dm,
+        "group" => ConversationKind::Group,
+        "channel" => ConversationKind::Channel,
+        "thread" => ConversationKind::Thread,
+        "unknown" => ConversationKind::Unknown,
+        _ => return Err("channel origin conversation kind is invalid".into()),
+    };
+    Ok(ConversationRef {
+        kind,
+        id: identity.id.clone(),
+        scope_id: identity.scope_id.clone(),
+        parent_id: identity.parent_id.clone(),
+        thread_id: identity.thread_id.clone(),
+        topic_id: identity.topic_id.clone(),
+    })
 }
 
 #[cfg(test)]
