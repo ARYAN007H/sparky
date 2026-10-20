@@ -56,13 +56,23 @@ pub(super) fn make_completion(
                 let result = result.map_err(anyhow::Error::msg);
                 match result {
                     Ok(outcome) => {
-                        match outcome.status {
+                        let status = if matches!(outcome.status, SubagentRunStatus::Completed)
+                            && super::dispatch::is_unexecuted_tool_call_stub(&outcome.output)
+                        {
+                            SubagentRunStatus::Incomplete {
+                                reason: "returned an unexecuted tool call instead of a result"
+                                    .to_string(),
+                            }
+                        } else {
+                            outcome.status.clone()
+                        };
+                        match status {
                             SubagentRunStatus::Completed => {
                                 if let Err(err) = subagent_sessions::mark_finished(
                                     &background_store,
                                     &background_subagent_session_id,
                                     &outcome.task_id,
-                                    &outcome.status,
+                                    &status,
                                     outcome.final_history.clone(),
                                 ) {
                                     log::warn!(
@@ -129,7 +139,7 @@ pub(super) fn make_completion(
                                     &background_store,
                                     &background_subagent_session_id,
                                     &outcome.task_id,
-                                    &outcome.status,
+                                    &status,
                                     outcome.final_history.clone(),
                                 ) {
                                     log::warn!(
@@ -309,6 +319,10 @@ pub(super) fn make_completion(
                     }
                     Err(err) => {
                         let error = err.to_string();
+                        let failure = super::dispatch::format_subagent_failure(
+                            "spawn_subagent",
+                            &error,
+                        );
                         if let Err(store_err) = subagent_sessions::mark_failed(
                             &background_store,
                             &background_subagent_session_id,
@@ -330,19 +344,19 @@ pub(super) fn make_completion(
                         // surfaces it as a follow-up chat turn.
                         if emit_lifecycle_effects {
                             completion_target
-                                .failed(&background_task_id, &background_agent_id, &error)
+                                .failed(&background_task_id, &background_agent_id, &failure)
                                 .await;
                             crate::agent::orchestration::subagent_events::publish_subagent_failed(
                                 background_parent_session,
                                 background_task_id.clone(),
                                 background_agent_id.clone(),
-                                error.clone(),
+                                failure.clone(),
                             );
                             abort_report
                                 .deliver(AgentProgress::SubagentFailed {
                                     agent_id: background_agent_id,
                                     task_id: background_task_id,
-                                    error,
+                                    error: failure,
                                 })
                                 .await;
                         }

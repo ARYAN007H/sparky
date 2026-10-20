@@ -15,6 +15,12 @@ pub(crate) fn is_unexecuted_tool_call_stub(output: &str) -> bool {
         .any(char::is_alphanumeric)
 }
 
+pub(crate) fn format_subagent_failure(tool: &str, error: &str) -> String {
+    format!(
+        "{tool} failed and did not complete. Do not treat this as success or fabricate output. Details: {error}"
+    )
+}
+
 pub(crate) fn incomplete_stop(
     reason: &str,
     failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
