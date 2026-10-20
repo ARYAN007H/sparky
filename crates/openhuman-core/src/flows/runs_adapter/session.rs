@@ -7,8 +7,8 @@ use std::time::Duration;
 use tinyflows_bus::runs::{self, RunEvent};
 use tinyflows_catalog::{types::FlowRunTrigger, Flow};
 
-use crate::config::Config;
 use super::{projection, RunBindings};
+use crate::config::Config;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct RunKey {
