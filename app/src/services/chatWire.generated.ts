@@ -547,6 +547,27 @@ export type WebChannelEvent =
     }
   | {
       client_id: string;
+      event: 'channel_outbound';
+      full_response?: string | null;
+      request_id: string;
+      seq?: number | null;
+      structured?: any;
+      thread_id: string;
+      ts?: number | null;
+      turn_request_id?: string | null;
+    }
+  | {
+      channel_event: ChannelEvent;
+      client_id: string;
+      event: 'channel_event';
+      request_id: string;
+      seq?: number | null;
+      thread_id: string;
+      ts?: number | null;
+      turn_request_id?: string | null;
+    }
+  | {
+      client_id: string;
       error_source?: string | null;
       error_type?: string | null;
       event: 'user_error';
@@ -708,11 +729,111 @@ export type OutboundVoice =
       durationMs?: number | null;
       kind: 'media';
       media: MediaReference;
+      /**
+       * Normalised 0.0-1.0 loudness preview for providers that draw one
+       * (WhatsApp push-to-talk). Absent when the codec path produced none.
+       */
+      waveform?: number[] | null;
     }
   | {
       kind: 'synthesize';
       text: string;
       voice?: string | null;
+    };
+/**
+ * One normalized event emitted by a channel provider.
+ */
+export type ChannelEvent = {
+  channel: ChannelRef;
+  /**
+   * Full conversation address. Presence events may omit it.
+   */
+  conversation?: ConversationRef | null;
+  /**
+   * Stable adapter event ID, suitable for host-side deduplication.
+   */
+  eventId: string;
+  /**
+   * Provider event ID, retained verbatim when supplied.
+   */
+  sourceEventId?: string | null;
+  /**
+   * Provider timestamp in Unix milliseconds, when supplied.
+   */
+  sourceTimestamp?: number | null;
+  /**
+   * Event vocabulary version. This DTO currently represents contract v2.
+   */
+  version: number;
+} & ChannelEvent1;
+export type ChannelEvent1 =
+  | {
+      active: boolean;
+      actor: SenderRef;
+      expiresAt?: number | null;
+      type: 'typing';
+    }
+  | {
+      actor?: SenderRef | null;
+      messageId: string;
+      timestamp?: number | null;
+      type: 'read_receipt';
+    }
+  | {
+      actor?: SenderRef | null;
+      messageId: string;
+      timestamp?: number | null;
+      type: 'delivered_receipt';
+    }
+  | {
+      actor: SenderRef;
+      messageId: string;
+      providerMessageId?: string | null;
+      reaction: ChannelReaction;
+      type: 'reaction_added';
+    }
+  | {
+      actor: SenderRef;
+      messageId: string;
+      providerMessageId?: string | null;
+      reaction: ChannelReaction;
+      type: 'reaction_removed';
+    }
+  | {
+      messageId: string;
+      providerMessageId?: string | null;
+      reaction: ChannelReaction;
+      success: boolean;
+      type: 'outbound_reaction';
+    }
+  | {
+      messageId: string;
+      parts: ContentPart[];
+      providerMessageId?: string | null;
+      type: 'message_updated';
+    }
+  | {
+      messageId: string;
+      providerMessageId?: string | null;
+      type: 'message_deleted';
+    }
+  | {
+      actionId: string;
+      actor: SenderRef;
+      providerMessageId?: string | null;
+      queryId: string;
+      type: 'button_callback';
+    }
+  | {
+      actor: SenderRef;
+      expiresAt?: number | null;
+      state: string;
+      type: 'presence';
+    }
+  | {
+      reason?: string | null;
+      state: string;
+      type: 'lifecycle';
     };
 
 /**
@@ -869,4 +990,48 @@ export interface WebQueueItemPayload {
   id: string;
   lane?: string | null;
   text_preview?: string | null;
+}
+/**
+ * Configured provider/account identity.
+ */
+export interface ChannelRef {
+  accountId?: string | null;
+  id?: string;
+}
+/**
+ * Reference to an inbound or outbound conversation.
+ */
+export interface ConversationRef {
+  id?: string;
+  /**
+   * Provider-neutral conversation kind.
+   */
+  kind?: 'dm' | 'group' | 'channel' | 'thread' | 'unknown';
+  parentId?: string | null;
+  scopeId?: string | null;
+  threadId?: string | null;
+  topicId?: string | null;
+}
+/**
+ * Reference to the message sender.
+ */
+export interface SenderRef {
+  altIds?: string[];
+  id?: string;
+  isBot?: boolean;
+  name?: string | null;
+  roles?: string[];
+}
+/**
+ * Provider reaction identity, including optional custom emoji identity.
+ */
+export interface ChannelReaction {
+  /**
+   * Provider-specific stable custom-emoji identity.
+   */
+  customEmojiId?: string | null;
+  /**
+   * Displayable reaction text, such as an emoji.
+   */
+  value?: string;
 }
