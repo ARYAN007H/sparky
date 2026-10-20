@@ -348,6 +348,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
                 worker_thread_id: None,
                 task_id: "task-cold-1".into(),
                 lifecycle_key: None,
+            parent_epoch: None,
             },
             None,
         )
