@@ -169,6 +169,7 @@ fn owner_file_pause_is_imported_and_the_original_bytes_stay_unchanged() {
 async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
     use crate::agent::harness::fork_context::ParentExecutionContext;
     use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use std::sync::Arc;
     use tinyagents_harness::context::{RunConfig, RunContext};
 
     let workspace = tempfile::tempdir().unwrap();
