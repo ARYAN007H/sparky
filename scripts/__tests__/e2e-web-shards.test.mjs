@@ -119,7 +119,7 @@ test("selection classifier rejects unknown diagnostics and protected-owner demot
   };
   assert.throws(
     () => classifySpecFiles(["test/playwright/specs/owner.spec.ts"], base),
-    /stale or unknown diagnostic spec/,
+    /diagnostic inventory differs from the reviewed file allowlist/,
   );
   assert.throws(
     () =>
@@ -157,7 +157,7 @@ test("CI Full requires every Playwright lane and manual workflow shares the arti
   );
   const job = full.slice(
     full.indexOf("  playwright-e2e:"),
-    full.indexOf("  # Full desktop E2E", full.indexOf("  playwright-e2e:")),
+    full.indexOf("  # Runs only the exact unchanged AUI", full.indexOf("  playwright-e2e:")),
   );
   assert.match(job, /fail-fast:\s*false/);
   assert.match(job, /lane:\s*\[1, 2, 3, 4\]/);
@@ -174,6 +174,13 @@ test("CI Full requires every Playwright lane and manual workflow shares the arti
     manual,
     /e2e-web-shards\.sh --lane=\$\{\{ matrix\.lane \}\} --lanes=4 --selection=all/,
   );
+  const diagnosticJob = full.slice(
+    full.indexOf("  playwright-legacy-diagnostic:"),
+    full.indexOf("  # Full desktop E2E", full.indexOf("  playwright-legacy-diagnostic:")),
+  );
+  assert.match(diagnosticJob, /continue-on-error:\s*true/);
+  assert.match(diagnosticJob, /--selection=diagnostic/);
+  assert.doesNotMatch(full.match(/needs:\s*\[[^\]]*playwright-legacy-diagnostic[^\]]*\]/g)?.join("\n") ?? "", /./);
 });
 
 test("required selection forwards every healthy spec and never the diagnostic file", () => {
@@ -268,15 +275,17 @@ test("failure artifact names are unique across all four Playwright lanes", () =>
   ];
 
   for (const [workflow, source] of workflows) {
-    const match = source.match(/name: (e2e-playwright-failure-logs-[^\r\n]+)/);
-    assert.ok(match, `${workflow} must upload its failure artifact`);
-    const names = Array.from({ length: 4 }, (_, index) =>
-      match[1].replace(/\$\{\{\s*matrix\.lane\s*\}\}/g, String(index + 1)),
+    const matches = [...source.matchAll(/name: (e2e-playwright-[^\r\n]*failure-logs-[^\r\n]+)/g)];
+    assert.ok(matches.length, `${workflow} must upload its failure artifact`);
+    const laneNames = matches.flatMap((match) =>
+      Array.from({ length: 4 }, (_, index) =>
+        match[1].replace(/\$\{\{\s*matrix\.lane\s*\}\}/g, String(index + 1)),
+      ),
     );
     assert.equal(
-      new Set(names).size,
-      4,
-      `${workflow} artifact names must be unique per lane`,
+      new Set(laneNames).size,
+      laneNames.length,
+      `${workflow} artifact names must be unique across jobs and lanes`,
     );
   }
 });
