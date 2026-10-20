@@ -234,6 +234,39 @@ pub async fn channel_web_chat_with_stored_attachments(
     voice_note_id: Option<String>,
     stored_attachments: Option<StoredAttachmentInput>,
 ) -> Result<Outcome<Value>, String> {
+    channel_web_chat_with_attachments(
+        ctx,
+        client_id,
+        thread_id,
+        message,
+        model_override,
+        temperature,
+        locale,
+        queue_mode,
+        run_mode,
+        metadata,
+        voice_note_id,
+        stored_attachments,
+        None,
+    )
+    .await
+}
+
+pub async fn channel_web_chat_with_attachments(
+    ctx: &crate::core::runtime::DispatchCtx,
+    client_id: &str,
+    thread_id: &str,
+    message: &str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    locale: Option<String>,
+    queue_mode: Option<String>,
+    run_mode: Option<String>,
+    metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
+    stored_attachments: Option<StoredAttachmentInput>,
+    attachment_uploads: Option<Vec<tinychannels_bus::ContentPart>>,
+) -> Result<Outcome<Value>, String> {
     // A SaaS user chooses the thread id; the same rules as `threads_upsert`
     // apply (no reserved prefixes, no path-like ids). No-op outside SaaS.
     crate::profiles::surface::check_thread_id(thread_id.trim())?;
@@ -254,7 +287,7 @@ pub async fn channel_web_chat_with_stored_attachments(
         }
     }
 
-    let result = start_chat_with_stored_attachments(
+    let result = super::start_chat::start_chat_with_attachments(
         ctx,
         client_id,
         thread_id,
@@ -266,6 +299,7 @@ pub async fn channel_web_chat_with_stored_attachments(
         metadata,
         voice_note_id,
         stored_attachments,
+        attachment_uploads,
     )
     .await?;
 
