@@ -194,6 +194,7 @@ pub(crate) async fn run_relay_turn(
         &config,
         parts,
         Arc::new(channels_by_name),
+        Arc::new(HashMap::new()),
         message_timeout_secs,
     );
     runtime.relay_thread = Some(thread_id.clone());

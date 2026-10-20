@@ -57,7 +57,7 @@ pub(crate) async fn configured_agent(
     config.default_model = Some(route.model.clone());
     config.default_temperature = ctx.temperature;
     config.multimodal_files = crate::config::MultimodalFileConfig::for_untrusted_channel_input();
-    HostAgent::from_config(&dispatch, config, agent_id).map_err(|error| error.to_string())
+    HostAgent::from_config(&dispatch, config, &agent_id).map_err(|error| error.to_string())
 }
 
 /// What a channel's binding resolves to for one message.

@@ -387,10 +387,10 @@ impl Summarizer<QueuedPayload> for NativeSummarizer {
             let idle = request
                 .idle_timeout
                 .unwrap_or_else(crate::agent::turn_policy::configured_idle_window);
-            crate::web_chat::web_errors::turn_idle_error_message(idle.as_secs())
+            crate::web_chat::turn_idle_error_message(idle.as_secs())
         } else {
             let deadline = request.deadline.unwrap_or_default();
-            crate::web_chat::web_errors::turn_timeout_error_message(deadline.as_secs())
+            crate::web_chat::turn_timeout_error_message(deadline.as_secs())
         };
         let (failure_type, message) = NativeFailures.classify(&error);
         Some(TurnResult {

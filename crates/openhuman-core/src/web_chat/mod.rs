@@ -47,7 +47,9 @@ mod types;
 
 mod voice_notes;
 mod web_errors;
-pub(crate) use web_errors::classify_inference_error;
+pub(crate) use web_errors::{
+    classify_inference_error, turn_idle_error_message, turn_timeout_error_message,
+};
 #[cfg(any(test, debug_assertions))]
 #[allow(unused_imports)]
 pub(crate) use web_errors::{
