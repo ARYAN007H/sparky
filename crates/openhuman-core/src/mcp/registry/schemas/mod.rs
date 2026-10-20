@@ -46,9 +46,19 @@ pub(crate) fn registry_get_controller_entry() -> ControllerEntry {
     ))
 }
 
-// Test-only bridges: `schemas_tests.rs` (kept as-is; not part of the unsplit
-// batch) reaches these through `use super::*`, mirroring the flat scope it
-// had when `include!` spliced everything into one file.
+// Test-only re-exports used by the companion schema tests.
 #[cfg(test)]
 use params::{read_optional_u32, read_required};
 
+#[cfg(test)]
+pub(crate) fn registry_get_parameter_contract() -> crate::core::all::ControllerParamContract {
+    crate::core::all::ControllerParamContract {
+        method: "mcp_clients.registry_get",
+        required: &["qualified_name"],
+        optional: &[],
+        examples: vec![
+            serde_json::json!({"qualified_name":"example/server"}),
+            serde_json::json!({"qualified_name":" example/server "}),
+        ],
+    }
+}

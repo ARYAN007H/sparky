@@ -363,3 +363,17 @@ fn computer_status_controller_entry() -> ControllerEntry {
     ))
 }
 
+#[cfg(test)]
+pub(crate) fn computer_status_parameter_contract() -> crate::core::all::ControllerParamContract {
+    crate::core::all::ControllerParamContract {
+        method: "modules.computer_status",
+        required: &[],
+        optional: &["load"],
+        examples: vec![
+            serde_json::json!({}),
+            serde_json::json!({"load":false}),
+            serde_json::json!({"load":true}),
+        ],
+    }
+}
+

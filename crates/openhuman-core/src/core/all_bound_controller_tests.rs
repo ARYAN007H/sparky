@@ -324,34 +324,27 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
         entry.rpc_method_name(),
         "openhuman.mcp_clients_registry_get"
     );
-    required_input_contract(&entry.schema, &["qualified_name"])
-        .expect("qualified_name is an independently required input");
+    let contract = crate::mcp::registry::schemas::registry_get_parameter_contract();
+    crate::core::all::verify_parameter_contracts(std::slice::from_ref(entry),
+        std::slice::from_ref(&contract))
+        .expect("raw MCP entry matches its independent contract and bound decoder");
     assert!(entry.schema.inputs.iter().all(|field| field.required));
-
-    for example in [
-        json!({"qualified_name":"example/server"}),
-        json!({"qualified_name":" example/server "}),
-    ] {
-        let params = example.as_object().expect("example object").clone();
-        validate_params(&entry.schema, &params).expect("schema accepts independent example");
-        entry
-            .decode_params(params)
-            .expect("bound decoder accepts independent example");
-    }
 
     for remove in [true, false] {
         let mut broken = entry.schema.clone();
         if remove {
-            broken.inputs.retain(|field| field.name != "qualified_name");
+            broken
+                .inputs
+                .retain(|field| field.name != contract.required[0]);
         } else {
             broken
                 .inputs
                 .iter_mut()
-                .find(|field| field.name == "qualified_name")
-                .expect("positive contract includes qualified_name")
+                .find(|field| field.name == contract.required[0])
+                .expect("positive contract includes its required input")
                 .required = false;
         }
-        assert!(required_input_contract(&broken, &["qualified_name"])
+        assert!(required_input_contract(&broken, contract.required)
             .unwrap_err()
             .contains("required inputs mismatch"));
     }
@@ -387,13 +380,10 @@ fn production_registry_binds_computer_status_to_its_declared_parser() {
     assert_eq!(entry.schema.inputs[0].name, "load");
     assert!(!entry.schema.inputs[0].required);
 
-    for example in [json!({}), json!({"load":true}), json!({"load":false})] {
-        let params = example.as_object().expect("example object").clone();
-        validate_params(&entry.schema, &params).expect("schema accepts independent example");
-        entry
-            .decode_params(params)
-            .expect("bound decoder accepts independent example");
-    }
+    let contract = crate::modules::schemas::computer_status_parameter_contract();
+    crate::core::all::verify_parameter_contracts(std::slice::from_ref(entry),
+        std::slice::from_ref(&contract))
+        .expect("raw Modules entry matches its independent contract and bound decoder");
 
     // Runtime parsing intentionally keeps its permissive false default for
     // non-boolean inputs; these maps are parser cases, not schema examples.
