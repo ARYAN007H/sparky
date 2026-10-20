@@ -230,10 +230,7 @@ fn channel_activity_emits_atomic_keyed_merge_patches() {
         .as_object()
         .unwrap();
     assert_eq!(read_entries.len(), 1);
-    assert_eq!(
-        read_entries.values().next().unwrap()["actorId"],
-        "bob"
-    );
+    assert_eq!(read_entries.values().next().unwrap()["actorId"], "bob");
     assert_eq!(read_entries.values().next().unwrap()["timestamp"], 42);
 
     let removed = event(ChannelEventKind::ReactionRemoved {

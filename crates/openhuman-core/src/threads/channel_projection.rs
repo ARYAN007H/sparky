@@ -250,10 +250,7 @@ fn keyed_digest(parts: &[&str]) -> Result<String> {
     Ok(hex::encode(Sha256::digest(encoded)))
 }
 
-fn reaction_digest(
-    actor_id: &str,
-    reaction: &tinychannels_bus::ChannelReaction,
-) -> Result<String> {
+fn reaction_digest(actor_id: &str, reaction: &tinychannels_bus::ChannelReaction) -> Result<String> {
     let encoded = serde_json::to_vec(&(
         actor_id,
         &reaction.value,
