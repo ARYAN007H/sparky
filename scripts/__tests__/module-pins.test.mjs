@@ -286,11 +286,12 @@ test("the existing exact-drift exemption is proof-checked and keeps ahead visibl
       assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
       actualHead: fixture.candidateCommit,
     };
-    const accepted = classifyPin({ ...base, actual, exemption, sourceParityContext });
+    const accepted = classifyPin({ ...base, version: "1.0.0", actual, exemption, sourceParityContext });
     assert.equal(accepted.ok, true);
     assert.equal(accepted.kind, "exempt");
     const altered = classifyPin({
       ...base,
+      version: "1.0.0",
       actual,
       exemption: { ...exemption, sourceParity: { ...fixture.parity, candidateCommit: "f".repeat(40) } },
       sourceParityContext,
