@@ -55,6 +55,7 @@ import {
 } from './chatWire';
 import { callCoreRpc } from './coreRpcClient';
 import { socketService } from './socketService';
+import type { QueuedChatAck } from '../types/threadWire.generated';
 
 const chatLog = debug('realtime:chat');
 
@@ -958,6 +959,38 @@ export interface ChatSendAck {
   queuedAttachments: ContentPart[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isQueuedAttachment(value: unknown): value is ContentPart {
+  if (!isRecord(value) || typeof value.kind !== 'string') return false;
+  const mediaKinds = new Set(['image', 'video', 'audio', 'file', 'sticker']);
+  if (!mediaKinds.has(value.kind)) return true;
+  if (!isRecord(value.media)) return false;
+  const media = value.media;
+  return (
+    typeof media.opaqueId === 'string' &&
+    media.opaqueId.length > 0 &&
+    media.url == null &&
+    media.path == null
+  );
+}
+
+function isQueuedChatAck(value: unknown): value is QueuedChatAck {
+  return (
+    isRecord(value) &&
+    value.queued === true &&
+    typeof value.queue_mode === 'string' &&
+    typeof value.client_id === 'string' &&
+    typeof value.thread_id === 'string' &&
+    typeof value.request_id === 'string' &&
+    typeof value.queue_depth === 'number' &&
+    Array.isArray(value.queued_attachments) &&
+    value.queued_attachments.every(isQueuedAttachment)
+  );
+}
+
 export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendAck> {
   const socket = socketService.getSocket();
   const clientId = socket?.id;
@@ -983,15 +1016,12 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
     },
   });
 
-  const ack = result as
-    | { request_id?: unknown; queued_attachments?: unknown }
-    | null;
-  const requestId = ack?.request_id;
+  if (!isQueuedChatAck(result)) {
+    throw new Error('Core returned an invalid chat queue acknowledgement');
+  }
   return {
-    requestId: typeof requestId === 'string' ? requestId : undefined,
-    queuedAttachments: Array.isArray(ack?.queued_attachments)
-      ? (ack.queued_attachments as ContentPart[])
-      : [],
+    requestId: result.request_id,
+    queuedAttachments: result.queued_attachments,
   };
 }
 

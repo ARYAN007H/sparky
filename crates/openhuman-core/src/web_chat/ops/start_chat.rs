@@ -439,7 +439,7 @@ async fn start_chat_inner(
                 item_id: Some(request_id.clone()),
                 text_preview: Some(preview),
             });
-            serde_json::to_string(&super::super::types::QueuedChatAck {
+            serde_json::to_string(&crate::threads::rpc_models::QueuedChatAck {
                 queued: true,
                 queue_mode: mode.to_string(),
                 client_id,
