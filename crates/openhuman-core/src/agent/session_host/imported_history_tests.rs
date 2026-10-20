@@ -192,13 +192,13 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
 
     let root = tempfile::tempdir().expect("workspace");
     let locator = crate::agent::session_store::splice_fixture::memory_locator();
-    let model: Arc<dyn ChatModel<()>> =
-        Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
-            "unused",
-        ]));
+    let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+        "reply after legacy adoption",
+    ]));
+    let chat_model: Arc<dyn ChatModel<()>> = model.clone();
     let mut host = SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(&locator))
-        .chat_model(model)
+        .chat_model(chat_model)
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
@@ -265,17 +265,25 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
         })
         .await
         .unwrap());
+    assert_eq!(
+        host.turn("first durable turn").await.unwrap(),
+        "reply after legacy adoption"
+    );
+    let first_request = model.requests().into_iter().next().expect("first request");
+    let first_messages = serde_json::to_string(&first_request.messages).unwrap();
+    assert!(first_messages.contains("legacy question"));
+    assert!(first_messages.contains("first durable turn"));
 
-    // A separate host bound to a session with committed durable rows never
-    // consults the legacy source, even when that source is unavailable.
+    // A separate host resumes the committed turn while the legacy source is
+    // unavailable. It must use the durable transcript and never read legacy.
     let second_root = tempfile::tempdir().expect("second workspace");
-    let second_model: Arc<dyn ChatModel<()>> =
-        Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
-            "unused",
-        ]));
+    let second_model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+        "reply after restart",
+    ]));
+    let second_chat_model: Arc<dyn ChatModel<()>> = second_model.clone();
     let mut resumed = SessionHostBuilder::new()
         .with_session_history_locator(locator.clone())
-        .chat_model(second_model)
+        .chat_model(second_chat_model)
         .workspace_dir(second_root.path().join("workspace"))
         .action_dir(second_root.path().to_path_buf())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
@@ -289,4 +297,14 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
         })
         .await
         .unwrap());
+    assert_eq!(resumed.turn("after restart").await.unwrap(), "reply after restart");
+    let resumed_request = second_model
+        .requests()
+        .into_iter()
+        .next()
+        .expect("resumed model request");
+    let resumed_messages = serde_json::to_string(&resumed_request.messages).unwrap();
+    assert!(resumed_messages.contains("legacy question"));
+    assert!(resumed_messages.contains("first durable turn"));
+    assert!(resumed_messages.contains("after restart"));
 }
