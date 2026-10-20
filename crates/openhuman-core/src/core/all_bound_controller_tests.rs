@@ -465,7 +465,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.test_provider",
             required: &["workload", "provider"],
             optional: &["validate_only", "api_key"],
-            examples: &[
+            examples: vec![
                 json!({"workload":"tts","provider":"cloud"}),
                 json!({"workload":"stt","provider":"cloud","validate_only":true,"api_key":"fixture-key"}),
             ],
