@@ -433,6 +433,13 @@ pub fn all_tools_with_runtime(
         Some(crate::tools::sources::ANCHOR_AFTER_SEARCH),
     ));
 
+    // Keep the hosted-tool placement stable for registered sources that still
+    // use the former post-delegate slot.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),
+    ));
+
     // Hosting tools — deploy a workspace directory through the compiled
     // TinyHosts module. Registered only once a credential
     // actually resolves (`[hosting].api_key`, else the provider's environment

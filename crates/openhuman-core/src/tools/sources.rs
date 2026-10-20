@@ -47,8 +47,11 @@ pub type ToolSourceFactory =
 
 /// Anchor point: right after the search tools, before hosting.
 pub const ANCHOR_AFTER_SEARCH: &str = "after_search";
+/// Stable insertion point for registered hosted tools after the former
+/// configured-delegate catalogue slot and before Composio.
+pub const ANCHOR_AFTER_DELEGATE: &str = "after_delegate";
 /// Every anchor `all_tools_with_runtime` splices sources into.
-pub const ANCHORS: [&str; 1] = [ANCHOR_AFTER_SEARCH];
+pub const ANCHORS: [&str; 2] = [ANCHOR_AFTER_SEARCH, ANCHOR_AFTER_DELEGATE];
 
 /// Where in the catalogue a source's tools go.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

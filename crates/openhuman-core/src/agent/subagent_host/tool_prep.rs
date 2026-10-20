@@ -35,7 +35,7 @@ pub(crate) fn subagent_prompt_protocol(
 /// delegates. Nested spawns would create a recursion tree the harness
 /// is not designed to budget, cost, or observe.
 ///
-/// Matches TinyAgents' spawn-tool list, the host's `delegate` and
+/// Matches TinyAgents' spawn-tool list and the host's
 /// `continue_subagent` tools, and every synthesised per-archetype `delegate_*` tool
 ///   ([`crate::tools::orchestrator_tools::collect_orchestrator_tools`]
 ///   emits tools for each configured delegation target).

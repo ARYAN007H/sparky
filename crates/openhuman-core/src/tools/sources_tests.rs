@@ -141,9 +141,9 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
         move |_| anchor_tools(&["anchor_fake_search_b"]),
     );
     register_tool_source_at(
-        "test::after_search_extra",
-        ToolSourcePlacement::After(ANCHOR_AFTER_SEARCH),
-        move |_| anchor_tools(&["anchor_fake_search_extra"]),
+        "test::after_delegate",
+        ToolSourcePlacement::After(ANCHOR_AFTER_DELEGATE),
+        move |_| anchor_tools(&["anchor_fake_delegate"]),
     );
     register_tool_source("test::end", |_| vec![Box::new(FakeTool("anchor_fake_end"))]);
     register_tool_source_at(
@@ -155,7 +155,7 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     for id in [
         "test::after_search_a",
         "test::after_search_b",
-        "test::after_search_extra",
+        "test::after_delegate",
         "test::end",
         "test::unknown_anchor",
     ] {
@@ -176,8 +176,8 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     assert!(pos("anchor_fake_search_b") < pos("image_info"));
     // End sources, and sources with an unknown anchor, trail every built-in
     // and keep registration order.
-    assert!(pos("image_info") < pos("anchor_fake_search_extra"));
-    assert!(pos("anchor_fake_search_extra") < pos("anchor_fake_end"));
+    assert!(pos("image_info") < pos("anchor_fake_delegate"));
+    assert!(pos("anchor_fake_delegate") < pos("anchor_fake_end"));
     assert!(pos("anchor_fake_end") < pos("anchor_fake_unknown"));
     // Sibling tests register sources on the same process-wide slot, so only
     // relative positions are asserted, never the total length.
