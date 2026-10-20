@@ -474,7 +474,7 @@ async fn flows_run_persists_live_steps_with_status_and_timing() {
         }
     }
 
-    BUS.init().await.expect("bus init");
+    crate::core::bus::init().await.expect("bus init");
     let progress = Arc::new(Mutex::new(Vec::new()));
     let _progress_subscription = BUS
         .subscribe(Arc::new(ProgressCollector {

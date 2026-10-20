@@ -7,7 +7,7 @@ async fn classified_stop_cause_survives_the_latch_cleanup_on_agent_finish() {
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let handle = SteeringHandle::new(SteeringPolicy::new());
     let middleware = RepeatedToolFailureMiddleware::new(handle, 3, slot);
-    middleware.stop.halt_classified(
+    middleware.policy.stop.halt_classified(
         "classified summary".into(),
         "uncertain_side_effect",
         "web_answer_tool",

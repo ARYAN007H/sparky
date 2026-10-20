@@ -37,9 +37,10 @@ async fn flows_run_detached_returns_running_run_id_and_inserts_row() {
 
     // The `running` row is inserted synchronously before the background task is
     // spawned, so the copilot's immediate `get_flow_run(run_id)` poll finds it.
-    let row = store::get_flow_run(&config, &run_id)
-        .unwrap()
-        .expect("a run row must exist immediately after detaching");
+    let row = flows_get_run(&config, &run_id)
+        .await
+        .expect("a run row must exist immediately after detaching")
+        .value;
     assert_eq!(row.flow_id, flow.id);
 }
 

@@ -233,7 +233,7 @@ async fn digest_ignores_cancelled_run() {
 }
 
 #[tokio::test]
-fn digest_rendering_scrubs_persisted_outputs() {
+async fn digest_rendering_scrubs_persisted_outputs() {
     let step = tinyflows_catalog::FlowRunStep {
         node_id: "n1".to_string(),
         output: json!({

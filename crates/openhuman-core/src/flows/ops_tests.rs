@@ -431,8 +431,8 @@ fn seeded_slack_send_message_contract_with_schema() -> ToolContract {
 // degrade_completed_status (PR2 — run honesty)
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn clean_step(node_id: &str) -> FlowRunStep {
-    FlowRunStep {
+fn clean_step(node_id: &str) -> tinyflows_catalog::FlowRunStep {
+    tinyflows_catalog::FlowRunStep {
         node_id: node_id.to_string(),
         output: Value::Null,
         port: None,

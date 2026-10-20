@@ -550,6 +550,7 @@ fn an_equal_millisecond_live_close_persists_and_a_stale_snapshot_cannot_reopen_i
                 task_title: "Task".into(),
                 worker_thread_id: None,
                 task_id: "task-id".into(),
+                lifecycle_key: None,
             },
             None,
         )

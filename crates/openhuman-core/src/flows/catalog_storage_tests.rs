@@ -479,7 +479,7 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         .unwrap();
     assert!(matches!(ensured, CatalogStorageReply::Value { .. }));
     let rebound = proxy
-        .call::<CatalogStorageReply, _>(
+        .call::<CatalogStorageReply>(
             catalog::storage::GET,
             &(catalog::DocGetRequest {
                 collection: "graph.threads".into(),

@@ -29,7 +29,7 @@ async fn streamed_flow_finalizer_settles_the_bridge_workspace_turn_state() {
         request_id: "flow-stream-request-binding".to_string(),
     };
     for config in [&config_a, &config_b] {
-        crate::agent::session_store::turn_states_for(&config.workspace_dir)
+        crate::storage::sessions::turn_states_for(&config.workspace_dir)
             .put(&TurnState::started(
                 target.thread_id.clone(),
                 target.request_id.clone(),
@@ -49,11 +49,11 @@ async fn streamed_flow_finalizer_settles_the_bridge_workspace_turn_state() {
     )
     .await;
 
-    let state_a = crate::agent::session_store::turn_states_for(&config_a.workspace_dir)
+    let state_a = crate::storage::sessions::turn_states_for(&config_a.workspace_dir)
         .get_turn(&target.thread_id, &target.request_id)
         .unwrap()
         .unwrap();
-    let state_b = crate::agent::session_store::turn_states_for(&config_b.workspace_dir)
+    let state_b = crate::storage::sessions::turn_states_for(&config_b.workspace_dir)
         .get_turn(&target.thread_id, &target.request_id)
         .unwrap()
         .unwrap();

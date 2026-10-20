@@ -40,7 +40,7 @@ async fn private_agent_progress_advances_cursor_without_leaking_text_or_replayin
         }
     }
 
-    crate::core::bus::BUS.init().await.expect("bus init");
+    crate::core::bus::init().await.expect("bus init");
     let collector = Arc::new(Collector::default());
     let _subscription = crate::core::bus::BUS
         .subscribe(Arc::clone(&collector))
