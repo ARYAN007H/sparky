@@ -52,7 +52,7 @@ fn legacy_inference_url_becomes_custom_entry() {
 
     let stats = run(&mut c).expect("migration must succeed");
 
-    assert_eq!(stats.cloud_providers_seeded, 2);
+    assert_eq!(stats.cloud_providers_seeded, 1);
     let custom = c
         .cloud_providers
         .iter()
@@ -74,9 +74,8 @@ fn managed_inference_url_does_not_seed_custom() {
     c.resolved_endpoints.managed_hosts = vec![".managed.test".into()];
     c.inference_url = Some("https://api.managed.test/v1".into());
     let _ = run(&mut c).expect("migration must succeed");
-    // Only the openhuman entry should be seeded — no Custom entry.
-    assert_eq!(c.cloud_providers.len(), 1);
-    assert_eq!(c.cloud_providers[0].slug, "openhuman");
+    // Hosted entries are installed by TinyHumans, not the core migration.
+    assert!(c.cloud_providers.is_empty());
 }
 
 #[test]
@@ -86,8 +85,8 @@ fn without_managed_hosts_every_inference_url_is_custom() {
     let mut c = Config::default();
     c.inference_url = Some("https://api.managed.test/v1".into());
     let _ = run(&mut c).expect("migration must succeed");
-    assert_eq!(c.cloud_providers.len(), 2);
-    assert_eq!(c.cloud_providers[1].slug, "custom");
+    assert_eq!(c.cloud_providers.len(), 1);
+    assert_eq!(c.cloud_providers[0].slug, "custom");
 }
 
 #[test]
