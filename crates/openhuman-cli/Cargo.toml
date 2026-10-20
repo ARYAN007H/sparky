@@ -189,10 +189,53 @@ path = "../../tests/memory_cortexdb_live.rs"
 # boots the server in Docker and sets OPENHUMAN_LIVE_CORTEXDB_URL.
 
 [[test]]
-name = "json_rpc_e2e"
-path = "../../tests/json_rpc_e2e.rs"
-# `openhuman_tinyhumans::voice::reply_speech::{test_seam, TEST_SEAM_ENV}` — the
-# reply-speech seam only exists with the voice feature (hosted TTS provider).
+name = "json_rpc_threads_e2e"
+path = "../../tests/json_rpc_threads_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_wallet_e2e"
+path = "../../tests/json_rpc_wallet_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_flows_e2e"
+path = "../../tests/json_rpc_flows_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_mcp_e2e"
+path = "../../tests/json_rpc_mcp_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_inference_e2e"
+path = "../../tests/json_rpc_inference_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_auth_security_e2e"
+path = "../../tests/json_rpc_auth_security_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_config_e2e"
+path = "../../tests/json_rpc_config_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_agent_team_e2e"
+path = "../../tests/json_rpc_agent_team_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_web_chat_e2e"
+path = "../../tests/json_rpc_web_chat_e2e.rs"
+required-features = ["voice", "http-server"]
+
+[[test]]
+name = "json_rpc_misc_e2e"
+path = "../../tests/json_rpc_misc_e2e.rs"
 required-features = ["voice", "http-server"]
 
 [[test]]

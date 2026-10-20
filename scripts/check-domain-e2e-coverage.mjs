@@ -176,7 +176,7 @@ function read(file) {
  *  - Ignoring bare list entries: not separable by line shape. rustfmt puts a
  *    long call's method argument on its own line, so an invocation and a list
  *    element look identical (`"openhuman.flows_create",` is a list entry by
- *    shape and a real `post_json_rpc` argument at `json_rpc_e2e.rs:11049`).
+ *    shape and a real `post_json_rpc` argument in the JSON-RPC E2E targets).
  *    Telling them apart needs an AST, which is a different tool than this.
  *
  * So: a method credited here is *named* by an e2e target, not provably invoked
