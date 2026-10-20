@@ -209,9 +209,13 @@ where
                         let channel = ctx.channels_by_name.get(account)?;
                         (channel.name() == account
                             && tinychannels_bus::provider_id(channel.name()) == scope.channel.id)
-                            .then(|| tinychannels_bus::module_control::ConfiguredControlChannel {
-                                name: channel.name().to_owned(),
-                                capabilities: channel.capabilities(),
+                            .then(|| {
+                                Box::new(
+                                    tinychannels_bus::module_control::ConfiguredControlChannel {
+                                        name: channel.name().to_owned(),
+                                        capabilities: channel.capabilities(),
+                                    },
+                                )
                             })
                     }),
                     providers: provider_descriptors(),
