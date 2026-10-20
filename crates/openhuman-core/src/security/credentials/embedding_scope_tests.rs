@@ -67,3 +67,17 @@ fn env_workspace_scope_is_the_config_dir_not_the_raw_workspace() {
     assert_eq!(resolved, sibling_config);
     assert_ne!(resolved, workspace);
 }
+
+/// The modern `~/.openhuman/workspace` layout keeps config and credentials in
+/// the parent `.openhuman` directory too.
+#[test]
+fn modern_workspace_scope_is_the_parent_openhuman_dir() {
+    let root = tempfile::tempdir().unwrap();
+    let config_dir = root.path().join(".openhuman");
+    let workspace = config_dir.join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    let resolved = env_workspace_state_dir(&workspace);
+
+    assert_eq!(resolved, config_dir);
+}

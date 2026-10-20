@@ -1,5 +1,4 @@
-//! Credential scope and the unavailable placeholder for the managed cloud
-//! embedder. The embedder itself is a registered provider
+//! Unavailable placeholder for the managed cloud embedder. The embedder itself is a registered provider
 //! ([`crate::inference::registry::register_embedding`]); with none registered
 //! the managed embedder is a placeholder that answers `BACKEND_UNAVAILABLE:`.
 
