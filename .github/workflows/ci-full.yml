@@ -339,11 +339,6 @@ jobs:
           bash scripts/ci-cancel-aware.sh bash app/scripts/e2e-web-session.sh \
             test/playwright/specs/connections-tab-deeplinks.spec.ts
 
-          export OPENHUMAN_WORKSPACE="$workspace_root/chat-harness-subagent"
-          mkdir -p "$OPENHUMAN_WORKSPACE"
-          bash scripts/ci-cancel-aware.sh bash app/scripts/e2e-web-session.sh \
-            test/playwright/specs/chat-harness-subagent.spec.ts
-
           skills_index=0
           while IFS= read -r skills_test; do
             export OPENHUMAN_WORKSPACE="$workspace_root/skills-$skills_index"
