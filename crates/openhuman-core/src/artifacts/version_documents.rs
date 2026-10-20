@@ -30,8 +30,8 @@ use tinystoragedrivers::{CollectionSpec, Precondition, Query, Sort};
 
 use super::storage_schema::{VERSIONS, version_body, version_record};
 use crate::storage::DocumentStoreExt;
-use crate::storage::documents::Repo;
 use crate::storage::ScopedStorage;
+use crate::storage::documents::Repo;
 use crate::storage::schema_support::key_of;
 
 const DOMAIN: &str = "artifacts::versions";

@@ -93,6 +93,71 @@ async fn legacy_path_refs_are_guarded_and_imported_as_opaque_file_keys() {
 }
 
 #[tokio::test]
+async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let (workspace, files) = temp_dirs();
+    let source = files.join("deck.pptx");
+    std::fs::write(&source, b"profile-a-bytes").unwrap();
+    let context_for = |profile: &'static str| {
+        let overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::kernel(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile(profile);
+        CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
+    };
+    let context_a = DispatchCtx::new(context_for("artifact-a"));
+    let context_b = DispatchCtx::new(context_for("ambient-b"));
+
+    CoreContext::scope(context_for("ambient-b"), async {
+        let (artifacts_a, files_a) = artifacts_service_with_file_store(
+            &workspace,
+            FileRoots::new(&files),
+            None,
+            None,
+            &context_a,
+        );
+        let created = artifacts_a
+            .create(
+                ArtifactKind::File,
+                "Deck",
+                Content::File(source.display().to_string()),
+                &Author::agent("agent-a"),
+                None,
+            )
+            .await
+            .unwrap();
+        let id = created.record.id;
+        let file = created.record.latest().unwrap().file.as_ref().unwrap();
+        assert_eq!(
+            files_a.as_ref().unwrap().read(&file.key).await.unwrap(),
+            b"profile-a-bytes"
+        );
+
+        let (artifacts_b, files_b) = artifacts_service_with_file_store(
+            &workspace,
+            FileRoots::new(&files),
+            None,
+            None,
+            &context_b,
+        );
+        assert!(artifacts_b.get(&id).await.unwrap().is_none());
+        assert!(
+            files_b
+                .as_ref()
+                .unwrap()
+                .metadata(&file.key)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn an_edit_is_appended_as_an_operator_version_and_written_to_the_file() {
     let (workspace, files) = temp_dirs();
     let store = seeded(&workspace, &files).await;

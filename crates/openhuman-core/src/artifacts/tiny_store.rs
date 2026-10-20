@@ -422,7 +422,9 @@ fn build_artifacts_service(
         .as_ref()
         .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(scoped)) as Arc<dyn FileStore>);
     let mut records: Arc<dyn ArtifactStore> = Arc::new(match scoped.as_ref() {
-        Some(scoped) => super::version_documents::DocumentArtifactStore::over(workspace_dir, scoped),
+        Some(scoped) => {
+            super::version_documents::DocumentArtifactStore::over(workspace_dir, scoped)
+        }
         None => versioned_store(workspace_dir),
     });
     if let Some(store) = file_store.as_ref() {
