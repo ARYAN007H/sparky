@@ -2,7 +2,7 @@
 
 use super::*;
 use tinyflows::model::{Node, NodeKind, WorkflowGraph};
-use tinyflows_catalog::types::Flow;
+use tinyflows_bus::catalog::Workflow as Flow;
 
 fn node(id: &str, kind: NodeKind, config: serde_json::Value) -> Node {
     Node {
@@ -21,10 +21,10 @@ fn flow(name: &str, enabled: bool, nodes: Vec<Node>) -> Flow {
         id: "flow-abc-123".to_string(),
         name: name.to_string(),
         enabled,
-        graph: WorkflowGraph {
-            nodes,
-            ..Default::default()
-        },
+        graph: serde_json::json!({
+            "nodes": serde_json::to_value(nodes).unwrap(),
+            "edges": []
+        }),
         created_at: String::new(),
         updated_at: String::new(),
         last_run_at: None,
