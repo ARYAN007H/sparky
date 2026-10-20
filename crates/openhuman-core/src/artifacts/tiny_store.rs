@@ -100,6 +100,29 @@ struct LegacyFileImportStore {
     roots: tiny_artifacts::FileRoots,
 }
 
+/// Refuses all versioned-record operations when a tenant storage binding
+/// could not be resolved, rather than substituting ambient workspace data.
+struct UnavailableArtifactStore;
+
+#[async_trait]
+impl ArtifactStore for UnavailableArtifactStore {
+    async fn list(&self) -> anyhow::Result<Vec<ArtifactRecord>> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+
+    async fn get(&self, _id: &str) -> anyhow::Result<Option<ArtifactRecord>> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+
+    async fn upsert(&self, _artifact: &ArtifactRecord) -> anyhow::Result<()> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+
+    async fn delete(&self, _id: &str) -> anyhow::Result<bool> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+}
+
 impl LegacyFileImportStore {
     async fn import_record(&self, mut record: ArtifactRecord) -> anyhow::Result<ArtifactRecord> {
         if !record.kind.holds_file() {
@@ -171,6 +194,7 @@ pub struct LegacyUiBridge {
     files: FileRoots,
     file_store: Option<Arc<dyn FileStore>>,
     chat: Option<ApprovalChatContext>,
+    ctx: crate::core::runtime::DispatchCtx,
 }
 
 impl LegacyUiBridge {
@@ -181,12 +205,14 @@ impl LegacyUiBridge {
         files: FileRoots,
         file_store: Option<Arc<dyn FileStore>>,
         chat: Option<&ApprovalChatContext>,
+        ctx: &crate::core::runtime::DispatchCtx,
     ) -> Self {
         Self {
             workspace_dir: workspace_dir.into(),
             files,
             file_store,
             chat: chat.cloned(),
+            ctx: ctx.clone(),
         }
     }
 
@@ -194,6 +220,10 @@ impl LegacyUiBridge {
     /// mark it ready: the content for text kinds, a copy of the file for file
     /// kinds (unless the file already is the one the artifact owns).
     pub(crate) async fn show_newest(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
+        self.ctx.enter(self.show_newest_in_scope(record)).await
+    }
+
+    async fn show_newest_in_scope(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
         let (Some(latest), Some((legacy_kind, ext))) = (record.latest(), legacy_shape(record))
         else {
             return Ok(());
@@ -280,9 +310,13 @@ fn same_file(a: &Path, b: &Path) -> bool {
 #[async_trait]
 impl ArtifactObserver for LegacyUiBridge {
     async fn on_event(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
+        self.ctx.enter(self.on_event_in_scope(event)).await
+    }
+
+    async fn on_event_in_scope(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
         let id = &event.record.id;
         match event.kind {
-            ArtifactEventKind::Ready => self.show_newest(&event.record).await,
+            ArtifactEventKind::Ready => self.show_newest_in_scope(&event.record).await,
             ArtifactEventKind::Failed => {
                 let reason = event.record.error.as_deref().unwrap_or("failed");
                 // Only an artifact the UI already shows has a row to fail.
@@ -435,7 +469,7 @@ pub(super) fn build_artifacts_service_with_scope(
         Some(scoped) => {
             super::version_documents::DocumentArtifactStore::over(workspace_dir, scoped)
         }
-        None => versioned_store(workspace_dir),
+        None => UnavailableArtifactStore,
     });
     if let Some(store) = file_store.as_ref() {
         records = Arc::new(LegacyFileImportStore {
@@ -450,6 +484,7 @@ pub(super) fn build_artifacts_service_with_scope(
             files,
             file_store.clone(),
             chat,
+            ctx,
         )))
         .with_file_roots(guarded_roots(roots));
     if let Some(file_store) = file_store.as_ref() {
