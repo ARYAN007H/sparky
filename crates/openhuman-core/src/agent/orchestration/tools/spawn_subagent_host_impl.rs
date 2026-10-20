@@ -1,4 +1,4 @@
-impl SpawnAsyncSubagentTool {
+impl SpawnSubagentTool {
     async fn execute_with_context_inner(
         &self,
         args: serde_json::Value,
@@ -27,7 +27,7 @@ impl SpawnAsyncSubagentTool {
         }
         let Some(detached_parent) = detached_parent else {
             return Ok(ToolResult::error(
-                "spawn_async_subagent requires a live harness run context.",
+                "spawn_subagent requires a live harness run context.",
             ));
         };
 
@@ -35,7 +35,7 @@ impl SpawnAsyncSubagentTool {
             Some(parent) => parent,
             None => {
                 return Ok(ToolResult::error(
-                    "spawn_async_subagent called outside of an agent turn",
+                    "spawn_subagent called outside of an agent turn",
                 ));
             }
         };
@@ -44,7 +44,7 @@ impl SpawnAsyncSubagentTool {
         // effects. A scoped refusal cannot become an accepted/running reference.
         if let Err(error) = running_subagents::admit_spawn(&dispatch, &parent.workspace_dir) {
             return Ok(ToolResult::error(format!(
-                "spawn_async_subagent: registration refused: {error}"
+                "spawn_subagent: registration refused: {error}"
             )));
         }
 
@@ -54,7 +54,7 @@ impl SpawnAsyncSubagentTool {
                 Some(registry) => registry,
                 None => {
                     return Ok(ToolResult::error(
-                        "spawn_async_subagent: AgentDefinitionRegistry has not been initialised",
+                        "spawn_subagent: AgentDefinitionRegistry has not been initialised",
                     ));
                 }
             };
@@ -63,7 +63,7 @@ impl SpawnAsyncSubagentTool {
             None => {
                 let available: Vec<&str> = registry.list().iter().map(|d| d.id.as_str()).collect();
                 return Ok(ToolResult::error(format!(
-                    "spawn_async_subagent: unknown agent_id '{agent_id}'. Available: {}",
+                    "spawn_subagent: unknown agent_id '{agent_id}'. Available: {}",
                     available.join(", ")
                 )));
             }
@@ -77,13 +77,13 @@ impl SpawnAsyncSubagentTool {
 
         if !parent.allowed_subagent_ids.contains(&definition.id) {
             log::warn!(
-                "[spawn_async_subagent] blocked subagent outside allowlist parent={} requested={} allowed={:?}",
+                "[spawn_subagent] blocked subagent outside allowlist parent={} requested={} allowed={:?}",
                 parent.agent_definition_id,
                 definition.id,
                 parent.allowed_subagent_ids
             );
             return Ok(ToolResult::error(format!(
-                "spawn_async_subagent: agent '{}' is not in parent agent '{}' subagents.allowlist",
+                "spawn_subagent: agent '{}' is not in parent agent '{}' subagents.allowlist",
                 definition.id, parent.agent_definition_id
             )));
         }
@@ -112,7 +112,7 @@ impl SpawnAsyncSubagentTool {
                 tracing::debug!(
                     workspace_root = %workspace.root.display(),
                     policy_id = %workspace.policy_id,
-                    "[spawn_async_subagent] using ToolExecutionContext workspace root"
+                    "[spawn_subagent] using ToolExecutionContext workspace root"
                 );
                 workspace.root.clone()
             })
@@ -156,12 +156,12 @@ impl SpawnAsyncSubagentTool {
                         Ok(true) => {}
                         Ok(false) => {
                             return Ok(ToolResult::error(
-                                "spawn_async_subagent: reusable session changed during fresh start; retry with the current session",
+                                "spawn_subagent: reusable session changed during fresh start; retry with the current session",
                             ));
                         }
                         Err(err) => {
                             return Ok(ToolResult::error(format!(
-                                "spawn_async_subagent: failed to close reusable session: {err}"
+                                "spawn_subagent: failed to close reusable session: {err}"
                             )));
                         }
                     }
@@ -263,7 +263,7 @@ impl SpawnAsyncSubagentTool {
                 &task_id,
             ) {
                 return Ok(ToolResult::error(
-                    "spawn_async_subagent: parent thread is stopped or deleted",
+                    "spawn_subagent: parent thread is stopped or deleted",
                 ));
             }
         }
@@ -279,7 +279,7 @@ impl SpawnAsyncSubagentTool {
             Ok(target) => target,
             Err(error) => {
                 return Ok(ToolResult::error(format!(
-                    "spawn_async_subagent: parent lifecycle admission failed: {error}"
+                    "spawn_subagent: parent lifecycle admission failed: {error}"
                 )));
             }
         };
@@ -344,7 +344,7 @@ impl SpawnAsyncSubagentTool {
                     err
                 );
                 return Ok(ToolResult::error(format!(
-                    "spawn_async_subagent: failed to persist reusable sub-agent session: {err}"
+                    "spawn_subagent: failed to persist reusable sub-agent session: {err}"
                 )));
             }
         };
@@ -403,7 +403,7 @@ impl SpawnAsyncSubagentTool {
             .unwrap_or_else(|| background_subagent_session_id.clone());
         let background_parent_thread_id = parent_thread_id.clone();
         log::debug!(
-            "[spawn_async_subagent] register task_id={} parent_session={} parent_thread_id={}",
+            "[spawn_subagent] register task_id={} parent_session={} parent_thread_id={}",
             task_id,
             parent_session,
             background_parent_thread_id.as_deref().unwrap_or("none")
@@ -489,7 +489,7 @@ impl SpawnAsyncSubagentTool {
                     .await;
             }
             return Ok(ToolResult::error(format!(
-                "spawn_async_subagent: failed to register detached sub-agent: {error}"
+                "spawn_subagent: failed to register detached sub-agent: {error}"
             )));
         }
 

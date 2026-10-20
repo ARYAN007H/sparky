@@ -1,4 +1,4 @@
-//! Tool: `spawn_async_subagent` - fire-and-forget sub-agent delegation.
+//! Tool: `spawn_subagent` - fire-and-forget sub-agent delegation.
 //!
 //! Unlike `spawn_subagent`, this tool returns as soon as the child run is
 //! accepted. Completion/failure is reported through normal sub-agent lifecycle
@@ -26,19 +26,19 @@ use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::ToolRunContext;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};
 
-pub struct SpawnAsyncSubagentTool {
+pub struct SpawnSubagentTool {
     /// The ids this instance advertises in its `agent_id` enum. Empty means
-    /// the whole registry. See [`SpawnAsyncSubagentTool::scoped`].
+    /// the whole registry. See [`SpawnSubagentTool::scoped`].
     advertised_ids: Vec<String>,
 }
 
 /// Harness dispatch for the detached child path. It owns the typed parent run
 /// so the spawned child receives the caller's carrier before `tokio::spawn`.
-pub(crate) struct SpawnAsyncSubagentDispatch {
+pub(crate) struct SpawnSubagentDispatch {
     tool: Arc<dyn Tool>,
 }
 
-impl SpawnAsyncSubagentDispatch {
+impl SpawnSubagentDispatch {
     pub(crate) fn new(tool: Arc<dyn Tool>) -> Self {
         Self { tool }
     }
@@ -46,7 +46,7 @@ impl SpawnAsyncSubagentDispatch {
 
 #[async_trait]
 impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
-    for SpawnAsyncSubagentDispatch
+    for SpawnSubagentDispatch
 {
     fn tool(&self) -> Arc<dyn Tool> {
         self.tool.clone()
@@ -63,7 +63,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         let context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
         let detached_parent =
             crate::agent::subagent_host::detached_subagent_parent(parent, "async-subagent")?;
-        SpawnAsyncSubagentTool::new()
+        SpawnSubagentTool::new()
             .execute_with_live_parent_context(
                 arguments,
                 Some(&context),
@@ -74,7 +74,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
     }
 }
 
-impl SpawnAsyncSubagentTool {
+impl SpawnSubagentTool {
     pub fn new() -> Self {
         Self {
             advertised_ids: Vec::new(),
@@ -84,7 +84,7 @@ impl SpawnAsyncSubagentTool {
     /// An instance whose schema advertises only `ids`, the parent's
     /// `[subagents]` allowlist.
     ///
-    /// [`scope_spawn_async_subagent_spec`] narrows the session's spec view,
+    /// [`scope_spawn_subagent_spec`] narrows the session's spec view,
     /// but on native tool calling the wire schema is read from the registered
     /// tool itself (`CanonicalSharedToolAdapter::for_name` → `Tool::spec`),
     /// so the narrowed view never reached the provider: a captured
@@ -167,13 +167,13 @@ async fn steer_reusable_session(
     }
 }
 
-impl Default for SpawnAsyncSubagentTool {
+impl Default for SpawnSubagentTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Narrow a session's `spawn_async_subagent` schema to the ids the parent may
+/// Narrow a session's `spawn_subagent` schema to the ids the parent may
 /// actually dispatch.
 ///
 /// The tool is registered once per process, so its `agent_id` enum is built
@@ -184,7 +184,7 @@ impl Default for SpawnAsyncSubagentTool {
 /// (`builder::visible_tool_specs_for_policy`), the same place `use_skill`'s
 /// pack index is narrowed. A missing or empty allowlist leaves the spec alone:
 /// wildcard parents keep the full registry.
-pub fn scope_spawn_async_subagent_spec(spec: &mut tinytools::ToolSpec, allowed: &[String]) {
+pub fn scope_spawn_subagent_spec(spec: &mut tinytools::ToolSpec, allowed: &[String]) {
     if allowed.is_empty() {
         return;
     }
@@ -210,9 +210,9 @@ pub fn scope_spawn_async_subagent_spec(spec: &mut tinytools::ToolSpec, allowed: 
 }
 
 #[async_trait]
-impl Tool for SpawnAsyncSubagentTool {
+impl Tool for SpawnSubagentTool {
     fn name(&self) -> &str {
-        "spawn_async_subagent"
+        "spawn_subagent"
     }
 
     fn description(&self) -> &str {
@@ -310,10 +310,10 @@ impl Tool for SpawnAsyncSubagentTool {
     }
 }
 
-impl SpawnAsyncSubagentTool {
+impl SpawnSubagentTool {
     /// Drive the tool the way a live parent turn does, over an explicit
     /// `parent` execution context. Tests only: production turns reach the tool
-    /// through [`SpawnAsyncSubagentDispatch`] with their own carrier.
+    /// through [`SpawnSubagentDispatch`] with their own carrier.
     #[cfg(test)]
     pub(crate) async fn execute_under_parent(
         &self,
@@ -353,12 +353,12 @@ impl SpawnAsyncSubagentTool {
     }
 }
 
-#[path = "spawn_async_subagent_completion.rs"]
+#[path = "spawn_subagent_completion.rs"]
 mod completion;
 
-include!("spawn_async_subagent_host_impl.rs");
-include!("spawn_async_subagent_request.rs");
-include!("spawn_async_subagent_projection.rs");
+include!("spawn_subagent_host_impl.rs");
+include!("spawn_subagent_request.rs");
+include!("spawn_subagent_projection.rs");
 
 /// Settle a late registration refusal before an accepted response is built.
 #[cfg(test)]
@@ -369,7 +369,7 @@ fn finish_spawn_registration(
     task_id: &str,
 ) -> Result<(), String> {
     if let Err(error) = registration {
-        let refusal = format!("spawn_async_subagent: registration refused: {error}");
+        let refusal = format!("spawn_subagent: registration refused: {error}");
         subagent_sessions::mark_failed(store, session_id, task_id, refusal.clone()).map_err(
             |failure| format!("{refusal}; failed to settle persisted session: {failure}"),
         )?;
@@ -620,7 +620,7 @@ fn attach_workflow_proposal(
         Ok(json) => json,
         Err(err) => {
             log::warn!(
-                "[spawn_async_subagent] workflow proposal re-serialize failed task_id={task_id} error={err}"
+                "[spawn_subagent] workflow proposal re-serialize failed task_id={task_id} error={err}"
             );
             return summary;
         }
@@ -630,7 +630,7 @@ fn attach_workflow_proposal(
         .and_then(|n| n.as_str())
         .unwrap_or("Untitled workflow");
     log::info!(
-        "[spawn_async_subagent] extracted workflow proposal '{name}' task_id={task_id} \
+        "[spawn_subagent] extracted workflow proposal '{name}' task_id={task_id} \
          ({} chars) — persisting to parent thread {:?}",
         proposal_json.len(),
         parent_thread_id
@@ -656,7 +656,7 @@ fn attach_workflow_proposal(
         );
         if let Err(err) = persisted {
             log::warn!(
-                "[spawn_async_subagent] workflow proposal persistence failed \
+                "[spawn_subagent] workflow proposal persistence failed \
                  thread_id={thread_id} task_id={task_id} error={err} — proposal still \
                  rides the delivery notice"
             );
@@ -682,5 +682,5 @@ fn reusable_follow_up_message(prompt: &str, context: Option<&str>) -> String {
 }
 
 #[cfg(test)]
-#[path = "spawn_async_subagent_tests.rs"]
+#[path = "spawn_subagent_tests.rs"]
 mod tests;
