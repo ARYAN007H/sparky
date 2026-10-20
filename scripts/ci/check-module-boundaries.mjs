@@ -406,7 +406,6 @@ export function run(root, strict = false, execute = execFileSync) {
   // The linked-modules CLI feature is local-only, never shipped. Audit its
   // separately rooted graph for a direct CLI edge; do not let its feature
   // unification contaminate the CLI's shipping feature graph above.
-  results.push({
   results.push(linkedHostAudit(linkedCliTree(root, execute), 'openhuman-cli', policy));
   // Default-feature graphs also guard against accidental bridge activation.
   for (const packageName of ['openhuman-cli', 'openhuman-tui', 'openhuman']) {
