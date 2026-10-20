@@ -1240,20 +1240,20 @@ function subagentToolCallFromPersisted(call: PersistedSubagentToolCall): Subagen
     callId: call.callId,
     toolName: call.toolName,
     status: call.status,
-    iteration: call.iteration,
-    elapsedMs: call.elapsedMs,
-    outputChars: call.outputChars,
-    displayName: call.displayName,
-    detail: call.detail,
+    iteration: call.iteration ?? undefined,
+    elapsedMs: call.elapsedMs ?? undefined,
+    outputChars: call.outputChars ?? undefined,
+    displayName: call.displayName ?? undefined,
+    detail: call.detail ?? undefined,
     // Carry the persisted arguments so a rehydrated child row keeps its input
     // block, and a degraded generic `tool` name can still derive its search
     // label from `query` (#5987).
-    args: call.args,
+    args: call.args ?? undefined,
     // Carry the persisted failure explanation across the round-trip (#4459).
-    failure: parseToolFailure(call.failure),
+    failure: parseToolFailure(call.failure ?? undefined),
     // Carry the persisted (capped) result text so a rehydrated child row can
     // still show what the tool returned.
-    result: call.output,
+    result: call.output ?? undefined,
   };
 }
 
@@ -1294,15 +1294,14 @@ function subagentTranscriptItemFromPersisted(
   if (item.kind === 'tool') {
     return {
       kind: 'tool',
-      iteration: item.iteration,
+      iteration: item.iteration ?? undefined,
       callId: item.callId,
       toolName: item.toolName,
       status: item.status,
-      elapsedMs: item.elapsedMs,
-      outputChars: item.outputChars,
-      displayName: item.displayName,
-      detail: item.detail,
-      failure: item.failure,
+      elapsedMs: item.elapsedMs ?? undefined,
+      outputChars: item.outputChars ?? undefined,
+      displayName: item.displayName ?? undefined,
+      detail: item.detail ?? undefined,
     };
   }
   return { kind: item.kind, iteration: item.iteration, text: item.text };
@@ -1335,15 +1334,15 @@ function subagentActivityFromPersisted(activity: PersistedSubagentActivity): Sub
   return {
     taskId: activity.taskId,
     agentId: activity.agentId,
-    status: activity.status,
-    workerThreadId: activity.workerThreadId,
-    mode: activity.mode,
-    dedicatedThread: activity.dedicatedThread,
-    childIteration: activity.childIteration,
-    childMaxIterations: activity.childMaxIterations,
-    iterations: activity.iterations,
-    elapsedMs: activity.elapsedMs,
-    outputChars: activity.outputChars,
+    status: activity.status ?? undefined,
+    workerThreadId: activity.workerThreadId ?? undefined,
+    mode: activity.mode ?? undefined,
+    dedicatedThread: activity.dedicatedThread ?? undefined,
+    childIteration: activity.childIteration ?? undefined,
+    childMaxIterations: activity.childMaxIterations ?? undefined,
+    iterations: activity.iterations ?? undefined,
+    elapsedMs: activity.elapsedMs ?? undefined,
+    outputChars: activity.outputChars ?? undefined,
     toolCalls,
     // Prefer the persisted prose transcript (reasoning/narration interleaved
     // with tools) so a settled / reloaded run replays its thoughts. Fall back
@@ -1391,16 +1390,16 @@ export function toolTimelineFromPersisted(
     round: entry.round,
     seq,
     status: entry.status,
-    argsBuffer: entry.argsBuffer,
-    displayName: entry.displayName,
-    detail: entry.detail,
-    sourceToolName: entry.sourceToolName,
+    argsBuffer: entry.argsBuffer ?? undefined,
+    displayName: entry.displayName ?? undefined,
+    detail: entry.detail ?? undefined,
+    sourceToolName: entry.sourceToolName ?? undefined,
     subagent: entry.subagent ? subagentActivityFromPersisted(entry.subagent) : undefined,
     // Carry a persisted failure explanation across the round-trip (#4254). The
     // shared parser tolerates both camelCase (persisted) and snake_case (wire).
     failure: parseToolFailure(entry.failure),
     // Persisted (capped) tool result text, when the core recorded one.
-    result: entry.output,
+    result: entry.output ?? undefined,
   };
 }
 
@@ -3212,8 +3211,8 @@ const chatRuntimeSlice = createSlice({
           phase: snapshot.phase ?? 'thinking',
           iteration: snapshot.iteration,
           maxIterations: snapshot.maxIterations,
-          activeTool: snapshot.activeTool,
-          activeSubagent: snapshot.activeSubagent,
+          activeTool: snapshot.activeTool ?? undefined,
+          activeSubagent: snapshot.activeSubagent ?? undefined,
         };
       } else {
         delete state.inferenceStatusByThread[threadId];
