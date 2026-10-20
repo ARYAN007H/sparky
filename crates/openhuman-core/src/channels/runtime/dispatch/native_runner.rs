@@ -36,6 +36,8 @@ type Runner = TurnRunner<
 #[derive(Default)]
 struct NativeSlot {
     lease: Option<SessionLease>,
+    profile_turn: Option<crate::profiles::turn_gate::TurnGuard>,
+    busy: Option<crate::agent::orchestration::busy_guard::TurnBusy>,
     native_reply: Option<Arc<NativeProgressiveReply>>,
     reply: Option<String>,
     progress_failed: bool,
@@ -70,6 +72,8 @@ impl NativeShared {
             slot.delivery_succeeded = Some(delivered);
             // The lease spans model execution and terminal provider delivery.
             slot.lease = None;
+            slot.profile_turn = None;
+            slot.busy = None;
             if !slot.waiting_for_delivery {
                 slots.remove(request_id);
             }
@@ -243,6 +247,21 @@ impl NativeHost {
         )
         .await
         .map_err(|()| "channel session lease was cancelled".to_owned())?;
+        // Match WebHost's lock order exactly: session lease before the
+        // profile-wide chat/cron gate. Both acquisitions happen in checkout,
+        // after TurnRunner admission, and cancellation drops either future.
+        let profile_turn = crate::profiles::turn_gate::acquire(dispatch).await;
+        let busy = match trusted.relay_thread.as_deref() {
+            Some(thread_id) => Some(
+                crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(
+                    dispatch, thread_id,
+                ),
+            ),
+            None => Some(crate::agent::orchestration::busy_guard::TurnBusy::start(
+                dispatch,
+                &session_id,
+            )),
+        };
         let native_reply = match trusted.native_target.as_ref() {
             Some(target) => Some(
                 target
@@ -254,6 +273,8 @@ impl NativeHost {
         };
         self.shared.with(&request.request_id, |slot| {
             slot.lease = Some(lease);
+            slot.profile_turn = profile_turn;
+            slot.busy = busy;
             slot.native_reply = native_reply;
         });
         Ok(TurnSession {

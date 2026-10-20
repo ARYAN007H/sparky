@@ -105,17 +105,11 @@ pub(crate) async fn run_relay_turn(
     thread_id: String,
     request_id: String,
 ) -> Vec<String> {
-    // One turn at a time per profile: wait behind its chat and cron turns.
-    let _turn = crate::profiles::turn_gate::acquire(&dispatch_ctx).await;
     let workspace_dir = config.workspace_dir.clone();
     // The thread is busy for the whole turn, so a background result due on it
     // waits instead of landing mid-turn. The pipeline's session id does not
     // name the thread, so the guard is taken on the thread itself; this task
     // runs in the caller's scope, which keys it to the caller's profile.
-    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(
-        &dispatch_ctx,
-        &thread_id,
-    );
     let channel = Arc::new(RelayChannel::new(
         params.channel.clone(),
         params.client_id(),
@@ -315,7 +309,6 @@ pub(crate) async fn run_relay_turn(
     record(&dispatch_ctx, &workspace_dir, &params, &thread_id, &replies).await;
     // Idle again: deliver anything that finished while the turn ran. No
     // `AgentTurnCompleted` maps to this thread, so nothing else would.
-    drop(busy);
     crate::agent::orchestration::background_delivery::kick_delivery(&dispatch_ctx, &thread_id);
     tracing::info!(
         channel = %params.channel,

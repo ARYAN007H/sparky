@@ -118,8 +118,15 @@ impl WebHost {
         )
         .await
         .map_err(|()| "agent session lease was cancelled".to_owned())?;
+        // Every runner acquires locks in this order: durable session first,
+        // then the profile-wide chat/cron gate. This keeps native, relay and
+        // web runner instances from forming an inverse-lock cycle.
+        let profile_turn = crate::profiles::turn_gate::acquire(&ctx).await;
         self.shared
-            .with(id, |slot| slot.session_lease = Some(lease));
+            .with(id, |slot| {
+                slot.session_lease = Some(lease);
+                slot.profile_turn = profile_turn;
+            });
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.
@@ -223,9 +230,6 @@ impl WebHost {
         let id = request.request_id.as_str();
         let thread_id = request.thread_id.as_str();
         let payload = &request.payload;
-        // One turn at a time per profile: wait behind its relay and cron turns.
-        let _turn = crate::profiles::turn_gate::acquire(&ctx).await;
-
         #[cfg(any(test, debug_assertions))]
         if let Some(outcome) = ops::run_test_hooks(&self.shared, request).await {
             return outcome;
