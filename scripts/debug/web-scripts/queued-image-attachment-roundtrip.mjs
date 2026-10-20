@@ -154,8 +154,12 @@ export default async function queuedImageAttachmentRoundtrip({
     () => rpcResponses.find((call) => call.method === "openhuman.channel_web_chat" && call.params?.message === "Hold this turn while I queue an image."),
     "first channel_web_chat response",
   );
-  if (typeof firstAck.result !== "string") {
-    throw new Error(`first chat response was not a legacy started request id: ${JSON.stringify(firstAck)}`);
+  if (
+    !firstAck.result ||
+    firstAck.result.accepted !== true ||
+    typeof firstAck.result.request_id !== "string"
+  ) {
+    throw new Error(`first chat response was not a started acknowledgement: ${JSON.stringify(firstAck)}`);
   }
   await page.waitForFunction(
     (id) =>
