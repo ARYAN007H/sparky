@@ -67,7 +67,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     name: "toolkit",
                     ty: TypeSchema::String,
                     comment: "Toolkit slug to authorize (must be in the backend allowlist).",
-                    required: true,
+                    required: false,
                 },
                 FieldSchema {
                     name: "extra_params",
