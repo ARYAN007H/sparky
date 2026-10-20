@@ -217,13 +217,6 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         &bob_agent.definition.id,
         &bob_store_agent,
     );
-    let bob_session = seed_session(
-        &bob_core,
-        workspace,
-        &bob_key,
-        &bob_agent.definition.id,
-        &bob_store_agent,
-    );
     assert_eq!(
         super::durable_channel_history_len(
             &alice_runtime,
