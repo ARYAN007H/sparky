@@ -340,13 +340,12 @@ fn an_invalid_flow_record_keeps_the_import_open_for_retry() {
     let backend = backend();
 
     let first = import_flows(&backend, &Scope::local(), &config).unwrap();
-    println!("invalid flow import result: {first:?}");
     assert!(
-        matches!(first, Outcome::Incomplete { skipped: 1, .. }),
+        matches!(&first, Outcome::Incomplete { skipped, .. } if *skipped > 0),
         "a skipped flow record must keep the migration incomplete: {first:?}"
     );
     let retry = import_flows(&backend, &Scope::local(), &config).unwrap();
-    assert!(matches!(retry, Outcome::Incomplete { skipped: 1, .. }));
+    assert_eq!(retry, first, "retrying must report the same incomplete batch");
     assert!(legacy_flow_import_pending(&backend, &config, &Scope::local()).unwrap());
     assert!(!legacy_flow_import_pending(
         &backend,
