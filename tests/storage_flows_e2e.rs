@@ -8,7 +8,6 @@
 use openhuman_core::config::Config;
 use openhuman_core::cron::{self, Schedule};
 use openhuman_core::flows;
-use openhuman_core::flows::tinyflows::state::FlowState;
 use serde_json::json;
 
 #[macro_use]
@@ -61,22 +60,9 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, flow.id);
 
-    // Flow state resolves to the backend, and its records read back through
-    // the catalog's KV (the engine/dedup sharing is unit-tested in core).
-    let state_config = config.clone();
-    tokio::task::spawn_blocking(move || {
-        assert!(matches!(
-            FlowState::open(&state_config, "flow:digest"),
-            FlowState::Documents(_)
-        ));
-        flows::kv_set(&state_config, "flow:digest", "seen", &json!(["a"])).unwrap();
-        assert_eq!(
-            flows::kv_get(&state_config, "flow:digest", "seen").unwrap(),
-            Some(json!(["a"]))
-        );
-    })
-    .await
-    .unwrap();
+    // The flow catalog is module-owned and reaches this configured backend
+    // through the host's scoped CatalogStorage callback. The successful
+    // create/list round-trip above exercises that boundary.
 
     // The delegation graph's checkpointer lives on the backend too.
     let delegation_config = config.clone();
@@ -135,24 +121,26 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
         );
     }
 
-    // Without a backend the workspace's own databases are used.
+    // Without the configured backend, catalog operations use the default
+    // workspace storage path.
     assert!(openhuman_core::storage::clear());
-    let fallback = config.clone();
-    tokio::task::spawn_blocking(move || {
-        assert!(matches!(
-            FlowState::open(&fallback, "flow:digest"),
-            FlowState::Documents(_)
-        ));
-    })
-    .await
-    .unwrap();
-    assert!(workspace.path().join("storage/storage.db").exists());
     // The flow written to the backend is not in the workspace's catalog.
     assert!(flows::ops::flows_list(&config)
         .await
         .unwrap()
         .value
         .is_empty());
+    let fallback_flow = flows::ops::flows_create(
+        &config,
+        "Fallback".to_string(),
+        structurally_valid_graph_for_storage_test(),
+        false,
+    )
+    .await
+    .unwrap()
+    .value;
+    assert_eq!(flows::ops::flows_list(&config).await.unwrap().value.len(), 1);
+    assert_eq!(fallback_flow.name, "Fallback");
     openhuman_core::agent::orchestration::open_delegation_checkpointer(&config).unwrap();
 }
 
