@@ -144,6 +144,16 @@ fn hosted_presets_and_classification_are_context_scoped() {
             auth_style: AuthStyle::Bearer,
         },
     );
+    super::register_hosted_cloud_preset_in(
+        &extensions,
+        "host-openai",
+        super::BuiltinCloudProvider {
+            slug: "openai",
+            label: "Host OpenAI Override",
+            endpoint: "https://override.example/v1",
+            auth_style: AuthStyle::Anthropic,
+        },
+    );
     super::register_hosted_cloud_provider_policy_in(
         &extensions,
         std::sync::Arc::new(|slug| slug == "tenant-hosted"),
@@ -162,6 +172,12 @@ fn hosted_presets_and_classification_are_context_scoped() {
         assert_eq!(presets[0].label, "Tenant Hosted");
         assert_eq!(presets[0].endpoint, "https://tenant.example/v1");
         assert!(presets.iter().any(|preset| preset.slug == "openai"));
+        assert_eq!(presets.iter().filter(|preset| preset.slug == "openai").count(), 1);
+        assert_eq!(
+            super::builtin_cloud_provider("openai").unwrap().endpoint,
+            "https://api.openai.com/v1",
+            "host additions must not replace a generic provider"
+        );
         assert!(super::builtin_presets().host_is_builtin_cloud_provider("tenant.example"));
         assert!(super::builtin_presets().endpoint_host_is_chat_completions_only(
             "https://tenant.example/v1"

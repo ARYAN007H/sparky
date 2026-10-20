@@ -122,21 +122,15 @@ pub fn builtin_cloud_providers() -> Vec<BuiltinCloudProvider> {
     // Keep the product's managed entry first for settings presentation. The
     // owner catalog itself remains generic-first for exact-slug lookup.
     hosted
-        .into_iter()
-        .chain(
-            UPSTREAM_BUILTINS
-                .iter()
-                .filter(|preset| !hosted_has_slug(preset.slug))
-                .map(BuiltinCloudProvider::from),
-        )
-        .collect::<Vec<_>>()
-}
-
-fn hosted_has_slug(slug: &str) -> bool {
-    HOSTED_PRESETS
-        .entries_context_first()
         .iter()
-        .any(|(_, preset)| preset.slug == slug)
+        .copied()
+        .filter(|preset| {
+            !UPSTREAM_BUILTINS
+                .iter()
+                .any(|generic| generic.slug == preset.slug)
+        })
+        .chain(UPSTREAM_BUILTINS.iter().map(BuiltinCloudProvider::from))
+        .collect::<Vec<_>>()
 }
 
 /// Generic provider catalog extended with the host's registered preset
@@ -164,6 +158,9 @@ pub fn builtin_presets() -> BuiltinPresets {
 }
 
 pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
+    if let Some(preset) = BuiltinPresets::default().builtin_cloud_provider(type_str) {
+        return Some(BuiltinCloudProvider::from(preset));
+    }
     let hosted = HOSTED_PRESETS
         .entries_context_first()
         .into_iter()
@@ -172,9 +169,7 @@ pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
     if let Some(preset) = hosted.iter().find(|preset| preset.slug == type_str) {
         return Some(*preset);
     }
-    BuiltinPresets::default()
-        .builtin_cloud_provider(type_str)
-        .map(BuiltinCloudProvider::from)
+    None
 }
 
 /// Whether `host` is the authority host of any built-in cloud **inference**
