@@ -92,6 +92,13 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .and_then(|value| value["task_id"].as_str().map(str::to_owned))
         .expect("accepted child includes its task ID");
+    let detached = crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
+        .expect("detached parent");
+    let lifecycle_key = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
+        &detached,
+        task_id.clone(),
+        None,
+    );
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
         .expect("driver child reached provider gate")
@@ -109,21 +116,12 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         "stop-detached-subagent-session",
         Some(thread_id),
     );
-    let parent_scope = tinyagents_orchestration::subagent::ParentJobScope::new(
-        tinytools::WorkspaceDescriptor::new(workspace.path()),
-        thread_id,
-    );
+    let job_id = jobs
+        .driver_job_for_key(&lifecycle_key, &owner)
+        .expect("driver owns a live child job for this lifecycle key");
     let job = jobs
-        .list_for_parent_scope(&owner, &parent_scope)
-        .expect("read owner-scoped driver jobs")
-        .into_iter()
-        .find(|job| {
-            job.extensions
-                .get("task_id")
-                .and_then(serde_json::Value::as_str)
-                == Some(task_id.as_str())
-        })
-        .expect("driver owns a live child job");
+        .get(job_id.as_str())
+        .expect("registered driver job remains available");
     assert_eq!(
         job.status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Running
