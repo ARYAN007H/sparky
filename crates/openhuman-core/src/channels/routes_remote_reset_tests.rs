@@ -65,11 +65,21 @@ fn remote_session_scope(session_key: &str) -> tinychannels_bus::module_remote::R
     }
 }
 
-fn seed_session(core: &CoreContext, workspace: &Path, key: &str, agent_id: &str) -> SessionRef {
+fn seed_session(
+    core: &CoreContext,
+    workspace: &Path,
+    key: &str,
+    agent_id: &str,
+    store_agent_id: &str,
+) -> SessionRef {
     let session = SessionRef::scoped(key, agent_id);
-    let history = crate::agent::session_store::transcripts_or_files_in(core, agent_id, workspace)
-        .open_session(&session, transcript_meta(key, agent_id))
-        .unwrap();
+    let history = crate::agent::session_store::transcripts_or_files_in(
+        core,
+        store_agent_id,
+        workspace,
+    )
+    .open_session(&session, transcript_meta(key, agent_id))
+    .unwrap();
     history
         .append(TranscriptMessage::user("prior tenant turn"))
         .unwrap();
@@ -79,13 +89,15 @@ fn seed_session(core: &CoreContext, workspace: &Path, key: &str, agent_id: &str)
     session
 }
 
-fn session_messages(core: &CoreContext, workspace: &Path, session: &SessionRef) -> Vec<String> {
+fn session_messages(
+    core: &CoreContext,
+    workspace: &Path,
+    store_agent_id: &str,
+    session: &SessionRef,
+) -> Vec<String> {
     let locator = crate::agent::session_store::transcripts_or_files_in(
         core,
-        session
-            .agent_id
-            .as_deref()
-            .expect("test session is scoped to an agent"),
+        store_agent_id,
         workspace,
     );
     let head = locator.head_generation(session);
@@ -184,12 +196,26 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     let canonical = "channel-session:telegram:bot-a:group:room-1";
     let alice_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, canonical);
     let bob_key = crate::core::runtime::tenant::tenant_key(&bob_tenant, canonical);
+    let alice_store_agent = crate::agent::session_store::current_agent_key_or(
+        &alice_dispatch,
+        &alice_agent.definition.id,
+    );
+    let bob_store_agent =
+        crate::agent::session_store::current_agent_key_or(&bob_dispatch, &bob_agent.definition.id);
     assert_ne!(alice_key, bob_key);
     let alice_session = seed_session(
         &alice_core,
         workspace,
         &alice_key,
         &alice_agent.definition.id,
+        &alice_store_agent,
+    );
+    let bob_session = seed_session(
+        &bob_core,
+        workspace,
+        &bob_key,
+        &bob_agent.definition.id,
+        &bob_store_agent,
     );
     let bob_session = seed_session(&bob_core, workspace, &bob_key, &bob_agent.definition.id);
     assert_eq!(
@@ -233,11 +259,11 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     .await
     .is_err());
     assert_eq!(
-        session_messages(&alice_core, workspace, &alice_session).len(),
+        session_messages(&alice_core, workspace, &alice_store_agent, &alice_session).len(),
         2
     );
     assert_eq!(
-        session_messages(&bob_core, workspace, &bob_session).len(),
+        session_messages(&bob_core, workspace, &bob_store_agent, &bob_session).len(),
         2
     );
 
@@ -254,7 +280,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     .await
     .expect("captured tenant reset succeeds");
     assert!(matches!(cleared, RemoteHostResult::Completed));
-    let alice_after = session_messages(&alice_core, workspace, &alice_session);
+    let alice_after = session_messages(&alice_core, workspace, &alice_store_agent, &alice_session);
     assert!(
         alice_after.is_empty(),
         "reset should empty Alice's actual session: agent={}, session={alice_session:?}, \
@@ -262,7 +288,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         alice_agent.definition.id,
         crate::agent::session_store::transcripts_or_files_in(
             &alice_core,
-            alice_agent.definition.id.as_str(),
+            &alice_store_agent,
             workspace,
         )
         .head_generation(&alice_session),
@@ -286,7 +312,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         "a reset clears the durable status count",
     );
     assert_eq!(
-        session_messages(&bob_core, workspace, &bob_session),
+        session_messages(&bob_core, workspace, &bob_store_agent, &bob_session),
         ["prior tenant turn", "prior tenant reply"]
     );
 }
