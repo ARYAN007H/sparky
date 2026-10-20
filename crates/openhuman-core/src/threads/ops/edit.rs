@@ -90,6 +90,15 @@ pub async fn edit_message(
 ) -> Result<Outcome<Value>, ThreadsError> {
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
+    if request
+        .attachments
+        .iter()
+        .any(|part| matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. }))
+    {
+        return Err(ThreadsError::Message(
+            "voice notes must be sent through channel.web_chat".into(),
+        ));
+    }
     // Validate typed uploads before cancellation or truncation. The folded
     // marker form is deliberately discarded: modern edits persist opaque refs
     // on the replacement row and give those refs to the trusted runner.
