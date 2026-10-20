@@ -75,6 +75,154 @@ fn workspace_scopes_keep_retry_queues_stable_and_isolated_on_shared_storage() {
 }
 
 #[test]
+fn workspace_scope_is_stable_before_creation_and_across_profile_layouts() {
+    use crate::config::schema::profile_layout::{LayoutVersion, ProfileLayout};
+
+    let tmp = tempfile::tempdir().unwrap();
+    let absent = tmp.path().join("created-on-first-use");
+    let before = super::workspace_scope(&absent).unwrap();
+    std::fs::create_dir_all(&absent).unwrap();
+    assert_eq!(super::workspace_scope(&absent).unwrap(), before);
+
+    let profile_dir = tmp.path().join("users").join("alice");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+    let v1 = ProfileLayout::with_version(profile_dir.clone(), LayoutVersion::V1);
+    let v1_scope = super::workspace_scope(&v1.workspace_dir).unwrap();
+    std::fs::create_dir_all(&v1.workspace_dir).unwrap();
+    ProfileLayout::mark_v2(&profile_dir).unwrap();
+    let v2 = ProfileLayout::with_version(profile_dir, LayoutVersion::V2);
+    assert_eq!(super::workspace_scope(&v2.workspace_dir).unwrap(), v1_scope);
+}
+
+#[test]
+fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_marker() {
+    use crate::config::schema::profile_layout::{LayoutVersion, ProfileLayout};
+    use crate::memory::deletion::PendingDeletion;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let alice_dir = tmp.path().join("users").join("alice");
+    let bob_dir = tmp.path().join("users").join("bob");
+    std::fs::create_dir_all(&alice_dir).unwrap();
+    std::fs::create_dir_all(&bob_dir).unwrap();
+    ProfileLayout::mark_v2(&alice_dir).unwrap();
+    ProfileLayout::mark_v2(&bob_dir).unwrap();
+    let alice_workspace = ProfileLayout::with_version(alice_dir, LayoutVersion::V2).workspace_dir;
+    let bob_workspace = ProfileLayout::with_version(bob_dir, LayoutVersion::V2).workspace_dir;
+
+    let backend: std::sync::Arc<dyn crate::storage::StorageBackend> =
+        std::sync::Arc::new(crate::storage::MemoryStorage::new());
+    let alice_old = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &crate::storage::scope_for_profile("alice"),
+        "memory",
+        "state",
+    )
+    .unwrap();
+    let bob_old = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &crate::storage::scope_for_profile("bob"),
+        "memory",
+        "state",
+    )
+    .unwrap();
+    let alice_item = PendingDeletion::Thread {
+        thread_id: "alice-owed".into(),
+    };
+    let bob_item = PendingDeletion::Thread {
+        thread_id: "bob-owed".into(),
+    };
+    alice_old.put("pending_deletions", &vec![alice_item.clone()]).unwrap();
+    bob_old.put("pending_deletions", &vec![bob_item.clone()]).unwrap();
+
+    let alice_scope = super::workspace_scope(&alice_workspace).unwrap();
+    let alice_target = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &alice_scope,
+        "memory",
+        "state",
+    )
+    .unwrap();
+    super::migrate_existing_queue_scopes(&alice_workspace, &backend, &alice_scope, &alice_target)
+        .unwrap();
+    assert_eq!(
+        alice_target
+            .get::<Vec<PendingDeletion>>("pending_deletions")
+            .unwrap(),
+        Some(vec![alice_item.clone()])
+    );
+    assert!(
+        bob_old
+            .get::<Vec<PendingDeletion>>("pending_deletions")
+            .unwrap()
+            .is_some(),
+        "opening Alice's workspace does not inspect or clear Bob's tenant scope"
+    );
+
+    alice_target.delete("pending_deletions").unwrap();
+    super::migrate_existing_queue_scopes(&alice_workspace, &backend, &alice_scope, &alice_target)
+        .unwrap();
+    assert!(
+        alice_target
+            .get::<Vec<PendingDeletion>>("pending_deletions")
+            .unwrap()
+            .is_none(),
+        "a completed transfer does not resurrect a queue drained after restart"
+    );
+
+    let late_item = PendingDeletion::Thread {
+        thread_id: "alice-late-legacy-write".into(),
+    };
+    alice_old
+        .put("pending_deletions", &vec![late_item.clone()])
+        .unwrap();
+    super::migrate_existing_queue_scopes(&alice_workspace, &backend, &alice_scope, &alice_target)
+        .unwrap();
+    assert_eq!(
+        alice_target
+            .get::<Vec<PendingDeletion>>("pending_deletions")
+            .unwrap(),
+        Some(vec![late_item]),
+        "a per-source marker does not hide a later old-scope write"
+    );
+
+    let bob_scope = super::workspace_scope(&bob_workspace).unwrap();
+    let bob_target = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &bob_scope,
+        "memory",
+        "state",
+    )
+    .unwrap();
+    super::migrate_existing_queue_scopes(&bob_workspace, &backend, &bob_scope, &bob_target).unwrap();
+    assert_eq!(
+        bob_target
+            .get::<Vec<PendingDeletion>>("pending_deletions")
+            .unwrap(),
+        Some(vec![bob_item])
+    );
+}
+
+#[tokio::test]
+async fn a_matching_active_agent_scope_is_a_legacy_source() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let workspace = tmp.path().join("custom-workspace");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    let context = CoreContext::for_test(DomainSet::full(), Some(workspace.clone())).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).session_agent("agent-a"),
+    );
+
+    let scopes = CoreContext::scope(context, async {
+        super::legacy_queue_scopes(&workspace)
+    })
+    .await;
+    assert!(scopes.contains(&crate::storage::scope_for_agent("agent-a")));
+}
+
+#[test]
 fn layout_import_places_legacy_retry_queue_in_its_workspace_scope() {
     let tmp = tempfile::tempdir().unwrap();
     let queue_file = super::legacy_path(tmp.path(), "pending_deletions");

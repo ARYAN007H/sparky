@@ -176,17 +176,21 @@ fn migrate_existing_queue_scopes(
             continue;
         }
         let marker = queue_migration_marker(&source_scope);
-        if target.get::<String>(&marker)?.as_deref() == Some("complete") {
-            continue;
-        }
-        target.insert_if_absent(&marker, &"in_progress")?;
         let source = StateKv::on_backend(backend, &source_scope, OWNER, NS)?;
         let Some(previous) =
             source.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
         else {
-            target.put(&marker, &"complete")?;
+            if target.get::<String>(&marker)?.as_deref() != Some("complete") {
+                target.put(&marker, &"complete")?;
+            }
             continue;
         };
+        if previous.is_empty() {
+            if target.get::<String>(&marker)?.as_deref() != Some("complete") {
+                target.put(&marker, &"complete")?;
+            }
+            continue;
+        }
         let transferred = previous.clone();
         target.update::<Vec<super::deletion::PendingDeletion>, _>(
             "pending_deletions",
