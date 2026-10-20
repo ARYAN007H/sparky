@@ -320,7 +320,7 @@ pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Res
     }
     if !fallback
         && legacy_flow_import_pending(&backend, config, &scope)
-        .map_err(|error| format!("check the legacy flow import marker: {error:#}"))?
+            .map_err(|error| format!("check the legacy flow import marker: {error:#}"))?
     {
         return Err(
             "legacy flow import is incomplete for this workspace; workflow access is paused until it succeeds"
