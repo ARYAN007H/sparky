@@ -77,14 +77,6 @@ const FLOW_PARKED_TTL_SECS: i64 = tinyflows_catalog::run_management::PARKED_RUN_
 
 /// T-M1 fail-closed refusal: the graph hash pinned when this run parked no
 /// longer matches the flow's current graph (`save_workflow` rewrote it while
-/// the approval sat pending). Distinct wording from every other
-/// `flows_resume` rejection so the UI/agent can tell a stale-approval refusal
-/// apart from an ordinary invalid-resume error and explain it plainly rather
-/// than surfacing a generic "resume failed".
-#[cfg(test)]
-const GRAPH_CHANGED_SINCE_PARK_ERROR: &str = "the workflow changed after this run was paused — \
-     the pending approval no longer matches the current graph";
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 2 — autonomy-tier gating of acting flow nodes
 // ─────────────────────────────────────────────────────────────────────────────
