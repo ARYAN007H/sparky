@@ -32,7 +32,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     parent
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
-    let live = core_backed_live_parent(
+    let (live, _core) = core_backed_live_parent(
         workspace.path(),
         parent,
         "continue-paused-e2e",
@@ -237,7 +237,10 @@ fn core_backed_live_parent(
     parent: crate::agent::harness::ParentExecutionContext,
     session_id: &str,
     thread_id: &str,
-) -> tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext> {
+) -> (
+    tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    Arc<crate::core::runtime::CoreContext>,
+) {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
 
@@ -261,9 +264,12 @@ fn core_backed_live_parent(
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
     host_context.thread_id = Some(thread_id.to_owned());
-    tinyagents_harness::context::RunContext::new(
-        tinyagents_harness::context::RunConfig::new(session_id).with_thread(thread_id),
-        host_context,
+    (
+        tinyagents_harness::context::RunContext::new(
+            tinyagents_harness::context::RunConfig::new(session_id).with_thread(thread_id),
+            host_context,
+        ),
+        core,
     )
 }
 
@@ -304,7 +310,7 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
 
-    let live = core_backed_live_parent(
+    let (live, _core) = core_backed_live_parent(
         workspace.path(),
         parent,
         "paused-cancel-rpc-parent",

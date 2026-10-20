@@ -284,7 +284,7 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
     let mut parent = parent_context(workspace.path());
     parent.session_id = "headless-spawn-session".into();
     parent.on_progress = Some(progress_tx);
-    let live = headless_core_backed_parent(workspace.path(), parent);
+    let (live, _core) = headless_core_backed_parent(workspace.path(), parent);
 
     let result = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
@@ -317,6 +317,13 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
                     output,
                     ..
                 }) if event_task_id == task_id => break output,
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    task_id: event_task_id,
+                    error,
+                    ..
+                }) if event_task_id == task_id => {
+                    panic!("headless child failed before completion: {error}")
+                }
                 Some(_) => {}
                 None => panic!("headless completion progress stream closed"),
             }
@@ -362,7 +369,10 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
 fn headless_core_backed_parent(
     workspace: &Path,
     mut parent: ParentExecutionContext,
-) -> tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext> {
+) -> (
+    tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    Arc<crate::core::runtime::CoreContext>,
+) {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
 
@@ -383,9 +393,12 @@ fn headless_core_backed_parent(
     let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent.clone());
-    tinyagents_harness::context::RunContext::new(
-        tinyagents_harness::context::RunConfig::new(parent.session_id),
-        host,
+    (
+        tinyagents_harness::context::RunContext::new(
+            tinyagents_harness::context::RunConfig::new(parent.session_id),
+            host,
+        ),
+        core,
     )
 }
 
