@@ -108,7 +108,10 @@ pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
             || s.is_empty()
             || s == "cloud"
             || s == PROVIDER_OPENHUMAN
-            || tinyinference_local::profile::is_local_provider_string(s)
+            // The owner classifier also accepts bare provider-kind aliases
+            // such as `openai`; persisted workload routes require a model
+            // separator, matching the previous prefix grammar.
+            || (s.contains(':') && tinyinference_local::profile::is_local_provider_string(s))
         {
             continue;
         }
