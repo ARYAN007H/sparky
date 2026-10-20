@@ -260,6 +260,19 @@ pub(crate) async fn resolve_persisted_parts(
         return Err("stored attachment refs do not match the persisted user row".into());
     }
 
+    let image_count = entries
+        .iter()
+        .filter(|entry| matches!(entry.part, ContentPart::Image { .. }))
+        .count();
+    let file_count = entries.len() - image_count;
+    let (max_images, image_mb) = config.multimodal.effective_limits();
+    let (max_files, file_mb, _) = config.multimodal_files.effective_limits();
+    if (image_count > 0 && (config.multimodal.max_images == 0 || image_count > max_images))
+        || (file_count > 0 && (config.multimodal_files.max_files == 0 || file_count > max_files))
+    {
+        return Err("stored attachment count exceeds configured limit".into());
+    }
+
     let mut resolved = Vec::with_capacity(entries.len());
     for mut entry in entries {
         let scope = crate::agent::attachments::AttachmentAccessScope {
@@ -274,6 +287,16 @@ pub(crate) async fn resolve_persisted_parts(
             .map_err(|error| format!("stored attachment is unavailable: {error}"))?;
         if !metadata.is_file() {
             return Err("stored attachment is not a regular file".into());
+        }
+        let media = opaque_media(&entry.part)
+            .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;
+        let is_image = matches!(entry.part, ContentPart::Image { .. });
+        let cap = if is_image { image_mb } else { file_mb } * 1024 * 1024;
+        if metadata.len() > cap as u64 {
+            return Err("stored attachment exceeds configured file limit".into());
+        }
+        if media.content_type.as_deref().is_none_or(|mime| mime.is_empty()) {
+            return Err("stored attachment MIME type is missing".into());
         }
         let media = opaque_media_mut(&mut entry.part)
             .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;

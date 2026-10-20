@@ -203,6 +203,9 @@ async fn message_append_with_config(
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     persistence_dir: &std::path::Path,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
+    // This field is reserved for paths minted after OpenHuman stages an
+    // upload. Client metadata must never be able to grant storage authority.
+    crate::threads::attachments::strip_private_metadata(&mut request.message.extra_metadata);
     let typed_attachments = if request.message.sender == "user" {
         std::mem::take(&mut request.attachments)
     } else {
@@ -460,6 +463,14 @@ pub async fn message_update(
     ctx: &DispatchCtx,
     request: UpdateConversationMessageRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, String> {
+    if request
+        .extra_metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("__openhumanStoredAttachments"))
+        .is_some()
+    {
+        return Err("private attachment storage metadata is reserved".into());
+    }
     let dir = workspace_dir().await?;
     let message = conversations::blocking::update_message(
         ctx.clone(),
