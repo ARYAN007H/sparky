@@ -24,9 +24,7 @@ use tinyinference_llm::providers::openai::OpenAiModel;
 use tinyinference_llm::providers::ProviderRequestOptions;
 use tinyinference_llm::Error as TiError;
 
-use openhuman_embed::__host::security::credentials::{AuthService, APP_SESSION_PROVIDER};
-
-use super::managed_session::managed_bearer;
+use super::managed_session::resolve_session_bearer;
 use crate::backend::url::effective_api_url;
 use crate::client::endpoint::is_managed_endpoint_for_api_key;
 
@@ -119,8 +117,6 @@ impl OpenHumanBackendModel {
     }
 
     pub(super) fn resolve_bearer(&self) -> anyhow::Result<String> {
-        use openhuman_embed::__host::security::credentials::session_support::classify_session_token;
-
         // A stored API key (library runtime) is the bearer outright: the
         // OpenAI-compatible managed endpoint accepts it as `Bearer <key>`,
         // and there is no session — so no `exp` and no signed-out state — to
@@ -147,25 +143,12 @@ impl OpenHumanBackendModel {
             );
             return Ok(key);
         }
-        if openhuman_embed::__host::platform::llm_gate::is_signed_out() {
-            anyhow::bail!(
-                "SESSION_EXPIRED: backend session not active — sign in to resume LLM work"
-            );
-        }
-        let auth = AuthService::new(&self.state_dir(), self.options.secrets_encrypt);
-        let profile = auth.get_profile(
-            APP_SESSION_PROVIDER,
+        resolve_session_bearer(
+            &self.state_dir(),
+            self.options.secrets_encrypt,
             self.options.auth_profile_override.as_deref(),
-        )?;
-
-        // #5503: precheck the recorded JWT `exp` BEFORE building a request, the
-        // same way `require_live_session_token` guards the backend REST callers.
-        // Managed inference used to fire a doomed request on an expired-but-
-        // stored token and let the 401 come back — but an expired session can
-        // also surface upstream as a misleading "model unavailable", which is a
-        // core symptom of #5503 (all tiers "die" over a long session). Failing
-        // fast as `session_expired` routes the user to re-auth instead.
-        managed_bearer(classify_session_token(profile.as_ref(), chrono::Utc::now()))
+            "openhuman_backend_model.resolve_bearer",
+        )
     }
 
     /// The managed OpenAI-compatible endpoint, from the configured `api_url`
@@ -335,9 +318,9 @@ fn resolve_model(model: &str) -> String {
         log::debug!(
             "[providers][openhuman-backend] empty model passed to OpenHuman backend; \
              substituting default `{}` (TAURI-RUST-RS)",
-            openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+            super::tiers::MODEL_MANAGED_DEFAULT
         );
-        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT.to_string()
+        super::tiers::MODEL_MANAGED_DEFAULT.to_string()
     } else {
         trimmed.to_string()
     }

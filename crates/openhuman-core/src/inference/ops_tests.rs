@@ -258,11 +258,11 @@ async fn inference_openai_oauth_disconnect_returns_removed_flag() {
 
 // ── is_unknown_provider_user_config (TAURI-RUST-X) ───────────────────────
 //
-// `inference_list_models` calls `providers::ops::list_configured_models`,
+// `inference_list_models` calls `provider::models::catalog_listing::list_configured_models`,
 // which surfaces a `String` error when the user-selected provider id isn't
 // registered in the cloud-provider list (e.g. picking "ollama" — a local
 // runtime — as a cloud provider). The error string is emitted at
-// `crates/openhuman-core/src/inference/provider/ops.rs:54`. Before this fix the emit
+// `crates/openhuman-core/src/inference/provider/models/catalog_listing.rs:54`. Before this fix the emit
 // site at `inference/ops.rs:248` escalated every such error to `error!`,
 // which sentry-tracing ships to Sentry as `"[inference::ops]
 // list_models:error"` — 5740+ events with the underlying error hidden in
@@ -272,7 +272,7 @@ async fn inference_openai_oauth_disconnect_returns_removed_flag() {
 
 #[test]
 fn is_unknown_provider_user_config_matches_canonical_emit_site_string() {
-    // Verbatim shape from `provider/ops.rs:54`:
+    // Verbatim shape from `provider/models/catalog_listing.rs:54`:
     //   format!("no cloud provider with id or slug '{}' found", provider_id)
     // Latest TAURI-RUST-X event (Sentry id 95) carried provider_id="ollama";
     // every well-formed provider id slug must trigger the demote.
@@ -295,9 +295,9 @@ fn is_unknown_provider_user_config_rejects_other_list_models_failures() {
     // strictly anchored on the "no cloud provider with id or slug" phrase
     // so it can't accidentally silence them.
     for raw in [
-        // TAURI-RUST-12 (362 events) — provider/ops.rs JSON decode failure
+        // TAURI-RUST-12 (362 events) — provider/models/catalog_listing.rs JSON decode failure
         "[providers][list_models] failed to parse JSON: error decoding response",
-        // TAURI-RUST-2W (100 events) — provider/ops.rs reqwest builder failure
+        // TAURI-RUST-2W (100 events) — provider/models/catalog_listing.rs reqwest builder failure
         "[providers][list_models] HTTP request failed: builder error",
         // TAURI-RUST-JP (8 events) — local_ai ollama_admin transport failure
         "[local_ai:ollama_admin] list_models: request send failed",

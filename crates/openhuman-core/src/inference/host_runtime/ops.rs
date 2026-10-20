@@ -8,15 +8,11 @@
 #[path = "ops_tests.rs"]
 mod tests;
 
-mod agent_chat;
+mod agent_chat_simple;
 mod complete_once;
 mod runtime_ops;
-mod turn_guards;
 
-pub use agent_chat::{
-    agent_chat, agent_chat_for, agent_chat_reply_for, agent_chat_simple, AgentChatEnv,
-    AgentChatReply, AgentChatTarget,
-};
+pub use agent_chat_simple::agent_chat_simple;
 pub use complete_once::{complete_once, CompletionEndpoint};
 pub use runtime_ops::{
     local_ai_prompt, local_ai_status, local_ai_summarize, local_ai_transcribe,
@@ -25,7 +21,3 @@ pub use runtime_ops::{
 
 #[cfg(test)]
 use crate::config::Config;
-#[cfg(test)]
-use turn_guards::{
-    effective_agent_chat_origin, grant_turn_cwd, normalize_model_override, resolve_turn_cwd,
-};

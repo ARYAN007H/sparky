@@ -18,7 +18,7 @@ const LOG_PREFIX: &str = "[inference::ops]";
 /// User picked a provider id (slug) that isn't registered in the cloud
 /// provider list — e.g. selecting `"ollama"` as a cloud provider when it's
 /// actually a local runtime. Matches the literal phrase emitted at
-/// `crates/openhuman-core/src/inference/provider/ops.rs:54`
+/// `crates/openhuman-core/src/inference/provider/models/catalog_listing.rs:54`
 /// (`"no cloud provider with id or slug '{}' found"`).
 ///
 /// Used by [`inference_list_models`] to demote this user-config case to
@@ -44,7 +44,7 @@ fn expected_test_provider_model_error_kind(
 
 pub async fn inference_status(config: &Config) -> Result<Outcome<LocalAiStatus>, String> {
     debug!("{LOG_PREFIX} status:start");
-    let result = local_runtime::rpc::local_ai_status(config).await;
+    let result = local_runtime::ops::local_ai_status(config).await;
     match &result {
         Ok(outcome) => debug!(state = %outcome.value.state, "{LOG_PREFIX} status:ok"),
         Err(err) => warn!(error = %err, "{LOG_PREFIX} status:error"),
@@ -62,7 +62,7 @@ pub async fn inference_summarize(
         ?max_tokens,
         "{LOG_PREFIX} summarize:start"
     );
-    let result = local_runtime::rpc::local_ai_summarize(config, text, max_tokens).await;
+    let result = local_runtime::ops::local_ai_summarize(config, text, max_tokens).await;
     match &result {
         Ok(outcome) => debug!(
             output_len = outcome.value.len(),
@@ -85,7 +85,7 @@ pub async fn inference_prompt(
         ?no_think,
         "{LOG_PREFIX} prompt:start"
     );
-    let result = local_runtime::rpc::local_ai_prompt(config, prompt, max_tokens, no_think).await;
+    let result = local_runtime::ops::local_ai_prompt(config, prompt, max_tokens, no_think).await;
     match &result {
         Ok(outcome) => debug!(output_len = outcome.value.len(), "{LOG_PREFIX} prompt:ok"),
         Err(err) => warn!(error = %err, "{LOG_PREFIX} prompt:error"),
@@ -106,7 +106,7 @@ pub async fn inference_vision_prompt(
         "{LOG_PREFIX} vision_prompt:start"
     );
     let result =
-        local_runtime::rpc::local_ai_vision_prompt(config, prompt, image_refs, max_tokens).await;
+        local_runtime::ops::local_ai_vision_prompt(config, prompt, image_refs, max_tokens).await;
     match &result {
         Ok(outcome) => debug!(
             output_len = outcome.value.len(),
@@ -305,7 +305,7 @@ pub async fn inference_update_local_settings(
 
 pub async fn inference_list_models(provider_id: &str) -> Result<Outcome<Value>, String> {
     debug!(provider_id, "{LOG_PREFIX} list_models:start");
-    let result = providers::ops::list_configured_models(provider_id).await;
+    let result = providers::models::catalog_listing::list_configured_models(provider_id).await;
     match &result {
         Ok(_) => debug!("{LOG_PREFIX} list_models:ok"),
         Err(err) => {

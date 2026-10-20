@@ -57,7 +57,7 @@ fn managed_jwt_style_never_maps_onto_the_registry() {
 
 #[test]
 fn registry_builds_a_model_for_every_unmanaged_builtin_preset() {
-    for preset in crate::config::schema::cloud_providers::BUILTIN_CLOUD_PROVIDERS.iter() {
+    for preset in crate::config::schema::cloud_providers::builtin_cloud_providers().iter() {
         if preset.auth_style == AuthStyle::OpenhumanJwt {
             continue;
         }
@@ -84,7 +84,7 @@ fn discovery_request_carries_bearer_auth_and_pins_openrouter_sorting() {
 }
 
 #[test]
-fn discovery_request_uses_x_api_key_for_anthropic_and_skips_codex_oauth() {
+fn discovery_request_uses_x_api_key_for_anthropic() {
     let claude = entry(
         "anthropic",
         "https://api.anthropic.com/v1",
@@ -92,14 +92,42 @@ fn discovery_request_uses_x_api_key_for_anthropic_and_skips_codex_oauth() {
     );
     let request = cloud_discovery_request(&build(&claude, "claude", "sk-ant")).expect("listing");
     assert!(request.headers.iter().any(|(name, _)| name == "x-api-key"));
+}
 
+#[test]
+fn discovery_request_builds_codex_oauth_listing_request() {
     let openai = entry("openai", "https://api.openai.com/v1", AuthStyle::Bearer);
     let oauth = OpenAiCodexRouting {
         endpoint: "https://chatgpt.com/backend-api/codex".to_string(),
         using_oauth: true,
-        account_id: None,
+        account_id: Some("account-123".to_string()),
     };
+    let query = [("client_version".to_string(), "0.130.0".to_string())];
     let mut with_oauth = build(&openai, "gpt", "tok");
     with_oauth.codex = Some(&oauth);
-    assert!(cloud_discovery_request(&with_oauth).is_none());
+    with_oauth.extra_query_params = &query;
+    with_oauth.user_agent = Some("codex_cli_rs/0.0.0 (OpenHuman 0.64.18)");
+
+    let request = cloud_discovery_request(&with_oauth).expect("Codex OAuth has a listing");
+    assert_eq!(request.endpoint, "https://chatgpt.com/backend-api/codex");
+    assert_eq!(
+        request.effective_listing_url(),
+        "https://chatgpt.com/backend-api/codex/models?client_version=0.130.0"
+    );
+    assert_eq!(request.model, "gpt");
+    assert!(request
+        .headers
+        .iter()
+        .any(|(name, value)| name == "Authorization" && value == "Bearer tok"));
+    assert!(request
+        .headers
+        .iter()
+        .any(|(name, value)| name == "ChatGPT-Account-ID" && value == "account-123"));
+    assert!(request
+        .headers
+        .iter()
+        .any(|(name, value)| name == "originator" && value == "codex_cli_rs"));
+    assert!(request.headers.iter().any(|(name, value)| {
+        name == "User-Agent" && value == "codex_cli_rs/0.0.0 (OpenHuman 0.64.18)"
+    }));
 }

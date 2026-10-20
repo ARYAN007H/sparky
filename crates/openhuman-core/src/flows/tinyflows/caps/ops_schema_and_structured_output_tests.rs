@@ -1,6 +1,12 @@
 use super::*;
-use crate::inference::provider::is_raw_passthrough_model;
 use tinyflows::nodes::integration::agent_prompt;
+
+fn is_raw_model(model: &str) -> bool {
+    crate::inference::provider_model::is_raw_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        model,
+    )
+}
 
 // ── resolve_completion_model raw/BYOK passthrough (issue #4598) ───────────
 #[test]
@@ -12,7 +18,7 @@ fn resolve_completion_model_forwards_raw_byok_node_model_verbatim() {
         agent_prompt::resolve_completion_model(
             Some("claude-opus-4"),
             "chat-v1".to_string(),
-            is_raw_passthrough_model
+            is_raw_model
         ),
         "claude-opus-4"
     );
@@ -20,7 +26,7 @@ fn resolve_completion_model_forwards_raw_byok_node_model_verbatim() {
         agent_prompt::resolve_completion_model(
             Some("deepseek-v4-pro"),
             "chat-v1".to_string(),
-            is_raw_passthrough_model
+            is_raw_model
         ),
         "deepseek-v4-pro"
     );
@@ -33,7 +39,7 @@ fn resolve_completion_model_leaves_managed_tier_and_hint_node_models_untouched()
         agent_prompt::resolve_completion_model(
             Some("chat-v1"),
             "chat-v1".to_string(),
-            is_raw_passthrough_model
+            is_raw_model
         ),
         "chat-v1"
     );
@@ -41,7 +47,7 @@ fn resolve_completion_model_leaves_managed_tier_and_hint_node_models_untouched()
         agent_prompt::resolve_completion_model(
             Some("hint:reasoning"),
             "reasoning-v1".to_string(),
-            is_raw_passthrough_model
+            is_raw_model
         ),
         "reasoning-v1"
     );
@@ -49,25 +55,17 @@ fn resolve_completion_model_leaves_managed_tier_and_hint_node_models_untouched()
         agent_prompt::resolve_completion_model(
             Some("hint:garbage"),
             "reasoning-v1".to_string(),
-            is_raw_passthrough_model
+            is_raw_model
         ),
         "reasoning-v1"
     );
     // No pinned model, or a whitespace-only pin, keeps the resolved default.
     assert_eq!(
-        agent_prompt::resolve_completion_model(
-            None,
-            "chat-v1".to_string(),
-            is_raw_passthrough_model
-        ),
+        agent_prompt::resolve_completion_model(None, "chat-v1".to_string(), is_raw_model),
         "chat-v1"
     );
     assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("   "),
-            "chat-v1".to_string(),
-            is_raw_passthrough_model
-        ),
+        agent_prompt::resolve_completion_model(Some("   "), "chat-v1".to_string(), is_raw_model),
         "chat-v1"
     );
 }

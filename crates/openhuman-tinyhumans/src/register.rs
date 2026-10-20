@@ -16,6 +16,7 @@ use crate::{channels, client, inference, integrations, memory};
 /// Registers every area's hooks with the core.
 pub(crate) fn register_all(options: &InstallOptions) {
     log::debug!("[tinyhumans] register_all: registering core hooks");
+    crate::hosted_config::register();
     client::register(options);
     integrations::register(options);
     #[cfg(feature = "voice")]

@@ -5,21 +5,7 @@
 //! otherwise long histories produce upstream `400 Bad Request` errors when usage
 //! metadata is not yet available.
 
-use crate::config::{legacy_tier_role, MODEL_MANAGED_DEFAULT};
-
-/// Conservative default for OpenHuman abstract tier models (tokens).
-const TIER_LARGE_CONTEXT: u64 = 200_000;
-/// Reasoning tier — backed by a 1M-context model.
-const TIER_REASONING_CONTEXT: u64 = 1_000_000;
-const TIER_STANDARD_CONTEXT: u64 = 128_000;
-const TIER_LOCAL_CONTEXT: u64 = 8_192;
-
-/// DeepSeek v4 Flash window (~1M tokens) — the managed default model
-/// (`MODEL_MANAGED_DEFAULT`) and the backing of the retired flash tiers. It
-/// must reflect the real model's capacity.
-const TIER_FLASH_CONTEXT: u64 = 1_000_000;
-
-/// Resolve the context window (in tokens) for a model id or OpenHuman tier alias.
+/// Resolve the context window (in tokens) for a model id or registered provider alias.
 ///
 /// Returns the static model estimate. Call [`context_window_for_route`] when
 /// the provider route is known; provider-discovered values are stored per
@@ -43,17 +29,52 @@ pub(crate) fn context_window_for_route(
         .or_else(|| static_context_window_for_model(model))
 }
 
-/// The static guess for a model's window: tier aliases, then the cost catalog,
+/// The static guess for a model's window: provider metadata, then the cost catalog,
 /// then the generic id-pattern hints. These never override a provider-reported
 /// window; [`crate::inference::context_window`] consults them last.
 pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
+    static_context_window_for_model_with_provider_window(
+        model,
+        crate::inference::registry::provider_model_context_window(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            model.trim(),
+        ),
+    )
+}
+
+/// Context-aware counterpart used when a dispatch carries its own provider
+/// registry. An empty context does not borrow model metadata from ambient work.
+pub(crate) fn static_context_window_for_model_in(
+    extensions: Option<&crate::core::slots::Extensions>,
+    model: &str,
+) -> Option<u64> {
+    static_context_window_for_model_with_provider_window(
+        model,
+        crate::inference::registry::provider_model_context_window_for(
+            extensions,
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            model.trim(),
+        ),
+    )
+}
+
+fn static_context_window_for_model_with_provider_window(
+    model: &str,
+    provider_window: Option<u64>,
+) -> Option<u64> {
     let normalized = model.trim();
     if normalized.is_empty() {
         return None;
     }
 
-    if let Some(window) = tier_context_window(normalized) {
+    if let Some(window) = provider_window {
         return Some(window);
+    }
+
+    // Keep conservative estimates for generic small-model ids.
+    if normalized.starts_with("gemma") || normalized.contains(":1b") || normalized.contains("270m")
+    {
+        return Some(8_192);
     }
 
     if let Some(price) = tinyagents_registry::pricing::lookup(normalized) {
@@ -76,30 +97,6 @@ pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
     }
 
     None
-}
-
-fn tier_context_window(model: &str) -> Option<u64> {
-    if model == MODEL_MANAGED_DEFAULT {
-        return Some(TIER_FLASH_CONTEXT);
-    }
-    // Role aliases and retired tier slugs: the windows the roles ran on before
-    // every managed role collapsed onto the default model. Kept so an alias a
-    // caller still holds budgets the way it used to.
-    let role = model
-        .strip_prefix("hint:")
-        .or_else(|| legacy_tier_role(model))
-        .unwrap_or("");
-    match role {
-        "reasoning" => Some(TIER_REASONING_CONTEXT),
-        "agentic" | "coding" => Some(TIER_LARGE_CONTEXT),
-        "burst" => Some(TIER_STANDARD_CONTEXT),
-        "chat" | "summarization" => Some(TIER_FLASH_CONTEXT),
-        _ if model == "chat" => Some(TIER_FLASH_CONTEXT),
-        _ if model.starts_with("gemma") || model.contains(":1b") || model.contains("270m") => {
-            Some(TIER_LOCAL_CONTEXT)
-        }
-        _ => None,
-    }
 }
 
 /// Whether the model resolved for a chat hint/agent/profile accepts image input
@@ -131,15 +128,27 @@ pub fn model_vision_enabled(model: &str, config: &crate::config::Config) -> bool
 /// Whether a resolved model accepts image input. The single predicate shared by
 /// the chat UI resolve and the server-side session/sub-agent gates.
 ///
-/// - **Managed models and role aliases** consult the core-owned map
-///   ([`crate::inference::provider::factory::oh_tier_supports_vision`]) —
-///   the remote backend does not advertise per-model capability. The managed
-///   default model and the `vision` / `reasoning` aliases are vision-capable.
+/// - **Hosted models and role aliases** consult the registered provider's
+///   capability hook; the backend does not advertise per-model capability.
 /// - **Custom/BYOK models** consult the user-set `model_registry.vision` flag
 ///   ([`model_vision_enabled`]).
 pub fn model_supports_vision(model: &str, config: &crate::config::Config) -> bool {
-    crate::inference::provider::factory::oh_tier_supports_vision(model)
-        || model_vision_enabled(model, config)
+    crate::inference::registry::provider_model_supports_vision(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        model,
+    ) || model_vision_enabled(model, config)
+}
+
+pub(crate) fn model_supports_vision_in(
+    extensions: Option<&crate::core::slots::Extensions>,
+    model: &str,
+    config: &crate::config::Config,
+) -> bool {
+    crate::inference::registry::provider_model_supports_vision_for(
+        extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        model,
+    ) || model_vision_enabled(model, config)
 }
 
 #[cfg(test)]
