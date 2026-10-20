@@ -453,6 +453,7 @@ async fn boot_sweep_logs_storage_open_failure_and_continues_boot() {
     assert_eq!(swept, 0);
 
     let warning = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    eprintln!("boot-sweep captured warning: {warning}");
     assert!(
         warning.contains("boot sweep failed"),
         "the storage-open failure must be reported by the sweep, got {warning:?}"
