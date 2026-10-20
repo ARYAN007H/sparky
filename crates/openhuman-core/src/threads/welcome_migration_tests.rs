@@ -1,5 +1,5 @@
 use super::*;
-use crate::threads::store::{CreateConversationThread, ensure_thread, list_threads};
+use crate::threads::store::{ensure_thread, list_threads, CreateConversationThread};
 use tempfile::TempDir;
 
 fn make_thread(id: &str, labels: Vec<String>) -> CreateConversationThread {

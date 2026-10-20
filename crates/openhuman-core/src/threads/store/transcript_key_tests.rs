@@ -58,11 +58,9 @@ fn deleting_a_thread_forgets_its_key() {
         .record_transcript_key("thread-b", "orchestrator")
         .unwrap();
 
-    assert!(
-        store
-            .delete_thread("thread-a", "2026-01-02T00:00:00Z")
-            .unwrap()
-    );
+    assert!(store
+        .delete_thread("thread-a", "2026-01-02T00:00:00Z")
+        .unwrap());
     assert_eq!(store.transcript_key("thread-a").unwrap(), None);
     assert!(store.transcript_key("thread-b").unwrap().is_some());
 

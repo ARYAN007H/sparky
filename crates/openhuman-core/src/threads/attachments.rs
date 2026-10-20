@@ -6,7 +6,7 @@
 //! when a turn is about to execute.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinychannels_bus::{ContentPart, MediaReference};
 
 use crate::agent::attachments::Attachment;
@@ -193,7 +193,9 @@ fn stored(metadata: &Value) -> Result<Vec<StoredAttachment>, String> {
         .map_err(|error| format!("stored attachment metadata is invalid: {error}"))
 }
 
-fn tenant_for(ctx: &crate::core::runtime::DispatchCtx) -> Result<crate::core::runtime::Tenant, String> {
+fn tenant_for(
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> Result<crate::core::runtime::Tenant, String> {
     crate::core::runtime::tenant::tenant_in(
         crate::core::runtime::is_saas(),
         ctx.resolved().as_deref(),
@@ -201,7 +203,10 @@ fn tenant_for(ctx: &crate::core::runtime::DispatchCtx) -> Result<crate::core::ru
     .map_err(|error| error.to_string())
 }
 
-fn staged_manifest_path(workspace: &std::path::Path, opaque_id: &str) -> Result<std::path::PathBuf, String> {
+fn staged_manifest_path(
+    workspace: &std::path::Path,
+    opaque_id: &str,
+) -> Result<std::path::PathBuf, String> {
     let uuid = uuid::Uuid::parse_str(opaque_id)
         .map_err(|_| "staged attachment reference is invalid".to_string())?;
     Ok(workspace
@@ -270,7 +275,7 @@ pub(crate) async fn stage_queued_parts(
     for part in input {
         if let Some(media) = opaque_media(part) {
             if media.opaque_id.is_some() {
-            return Err("queued attachment input must not contain existing opaque refs".into());
+                return Err("queued attachment input must not contain existing opaque refs".into());
             }
         }
     }
@@ -413,8 +418,7 @@ async fn validate_staged_files(
             .ok_or_else(|| "staged attachment MIME type is missing".to_string())?;
         if (is_image && !mime.starts_with("image/"))
             || !metadata.is_file()
-            || metadata.len()
-                > (if is_image { image_mb } else { file_mb } * 1024 * 1024) as u64
+            || metadata.len() > (if is_image { image_mb } else { file_mb } * 1024 * 1024) as u64
         {
             return Err("staged attachment exceeds configured type or size limit".into());
         }
@@ -564,11 +568,8 @@ pub(crate) async fn resolve_persisted_parts(
     )
     .await
     .map_err(|error| format!("stored attachment workspace unavailable: {error}"))?;
-    let messages = crate::threads::store::get_messages(
-        ctx,
-        config.workspace_dir.clone(),
-        thread_id,
-    )?;
+    let messages =
+        crate::threads::store::get_messages(ctx, config.workspace_dir.clone(), thread_id)?;
     let row = messages
         .iter()
         .find(|message| message.id == persisted_message_id && message.sender == "user")

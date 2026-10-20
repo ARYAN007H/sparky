@@ -66,7 +66,9 @@ impl OpenHumanSessionHost {
         let input = match input {
             Some(input) => input,
             None => user_message_from_text(
-                super::attachment_input::stage_turn(self, user_message, origin).await?.as_str(),
+                super::attachment_input::stage_turn(self, user_message, origin)
+                    .await?
+                    .as_str(),
             ),
         };
         let mut context = OpenHumanRunContext::new().with_host_env(&self.host_env);
@@ -164,10 +166,7 @@ impl OpenHumanSessionHost {
             .runtime_session
             .as_mut()
             .expect("runtime session initialized")
-            .turn(
-                SessionTurnRequest::new(input),
-                options,
-            );
+            .turn(SessionTurnRequest::new(input), options);
         let outcome = Box::pin(turn)
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;

@@ -130,13 +130,8 @@ impl OpenHumanSessionHost {
         let turn = async {
             match input {
                 Some(input) => {
-                    self.turn_with_approval_and_message(
-                        message,
-                        input,
-                        origin.as_ref(),
-                        approval,
-                    )
-                    .await
+                    self.turn_with_approval_and_message(message, input, origin.as_ref(), approval)
+                        .await
                 }
                 None => {
                     self.turn_with_approval(message, origin.as_ref(), approval)

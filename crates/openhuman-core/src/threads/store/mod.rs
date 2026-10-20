@@ -72,15 +72,15 @@ pub(crate) use bus::claim_channel_turn;
 pub(crate) use bus::persist_channel_message;
 pub use bus::register_conversation_persistence_subscriber;
 pub use store::{
-    ConversationStore, append_message, delete_messages_from, delete_thread, ensure_thread,
-    list_threads, purge_threads, update_message, update_thread_labels, update_thread_title,
-    update_thread_working_dir,
+    append_message, delete_messages_from, delete_thread, ensure_thread, list_threads,
+    purge_threads, update_message, update_thread_labels, update_thread_title,
+    update_thread_working_dir, ConversationStore,
 };
 pub(crate) use transcript_key::bind_transcript_key;
 pub use types::{
-    ConversationThread, CreateConversationThread, CrossThreadHit,
-    ThreadMessage as ConversationMessage, ThreadMessagePatch as ConversationMessagePatch,
-    is_deterministic_message_id, reply_run_id, run_reply_message_id,
+    is_deterministic_message_id, reply_run_id, run_reply_message_id, ConversationThread,
+    CreateConversationThread, CrossThreadHit, ThreadMessage as ConversationMessage,
+    ThreadMessagePatch as ConversationMessagePatch,
 };
 
 /// A thread's messages without artifact rows. Artifact rows place artifact
