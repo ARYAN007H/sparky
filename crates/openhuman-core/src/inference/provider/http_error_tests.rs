@@ -342,6 +342,46 @@ fn skips_sentry_report_for_transient_upstream_statuses() {
     }
 }
 
+#[test]
+fn provider_http_policy_uses_registered_error_ownership_metadata() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{
+        register_backend_error_classifier_in, BackendErrorClassification, BackendErrorKind,
+    };
+    use std::sync::Arc;
+
+    const PROVIDER: &str = "fixture-managed-provider";
+    const OWNED: &str = "owned fixture";
+    const REPORTABLE: &str = "reportable fixture";
+    let extensions = Extensions::new();
+    register_backend_error_classifier_in(
+        &extensions,
+        Arc::new(|provider, message| {
+            let is_owned = provider == Some(PROVIDER) && message == OWNED;
+            let is_reportable = provider == Some(PROVIDER) && message == REPORTABLE;
+            BackendErrorClassification {
+                provider_owned: is_owned || is_reportable,
+                backend_owned: is_owned || is_reportable,
+                reportable: !is_owned,
+                token: None,
+                kind: is_reportable.then_some(BackendErrorKind::Internal),
+                malformed_bad_request: false,
+            }
+        }),
+    );
+    let context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        None,
+        extensions,
+    );
+
+    crate::core::runtime::CoreContext::sync_scope(context, || {
+        assert!(is_backend_error_code_owned(PROVIDER, OWNED));
+        assert!(!is_backend_error_code_owned(PROVIDER, REPORTABLE));
+        assert!(!is_backend_error_code_owned("fixture-byo-provider", OWNED));
+    });
+}
+
 // Exercises the real `config_rejection_demoted` decision used
 // by `api_error`, including the inverted provider-aware polarity.
 mod provider_config_rejection_suppression {
