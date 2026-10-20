@@ -25,10 +25,9 @@ use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionReg
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{
     validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
-    SandboxMode as AgentSandboxMode,
 };
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
-use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
+use tinytools::ToolSpec;
 use tinytools_std::file_state::with_file_state_agent_id;
 
 use super::prompt::compose_subagent_system_prompt;
@@ -283,8 +282,8 @@ pub(crate) async fn run_subagent_direct_with_native_context(
         // tool through HostOperationContext.
         //
         let mut parent_for_subagent = parent.clone();
-        if options.workspace_descriptor.is_some() {
-            parent_for_subagent.workspace_descriptor = options.workspace_descriptor.clone();
+        if let Some(descriptor) = options.workspace_descriptor.clone() {
+            parent_for_subagent.workspace_descriptor = Some(descriptor);
         }
         let run_result = Box::pin(with_run_depth(RunDepth { depth: attempted_depth, max_depth }, async {
             with_file_state_agent_id(task_id.clone(), async {

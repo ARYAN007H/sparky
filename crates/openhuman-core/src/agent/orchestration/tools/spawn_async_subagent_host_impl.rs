@@ -432,9 +432,6 @@ impl SpawnAsyncSubagentTool {
             worker_thread_id: background_worker_thread_id,
             initial_history,
             checkpoint_dir: None,
-            worktree_action_dir: workspace_descriptor
-                .as_ref()
-                .map(|descriptor| descriptor.root.clone()),
             workspace_descriptor,
             run_queue: None,
             message_run_queue: None,

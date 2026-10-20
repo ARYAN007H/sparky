@@ -335,9 +335,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         prompt.chars().count()
     );
 
-    let worktree_action_dir = parent_workspace_descriptor
-        .as_ref()
-        .map(|descriptor| descriptor.root.clone());
     if let Some(descriptor) = parent_workspace_descriptor.as_ref() {
         tracing::debug!(
             agent_id,
@@ -360,7 +357,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         worker_thread_id: None,
         initial_history: None,
         checkpoint_dir: None,
-        worktree_action_dir,
         workspace_descriptor: parent_workspace_descriptor,
         run_queue: None,
         message_run_queue: None,
