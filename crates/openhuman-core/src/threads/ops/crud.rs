@@ -307,6 +307,7 @@ async fn message_append_with_config(
             &request.thread_id,
             config,
             &typed_attachments,
+            &request.message.id,
             &mut request.message.extra_metadata,
         )
         .await
@@ -479,7 +480,12 @@ async fn message_append_with_config(
     .await
     .map_err(|err| ThreadsError::from_thread_scoped_store_error(&request.thread_id, err))?;
     if let Some(staged_refs) = staged_refs {
-        crate::threads::attachments::consume_staged_parts(ctx, &request.thread_id, &staged_refs)
+        crate::threads::attachments::consume_staged_parts(
+            ctx,
+            &request.thread_id,
+            &staged_refs,
+            &message.id,
+        )
             .await
             .map_err(ThreadsError::Message)?;
     }
