@@ -150,6 +150,13 @@ export default async function queuedImageAttachmentRoundtrip({
     "the first model request",
     30_000,
   );
+  const firstAck = await waitUntil(
+    () => rpcResponses.find((call) => call.method === "openhuman.channel_web_chat" && call.params?.message === "Hold this turn while I queue an image."),
+    "first channel_web_chat response",
+  );
+  if (typeof firstAck.result !== "string") {
+    throw new Error(`first chat response was not a legacy started request id: ${JSON.stringify(firstAck)}`);
+  }
   await page.waitForFunction(
     (id) =>
       window.__OPENHUMAN_STORE__?.getState?.().thread?.activeThreadIds?.[id] ===
