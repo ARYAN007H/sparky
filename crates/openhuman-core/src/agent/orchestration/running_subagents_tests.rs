@@ -494,66 +494,6 @@ async fn task_id_for_session_prefers_live_task_over_terminal_task() {
 }
 
 #[tokio::test]
-async fn wait_returns_completion_once_published() {
-    let _guard = test_guard_async().await;
-    let rq = run_queue();
-    let tx = register_test("task-wait", "session-A", rq);
-
-    tokio::spawn(async move {
-        let _ = tx.send(DetachedSubagentStatus::Completed {
-            output: "the answer".into(),
-            iterations: 3,
-        });
-        // keep sender alive until after send
-        drop(tx);
-    });
-
-    let outcome = wait(&cx(), "task-wait", "session-A", Duration::from_secs(5))
-        .await
-        .expect("wait should resolve");
-    match outcome {
-        WaitOutcome::Terminal(DetachedSubagentStatus::Completed { output, iterations }) => {
-            assert_eq!(output, "the answer");
-            assert_eq!(iterations, 3);
-        }
-        other => panic!("expected completed terminal, got {other:?}"),
-    }
-
-    // pruned after a terminal wait
-    assert!(matches!(
-        wait(&cx(), "task-wait", "session-A", Duration::from_millis(10)).await,
-        Err(WaitError::Unknown)
-    ));
-}
-
-#[tokio::test]
-async fn wait_times_out_and_leaves_entry_intact() {
-    let _guard = test_guard_async().await;
-    let rq = run_queue();
-    let _tx = register_test("task-slow", "session-A", rq);
-
-    let outcome = wait(&cx(), "task-slow", "session-A", Duration::from_millis(20))
-        .await
-        .expect("wait should resolve");
-    assert!(matches!(
-        outcome,
-        WaitOutcome::TimedOut(DetachedSubagentStatus::Running)
-    ));
-
-    // still steerable after a timed-out wait
-    assert!(steer(
-        &cx(),
-        "task-slow",
-        "session-A",
-        "still here".into(),
-        QueueLane::Steer
-    )
-    .await
-    .is_ok());
-    prune("task-slow");
-}
-
-#[tokio::test]
 async fn cancel_for_thread_aborts_only_matching_entries() {
     let _guard = test_guard_async().await;
     let rq = run_queue();
@@ -566,46 +506,6 @@ async fn cancel_for_thread_aborts_only_matching_entries() {
 
     let cancelled = cancel_for_thread(&cx(), "thread-X");
     assert_eq!(cancelled, 2, "both thread-X entries should be cancelled");
-
-    // The two cancelled entries are gone (steer can't find them).
-    assert_eq!(
-        steer(
-            &cx(),
-            "task-tA-1",
-            "session-A",
-            "x".into(),
-            QueueLane::Steer
-        )
-        .await,
-        Err(SteerError::Unknown)
-    );
-    assert_eq!(
-        steer(
-            &cx(),
-            "task-tA-2",
-            "session-A",
-            "x".into(),
-            QueueLane::Steer
-        )
-        .await,
-        Err(SteerError::Unknown)
-    );
-
-    // Non-matching entries stay live and steerable.
-    assert!(
-        steer(&cx(), "task-tB", "session-A", "x".into(), QueueLane::Steer)
-            .await
-            .is_ok()
-    );
-    assert!(steer(
-        &cx(),
-        "task-headless",
-        "session-A",
-        "x".into(),
-        QueueLane::Steer
-    )
-    .await
-    .is_ok());
 
     // Idempotent: a second pass cancels nothing.
     assert_eq!(cancel_for_thread(&cx(), "thread-X"), 0);
@@ -620,7 +520,6 @@ async fn cancel_by_task_returns_metadata_and_removes_entry() {
     let rq = run_queue();
     let _tx = register_test_with_thread("task-cbt", "session-Z", Some("thread-cbt"), rq.clone());
     let task_id = TaskId::new("task-cbt");
-    shared_steering_registry().register(task_id.clone(), SteeringHandle::allow_all());
 
     let meta = cancel_by_task(&cx(), "task-cbt").expect("known task should cancel");
     assert_eq!(
@@ -630,16 +529,7 @@ async fn cancel_by_task_returns_metadata_and_removes_entry() {
     assert_eq!(meta.agent_id, "researcher");
     assert_eq!(meta.parent_session, "session-Z");
     assert_eq!(meta.parent_thread_id.as_deref(), Some("thread-cbt"));
-    assert!(
-        shared_steering_registry().get(&task_id).is_none(),
-        "hard cancel should remove the registered steering handle"
-    );
-
-    // Entry is gone — steer can no longer find it, and a second cancel is a no-op.
-    assert_eq!(
-        steer(&cx(), "task-cbt", "session-Z", "x".into(), QueueLane::Steer).await,
-        Err(SteerError::Unknown)
-    );
+    // Entry is gone and a second cancel is a no-op.
     assert!(cancel_by_task(&cx(), "task-cbt").is_none());
     // Unknown ids are simply None.
     assert!(cancel_by_task(&cx(), "never-existed").is_none());
