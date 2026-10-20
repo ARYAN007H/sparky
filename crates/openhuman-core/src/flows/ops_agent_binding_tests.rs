@@ -223,28 +223,17 @@ async fn flows_run_fails_cleanly_without_invoking_engine_when_inference_not_read
         "error must surface the specific reason (signed out): {err}"
     );
 
-    // The run row settled `failed` with that same message, and the engine
-    // never ran (no persisted steps) — this is the "no pointless work" half
-    // of the contract, not just "the RPC call returned an error".
+    // Provider readiness is a host preflight before the module's StartRun
+    // admission boundary, so rejection must not create a module-owned run row
+    // or stamp the saved workflow as executed.
     let runs = flows_list_runs(&config, &created.value.id, 1)
         .await
         .unwrap()
         .value;
-    let run = runs.first().expect("a run row must exist");
-    assert_eq!(run.status, "failed");
-    assert!(
-        run.steps.is_empty(),
-        "the engine must never have executed a step: {:?}",
-        run.steps
-    );
-    let run_error = run
-        .error
-        .as_deref()
-        .expect("a failed run must carry an error message");
-    assert!(
-        run_error.to_ascii_lowercase().contains("ai provider"),
-        "the persisted run error must explain the AI-provider problem: {run_error}"
-    );
+    assert!(runs.is_empty(), "preflight rejection must not admit a run");
+    let reloaded = flows_get(&config, &created.value.id).await.unwrap();
+    assert!(reloaded.value.last_run_at.is_none());
+    assert!(reloaded.value.last_status.is_none());
 
     // `SignedOutTestGuard` restores the prior flag on drop at the end of this
     // scope — no other test observes this override.

@@ -404,7 +404,7 @@ async fn combine_trail_off_fallback_returns_fallback_alone_for_genuine_silence()
 }
 
 #[tokio::test]
-async fn boot_sweep_logs_catalog_registration_failure_and_continues_boot() {
+async fn boot_sweep_logs_storage_open_failure_and_continues_boot() {
     let tmp = TempDir::new().unwrap();
     let file_path = tmp.path().join("not_a_dir");
     std::fs::write(&file_path, b"blocking file").unwrap();
@@ -445,15 +445,17 @@ async fn boot_sweep_logs_catalog_registration_failure_and_continues_boot() {
         .finish();
     let _subscriber_guard = tracing::subscriber::set_default(subscriber);
 
-    // Execute the failing sweep path to exercise the real warning branch.
+    // Registration is lazy and does not open the workspace backend. The
+    // module's BootSweep reaches the scoped callback, whose backend open must
+    // fail against this file-as-directory path while boot continues.
     let ctx = crate::core::runtime::DispatchCtx::ambient();
     let swept = crate::flows::recovery::sweep_orphaned_runs_on_boot(&ctx, &config).await;
     assert_eq!(swept, 0);
 
     let warning = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
     assert!(
-        warning.contains("create the storage directory"),
-        "the sweep warning must preserve the operation context, got {warning:?}"
+        warning.contains("boot sweep failed"),
+        "the storage-open failure must be reported by the sweep, got {warning:?}"
     );
     assert!(
         warning.contains(&file_path.display().to_string()),
