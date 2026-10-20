@@ -1,5 +1,5 @@
 use serde_json::Value;
-use tinyflows::model::{NodeKind, WorkflowGraph};
+use super::graph_json::nodes;
 
 /// Author-gate for `oh:storage_upload_file`: its literal `path` arg must be
 /// workspace-relative. Uploads are confined to the agent workspace by the
@@ -13,11 +13,11 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 /// Only LITERAL paths are checked: a `=`-expression resolves from upstream data
 /// at runtime and is out of scope here (the runtime check still applies). An
 /// absent `path` is left to the required-arg gate.
-pub(crate) fn validate_upload_paths(graph: &WorkflowGraph) -> Vec<String> {
+pub(crate) fn validate_upload_paths(graph: &Value) -> Vec<String> {
     const UPLOAD_SLUG: &str = "oh:storage_upload_file";
     let mut errors = Vec::new();
-    for node in &graph.nodes {
-        if node.kind != NodeKind::ToolCall {
+    for node in nodes(graph) {
+        if node.kind != "tool_call" {
             continue;
         }
         if node.config.get("slug").and_then(Value::as_str) != Some(UPLOAD_SLUG) {

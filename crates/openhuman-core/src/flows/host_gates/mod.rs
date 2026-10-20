@@ -2,6 +2,7 @@
 
 mod agent_refs;
 mod connections;
+mod graph_json;
 mod tool_contracts;
 mod upload_paths;
 
