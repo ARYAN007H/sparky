@@ -52,7 +52,14 @@ export function classifyStatus({
   exemption,
   sourceParityContext,
 }) {
-  const strict = classifyPin({ id, version, submodulePath, actual, exemption, sourceParityContext });
+  const strict = classifyPin({
+    id,
+    version,
+    submodulePath,
+    actual,
+    exemption,
+    sourceParityContext,
+  });
   if (strict.kind === "exempt") {
     return {
       id,
@@ -70,7 +77,7 @@ export function classifyStatus({
         ? " (the drift moved past its module-pin-exemptions.json entry)"
         : strict.kind === "invalid-source-parity"
           ? ` (${strict.message})`
-        : "";
+          : "";
   if (strict.kind === "match" || strict.kind === "stale-exemption") {
     return { id, kind: "in-sync", actual, message: `in sync${note}` };
   }
