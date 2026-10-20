@@ -108,7 +108,7 @@ impl BoundRegisteredController {
         (self.decode)(params)
     }
 
-    fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    pub fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
         (self.invoke)(ctx, params)
     }
 }
