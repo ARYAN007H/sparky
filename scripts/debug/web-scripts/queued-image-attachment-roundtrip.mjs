@@ -38,7 +38,7 @@ async function waitUntil(predicate, label, timeoutMs = 10_000) {
     if (value) return value;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw new Error(`timed out waiting for \${label}`);
+  throw new Error(`timed out waiting for ${label}`);
 }
 
 export default async function queuedImageAttachmentRoundtrip({
@@ -111,7 +111,7 @@ export default async function queuedImageAttachmentRoundtrip({
     () =>
       mock
         .requests()
-        .some((request) => /(?:^|\\/)chat\\/completions(?:\\?|$)/.test(request.url)),
+        .some((request) => /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url)),
     "the first model request",
     30_000,
   );
@@ -168,7 +168,7 @@ export default async function queuedImageAttachmentRoundtrip({
     JSON.stringify(ack.queued_attachments) !== JSON.stringify(pending.attachments)
   ) {
     throw new Error(
-      `queued ACK does not match sanitized UI state: \${JSON.stringify(ack)}`,
+      `queued ACK does not match sanitized UI state: ${JSON.stringify(ack)}`,
     );
   }
   if (
@@ -248,12 +248,12 @@ export default async function queuedImageAttachmentRoundtrip({
     throw new Error(`queued image produced ${userRows.length} persisted user rows, expected one`);
   }
   const persisted = userRows[0];
-  if (persisted.id !== `user:\${pending.requestId}`) {
+  if (persisted.id !== `user:${pending.requestId}`) {
     throw new Error(
-      `queued row ID \${persisted.id} does not match request-key ownership`,
+      `queued row ID ${persisted.id} does not match request-key ownership`,
     );
   }
-  if (/\\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(persisted.content)) {
+  if (/\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(persisted.content)) {
     throw new Error("queued typed image leaked a legacy marker into persisted content");
   }
   const reference = persisted.attachments?.[0];
@@ -274,11 +274,11 @@ export default async function queuedImageAttachmentRoundtrip({
 
   const imageRequest = mock
     .requests()
-    .filter((request) => /(?:^|\\/)chat\\/completions(?:\\?|$)/.test(request.url))
+    .filter((request) => /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url))
     .at(-1);
   if (!imageRequest) throw new Error("queued turn did not reach the mock model");
   const input = JSON.stringify(JSON.parse(imageRequest.body).messages ?? []);
-  if (/\\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(input)) {
+  if (/\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(input)) {
     throw new Error("queued model input contains a legacy marker");
   }
   if (!input.includes(IMAGE_BYTES.toString("base64"))) {
