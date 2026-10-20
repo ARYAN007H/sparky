@@ -103,7 +103,7 @@ pub(crate) fn all_voice_controller_entries() -> Vec<ControllerEntry> {
     ]
     .into_iter()
     .map(ControllerEntry::bound)
-    .chain(crate::voice::live::bound_live_controller_entries())
+    .chain(crate::voice::live::schemas::bound_live_controller_entries())
     .collect()
 }
 
