@@ -18,9 +18,7 @@ use tinyagents_runtime::{project_descriptors, ToolAdmission};
 use tinyinference_llm::model::ChatModel;
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
-use crate::agent::orchestration::tools::{
-    ContinueSubagentDispatch, DelegationDispatch, SpawnSubagentDispatch, SpawnSubagentDispatch,
-};
+use crate::agent::orchestration::tools::SpawnSubagentDispatch;
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
@@ -112,19 +110,13 @@ type ToolDispatchSelector = Arc<ToolDispatchSelectorFn>;
 pub(crate) fn typed_dispatch_for(
     name: &str,
     adapter: Arc<dyn tinytools::Tool>,
-    delegation_target: Option<String>,
+    _delegation_target: Option<String>,
 ) -> Option<Arc<dyn ToolDispatch<(), OpenHumanRunContext>>> {
     let dispatch: Arc<dyn ToolDispatch<(), OpenHumanRunContext>> = match name {
         "spawn_subagent" => Arc::new(SpawnSubagentDispatch::new(adapter)),
-        "spawn_subagent" => Arc::new(SpawnSubagentDispatch::new(adapter)),
-        "continue_subagent" => Arc::new(ContinueSubagentDispatch::new(adapter)),
         "memory" => Arc::new(LiveToolContextDispatch::new(adapter)),
         "todo" => Arc::new(TodoToolDispatch::new(adapter)),
-        _ => {
-            return DelegationDispatch::for_tool(adapter, delegation_target).map(|dispatch| {
-                Arc::new(dispatch) as Arc<dyn ToolDispatch<(), OpenHumanRunContext>>
-            });
-        }
+        _ => return None,
     };
     Some(dispatch)
 }
