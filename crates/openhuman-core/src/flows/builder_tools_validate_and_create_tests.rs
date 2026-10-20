@@ -133,7 +133,8 @@ async fn edit_workflow_does_not_persist_an_incompatible_saved_child_reference() 
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let safe_graph = json!({
         "nodes": [
             { "id": "t", "kind": "trigger", "name": "Trigger" },

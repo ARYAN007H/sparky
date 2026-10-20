@@ -65,7 +65,8 @@ async fn flows_create_schedule_trigger_creates_disabled() {
         false,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     assert!(
         !created.value.enabled,
@@ -99,7 +100,8 @@ async fn flows_create_app_event_trigger_creates_disabled() {
         false,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     assert!(
         !created.value.enabled,
@@ -174,7 +176,8 @@ async fn flows_create_outbound_http_forces_require_approval() {
         false,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     assert!(
         created.value.require_approval,
@@ -209,7 +212,8 @@ async fn flows_create_readonly_graph_respects_caller_require_approval() {
         false,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     assert!(
         !created.value.require_approval,
