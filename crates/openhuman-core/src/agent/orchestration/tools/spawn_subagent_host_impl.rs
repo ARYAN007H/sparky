@@ -69,12 +69,6 @@ impl SpawnSubagentTool {
             }
         };
 
-        let fleet = if parent.visible_tool_names.is_empty() {
-            FleetToolSet::for_parent(&parent.agent_definition_id)
-        } else {
-            FleetToolSet::from_visible_tool_names(&parent.visible_tool_names)
-        };
-
         if !parent.allowed_subagent_ids.contains(&definition.id) {
             log::warn!(
                 "[spawn_subagent] blocked subagent outside allowlist parent={} requested={} allowed={:?}",
@@ -211,23 +205,17 @@ impl SpawnSubagentTool {
                             let payload = async_subagent_ref_payload(
                                 running_task_id,
                                 &session.subagent_session_id,
+                                &session.task_key,
                                 &definition.id,
                                 session.worker_thread_id.as_deref(),
                                 true,
                                 reuse_decision.as_str(),
                                 "running",
-                                &fleet,
                             );
-                            let follow_up = if fleet.can_wait() {
-                                "Use the structured reference below to send more input, wait, or perform a short timeout tick."
-                            } else {
-                                "Its result is delivered to you automatically on a later turn; do not wait or poll for it."
-                            };
                             return Ok(ToolResult::success(format!(
                                 "Continued reusable async sub-agent `{}`. It is already running and will pick up the new instruction at its next step. \
-                                 {}\n\n[async_subagent_ref]\n{}\n[/async_subagent_ref]",
+                                 Its result is delivered automatically on a later turn.\n\n[async_subagent_ref]\n{}\n[/async_subagent_ref]",
                                 payload["agent_id"].as_str().unwrap_or("subagent"),
-                                follow_up,
                                 serde_json::to_string(&payload)
                                     .unwrap_or_else(|_| "{}".to_string())
                             )));
@@ -493,7 +481,7 @@ impl SpawnSubagentTool {
             worker_thread_id.as_deref(),
             reusable.is_some(),
             reuse_decision.as_str(),
-            &fleet,
+            &task_key,
         ))
     }
 }
