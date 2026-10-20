@@ -47,12 +47,12 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
             max_depth: 3,
         },
     );
-    config.model_routes.push(
-        openhuman_embed::__host::config::schema::ModelRouteConfig {
+    config
+        .model_routes
+        .push(openhuman_embed::__host::config::schema::ModelRouteConfig {
             hint: "summary".to_string(),
             model: "summarization-v1".to_string(),
-        },
-    );
+        });
     config.model_routes.extend([
         openhuman_embed::__host::config::schema::ModelRouteConfig {
             hint: "custom".to_string(),
@@ -70,9 +70,18 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
 
     assert!(normalize_config(&mut config));
     assert_eq!(config.default_model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
-    assert_eq!(config.orchestrator.model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
-    assert_eq!(config.teams["team"].lead_model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
-    assert_eq!(config.teams["team"].agent_model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
+    assert_eq!(
+        config.orchestrator.model.as_deref(),
+        Some(MODEL_MANAGED_DEFAULT)
+    );
+    assert_eq!(
+        config.teams["team"].lead_model.as_deref(),
+        Some(MODEL_MANAGED_DEFAULT)
+    );
+    assert_eq!(
+        config.teams["team"].agent_model.as_deref(),
+        Some(MODEL_MANAGED_DEFAULT)
+    );
     assert_eq!(config.agents["legacy"].model, MODEL_MANAGED_DEFAULT);
     assert_eq!(config.model_routes[0].model, MODEL_MANAGED_DEFAULT);
     assert_eq!(config.model_routes[1].model, "vendor/pinned");

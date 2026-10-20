@@ -138,10 +138,9 @@ pub mod config {
             pub use openhuman_core::config::schema::cloud_providers::{
                 builtin_cloud_provider, endpoint_host, generate_provider_id,
                 host_is_builtin_cloud_provider, is_hosted_cloud_provider,
-                register_hosted_cloud_provider_policy,
-                register_hosted_cloud_provider_policy_in, register_hosted_cloud_preset,
-                register_hosted_cloud_preset_in, AuthStyle, BuiltinCloudProvider,
-                CloudProviderCreds, HostedCloudProviderClassifier,
+                register_hosted_cloud_preset, register_hosted_cloud_preset_in,
+                register_hosted_cloud_provider_policy, register_hosted_cloud_provider_policy_in,
+                AuthStyle, BuiltinCloudProvider, CloudProviderCreds, HostedCloudProviderClassifier,
             };
         }
     }
@@ -365,16 +364,16 @@ pub mod inference_registry {
     pub use openhuman_core::inference::registry::{
         classify_backend_error, provider_default_model, provider_default_pricing,
         provider_model_context_window, provider_model_is_alias, provider_model_is_raw,
-        provider_model_role, provider_model_supports_vision, register_backend_error_classifier,
-        register_backend_error_classifier_in, register_catalog, register_catalog_in,
-        register_chat_model, register_chat_model_in, register_config_normalizer,
-        register_config_normalizer_in, register_embedding, register_embedding_in,
-        provider_request_without_reasoning, resolve_provider_model,
-        unregister_backend_error_classifier, unregister_catalog,
-        unregister_chat_model, unregister_embedding, BackendErrorClassification,
-        BackendErrorClassifier, BackendErrorKind, BoxFuture, CatalogEntry, CatalogLimits,
-        CatalogListing, CatalogRequest, ChatModelEntry, ChatModelFactory, ChatModelRequest,
-        ConfigNormalizer, EmbeddingFactory, EmbeddingRequest, ProviderModelHooks, ReadinessProbe,
+        provider_model_role, provider_model_supports_vision, provider_request_without_reasoning,
+        register_backend_error_classifier, register_backend_error_classifier_in, register_catalog,
+        register_catalog_in, register_chat_model, register_chat_model_in,
+        register_config_normalizer, register_config_normalizer_in, register_embedding,
+        register_embedding_in, resolve_provider_model, unregister_backend_error_classifier,
+        unregister_catalog, unregister_chat_model, unregister_embedding,
+        BackendErrorClassification, BackendErrorClassifier, BackendErrorKind, BoxFuture,
+        CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest, ChatModelEntry,
+        ChatModelFactory, ChatModelRequest, ConfigNormalizer, EmbeddingFactory, EmbeddingRequest,
+        ProviderModelHooks, ReadinessProbe,
     };
 }
 

@@ -217,10 +217,7 @@ pub fn backend_error_code_skips_sentry(err: &str) -> bool {
 }
 
 /// Classify an error for the core's generic observability and chat surfaces.
-pub(crate) fn classify(
-    provider: Option<&str>,
-    err: &str,
-) -> BackendErrorClassification {
+pub(crate) fn classify(provider: Option<&str>, err: &str) -> BackendErrorClassification {
     let provider_owned = provider.map_or_else(
         || is_managed_backend_envelope(err),
         |provider| provider == PROVIDER_LABEL,
@@ -228,18 +225,21 @@ pub(crate) fn classify(
     let token = provider_owned
         .then(|| extract_backend_error_code_token(err))
         .flatten();
-    let kind = token.as_deref().and_then(BackendErrorCode::from_token).map(|code| match code {
-        BackendErrorCode::RateLimited => BackendErrorKind::RateLimited,
-        BackendErrorCode::UserInsufficientCredits => BackendErrorKind::InsufficientCredits,
-        BackendErrorCode::UpstreamUnavailable => BackendErrorKind::UpstreamUnavailable,
-        BackendErrorCode::ModelUnavailable => BackendErrorKind::ModelUnavailable,
-        BackendErrorCode::PayloadTooLarge => BackendErrorKind::PayloadTooLarge,
-        BackendErrorCode::ContextLengthExceeded => BackendErrorKind::ContextLengthExceeded,
-        BackendErrorCode::BadRequest => BackendErrorKind::BadRequest,
-        BackendErrorCode::InternalError => BackendErrorKind::Internal,
-    });
-    let malformed_bad_request = matches!(kind, Some(BackendErrorKind::BadRequest))
-        && body_flags_malformed(err);
+    let kind = token
+        .as_deref()
+        .and_then(BackendErrorCode::from_token)
+        .map(|code| match code {
+            BackendErrorCode::RateLimited => BackendErrorKind::RateLimited,
+            BackendErrorCode::UserInsufficientCredits => BackendErrorKind::InsufficientCredits,
+            BackendErrorCode::UpstreamUnavailable => BackendErrorKind::UpstreamUnavailable,
+            BackendErrorCode::ModelUnavailable => BackendErrorKind::ModelUnavailable,
+            BackendErrorCode::PayloadTooLarge => BackendErrorKind::PayloadTooLarge,
+            BackendErrorCode::ContextLengthExceeded => BackendErrorKind::ContextLengthExceeded,
+            BackendErrorCode::BadRequest => BackendErrorKind::BadRequest,
+            BackendErrorCode::InternalError => BackendErrorKind::Internal,
+        });
+    let malformed_bad_request =
+        matches!(kind, Some(BackendErrorKind::BadRequest)) && body_flags_malformed(err);
     let client_guard_leak = matches!(
         kind,
         Some(BackendErrorKind::PayloadTooLarge | BackendErrorKind::ContextLengthExceeded)
@@ -258,4 +258,3 @@ pub(crate) fn classify(
 #[cfg(test)]
 #[path = "backend_error_code_tests.rs"]
 mod tests;
-

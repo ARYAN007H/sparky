@@ -13,11 +13,11 @@
 //! `register` is the one place it does so; `crate::register::register_all`
 //! calls it from `install()`.
 
+mod backend_error_code;
 mod managed_calls;
 mod managed_catalog;
 mod managed_embedding;
 mod managed_model;
-mod backend_error_code;
 mod managed_reasoning;
 mod managed_session;
 mod managed_usage;
@@ -28,9 +28,9 @@ use std::sync::Arc;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::inference_registry::{
     register_backend_error_classifier, register_catalog, register_chat_model,
-    register_config_normalizer, register_embedding, BackendErrorClassification,
-    BackendErrorKind, BoxFuture, ChatModelEntry, ChatModelFactory, ChatModelRequest,
-    ProviderModelHooks, ReadinessProbe, PROVIDER_OPENHUMAN,
+    register_config_normalizer, register_embedding, BackendErrorClassification, BackendErrorKind,
+    BoxFuture, ChatModelEntry, ChatModelFactory, ChatModelRequest, ProviderModelHooks,
+    ReadinessProbe, PROVIDER_OPENHUMAN,
 };
 use tinyinference_llm::model::ChatModel;
 
@@ -121,10 +121,7 @@ pub(crate) fn register(_options: &InstallOptions) {
         Ok(Box::new(ManagedEmbeddingModel::from_request(request)))
     });
     register_catalog(PROVIDER_OPENHUMAN, managed_catalog::entry());
-    register_config_normalizer(
-        PROVIDER_OPENHUMAN,
-        Arc::new(tiers::normalize_config),
-    );
+    register_config_normalizer(PROVIDER_OPENHUMAN, Arc::new(tiers::normalize_config));
     register_backend_error_classifier(Arc::new(backend_error_code::classify));
     log::debug!(
         "[tinyhumans] inference: registered the managed chat model, embeddings and catalog"

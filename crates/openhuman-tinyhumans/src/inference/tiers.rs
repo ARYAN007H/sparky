@@ -70,23 +70,36 @@ pub(crate) fn resolve_model(
         .filter(|model| !model.is_empty() && !is_alias(model))
         .unwrap_or(MODEL_MANAGED_DEFAULT)
         .to_string();
-    Some(match model_override.map(str::trim).filter(|model| !model.is_empty()) {
-        Some(model) if is_alias(model) => configured,
-        Some(model) => model.to_string(),
-        None => configured,
-    })
+    Some(
+        match model_override
+            .map(str::trim)
+            .filter(|model| !model.is_empty())
+        {
+            Some(model) if is_alias(model) => configured,
+            Some(model) => model.to_string(),
+            None => configured,
+        },
+    )
 }
 
 pub(crate) fn supports_vision(model: &str) -> bool {
     let model = model.trim();
     model == MODEL_MANAGED_DEFAULT
         || MANAGED_MULTIMODAL_MODELS.contains(&model)
-        || matches!(role_for_model(model).as_deref(), Some("vision" | "reasoning"))
+        || matches!(
+            role_for_model(model).as_deref(),
+            Some("vision" | "reasoning")
+        )
 }
 
 pub(crate) fn context_window(model: &str) -> Option<u64> {
     let model = model.trim();
-    if model == MODEL_MANAGED_DEFAULT || matches!(role_for_model(model).as_deref(), Some("chat" | "summarization")) {
+    if model == MODEL_MANAGED_DEFAULT
+        || matches!(
+            role_for_model(model).as_deref(),
+            Some("chat" | "summarization")
+        )
+    {
         return Some(1_000_000);
     }
     match role_for_model(model).as_deref() {
@@ -132,17 +145,35 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
         changed |= rewrite(&mut route.model);
     }
     if config.cloud_providers.is_empty() {
-        if let Some(preset) = openhuman_embed::__host::config::schema::cloud_providers::builtin_cloud_provider("openhuman") {
-            let id = openhuman_embed::__host::config::schema::cloud_providers::generate_provider_id("openhuman");
-            config.cloud_providers.push(openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
-                id: id.clone(),
-                slug: preset.slug.to_string(),
-                label: preset.label.to_string(),
-                endpoint: config.api_url.as_deref().filter(|url| !url.trim().is_empty()).unwrap_or(preset.endpoint).to_string(),
-                auth_style: preset.auth_style,
-                default_model: config.default_model.clone(),
-            });
-            if config.primary_cloud.is_none() && config.inference_url.as_deref().is_none_or(|url| url.trim().is_empty()) {
+        if let Some(preset) =
+            openhuman_embed::__host::config::schema::cloud_providers::builtin_cloud_provider(
+                "openhuman",
+            )
+        {
+            let id = openhuman_embed::__host::config::schema::cloud_providers::generate_provider_id(
+                "openhuman",
+            );
+            config.cloud_providers.push(
+                openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
+                    id: id.clone(),
+                    slug: preset.slug.to_string(),
+                    label: preset.label.to_string(),
+                    endpoint: config
+                        .api_url
+                        .as_deref()
+                        .filter(|url| !url.trim().is_empty())
+                        .unwrap_or(preset.endpoint)
+                        .to_string(),
+                    auth_style: preset.auth_style,
+                    default_model: config.default_model.clone(),
+                },
+            );
+            if config.primary_cloud.is_none()
+                && config
+                    .inference_url
+                    .as_deref()
+                    .is_none_or(|url| url.trim().is_empty())
+            {
                 config.primary_cloud = Some(id);
             }
             changed = true;

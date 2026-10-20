@@ -1,5 +1,5 @@
 use openhuman_embed::__host::config::schema::cloud_providers::{
-    register_hosted_cloud_provider_policy, register_hosted_cloud_preset, AuthStyle,
+    register_hosted_cloud_preset, register_hosted_cloud_provider_policy, AuthStyle,
     BuiltinCloudProvider,
 };
 use std::sync::Arc;

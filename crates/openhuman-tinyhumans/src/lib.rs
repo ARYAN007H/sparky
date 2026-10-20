@@ -78,9 +78,9 @@ pub mod backend;
 pub(crate) mod channels;
 pub mod client;
 pub mod hosted;
+mod hosted_config;
 pub(crate) mod inference;
 mod install;
-mod hosted_config;
 pub mod integrations;
 #[cfg(feature = "jev")]
 pub mod jev;

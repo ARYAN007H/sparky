@@ -33,8 +33,10 @@ fn managed_route_does_not_invent_a_model_when_provider_policy_is_absent() {
     assert!(error.to_string().contains("BACKEND_UNAVAILABLE"));
 
     config.default_model = Some("openrouter/deepseek/deepseek-v4-pro".to_string());
-    assert!(build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .is_err(), "an explicit pin still needs a registered hosted constructor");
+    assert!(
+        build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).is_err(),
+        "an explicit pin still needs a registered hosted constructor"
+    );
 }
 
 #[test]
@@ -44,8 +46,10 @@ fn build_remote_provider_falls_back_to_managed_when_chat_local() {
     // never errors because Ollama is down.
     let mut config = test_config();
     config.chat_provider = Some("ollama:llama3.2:3b".to_string());
-    assert!(build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .is_err(), "triage's managed fallback requires an installed provider");
+    assert!(
+        build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).is_err(),
+        "triage's managed fallback requires an installed provider"
+    );
 }
 
 #[test]
@@ -97,8 +101,10 @@ fn build_remote_provider_reports_missing_managed_fallback_policy() {
     // backend rather than erroring the turn.
     let mut config = test_config();
     config.chat_provider = Some("groq:llama3".to_string());
-    assert!(build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .is_err(), "fallback cannot fabricate a managed model");
+    assert!(
+        build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).is_err(),
+        "fallback cannot fabricate a managed model"
+    );
 }
 
 #[tokio::test]
@@ -106,16 +112,20 @@ async fn resolve_provider_with_config_requires_a_registered_remote_model_source(
     // Even when runtime_enabled is true, triage must always use remote.
     let mut config = test_config();
     config.local_ai.runtime_enabled = true;
-    assert!(resolve_provider_with_config(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .await
-        .is_err());
+    assert!(
+        resolve_provider_with_config(&crate::core::runtime::DispatchCtx::ambient(), &config)
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
 async fn resolve_provider_with_config_without_provider_does_not_invent_a_route() {
     let mut config = test_config();
     config.local_ai.runtime_enabled = false;
-    assert!(resolve_provider_with_config(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .await
-        .is_err());
+    assert!(
+        resolve_provider_with_config(&crate::core::runtime::DispatchCtx::ambient(), &config)
+            .await
+            .is_err()
+    );
 }

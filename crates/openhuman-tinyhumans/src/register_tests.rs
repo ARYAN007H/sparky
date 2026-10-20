@@ -25,7 +25,9 @@ async fn boot_registration_supplies_hosted_model_default_and_normalizer_before_c
     let tmp = tempfile::tempdir().unwrap();
     legacy.workspace_dir = tmp.path().join("workspace");
     legacy.config_path = tmp.path().join("config.toml");
-    tokio::fs::create_dir_all(&legacy.workspace_dir).await.unwrap();
+    tokio::fs::create_dir_all(&legacy.workspace_dir)
+        .await
+        .unwrap();
     openhuman_embed::__host::config::migrations::run_pending(&mut legacy).await;
     assert_eq!(
         legacy.default_model.as_deref(),

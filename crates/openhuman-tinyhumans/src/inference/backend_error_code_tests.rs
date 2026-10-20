@@ -162,7 +162,8 @@ fn hosted_classifier_drives_core_observability_without_core_token_ownership() {
         Some(ExpectedErrorKind::BackendErrorCodeOwned)
     );
 
-    let malformed = r#"OpenHuman API error (400): {"error":{"errorCode":"BAD_REQUEST","malformed":true}}"#;
+    let malformed =
+        r#"OpenHuman API error (400): {"error":{"errorCode":"BAD_REQUEST","malformed":true}}"#;
     assert_ne!(
         expected_error_kind(malformed),
         Some(ExpectedErrorKind::BackendErrorCodeOwned)
