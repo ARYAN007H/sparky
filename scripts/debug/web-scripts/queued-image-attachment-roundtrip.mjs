@@ -31,6 +31,16 @@ function findStoredBytes(root, expected) {
   return null;
 }
 
+async function waitUntil(predicate, label, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const value = predicate();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(\`timed out waiting for \${label}\`);
+}
+
 export default async function queuedImageAttachmentRoundtrip({
   page,
   mock,
@@ -38,6 +48,7 @@ export default async function queuedImageAttachmentRoundtrip({
   logDir,
 }) {
   const rpcCalls = [];
+  const rpcResponses = [];
   let rpcUrl;
   let authorization;
   page.on("request", async (request) => {
@@ -47,6 +58,18 @@ export default async function queuedImageAttachmentRoundtrip({
     try {
       const body = JSON.parse(request.postData() ?? "{}");
       rpcCalls.push({ method: body.method, params: body.params });
+    } catch {}
+  });
+  page.on("response", async (response) => {
+    if (!response.url().endsWith("/rpc")) return;
+    try {
+      const request = response.request();
+      const body = JSON.parse(request.postData() ?? "{}");
+      rpcResponses.push({
+        method: body.method,
+        params: body.params,
+        result: unwrap(await response.json()),
+      });
     } catch {}
   });
   page.on("response", async (response) => {
@@ -84,13 +107,13 @@ export default async function queuedImageAttachmentRoundtrip({
 
   await composer.fill("Hold this turn while I queue an image.");
   await page.getByTestId("send-message-button").click();
-  await page.waitForFunction(
+  await waitUntil(
     () =>
-      performance
-        .getEntriesByType("resource")
-        .some((entry) => entry.name.includes("/chat/completions")),
-    null,
-    { timeout: 30_000 },
+      mock
+        .requests()
+        .some((request) => /(?:^|\\/)chat\\/completions(?:\\?|$)/.test(request.url)),
+    "the first model request",
+    30_000,
   );
 
   // The queued turn will use this fast script; the already-running request has
@@ -129,12 +152,25 @@ export default async function queuedImageAttachmentRoundtrip({
   if (!pending?.requestId || pending.message?.content !== QUEUED_PROMPT) {
     throw new Error("accepted queued image did not remain as a pending follow-up");
   }
-  const queuedAckCall = rpcCalls.find(
-    (call) =>
-      call.method === "openhuman.channel_web_chat" &&
-      call.params?.message === QUEUED_PROMPT,
+  const queuedAckResponse = await waitUntil(
+    () =>
+      rpcResponses.find(
+        (call) =>
+          call.method === "openhuman.channel_web_chat" &&
+          call.params?.message === QUEUED_PROMPT,
+      ),
+    "the queued channel_web_chat acknowledgement",
   );
-  if (!queuedAckCall) throw new Error("queued image did not use channel_web_chat");
+  const ack = queuedAckResponse.result;
+  if (
+    ack?.queued !== true ||
+    ack.request_id !== pending.requestId ||
+    JSON.stringify(ack.queued_attachments) !== JSON.stringify(pending.attachments)
+  ) {
+    throw new Error(
+      \`queued ACK does not match sanitized UI state: \${JSON.stringify(ack)}\`,
+    );
+  }
   if (
     pending.attachments?.length !== 1 ||
     pending.attachments[0]?.kind !== "image" ||
@@ -188,23 +224,6 @@ export default async function queuedImageAttachmentRoundtrip({
   await page.getByText(FIRST_REPLY, { exact: false }).waitFor({ timeout: 60_000 });
   await page.getByText(QUEUED_REPLY, { exact: false }).waitFor({ timeout: 90_000 });
 
-  const queuedRequest = rpcCalls.find(
-    (call) =>
-      call.method === "openhuman.channel_web_chat" &&
-      call.params?.message === QUEUED_PROMPT,
-  );
-  if (!queuedRequest || queuedRequest.params?.request_id !== pending.requestId) {
-    throw new Error("queued follow-up did not enter the runner with its accepted request ID");
-  }
-  if (
-    queuedRequest.params?.persisted_message_id ||
-    JSON.stringify(queuedRequest.params?.attachments).match(
-      /data:|base64|"(?:path|url|localCachePath)"\\s*:/i,
-    )
-  ) {
-    throw new Error("queued runner request carried a premature row ID or untrusted media authority");
-  }
-
   const rows = await page.evaluate(
     async ({ url, token, id }) => {
       const response = await fetch(url, {
@@ -229,6 +248,11 @@ export default async function queuedImageAttachmentRoundtrip({
     throw new Error(`queued image produced ${userRows.length} persisted user rows, expected one`);
   }
   const persisted = userRows[0];
+  if (persisted.id !== \`user:\${pending.requestId}\`) {
+    throw new Error(
+      \`queued row ID \${persisted.id} does not match request-key ownership\`,
+    );
+  }
   if (/\\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(persisted.content)) {
     throw new Error("queued typed image leaked a legacy marker into persisted content");
   }
