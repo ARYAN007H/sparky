@@ -1,13 +1,13 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
 
 #[test]
-fn all_schemas_returns_two() {
-    assert_eq!(all_controller_schemas().len(), 2);
-}
-
-#[test]
-fn all_controllers_returns_two() {
-    assert_eq!(all_registered_controllers().len(), 2);
+fn doctor_schema_catalog_matches_registered_controllers() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "report",
+    );
 }
 
 #[test]
@@ -27,35 +27,22 @@ fn models_schema_has_optional_use_cache() {
 }
 
 #[test]
-fn schemas_and_controllers_match() {
-    let s = all_controller_schemas();
-    let c = all_registered_controllers();
-    for (schema, ctrl) in s.iter().zip(c.iter()) {
-        assert_eq!(schema.function, ctrl.schema.function);
+fn optional_cache_flag_preserves_missing_null_and_boolean_values() {
+    for (case, input, expected) in [
+        ("missing", None, None),
+        ("null", Some(Value::Null), None),
+        ("boolean", Some(Value::Bool(true)), Some(true)),
+    ] {
+        let mut params = Map::new();
+        if let Some(input) = input {
+            params.insert("use_cache".into(), input);
+        }
+        assert_eq!(
+            read_optional::<bool>(&params, "use_cache").unwrap(),
+            expected,
+            "{case}"
+        );
     }
-}
-
-#[test]
-fn read_optional_returns_none_for_missing() {
-    let m = Map::new();
-    let result: Option<bool> = read_optional(&m, "use_cache").unwrap();
-    assert!(result.is_none());
-}
-
-#[test]
-fn read_optional_returns_none_for_null() {
-    let mut m = Map::new();
-    m.insert("use_cache".into(), Value::Null);
-    let result: Option<bool> = read_optional(&m, "use_cache").unwrap();
-    assert!(result.is_none());
-}
-
-#[test]
-fn read_optional_returns_some_for_value() {
-    let mut m = Map::new();
-    m.insert("use_cache".into(), Value::Bool(true));
-    let result: Option<bool> = read_optional(&m, "use_cache").unwrap();
-    assert_eq!(result, Some(true));
 }
 
 #[test]

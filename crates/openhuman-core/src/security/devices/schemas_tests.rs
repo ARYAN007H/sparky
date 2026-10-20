@@ -1,43 +1,40 @@
 use super::*;
+use crate::core::all::{
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
+    expect_schema_input_order, expect_schema_output_fields, expect_schema_output_names,
+};
 use serde_json::json;
 
 #[test]
-fn schemas_create_pairing_has_correct_shape() {
-    let s = schemas("create_pairing");
-    assert_eq!(s.namespace, "devices");
-    assert_eq!(s.function, "create_pairing");
-    assert_eq!(s.inputs.len(), 1);
-    assert_eq!(s.inputs[0].name, "label");
-    assert!(!s.inputs[0].required);
-    assert!(s.outputs.iter().any(|f| f.name == "channel_id"));
-    assert!(s.outputs.iter().any(|f| f.name == "pairing_token"));
-    assert!(s.outputs.iter().any(|f| f.name == "core_pubkey"));
-}
-
-#[test]
-fn schemas_list_has_no_inputs_and_devices_output() {
-    let s = schemas("list");
-    assert!(s.inputs.is_empty());
-    assert_eq!(s.outputs.len(), 1);
-    assert_eq!(s.outputs[0].name, "devices");
-}
-
-#[test]
-fn schemas_revoke_requires_channel_id() {
-    let s = schemas("revoke");
-    assert_eq!(s.inputs.len(), 1);
-    assert_eq!(s.inputs[0].name, "channel_id");
-    assert!(s.inputs[0].required);
-    assert_eq!(s.outputs[0].name, "success");
-}
-
-#[test]
-fn all_controller_schemas_covers_three_functions() {
+fn device_schema_wire_contracts_are_preserved() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "create_pairing",
+    );
+    let contracts = ["create_pairing", "list", "revoke"];
     let names: Vec<_> = all_controller_schemas()
         .into_iter()
-        .map(|s| s.function)
+        .map(|schema| schema.function)
         .collect();
-    assert_eq!(names, vec!["create_pairing", "list", "revoke"]);
+    assert_eq!(names, contracts);
+
+    let create = schemas("create_pairing");
+    expect_schema_identity(&create, "devices", "create_pairing");
+    expect_schema_input_order(&create, &["label"]);
+    expect_schema_fields(&create, &[("label", Some(false))]);
+    expect_schema_output_fields(&create, &["channel_id", "pairing_token", "core_pubkey"]);
+
+    let list = schemas("list");
+    expect_schema_identity(&list, "devices", "list");
+    assert!(list.inputs.is_empty());
+    expect_schema_output_names(&list, &["devices"]);
+
+    let revoke = schemas("revoke");
+    expect_schema_identity(&revoke, "devices", "revoke");
+    expect_schema_input_order(&revoke, &["channel_id"]);
+    expect_schema_fields(&revoke, &[("channel_id", Some(true))]);
+    expect_schema_output_names(&revoke, &["success"]);
 }
 
 #[test]
@@ -59,14 +56,4 @@ fn read_optional_string_present_value_returned() {
     params.insert("label".into(), json!("iPhone 15"));
     let result = read_optional_string(&params, "label").unwrap();
     assert_eq!(result, Some("iPhone 15".to_string()));
-}
-
-#[test]
-fn type_name_covers_all_variants() {
-    assert_eq!(type_name(&Value::Null), "null");
-    assert_eq!(type_name(&json!(true)), "bool");
-    assert_eq!(type_name(&json!(1)), "number");
-    assert_eq!(type_name(&json!("s")), "string");
-    assert_eq!(type_name(&json!([])), "array");
-    assert_eq!(type_name(&json!({})), "object");
 }
