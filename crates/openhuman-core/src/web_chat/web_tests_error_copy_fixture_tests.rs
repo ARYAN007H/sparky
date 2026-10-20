@@ -72,26 +72,7 @@ fn every_failure_class_keeps_its_exact_copy_and_wire_values() {
     for (case, input, error_type, source, retryable, retry_after_ms, provider, fallback, message) in
         EXPECTED
     {
-        let backend_kind = match *case {
-            "be_rate_limited" => Some(BackendErrorKind::RateLimited),
-            "be_credits" => Some(BackendErrorKind::InsufficientCredits),
-            "be_upstream" => Some(BackendErrorKind::UpstreamUnavailable),
-            "be_model_unavailable" => Some(BackendErrorKind::ModelUnavailable),
-            "be_payload" => Some(BackendErrorKind::PayloadTooLarge),
-            "be_context" => Some(BackendErrorKind::ContextLengthExceeded),
-            "be_bad_request" | "be_bad_request_history" => Some(BackendErrorKind::BadRequest),
-            "be_bad_request_malformed" => Some(BackendErrorKind::BadRequest),
-            "be_internal" => Some(BackendErrorKind::Internal),
-            _ => None,
-        };
-        let got = match backend_kind {
-            Some(kind) => classify_with_backend_metadata(
-                input,
-                kind,
-                *case == "be_bad_request_malformed",
-            ),
-            None => classify_inference_error(input),
-        };
+        let got = classify_failure_fixture(case, input);
         assert_eq!(got.error_type, *error_type, "{case}: error_type");
         assert_eq!(got.source, *source, "{case}: source");
         assert_eq!(got.retryable, *retryable, "{case}: retryable");
@@ -469,7 +450,7 @@ fn every_failure_class_carries_its_i18n_key_and_params() {
         EXPECTED.iter().zip(EXPECTED_COPY_KEYS.iter())
     {
         assert_eq!(case, key_case, "fixture rows out of order");
-        let got = classify_inference_error(input);
+        let got = classify_failure_fixture(case, input);
         assert_eq!(got.copy_key, *copy_key, "{case}: copy_key");
         let got_params = got
             .copy_params
