@@ -70,6 +70,7 @@ mod routes;
 mod runtime;
 mod runtime_local_jail;
 mod scheduler_gate;
+mod security;
 mod task_sources;
 mod tokenjuice;
 mod tools;
@@ -84,9 +85,8 @@ pub use autonomy::AutonomyConfig;
 pub use capability_providers::{CapabilityProviderConfig, CapabilityProviderTrustState};
 pub use channel_voice::{ChannelVoiceConfig, ChannelVoiceOverride, VoiceReplyMode};
 pub use channels::{
-    AuditConfig, ChannelsConfig, DingTalkConfig, DiscordConfig, EmailConfig, IMessageConfig,
-    IrcConfig, LarkConfig, LarkReceiveMode, LinqConfig, MattermostConfig, QQConfig,
-    ResourceLimitsConfig, SandboxBackend, SandboxConfig, SecurityConfig, SignalConfig, SlackConfig,
+    ChannelsConfig, DingTalkConfig, DiscordConfig, EmailConfig, IMessageConfig, IrcConfig,
+    LarkConfig, LarkReceiveMode, LinqConfig, MattermostConfig, QQConfig, SignalConfig, SlackConfig,
     StreamMode, TelegramConfig, WhatsAppConfig, YuanbaoConfig,
 };
 pub(crate) use cli_overrides::set_cli_inference_overrides;
@@ -120,6 +120,9 @@ pub use runtime::{
 };
 pub use runtime_local_jail::LocalJailConfig;
 pub use scheduler_gate::{PauseReason, Policy, SchedulerGateConfig, SchedulerGateMode};
+pub use security::{
+    AuditConfig, ResourceLimitsConfig, SandboxBackend, SandboxConfig, SecurityConfig,
+};
 pub use task_sources::TaskSourcesConfig;
 pub use tokenjuice::TokenjuiceConfig;
 pub use tools::{
