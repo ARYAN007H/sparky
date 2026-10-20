@@ -256,4 +256,3 @@ async fn failed_connect_does_not_block_healthy_peer() {
     );
     disconnect(&config, good).await;
 }
-
