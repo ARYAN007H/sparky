@@ -225,6 +225,72 @@ async fn missing_artifact_storage_binding_does_not_fall_back_to_ambient_records(
 }
 
 #[tokio::test]
+async fn legacy_bridge_does_not_overwrite_an_existing_card_file_outside_trusted_roots() {
+    let (workspace, files) = temp_dirs();
+    let root = files.parent().unwrap();
+    let records: Arc<dyn ArtifactStore> =
+        Arc::new(tiny_artifacts::FsArtifactStore::new(root.join("records")));
+    let file_store: Arc<dyn FileStore> =
+        Arc::new(tiny_artifacts::FsFileStore::new(root.join("blobs")));
+    let ctx = crate::core::runtime::DispatchCtx::unbound();
+    let bridge = Arc::new(LegacyUiBridge::new(
+        &workspace,
+        FileRoots::new(&files),
+        Some(file_store.clone()),
+        None,
+        &ctx,
+    ));
+    let artifacts = Artifacts::new(records)
+        .with_file_roots(guarded_roots(vec![files.clone()]))
+        .with_file_store(file_store)
+        .with_observer(bridge);
+
+    let source = files.join("source.txt");
+    std::fs::write(&source, b"first version").unwrap();
+    let saved = artifacts
+        .create(
+            ArtifactKind::File,
+            "Protected export",
+            Content::File(source.display().to_string()),
+            &Author::agent("agent"),
+            None,
+        )
+        .await
+        .unwrap();
+
+    let outside = root.join("poisoned.txt");
+    std::fs::write(&outside, b"leave this file alone").unwrap();
+    let mut card = super::super::store::get_artifact(&workspace, &saved.record.id)
+        .await
+        .unwrap();
+    card.file = Some(outside.display().to_string());
+    super::super::store::save_artifact_meta(&workspace, &card)
+        .await
+        .unwrap();
+
+    std::fs::write(&source, b"replacement version").unwrap();
+    let revised = artifacts
+        .revise(
+            &saved.record.id,
+            Content::File(source.display().to_string()),
+            &Author::agent("agent"),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert!(
+        revised.notice.is_some(),
+        "a poisoned legacy file path should be refused by the bridge"
+    );
+    assert_eq!(
+        std::fs::read(&outside).unwrap(),
+        b"leave this file alone",
+        "the bridge must not write outside its trusted files roots"
+    );
+}
+
+#[tokio::test]
 async fn an_edit_is_appended_as_an_operator_version_and_written_to_the_file() {
     let (workspace, files) = temp_dirs();
     let store = seeded(&workspace, &files).await;
