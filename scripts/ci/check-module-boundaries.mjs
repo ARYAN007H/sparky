@@ -288,14 +288,19 @@ export function run(root, strict = false, execute = execFileSync) {
     ['Cargo.toml', 'openhuman-tui'],
     ['crates/openhuman-app/Cargo.toml', 'openhuman-app'],
   ]) {
-    results.push(auditGraph(hostTree(root, manifest, packageName, true, execute), [packageName], policy));
+    const tree = hostTree(root, manifest, packageName, true, execute);
+    results.push(auditGraph(tree, [packageName], policy));
   }
   // With default features, neither core nor the TUI nor the CLI reaches the
   // optional linked-modules bridge. The all-feature host audits above allow
   // that bridge only as a direct CLI edge, never through a wrapper.
   for (const packageName of ['openhuman-cli', 'openhuman-tui', 'openhuman']) {
     results.push({
-      violations: bridgeReach(hostTree(root, 'Cargo.toml', packageName, false, execute), [packageName], policy),
+      violations: bridgeReach(
+        hostTree(root, 'Cargo.toml', packageName, false, execute),
+        [packageName],
+        policy,
+      ),
       exceptions: [],
     });
   }

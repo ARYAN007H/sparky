@@ -221,7 +221,12 @@ test('Cargo tree parsing preserves package versions, path identity, and dedup ed
     ...strict,
     contractManifests: { 'tinyjuice-bus': `${localBus}/Cargo.toml` },
   };
-  assert.deepEqual(auditGraph(m, ['openhuman'], pinned).violations, []);
+  assert.equal(auditGraph(m, ['openhuman'], strict).violations.length, 2);
+  const pinnedTree = treeGraph([
+    '0openhuman v0.64.18',
+    `1tinyjuice-bus v0.1.0 (${localBus})`,
+  ].join('\n'));
+  assert.deepEqual(auditGraph(pinnedTree, ['openhuman'], pinned).violations, []);
   const unpinned = treeGraph([
     '0openhuman v0.64.18',
     '1tinyjuice-bus v0.1.0',
