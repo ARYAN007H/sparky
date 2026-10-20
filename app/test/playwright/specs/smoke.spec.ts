@@ -10,7 +10,7 @@ test.describe('Smoke', () => {
     await expect
       .poll(async () => page.evaluate(() => window.location.hash))
       .toMatch(/^#\/(home|chat)/);
-    await expect(page.locator('[data-testid="bottom-tab-bar"], nav')).toHaveCount(1);
+    await expect(page.getByRole('navigation', { name: 'Home' })).toHaveCount(1);
 
     const bootstrap = await page.evaluate(() => ({
       rpcUrl: localStorage.getItem('openhuman_core_rpc_url'),
