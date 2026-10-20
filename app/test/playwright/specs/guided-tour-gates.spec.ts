@@ -55,7 +55,7 @@ test.describe('Guided tour gates', () => {
       { hash: /#\/chat$/, target: 'chat-agent-panel' },
       { hash: /#\/connections\?tab=composio$/, target: 'skills-grid' },
       { hash: /#\/connections\?tab=channels$/, target: 'skills-channels' },
-      { hash: /#\/settings$/, target: 'settings-menu' },
+      { hash: /#\/settings\/account$/, target: 'settings-menu' },
       { hash: /#\/chat$/, target: 'tab-chat' },
       { hash: /#\/chat$/, target: 'tab-connections' },
       { hash: /#\/chat$/, target: 'chat-agent-panel' },
