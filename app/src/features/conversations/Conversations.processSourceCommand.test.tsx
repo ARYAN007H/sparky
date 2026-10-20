@@ -374,11 +374,12 @@ describe('the agent-process-source command follows the panel that hosts it', () 
     expect(chatSend).toHaveBeenLastCalledWith(
       expect.objectContaining({
         threadId: THREAD_ID,
-        message: 'text',
+        message: uploaded.content,
         persistedMessageId: 'persisted-user-row',
         attachments: [persistedAttachment],
       })
     );
+    expect(uploaded.content).not.toMatch(/\[(?:ATTACHMENT|IMAGE|FILE):/i);
   });
 
   it('keeps queued raw upload content only in memory until the core append flush', async () => {
