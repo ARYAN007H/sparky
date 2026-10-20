@@ -11,8 +11,8 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::storage::state_kv::StateKv;
 

@@ -10,9 +10,9 @@ use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
-    FailureScope, FailureScopeMiddleware, FailureScopePolicy, FailureStopKind, Middleware,
-    ToolFactsLookup, ToolInvocationIdentity, call_effect, dispatch_target, is_repeat_call_exempt,
-    repeat_guard_marker,
+    call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, FailureScope,
+    FailureScopeMiddleware, FailureScopePolicy, FailureStopKind, Middleware, ToolFactsLookup,
+    ToolInvocationIdentity,
 };
 use tinyagents_harness::no_progress::FailurePolicy;
 use tinyagents_harness::steering::SteeringHandle;
@@ -32,7 +32,7 @@ use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_to
 
 #[cfg(test)]
 use tinyagents_harness::no_progress::{
-    ClassifiedFailureTracker, ClassifiedStep, RecoverableFailureLadder, classified_step,
+    classified_step, ClassifiedFailureTracker, ClassifiedStep, RecoverableFailureLadder,
 };
 
 /// `after_tool`: stop (or nudge) the run when tool calls keep failing with no

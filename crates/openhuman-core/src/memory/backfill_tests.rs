@@ -349,11 +349,12 @@ async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
         assert_eq!(blocked.state.phase, BackfillPhase::Idle);
         assert_eq!((blocked.pending_threads, blocked.pending_turns), (1, 1));
         assert!(!is_running(&workspace));
-        assert!(
-            crate::memory::state_store::load::<BackfillFile>(&workspace, "conversations_backfill")
-                .unwrap()
-                .is_none()
-        );
+        assert!(crate::memory::state_store::load::<BackfillFile>(
+            &workspace,
+            "conversations_backfill"
+        )
+        .unwrap()
+        .is_none());
 
         drop(peer_guard);
         let started = start(
@@ -367,10 +368,11 @@ async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
         let done = wait_done(&config).await;
         assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
         assert_eq!(done.state.items_stored, 2);
-        assert!(
-            crate::memory::state_store::load::<BackfillFile>(&workspace, "conversations_backfill")
-                .unwrap()
-                .is_some()
-        );
+        assert!(crate::memory::state_store::load::<BackfillFile>(
+            &workspace,
+            "conversations_backfill"
+        )
+        .unwrap()
+        .is_some());
     }
 }
