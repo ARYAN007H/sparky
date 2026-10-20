@@ -10,6 +10,7 @@ mod tests;
 
 use crate::inference::registry::classify_backend_error;
 use tinyinference_core::sanitize::sanitize_api_error;
+use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
 use tinyinference_llm::failure::http::{
     classify_and_report_http_failure, ErrorReporter, ProviderHttpFailure, ProviderHttpFailureFacts,
 };
@@ -34,16 +35,6 @@ pub fn is_backend_auth_failure(provider: &str, status: reqwest::StatusCode) -> b
 pub fn is_backend_error_code_owned(provider: &str, body: &str) -> bool {
     classify_backend_error(Some(provider), body)
         .is_some_and(|result| result.backend_owned && !result.reportable)
-}
-
-/// Config-rejection demotion policy: the managed backend's unknown-model body
-/// is user-state on every provider; the remaining rejection phrases stay
-/// third-party scoped so a backend regression still reaches Sentry.
-pub(crate) fn config_rejection_demoted(facts: &ProviderHttpFailureFacts, provider: &str) -> bool {
-    facts.configuration_rejected
-        && (facts.unknown_model
-            || !classify_backend_error(Some(provider), "")
-                .is_some_and(|result| result.provider_owned))
 }
 
 fn log_user_state(
@@ -139,6 +130,41 @@ struct HostErrorReporter<'a> {
     backend_error_code_owned: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HostDemotion {
+    Provider(DemotionKind),
+    BackendOwned,
+    Report,
+}
+
+/// Compose the host's backend `errorCode` guard at its historical position:
+/// after quota demotion, before the remaining provider/account classifications.
+fn select_demotion(
+    facts: &ProviderHttpFailureFacts,
+    provider_is_managed: bool,
+    backend_error_code_owned: bool,
+) -> HostDemotion {
+    let decision = demote_decision(facts, provider_is_managed);
+    if let Some(
+        kind @ (DemotionKind::BudgetExhausted
+        | DemotionKind::NoModelLoaded
+        | DemotionKind::CustomUpstreamBadRequest
+        | DemotionKind::AccessPolicyDenied
+        | DemotionKind::ConfigurationRejected
+        | DemotionKind::ContextWindowExceeded
+        | DemotionKind::QuotaExhausted),
+    ) = decision
+    {
+        HostDemotion::Provider(kind)
+    } else if backend_error_code_owned {
+        HostDemotion::BackendOwned
+    } else if let Some(kind) = decision {
+        HostDemotion::Provider(kind)
+    } else {
+        HostDemotion::Report
+    }
+}
+
 impl ErrorReporter for HostErrorReporter<'_> {
     fn report(&self, failure: ProviderHttpFailure<'_>) {
         let ProviderHttpFailure {
@@ -155,76 +181,80 @@ impl ErrorReporter for HostErrorReporter<'_> {
         let demote = |kind: &str, reason: &str, warn: bool| {
             log_user_state(warn, kind, reason, operation, provider, model, status);
         };
-        let config_rejected = config_rejection_demoted(&facts, provider);
+        let decision = select_demotion(&facts, is_backend, self.backend_error_code_owned);
 
         if matches!(status, 401 | 403) && is_backend {
             publish_backend_session_expired(operation, provider, status_code, self.message);
-        } else if facts.budget_exhausted {
-            demote("budget", "budget-exhausted 400", false);
-        } else if facts.no_model_loaded {
-            demote(
-                "provider_user_state",
-                "local_provider_no_model_loaded",
-                false,
-            );
-        } else if facts.custom_upstream_bad_request {
-            demote(
-                "provider_user_state",
-                "custom_openai_upstream_bad_request",
-                false,
-            );
-        } else if facts.access_policy_denied {
-            demote(
-                "provider_access_policy",
-                "provider access-policy 403",
-                false,
-            );
-        } else if config_rejected {
-            demote(
-                "provider_config_rejection",
-                "provider config-rejection",
-                false,
-            );
-        } else if facts.context_window_exceeded {
-            demote("context_window_exceeded", "context-window exceeded", true);
-        } else if facts.quota_exhausted {
-            demote("quota_exhausted", "provider monthly-quota exhausted", false);
-        } else if self.backend_error_code_owned {
-            demote("backend_error_code", "backend errorCode owned", false);
-        } else if facts.api_key_rejected && !is_backend {
-            log_byo_provider_auth_failure(operation, provider, model, status_code);
-        } else if facts.oauth_session_expired && !is_backend {
-            demote("provider_user_state", "openai_oauth_session_expired", false);
-        } else if facts.insufficient_credits {
-            demote(
-                "insufficient_credits",
-                "provider insufficient-credits 402",
-                false,
-            );
-        } else if facts.ollama_cloud_internal_error {
-            demote(
-                "ollama_cloud_internal_500",
-                "Ollama Cloud hosted-inference 500",
-                false,
-            );
-        } else if facts.moderation_rejected {
-            demote(
-                "external_moderation_rejection",
-                "external content-moderation rejection",
-                false,
-            );
-        } else if should_report_provider_http_status(status) {
-            let status_str = status.to_string();
-            crate::core::observability::report_error(
-                self.message,
-                "llm_provider",
-                "api_error",
-                &[
-                    ("provider", provider),
-                    ("status", status_str.as_str()),
-                    ("failure", "non_2xx"),
-                ],
-            );
+        } else {
+            match decision {
+                HostDemotion::Provider(DemotionKind::BudgetExhausted) => {
+                    demote("budget", "budget-exhausted 400", false)
+                }
+                HostDemotion::Provider(DemotionKind::NoModelLoaded) => demote(
+                    "provider_user_state",
+                    "local_provider_no_model_loaded",
+                    false,
+                ),
+                HostDemotion::Provider(DemotionKind::CustomUpstreamBadRequest) => demote(
+                    "provider_user_state",
+                    "custom_openai_upstream_bad_request",
+                    false,
+                ),
+                HostDemotion::Provider(DemotionKind::AccessPolicyDenied) => demote(
+                    "provider_access_policy",
+                    "provider access-policy 403",
+                    false,
+                ),
+                HostDemotion::Provider(DemotionKind::ConfigurationRejected) => demote(
+                    "provider_config_rejection",
+                    "provider config-rejection",
+                    false,
+                ),
+                HostDemotion::Provider(DemotionKind::ContextWindowExceeded) => {
+                    demote("context_window_exceeded", "context-window exceeded", true)
+                }
+                HostDemotion::Provider(DemotionKind::QuotaExhausted) => {
+                    demote("quota_exhausted", "provider monthly-quota exhausted", false)
+                }
+                HostDemotion::BackendOwned => {
+                    demote("backend_error_code", "backend errorCode owned", false)
+                }
+                HostDemotion::Provider(DemotionKind::ApiKeyRejected) => {
+                    log_byo_provider_auth_failure(operation, provider, model, status_code)
+                }
+                HostDemotion::Provider(DemotionKind::OAuthSessionExpired) => {
+                    demote("provider_user_state", "openai_oauth_session_expired", false)
+                }
+                HostDemotion::Provider(DemotionKind::InsufficientCredits) => demote(
+                    "insufficient_credits",
+                    "provider insufficient-credits 402",
+                    false,
+                ),
+                HostDemotion::Provider(DemotionKind::OllamaCloudInternalError) => demote(
+                    "ollama_cloud_internal_500",
+                    "Ollama Cloud hosted-inference 500",
+                    false,
+                ),
+                HostDemotion::Provider(DemotionKind::ModerationRejected) => demote(
+                    "external_moderation_rejection",
+                    "external content-moderation rejection",
+                    false,
+                ),
+                HostDemotion::Report if should_report_provider_http_status(status) => {
+                    let status_str = status.to_string();
+                    crate::core::observability::report_error(
+                        self.message,
+                        "llm_provider",
+                        "api_error",
+                        &[
+                            ("provider", provider),
+                            ("status", status_str.as_str()),
+                            ("failure", "non_2xx"),
+                        ],
+                    );
+                }
+                HostDemotion::Report => {}
+            }
         }
     }
 }
