@@ -508,7 +508,8 @@ async fn get_and_delete_refuse_a_record_rooted_outside_the_files_folder() {
 async fn sharing_without_cloud_storage_is_refused_with_a_reason() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = ai_share_artifact(&config, "a-1", None, false)
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let err = ai_share_artifact(&config, "a-1", None, false, &ctx)
         .await
         .unwrap_err();
     assert!(err.contains("sign in"), "{err}");

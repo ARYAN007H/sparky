@@ -36,7 +36,8 @@ async fn an_edit_is_appended_as_an_operator_version_and_written_to_the_file() {
     let (workspace, files) = temp_dirs();
     let store = seeded(&workspace, &files).await;
 
-    let saved = save_operator_version(&workspace, FileRoots::new(&files), "a-1", "# v2")
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let saved = save_operator_version(&workspace, FileRoots::new(&files), "a-1", "# v2", &ctx)
         .await
         .unwrap();
     assert_eq!(
@@ -64,7 +65,8 @@ async fn an_unchanged_body_appends_nothing() {
     let (workspace, files) = temp_dirs();
     let store = seeded(&workspace, &files).await;
 
-    let saved = save_operator_version(&workspace, FileRoots::new(&files), "a-1", "# v1")
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let saved = save_operator_version(&workspace, FileRoots::new(&files), "a-1", "# v1", &ctx)
         .await
         .unwrap();
     assert_eq!(
@@ -80,7 +82,8 @@ async fn an_unchanged_body_appends_nothing() {
 #[tokio::test]
 async fn a_missing_artifact_is_an_error() {
     let (workspace, files) = temp_dirs();
-    let err = save_operator_version(&workspace, FileRoots::new(&files), "nope", "x")
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let err = save_operator_version(&workspace, FileRoots::new(&files), "nope", "x", &ctx)
         .await
         .unwrap_err();
     assert!(err.contains("not found"), "{err}");
@@ -92,7 +95,8 @@ async fn an_image_filed_through_the_service_gets_a_card_and_a_copy_in_files() {
     let action = workspace.parent().unwrap().join("projects");
     std::fs::create_dir_all(&action).unwrap();
     std::fs::write(action.join("chart.png"), b"png-bytes").unwrap();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None);
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None, &ctx);
 
     let saved = artifacts
         .create(
@@ -125,7 +129,8 @@ async fn a_file_outside_the_allowed_folders_is_refused() {
     let elsewhere = workspace.parent().unwrap().join("elsewhere");
     std::fs::create_dir_all(&elsewhere).unwrap();
     std::fs::write(elsewhere.join("x.pdf"), b"x").unwrap();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None, None);
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None, None, &ctx);
     let err = artifacts
         .create(
             ArtifactKind::File,
@@ -142,7 +147,8 @@ async fn a_file_outside_the_allowed_folders_is_refused() {
 #[tokio::test]
 async fn deleting_an_artifact_removes_its_card() {
     let (workspace, files) = temp_dirs();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None, None);
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None, None, &ctx);
     let saved = artifacts
         .create(
             ArtifactKind::Markdown,
@@ -213,7 +219,8 @@ async fn a_file_in_an_earlier_files_folder_can_still_be_revised() {
     std::fs::write(&old, b"v1").unwrap();
     // The files folder moved; the earlier one stays trusted.
     let roots = FileRoots::new(&files).with_trusted([earlier.clone()]);
-    let artifacts = artifacts_service(&workspace, roots, None, None);
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let artifacts = artifacts_service(&workspace, roots, None, None, &ctx);
     let id = artifacts
         .create(
             ArtifactKind::File,
@@ -246,7 +253,8 @@ async fn a_protected_file_inside_the_working_folder_is_refused() {
     let ssh = action.join(".ssh");
     std::fs::create_dir_all(&ssh).unwrap();
     std::fs::write(ssh.join("id_ed25519"), b"PRIVATE").unwrap();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None);
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None, &ctx);
 
     let err = artifacts
         .create(
