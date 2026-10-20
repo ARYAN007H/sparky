@@ -70,4 +70,5 @@ impl OpenHumanAgentRunner {
         }
         .complete_with_format_request(completion_request, request, conn)
         .await
-    }}
+    }
+}

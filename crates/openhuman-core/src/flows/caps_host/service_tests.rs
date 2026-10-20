@@ -129,10 +129,8 @@ async fn agent_run_rejects_an_identity_from_another_bound_run() {
 #[tokio::test]
 async fn late_agent_run_after_cancel_ack_returns_cancelled_handle_without_starting_work() {
     let temp = tempfile::TempDir::new().unwrap();
-    let binding = super::super::binding_tests::binding(
-        crate::core::runtime::DispatchCtx::unbound(),
-        &temp,
-    );
+    let binding =
+        super::super::binding_tests::binding(crate::core::runtime::DispatchCtx::unbound(), &temp);
     let service = CapsHostService::new(Arc::new(binding));
     let cancel_member = tinybus::MemberName::new(runs::caps::AGENT_CANCEL).unwrap();
     let run_member = tinybus::MemberName::new(runs::caps::AGENT_RUN).unwrap();

@@ -26,22 +26,18 @@ fn http_request_node_tier_gate_blocks_readonly_allows_higher() {
 
     // Supervised/full do not hard-block — they fall through to the
     // ApprovalGate (which performs the Prompt round-trip).
-    assert!(
-        enforce_node_tier_gate(
-            &policy(AutonomyLevel::Supervised),
-            CommandClass::Network,
-            "http_request"
-        )
-        .is_ok()
-    );
-    assert!(
-        enforce_node_tier_gate(
-            &policy(AutonomyLevel::Full),
-            CommandClass::Network,
-            "http_request"
-        )
-        .is_ok()
-    );
+    assert!(enforce_node_tier_gate(
+        &policy(AutonomyLevel::Supervised),
+        CommandClass::Network,
+        "http_request"
+    )
+    .is_ok());
+    assert!(enforce_node_tier_gate(
+        &policy(AutonomyLevel::Full),
+        CommandClass::Network,
+        "http_request"
+    )
+    .is_ok());
 }
 
 /// The tier gate a `code` (Write-class) node calls: BLOCKED under read-only,
@@ -50,22 +46,18 @@ fn http_request_node_tier_gate_blocks_readonly_allows_higher() {
 fn code_node_tier_gate_blocks_readonly_allows_full() {
     use crate::security::AutonomyLevel;
 
-    assert!(
-        enforce_node_tier_gate(
-            &policy(AutonomyLevel::ReadOnly),
-            CommandClass::Write,
-            "code"
-        )
-        .is_err()
-    );
-    assert!(
-        enforce_node_tier_gate(
-            &policy(AutonomyLevel::Supervised),
-            CommandClass::Write,
-            "code"
-        )
-        .is_ok()
-    );
+    assert!(enforce_node_tier_gate(
+        &policy(AutonomyLevel::ReadOnly),
+        CommandClass::Write,
+        "code"
+    )
+    .is_err());
+    assert!(enforce_node_tier_gate(
+        &policy(AutonomyLevel::Supervised),
+        CommandClass::Write,
+        "code"
+    )
+    .is_ok());
     assert!(
         enforce_node_tier_gate(&policy(AutonomyLevel::Full), CommandClass::Write, "code").is_ok()
     );
@@ -288,20 +280,22 @@ fn prompt_decision_escalates_default_workflow_origin() {
 /// escalation — it's already forced through the parking flow.
 #[test]
 fn prompt_decision_does_not_re_escalate_already_gated_workflow() {
-    assert!(
-        escalated_origin_for_prompt(GateDecision::Prompt, Some(workflow_origin("flow-1", true)))
-            .is_none()
-    );
+    assert!(escalated_origin_for_prompt(
+        GateDecision::Prompt,
+        Some(workflow_origin("flow-1", true))
+    )
+    .is_none());
 }
 
 /// An `Allow` tier decision never escalates, regardless of the workflow's
 /// `require_approval` toggle — Full-tier runs keep running unattended.
 #[test]
 fn allow_decision_never_escalates() {
-    assert!(
-        escalated_origin_for_prompt(GateDecision::Allow, Some(workflow_origin("flow-1", false)))
-            .is_none()
-    );
+    assert!(escalated_origin_for_prompt(
+        GateDecision::Allow,
+        Some(workflow_origin("flow-1", false))
+    )
+    .is_none());
 }
 
 /// No scoped origin (or a non-Workflow origin) never escalates — there is

@@ -1,6 +1,6 @@
 //! Host-side inference message and response projection.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyflows_bus::portability::CompletionMessage;
 

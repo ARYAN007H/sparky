@@ -29,7 +29,7 @@ fn nested_conditional_fan_in() -> Value {
 #[tokio::test]
 async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-    use crate::integrations::composio::catalog::{ToolContract, seed_live_catalog_cache};
+    use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
     use crate::tools::toolpacks::ToolGroups;
 
     let tmp = tempfile::tempdir().expect("temporary workspace");

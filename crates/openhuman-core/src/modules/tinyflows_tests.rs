@@ -334,12 +334,10 @@ async fn serving_caps_host_advertises_v2_without_replacing_other_peer_manifest_e
     assert_eq!(caps_host.speaks, tinybus::Version::new(2, 0, 0));
     assert_eq!(announced.name, prior_name);
     assert_eq!(announced.version, prior_version);
-    assert!(
-        announced
-            .provides
-            .iter()
-            .any(|item| item.interface.as_str() == "ai.tinyhumans.openhuman.TestPreserved")
-    );
+    assert!(announced
+        .provides
+        .iter()
+        .any(|item| item.interface.as_str() == "ai.tinyhumans.openhuman.TestPreserved"));
     assert_eq!(announced.consumes, prior_consumes);
 
     let proxy = connection

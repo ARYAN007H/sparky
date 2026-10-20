@@ -17,11 +17,11 @@ pub(crate) mod tools;
 mod binding_tests;
 
 pub(crate) use agent::OpenHumanAgentRunner;
-pub(crate) use binding::{CapsHostRegistration, serve};
+pub(crate) use binding::{serve, CapsHostRegistration};
 pub(crate) use code::OpenHumanCode;
 pub(crate) use error::{CapsError, EngineError, Result};
-pub(crate) use http::{OpenHumanHttp, resolve_http_credential};
-pub(crate) use llm::{OpenHumanLlm, resolve_host_model};
+pub(crate) use http::{resolve_http_credential, OpenHumanHttp};
+pub(crate) use llm::{resolve_host_model, OpenHumanLlm};
 pub(crate) use memory::OpenHumanMemory;
 pub(crate) use prompt::model_response_to_completion_value;
 pub(crate) use service::CapsHostService;
@@ -30,7 +30,7 @@ pub(crate) use tier::{
     gate_call_for_tier,
 };
 pub(crate) use tools::OpenHumanTools;
-pub(crate) use tools::{NATIVE_TOOL_PREFIX, classify_composio_action_for_tier};
+pub(crate) use tools::{classify_composio_action_for_tier, NATIVE_TOOL_PREFIX};
 
 #[cfg(test)]
 #[path = "ops_tests.rs"]

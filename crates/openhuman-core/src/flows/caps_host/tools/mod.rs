@@ -32,8 +32,8 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::security::SecurityPolicy;
 use crate::security::approval::ApprovalTurnContext;
+use crate::security::SecurityPolicy;
 
 use super::{EngineError, Result};
 

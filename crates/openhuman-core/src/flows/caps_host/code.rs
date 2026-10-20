@@ -8,7 +8,7 @@
 use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::*;
 use crate::config::Config;

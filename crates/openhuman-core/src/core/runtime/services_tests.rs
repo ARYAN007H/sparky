@@ -154,12 +154,10 @@ async fn stopping_service_tasks_aborts_every_tracked_task() {
     tasks.stop();
     assert_eq!(tasks.len(), 0);
     // The sender drops when the aborted task is torn down.
-    assert!(
-        tokio::time::timeout(std::time::Duration::from_secs(5), rx)
-            .await
-            .expect("the aborted task is torn down")
-            .is_err()
-    );
+    assert!(tokio::time::timeout(std::time::Duration::from_secs(5), rx)
+        .await
+        .expect("the aborted task is torn down")
+        .is_err());
 }
 
 #[tokio::test]
@@ -175,12 +173,10 @@ async fn dropping_service_tasks_aborts_them() {
             }),
         );
     }
-    assert!(
-        tokio::time::timeout(std::time::Duration::from_secs(5), rx)
-            .await
-            .expect("the aborted task is torn down")
-            .is_err()
-    );
+    assert!(tokio::time::timeout(std::time::Duration::from_secs(5), rx)
+        .await
+        .expect("the aborted task is torn down")
+        .is_err());
 }
 
 #[test]

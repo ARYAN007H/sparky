@@ -10,19 +10,19 @@
 
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::*;
 use crate::config::Config;
 use crate::flows::agent_route::{
-    AgentRoute, harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref,
+    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
 };
 use crate::modules::tinyflows as module;
 
-#[path = "agent_harness.rs"]
-mod harness;
 #[path = "agent_fallback.rs"]
 mod fallback;
+#[path = "agent_harness.rs"]
+mod harness;
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected
 /// agent kind by one of two paths, chosen by [`route_for_agent_ref`]:
@@ -296,9 +296,7 @@ impl OpenHumanAgentRunner {
     }
 }
 
-impl OpenHumanAgentRunner {
-
-}
+impl OpenHumanAgentRunner {}
 
 #[cfg(test)]
 #[path = "agent_tests.rs"]

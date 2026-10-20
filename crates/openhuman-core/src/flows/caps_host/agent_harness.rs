@@ -214,5 +214,4 @@ impl OpenHumanAgentRunner {
         self.format_agent_result(agent_ref, request, final_text)
             .await
     }
-
 }

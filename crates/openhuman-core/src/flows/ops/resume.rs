@@ -67,7 +67,7 @@ async fn current_workflow_for_resume(
     config: &Config,
     flow_id: &str,
 ) -> Result<ResumeWorkflow, String> {
-    use tinyflows_bus::catalog::{Workflow, members};
+    use tinyflows_bus::catalog::{members, Workflow};
 
     let storage = crate::flows::catalog_storage::register(ctx, config)
         .await?

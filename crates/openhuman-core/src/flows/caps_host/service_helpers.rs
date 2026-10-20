@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use tinyflows_bus::runs;
 
-use super::super::OpenHumanMemory;
 use super::super::binding::CapsHostBinding;
+use super::super::OpenHumanMemory;
 
 pub(super) fn memory(binding: &CapsHostBinding) -> OpenHumanMemory {
     OpenHumanMemory {

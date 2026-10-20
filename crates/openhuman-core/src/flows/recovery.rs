@@ -39,13 +39,9 @@ pub(crate) async fn expire_parked_runs(ctx: &DispatchCtx, config: &Config) -> us
 /// callback. The module applies the boot floor and live-actor/lease checks and
 /// returns only rows it changed; the runs adapter handles event projection and
 /// releases retained callback state for those rows.
-pub(crate) async fn sweep_orphaned_runs_on_boot(
-    ctx: &DispatchCtx,
-    config: &Config,
-) -> usize {
-    if tinyflows_catalog::run_management::boot_sweep_plan(
-        crate::storage::installed_is_shared(),
-    ) == tinyflows_catalog::run_management::BootSweepPlan::Nothing
+pub(crate) async fn sweep_orphaned_runs_on_boot(ctx: &DispatchCtx, config: &Config) -> usize {
+    if tinyflows_catalog::run_management::boot_sweep_plan(crate::storage::installed_is_shared())
+        == tinyflows_catalog::run_management::BootSweepPlan::Nothing
     {
         tracing::info!(target: "flows", "[flows] boot sweep: skipped, the storage backend is shared");
         return 0;
@@ -61,14 +57,17 @@ pub(crate) async fn sweep_orphaned_runs_on_boot(
 }
 
 async fn sweep_one_scope(ctx: &DispatchCtx, config: &Config) -> usize {
-    let storage: Arc<CatalogStorageRegistration> =
-        match crate::flows::catalog_storage::register(ctx, config).await {
-            Ok(storage) => storage,
-            Err(error) => {
-                tracing::warn!(target: "flows", %error, "[flows] boot sweep: CatalogStorage registration failed");
-                return 0;
-            }
-        };
+    let storage: Arc<CatalogStorageRegistration> = match crate::flows::catalog_storage::register(
+        ctx, config,
+    )
+    .await
+    {
+        Ok(storage) => storage,
+        Err(error) => {
+            tracing::warn!(target: "flows", %error, "[flows] boot sweep: CatalogStorage registration failed");
+            return 0;
+        }
+    };
 
     match runs_adapter::boot_sweep(ctx, config, storage).await {
         Ok(response) => response.interrupted.len(),

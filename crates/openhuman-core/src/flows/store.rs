@@ -5,8 +5,8 @@
 //! requests and back. Run lifecycle and checkpoint records are owned by the
 //! Runs adapter, not this definition client.
 
-use anyhow::{Result, anyhow};
-use serde::{Serialize, de::DeserializeOwned};
+use anyhow::{anyhow, Result};
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 use tinyflows_bus::catalog::{

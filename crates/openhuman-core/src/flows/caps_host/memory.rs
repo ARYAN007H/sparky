@@ -33,25 +33,25 @@
 
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 #[cfg(test)]
 use crate::agent::turn_origin;
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::flows::{
-    FLOWS_TAG, cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, forget_matching,
-    remember_keyed,
+    cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, forget_matching, remember_keyed,
+    FLOWS_TAG,
 };
 use crate::memory::types::{FetchParams, RecallParams};
+use crate::security::approval::{redact_args, summarize_action, GateOutcome};
 use crate::security::SecurityPolicy;
-use crate::security::approval::{GateOutcome, redact_args, summarize_action};
 use tinybox_bus::CommandClass;
-use tinymemory_api::Error;
 use tinymemory_api::wrap_untrusted_for_agent;
+use tinymemory_api::Error;
 use tinymemory_api::{Hit, LearningKind, MemoryMeta, MetaFilter, SourceKind};
 
-use super::{EngineError, Result, enforce_current_node_tier_gate, gate_call_for_tier};
+use super::{enforce_current_node_tier_gate, gate_call_for_tier, EngineError, Result};
 
 /// Stable `tracing` grep prefix for every log line this adapter emits. Never
 /// logs memory *content* or PII — only operation names, scopes, resolved
