@@ -126,6 +126,15 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
         .expect("initial durable session points at the paused child");
     assert_eq!(before_session.status, DurableSubagentStatus::AwaitingUser);
+    let original_lifecycle_key = before_session
+        .lifecycle_key
+        .clone()
+        .expect("paused session retains its original TinyAgents task key");
+    assert_eq!(original_lifecycle_key.task_id, task_id);
+    assert_eq!(
+        original_lifecycle_key.thread_id.as_deref(),
+        Some("continue-paused-e2e-thread")
+    );
     let before_job_count = jobs.list().len();
 
     let resumed = SpawnSubagentTool::new()
@@ -209,6 +218,17 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     assert_eq!(
         completed_job.output.as_deref(),
         Some("paused-child-resumed-answer")
+    );
+    let completed_session = sessions
+        .load()
+        .expect("completed session list")
+        .into_iter()
+        .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
+        .expect("completed row still owns the original task");
+    assert_eq!(
+        completed_session.lifecycle_key.as_ref(),
+        Some(&original_lifecycle_key),
+        "resume preserves the original lifecycle identity"
     );
 }
 

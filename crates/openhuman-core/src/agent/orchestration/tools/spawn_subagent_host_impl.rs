@@ -244,6 +244,20 @@ impl SpawnSubagentTool {
                 ));
             };
             let checkpoint_dir = parent.workspace_dir.join(".openhuman/subagent_checkpoints");
+            let original_key = match subagent_sessions::resolve_lifecycle_key(
+                &store,
+                &session.subagent_session_id,
+                &parent_session,
+                parent_thread_id.as_deref(),
+                &checkpoint_dir,
+            ) {
+                Ok(key) => key,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: reusable session has no valid lifecycle key: {error}"
+                    )));
+                }
+            };
             let checkpoint = match crate::agent::subagent_host::load_subagent_checkpoint(
                 &checkpoint_dir,
                 task_id,
@@ -255,12 +269,10 @@ impl SpawnSubagentTool {
                     )));
                 }
             };
-            let Some(original_key) = checkpoint.task_key.clone() else {
-                return Ok(ToolResult::error(
-                    "spawn_subagent: paused checkpoint omitted its original task key",
-                ));
-            };
-            if checkpoint.agent_id != definition.id || original_key.task_id != task_id {
+            if checkpoint.agent_id != definition.id
+                || checkpoint.task_id != task_id
+                || checkpoint.task_key.as_ref() != Some(&original_key)
+            {
                 return Ok(ToolResult::error(
                     "spawn_subagent: paused checkpoint does not match the reusable session",
                 ));
