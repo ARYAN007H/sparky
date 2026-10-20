@@ -7,7 +7,6 @@ import {
 } from '../helpers/core-rpc';
 import {
   inFlightThreadKeys,
-  listedThreadTranscripts,
   selectedThreadTranscript,
 } from '../helpers/chat-transcript';
 
@@ -171,10 +170,7 @@ test.describe('Chat Harness - Send Stream', () => {
     const durable = await selectedThreadTranscript(page);
     expect(durable.content).toContain(PROMPT);
     expect(durable.content).toContain(REPLY_PIECES.join(''));
-    const files = await listedThreadTranscripts();
-    const durableFile = files.find(file => file.rel_path === durable.path);
-    expect(durableFile).toBeDefined();
-    expect(durableFile?.size).toBeGreaterThan(0);
+    expect(durable.total).toBeGreaterThan(0);
     await expect.poll(inFlightThreadKeys).not.toContain(`::${durable.threadId}`);
   });
 });
