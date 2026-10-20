@@ -9,7 +9,7 @@ fn envelope_carries_resume_handles_and_question() {
         "Which MCP server would you like to install?",
         true,
     );
-    // The orchestrator needs task_id + agent_id to call continue_subagent.
+    // The task id and agent id identify the paused child in the transcript.
     assert!(env.contains("task_id: sub-abc123"), "envelope: {env}");
     assert!(env.contains("agent_id: crypto_agent"), "envelope: {env}");
     // The question must be surfaced verbatim.
@@ -18,7 +18,7 @@ fn envelope_carries_resume_handles_and_question() {
         "envelope: {env}"
     );
     // It must steer the model to resume, not re-spawn (#4291 loop).
-    assert!(env.contains("continue_subagent"), "envelope: {env}");
+    assert!(env.contains("spawn_subagent with the original task_key"), "envelope: {env}");
     assert!(
         env.to_lowercase().contains("do not re-spawn"),
         "envelope must forbid re-spawn: {env}"
@@ -71,7 +71,7 @@ fn malicious_question_cannot_break_envelope_structure() {
         "question must be JSON-encoded (quoted): {env}"
     );
     // Resume instruction still present and intact after the real terminator.
-    assert!(env.contains("continue_subagent"), "envelope: {env}");
+    assert!(env.contains("spawn_subagent with the original task_key"), "envelope: {env}");
 }
 
 // ── An unpersisted pause must say so (#5928) ────────────────────────────────
@@ -98,10 +98,10 @@ fn an_unpersisted_pause_warns_that_resuming_may_fail() {
 
     // The caveat is advice, not a replacement: the durable-session store can
     // still resume some of these, so the resume handles and the instruction to
-    // use `continue_subagent` must survive both ways.
+    // task-key instruction must survive both ways.
     for env in [&saved, &lost] {
         assert!(env.contains("task_id: t-1"), "envelope: {env}");
-        assert!(env.contains("continue_subagent"), "envelope: {env}");
+        assert!(env.contains("spawn_subagent with the original task_key"), "envelope: {env}");
         assert_eq!(
             env.lines()
                 .filter(|l| l.trim() == "[/SUBAGENT_AWAITING_USER]")
