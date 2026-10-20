@@ -18,10 +18,10 @@ pub(super) struct StagedAttachment {
 pub(super) struct StagedAttachmentClaim {
     pub(super) tenant: crate::core::runtime::Tenant,
     pub(super) thread_id: String,
-    message_id: String,
-    part: ContentPart,
+    pub(super) message_id: String,
+    pub(super) part: ContentPart,
     #[serde(default)]
-    canceled: bool,
+    pub(super) canceled: bool,
 }
 
 pub(super) const STAGED_DOMAIN: &str = "threads::attachments";
