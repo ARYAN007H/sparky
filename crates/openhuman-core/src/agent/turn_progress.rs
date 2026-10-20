@@ -57,6 +57,138 @@ pub(crate) fn turn_event(event: AgentProgress) -> Option<ChannelOutputEvent> {
     }
 }
 
+/// Map sub-agent progress into the canonical output vocabulary.
+///
+/// The caller supplies correlation captured by the owner progress ledger;
+/// this mapper keeps no per-turn state and does not decide which surfaces
+/// publish child progress.
+pub(crate) fn subagent_event(
+    event: AgentProgress,
+    round: u32,
+    parent_call_id: Option<String>,
+) -> Option<ChannelOutputEvent> {
+    match event {
+        AgentProgress::SubagentSpawned {
+            agent_id,
+            task_id,
+            mode,
+            dedicated_thread,
+            prompt_chars,
+            worker_thread_id,
+            display_name,
+            ..
+        } => Some(sub_spawned(
+            &agent_id,
+            &task_id,
+            round,
+            mode,
+            dedicated_thread,
+            prompt_chars,
+            worker_thread_id,
+            display_name,
+            parent_call_id,
+        )),
+        AgentProgress::SubagentCompleted {
+            agent_id,
+            task_id,
+            elapsed_ms,
+            iterations,
+            output_chars,
+            output,
+            usage,
+            worktree_path,
+            changed_files,
+            dirty_status,
+            ..
+        } => Some(sub_completed(
+            &agent_id,
+            &task_id,
+            elapsed_ms,
+            iterations,
+            output_chars,
+            output,
+            usage.as_ref(),
+            worktree_path,
+            changed_files,
+            dirty_status,
+            parent_call_id,
+        )),
+        AgentProgress::SubagentFailed {
+            agent_id,
+            task_id,
+            error,
+        } => Some(sub_failed(
+            &agent_id,
+            &task_id,
+            round,
+            error,
+            parent_call_id,
+        )),
+        AgentProgress::SubagentAwaitingUser {
+            agent_id,
+            task_id,
+            question,
+            worker_thread_id,
+            ..
+        } => Some(sub_awaiting_user(
+            &agent_id,
+            &task_id,
+            round,
+            question,
+            worker_thread_id,
+            parent_call_id,
+        )),
+        AgentProgress::SubagentIterationStarted {
+            agent_id,
+            task_id,
+            iteration,
+            max_iterations,
+            extended_policy,
+        } => Some(sub_iteration(
+            &agent_id,
+            &task_id,
+            iteration,
+            max_iterations,
+            extended_policy,
+        )),
+        AgentProgress::SubagentToolCallStarted {
+            agent_id,
+            task_id,
+            call_id,
+            tool_name,
+            arguments,
+            iteration,
+            display_label,
+            display_detail,
+        } => Some(sub_tool_started(
+            &agent_id,
+            &task_id,
+            call_id,
+            tool_name,
+            arguments,
+            iteration,
+            display_label,
+            display_detail,
+        )),
+        completed @ AgentProgress::SubagentToolCallCompleted { .. } => {
+            sub_tool_completed(completed)
+        }
+        AgentProgress::SubagentTextDelta {
+            agent_id,
+            task_id,
+            delta,
+            iteration,
+        } => Some(sub_delta(&agent_id, &task_id, false, delta, iteration)),
+        AgentProgress::SubagentThinkingDelta {
+            agent_id,
+            task_id,
+            delta,
+            iteration,
+        } => Some(sub_delta(&agent_id, &task_id, true, delta, iteration)),
+        _ => None,
+    }
+}
+
 pub(crate) fn text_delta(text: String, iteration: u32) -> ChannelOutputEvent {
     ChannelOutputEvent::TextDelta {
         text,

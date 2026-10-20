@@ -38,7 +38,7 @@ fn lifecycle_events_name_the_stage_and_the_round() {
 }
 
 #[test]
-fn native_progress_mapping_projects_subagent_spawn_events() {
+fn native_progress_mapping_leaves_subagent_lifecycle_to_its_surface() {
     let event = turn_event(AgentProgress::SubagentSpawned {
         agent_id: "researcher".into(),
         task_id: "task-native".into(),
@@ -49,12 +49,8 @@ fn native_progress_mapping_projects_subagent_spawn_events() {
         worker_thread_id: None,
         display_name: Some("Researcher".into()),
         parent_call_id: Some("parent-call".into()),
-    })
-    .expect("native subagent lifecycle is projected");
-    let out = expect_subagent(event);
-    assert_eq!(out.state, "spawned");
-    assert_eq!(out.agent_id, "researcher");
-    assert_eq!(out.parent_call_id.as_deref(), Some("parent-call"));
+    });
+    assert!(event.is_none(), "native delivery keeps its existing filter");
 }
 
 #[test]
