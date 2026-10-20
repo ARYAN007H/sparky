@@ -444,21 +444,22 @@ mod provider_config_rejection_suppression {
         // mean we sent it a bad request — a real regression that
         // must still reach Sentry. (Mirror of the 401/403 backend
         // rule.)
+        super::install_fixture_backend_classifier();
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                "OpenHuman",
+                FIXTURE_BACKEND,
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TIER_LEAK_BODY
             ),
-            "OpenHuman"
+            FIXTURE_BACKEND
         ));
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                "OpenHuman",
+                FIXTURE_BACKEND,
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TEMP_BODY
             ),
-            "OpenHuman"
+            FIXTURE_BACKEND
         ));
     }
 
@@ -563,14 +564,15 @@ mod provider_config_rejection_suppression {
         // and must still reach Sentry. The phrase does not appear in any
         // expected backend body, so this is purely defensive.
         let body = r#"{"error":"this model requires a subscription, upgrade for access: https://ollama.com/upgrade (ref: test)"}"#;
+        super::install_fixture_backend_classifier();
         assert!(
             !config_rejection_demoted(
                 &tinyinference_llm::failure::http::classify_http_failure(
-                    "OpenHuman",
+                    FIXTURE_BACKEND,
                     reqwest::StatusCode::FORBIDDEN.as_u16(),
                     body
                 ),
-                "OpenHuman"
+                FIXTURE_BACKEND
             ),
             "backend 403 subscription phrase must NOT be suppressed (polarity guard)"
         );

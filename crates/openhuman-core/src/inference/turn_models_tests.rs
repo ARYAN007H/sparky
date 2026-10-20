@@ -15,6 +15,42 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
     use crate::agent::host_overrides::HostOverrides;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     let config = crate::config::Config::default();
+    let extensions = crate::core::slots::Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        crate::inference::registry::ChatModelEntry {
+            build: Arc::new(|_| {
+                Ok((
+                    Arc::new(NamedModel("managed fixture")),
+                    "fixture/managed-default".into(),
+                ))
+            }),
+            probe: None,
+            models: Some(crate::inference::registry::ProviderModelHooks {
+                default_model: Arc::new(|| Some("fixture/managed-default".into())),
+                role_for_model: Arc::new(|model| {
+                    model
+                        .strip_prefix("hint:")
+                        .filter(|role| matches!(*role, "chat" | "coding" | "summarization"))
+                        .map(str::to_string)
+                }),
+                is_alias: Arc::new(|model| model.starts_with("hint:")),
+                is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+                supports_vision: Arc::new(|_| false),
+                resolve_model: Arc::new(|_, config, model| {
+                    model
+                        .filter(|model| !model.starts_with("hint:"))
+                        .map(str::to_string)
+                        .or_else(|| config.default_model.clone())
+                        .or_else(|| Some("fixture/managed-default".into()))
+                }),
+                context_window: Arc::new(|_| None),
+                default_pricing: Arc::new(|| None),
+                without_reasoning: Arc::new(|request| request),
+            }),
+        },
+    );
     let mut overrides = HostOverrides::default();
     overrides
         .role_models
@@ -23,7 +59,7 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
         "summarization".into(),
         Arc::new(NamedModel("pinned summary")),
     );
-    let root = CoreContext::for_test(DomainSet::full(), None);
+    let root = CoreContext::for_test_with_extensions(DomainSet::full(), None, extensions);
     let context = root.derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
             .host_overrides(Arc::new(overrides)),
