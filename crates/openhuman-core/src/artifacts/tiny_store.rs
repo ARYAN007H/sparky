@@ -102,11 +102,11 @@ struct LegacyFileImportStore {
 
 impl LegacyFileImportStore {
     async fn import_record(&self, mut record: ArtifactRecord) -> anyhow::Result<ArtifactRecord> {
+        if !record.kind.holds_file() {
+            return Ok(record);
+        }
         let mut changed = false;
         for version in &mut record.versions {
-            if !record.kind.holds_file() {
-                continue;
-            }
             let legacy = version.file.clone().unwrap_or_else(|| FileRef {
                 key: version.body.clone(),
                 size_bytes: 0,
@@ -414,7 +414,6 @@ pub fn artifacts_service(
     artifacts
 }
 
-/// Where each file version keeps its own copy:
 /// Legacy workspace folder that earlier builds used for per-version file
 /// copies. New file bytes live in the acting tenant's scoped blob store.
 pub fn version_files_dir(workspace_dir: &Path) -> PathBuf {
