@@ -52,7 +52,7 @@ async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
         action_root: None,
         task_key: "failed-steer-canary".into(),
     };
-    let existing = crate::core::runtime::CoreContext::sync_scope(live.data.core().unwrap().clone(), || {
+    let existing = crate::core::runtime::CoreContext::sync_scope(core.clone(), || {
         crate::agent::orchestration::subagent_sessions::upsert_running(
             &store,
             SubagentSessionUpsert {
