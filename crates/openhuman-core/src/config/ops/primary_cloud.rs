@@ -155,3 +155,7 @@ pub(crate) fn normalize_endpoint_for_compare(url: &str) -> String {
 pub(crate) fn looks_like_openhuman_backend(config: &Config, url: &str) -> bool {
     config.resolved_endpoints.is_managed_host(url)
 }
+
+#[cfg(test)]
+#[path = "primary_cloud_tests.rs"]
+mod tests;

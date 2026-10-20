@@ -13,6 +13,23 @@ fn reserved_slugs() {
     }
 }
 
+#[test]
+fn auth_style_parse_accepts_rpc_spellings_and_preserves_unknown_error() {
+    for (value, expected) in [
+        ("BEARER", AuthStyle::Bearer),
+        ("anthropic", AuthStyle::Anthropic),
+        ("openhuman_jwt", AuthStyle::OpenhumanJwt),
+        ("OpenHumanJwt", AuthStyle::OpenhumanJwt),
+        ("none", AuthStyle::None),
+    ] {
+        assert_eq!(AuthStyle::parse(value).unwrap(), expected);
+    }
+    assert_eq!(
+        AuthStyle::parse("Strange").unwrap_err(),
+        "unknown auth_style 'strange'; valid: bearer, anthropic, openhuman_jwt, none"
+    );
+}
+
 // Regression: `ollama` was previously reserved, which made the AI settings
 // panel unable to persist an `ollama` cloud_providers entry — so the
 // model-list dropdown failed with "no cloud provider with id or slug
