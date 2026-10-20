@@ -262,7 +262,7 @@ pub async fn update_settings(
         let api_key = resolve_api_key(&config, "custom");
         let probe = tokio::time::timeout(
             std::time::Duration::from_secs(10),
-            probe_custom_embeddings(endpoint, &api_key, &new_model, new_dims),
+            probe_custom_embeddings(&endpoint, &api_key, &new_model, new_dims),
         )
         .await;
         {
