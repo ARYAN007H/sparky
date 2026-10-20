@@ -471,7 +471,9 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         .map(std::path::PathBuf::from)
         .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
     assert!(
-        module_source_dir.join("tinychannels/modules.toml").is_file(),
+        module_source_dir
+            .join("tinychannels/modules.toml")
+            .is_file(),
         "compiled TinyChannels source descriptor is missing from {}",
         module_source_dir.display()
     );
