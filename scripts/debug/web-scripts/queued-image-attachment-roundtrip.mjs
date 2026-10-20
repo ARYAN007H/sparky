@@ -38,7 +38,6 @@ export default async function queuedImageAttachmentRoundtrip({
   logDir,
 }) {
   const rpcCalls = [];
-  const rpcResponses = [];
   let rpcUrl;
   let authorization;
   page.on("request", async (request) => {
@@ -55,12 +54,6 @@ export default async function queuedImageAttachmentRoundtrip({
     try {
       const request = response.request();
       const body = JSON.parse(request.postData() ?? "{}");
-      if (body.method === "openhuman.channel_web_chat") {
-        rpcResponses.push({
-          params: body.params,
-          response: unwrap(await response.json()),
-        });
-      }
     } catch {}
   });
 
@@ -136,6 +129,12 @@ export default async function queuedImageAttachmentRoundtrip({
   if (!pending?.requestId || pending.message?.content !== QUEUED_PROMPT) {
     throw new Error("accepted queued image did not remain as a pending follow-up");
   }
+  const queuedAckCall = rpcCalls.find(
+    (call) =>
+      call.method === "openhuman.channel_web_chat" &&
+      call.params?.message === QUEUED_PROMPT,
+  );
+  if (!queuedAckCall) throw new Error("queued image did not use channel_web_chat");
   if (
     pending.attachments?.length !== 1 ||
     pending.attachments[0]?.kind !== "image" ||
