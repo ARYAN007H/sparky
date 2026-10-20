@@ -209,6 +209,7 @@ test('Cargo tree parsing preserves package versions, path identity, and dedup ed
     '1wrapper v1.0.0',
     '2shared v1.0.0',
     '1wrapper v1.0.0 (*)',
+    '1wrapper v1.0.0',
     '2tinyjuice v1.0.0',
     '2tinyjuice v2.0.0',
   ].join('\n'));
@@ -216,7 +217,7 @@ test('Cargo tree parsing preserves package versions, path identity, and dedup ed
   assert.equal(bus.source, null);
   assert.equal(bus.manifest_path, `${localBus}/Cargo.toml`);
   assert.equal(m.packages.filter(pkg => pkg.name === 'tinyjuice').length, 2);
-  assert.equal(m.resolve.nodes.find(node => node.id.startsWith('tree:2:wrapper v1.0.0')).deps.length, 3);
+  assert.equal(m.resolve.nodes.find(node => node.id.startsWith('tree:2:wrapper v1.0.0')).deps.length, 4);
   const pinned = {
     ...strict,
     contractManifests: { 'tinyjuice-bus': `${localBus}/Cargo.toml` },
