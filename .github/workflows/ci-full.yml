@@ -246,16 +246,16 @@ jobs:
           if-no-files-found: error
 
   playwright-e2e:
-    name: E2E (Playwright / web lane)
+    name: E2E (Playwright / lane ${{ matrix.lane }})
     needs: [build-playwright-e2e-artifact]
     runs-on: ubuntu-22.04
     container:
       image: ghcr.io/tinyhumansai/openhuman_ci:latest@sha256:c3c20d625bcc9f75e50c3c2c2b75c88d3e60a3f4352b0f19f5327b490438722d
     timeout-minutes: 90
-    # TODO(ci-flaky, #3615): several specs consistently hit toBeVisible
-    # timeouts under CI resource contention. Run the lane but don't block
-    # release merges until infra stabilises.
-    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [1, 2, 3, 4]
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -326,44 +326,7 @@ jobs:
         env:
           OPENHUMAN_WORKSPACE: ${{ runner.temp }}/openhuman-playwright-workspace
           OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: "1"
-        run: |
-          mkdir -p "$OPENHUMAN_WORKSPACE"
-          workspace_root="$OPENHUMAN_WORKSPACE"
-          export OPENHUMAN_WORKSPACE="$workspace_root/connections-aliases"
-          mkdir -p "$OPENHUMAN_WORKSPACE"
-          bash scripts/ci-cancel-aware.sh bash app/scripts/e2e-web-session.sh \
-            test/playwright/specs/connections-tab-aliases.spec.ts
-
-          export OPENHUMAN_WORKSPACE="$workspace_root/connections-deeplinks"
-          mkdir -p "$OPENHUMAN_WORKSPACE"
-          bash scripts/ci-cancel-aware.sh bash app/scripts/e2e-web-session.sh \
-            test/playwright/specs/connections-tab-deeplinks.spec.ts
-
-          skills_index=0
-          while IFS= read -r skills_test; do
-            export OPENHUMAN_WORKSPACE="$workspace_root/skills-$skills_index"
-            mkdir -p "$OPENHUMAN_WORKSPACE"
-            bash scripts/ci-cancel-aware.sh bash app/scripts/e2e-web-session.sh \
-              test/playwright/specs/skills-search-install.spec.ts -g "$skills_test"
-            skills_index=$((skills_index + 1))
-          done <<'EOF'
-          a burst of typing issues ONE catalog search
-          a pause between words issues a second search
-          a query with no matches leaves no catalog rows
-          the typed text is preserved in the box while results load
-          offers Install, and the button is enabled before it is pressed
-          disables the button and shows Installing while the RPC is in flight
-          a failed install re-enables the button rather than stranding it
-          EOF
-
-          for shard_index in $(seq 1 64); do
-            shard="$shard_index/64"
-            export OPENHUMAN_WORKSPACE="$workspace_root/shard-$shard_index"
-            mkdir -p "$OPENHUMAN_WORKSPACE"
-            bash scripts/ci-cancel-aware.sh bash app/scripts/e2e-web-session.sh \
-              --shard="$shard" \
-              --grep-invert='Connections (aliases|deep links)|Skills explorer|Chat Harness - Subagent'
-          done
+        run: bash app/scripts/e2e-web-shards.sh --lane=${{ matrix.lane }} --lanes=4
 
       - name: Pack Playwright E2E failure artifacts
         if: failure()
@@ -404,14 +367,7 @@ jobs:
       - unit-tests
       - rust-e2e
       - build-playwright-e2e-artifact
-      # `playwright-e2e` is intentionally EXCLUDED from the gate. It carries
-      # `continue-on-error: true` (flaky specs, TODO #3615), which makes the
-      # job report `success` to `needs` even when its steps fail — so listing
-      # it here would be a can-never-fail check that only reads as coverage.
-      # Rather than leave it decorative, we drop it from the gate until the
-      # specs are stabilised and the flag removed (#3615); the lane still runs
-      # for signal, and `build-playwright-e2e-artifact` (which CAN fail) stays
-      # gated so a broken web build is still caught.
+      - playwright-e2e
       - e2e-desktop
     if: always()
     runs-on: ubuntu-latest
@@ -420,13 +376,11 @@ jobs:
       - name: Require all CI Full jobs to pass
         run: |
           set -euo pipefail
-          # NOTE: "Playwright E2E" is deliberately absent — see the needs:
-          # comment above (#3615). Re-add it here once continue-on-error is
-          # removed from the playwright-e2e job.
           declare -A results=(
             ["Full Unit Suites"]="${{ needs['unit-tests'].result }}"
             ["Rust E2E"]="${{ needs['rust-e2e'].result }}"
             ["Build Playwright E2E Artifact"]="${{ needs['build-playwright-e2e-artifact'].result }}"
+            ["Playwright E2E"]="${{ needs['playwright-e2e'].result }}"
             ["Desktop E2E"]="${{ needs['e2e-desktop'].result }}"
           )
 
