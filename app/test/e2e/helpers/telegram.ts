@@ -1,14 +1,11 @@
 /**
  * Telegram channel E2E helpers.
  *
- * Wraps `callOpenhumanRpc` (core RPC) and the Telegram mock admin endpoints so
- * specs can drive the full Telegram channel lifecycle without knowing the raw
- * RPC method names or admin path strings.
+ * Wraps `callOpenhumanRpc` so UI smoke specs can exercise Telegram channel
+ * configuration without knowing the raw RPC method names.
  *
  * Design principles:
  *  - All helpers are pure async functions — no hidden state.
- *  - Admin HTTP helpers call mock server endpoints that are already wired by
- *    WS-A (see `app/test/e2e/mock-server.ts` and `scripts/mock-api/routes/telegram.mjs`).
  *  - RPC helpers forward to `callOpenhumanRpc` using the exact field names from
  *    `crates/openhuman-core/src/channels/controllers/schemas.rs` (camelCase for the wire
  *    format; the Rust serde layer translates).
@@ -18,11 +15,6 @@
  *   channels_disconnect -> { channel, authMode }
  *   channels_status   -> { channel? }   -> entries: ChannelStatusEntry[]
  */
-import {
-  getTelegramSentMessages as adminGetSentMessages,
-  injectTelegramUpdate as adminInjectUpdate,
-  resetTelegramMock as adminReset,
-} from '../mock-server';
 import { callOpenhumanRpc } from './core-rpc';
 
 const LOG_PREFIX = '[TelegramChannel]';
@@ -60,53 +52,6 @@ interface TelegramStatusEntry {
   authMode: string;
   connected: boolean;
   hasCredentials: boolean;
-}
-
-interface TelegramUpdate {
-  update_id: number;
-  message: {
-    message_id: number;
-    from: { id: number; is_bot: boolean; first_name: string; username?: string };
-    chat: {
-      id: number;
-      type: 'private' | 'group' | 'supergroup' | 'channel';
-      title?: string;
-      username?: string;
-      first_name?: string;
-    };
-    date: number;
-    text: string;
-  };
-}
-
-interface SentMessage {
-  method: string;
-  chat_id: string | number;
-  text?: string;
-  [key: string]: unknown;
-}
-
-function telegramSentBody(entry: SentMessage): Record<string, unknown> {
-  return typeof entry.body === 'object' && entry.body !== null
-    ? (entry.body as Record<string, unknown>)
-    : {};
-}
-
-function normalizeTelegramSentMessage(entry: SentMessage): SentMessage {
-  const body = telegramSentBody(entry);
-  const bodyChatId = body.chat_id;
-  const bodyText = body.text;
-  const message = entry.message;
-  return {
-    ...entry,
-    chat_id:
-      entry.chat_id ??
-      (typeof bodyChatId === 'string' || typeof bodyChatId === 'number' ? bodyChatId : ''),
-    text:
-      entry.text ??
-      (typeof message === 'string' ? message : undefined) ??
-      (typeof bodyText === 'string' ? bodyText : undefined),
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -242,170 +187,4 @@ export async function getTelegramChannelStatus(): Promise<TelegramStatusEntry | 
 
   console.log(`${LOG_PREFIX} getTelegramChannelStatus: ${JSON.stringify(match ?? null)}`);
   return match ?? null;
-}
-
-// ---------------------------------------------------------------------------
-// Mock admin helpers (relay to WS-A admin endpoints)
-// ---------------------------------------------------------------------------
-
-/**
- * Build a realistic Telegram Update JSON for a private or group message.
- *
- * @param opts.updateId    — Telegram update_id (must increase monotonically).
- * @param opts.chatId      — Chat numeric ID.
- * @param opts.userId      — Sender numeric user ID.
- * @param opts.username    — Sender Telegram username (without `@`).
- * @param opts.text        — Message text.
- * @param opts.isGroup     — When true, emits a group chat type.
- * @param opts.botUsername — When provided AND isGroup, includes the mention
- *                           in the text so mention-only filtering fires.
- */
-export function buildTelegramUpdate(opts: {
-  updateId: number;
-  chatId: number;
-  userId: number;
-  username: string;
-  text: string;
-  isGroup?: boolean;
-  botUsername?: string;
-}): TelegramUpdate {
-  const chatType = opts.isGroup ? 'group' : 'private';
-
-  return {
-    update_id: opts.updateId,
-    message: {
-      message_id: opts.updateId * 10, // stable across retries
-      from: { id: opts.userId, is_bot: false, first_name: opts.username, username: opts.username },
-      chat: {
-        id: opts.chatId,
-        type: chatType,
-        ...(opts.isGroup ? { title: `e2e-group-${opts.chatId}` } : { first_name: opts.username }),
-      },
-      date: Math.floor(Date.now() / 1000),
-      text: opts.text,
-    },
-  };
-}
-
-/**
- * Inject a Telegram Update into the mock server's pending queue.
- * The Telegram provider's `getUpdates` poll will drain this on the next call.
- */
-export async function injectTelegramUpdate(update: TelegramUpdate): Promise<void> {
-  console.log(
-    `${LOG_PREFIX} injectTelegramUpdate: update_id=${update.update_id} ` +
-      `chat_id=${update.message.chat.id} text="${update.message.text.slice(0, 60)}"`
-  );
-  await adminInjectUpdate(update);
-}
-
-/**
- * Poll the mock's sent-messages log until a `sendMessage` entry appears that
- * matches the given `chatId` and optional `contains` predicate.
- *
- * Returns the matching entry, or throws after `timeoutMs`.
- */
-export async function waitForTelegramReply(opts: {
-  chatId: number;
-  contains?: string;
-  timeoutMs?: number;
-}): Promise<SentMessage> {
-  const { chatId, contains, timeoutMs = 20_000 } = opts;
-
-  console.log(
-    `${LOG_PREFIX} waitForTelegramReply: chatId=${chatId} ` +
-      `contains="${contains ?? '*'}" timeout=${timeoutMs}ms`
-  );
-
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    const sent = (await adminGetSentMessages()) as SentMessage[];
-    const match = sent.find(entry => {
-      // method might be 'sendMessage', 'sendText', etc.; filter by chat_id first.
-      const matchesChat =
-        String(entry.chat_id) === String(chatId) ||
-        // Some mock implementations nest the chat_id inside a request body JSON.
-        String((entry as Record<string, unknown>).body_chat_id ?? '') === String(chatId);
-      const body = telegramSentBody(entry);
-      const matchesBodyChat = String(body.chat_id ?? '') === String(chatId);
-
-      if (!matchesChat && !matchesBodyChat) return false;
-      const text = String(entry.text ?? entry.message ?? body.text ?? '');
-      if (!text) return false;
-      if (!contains) return true;
-      return text.includes(contains);
-    });
-
-    if (match) {
-      const normalized = normalizeTelegramSentMessage(match);
-      console.log(
-        `${LOG_PREFIX} waitForTelegramReply: found match — ${JSON.stringify(normalized)}`
-      );
-      return normalized;
-    }
-
-    await browser.pause(300);
-  }
-
-  const allSent = (await adminGetSentMessages()) as SentMessage[];
-  throw new Error(
-    `${LOG_PREFIX} waitForTelegramReply: TIMEOUT — no reply to chatId=${chatId}` +
-      (contains ? ` containing "${contains}"` : '') +
-      ` after ${timeoutMs}ms. Sent log (${allSent.length} entries): ` +
-      JSON.stringify(allSent.slice(-5))
-  );
-}
-
-/**
- * Poll the mock's sent-messages log and assert that NO reply to `chatId`
- * appears within `timeoutMs`. Returns `true` if the window passes cleanly,
- * `false` if a matching message is observed.
- */
-export async function assertNoTelegramReply(opts: {
-  chatId: number;
-  contains?: string;
-  timeoutMs?: number;
-}): Promise<boolean> {
-  const { chatId, contains, timeoutMs = 5_000 } = opts;
-
-  console.log(
-    `${LOG_PREFIX} assertNoTelegramReply: chatId=${chatId} ` +
-      `contains="${contains ?? '*'}" window=${timeoutMs}ms`
-  );
-
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    const sent = (await adminGetSentMessages()) as SentMessage[];
-    const match = sent.find(entry => {
-      const matchesChat = String(entry.chat_id) === String(chatId);
-      if (!matchesChat) return false;
-      if (!contains) return true;
-      const text = String(entry.text ?? entry.message ?? '');
-      return text.includes(contains);
-    });
-
-    if (match) {
-      console.warn(
-        `${LOG_PREFIX} assertNoTelegramReply: UNEXPECTED reply to chatId=${chatId} — ` +
-          JSON.stringify(match)
-      );
-      return false;
-    }
-
-    await browser.pause(300);
-  }
-
-  console.log(`${LOG_PREFIX} assertNoTelegramReply: clean — no reply in ${timeoutMs}ms window`);
-  return true;
-}
-
-/**
- * Reset the Telegram mock state (pending update queue + sent log + counter).
- * Delegates to the WS-A admin endpoint via `mock-server.ts`.
- */
-export async function resetTelegramMock(): Promise<void> {
-  await adminReset();
-  console.log(`${LOG_PREFIX} resetTelegramMock: done`);
 }
