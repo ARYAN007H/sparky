@@ -275,6 +275,22 @@ impl WebHost {
             },
         );
 
+        let message_input = if let Some(stored) = payload.stored_attachments.as_ref() {
+            let parts = crate::threads::attachments::resolve_persisted_parts(
+                &ctx,
+                thread_id,
+                &stored.persisted_message_id,
+                &stored.parts,
+            )
+            .await?;
+            Some(crate::agent::message_convert::user_message_from_parts(
+                &request.text,
+                &parts,
+            )?)
+        } else {
+            None
+        };
+
         // `run_single`'s future is very large; box it so the origin scope holds
         // a pointer rather than inlining it into this frame.
         #[cfg(feature = "tinymemes")]
@@ -283,7 +299,7 @@ impl WebHost {
             agent,
             crate::agent::turn_host::AgentTurnRequest {
                 message: request.text.clone(),
-                message_input: None,
+                message_input,
                 thread_id: Some(thread_id.to_owned()),
                 origin,
                 approval,
