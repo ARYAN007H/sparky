@@ -83,7 +83,8 @@ fn effective_embedder_slug_from_config(config: &Config) -> &'static str {
 
 fn active_custom_profile(config: &Config) -> Option<crate::config::schema::CustomEmbeddingsConfig> {
     let (_, endpoint) = split_custom_provider(&config.memory.embedding_provider);
-    let endpoint = endpoint?.trim();
+    let endpoint = endpoint?;
+    let endpoint = endpoint.trim();
     if endpoint.is_empty() {
         return None;
     }
@@ -146,7 +147,7 @@ pub async fn get_settings(config: &Config) -> Result<Outcome<serde_json::Value>,
         .collect();
 
     let vector_search_enabled = {
-        let (slug, endpoint) = split_custom_provider(provider);
+        let (_, endpoint) = split_custom_provider(provider);
         let slug = if endpoint.is_some() {
             "custom"
         } else {
