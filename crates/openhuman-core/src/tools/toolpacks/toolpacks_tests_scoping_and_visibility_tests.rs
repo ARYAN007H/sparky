@@ -247,7 +247,7 @@ fn a_non_owner_listing_omits_the_tools_the_gate_will_refuse() {
     let rendered = tinyagents_harness_tools::skills::render_pack_filtered(
         &CATALOG,
         "workflows",
-        handle,
+        &handle,
         &|name: &str| name != "propose_workflow",
         "",
     )
@@ -275,7 +275,7 @@ fn a_listing_with_nothing_callable_names_the_route_out() {
     let err = tinyagents_harness_tools::skills::render_pack_filtered(
         &CATALOG,
         "workflows",
-        handle,
+        &handle,
         &|_| false,
         &route,
     )

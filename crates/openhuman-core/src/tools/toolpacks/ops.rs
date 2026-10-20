@@ -68,7 +68,7 @@ fn for_each_pack_tool(
             continue;
         }
         if let Some(handle) = crate::tools::host_extensions::pack_registry_handle(tool.as_ref()) {
-            edit(handle);
+            edit(&handle);
             bound += 1;
         }
     }
