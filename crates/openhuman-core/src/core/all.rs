@@ -166,7 +166,7 @@ impl ControllerEntry {
         }
     }
 
-    fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    pub fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
         match &self.handler {
             EntryHandler::Legacy(handler) => handler(ctx, params),
             EntryHandler::Bound(handler) => handler.invoke(ctx, params),
