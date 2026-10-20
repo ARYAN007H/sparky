@@ -86,6 +86,16 @@ fn owner_and_legacy_managed_provider_labels_keep_error_codes_provider_owned() {
 }
 
 #[test]
+fn flattened_owner_errors_keep_backend_code_ownership() {
+    let error = r#"tinyhumans API error: {"errorCode":"RATE_LIMITED"}"#;
+    assert!(is_managed_backend_envelope(error));
+    assert_eq!(
+        classify(None, error).kind,
+        Some(BackendErrorKind::RateLimited)
+    );
+}
+
+#[test]
 fn extraction_is_case_insensitive_on_key_and_normalises_value() {
     let body = r#"{"ErrorCode":"rate_limited"}"#;
     assert_eq!(
