@@ -63,16 +63,29 @@ pub async fn read_body(
         Some(record) => record,
         // An artifact made before versioning has only its legacy record: show
         // the file that record vouches for.
-        None => legacy_record(&config.workspace_dir, &files, id, file_store.as_ref()).await?,
+        None => {
+            legacy_record(
+                &config.workspace_dir,
+                &files,
+                id,
+                file_store.as_ref(),
+                ctx,
+            )
+            .await?
+        }
     };
     let converter = DocumentConverter::for_config(config);
-    let display_path = match super::store::get_artifact(&config.workspace_dir, id).await {
-        Ok(meta) => super::files::resolve_file(&config.workspace_dir, &meta, &files)
-            .await
-            .ok()
-            .map(|path| path.to_string_lossy().into_owned()),
-        Err(_) => None,
-    };
+    let display_path = ctx
+        .enter(async {
+            match super::store::get_artifact(&config.workspace_dir, id).await {
+                Ok(meta) => super::files::resolve_file(&config.workspace_dir, &meta, &files)
+                    .await
+                    .ok()
+                    .map(|path| path.to_string_lossy().into_owned()),
+                Err(_) => None,
+            }
+        })
+        .await;
     Ok(body_of(
         &record,
         file_store.as_ref(),
@@ -90,11 +103,15 @@ async fn legacy_record(
     files: &super::files::FileRoots,
     id: &str,
     file_store: Option<&std::sync::Arc<dyn FileStore>>,
+    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<ArtifactRecord, String> {
-    let meta = super::store::get_artifact(workspace_dir, id)
+    let meta = ctx
+        .enter(super::store::get_artifact(workspace_dir, id))
         .await
         .map_err(|_| format!("artifact {id} not found"))?;
-    let path = super::files::resolve_ready_file(workspace_dir, files, id).await?;
+    let path = ctx
+        .enter(super::files::resolve_ready_file(workspace_dir, files, id))
+        .await?;
     let path = path.display().to_string();
     let at = u64::try_from(meta.created_at.timestamp_millis()).unwrap_or(0);
     let legacy_ref = FileRef {
