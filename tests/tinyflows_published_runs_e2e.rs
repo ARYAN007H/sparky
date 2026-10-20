@@ -8,6 +8,7 @@ mod published_tinyflows;
 mod tinyhumans_boot;
 
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::http::header::AUTHORIZATION;
@@ -20,7 +21,7 @@ mod storage_drivers;
 
 use storage_drivers::{Case, Driver};
 
-fn write_config(home: &Path, module: &Path) {
+fn write_config(home: &Path, module: &Path) -> std::path::PathBuf {
     let quoted_module = serde_json::to_string(
         module
             .to_str()
@@ -34,6 +35,7 @@ fn write_config(home: &Path, module: &Path) {
         std::fs::create_dir_all(&dir).expect("create isolated config directory");
         std::fs::write(dir.join("config.toml"), &config).expect("write isolated config");
     }
+    home.join(".openhuman/config.toml")
 }
 
 async fn rpc(
@@ -135,23 +137,33 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     let _module_source_dir = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
     let _tinyflows_source = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYFLOWS");
     let (module, digest) = published_tinyflows::staged_v0_8_27_module();
-    write_config(temp.path(), &module);
+    let config_path = write_config(temp.path(), &module);
     tinyhumans_boot::boot();
 
     const TEST_TOKEN: &str = "tinyflows-published-runs-e2e-token";
-    openhuman_core::core::auth::init_rpc_token_with_value(TEST_TOKEN)
-        .expect("initialize isolated RPC token");
+    openhuman_core::core::bus::init()
+        .await
+        .expect("initialize the core bus");
+    let config = openhuman_core::config::Config::load_from_config_path(&config_path, &workspace)
+        .await
+        .expect("load the isolated ReadOnly module configuration");
+    let (core_context, _, _) = openhuman_core::core::runtime::CoreContext::init_with_config(
+        openhuman_core::core::types::HostKind::Library,
+        &openhuman_core::core::runtime::TokenSource::Fixed(Arc::new(TEST_TOKEN.to_owned())),
+        openhuman_core::core::runtime::DomainSet::full(),
+        openhuman_core::tools::toolpacks::ToolGroups::none(),
+        Some(config),
+    )
+    .await
+    .expect("initialize explicit ReadOnly host context");
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind loopback RPC listener");
     let addr = listener.local_addr().expect("RPC listener address");
-    let server = tokio::spawn(async move {
-        axum::serve(
-            listener,
-            openhuman_rpc::server::build_core_http_router(false),
-        )
-        .await
-    });
+    let router = openhuman_rpc::server::build_core_http_router(false).layer(axum::Extension(
+        openhuman_core::core::runtime::DispatchCtx::new(core_context),
+    ));
+    let server = tokio::spawn(async move { axum::serve(listener, router).await });
 
     let created = ok(
         addr,
