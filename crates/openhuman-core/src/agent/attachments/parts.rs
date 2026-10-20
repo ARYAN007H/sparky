@@ -91,8 +91,9 @@ fn source_of(media: &MediaReference, index: usize) -> Result<&str, AttachmentPar
 
 /// Render `parts` after `text` as the staging markers, in order.
 ///
-/// `Text` parts join the message text. Images become `[IMAGE:…]`; video,
-/// audio and files become `[FILE:…]`. Any other part kind is refused.
+/// `Text` parts join the message text. Images become `[IMAGE:…]`; video, audio
+/// and files become `[FILE:…]`. Voice notes retain their typed audio payload
+/// at this boundary and contribute no marker to the model text.
 pub fn fold_into_message(text: &str, parts: &[ContentPart]) -> Result<String, AttachmentPartError> {
     if parts.is_empty() {
         return Ok(text.to_string());
@@ -112,6 +113,11 @@ pub fn fold_into_message(text: &str, parts: &[ContentPart]) -> Result<String, At
             | ContentPart::Audio { media, .. }
             | ContentPart::File { media, .. } => {
                 markers.push(format!("[FILE:{}]", source_of(media, index)?));
+            }
+            ContentPart::VoiceNote { voice_note } => {
+                // The handler validates this opaque reference against the
+                // durable note store. Never expose it in model-visible text.
+                let _ = voice_note;
             }
             other => {
                 return Err(AttachmentPartError::UnsupportedKind {

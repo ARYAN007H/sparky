@@ -54,6 +54,39 @@ fn reply_metadata_exists_only_after_the_reply_audio_is_stored() {
 }
 
 #[test]
+fn synthesized_reply_metadata_preserves_its_viseme_timeline() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(store_synthesized_reply(
+        tmp.path(),
+        "request-1",
+        "YWJj",
+        "audio/mpeg",
+        &[
+            tinyinference_voice::VisemeFrame {
+                viseme: "aa".into(),
+                start_ms: 0,
+                end_ms: 120
+            },
+            tinyinference_voice::VisemeFrame {
+                viseme: "PP".into(),
+                start_ms: 120,
+                end_ms: 220
+            },
+        ]
+    ));
+
+    let meta = reply_note_metadata(tmp.path(), "request-1").unwrap();
+    assert_eq!(
+        meta["visemes"],
+        serde_json::json!([
+            {"viseme": "aa", "start_ms": 0, "end_ms": 120},
+            {"viseme": "PP", "start_ms": 120, "end_ms": 220}
+        ]),
+        "replayed assistant audio needs the original TTS timeline for mascot lip-sync"
+    );
+}
+
+#[test]
 fn rpc_round_trip_and_bad_base64() {
     let tmp = tempfile::tempdir().unwrap();
     let out = store_from_rpc(tmp.path(), "rt", "audio/webm", "YWJj").unwrap();
@@ -65,20 +98,51 @@ fn rpc_round_trip_and_bad_base64() {
 }
 
 #[test]
+fn typed_voice_media_must_match_its_durable_note_reference() {
+    let tmp = tempfile::tempdir().unwrap();
+    store_note(tmp.path(), "note-typed", "audio/wav", &[0, 1, 2]).unwrap();
+    let media = |note_id: &str, content_type: &str| tinychannels_bus::MediaReference {
+        opaque_id: Some(note_id.into()),
+        content_type: Some(content_type.into()),
+        kind: tinychannels_bus::MediaKind::Audio,
+        ..Default::default()
+    };
+
+    assert!(
+        validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/wav")).is_ok()
+    );
+    assert!(
+        validate_typed_media(tmp.path(), "note-typed", &media("other-note", "audio/wav")).is_err()
+    );
+    assert!(
+        validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/mpeg")).is_err()
+    );
+    assert!(validate_typed_media(tmp.path(), "missing", &media("missing", "audio/wav")).is_err());
+}
+
+#[test]
 fn synthesized_reply_is_stored_only_with_decodable_audio() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(!store_synthesized_reply(tmp.path(), "r1", "", "audio/mpeg"));
+    assert!(!store_synthesized_reply(
+        tmp.path(),
+        "r1",
+        "",
+        "audio/mpeg",
+        &[] as &[serde_json::Value]
+    ));
     assert!(!store_synthesized_reply(
         tmp.path(),
         "r1",
         "***",
-        "audio/mpeg"
+        "audio/mpeg",
+        &[] as &[serde_json::Value]
     ));
     assert!(store_synthesized_reply(
         tmp.path(),
         "r1",
         "YWJj",
-        "audio/mpeg"
+        "audio/mpeg",
+        &[] as &[serde_json::Value]
     ));
     assert!(reply_note_metadata(tmp.path(), "r1").is_some());
 }

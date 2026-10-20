@@ -37,7 +37,7 @@ use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
 use crate::agent::queued_turn::QueuedPayload;
-use crate::agent::turn_origin::AgentTurnOrigin;
+use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
@@ -497,6 +497,7 @@ async fn speak_and_publish(
                     &request.request_id,
                     &outcome.value.audio_base64,
                     &outcome.value.audio_mime,
+                    &outcome.value.visemes,
                 );
                 log::debug!(
                     "[web_channel] reply_speech dispatched chars={} stored={stored} client_id={} thread_id={thread_id} request_id={}",

@@ -206,6 +206,32 @@ pub fn start_chat<'a>(
     queue_mode: Option<String>,
     metadata: ChatRequestMetadata,
 ) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
+    start_chat_with_voice_note(
+        ctx,
+        client_id,
+        thread_id,
+        message,
+        model_override,
+        temperature,
+        locale,
+        queue_mode,
+        metadata,
+        None,
+    )
+}
+
+pub(super) fn start_chat_with_voice_note<'a>(
+    ctx: &'a crate::core::runtime::DispatchCtx,
+    client_id: &'a str,
+    thread_id: &'a str,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    locale: Option<String>,
+    queue_mode: Option<String>,
+    metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
+) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
     Box::pin(start_chat_inner(
         ctx,
         client_id,
@@ -216,6 +242,7 @@ pub fn start_chat<'a>(
         locale,
         queue_mode,
         metadata,
+        voice_note_id,
     ))
 }
 
@@ -230,6 +257,7 @@ async fn start_chat_inner(
     locale: Option<String>,
     queue_mode: Option<String>,
     metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
 ) -> Result<String, StartChatError> {
     let client_id = client_id.trim().to_string();
     let thread_id = thread_id.trim().to_string();
@@ -250,6 +278,9 @@ async fn start_chat_inner(
 
     let mode = parse_mode(queue_mode.as_deref());
     let request_id = Uuid::new_v4().to_string();
+    if let Some(note_id) = voice_note_id.as_deref() {
+        bind_voice_note_request_id(ctx, &thread_id, &message, note_id, &request_id).await?;
+    }
     let preview = crate::agent::queued_turn::text_preview(&message);
     let scope = scope_of(ctx);
     let queued_at_ms = std::time::SystemTime::now()
@@ -346,6 +377,73 @@ async fn start_chat_inner(
             .to_string())
         }
     }
+}
+
+/// Store the host-generated turn id on the one durable user row named by the
+/// typed note reference before the runner can consume the request. This keeps
+/// transcript projection unambiguous for repeated identical transcriptions.
+async fn bind_voice_note_request_id(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    message: &str,
+    note_id: &str,
+    request_id: &str,
+) -> Result<(), StartChatError> {
+    use crate::threads::store::{blocking, ConversationMessagePatch};
+
+    let workspace_dir = ctx
+        .load_config()
+        .await
+        .map_err(|error| StartChatError::Other(format!("load voice note workspace: {error}")))?
+        .workspace_dir;
+    let rows = blocking::get_messages(ctx.clone(), workspace_dir.clone(), thread_id.to_string())
+        .await
+        .map_err(StartChatError::Other)?;
+    let matches = rows
+        .iter()
+        .filter(|row| row.sender == "user" && row.content == message)
+        .filter(|row| {
+            row.extra_metadata
+                .pointer("/voiceNote/noteId")
+                .and_then(serde_json::Value::as_str)
+                == Some(note_id)
+        })
+        .collect::<Vec<_>>();
+    let [row] = matches.as_slice() else {
+        return Err(StartChatError::Other(format!(
+            "voice note {note_id} must identify exactly one user row in thread {thread_id}"
+        )));
+    };
+    let mut extra_metadata = row.extra_metadata.clone();
+    let Some(metadata) = extra_metadata.as_object_mut() else {
+        return Err(StartChatError::Other(
+            "voice note row metadata is invalid".into(),
+        ));
+    };
+    if let Some(existing) = metadata
+        .get("requestId")
+        .and_then(serde_json::Value::as_str)
+    {
+        if existing == request_id {
+            return Ok(());
+        }
+        return Err(StartChatError::Other(format!(
+            "voice note {note_id} is already bound to request {existing}"
+        )));
+    }
+    metadata.insert("requestId".into(), serde_json::json!(request_id));
+    blocking::update_message(
+        ctx.clone(),
+        workspace_dir,
+        thread_id.to_string(),
+        row.id.clone(),
+        ConversationMessagePatch {
+            extra_metadata: Some(extra_metadata),
+        },
+    )
+    .await
+    .map_err(StartChatError::Other)?;
+    Ok(())
 }
 
 #[cfg(test)]

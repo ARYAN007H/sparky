@@ -7,7 +7,7 @@
  * until asked.
  */
 import { PauseIcon, PlayIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { trackAnalyticsEvent } from '../../components/analytics';
 import Button from '../../components/ui/Button';
@@ -19,6 +19,7 @@ import {
 import Slider from '../../components/ui/Slider';
 import { cn } from '../../lib/cn';
 import { useT } from '../../lib/i18n/I18nContext';
+import { proceduralVisemes } from '../human/voice/ttsClient';
 import { formatDuration, readVoiceNote } from './voiceNoteApi';
 
 export interface VoiceNotePlayerProps {
@@ -29,6 +30,10 @@ export interface VoiceNotePlayerProps {
   waveform?: number[];
   /** When set, a transcript disclosure is shown under the player. */
   transcript?: string;
+  /** Animate the shared mascot during assistant reply playback. */
+  mascotPlayback?: boolean;
+  visemes?: Array<{ viseme: string; start_ms: number; end_ms: number }>;
+  speechText?: string;
   className?: string;
 }
 
@@ -43,26 +48,56 @@ function VoiceNotePlayerBody({
   durationMs,
   waveform,
   transcript,
+  mascotPlayback = false,
+  visemes,
+  speechText = '',
   className,
 }: VoiceNotePlayerProps) {
   const { t } = useT();
+  const playbackOwner = useId();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const playbackRafRef = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const totalMs = loadedMs ?? durationMs ?? 0;
+  const frames = visemes?.length ? visemes : proceduralVisemes(speechText, totalMs);
+  const framesRef = useRef(frames);
+  framesRef.current = frames;
+
+  const publishMascot = useCallback(
+    (active: boolean, atMs = 0, claim = false) => {
+      if (!mascotPlayback) return;
+      let viseme = 'sil';
+      if (active) {
+        const frame = framesRef.current.find(item => atMs >= item.start_ms && atMs < item.end_ms);
+        viseme = frame?.viseme ?? 'sil';
+      }
+      window.dispatchEvent(
+        new CustomEvent('voice-note-mascot', {
+          detail: { owner: playbackOwner, active, viseme, claim },
+        })
+      );
+    },
+    [mascotPlayback, playbackOwner]
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
   const release = useCallback(() => {
+    if (playbackRafRef.current !== null) {
+      window.cancelAnimationFrame(playbackRafRef.current);
+      playbackRafRef.current = null;
+    }
     audioRef.current?.pause();
     audioRef.current = null;
+    publishMascot(false);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
-  }, []);
+  }, [publishMascot]);
 
   // Release the element and any object URL when the player goes away.
   useEffect(() => release, [release]);
@@ -87,21 +122,51 @@ function VoiceNotePlayerBody({
       }
     }
     const audio = new window.Audio(url);
-    audio.addEventListener('timeupdate', () => setPositionMs(audio.currentTime * 1000));
+    const publishAtCurrentTime = (claim = false) => {
+      const atMs = audio.currentTime * 1000;
+      setPositionMs(atMs);
+      publishMascot(!audio.paused && !audio.ended, atMs, claim);
+    };
+    const stopSampling = () => {
+      if (playbackRafRef.current !== null) {
+        window.cancelAnimationFrame(playbackRafRef.current);
+        playbackRafRef.current = null;
+      }
+    };
+    const sampleWhilePlaying = () => {
+      if (audio.paused || audio.ended) {
+        playbackRafRef.current = null;
+        return;
+      }
+      publishAtCurrentTime();
+      playbackRafRef.current = window.requestAnimationFrame(sampleWhilePlaying);
+    };
+    audio.addEventListener('timeupdate', () => publishAtCurrentTime());
     audio.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
         setLoadedMs(audio.duration * 1000);
       }
     });
     audio.addEventListener('ended', () => {
+      stopSampling();
       setPlaying(false);
       setPositionMs(0);
+      publishMascot(false);
     });
-    audio.addEventListener('pause', () => setPlaying(false));
-    audio.addEventListener('play', () => setPlaying(true));
+    audio.addEventListener('pause', () => {
+      stopSampling();
+      setPlaying(false);
+      publishMascot(false);
+    });
+    audio.addEventListener('play', () => {
+      setPlaying(true);
+      publishAtCurrentTime(true);
+      stopSampling();
+      playbackRafRef.current = window.requestAnimationFrame(sampleWhilePlaying);
+    });
     audioRef.current = audio;
     return audio;
-  }, [noteId, src]);
+  }, [noteId, src, publishMascot]);
 
   const toggle = useCallback(async () => {
     const audio = await ensureAudio();
@@ -123,8 +188,9 @@ function VoiceNotePlayerBody({
       if (!audio) return;
       audio.currentTime = value / 1000;
       setPositionMs(value);
+      if (!audio.paused) publishMascot(true, value);
     },
-    [ensureAudio]
+    [ensureAudio, publishMascot]
   );
 
   const progress = totalMs > 0 ? Math.min(1, positionMs / totalMs) : 0;

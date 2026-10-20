@@ -3,17 +3,17 @@
 //! inspecting/clearing a thread's run queue. The turns and their queues live
 //! in the context's turn runner; these are the thin entry points over it.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::core::Outcome;
 use crate::core::runtime::DispatchCtx;
-use crate::web_chat::WebChannelEvent;
+use crate::core::Outcome;
 use crate::web_chat::event_context;
+use crate::web_chat::WebChannelEvent;
 
 use super::super::event_bus::publish_web_channel_event_in;
-use super::super::runner::{CancelNote, runtime, scope_of};
+use super::super::runner::{runtime, scope_of, CancelNote};
 use super::super::types::ChatRequestMetadata;
-use super::start_chat::start_chat;
+use super::start_chat::start_chat_with_voice_note;
 
 /// Cancel the in-flight turn(s) for a thread.
 ///
@@ -200,6 +200,7 @@ pub async fn channel_web_chat(
     queue_mode: Option<String>,
     run_mode: Option<String>,
     metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
 ) -> Result<Outcome<Value>, String> {
     // A SaaS user chooses the thread id; the same rules as `threads_upsert`
     // apply (no reserved prefixes, no path-like ids). No-op outside SaaS.
@@ -221,7 +222,7 @@ pub async fn channel_web_chat(
         }
     }
 
-    let result = start_chat(
+    let result = start_chat_with_voice_note(
         ctx,
         client_id,
         thread_id,
@@ -231,6 +232,7 @@ pub async fn channel_web_chat(
         locale,
         queue_mode,
         metadata,
+        voice_note_id,
     )
     .await?;
 
