@@ -447,6 +447,19 @@ describe('chatService.subscribeChatEvents', () => {
     });
   });
 
+  it.each([
+    { accepted: false, client_id: 'socket-1', thread_id: 'thread-1', request_id: 'request-1' },
+    { accepted: true, client_id: 'socket-1', thread_id: 'thread-1', request_id: 42 },
+  ])('rejects malformed started-turn acknowledgements', async response => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    mockCallCoreRpc.mockResolvedValue(response);
+
+    await expect(chatSendWithAck({ threadId: 'thread-1', message: 'hello' })).rejects.toThrow(
+      'invalid chat queue acknowledgement'
+    );
+  });
+
   it('rejects an invalid queue acknowledgement instead of trusting raw RPC data', async () => {
     const socket = createMockSocket();
     bindMockSocket(socket);
