@@ -285,7 +285,15 @@ export default async function typedImageAttachmentRoundtrip({
   const modelRequests = mock
     .requests()
     .filter((request) => /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url));
-  const editedModelRequest = modelRequests.at(-1);
+  const editedModelRequest = [...modelRequests].reverse().find((request) => {
+    const body = JSON.parse(request.body);
+    return body.messages?.some(
+      (message) =>
+        message.role === "user" &&
+        JSON.stringify(message.content).includes(EDITED_TEXT) &&
+        JSON.stringify(message.content).includes(IMAGE_BYTES.toString("base64")),
+    );
+  });
   const editedModelBody = editedModelRequest && JSON.parse(editedModelRequest.body);
   const editedUserMessages =
     editedModelBody?.messages?.filter((message) => message.role === "user") ?? [];
