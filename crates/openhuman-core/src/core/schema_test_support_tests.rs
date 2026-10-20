@@ -135,20 +135,9 @@ fn duplicate_controller_and_schema_identity_failures_are_rejected() {
 
 #[test]
 fn legacy_entries_are_rejected_without_running_the_legacy_handler() {
-    let (_, contract) = fixture();
+    let (bound, contract) = fixture();
     let legacy = ControllerEntry::legacy(RegisteredController {
-        schema: ControllerSchema {
-            namespace: "fixture",
-            function: "read",
-            description: "Read a fixture.",
-            inputs: vec![crate::core::FieldSchema {
-                name: "id",
-                ty: crate::core::TypeSchema::String,
-                comment: "Fixture identifier.",
-                required: true,
-            }],
-            outputs: vec![],
-        },
+        schema: bound.schema,
         handler: legacy_handler,
     });
     assert!(verify_parameter_contracts(&[legacy], &[contract])

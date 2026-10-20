@@ -491,7 +491,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
         .chain(internal_registry())
         .filter(|row| row.controller.schema.method_name().starts_with("voice."))
         .collect();
-    let entries: Vec<_> = grouped.iter().map(|row| &row.controller).collect();
+    let entries: Vec<_> = grouped.iter().map(|row| row.controller.clone()).collect();
     let contracts = crate::voice::parameter_contracts();
     let expected_methods = [
         "voice.status",
