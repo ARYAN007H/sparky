@@ -36,8 +36,21 @@ pub(super) fn managed_chat_model(
     thread_id: Option<&str>,
     egress: &EgressLedger,
 ) -> anyhow::Result<ManagedChatModel> {
+    managed_chat_model_for(None, role, config, model_override, default_model, native_tool_calling, thread_id, egress)
+}
+
+pub(super) fn managed_chat_model_for(
+    extensions: Option<&crate::core::slots::Extensions>,
+    role: &str,
+    config: &Config,
+    model_override: Option<&str>,
+    default_model: Option<&str>,
+    native_tool_calling: bool,
+    thread_id: Option<&str>,
+    egress: &EgressLedger,
+) -> anyhow::Result<ManagedChatModel> {
     enforce_local_only_inference(role, PROVIDER_OPENHUMAN)?;
-    let Some(entry) = crate::inference::registry::chat_model(PROVIDER_OPENHUMAN) else {
+    let Some(entry) = crate::inference::registry::chat_model_for(extensions, PROVIDER_OPENHUMAN) else {
         log::debug!("[providers][chat-factory] role={role} managed provider is not registered");
         return Err(managed_unavailable_error());
     };
@@ -80,6 +93,28 @@ pub(crate) fn make_openhuman_backend_model_for_thread(
     // `model` may be a role alias (`hint:reasoning`) the registry keys the
     // route by; the provider only ever sees the concrete id it resolves to.
     managed_chat_model(
+        role,
+        config,
+        model,
+        None,
+        native_tool_calling,
+        thread_id,
+        egress,
+    )
+}
+
+/// Explicit-context counterpart for turn construction.
+pub(crate) fn make_openhuman_backend_model_for_thread_in(
+    extensions: Option<&crate::core::slots::Extensions>,
+    role: &str,
+    config: &Config,
+    model: Option<&str>,
+    native_tool_calling: bool,
+    thread_id: Option<&str>,
+    egress: &EgressLedger,
+) -> anyhow::Result<ManagedChatModel> {
+    managed_chat_model_for(
+        extensions,
         role,
         config,
         model,

@@ -200,6 +200,15 @@ pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
     CHAT_MODELS.get(provider_id)
 }
 
+/// The chat-model provider selected by an explicit context, falling back only
+/// to process registration when that context has no entry.
+pub(crate) fn chat_model_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+) -> Option<ChatModelEntry> {
+    CHAT_MODELS.get_for(extensions, provider_id)
+}
+
 /// The registered provider's model hooks, if it has any.
 pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelHooks> {
     chat_model(provider_id)?.models
@@ -223,6 +232,15 @@ pub fn provider_model_role(provider_id: &str, model: &str) -> Option<String> {
     (hooks.role_for_model)(model)
 }
 
+pub(crate) fn provider_model_role_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> Option<String> {
+    let hooks = chat_model_for(extensions, provider_id)?.models?;
+    (hooks.role_for_model)(model)
+}
+
 /// Whether the provider recognizes `model` as an abstract alias.
 pub fn provider_model_is_alias(provider_id: &str, model: &str) -> bool {
     provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.is_alias)(model))
@@ -241,6 +259,16 @@ pub fn provider_model_supports_vision(provider_id: &str, model: &str) -> bool {
     provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.supports_vision)(model))
 }
 
+pub(crate) fn provider_model_supports_vision_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> bool {
+    chat_model_for(extensions, provider_id)
+        .and_then(|entry| entry.models)
+        .is_some_and(|hooks| (hooks.supports_vision)(model))
+}
+
 /// Provider-specific resolution of a role alias, configured default, or pin.
 pub fn resolve_provider_model(
     provider_id: &str,
@@ -255,6 +283,15 @@ pub fn resolve_provider_model(
 /// The provider's model-specific context window, if known.
 pub fn provider_model_context_window(provider_id: &str, model: &str) -> Option<u64> {
     let hooks = provider_model_hooks(provider_id)?;
+    (hooks.context_window)(model)
+}
+
+pub(crate) fn provider_model_context_window_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> Option<u64> {
+    let hooks = chat_model_for(extensions, provider_id)?.models?;
     (hooks.context_window)(model)
 }
 

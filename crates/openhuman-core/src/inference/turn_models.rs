@@ -132,6 +132,10 @@ fn build_turn_models_crate(
     // P2, PR #4812). The ledger collapses same-destination repeats to one
     // disclosure per turn while still surfacing each distinct tier model.
     let egress = crate::security::egress::EgressLedger::per_turn();
+    let resolved_context = ctx.resolved();
+    let context_extensions = resolved_context
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
 
     // The primary honours an explicit provider-string override when the producer's
     // effective provider differs from `provider_for_role(role)` (triage #1257).
@@ -146,7 +150,8 @@ fn build_turn_models_crate(
             })
             .unwrap_or_else(|| factory::resolves_to_managed_backend(role, config));
         if managed {
-            let (backend, _) = factory::make_openhuman_backend_model_for_thread(
+            let (backend, _) = factory::make_openhuman_backend_model_for_thread_in(
+                context_extensions,
                 role,
                 config,
                 Some(m),
@@ -209,10 +214,15 @@ fn build_turn_models_crate(
             if tier == model {
                 continue;
             }
-            let tier_role = crate::inference::provider_model::role_for_provider_model(
+            let tier_role = crate::inference::registry::provider_model_role_for(
+                context_extensions,
                 factory::PROVIDER_OPENHUMAN,
                 tier,
-            );
+            )
+            .unwrap_or_else(|| crate::inference::provider_model::role_for_provider_model(
+                factory::PROVIDER_OPENHUMAN,
+                tier,
+            ));
             if let Some(custom) = ctx.host_overrides().and_then(|local| {
                 local
                     .role_models
@@ -231,7 +241,8 @@ fn build_turn_models_crate(
                 continue;
             }
             let route = if factory::resolves_to_managed_backend(tier_role, config) {
-                factory::make_openhuman_backend_model_for_thread(
+                factory::make_openhuman_backend_model_for_thread_in(
+                    context_extensions,
                     tier_role,
                     config,
                     Some(tier),
