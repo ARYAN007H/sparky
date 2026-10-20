@@ -572,15 +572,12 @@ fn unsigned_in_user_fails_probe() {
 /// `thread 'tokio-rt-worker' has overflowed its stack, fatal runtime
 /// error: stack overflow`.
 ///
-/// The deep ground-truth regression catcher for this is the
-/// `chat-harness-subagent.spec.ts` Playwright spec, which exercises the
-/// real orchestrator → researcher dispatch end-to-end (real provider
-/// stream, real config load, real tool registry). The scripted unit
-/// path here has much smaller per-frame state than production, so a
-/// single stack size doesn't cleanly bracket boxed-vs-unboxed — we use
-/// the loose 1 MiB worker stack as a smoke check that the dispatch
-/// path remains poll-bounded after refactors. See `subagent_host/
-/// ops.rs` `Box::pin` callsites for the structural fix.
+/// The former desktop end-to-end regression flow is currently skipped under
+/// #6389, so it is not current pass evidence. The scripted path here has much
+/// smaller per-frame state than production, and a single stack size doesn't
+/// cleanly bracket boxed-vs-unboxed — we use the loose 1 MiB worker stack as a
+/// smoke check that the dispatch path remains poll-bounded after refactors.
+/// See `subagent_host/ops.rs` `Box::pin` callsites for the structural fix.
 #[test]
 fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
     use async_trait::async_trait;

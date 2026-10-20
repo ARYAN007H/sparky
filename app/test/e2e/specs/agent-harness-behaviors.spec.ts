@@ -2,12 +2,11 @@
  * Agent-harness behaviors — approval gate, subagent clarification, inference
  * phases, and the tool timeline, driven through the real web-chat stack.
  *
- * Pattern source of truth: `chat-harness-subagent.spec.ts` (orchestrator →
- * subagent delegation, Redux polling via `__OPENHUMAN_STORE__`) and
- * `chat-harness-subagent-continue.spec.ts` (clarification continuation). This
- * spec reuses their proven flow: start a fresh thread, send a prompt, drive the
- * mock LLM with `llmForcedResponses`, and assert against the live Redux runtime
- * slice + the rendered DOM.
+ * This spec starts fresh threads, drives the mock LLM with
+ * `llmForcedResponses`, and asserts against the live Redux runtime slice and
+ * rendered DOM. Subagent clarification continuation is also exercised by the
+ * separate `chat-harness-subagent-continue.spec.ts`; that browser flow is
+ * currently skipped under #6389 and is not pass evidence.
  *
  * Approval gate notes (verified against the codebase, not the issue text):
  *   - `ApprovalGate` installs by default under the desktop shell and parks
@@ -126,8 +125,7 @@ async function readTimeline(threadId: string): Promise<TimelineEntry[]> {
   }, threadId)) as TimelineEntry[];
 }
 
-/** Start a brand-new chat thread and return its id. Mirrors the new-thread
- *  flow proven in `chat-harness-subagent.spec.ts`. */
+/** Start a brand-new chat thread and return its id. */
 async function startNewThread(): Promise<string> {
   await browser.waitUntil(async () => await chatMounted(), {
     timeout: 15_000,

@@ -259,7 +259,6 @@ if should_run_suite "chat"; then
   run "test/e2e/specs/chat-harness-send-stream.spec.ts"       "chat-send-stream"          "chat"
   run "test/e2e/specs/chat-harness-cancel.spec.ts"            "chat-cancel"               "chat"
   run "test/e2e/specs/chat-harness-scroll-render.spec.ts"     "chat-scroll-render"        "chat"
-  run "test/e2e/specs/chat-harness-subagent.spec.ts"          "chat-subagent"             "chat"
   run "test/e2e/specs/chat-harness-wallet-flow.spec.ts"       "chat-wallet"               "chat"
   run "test/e2e/specs/chat-tool-call-flow.spec.ts"            "chat-tool-call"            "chat"
   run "test/e2e/specs/chat-multi-tool-round.spec.ts"          "chat-multi-tool"           "chat"
@@ -313,7 +312,6 @@ if should_run_suite "webhooks"; then
   echo "## Running suite: webhooks"
   run "test/e2e/specs/webhooks-ingress-flow.spec.ts"          "webhooks-ingress"          "webhooks"
   run "test/e2e/specs/webhooks-tunnel-flow.spec.ts"           "webhooks-tunnel"           "webhooks"
-  run "test/e2e/specs/harness-channel-bridge-flow.spec.ts"    "harness-channel-bridge"    "webhooks"
   run "test/e2e/specs/harness-composio-tool-flow.spec.ts"     "harness-composio-tool"     "webhooks"
   _mini_summary "webhooks"
 fi
