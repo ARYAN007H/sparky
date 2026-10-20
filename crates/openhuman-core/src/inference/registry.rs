@@ -292,7 +292,7 @@ pub fn register_config_normalizer_in(
 /// changed the config.
 pub(crate) fn normalize_config(config: &mut Config) -> bool {
     CONFIG_NORMALIZERS
-        .entries()
+        .entries_context_first()
         .into_iter()
         .fold(false, |changed, (_, normalize)| normalize(config) || changed)
 }
