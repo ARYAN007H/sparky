@@ -1,4 +1,5 @@
 use super::*;
+use tinytools::Tool;
 
 // Both flows agents are `#[cfg(feature = "flows")]` entries in `BUILTINS`
 // (#4797), so these tests only apply when the gate is on.
