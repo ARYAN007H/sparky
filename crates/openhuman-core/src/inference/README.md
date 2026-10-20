@@ -156,14 +156,14 @@ A failed provider call passes through several layers, each with one job:
      |
      v
   provider/http_error.rs   api_error(): tinyinference_llm::failure::http
-     |  classifies; HostErrorReporter applies backend guards, demotion, Sentry
+     |  classifies; HostErrorReporter applies backend guards, upstream demotion, Sentry
      |
      +--> http_error.rs: 401 from managed backend -> SessionExpired event
      |                     401/403 on a BYO key -> auth_error_registry::record
      |                        -> ProviderApiKeyRejected (once per episode)
      v
   registry.rs                provider-owned classification metadata
-  provider/error_classify.rs rate-limit / upstream-unhealthy / retry-after
+  TinyInference failure classifier and retry-after parser
      v
   failure_copy/table.rs      class -> error_type, source, retryable, copy
                              (consumed by web_chat::web_errors)
@@ -200,7 +200,7 @@ picks the provider the same way a provider string does.
 | `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
 | `provider_model.rs`, `registry.rs` | Provider-neutral model hooks and caller adapters; hosted aliases, model defaults, pricing, and request metadata are registered by `openhuman-tinyhumans`. |
 | `provider/openai_codex.rs` | Codex routing metadata for the `openai` slug when Codex OAuth is connected. |
-| [`provider/error_classify.rs`](./provider/error_classify.rs), `registry.rs` | Provider-neutral retry classification and registered provider ownership metadata. |
+| `registry.rs` | Registered provider ownership metadata; provider-neutral retry classification is supplied by TinyInference. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |
 | [`provider/`](./provider/) | [`http_error.rs`](./provider/http_error.rs) (host reporter over `tinyinference_llm::failure::http`, `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `factory/` (chat-model construction and cloud provider resolution). |
 | [`provider/types.rs`](./provider/types.rs) | Host DTOs kept at product and RPC boundaries: `ChatResponse`, `ProviderDelta`, `BilledUsage`, `AGENT_TURN_MAX_OUTPUT_TOKENS`. |
