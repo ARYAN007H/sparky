@@ -85,6 +85,7 @@ async fn write_thread(ctx: &DispatchCtx) {
     let root_meta = meta("orchestrator", "root");
     let turn = vec![
         TranscriptMessage::user("Current Date & Time: today\n\nhello"),
+        TranscriptMessage::assistant("Let me think through that."),
         TranscriptMessage::assistant("hi there"),
     ];
     locator
@@ -196,10 +197,12 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
     let decorated_user = "Current Date & Time: today\n\nhello";
     let prior = vec![
         TranscriptMessage::user(decorated_user),
+        TranscriptMessage::assistant("Let me think through that."),
         TranscriptMessage::assistant("hi there"),
     ];
     let complete = vec![
         TranscriptMessage::user(decorated_user),
+        TranscriptMessage::assistant("Let me think through that."),
         TranscriptMessage::assistant("hi there"),
         TranscriptMessage::user("hello"),
         TranscriptMessage::assistant("hi again"),
@@ -263,6 +266,14 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
         } if content == "hi there" => extra_metadata.as_ref(),
         _ => None,
     });
+    let narration = page.items.iter().find_map(|item| match item {
+        tinyagents_session::transcript::view::DisplayItem::AssistantMessage {
+            content,
+            extra_metadata,
+            ..
+        } if content == "Let me think through that." => extra_metadata.as_ref(),
+        _ => None,
+    });
     assert_eq!(
         voice_user.and_then(|value| value.pointer("/voiceNote/noteId")),
         Some(&json!("recording-1"))
@@ -272,6 +283,7 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
         assistant.and_then(|value| value.pointer("/voiceNote/noteId")),
         Some(&json!("reply-1"))
     );
+    assert!(narration.is_none_or(|value| value.get("voiceNote").is_none()));
     let mut cursor = None;
     let mut voice_reply_on_its_page = false;
     loop {

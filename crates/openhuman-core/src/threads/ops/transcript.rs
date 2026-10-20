@@ -121,7 +121,11 @@ async fn attach_voice_note_metadata(
                 match (request_id, row_request_id) {
                     // A request id identifies the exact turn even when the
                     // transcript decorates the user text with model context.
-                    (Some(projected), Some(stored)) => projected == stored,
+                    // Assistant turns may contain several messages, so their
+                    // content still selects the persisted final reply row.
+                    (Some(projected), Some(stored)) => {
+                        projected == stored && (sender == "user" || row.content == content)
+                    }
                     // Legacy rows have no turn identity, so use exact content
                     // only when both sides are legacy.
                     (None, None) => row.content == content,
