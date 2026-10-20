@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
 use serde_json::{json, Value};
 use tempfile::TempDir;
-use tinyflows_catalog::FlowConnection;
+use crate::flows::ops::FlowConnection;
 
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {

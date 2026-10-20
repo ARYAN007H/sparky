@@ -141,14 +141,15 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
         let config = config.clone();
         CoreContext::scope(core, async move {
             let graph = tinyflows::migrate::deserialize_graph(graph).unwrap();
-            let mut flow = crate::flows::store::create_flow(
+            let result = crate::flows::store::create_flow(
                 &config,
                 "scoped child".into(),
-                graph,
+                serde_json::to_value(graph).unwrap(),
                 false,
                 false,
             )
             .unwrap();
+            let mut flow = result.workflow;
             flow.id = shared_id.into();
             crate::flows::test_support::seed_flow(&config, &flow).unwrap();
         })
@@ -308,7 +309,7 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
             None,
             "Scoped parent".into(),
             candidate,
-            tinyflows_catalog::DraftOrigin::Chat,
+            tinyflows_bus::catalog::DraftOrigin::Chat,
         )
         .unwrap()
         .value
