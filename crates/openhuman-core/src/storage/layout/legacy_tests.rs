@@ -68,4 +68,6 @@ fn dbg_docs(p: &std::path::Path) {
     let _ = col; let q = "SELECT scope||' '||coll, count(*) FROM docs GROUP BY 1 ORDER BY 1".to_string();
     let rows: Vec<(String, i64)> = c.prepare(&q).unwrap().query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))).unwrap().map(|x| x.unwrap()).collect();
     eprintln!("DBGDOCS {rows:?}");
+    let ids: Vec<String> = c.prepare("SELECT id||' '||body FROM docs WHERE coll='tsd.migrations' AND scope LIKE '%module:memory-workspace%' ORDER BY id").unwrap().query_map([], |r| r.get::<_, String>(0)).unwrap().map(|x| x.unwrap()).collect();
+    eprintln!("DBGIDS {}", ids.join(" || "));
 }
