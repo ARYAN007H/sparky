@@ -441,6 +441,28 @@ describe('chatService.subscribeChatEvents', () => {
     ).rejects.toThrow('invalid chat queue acknowledgement');
   });
 
+  it.each([
+    { kind: 'unknown_media', media: { opaqueId: 'opaque-1' } },
+    { kind: 'image', media: { opaqueId: 'opaque-1', localCachePath: '/tmp/image.png' } },
+    { kind: 'video', media: { opaqueId: 'opaque-1' }, thumbnail: { path: '/tmp/thumbnail.png' } },
+  ])('rejects queued attachment authorities or unknown kinds: $kind', async attachment => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    mockCallCoreRpc.mockResolvedValue({
+      queued: true,
+      queue_mode: 'followup',
+      client_id: 'socket-1',
+      thread_id: 'thread-1',
+      request_id: 'request-1',
+      queue_depth: 1,
+      queued_attachments: [attachment],
+    });
+
+    await expect(
+      chatSendWithAck({ threadId: 'thread-1', message: '', queueMode: 'followup' })
+    ).rejects.toThrow('invalid chat queue acknowledgement');
+  });
+
   it('forwards speak_reply, source, session_id when provided', async () => {
     const socket = createMockSocket();
     bindMockSocket(socket);

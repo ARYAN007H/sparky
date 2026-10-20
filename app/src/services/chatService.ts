@@ -8,6 +8,7 @@
  */
 import debug from 'debug';
 
+import type { QueuedChatAck } from '../types/threadWire.generated';
 import {
   type ArtifactFailedEvent,
   ArtifactKind,
@@ -55,7 +56,6 @@ import {
 } from './chatWire';
 import { callCoreRpc } from './coreRpcClient';
 import { socketService } from './socketService';
-import type { QueuedChatAck } from '../types/threadWire.generated';
 
 const chatLog = debug('realtime:chat');
 
@@ -964,17 +964,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isQueuedAttachment(value: unknown): value is ContentPart {
-  if (!isRecord(value) || typeof value.kind !== 'string') return false;
-  const mediaKinds = new Set(['image', 'video', 'audio', 'file', 'sticker']);
-  if (!mediaKinds.has(value.kind)) return true;
+  if (!isRecord(value) || !['image', 'video', 'audio', 'file'].includes(String(value.kind))) {
+    return false;
+  }
   if (!isRecord(value.media)) return false;
   const media = value.media;
-  return (
-    typeof media.opaqueId === 'string' &&
-    media.opaqueId.length > 0 &&
-    media.url == null &&
-    media.path == null
-  );
+  const hasNoAuthority = (reference: Record<string, unknown>) =>
+    reference.url == null && reference.path == null && reference.localCachePath == null;
+  const safeMedia =
+    typeof media.opaqueId === 'string' && media.opaqueId.length > 0 && hasNoAuthority(media);
+  if (!safeMedia) return false;
+  if (value.kind === 'video' && value.thumbnail != null) {
+    return isRecord(value.thumbnail) && hasNoAuthority(value.thumbnail);
+  }
+  return true;
 }
 
 function isQueuedChatAck(value: unknown): value is QueuedChatAck {
@@ -1027,10 +1030,7 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
   if (!isQueuedChatAck(result)) {
     throw new Error('Core returned an invalid chat queue acknowledgement');
   }
-  return {
-    requestId: result.request_id,
-    queuedAttachments: result.queued_attachments,
-  };
+  return { requestId: result.request_id, queuedAttachments: result.queued_attachments };
 }
 
 export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
