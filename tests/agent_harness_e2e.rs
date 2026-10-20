@@ -962,7 +962,10 @@ async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
         tinysearch.get("version").and_then(Value::as_str),
         Some("0.5.1")
     );
-    assert_eq!(tinysearch.get("state").and_then(Value::as_str), Some("ready"));
+    assert_eq!(
+        tinysearch.get("state").and_then(Value::as_str),
+        Some("ready")
+    );
     assert_eq!(
         tinysearch.get("source").and_then(Value::as_str),
         Some("release")
