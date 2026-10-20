@@ -1,13 +1,13 @@
+use super::graph_json::nodes;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use serde_json::Value;
-use tinyflows::model::{NodeKind, WorkflowGraph};
 
 // Agent-ref resolvability gate: an `agent` node's `agent_ref` must name a
 // real agent, not the runtime's `RegistryFallback` "unknown agent_ref" case
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// `run_via_registry_fallback` (`tinyflows/caps.rs`) hard-errors mid-run with
+// `run_via_registry_fallback` (`flows/caps_host/agent.rs`) hard-errors mid-run with
 // "unknown agent_ref '…'" the moment an `agent` node's `config.agent_ref`
 // doesn't resolve to either a harness `AgentDefinition` or a custom agent
 // registry entry. Today that is the FIRST time an author finds out — the
@@ -25,7 +25,7 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 
 /// Rejects an `agent` node whose `config.agent_ref` would hit the runtime's
 /// `RegistryFallback` "unknown agent_ref" hard error mid-run
-/// (`run_via_registry_fallback` in `tinyflows/caps.rs`) — a real ref is one
+/// (`run_via_registry_fallback` in `flows/caps_host/agent.rs`) — a real ref is one
 /// that resolves via [`crate::flows::agent_route::route_for_agent_ref`]
 /// to a harness [`AgentDefinition`](crate::agent_registry::host_definition::AgentDefinition)
 /// (`AgentRoute::Harness`), OR — when it routes to `AgentRoute::RegistryFallback`
@@ -65,7 +65,7 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 pub(crate) async fn validate_agent_refs(
     ctx: &DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Vec<String> {
     use crate::agent_registry::host_definition::AgentDefinitionRegistry;
     use crate::agent_registry::AgentRegistryEntry;
@@ -75,8 +75,8 @@ pub(crate) async fn validate_agent_refs(
     let mut harness_registry_init_attempted = false;
     let mut custom_registry: Option<Result<Vec<AgentRegistryEntry>, String>> = None;
 
-    for node in &graph.nodes {
-        if node.kind != NodeKind::Agent {
+    for node in nodes(graph) {
+        if node.kind != "agent" {
             continue;
         }
         let Some(agent_ref) = node.config.get("agent_ref").and_then(Value::as_str) else {

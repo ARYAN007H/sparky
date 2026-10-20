@@ -27,6 +27,84 @@ fn nested_conditional_fan_in() -> Value {
 }
 
 #[tokio::test]
+async fn check_gate_rejects_a_tool_node_without_its_id() {
+    let tmp = tempfile::tempdir().expect("temporary workspace");
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.action_dir = config.workspace_dir.clone();
+    config.config_path = tmp.path().join("config.toml");
+    std::fs::create_dir_all(&config.workspace_dir).unwrap();
+
+    let registration = register(
+        Arc::new(config.clone()),
+        crate::core::runtime::DispatchCtx::ambient(),
+    )
+    .await
+    .unwrap();
+    let runtime = crate::modules::runtime::runtime().await.unwrap();
+    let proxy = runtime
+        .connection()
+        .proxy(
+            &registration.authoring.bus_name,
+            &registration.authoring.object_path,
+            "ai.tinyhumans.tinyflows.AuthoringHost",
+        )
+        .unwrap();
+
+    let valid = proxy
+        .call::<Vec<String>>(
+            tinyflows_bus::host::CHECK_GATE,
+            (
+                tinyflows_bus::host::TOOL_POLICY,
+                json!({
+                    "nodes": [{
+                        "id": "upload",
+                        "kind": "tool_call",
+                        "name": "Upload",
+                        "config": {
+                            "slug": "oh:storage_upload_file",
+                            "args": {"path": "report.html"}
+                        }
+                    }],
+                    "edges": []
+                }),
+            ),
+        )
+        .await
+        .expect("a valid normalized graph reaches the registered host callback");
+    assert!(
+        valid.is_empty(),
+        "valid relative upload should pass: {valid:?}"
+    );
+
+    let result = proxy
+        .call::<Vec<String>>(
+            tinyflows_bus::host::CHECK_GATE,
+            (
+                tinyflows_bus::host::TOOL_POLICY,
+                json!({
+                    "nodes": [{
+                        "kind": "tool_call",
+                        "name": "Upload",
+                        "config": {
+                            "slug": "oh:storage_upload_file",
+                            "args": {"path": "/tmp/report.html"}
+                        }
+                    }],
+                    "edges": []
+                }),
+            ),
+        )
+        .await;
+
+    let error = result.expect_err("a node without an id is malformed");
+    assert!(
+        error.to_string().contains("node 0"),
+        "expected a node-shape error, got {error}"
+    );
+}
+
+#[tokio::test]
 async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
@@ -72,7 +150,7 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
             )
             .unwrap();
             flow.id = shared_id.into();
-            crate::flows::store::upsert_flow(&config, &flow).unwrap();
+            crate::flows::test_support::seed_flow(&config, &flow).unwrap();
         })
         .await;
     }

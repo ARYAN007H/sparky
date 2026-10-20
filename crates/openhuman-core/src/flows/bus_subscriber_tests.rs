@@ -1,48 +1,5 @@
 use super::*;
-use tinyflows::model::TriggerKind;
 use tinyflows_catalog::types::{FlowRun, FlowRunTrigger};
-
-#[test]
-fn pinned_trigger_inputs_reads_values_an_author_fixed_for_unattended_runs() {
-    let flow = flow_with_trigger_config(
-        "f1",
-        true,
-        json!({
-            "trigger_kind": "schedule",
-            "schedule": "0 9 * * *",
-            "inputs": { "repo": "acme/api", "depth": 3 }
-        }),
-    );
-    let inputs = pinned_trigger_inputs(&flow);
-    assert_eq!(inputs["repo"], json!("acme/api"));
-    assert_eq!(inputs["depth"], json!(3));
-}
-
-#[test]
-fn pinned_trigger_inputs_is_empty_when_unset_or_malformed() {
-    // Empty, not an error: a flow declaring no inputs (the overwhelming
-    // majority) must keep dispatching on a tick exactly as before, and a
-    // malformed value is caught downstream by `prepare_flow_run`, which
-    // reports it against the flow's actual declarations.
-    for cfg in [
-        json!({ "trigger_kind": "schedule" }),
-        json!({ "trigger_kind": "schedule", "inputs": null }),
-        json!({ "trigger_kind": "schedule", "inputs": ["repo"] }),
-    ] {
-        let flow = flow_with_trigger_config("f1", true, cfg.clone());
-        assert!(
-            pinned_trigger_inputs(&flow).is_empty(),
-            "expected no pinned inputs for {cfg}"
-        );
-    }
-}
-
-#[test]
-fn pinned_trigger_inputs_is_empty_for_a_graph_with_no_trigger() {
-    let mut flow = flow_with_trigger_config("f1", true, json!({ "trigger_kind": "schedule" }));
-    flow.graph.nodes.clear();
-    assert!(pinned_trigger_inputs(&flow).is_empty());
-}
 
 #[test]
 fn name_and_domains_are_stable() {
@@ -53,6 +10,56 @@ fn name_and_domains_are_stable() {
         sub.domains(),
         Some(&["cron", "composio", "webhook", "system"][..])
     );
+}
+
+#[tokio::test]
+async fn portability_proxy_describes_bindings_and_returns_pinned_inputs() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let schedule_flow = flow_with_trigger_config(
+        "schedule-flow",
+        true,
+        json!({
+            "trigger_kind": "schedule",
+            "schedule": "0 9 * * *",
+            "inputs": {"repo": "acme/api", "depth": 3}
+        }),
+    );
+
+    let details = describe_trigger(&config, &schedule_flow).unwrap();
+    assert_eq!(details.kind.as_deref(), Some("schedule"));
+    assert!(
+        details.schedule.is_some(),
+        "schedule is returned as a typed value"
+    );
+    let inputs = trigger::pinned_trigger_inputs(&config, &schedule_flow).unwrap();
+    assert_eq!(inputs["repo"], json!("acme/api"));
+    assert_eq!(inputs["depth"], json!(3));
+
+    let event_flow = flow_with_trigger_config(
+        "event-flow",
+        true,
+        json!({
+            "trigger_kind": "app_event",
+            "toolkit": "gmail",
+            "trigger_slug": "GMAIL_NEW_GMAIL_MESSAGE"
+        }),
+    );
+    assert!(
+        trigger::matches_app_event(&config, &event_flow, "Gmail", "gmail_new_gmail_message")
+            .unwrap()
+    );
+    assert!(
+        !trigger::matches_app_event(&config, &event_flow, "slack", "GMAIL_NEW_GMAIL_MESSAGE")
+            .unwrap()
+    );
+
+    let malformed = flow_with_trigger_config(
+        "malformed-flow",
+        true,
+        json!({"trigger_kind": "schedule", "schedule": {"invalid": true}}),
+    );
+    assert!(describe_trigger(&config, &malformed).is_err());
 }
 
 #[tokio::test]
@@ -72,64 +79,6 @@ async fn handle_does_not_panic_on_arbitrary_events() {
     .await;
 }
 
-#[test]
-fn extract_trigger_kind_reads_schedule() {
-    let flow = flow_with_trigger_config(
-        "f1",
-        true,
-        json!({ "trigger_kind": "schedule", "schedule": "0 9 * * *" }),
-    );
-    assert!(matches!(
-        extract_trigger_kind(&flow),
-        Some(TriggerKind::Schedule)
-    ));
-}
-
-#[test]
-fn extract_trigger_kind_none_for_missing_discriminator() {
-    let flow = flow_with_trigger_config("f1", true, json!({}));
-    assert!(extract_trigger_kind(&flow).is_none());
-}
-
-#[test]
-fn extract_trigger_kind_none_for_invalid_discriminator() {
-    let flow = flow_with_trigger_config("f1", true, json!({ "trigger_kind": "not_a_kind" }));
-    assert!(extract_trigger_kind(&flow).is_none());
-}
-
-#[test]
-fn matches_app_event_requires_toolkit_and_slug_match() {
-    let flow = flow_with_trigger_config(
-        "f1",
-        true,
-        json!({ "trigger_kind": "app_event", "toolkit": "gmail", "trigger_slug": "GMAIL_NEW_GMAIL_MESSAGE" }),
-    );
-    assert!(matches_app_event(&flow, "gmail", "GMAIL_NEW_GMAIL_MESSAGE"));
-    // Case-insensitive.
-    assert!(matches_app_event(&flow, "Gmail", "gmail_new_gmail_message"));
-    // Wrong toolkit or slug does not match.
-    assert!(!matches_app_event(
-        &flow,
-        "slack",
-        "GMAIL_NEW_GMAIL_MESSAGE"
-    ));
-    assert!(!matches_app_event(&flow, "gmail", "SLACK_NEW_MESSAGE"));
-}
-
-#[test]
-fn matches_app_event_false_for_non_app_event_trigger() {
-    let flow = flow_with_trigger_config(
-        "f1",
-        true,
-        json!({ "trigger_kind": "schedule", "schedule": "0 9 * * *" }),
-    );
-    assert!(!matches_app_event(
-        &flow,
-        "gmail",
-        "GMAIL_NEW_GMAIL_MESSAGE"
-    ));
-}
-
 #[tokio::test]
 async fn handle_app_event_ignores_disabled_flows() {
     let tmp = tempfile::TempDir::new().unwrap();
@@ -139,7 +88,7 @@ async fn handle_app_event_ignores_disabled_flows() {
         false,
         json!({ "trigger_kind": "app_event", "toolkit": "gmail", "trigger_slug": "GMAIL_NEW_GMAIL_MESSAGE" }),
     );
-    crate::flows::store::upsert_flow(&config, &flow).unwrap();
+    crate::flows::test_support::seed_flow(&config, &flow).unwrap();
 
     // `list_enabled_flows` must not surface the disabled flow at all —
     // proves the subscriber's dispatch source already excludes it,
@@ -158,7 +107,7 @@ async fn handle_schedule_tick_ignores_disabled_flow() {
         false,
         json!({ "trigger_kind": "schedule", "schedule": "0 9 * * *" }),
     );
-    crate::flows::store::upsert_flow(&config, &flow).unwrap();
+    crate::flows::test_support::seed_flow(&config, &flow).unwrap();
 
     let sub = FlowTriggerSubscriber::new(config.clone());
     // Must not panic and must not spawn a run for a disabled flow — we
@@ -286,7 +235,7 @@ async fn digest_treats_completed_with_warnings_as_success() {
     let _engine = digest_test_engine(&config);
 
     let flow = flow_with_trigger_config("f-warn", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
+    crate::flows::test_support::seed_flow(&config, &flow).unwrap();
     let run = crate::flows::ops::flows_run(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -332,7 +281,7 @@ async fn digest_is_skipped_quietly_when_memory_is_off() {
     config.memory.engine = String::new();
     let config = Arc::new(config);
     let flow = flow_with_trigger_config("f-off", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
+    crate::flows::test_support::seed_flow(&config, &flow).unwrap();
     // No run row exists: with memory off the subscriber must return before
     // even loading it, so this completes without a warning path.
     FlowRunDigestSubscriber::new(config)

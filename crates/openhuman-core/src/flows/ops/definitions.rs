@@ -1,4 +1,5 @@
 use super::*;
+use tinyflows_catalog::graph_policy::{enforce_side_effect_approval, trigger_is_automatic};
 
 /// Publishes a [`DomainEvent::FlowChanged`](crate::core::events::DomainEvent::FlowChanged)
 /// so an open Workflows list/canvas refetches (bridged to a `flow:changed`
@@ -113,12 +114,15 @@ pub(crate) async fn flows_create_with_context(
 
     let mut logs = vec!["flow created".to_string()];
     if !enabled {
-        let trigger_label = flow
-            .graph
-            .trigger()
-            .and_then(|t| t.config.get("trigger_kind"))
-            .and_then(Value::as_str)
-            .unwrap_or("automatic");
+        let trigger_label = match bus::describe_trigger(config, &flow) {
+            Ok(details) => details
+                .kind
+                .unwrap_or_else(|| "automatic".to_string()),
+            Err(error) => {
+                tracing::warn!(target: "flows", flow_id = %flow.id, %error, "[flows] could not describe trigger after create");
+                "automatic".to_string()
+            }
+        };
         logs.push(format!(
             "Flow created DISABLED because it has an automatic trigger ({trigger_label}). \
              Enable it explicitly (flows_set_enabled) when you are ready for it to fire."

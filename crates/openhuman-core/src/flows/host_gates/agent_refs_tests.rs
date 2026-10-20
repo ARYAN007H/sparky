@@ -2,7 +2,6 @@ use super::*;
 use crate::config::Config;
 use serde_json::{json, Value};
 use tempfile::TempDir;
-use tinyflows::model::WorkflowGraph;
 
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
@@ -15,11 +14,11 @@ fn test_config(tmp: &TempDir) -> Config {
     config
 }
 
-fn graph(value: Value) -> WorkflowGraph {
+fn graph(value: Value) -> Value {
     let graph = tinyflows::migrate::deserialize_graph(value).expect("test graph deserializes");
     tinyflows::validate::validate(&graph).expect("test graph is structurally valid");
     tinyflows::compat::ensure_compatible(&graph).expect("test graph is compatible");
-    graph
+    serde_json::to_value(graph).expect("validated graph serializes")
 }
 
 // ── validate_agent_refs (agent-ref resolvability gate, PR #5114) ───────────

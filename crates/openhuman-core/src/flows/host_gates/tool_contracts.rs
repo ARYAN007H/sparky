@@ -1,6 +1,6 @@
+use super::graph_json::nodes;
 use crate::config::Config;
 use serde_json::Value;
-use tinyflows::model::{NodeKind, WorkflowGraph};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool-contract enforcement gate (systemic tool-contract fix, Part 2)
@@ -40,18 +40,16 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 /// field can't be proven wrong, whereas a nonexistent slug or a missing
 /// required arg are both provably broken.
 /// Enforces the host's curated-only, live-action and argument-shape policy.
-pub(crate) async fn validate_tool_contracts(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
+pub(crate) async fn validate_tool_contracts(config: &Config, graph: &Value) -> Vec<String> {
     use crate::integrations::composio::contract::validation::{
         validate_tool_contract_nodes, ToolContractNode,
     };
 
-    let nodes: Vec<_> = graph
-        .nodes
-        .iter()
-        .filter(|node| node.kind == NodeKind::ToolCall)
+    let nodes: Vec<_> = nodes(graph)
+        .filter(|node| node.kind == "tool_call")
         .filter_map(|node| {
             Some(ToolContractNode {
-                id: node.id.clone(),
+                id: node.id.to_owned(),
                 slug: node.config.get("slug")?.as_str()?.to_string(),
                 args: node.config.get("args").cloned().unwrap_or(Value::Null),
             })
