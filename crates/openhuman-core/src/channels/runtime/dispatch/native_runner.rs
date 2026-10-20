@@ -141,22 +141,19 @@ impl TurnHost<QueuedPayload> for NativeHost {
             .as_ref()
             .ok_or_else(|| "channel turn has no trusted host context".to_owned())?;
         let (agent_progress, mut progress_rx) = mpsc::channel(64);
-        let progress_forwarder = request
-            .payload
-            .ctx
-            .as_ref()
-            .map(crate::core::runtime::DispatchCtx::clone)
-            .map(|dispatch| dispatch.spawn(async move {
-            while let Some(event) = progress_rx.recv().await {
-                if progress
-                    .send(TurnSignal::Progress(Box::new(event)))
-                    .await
-                    .is_err()
-                {
-                    break;
+        let progress_forwarder = request.payload.ctx.as_ref().map(|dispatch| {
+            dispatch.clone().spawn(async move {
+                while let Some(event) = progress_rx.recv().await {
+                    if progress
+                        .send(TurnSignal::Progress(Box::new(event)))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
                 }
-            }
-        }));
+            })
+        });
         let response = crate::channels::runtime::dispatch::host_agent::run_host_agent_turn(
             trusted.host_agent.clone(),
             crate::channels::runtime::dispatch::host_agent::HostChannelTurn {
@@ -176,8 +173,13 @@ impl TurnHost<QueuedPayload> for NativeHost {
         )
         .await
         .map_err(|error| error.to_string());
-        if let Some(progress_forwarder) = progress_forwarder {
-            let _ = progress_forwarder.await;
+        if let Some(mut progress_forwarder) = progress_forwarder {
+            if tokio::time::timeout(std::time::Duration::from_secs(5), &mut progress_forwarder)
+                .await
+                .is_err()
+            {
+                progress_forwarder.abort();
+            }
         }
         response.map(|response| TurnResult {
             reply: response.text,
@@ -190,7 +192,11 @@ impl TurnHost<QueuedPayload> for NativeHost {
 
     async fn checkin(&self, _request: &TurnRequest<QueuedPayload>) {}
 
-    async fn cancel_children(&self, _request: &TurnRequest<QueuedPayload>) {}
+    async fn cancel_children(&self, _request: &TurnRequest<QueuedPayload>) {
+        // Channel turns preserve the web host's scoped-stop policy: the
+        // per-turn cancellation token reaches the parent session, while
+        // detached sub-agents remain independently owned and cancellable.
+    }
 }
 
 impl NativeHost {
@@ -293,9 +299,21 @@ impl EventSink<QueuedPayload> for NativeEvents {
         let Some(reply) = reply else {
             return;
         };
+        if self
+            .shared
+            .with(&request.request_id, |slot| slot.progress_failed)
+        {
+            return;
+        }
         match reply.feed(vec![event]).await {
             Ok(result) if super::processor::progressive::delivery_succeeded(&result) => {}
-            Ok(_) | Err(_) => self.shared.with(&request.request_id, |slot| slot.progress_failed = true),
+            Ok(_) | Err(_) => {
+                self.shared
+                    .with(&request.request_id, |slot| slot.progress_failed = true);
+                if let Err(error) = reply.close().await {
+                    tracing::warn!("[dispatch] native progressive close failed: {error}");
+                }
+            }
         }
     }
 
@@ -447,3 +465,7 @@ pub(crate) async fn run(
         queued,
     }
 }
+
+#[cfg(test)]
+#[path = "native_runner_tests.rs"]
+mod tests;
