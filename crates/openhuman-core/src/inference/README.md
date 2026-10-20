@@ -79,13 +79,12 @@ through the same gates and constructors.
 
 ### The managed backend model
 
-The managed backend model (`crates/openhuman-tinyhumans/src/inference/managed_model.rs`, registered with `inference::registry` under `PROVIDER_OPENHUMAN`) is a host `ChatModel` for the OpenHuman backend. It cannot be
-a plain `tinyinference` OpenAI preset for three reasons: the session bearer is resolved fresh per
-call, the request carries a top-level `thread_id` so the backend can group logs and align cache
-keys, and the response carries an `openhuman.{billing,usage}` envelope with the charged USD that
-the generic parser drops. The model re-projects that envelope
-(`managed_usage.rs` in `openhuman-tinyhumans`) so usage meters see real costs. When the bearer's `exp` has
-already passed, or the backend rejects it, it publishes `DomainEvent::SessionExpired`.
+Managed chat uses TinyInference's `TinyHumansModel` through the host adapter in
+`openhuman-tinyhumans/src/inference/managed_model.rs`. The adapter supplies the live bearer
+resolver and host error observer; TinyInference owns request construction and response parsing.
+The host's typed authentication-failure callback publishes `DomainEvent::SessionExpired` when a
+stored session has expired or the backend rejects it. API-key credentials remain eligible for
+managed inference and do not trigger session demotion.
 
 [`provider/openai_codex.rs`](./provider/openai_codex.rs) is related but is not a model. When ChatGPT/Codex OAuth tokens exist
 for the `openai` slug, `resolve_openai_codex_routing` re-targets that slug at the Codex backend
@@ -221,7 +220,7 @@ picks the provider the same way a provider string does.
 - `probe_inference_readiness` (`provider/factory/chat_model.rs`) checks that a role can actually
   run: it builds the model and, for the managed backend, makes one cheap completion.
 - `BYOK_INCOMPLETE_SENTINEL` (`provider/factory.rs`) marks a BYOK route with missing pieces.
-- `OpenHumanBackendModel` (`openhuman-tinyhumans`, `src/inference/managed_model.rs`) is the managed backend model, registered through `registry.rs`.
+- `TinyHumansModel` (from TinyInference) is the managed chat implementation; `openhuman-tinyhumans/src/inference/managed_model.rs` supplies host credential and failure policy, and `registry.rs` registers it under `PROVIDER_OPENHUMAN`.
 - `host_runtime::global` ([`host_runtime/core.rs`](./host_runtime/core.rs)) returns the `LocalAiService` singleton.
 - `agent_chat_for` and `agent_chat_reply_for` (`agent_runs/agent_chat/session_turn.rs`) run an agent turn
   natively. `INFERENCE_AGENT_CHAT` (`agent_runs::INFERENCE_AGENT_CHAT`) is the wire method name hosts reference.

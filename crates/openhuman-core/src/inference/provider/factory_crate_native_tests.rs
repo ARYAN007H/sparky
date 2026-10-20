@@ -241,7 +241,7 @@ async fn one_shot_chat_models_preserve_factory_temperature_as_request_default() 
 
 // ── Motion B (#4727): managed-backend crate-native routing ──────────────────
 // `create_chat_model` must route the managed OpenHuman backend through the
-// crate-native `OpenHumanBackendModel`, whose concrete `managed` profile
+// crate-native `TinyHumansModel`, whose concrete `managed` profile
 // advertises the capabilities that routing previously inferred through the
 // provider adapter.
 
