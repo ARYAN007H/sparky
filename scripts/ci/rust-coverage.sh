@@ -166,10 +166,30 @@ target_expected_in_coverage() {
 # scripts/ci-cancel-aware.sh) stops the run at once.
 FAILED_SUITES=()
 
+# Cargo names why it rebuilds a unit ("Dirty <crate>: <reason>") only in
+# verbose mode. Keep those lines, in the log and in ci-out/rebuilds/<suite>.log,
+# and drop the verbose noise ("Running `rustc ...`", "Fresh <crate>"): an
+# identical suite rebuilding the whole graph (the embed suite after the core
+# suite in EX63 runs 39365491098 and 39371566398) is otherwise unexplained.
+# OH_COV_EXPLAIN_REBUILDS=0 turns it off.
+explain_rebuilds() {
+  awk -v reasons="$1" '
+    /^ +Dirty / { print >> reasons; print; fflush(); next }
+    /^ +(Running `|Fresh )/ { next }
+    { print; fflush() }
+  '
+}
+
 suite() {
-  local name="$1" rc=0
+  local name="$1" rc=0 slug
   shift
-  COV_SUITE="$(printf '%s' "$name" | tr -cs '[:alnum:]' '-')" "$@" || rc=$?
+  slug="$(printf '%s' "$name" | tr -cs '[:alnum:]' '-')"
+  if [ "${OH_COV_EXPLAIN_REBUILDS:-1}" = "1" ]; then
+    mkdir -p ci-out/rebuilds
+    CARGO_TERM_VERBOSE=true COV_SUITE="${slug}" "$@" 2> >(explain_rebuilds "ci-out/rebuilds/${slug}.log" >&2) || rc=$?
+  else
+    COV_SUITE="${slug}" "$@" || rc=$?
+  fi
   # On the self-hosted guest (CI_SCRATCH_DIR is set) log what the scratch disk
   # has left and how large the coverage target and its raw profiles are after
   # each suite, so a full disk (EX63 run 39292268284) names the suite that
