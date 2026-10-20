@@ -272,9 +272,13 @@ async fn execute_via_bus(
         &config.action_dir,
     ));
     let binding = Binding::new(ctx, config, security);
-    let host = bus_host::register(binding).await.map_err(|e| anyhow!(e))?;
+    let host = bus_host::register(binding.clone())
+        .await
+        .map_err(|e| anyhow!(e))?;
     let proxy = module::run_proxy(config).await.map_err(|e| anyhow!(e))?;
-    let scope = crate::cron::documents_port::DocScope::current(config)?;
+    let scope = binding
+        .within(async { crate::cron::documents_port::DocScope::current(config) })
+        .await?;
     let request = RunJobNow {
         scope: CLAIM_SCOPE.to_string(),
         callback: host.address(),
