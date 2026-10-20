@@ -350,7 +350,7 @@ async fn load_or_init_falls_back_to_defaults_when_backup_also_corrupted() {
     // Config::default() sets default_model = Some("reasoning-v1").
     assert_eq!(
         config.default_model.as_deref(),
-        Some("openrouter/deepseek/deepseek-v4-flash"),
+        None,
         "must fall back to defaults when backup is also corrupted"
     );
 
@@ -382,7 +382,7 @@ async fn load_or_init_falls_back_to_defaults_when_no_backup() {
 
     assert_eq!(
         config.default_model.as_deref(),
-        Some("openrouter/deepseek/deepseek-v4-flash"),
+        None,
         "must fall back to defaults when no backup exists"
     );
 

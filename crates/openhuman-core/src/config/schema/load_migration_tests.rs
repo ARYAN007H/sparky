@@ -104,7 +104,7 @@ async fn load_or_init_non_utf8_falls_back_to_defaults_when_backup_also_non_utf8(
 
     assert_eq!(
         config.default_model.as_deref(),
-        Some("openrouter/deepseek/deepseek-v4-flash"),
+        None,
         "must fall back to defaults when both config and backup have non-UTF-8 content"
     );
 
