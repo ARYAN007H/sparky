@@ -11,7 +11,12 @@ use std::process::Command;
 #[cfg(feature = "skills")]
 use std::time::Duration;
 
-fn dump_published_prompt(agent_id: &str, workspace: &Path) -> serde_json::Value {
+fn dump_published_prompt(
+    agent_id: &str,
+    home: &Path,
+    workspace: &Path,
+    module_search_path: &Path,
+) -> serde_json::Value {
     let output = Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
         .args([
             "agent",
@@ -23,6 +28,17 @@ fn dump_published_prompt(agent_id: &str, workspace: &Path) -> serde_json::Value 
             "--json",
             "--with-tools",
         ])
+        .env("HOME", home)
+        .env("OPENHUMAN_WORKSPACE", workspace)
+        .env("OPENHUMAN_MODULE_PATH", module_search_path)
+        .env_remove("BACKEND_URL")
+        .env_remove("VITE_BACKEND_URL")
+        .env_remove("OPENHUMAN_BACKEND_API_KEY")
+        .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
+        .env_remove("OPENHUMAN_STORAGE_URL")
+        .env_remove("OPENHUMAN_MODULE_SOURCE")
+        .env_remove("OPENHUMAN_MODULE_SOURCE_DIR")
+        .env_remove("OPENHUMAN_MODULE_SOURCE_TINYFLOWS")
         .output()
         .expect("run the public prompt-dump command");
     assert!(
@@ -76,9 +92,13 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
     let _tinyflows_source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYFLOWS");
     let (library, _) = published_tinyflows::staged_v0_8_27_module();
+    let module_search_path = library
+        .parent()
+        .expect("staged module artifact has a search directory");
     let workspace = temp.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("workspace directory");
     let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
+    let _module_path_guard = EnvVarGuard::set_to_path("OPENHUMAN_MODULE_PATH", module_search_path);
     let openhuman_home = temp.path().join(".openhuman");
     let local_config_dir = openhuman_home.join("users/local");
     std::fs::create_dir_all(&local_config_dir).expect("create isolated local config directory");
@@ -101,7 +121,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         ("workflow_builder", "propose_workflow", "propose-only"),
         ("flow_discovery", "suggest_workflows", "read-only"),
     ] {
-        let prompt = dump_published_prompt(agent_id, &workspace);
+        let prompt = dump_published_prompt(agent_id, temp.path(), &workspace, module_search_path);
         let text = prompt["system_prompt"]
             .as_str()
             .expect("public prompt dump returns system_prompt text");
@@ -186,7 +206,12 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         for path in [&config_path, &local_config_path] {
             std::fs::write(path, &disabled_text).expect("disable module in active CLI config");
         }
-        let ordinary_prompt = dump_published_prompt("orchestrator", &workspace);
+        let ordinary_prompt = dump_published_prompt(
+            "orchestrator",
+            temp.path(),
+            &workspace,
+            module_search_path,
+        );
         assert!(ordinary_prompt["system_prompt"]
             .as_str()
             .expect("ordinary prompt text")
@@ -197,7 +222,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         for path in [&config_path, &local_config_path] {
             std::fs::write(path, &enabled_config).expect("re-enable module in CLI config");
         }
-        dump_published_prompt("workflow_builder", &workspace);
+        dump_published_prompt("workflow_builder", temp.path(), &workspace, module_search_path);
         prewarm_flow_authoring_in_parent(&ctx, &config).await;
         let reenabled = openhuman_core::skills::load_workflow_metadata_for(&ctx, &config);
         assert!(
