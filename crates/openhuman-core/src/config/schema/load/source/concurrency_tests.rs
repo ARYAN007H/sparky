@@ -28,7 +28,7 @@ async fn agent_registry_rpc_preserves_document_conflicts() {
         .expect("agent registry RPC is registered");
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), stale);
     let error = CoreContext::scope(ctx.clone(), async move {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(ctx),
             json!({"id": "orchestrator", "enabled": true})
                 .as_object()
@@ -71,7 +71,7 @@ async fn memory_engine_rpc_preserves_document_conflicts() {
         .expect("memory engine RPC is registered");
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), stale);
     let error = CoreContext::scope(ctx.clone(), async move {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(ctx),
             json!({"engine": "none"}).as_object().unwrap().clone(),
         )
@@ -114,7 +114,7 @@ async fn sequential_config_rpcs_use_the_latest_context_snapshot() {
     ] {
         let dispatch = DispatchCtx::new(ctx.clone());
         CoreContext::scope(ctx.clone(), async {
-            (controller.handler)(dispatch, patch.as_object().unwrap().clone())
+            controller.invoke(dispatch, patch.as_object().unwrap().clone())
                 .await
                 .expect(
                     "sequential config settings updates should use the latest context snapshot",
@@ -157,7 +157,7 @@ async fn external_config_conflict_refreshes_the_context_before_the_next_read() {
         .find(|controller| controller.rpc_method_name() == "openhuman.config_update_model_settings")
         .expect("config model settings RPC is registered");
     let conflict = CoreContext::scope(ctx.clone(), async {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(ctx.clone()),
             json!({"default_temperature": 0.8})
                 .as_object()
@@ -223,7 +223,7 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
         .find(|controller| controller.rpc_method_name() == "openhuman.config_update_model_settings")
         .expect("config model settings RPC is registered");
     let conflict = CoreContext::scope(ctx.clone(), async {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(ctx.clone()),
             json!({"default_temperature": 0.8})
                 .as_object()
@@ -253,7 +253,7 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     assert!(refreshed.composio.host_credential.is_some());
 
     CoreContext::scope(ctx.clone(), async {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(ctx.clone()),
             json!({"default_temperature": 0.6})
                 .as_object()
@@ -285,7 +285,7 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     later_external.autonomy.enabled = false;
     later_external.save().await.unwrap();
     let later_conflict = CoreContext::scope(grandchild.clone(), async {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(grandchild.clone()),
             json!({"default_temperature": 0.7})
                 .as_object()
@@ -355,7 +355,7 @@ async fn nested_context_refresh_does_not_pin_a_previous_external_value() {
     external.default_model = Some("external-first".into());
     external.save().await.unwrap();
     let first_conflict = CoreContext::scope(first_context.clone(), async {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(first_context.clone()),
             json!({"default_temperature": 0.8})
                 .as_object()
@@ -387,7 +387,7 @@ async fn nested_context_refresh_does_not_pin_a_previous_external_value() {
     external.default_model = Some("external-second".into());
     external.save().await.unwrap();
     let second_conflict = CoreContext::scope(nested.clone(), async {
-        (controller.handler)(
+        controller.invoke(
             DispatchCtx::new(nested.clone()),
             json!({"default_temperature": 0.7})
                 .as_object()

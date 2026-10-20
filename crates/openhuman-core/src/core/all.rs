@@ -71,7 +71,7 @@ impl BoundRegisteredController {
     ) -> Self {
         let decode =
             Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
-        let invoke = Arc::new(move |ctx, params| {
+        let invoke = Arc::new(move |ctx: DispatchCtx, params: Map<String, Value>| {
             Box::pin(async move { run(ctx, parse(params)?).await }) as ControllerFuture
         }) as Arc<dyn Fn(_, _) -> _ + Send + Sync>;
         Self {
