@@ -372,7 +372,10 @@ export default async function queuedImageAttachmentRoundtrip({
   }
   log("composer ACK reached the matching pending UI entry; queued RPC image ACK retained an opaque ref; neither had a transcript row before the active turn completed");
 
-  await page.getByText(FIRST_REPLY, { exact: false }).waitFor({ timeout: 60_000 });
+  // The mock holds the first turn for sixty one-second thinking deltas. The
+  // queue/no-row checks above prove it remained active; this bounded wait lets
+  // the scripted response naturally drain without a timing assertion race.
+  await page.getByText(FIRST_REPLY, { exact: false }).waitFor({ timeout: 90_000 });
   await waitUntil(
     async () =>
       (await page.getByText(QUEUED_REPLY, { exact: false }).count()) >= 2,
