@@ -246,7 +246,7 @@ impl ChannelHostCallbacks {
         request: HostVoiceReplyPolicyRequest,
     ) -> Result<HostVoiceReplyPolicy> {
         Self::validate_callback_size(&request)?;
-        Ok(self.voice().reply_policy(&request.scope))
+        Ok(self.voice().reply_policy(&request.scope, &self.tenant))
     }
 
     async fn publish_event(&self, publication: HostEventPublication) -> Result<()> {

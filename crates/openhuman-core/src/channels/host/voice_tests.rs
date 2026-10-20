@@ -20,6 +20,10 @@ fn scope(channel: &str, conversation: &str, turn: &str) -> HostVoiceScope {
 fn envelope(conversation: &str, message: &str, voice: bool) -> ChannelInboundEnvelope {
     let mut envelope = ChannelInboundEnvelope {
         message_id: message.into(),
+        channel: ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram".into()),
+        },
         conversation: ConversationRef {
             id: conversation.into(),
             ..ConversationRef::default()
@@ -41,13 +45,14 @@ fn envelope(conversation: &str, message: &str, voice: bool) -> ChannelInboundEnv
 
 #[test]
 fn mirror_policy_reports_inbound_voice_from_recorded_envelope() {
-    record_inbound_envelope(&envelope("c-voice", "m1", true));
-    record_inbound_envelope(&envelope("c-text", "m2", false));
+    let tenant = crate::core::runtime::Tenant::default();
+    record_inbound_envelope(&envelope("c-voice", "m1", true), &tenant);
+    record_inbound_envelope(&envelope("c-text", "m2", false), &tenant);
     let cfg = ChannelVoiceConfig::default();
-    let voice = resolve_policy(&cfg, &scope("telegram", "c-voice", "m1"));
+    let voice = resolve_policy(&cfg, &scope("telegram", "c-voice", "m1"), &tenant);
     assert_eq!(voice.mode, HostVoiceReplyMode::Mirror);
     assert!(voice.inbound_has_voice);
-    let text = resolve_policy(&cfg, &scope("telegram", "c-text", "m2"));
+    let text = resolve_policy(&cfg, &scope("telegram", "c-text", "m2"), &tenant);
     assert!(!text.inbound_has_voice);
 }
 
@@ -64,16 +69,19 @@ fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
         account_id: Some("telegram:bob".into()),
     };
 
-    record_inbound_envelope(&voice);
-    record_inbound_envelope(&text);
+    let tenant = crate::core::runtime::Tenant::default();
+    record_inbound_envelope(&voice, &tenant);
+    record_inbound_envelope(&text, &tenant);
 
     let alice = resolve_policy(
         &ChannelVoiceConfig::default(),
         &scope("telegram:alice", "shared-conversation", "shared-turn"),
+        &tenant,
     );
     let bob = resolve_policy(
         &ChannelVoiceConfig::default(),
         &scope("telegram:bob", "shared-conversation", "shared-turn"),
+        &tenant,
     );
     assert!(alice.inbound_has_voice, "Alice's voice turn was overwritten by Bob's text turn");
     assert!(!bob.inbound_has_voice);
@@ -81,7 +89,11 @@ fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
 
 #[test]
 fn unknown_turn_defaults_to_no_voice() {
-    let policy = resolve_policy(&ChannelVoiceConfig::default(), &scope("t", "nope", "nope"));
+    let policy = resolve_policy(
+        &ChannelVoiceConfig::default(),
+        &scope("t", "nope", "nope"),
+        &crate::core::runtime::Tenant::default(),
+    );
     assert!(!policy.inbound_has_voice);
     assert!(!policy.explicitly_requested);
 }
@@ -97,24 +109,32 @@ fn policy_mode_follows_thread_then_channel_overrides() {
         },
     );
     assert_eq!(
-        resolve_policy(&cfg, &scope("telegram", "c", "t")).mode,
+        resolve_policy(&cfg, &scope("telegram", "c", "t"), &crate::core::runtime::Tenant::default()).mode,
         HostVoiceReplyMode::Always
     );
     cfg.threads.insert("c".into(), VoiceReplyMode::Never);
     assert_eq!(
-        resolve_policy(&cfg, &scope("telegram", "c", "t")).mode,
+        resolve_policy(&cfg, &scope("telegram", "c", "t"), &crate::core::runtime::Tenant::default()).mode,
         HostVoiceReplyMode::Never
     );
     assert_eq!(
-        resolve_policy(&cfg, &scope("slack", "other", "t")).mode,
+        resolve_policy(&cfg, &scope("slack", "other", "t"), &crate::core::runtime::Tenant::default()).mode,
         HostVoiceReplyMode::Mirror
     );
 }
 
 #[test]
 fn registry_is_bounded() {
+    let tenant = crate::core::runtime::Tenant::default();
     for index in 0..(MAX_TRACKED_TURNS + 10) {
-        record_turn("bounded", &index.to_string(), VoiceTurnFacts::default());
+        let conversation = ConversationRef {
+            id: "bounded".into(),
+            ..ConversationRef::default()
+        };
+        record_turn(
+            turn_key(&tenant, &ChannelRef::default(), &conversation, &index.to_string()),
+            VoiceTurnFacts::default(),
+        );
     }
     assert!(TURNS.lock().len() <= MAX_TRACKED_TURNS);
 }

@@ -81,7 +81,6 @@ pub(crate) async fn process_channel_runtime_message(
         conversation: envelope.conversation.clone(),
         session_key: canonical_session_key.clone(),
     };
-    crate::channels::host::voice::record_inbound_envelope(&envelope);
     let native_target = if let Some(target) = progressive_target {
         Some(target)
     } else {
@@ -101,6 +100,7 @@ pub(crate) async fn process_channel_runtime_message(
             return;
         }
     };
+    crate::channels::host::voice::record_inbound_envelope(&envelope, &tenant);
     let session_key = crate::core::runtime::tenant::tenant_key(&tenant, &canonical_session_key);
 
     println!(

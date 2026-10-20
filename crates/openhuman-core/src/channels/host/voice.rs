@@ -12,9 +12,10 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Instant;
 use tinychannels_bus::{
-    ChannelInboundEnvelope, ContentPart, HostSpeechSynthesisRequest, HostSpeechSynthesisResult,
-    HostTranscriptionRequest, HostTranscriptionResult, HostVoiceReplyMode, HostVoiceReplyPolicy,
-    HostVoiceScope, HostVoiceTranscriptionRequest,
+    ChannelInboundEnvelope, ChannelRef, ContentPart, ConversationRef,
+    HostSpeechSynthesisRequest, HostSpeechSynthesisResult, HostTranscriptionRequest,
+    HostTranscriptionResult, HostVoiceReplyMode, HostVoiceReplyPolicy, HostVoiceScope,
+    HostVoiceTranscriptionRequest,
 };
 
 const LOG_PREFIX: &str = "[channels_voice]";
@@ -29,15 +30,21 @@ pub(crate) struct VoiceTurnFacts {
     pub explicitly_requested: bool,
 }
 
-static TURNS: Mutex<VecDeque<(String, VoiceTurnFacts)>> = Mutex::new(VecDeque::new());
-
-fn turn_key(conversation_id: &str, turn_id: &str) -> String {
-    format!("{conversation_id}\u{1f}{turn_id}")
+/// Full authenticated identity for one inbound voice-policy fact. Provider
+/// conversation and message ids are not globally unique, so neither may be
+/// used without the tenant and configured account that own them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct VoiceTurnKey {
+    tenant: crate::core::runtime::Tenant,
+    channel: ChannelRef,
+    conversation: ConversationRef,
+    turn_id: String,
 }
 
+static TURNS: Mutex<VecDeque<(VoiceTurnKey, VoiceTurnFacts)>> = Mutex::new(VecDeque::new());
+
 /// Remember the facts of an inbound turn so the reply policy can read them.
-pub(crate) fn record_turn(conversation_id: &str, turn_id: &str, facts: VoiceTurnFacts) {
-    let key = turn_key(conversation_id, turn_id);
+fn record_turn(key: VoiceTurnKey, facts: VoiceTurnFacts) {
     let mut turns = TURNS.lock();
     turns.retain(|(existing, _)| existing != &key);
     if turns.len() >= MAX_TRACKED_TURNS {
@@ -46,8 +53,22 @@ pub(crate) fn record_turn(conversation_id: &str, turn_id: &str, facts: VoiceTurn
     turns.push_back((key, facts));
 }
 
-fn turn_facts(conversation_id: &str, turn_id: &str) -> VoiceTurnFacts {
-    let key = turn_key(conversation_id, turn_id);
+fn turn_key(
+    tenant: &crate::core::runtime::Tenant,
+    channel: &ChannelRef,
+    conversation: &ConversationRef,
+    turn_id: &str,
+) -> VoiceTurnKey {
+    VoiceTurnKey {
+        tenant: tenant.clone(),
+        channel: channel.clone(),
+        conversation: conversation.clone(),
+        turn_id: turn_id.to_owned(),
+    }
+}
+
+fn turn_facts(scope: &HostVoiceScope, tenant: &crate::core::runtime::Tenant) -> VoiceTurnFacts {
+    let key = turn_key(tenant, &scope.channel, &scope.conversation, &scope.turn_id);
     TURNS
         .lock()
         .iter()
@@ -58,14 +79,21 @@ fn turn_facts(conversation_id: &str, turn_id: &str) -> VoiceTurnFacts {
 
 /// Record an inbound envelope's voice facts. The inbound message id is the
 /// turn id the module echoes back in its voice scope.
-pub(crate) fn record_inbound_envelope(envelope: &ChannelInboundEnvelope) {
+pub(crate) fn record_inbound_envelope(
+    envelope: &ChannelInboundEnvelope,
+    tenant: &crate::core::runtime::Tenant,
+) {
     let inbound_has_voice = envelope
         .parts
         .iter()
         .any(|part| matches!(part, ContentPart::VoiceNote { .. }));
     record_turn(
-        &envelope.conversation.id,
-        &envelope.message_id,
+        turn_key(
+            tenant,
+            &envelope.channel,
+            &envelope.conversation,
+            &envelope.message_id,
+        ),
         VoiceTurnFacts {
             inbound_has_voice,
             explicitly_requested: false,
@@ -95,9 +123,10 @@ fn wire_mode(mode: VoiceReplyMode) -> HostVoiceReplyMode {
 pub(crate) fn resolve_policy(
     voice: &ChannelVoiceConfig,
     scope: &HostVoiceScope,
+    tenant: &crate::core::runtime::Tenant,
 ) -> HostVoiceReplyPolicy {
     let mode = voice.resolve_mode(&scope.configured_instance, thread_key(scope));
-    let facts = turn_facts(&scope.conversation.id, &scope.turn_id);
+    let facts = turn_facts(scope, tenant);
     HostVoiceReplyPolicy {
         mode: wire_mode(mode),
         inbound_has_voice: facts.inbound_has_voice,
@@ -242,8 +271,12 @@ impl ChannelVoiceHost {
     }
 
     /// Host-authoritative reply policy for the scoped turn.
-    pub(crate) fn reply_policy(&self, scope: &HostVoiceScope) -> HostVoiceReplyPolicy {
-        let policy = resolve_policy(&self.config.channel_voice, scope);
+    pub(crate) fn reply_policy(
+        &self,
+        scope: &HostVoiceScope,
+        tenant: &crate::core::runtime::Tenant,
+    ) -> HostVoiceReplyPolicy {
+        let policy = resolve_policy(&self.config.channel_voice, scope, tenant);
         tracing::debug!(
             "{LOG_PREFIX} policy channel={} mode={:?} inbound_voice={}",
             scope.configured_instance,
