@@ -454,19 +454,19 @@ mod provider_config_rejection_suppression {
         // rule.)
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                openhuman_backend_model::PROVIDER_LABEL,
+                "OpenHuman",
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TIER_LEAK_BODY
             ),
-            openhuman_backend_model::PROVIDER_LABEL
+            "OpenHuman"
         ));
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                openhuman_backend_model::PROVIDER_LABEL,
+                "OpenHuman",
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TEMP_BODY
             ),
-            openhuman_backend_model::PROVIDER_LABEL
+            "OpenHuman"
         ));
     }
 
@@ -490,11 +490,11 @@ mod provider_config_rejection_suppression {
             assert!(
                 config_rejection_demoted(
                     &tinyinference_llm::failure::http::classify_http_failure(
-                        openhuman_backend_model::PROVIDER_LABEL,
+                        "OpenHuman",
                         reqwest::StatusCode::BAD_REQUEST.as_u16(),
                         body
                     ),
-                    openhuman_backend_model::PROVIDER_LABEL
+                    "OpenHuman"
                 ),
                 "TAURI-RUST-2Z1 body must be suppressed for openhuman backend: {body:?}"
             );
@@ -574,11 +574,11 @@ mod provider_config_rejection_suppression {
         assert!(
             !config_rejection_demoted(
                 &tinyinference_llm::failure::http::classify_http_failure(
-                    openhuman_backend_model::PROVIDER_LABEL,
+                    "OpenHuman",
                     reqwest::StatusCode::FORBIDDEN.as_u16(),
                     body
                 ),
-                openhuman_backend_model::PROVIDER_LABEL
+                "OpenHuman"
             ),
             "backend 403 subscription phrase must NOT be suppressed (polarity guard)"
         );
