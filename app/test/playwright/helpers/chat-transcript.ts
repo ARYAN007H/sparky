@@ -11,9 +11,15 @@ export async function selectedThreadTranscript(page: Page): Promise<{
   const threadId = await waitForSelectedThreadId(page);
   const response = await callCoreRpc<unknown>('openhuman.threads_transcript_get', {
     thread_id: threadId,
+    limit: 500,
   });
-  expect(response && typeof response === 'object' && 'data' in response).toBe(true);
-  const data = (response as { data: unknown }).data;
+  let envelope = response;
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (!envelope || typeof envelope !== 'object' || !('result' in envelope)) break;
+    envelope = (envelope as { result: unknown }).result;
+  }
+  expect(envelope && typeof envelope === 'object' && 'data' in envelope).toBe(true);
+  const data = (envelope as { data: unknown }).data;
   expect(data && typeof data === 'object' && 'hasTranscript' in data).toBe(true);
   expect((data as { hasTranscript: unknown }).hasTranscript).toBe(true);
   expect(Array.isArray((data as { items: unknown }).items)).toBe(true);
