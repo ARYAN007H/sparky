@@ -27,6 +27,13 @@ pub fn is_raw_model(provider_id: &str, model: &str) -> bool {
     crate::inference::registry::provider_model_is_raw(provider_id, model)
 }
 
+/// `hint:*` is an abstract routing marker even if no installed provider
+/// recognizes the suffix; never pass it to a concrete BYOK endpoint.
+pub fn is_abstract_model(provider_id: &str, model: &str) -> bool {
+    model.trim().starts_with("hint:")
+        || crate::inference::registry::provider_model_is_alias(provider_id, model)
+}
+
 /// Resolve a model hint according to the configured provider route and the
 /// route's registered provider model policy.
 pub fn resolve_provider_model_hint(provider_id: &str, hint: &str, config: &Config) -> String {

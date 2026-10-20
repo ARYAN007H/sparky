@@ -18,3 +18,7 @@ pub(crate) fn register() {
         slug == "openhuman" || style == AuthStyle::OpenhumanJwt
     }));
 }
+
+#[cfg(test)]
+#[path = "hosted_config_tests.rs"]
+mod tests;

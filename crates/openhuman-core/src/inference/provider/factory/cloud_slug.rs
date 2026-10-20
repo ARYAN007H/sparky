@@ -86,12 +86,12 @@ pub(super) fn resolve_cloud_slug<'a>(
         );
     }
 
-    if !hosted && is_abstract_tier_model(&effective_model) {
+    if !hosted && crate::inference::provider_model::is_abstract_model(PROVIDER_OPENHUMAN, &effective_model) {
         if let Some(default_model) = entry
             .default_model
             .as_deref()
             .map(str::trim)
-            .filter(|m| !m.is_empty() && !is_abstract_tier_model(m))
+            .filter(|m| !m.is_empty() && !crate::inference::provider_model::is_abstract_model(PROVIDER_OPENHUMAN, m))
         {
             log::info!(
                 "[providers][chat-factory] role={} slug={} remapping abstract model {} -> {}",
