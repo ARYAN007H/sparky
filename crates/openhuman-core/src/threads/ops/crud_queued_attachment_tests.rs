@@ -98,7 +98,12 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
 #[tokio::test]
 async fn queued_text_only_user_message_is_persisted_idempotently() {
     let (_temp, config) = setup().await;
-    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let ctx = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_config(
+            crate::core::runtime::DomainSet::full(),
+            config.clone(),
+        ),
+    );
 
     let first = persist_queued_user_message(&ctx, "uploads", "text-only", "follow-up", &[])
         .await

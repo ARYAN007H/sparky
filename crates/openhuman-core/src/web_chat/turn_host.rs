@@ -16,19 +16,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use tinyagents_harness::CancellationToken;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_harness::turn_runner::{
     QueueDisposition, TurnHost, TurnRequest, TurnResult, TurnSession, TurnSignal, WorkTracker,
 };
-use tinyagents_harness::CancellationToken;
 use tinyinference_llm::failure::is_empty_provider_response_text;
-use tokio::sync::{mpsc, watch, Mutex as AsyncMutex};
+use tokio::sync::{Mutex as AsyncMutex, mpsc, watch};
 
 use super::ops::{self, BudgetCorrelation};
-use super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
+use super::progress::{INFERENCE_HEARTBEAT_SECS, ProgressProjection};
 use super::runner::{Admission, Shared};
 use super::session::{
-    checkin_session_agent, checkout_session_agent, normalize_model_override, CheckoutPolicy,
+    CheckoutPolicy, checkin_session_agent, checkout_session_agent, normalize_model_override,
 };
 use super::surface::TurnIds;
 use super::turn_activity::TurnActivity;
@@ -123,8 +123,8 @@ impl WebHost {
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.
-        let deferred_user_message = self.shared.was_queued(id)
-            && request.disposition == QueueDisposition::Followup;
+        let deferred_user_message =
+            self.shared.was_queued(id) && request.disposition == QueueDisposition::Followup;
         if deferred_user_message {
             crate::core::bus::BUS.publish(DomainEvent::RunQueueFollowupDispatched {
                 thread_id: request.thread_id.clone(),
@@ -238,15 +238,15 @@ impl WebHost {
 
         let (config, thread_dir, checked, projection, activity, deferred_user_message) =
             self.shared.with(id, |slot| {
-            (
-                slot.config.clone(),
-                slot.thread_dir.clone(),
-                slot.session.take(),
-                slot.projection.clone(),
-                slot.activity.clone(),
-                slot.deferred_user_message,
-            )
-        });
+                (
+                    slot.config.clone(),
+                    slot.thread_dir.clone(),
+                    slot.session.take(),
+                    slot.projection.clone(),
+                    slot.activity.clone(),
+                    slot.deferred_user_message,
+                )
+            });
         let (Some(config), Some(mut checked), Some(projection)) = (config, checked, projection)
         else {
             return Err("web chat turn started without a checked-out session".to_owned());
