@@ -1810,11 +1810,6 @@ const messages: TranslationMap = {
   'chat.todos.ofTotal': '{done} من {total}',
   'chat.todos.receipt': 'تم تحديث التقدم · {done}/{total}',
   'chat.subagents.ranFor': 'استغرق {duration}',
-  'chat.subagents.ofTotal': '{complete} من {total}',
-  'chat.subagents.runningCount': '{count} قيد التشغيل',
-  'chat.subagents.failedCount': '{count} فشل',
-  'chat.subagents.incompleteCount': '{count} غير مكتمل',
-  'chat.subagents.settled': 'انتهت المهام الفرعية. تجري معالجة نتائجها.',
   'conversations.planReview.title': 'مراجعة الخطة',
   'conversations.planReview.subtitle':
     'وافق لتشغيلها، أو ارفضها لتجاهلها، أو أرسل ملاحظات لتعديلها.',

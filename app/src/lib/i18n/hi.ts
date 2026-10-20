@@ -1849,11 +1849,6 @@ const messages: TranslationMap = {
   'chat.todos.ofTotal': '{total} में से {done}',
   'chat.todos.receipt': 'प्रगति अपडेट हुई · {done}/{total}',
   'chat.subagents.ranFor': '{duration} तक चला',
-  'chat.subagents.ofTotal': '{total} में से {complete}',
-  'chat.subagents.runningCount': '{count} चल रहे हैं',
-  'chat.subagents.failedCount': '{count} विफल',
-  'chat.subagents.incompleteCount': '{count} अधूरे',
-  'chat.subagents.settled': 'उप-कार्य पूरे हुए। उनके परिणाम संसाधित हो रहे हैं।',
   'conversations.planReview.title': 'योजना की समीक्षा करें',
   'conversations.planReview.subtitle':
     'इसे चलाने के लिए स्वीकृत करें, हटाने के लिए अस्वीकार करें, या संशोधित करने के लिए प्रतिक्रिया भेजें।',

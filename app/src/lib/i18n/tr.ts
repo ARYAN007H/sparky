@@ -1882,11 +1882,6 @@ const messages: TranslationMap = {
   'chat.todos.ofTotal': '{done} / {total}',
   'chat.todos.receipt': 'İlerleme güncellendi · {done}/{total}',
   'chat.subagents.ranFor': '{duration} çalıştı',
-  'chat.subagents.ofTotal': '{complete} / {total}',
-  'chat.subagents.runningCount': '{count} çalışıyor',
-  'chat.subagents.failedCount': '{count} başarısız',
-  'chat.subagents.incompleteCount': '{count} tamamlanmadı',
-  'chat.subagents.settled': 'Alt çalıştırmalar tamamlandı. Sonuçları işleniyor.',
   'conversations.planReview.title': 'Planı incele',
   'conversations.planReview.subtitle':
     'Çalıştırmak için onaylayın, atmak için reddedin veya düzeltilmesi için geri bildirim gönderin.',

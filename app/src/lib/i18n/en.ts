@@ -2119,11 +2119,6 @@ const en: TranslationMap = {
   'chat.todos.ofTotal': '{done} of {total}',
   'chat.todos.receipt': 'Progress updated · {done}/{total}',
   'chat.subagents.ranFor': 'Ran for {duration}',
-  'chat.subagents.ofTotal': '{complete} of {total}',
-  'chat.subagents.runningCount': '{count} running',
-  'chat.subagents.failedCount': '{count} failed',
-  'chat.subagents.incompleteCount': '{count} incomplete',
-  'chat.subagents.settled': 'Child runs finished. Processing their results.',
   'conversations.planReview.title': 'Review plan',
   'conversations.planReview.subtitle':
     'Approve to run it, reject to discard, or send feedback to revise.',

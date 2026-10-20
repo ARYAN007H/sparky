@@ -1862,11 +1862,6 @@ const messages: TranslationMap = {
   'chat.todos.ofTotal': '{done} dari {total}',
   'chat.todos.receipt': 'Progres diperbarui · {done}/{total}',
   'chat.subagents.ranFor': 'Berjalan selama {duration}',
-  'chat.subagents.ofTotal': '{complete} dari {total}',
-  'chat.subagents.runningCount': '{count} berjalan',
-  'chat.subagents.failedCount': '{count} gagal',
-  'chat.subagents.incompleteCount': '{count} belum selesai',
-  'chat.subagents.settled': 'Subtugas selesai. Memproses hasilnya.',
   'conversations.planReview.title': 'Tinjau rencana',
   'conversations.planReview.subtitle':
     'Setujui untuk menjalankannya, tolak untuk membuangnya, atau kirim masukan untuk merevisinya.',

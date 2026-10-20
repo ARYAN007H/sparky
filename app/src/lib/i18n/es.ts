@@ -1878,11 +1878,6 @@ const messages: TranslationMap = {
   'chat.todos.ofTotal': '{done} de {total}',
   'chat.todos.receipt': 'Progreso actualizado · {done}/{total}',
   'chat.subagents.ranFor': 'Duró {duration}',
-  'chat.subagents.ofTotal': '{complete} de {total}',
-  'chat.subagents.runningCount': '{count} en curso',
-  'chat.subagents.failedCount': '{count} con error',
-  'chat.subagents.incompleteCount': '{count} incompletos',
-  'chat.subagents.settled': 'Las subtareas terminaron. Procesando sus resultados.',
   'conversations.planReview.title': 'Revisar plan',
   'conversations.planReview.subtitle':
     'Aprueba para ejecutarlo, recházalo para descartarlo o envía comentarios para revisarlo.',

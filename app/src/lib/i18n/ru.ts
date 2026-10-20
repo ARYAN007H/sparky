@@ -1859,11 +1859,6 @@ const messages: TranslationMap = {
   'chat.todos.ofTotal': '{done} из {total}',
   'chat.todos.receipt': 'Прогресс обновлён · {done}/{total}',
   'chat.subagents.ranFor': 'Длилось {duration}',
-  'chat.subagents.ofTotal': '{complete} из {total}',
-  'chat.subagents.runningCount': 'Выполняется: {count}',
-  'chat.subagents.failedCount': 'С ошибкой: {count}',
-  'chat.subagents.incompleteCount': 'Не завершено: {count}',
-  'chat.subagents.settled': 'Подзадачи завершены. Обрабатываем их результаты.',
   'conversations.planReview.title': 'Проверить план',
   'conversations.planReview.subtitle':
     'Одобрите для запуска, отклоните для отмены или отправьте отзыв для доработки.',

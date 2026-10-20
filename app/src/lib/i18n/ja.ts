@@ -2124,11 +2124,6 @@ const messages: TranslationMap = {
   'chat.todos.ofTotal': '{done} / {total} 件',
   'chat.todos.receipt': '進捗を更新しました · {done}/{total}',
   'chat.subagents.ranFor': '{duration}間実行',
-  'chat.subagents.ofTotal': '{complete} / {total} 件',
-  'chat.subagents.runningCount': '{count}件実行中',
-  'chat.subagents.failedCount': '{count}件失敗',
-  'chat.subagents.incompleteCount': '{count}件未完了',
-  'chat.subagents.settled': '子の実行が完了しました。結果を処理しています。',
   'conversations.planReview.title': 'プランの確認',
   'conversations.planReview.subtitle':
     '承認して実行、却下して破棄、またはフィードバックを送信して修正します。',
