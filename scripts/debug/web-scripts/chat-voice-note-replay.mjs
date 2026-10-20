@@ -52,6 +52,8 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
       typedVoiceNoteSent =
         params.source === "voice_note" &&
         !!typedVoiceNoteId &&
+        params.message === TRANSCRIPT &&
+        !/\[(?:FILE|VOICE):/i.test(params.message) &&
         !typedVoicePart.voiceNote?.media?.url &&
         typedVoicePart.voiceNote?.durationMs > 0;
       log(`voice-note chat RPC carried typed media: ${typedVoiceNoteSent}`);
