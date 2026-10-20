@@ -4,12 +4,7 @@ use std::sync::Arc;
 #[test]
 fn builder_requires_a_model_when_no_host_policy_is_installed() {
     let tmp = tempfile::TempDir::new().unwrap();
-    let config = crate::config::Config {
-        workspace_dir: tmp.path().join("workspace"),
-        action_dir: tmp.path().join("workspace"),
-        config_path: tmp.path().join("config.toml"),
-        ..crate::config::Config::default()
-    };
+    let config = test_config_without_inference(&tmp);
     assert!(config.default_model.is_none());
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));

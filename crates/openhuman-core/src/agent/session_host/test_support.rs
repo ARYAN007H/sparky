@@ -18,6 +18,10 @@ impl ChatModel<()> for SessionFixtureModel {
     }
 }
 
+pub(crate) fn with_fixture_model_name(builder: SessionHostBuilder) -> SessionHostBuilder {
+    builder.model_name("test/session-fixture".to_string())
+}
+
 /// Installs an explicit generic model fixture for tests that construct a
 /// session through the managed-provider factory. HookSlot test registrations
 /// are thread-local, so each test opts in on the thread that builds its host.
@@ -84,4 +88,3 @@ pub(crate) fn install_model_fixture_in(extensions: &crate::core::slots::Extensio
         model_fixture_entry(),
     );
 }
-
