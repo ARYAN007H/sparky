@@ -14,7 +14,7 @@ pub mod types;
 pub mod url;
 pub(crate) mod ws_loop;
 
-pub use manager::{SocketManager, global_socket_manager, set_global_socket_manager};
+pub use manager::{global_socket_manager, set_global_socket_manager, SocketManager};
 pub use schemas::{
     all_controller_schemas as all_socket_controller_schemas,
     all_registered_controllers as all_socket_registered_controllers,

@@ -1,7 +1,7 @@
 //! Controller schemas and RPC handlers for the `socket` namespace.
 
 use crate::core::runtime::DispatchCtx;
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
 use crate::core::all::{
     BoundRegisteredController, ControllerEntry, ControllerFuture, ControllerTask,
@@ -141,7 +141,8 @@ pub fn schemas(function: &str) -> ControllerSchema {
         "connect_with_session" => ControllerSchema {
             namespace: "socket",
             function: "connect_with_session",
-            description: "Connect to the backend using the stored session token and configured API URL.",
+            description:
+                "Connect to the backend using the stored session token and configured API URL.",
             inputs: vec![],
             outputs: vec![FieldSchema {
                 name: "status",

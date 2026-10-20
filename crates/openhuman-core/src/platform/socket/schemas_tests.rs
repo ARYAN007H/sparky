@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::all::{
-    ControllerHandler, ControllerParamContract, assert_schema_controller_parity,
-    verify_parameter_schema,
+    assert_schema_controller_parity, verify_parameter_schema, ControllerHandler,
+    ControllerParamContract,
 };
 use crate::core::runtime::DispatchCtx;
 
