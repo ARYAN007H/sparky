@@ -48,6 +48,21 @@ test("invalid lane is rejected", () => {
   assert.match(result.stderr, /exceeds lane count/);
 });
 
+test("CI Full requires every Playwright lane and manual workflow shares the artifact scheduler", () => {
+  const full = fs.readFileSync(path.join(repoRoot, ".github/workflows/ci-full.yml"), "utf8");
+  const manual = fs.readFileSync(path.join(repoRoot, ".github/workflows/e2e-playwright.yml"), "utf8");
+  const job = full.slice(full.indexOf("  playwright-e2e:"), full.indexOf("  # Full desktop E2E", full.indexOf("  playwright-e2e:")));
+  assert.match(job, /fail-fast:\s*false/);
+  assert.match(job, /lane:\s*\[1, 2, 3, 4\]/);
+  assert.doesNotMatch(job, /continue-on-error:/);
+  assert.match(full, /- playwright-e2e/);
+  assert.match(full, /\["Playwright E2E"\]="\$\{\{ needs\['playwright-e2e'\]\.result \}\}"/);
+  assert.match(manual, /name: Build Playwright E2E artifact/);
+  assert.match(manual, /name: e2e-playwright-linux-\$\{\{ github\.run_id \}\}/);
+  assert.match(manual, /lane:\s*\[1, 2, 3, 4\]/);
+  assert.match(manual, /e2e-web-shards\.sh --lane=\$\{\{ matrix\.lane \}\} --lanes=4/);
+});
+
 test("failed units retain failure while later units run in distinct workspaces", () => {
   const runner = path.join(fixtureRoot, "runner.sh");
   fs.writeFileSync(
