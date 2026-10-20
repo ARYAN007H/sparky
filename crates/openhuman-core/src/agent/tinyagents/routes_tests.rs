@@ -10,6 +10,7 @@ use futures::StreamExt;
 use tinyagents_harness::agent_loop::AgentStreamItem;
 use tinyagents_harness::context::RunConfig;
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
+use tinyagents_harness::host::{FixedModelResolver, ModelResolver, PrebuiltModelResolver};
 use tinyagents_harness::runtime::{AgentHarness, RunPolicy};
 use tinyagents_harness::testkit::ScriptedModel;
 use tinyinference_llm::message::Message;
@@ -62,26 +63,21 @@ async fn run_recorded_route(
 ) -> (ResolvedModelRoute, Vec<AgentEvent>) {
     let mut harness: AgentHarness<(), crate::agent::tinyagents::host::OpenHumanRunContext> =
         AgentHarness::new();
-    let served_route = if fallback {
-        let primary = Arc::new(RouteRecordingModel::new(
-            Arc::new(FailingModel),
-            ResolvedModelRoute::new("primary", "unavailable", "primary"),
-        ));
-        harness
-            .register_model("primary", primary)
-            .set_default_model("primary");
-        route.clone()
-    } else {
-        route.clone()
-    };
+    let served_route = route.clone();
     let successful = Arc::new(RouteRecordingModel::new(
         successful_model,
         served_route.clone(),
     ));
     if fallback {
-        harness
-            .register_model("backup", successful)
-            .with_policy(RunPolicy {
+        let primary: Arc<dyn ChatModel<()>> = Arc::new(RouteRecordingModel::new(
+            Arc::new(FailingModel),
+            ResolvedModelRoute::new("primary", "unavailable", "primary"),
+        ));
+        let resolver: Arc<dyn ModelResolver<()>> = Arc::new(
+            PrebuiltModelResolver::new(primary, [("backup".into(), successful)])
+                .with_primary_name("primary"),
+        );
+        harness.with_model_resolver(resolver).with_policy(RunPolicy {
                 retry: tinyagents_harness::retry::RetryPolicy::default().with_max_attempts(1),
                 fallback: Some(tinyagents_harness::retry::FallbackPolicy::new([
                     "primary", "backup",
@@ -89,9 +85,7 @@ async fn run_recorded_route(
                 ..RunPolicy::default()
             });
     } else {
-        harness
-            .register_model("primary", successful)
-            .set_default_model("primary");
+        harness.with_model_resolver(Arc::new(FixedModelResolver::named("primary", successful)));
     }
     harness.push_model_middleware(Arc::new(ResolvedRouteMiddleware::new(
         "configured-provider",
@@ -147,9 +141,7 @@ async fn resolved_route_enrichment_uses_actual_provider_model_and_call_identity(
     let mut harness: AgentHarness<(), crate::agent::tinyagents::host::OpenHumanRunContext> =
         AgentHarness::new();
     let model = Arc::new(RouteRecordingModel::new(scripted_success(), route));
-    harness
-        .register_model("primary", model)
-        .set_default_model("primary");
+    harness.with_model_resolver(Arc::new(FixedModelResolver::named("primary", model)));
     harness.push_model_middleware(Arc::new(ResolvedRouteMiddleware::new(
         "configured-provider",
         "gpt-4.1",
