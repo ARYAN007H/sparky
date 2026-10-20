@@ -217,6 +217,12 @@ renamed files), and add it only to the owning suite. If host and browser cases
 cover distinct behavior, name and document both responsibilities explicitly;
 never keep a second full copy as extra confidence.
 
+The current inventory has 30 native spec files and 110 Playwright spec files,
+with only the five mixed files above shared by basename. The offline-banner E2Es
+were retired because their only UI consumer was removed before this baseline;
+focused connectivity-selector and listener unit tests retain the device/backend
+distinction, and no E2E banner coverage is claimed.
+
 ---
 
 ## Troubleshooting
