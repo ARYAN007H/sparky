@@ -36,9 +36,9 @@ async fn save_tier_config(config: &Config) {
 fn has_issue48_workflow_origin(ctx: &crate::core::runtime::DispatchCtx) -> bool {
     matches!(
         ctx.turn_origin(),
-        Some(crate::agent::turn_origin::AgentTurnOrigin::TrustedAutomation {
+        Some(crate::security::turn_origin::AgentTurnOrigin::TrustedAutomation {
             job_id,
-            source: crate::agent::turn_origin::TrustedAutomationSource::Workflow {
+            source: crate::security::turn_origin::TrustedAutomationSource::Workflow {
                 require_approval: true,
             },
         }) if job_id == "issue48-flow-run"
@@ -58,9 +58,9 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
         AutonomyLevel::ReadOnly,
     );
     save_tier_config(&decoy).await;
-    let origin = crate::agent::turn_origin::AgentTurnOrigin::TrustedAutomation {
+    let origin = crate::security::turn_origin::AgentTurnOrigin::TrustedAutomation {
         job_id: "issue48-flow-run".to_string(),
-        source: crate::agent::turn_origin::TrustedAutomationSource::Workflow {
+        source: crate::security::turn_origin::TrustedAutomationSource::Workflow {
             require_approval: true,
         },
     };

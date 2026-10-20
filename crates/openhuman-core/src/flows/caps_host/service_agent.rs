@@ -24,7 +24,7 @@ pub(crate) async fn run_agent(
     let progress_state = Arc::clone(&state);
     let progress = tokio::spawn(async move {
         while let Some(event) = progress_rx.recv().await {
-            if let crate::agent::progress::AgentProgress::TurnCompleted {
+            if let crate::progress::AgentProgress::TurnCompleted {
                 stop: Some(stop), ..
             } = &event
             {
@@ -163,8 +163,8 @@ pub(crate) async fn run_agent(
     }
 }
 
-fn progress_event(event: crate::agent::progress::AgentProgress) -> Option<(String, String)> {
-    use crate::agent::progress::AgentProgress;
+fn progress_event(event: crate::progress::AgentProgress) -> Option<(String, String)> {
+    use crate::progress::AgentProgress;
     match event {
         AgentProgress::TurnStarted => Some(("turn_started".into(), "Agent turn started".into())),
         AgentProgress::IterationStarted { iteration, .. } => {

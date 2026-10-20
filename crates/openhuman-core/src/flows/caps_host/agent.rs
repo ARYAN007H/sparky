@@ -28,7 +28,7 @@ mod harness;
 /// agent kind by one of two paths, chosen by [`route_for_agent_ref`]:
 ///
 /// 1. **Full harness turn** (the common case, Phase A). When `agent_ref` names a
-///    harness [`AgentDefinition`](crate::agent::harness::host_definition::AgentDefinition),
+///    harness [`AgentDefinition`](crate::agent_registry::host_definition::AgentDefinition),
 ///    the node builds a real session agent
 ///    ([`OpenHumanSessionHost::from_config_for_agent`](crate::agent::OpenHumanSessionHost::from_config_for_agent)
 ///    + `set_agent_definition_name`) and drives one full turn via
@@ -43,7 +43,7 @@ mod harness;
 ///    the flow's tinyagents graph.
 /// 2. **Persona-shaping completion fallback** (no regression for custom agents).
 ///    When `agent_ref` only resolves to a custom
-///    [`AgentRegistryEntry`](crate::agent::registry::AgentRegistryEntry)
+///    [`AgentRegistryEntry`](crate::agent_registry::AgentRegistryEntry)
 ///    (no harness definition), the node keeps the original single-completion
 ///    behavior: the entry's `system_prompt` / `model` are shaped on top of the
 ///    node request and run through [`OpenHumanLlm::complete`].
@@ -78,7 +78,7 @@ pub struct OpenHumanAgentRunner {
     /// with every acting dispatch.
     pub approval: crate::security::approval::ApprovalTurnContext,
     /// Run-scoped event stream consumed by `CapsHost.AgentEvents`.
-    pub progress: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+    pub progress: Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
 }
 
 /// Bounded callback state for one in-flight host agent turn.
@@ -193,7 +193,7 @@ impl OpenHumanAgentRunner {
         // build a named agent. Idempotent: a booted core already did this at
         // startup; a bare flow run (tests, standalone) has not. A failure here
         // is non-fatal — we log and fall through to the registry-entry route.
-        if let Err(e) = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+        if let Err(e) = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
             &self.config.workspace_dir,
         ) {
             tracing::warn!(
@@ -251,7 +251,7 @@ impl OpenHumanAgentRunner {
                 // are disabled, which `run_via_registry_fallback` already
                 // rejects with a clear error).
                 let custom_entry =
-                    crate::agent::registry::find_custom_in_config(&self.config, agent_ref);
+                    crate::agent_registry::find_custom_in_config(&self.config, agent_ref);
                 let entry_model = custom_entry.as_ref().and_then(|e| e.model.clone());
                 match route_custom_entry_lookup(custom_entry.as_ref()) {
                     AgentRoute::Harness | AgentRoute::HostAgent => {

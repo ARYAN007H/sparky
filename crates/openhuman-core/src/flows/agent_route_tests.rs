@@ -2,9 +2,9 @@ use super::*;
 
 use serde_json::json;
 
-fn custom_registry_entry(enabled: bool) -> crate::agent::registry::AgentRegistryEntry {
-    use crate::agent::registry::types::{AgentRegistrySource, AgentSubagentPolicy};
-    crate::agent::registry::AgentRegistryEntry {
+fn custom_registry_entry(enabled: bool) -> crate::agent_registry::AgentRegistryEntry {
+    use crate::agent_registry::types::{AgentRegistrySource, AgentSubagentPolicy};
+    crate::agent_registry::AgentRegistryEntry {
         id: "finance_analyst".to_string(),
         name: "Finance Analyst".to_string(),
         description: "Reviews spend and drafts finance summaries.".to_string(),
@@ -49,7 +49,7 @@ fn harness_model_default_override_forwards_raw_models_verbatim() {
 
 #[test]
 fn route_for_agent_ref_selects_harness_for_definitions_else_fallback() {
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     assert_eq!(route_for_agent_ref("workflow_builder"), AgentRoute::Harness);
     assert_eq!(route_for_agent_ref("planner"), AgentRoute::Harness);
     assert_eq!(

@@ -14,7 +14,7 @@ async fn streamed_flow_finalizer_settles_the_bridge_workspace_turn_state() {
         ),
     );
 
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
         &config_b.workspace_dir,
     )
     .expect("agent registry init");

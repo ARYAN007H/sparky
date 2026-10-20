@@ -22,7 +22,7 @@ pub(crate) fn route_for_agent_ref(agent_ref: &str) -> AgentRoute {
     if crate::agent::host_agents::resolve(agent_ref).is_some() {
         return AgentRoute::HostAgent;
     }
-    let has_definition = crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+    let has_definition = crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
         .map(|reg| reg.get(agent_ref).is_some())
         .unwrap_or(false);
     if has_definition {
@@ -65,7 +65,7 @@ pub(crate) fn harness_model_default_override(node_model: &str) -> String {
 /// over the lookup result so the decision is unit-testable without a live
 /// `Config`/registry.
 pub(crate) fn route_custom_entry_lookup(
-    entry: Option<&crate::agent::registry::AgentRegistryEntry>,
+    entry: Option<&crate::agent_registry::AgentRegistryEntry>,
 ) -> AgentRoute {
     match entry {
         Some(e) if e.enabled => AgentRoute::Harness,

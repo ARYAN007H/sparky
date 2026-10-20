@@ -3,7 +3,7 @@ use tinyagents_definition::DefinitionSource;
 
 #[test]
 fn only_dynamic_builtin_flow_definitions_use_the_bus_prompt() {
-    let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
+    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
     for id in ["workflow_builder", "flow_discovery"] {
         let mut definition = registry.get(id).expect("builtin flow agent").clone();
         assert!(is_bus_backed_builtin(&definition));
@@ -22,7 +22,7 @@ fn only_dynamic_builtin_flow_definitions_use_the_bus_prompt() {
 
 #[test]
 fn renamed_dynamic_flow_builtin_keeps_its_prompt_owner() {
-    let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
+    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
     let mut definition = registry
         .get("workflow_builder")
         .expect("workflow_builder builtin")
@@ -38,7 +38,7 @@ fn renamed_dynamic_flow_builtin_keeps_its_prompt_owner() {
 
 #[tokio::test]
 async fn flow_prompt_requires_the_scoped_config_and_respects_component_disable() {
-    let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
+    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
     let definition = registry
         .get("workflow_builder")
         .expect("workflow_builder builtin");
@@ -57,7 +57,7 @@ async fn flow_prompt_requires_the_scoped_config_and_respects_component_disable()
 
 #[tokio::test]
 async fn flow_prompt_fetch_uses_the_copilot_get_prompt_bus_member() {
-    let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
+    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
     let mut config = Config::default();
     let temp = tempfile::tempdir().expect("workspace");
     config.workspace_dir = temp.path().join("workspace");

@@ -2,7 +2,7 @@ use super::*;
 
 impl OpenHumanAgentRunner {
     /// Persona-shaping single-completion fallback for a custom
-    /// [`AgentRegistryEntry`](crate::agent::registry::AgentRegistryEntry)
+    /// [`AgentRegistryEntry`](crate::agent_registry::AgentRegistryEntry)
     /// with no harness definition — the pre-Phase-A behavior, kept so custom
     /// agents don't regress.
     pub(super) async fn run_via_registry_fallback(
@@ -13,7 +13,7 @@ impl OpenHumanAgentRunner {
         conn: Option<&str>,
     ) -> Result<Value> {
         // Resolve + validate the requested agent kind against the registry.
-        let entry = crate::agent::registry::get_agent(dispatch, agent_ref)
+        let entry = crate::agent_registry::get_agent(dispatch, agent_ref)
             .await
             .map_err(EngineError::Capability)?
             .ok_or_else(|| {

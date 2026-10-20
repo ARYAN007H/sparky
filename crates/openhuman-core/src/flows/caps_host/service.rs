@@ -268,12 +268,12 @@ impl CapsHostService {
         let scope = Arc::clone(&binding);
         scope
             .within(async move {
-                crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
                     &binding.config.workspace_dir,
                 )
                 .map_err(|error| error.to_string())?;
                 let registry =
-                    crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+                    crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
                 registry
                     .and_then(|registry| registry.get(&id).cloned())
                     .map(to_bus_agent_definition)
@@ -288,12 +288,12 @@ impl CapsHostService {
         let scope = Arc::clone(&binding);
         scope
             .within(async move {
-                crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
                     &binding.config.workspace_dir,
                 )
                 .map_err(|error| error.to_string())?;
                 let registry =
-                    crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+                    crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
                 registry
                     .map(|registry| {
                         registry
