@@ -304,51 +304,53 @@ async fn claim_staged_refs(
             part: entry.part.clone(),
             canceled: false,
         };
-        let bytes = serde_json::to_vec(&claim)
-            .map_err(|error| format!("serialize staged attachment claim: {error}"))?;
-        let temp_path = manifest_path.with_extension(format!("{}.claim-tmp", uuid::Uuid::new_v4()));
-        let result = async {
-            use tokio::io::AsyncWriteExt;
-            let mut file = tokio::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temp_path)
-                .await
-                .map_err(|error| format!("create staged attachment claim: {error}"))?;
-            file.write_all(&bytes)
-                .await
-                .map_err(|error| format!("write staged attachment claim: {error}"))?;
-            file.sync_all()
-                .await
-                .map_err(|error| format!("sync staged attachment claim: {error}"))?;
-            match tokio::fs::hard_link(&temp_path, &claim_path).await {
-                Ok(()) => Ok(true),
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let stored: StagedAttachmentClaim = serde_json::from_slice(
-                        &tokio::fs::read(&claim_path)
-                            .await
-                            .map_err(|read| format!("read staged attachment claim: {read}"))?,
-                    )
-                    .map_err(|read| format!("decode staged attachment claim: {read}"))?;
-                    if stored == claim {
-                        Ok(false)
-                    } else {
-                        Err("staged attachment is already bound to another message".into())
-                    }
-                }
-                Err(error) => Err(format!("publish staged attachment claim: {error}")),
-            }
-        }
-        .await;
-        let _ = tokio::fs::remove_file(&temp_path).await;
-        match result {
-            Ok(_) => {}
-            Err(error) => {
-                return Err(error);
-            }
-        }
+        publish_staged_claim(&claim_path, &claim).await?;
     }
     Ok(())
+}
+
+async fn publish_staged_claim(
+    claim_path: &std::path::Path,
+    claim: &StagedAttachmentClaim,
+) -> Result<bool, String> {
+    let bytes = serde_json::to_vec(claim)
+        .map_err(|error| format!("serialize staged attachment claim: {error}"))?;
+    let temp_path = claim_path.with_extension(format!("{}.claim-tmp", uuid::Uuid::new_v4()));
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp_path)
+        .await
+        .map_err(|error| format!("create staged attachment claim: {error}"))?;
+    use tokio::io::AsyncWriteExt;
+    file.write_all(&bytes)
+        .await
+        .map_err(|error| format!("write staged attachment claim: {error}"))?;
+    file.sync_all()
+        .await
+        .map_err(|error| format!("sync staged attachment claim: {error}"))?;
+    drop(file);
+    let result = match tokio::fs::hard_link(&temp_path, claim_path).await {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let stored: StagedAttachmentClaim = serde_json::from_slice(
+                &tokio::fs::read(claim_path)
+                    .await
+                    .map_err(|read| format!("read staged attachment claim: {read}"))?,
+            )
+            .map_err(|read| format!("decode staged attachment claim: {read}"))?;
+            if stored == *claim {
+                Ok(false)
+            } else if stored.canceled {
+                Err("staged attachment was canceled before it could be bound".into())
+            } else {
+                Err("staged attachment is already bound to another message".into())
+            }
+        }
+        Err(error) => Err(format!("publish staged attachment claim: {error}")),
+    };
+    let _ = tokio::fs::remove_file(temp_path).await;
+    result
 }
 
 /// Stage media supplied with a queued follow-up, returning only opaque refs.
@@ -549,37 +551,7 @@ pub(crate) async fn discard_staged_parts(
             part: entry.part.clone(),
             canceled: true,
         };
-        let bytes = serde_json::to_vec(&cancellation)
-            .map_err(|error| format!("serialize staged attachment cancellation: {error}"))?;
-        let temp_path = manifest_path.with_extension(format!("{}.claim-tmp", uuid::Uuid::new_v4()));
-        let mut file = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp_path)
-            .await
-            .map_err(|error| format!("create staged attachment cancellation: {error}"))?;
-        use tokio::io::AsyncWriteExt;
-        file.write_all(&bytes)
-            .await
-            .map_err(|error| format!("write staged attachment cancellation: {error}"))?;
-        file.sync_all()
-            .await
-            .map_err(|error| format!("sync staged attachment cancellation: {error}"))?;
-        drop(file);
-        let owns_cancellation = match tokio::fs::hard_link(&temp_path, &claim_path).await {
-            Ok(()) => true,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                let claim: StagedAttachmentClaim = serde_json::from_slice(
-                    &tokio::fs::read(&claim_path)
-                        .await
-                        .map_err(|read| format!("read staged attachment claim: {read}"))?,
-                )
-                .map_err(|read| format!("decode staged attachment claim: {read}"))?;
-                claim == cancellation
-            }
-            Err(error) => return Err(format!("publish staged attachment cancellation: {error}")),
-        };
-        let _ = tokio::fs::remove_file(&temp_path).await;
+        let owns_cancellation = publish_staged_claim(&claim_path, &cancellation).await?;
         if !owns_cancellation {
             continue;
         }
