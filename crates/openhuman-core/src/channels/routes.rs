@@ -1,6 +1,7 @@
 //! Per-sender routing and runtime command handling.
 
 #[cfg(test)]
+#[cfg(test)]
 use super::context::clear_sender_history;
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::{Channel, ChannelSendExt, SendMessage};
