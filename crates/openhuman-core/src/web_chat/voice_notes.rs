@@ -51,7 +51,7 @@ fn viseme_repo(ctx: &crate::core::runtime::DispatchCtx, workspace: &Path) -> Res
 }
 
 const VISEME_DOMAIN: &str = "web_chat::voice_notes";
-const VISEME_COLLECTION: &str = "reply_viseme_timelines";
+const VISEME_COLLECTION: &str = crate::threads::store::storage_schema::REPLY_VISEME_TIMELINES;
 /// Largest note the store accepts (decoded bytes).
 pub(crate) const MAX_NOTE_BYTES: usize = 25 * 1024 * 1024;
 

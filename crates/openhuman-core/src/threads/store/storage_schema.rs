@@ -16,6 +16,9 @@ use tinystoragedrivers::{CollectionSpec, Result};
 use crate::storage::schema_support::{key_of, owner};
 
 pub(super) const TRANSCRIPT_KEYS: &str = "threads.transcript_keys";
+pub(super) const CHANNEL_MESSAGES: &str = "threads.channel_messages";
+pub(super) const STAGED_ATTACHMENTS: &str = "threads.staged_attachments";
+pub(super) const REPLY_VISEME_TIMELINES: &str = "threads.reply_viseme_timelines";
 pub(super) const LEGACY_TRANSCRIPT_KEYS: &str = "threads_transcript_keys";
 const SCHEMA: u32 = 2;
 
@@ -24,6 +27,21 @@ const SCHEMA: u32 = 2;
 pub fn storage_schema() -> Schema {
     Schema::new(owner("threads"))
         .collection_with(SCHEMA, spec(), ScopeClass::Tenant)
+        .collection_with(
+            SCHEMA,
+            CollectionSpec::new(CHANNEL_MESSAGES),
+            ScopeClass::Tenant,
+        )
+        .collection_with(
+            SCHEMA,
+            CollectionSpec::new(STAGED_ATTACHMENTS),
+            ScopeClass::Agent,
+        )
+        .collection_with(
+            SCHEMA,
+            CollectionSpec::new(REPLY_VISEME_TIMELINES),
+            ScopeClass::Agent,
+        )
         .step(
             Step::new(
                 "transcript_keys_v2",

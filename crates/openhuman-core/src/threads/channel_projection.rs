@@ -21,7 +21,7 @@ use crate::storage::{
 };
 
 const DOMAIN: &str = "threads::channel_projection";
-const COLLECTION: &str = "thread_channel_messages";
+const COLLECTION: &str = super::store::storage_schema::CHANNEL_MESSAGES;
 const LOG_PREFIX: &str = "[threads:channel-projection]";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
