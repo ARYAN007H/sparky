@@ -546,8 +546,12 @@ pub(crate) async fn process_channel_runtime_message(
                 started_at.elapsed().as_millis(),
                 truncate_with_ellipsis(&response_text, REPLY_LOG_TRUNCATE_CHARS)
             );
-            let delivered =
-                super::progressive::finish_native_reply(&native_reply, &response_text).await;
+            let delivered = if progress_failed {
+                super::progressive::close_native_reply(&native_reply).await;
+                false
+            } else {
+                super::progressive::finish_native_reply(&native_reply, &response_text).await
+            };
             if native_reply.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
                     if let Some(ref draft_id) = draft_message_id {
@@ -591,7 +595,11 @@ pub(crate) async fn process_channel_runtime_message(
                     "  ⚠️ Context window exceeded after {}ms",
                     started_at.elapsed().as_millis()
                 );
-                let _ = super::progressive::finish_native_reply(&native_reply, error_text).await;
+                if progress_failed {
+                    super::progressive::close_native_reply(&native_reply).await;
+                } else {
+                    let _ = super::progressive::finish_native_reply(&native_reply, error_text).await;
+                }
                 if native_reply.is_none() {
                     if let Some(channel) = target_channel.as_ref() {
                         if let Some(ref draft_id) = draft_message_id {
@@ -684,7 +692,11 @@ pub(crate) async fn process_channel_runtime_message(
                     ],
                 );
             }
-            let _ = super::progressive::finish_native_reply(&native_reply, &error_response).await;
+            if progress_failed {
+                super::progressive::close_native_reply(&native_reply).await;
+            } else {
+                let _ = super::progressive::finish_native_reply(&native_reply, &error_response).await;
+            }
             if native_reply.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
                     if let Some(ref draft_id) = draft_message_id {
@@ -709,53 +721,6 @@ pub(crate) async fn process_channel_runtime_message(
             (
                 false,
                 error_response,
-                route.provider.clone(),
-                route.model.clone(),
-            )
-        }
-        Err(_) => {
-            let timeout_msg = format!("LLM response timed out after {}s", ctx.message_timeout_secs);
-            eprintln!(
-                "  ❌ {} (elapsed: {}ms)",
-                timeout_msg,
-                started_at.elapsed().as_millis()
-            );
-            crate::core::observability::report_error(
-                timeout_msg.as_str(),
-                "channels",
-                "dispatch_llm_timeout",
-                &[
-                    ("channel", msg.channel.as_str()),
-                    ("timeout_secs", &ctx.message_timeout_secs.to_string()),
-                ],
-            );
-            let error_text =
-                "⚠️ Request timed out while waiting for the model. Please try again.".to_string();
-            let _ = super::progressive::finish_native_reply(&native_reply, &error_text).await;
-            if native_reply.is_none() {
-                if let Some(channel) = target_channel.as_ref() {
-                    if let Some(ref draft_id) = draft_message_id {
-                        let _ = channel
-                            .finalize_draft(
-                                &msg.reply_target,
-                                draft_id,
-                                &error_text,
-                                msg.thread_ts.as_deref(),
-                            )
-                            .await;
-                    } else {
-                        let _ = channel
-                            .send_with_outbound_intent(
-                                &SendMessage::new(&error_text, &msg.reply_target)
-                                    .in_thread(msg.thread_ts.clone()),
-                            )
-                            .await;
-                    }
-                }
-            }
-            (
-                false,
-                error_text,
                 route.provider.clone(),
                 route.model.clone(),
             )

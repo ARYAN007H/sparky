@@ -57,6 +57,16 @@ pub(super) async fn finish_native_reply(
     delivered
 }
 
+pub(super) async fn close_native_reply(
+    reply: &Option<std::sync::Arc<NativeProgressiveReply>>,
+) {
+    if let Some(reply) = reply {
+        if let Err(error) = reply.close().await {
+            tracing::warn!("[dispatch] native progressive close failed: {error}");
+        }
+    }
+}
+
 pub(super) fn spawn_native_progress(
     mut events: mpsc::Receiver<AgentProgress>,
     reply: std::sync::Arc<NativeProgressiveReply>,
