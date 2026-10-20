@@ -109,6 +109,7 @@ pub fn upsert_running(
         let worker_thread_id = upsert.worker_thread_id.clone();
         let display_name = upsert.display_name.clone();
         let task_id = upsert.task_id.clone();
+        let lifecycle_key = upsert.lifecycle_key.clone();
         let expected_task_id = reuse.current_task_id.clone();
         let expected_lifecycle_key = reuse.lifecycle_key.clone();
         if let Some(updated) =
@@ -129,6 +130,9 @@ pub fn upsert_running(
                     .clone()
                     .or_else(|| session.display_name.clone());
                 session.current_task_id = Some(task_id.clone());
+                if let Some(lifecycle_key) = &lifecycle_key {
+                    session.lifecycle_key = Some(lifecycle_key.clone());
+                }
                 session.status = DurableSubagentStatus::Running;
                 session.reusable = true;
                 session.latest_error = None;
