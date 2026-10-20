@@ -318,7 +318,7 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
                     .host()
                     .list()
                     .into_iter()
-                    .find(|module| module.name == "tinyflows")
+                    .find(|module| module.name == "tinyflows-module")
             });
         eprintln!(
             "ResumeRun nonparked-status diagnostic: error={err}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; registry_version={module_version}; loaded_version={}; loaded_file={}; artifact={:?}",
