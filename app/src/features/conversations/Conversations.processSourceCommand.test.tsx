@@ -39,11 +39,21 @@ vi.mock('../../services/socketService', () => ({
   },
 }));
 
-const { mockGetThreads, mockGetThreadMessages, mockUseUsageState, mockChatSend } = vi.hoisted(
+const {
+  mockGetThreads,
+  mockGetThreadMessages,
+  mockUseUsageState,
+  mockChatSend,
+  mockChatSendWithAck,
+} = vi.hoisted(
   () => ({
     mockGetThreads: vi.fn().mockResolvedValue({ threads: [], count: 0 }),
     mockGetThreadMessages: vi.fn().mockResolvedValue({ messages: [], count: 0 }),
     mockChatSend: vi.fn().mockResolvedValue(undefined),
+    mockChatSendWithAck: vi.fn().mockResolvedValue({
+      requestId: 'queued-request',
+      queuedAttachments: [],
+    }),
     mockUseUsageState: vi.fn(() => ({
       teamUsage: null,
       currentPlan: null,
@@ -66,6 +76,7 @@ vi.mock('../../services/chatService', () => ({
   chatCancel: vi.fn().mockResolvedValue({ accepted: true, turnCancelled: true }),
   chatClearQueue: vi.fn().mockResolvedValue(0),
   chatSend: mockChatSend,
+  chatSendWithAck: mockChatSendWithAck,
   subscribeChatEvents: vi.fn(() => () => {}),
   useRustChat: vi.fn(() => true),
 }));
@@ -312,6 +323,7 @@ async function useRealChatSend() {
     '../../services/chatService'
   );
   mockChatSend.mockImplementation(actual.chatSend);
+  mockChatSendWithAck.mockImplementation(actual.chatSendWithAck);
 }
 
 function latestChatRpc() {
@@ -382,9 +394,25 @@ describe('the agent-process-source command follows the panel that hosts it', () 
     expect(uploaded.content).not.toMatch(/\[(?:ATTACHMENT|IMAGE|FILE):/i);
   });
 
-  it('keeps queued raw upload content only in memory until the core append flush', async () => {
+  it('keeps only core-returned opaque refs for a queued upload', async () => {
     vi.mocked(threadApi.appendMessage).mockClear();
     vi.mocked(chatSend).mockClear();
+    mockChatSendWithAck.mockResolvedValueOnce({
+      requestId: 'queued-upload-request',
+      queuedAttachments: [
+        {
+          kind: 'file',
+          media: {
+            opaqueId: 'opaque-queued-file',
+            contentType: 'application/zip',
+            fileName: 'archive.zip',
+            sizeBytes: 3,
+          },
+          fileName: 'archive.zip',
+          caption: null,
+        },
+      ],
+    });
     const store = await renderChat('text');
     fireEvent.change(document.querySelector('input[type="file"]')!, {
       target: {
@@ -396,8 +424,8 @@ describe('the agent-process-source command follows the panel that hosts it', () 
       store.dispatch(markThreadInferenceActive(THREAD_ID));
     });
     fireEvent.click(screen.getByTestId('send-message-button'));
-    await waitFor(() => expect(chatSend).toHaveBeenCalled());
-    expect(chatSend).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(mockChatSendWithAck).toHaveBeenCalled());
+    expect(mockChatSendWithAck).toHaveBeenLastCalledWith(
       expect.objectContaining({
         queueMode: 'followup',
         message: '',
@@ -415,6 +443,12 @@ describe('the agent-process-source command follows the panel that hosts it', () 
     const queued = store.getState().queue.pendingFollowupsByThread[THREAD_ID][0];
     const pending = queued.message;
     expect(queued.attachments).toHaveLength(1);
+    expect(queued.requestId).toBe('queued-upload-request');
+    expect(queued.attachments[0]).toMatchObject({
+      kind: 'file',
+      media: { opaqueId: 'opaque-queued-file' },
+    });
+    expect(JSON.stringify(queued.attachments)).not.toMatch(/data:|base64|"url"\s*:|"path"\s*:/i);
     expect(pending.content).toBe('');
     expect(pending.extraMetadata).toEqual({
       attachmentCount: 1,
@@ -422,6 +456,7 @@ describe('the agent-process-source command follows the panel that hosts it', () 
       attachmentKinds: ['file'],
       attachmentCompressed: [false],
     });
+    expect(JSON.stringify(pending.extraMetadata)).not.toMatch(/data:|base64/i);
   });
 
   it('is disabled when the assistant-ui surface has no process data to show', async () => {
@@ -461,6 +496,10 @@ describe('composer model routing', () => {
       .mockImplementation(async (_threadId: string, message) => message);
     vi.mocked(callCoreRpc).mockReset().mockResolvedValue({});
     mockChatSend.mockReset().mockResolvedValue(undefined);
+    mockChatSendWithAck.mockReset().mockResolvedValue({
+      requestId: 'queued-request',
+      queuedAttachments: [],
+    });
   });
 
   it('waits for a successful model clear before sending a normal default turn', async () => {
@@ -490,9 +529,9 @@ describe('composer model routing', () => {
     expect(mockChatSend).not.toHaveBeenCalled();
 
     await act(async () => clear.resolve({}));
-    await waitFor(() => expect(mockChatSend).toHaveBeenCalledTimes(1));
-    expect(mockChatSend.mock.calls[0][0]).toMatchObject({ queueMode: 'followup' });
-    expect(mockChatSend.mock.calls[0][0]).not.toHaveProperty('model');
+    await waitFor(() => expect(mockChatSendWithAck).toHaveBeenCalledTimes(1));
+    expect(mockChatSendWithAck.mock.calls[0][0]).toMatchObject({ queueMode: 'followup' });
+    expect(mockChatSendWithAck.mock.calls[0][0]).not.toHaveProperty('model');
   });
 
   it('blocks a normal send after a rejected clear and keeps the draft', async () => {
@@ -598,12 +637,13 @@ describe('composer model routing', () => {
       expect(threadApi.appendMessage).not.toHaveBeenCalled();
       await act(async () => thirdClear.resolve({}));
 
-      await waitFor(() => expect(mockChatSend).toHaveBeenCalledTimes(1));
-      expect(mockChatSend.mock.calls[0][0]).not.toHaveProperty('model');
+      await waitFor(() => expect(followup ? mockChatSendWithAck : mockChatSend).toHaveBeenCalledTimes(1));
+      const sent = followup ? mockChatSendWithAck.mock.calls[0][0] : mockChatSend.mock.calls[0][0];
+      expect(sent).not.toHaveProperty('model');
       if (followup) {
-        expect(mockChatSend.mock.calls[0][0]).toMatchObject({ queueMode: 'followup' });
+        expect(sent).toMatchObject({ queueMode: 'followup' });
       } else {
-        expect(mockChatSend.mock.calls[0][0]).not.toHaveProperty('queueMode');
+        expect(sent).not.toHaveProperty('queueMode');
       }
     }
   );
@@ -638,8 +678,8 @@ describe('composer model routing', () => {
     expect(mockChatSend).not.toHaveBeenCalled();
 
     await act(async () => newerClear.resolve({}));
-    await waitFor(() => expect(mockChatSend).toHaveBeenCalledTimes(1));
-    expect(mockChatSend.mock.calls[0][0]).not.toHaveProperty('model');
+    await waitFor(() => expect(mockChatSendWithAck).toHaveBeenCalledTimes(1));
+    expect(mockChatSendWithAck.mock.calls[0][0]).not.toHaveProperty('model');
   });
 
   it('does not wait for selected-model persistence before an explicit-model send', async () => {
@@ -702,8 +742,8 @@ describe('composer model routing', () => {
     await renderChat('text', false, true);
     await submitComposerText('follow-up default route');
 
-    expect(mockChatSend.mock.calls[0][0]).toMatchObject({ queueMode: 'followup' });
-    expect(mockChatSend.mock.calls[0][0]).not.toHaveProperty('model');
+    expect(mockChatSendWithAck.mock.calls[0][0]).toMatchObject({ queueMode: 'followup' });
+    expect(mockChatSendWithAck.mock.calls[0][0]).not.toHaveProperty('model');
   });
 
   it('forwards the concrete provider/model chosen in the picker for a normal send', async () => {
