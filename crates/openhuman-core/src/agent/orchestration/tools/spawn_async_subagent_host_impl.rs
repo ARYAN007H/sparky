@@ -329,8 +329,7 @@ impl SpawnAsyncSubagentTool {
                         parent_thread_id.clone(),
                     ),
                 ),
-                            parent_epoch: None,
-},
+            },
             reusable.as_ref(),
         ) {
             Ok(session) => session,

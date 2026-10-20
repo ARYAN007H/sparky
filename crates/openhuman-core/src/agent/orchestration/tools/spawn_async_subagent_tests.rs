@@ -67,8 +67,7 @@ async fn late_registration_refusal_aborts_the_worker_and_settles_its_durable_ses
                 worker_thread_id: None,
                 task_id: "late-refusal-task".into(),
                 lifecycle_key: None,
-                            parent_epoch: None,
-},
+            },
             None,
         )
         .unwrap()

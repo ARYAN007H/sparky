@@ -55,8 +55,7 @@ fn compatible_session_reuses_and_incompatible_shape_spawns_new() {
         worker_thread_id: Some("worker-1".into()),
         task_id: "sub-1".into(),
         lifecycle_key: None,
-        let upsert =     parent_epoch: None,
-};
+    };
     let session = upsert_running(&store, upsert, None).unwrap();
     mark_finished(
         &store,
@@ -90,8 +89,7 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
             worker_thread_id: None,
             task_id: "first-task".into(),
             lifecycle_key: None,
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -104,8 +102,7 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
             worker_thread_id: None,
             task_id: "second-task".into(),
             lifecycle_key: None,
-                    parent_epoch: None,
-},
+        },
         Some(&first),
     )
     .unwrap();
@@ -167,8 +164,7 @@ fn driver_task_cancel_reports_legacy_failure_and_refuses_ambiguous_ids() {
             worker_thread_id: None,
             task_id: "finished-failed".into(),
             lifecycle_key: None,
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -198,8 +194,7 @@ fn driver_task_cancel_reports_legacy_failure_and_refuses_ambiguous_ids() {
                 thread_id: Some("thread-a".into()),
                 task_id: "same-public-id".into(),
             }),
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -217,8 +212,7 @@ fn driver_task_cancel_reports_legacy_failure_and_refuses_ambiguous_ids() {
                 thread_id: Some("thread-a".into()),
                 task_id: "same-public-id".into(),
             }),
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -276,8 +270,7 @@ fn cancellation_reason_is_written_only_for_the_observed_full_lifecycle() {
             worker_thread_id: None,
             task_id: key.task_id.clone(),
             lifecycle_key: Some(key.clone()),
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -318,8 +311,7 @@ fn paused_driver_cancel_marks_only_the_observed_session_failed() {
             worker_thread_id: None,
             task_id: lifecycle_key.task_id.clone(),
             lifecycle_key: Some(lifecycle_key.clone()),
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -390,8 +382,7 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
             worker_thread_id: None,
             task_id: "same-public-task".into(),
             lifecycle_key: Some(first_key.clone()),
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -404,8 +395,7 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
             worker_thread_id: None,
             task_id: "same-public-task".into(),
             lifecycle_key: Some(second_key.clone()),
-                    parent_epoch: None,
-},
+        },
         Some(&first),
     )
     .unwrap();
@@ -435,8 +425,7 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
                 worker_thread_id: None,
                 task_id: "stale-task".into(),
                 lifecycle_key: None,
-                            parent_epoch: None,
-},
+            },
             Some(&first),
         )
         .is_err(),
@@ -458,8 +447,7 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
                 worker_thread_id: None,
                 task_id: "late-task".into(),
                 lifecycle_key: None,
-                            parent_epoch: None,
-},
+            },
             Some(&second),
         )
         .is_err(),
@@ -486,8 +474,7 @@ fn upsert_persists_the_full_lifecycle_key_without_collapsing_to_task_id() {
             worker_thread_id: None,
             task_id: "sub-1".into(),
             lifecycle_key: Some(key.clone()),
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -532,8 +519,7 @@ fn closed_session_is_not_reusable() {
             worker_thread_id: None,
             task_id: "sub-1".into(),
             lifecycle_key: None,
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -555,8 +541,7 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
             worker_thread_id: None,
             task_id: "sub-1".into(),
             lifecycle_key: None,
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();
@@ -572,8 +557,7 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
             worker_thread_id: None,
             task_id: "sub-2".into(),
             lifecycle_key: None,
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .unwrap();

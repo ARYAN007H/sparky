@@ -330,8 +330,7 @@ async fn continue_subagent_resumes_idle_durable_session_e2e() {
             worker_thread_id: None,
             task_id: "sub-earlier-task".into(),
             lifecycle_key: None,
-                    parent_epoch: None,
-},
+        },
         None,
     )
     .expect("seed durable session");
