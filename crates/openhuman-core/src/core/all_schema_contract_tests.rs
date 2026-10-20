@@ -147,7 +147,6 @@ fn registered_wallet_schema_contract_rejects_missing_encrypted_mnemonic() {
 
 /// Built-in/internal snapshots avoid ambient DomainSet filtering and global
 /// hosted-extension mutation. Hosted/RPC contracts belong to their own crates.
-#[cfg(not(any(feature = "modules", feature = "mcp")))]
 fn builtin_controller_snapshot() -> Vec<ControllerEntry> {
     registry()
         .iter()
