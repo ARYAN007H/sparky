@@ -395,7 +395,6 @@ zstd = "0.13"
 # behind the `scheduler-gate` feature. CPU sampling uses `sysinfo` above.
 starship-battery = { version = "0.12", optional = true }
 
-# WhatsApp Web provider execution is supplied by the TinyChannels module.
 # TinyDocs — the document wire contract, and nothing else.
 #
 # `tinydocs-bus` is the whole dependency: the spec types, their size limits,
@@ -518,7 +517,7 @@ tokio-tungstenite = { version = "0.29", default-features = false, features = ["c
 [dev-dependencies]
 # Legacy TinyChannels provider/runtime fixtures remain available to tests only;
 # production channel execution uses the TinyBus module contract above.
-tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark", "whatsapp-web"] }
+tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark"] }
 tinychannels-runtime = { path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
 # The real TinyChannels module, linked into the test binary (never the product)
 # as the fixture behind `channels::module_fixture`.
@@ -855,9 +854,6 @@ crash-reporting = ["dep:sentry"]
 # Channels-backed operations require the process-wide module loader;
 # serialized configuration/messages come from the always-on bus contract.
 channels = ["modules"]
-# Retained only to gate legacy provider test fixtures; production channel
-# execution is delivered by the TinyChannels module artifact.
-whatsapp-web = ["channels"]
 # Exposes the destructive `openhuman.test_reset` RPC. Off by default; the E2E
 # build (app/scripts/e2e-build.sh) flips it on. Shipped binaries never have
 # this feature so the wipe RPC isn't even registered, let alone reachable.

@@ -72,7 +72,6 @@ mcp = ["openhuman-tinyhumans/mcp"]
 # to Sentry.
 crash-reporting = ["openhuman-tinyhumans/crash-reporting"]
 channels = ["openhuman-tinyhumans/channels"]
-whatsapp-web = ["openhuman-tinyhumans/whatsapp-web"]
 file-logging = ["openhuman-tinyhumans/file-logging"]
 scheduler-gate = ["openhuman-tinyhumans/scheduler-gate"]
 # E2E builds only (`openhuman.test_reset`); default-OFF. The desktop app

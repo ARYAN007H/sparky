@@ -71,10 +71,6 @@ pub use providers::slack;
 #[cfg(all(feature = "channels", test))]
 pub use providers::telegram;
 #[cfg(all(feature = "channels", test))]
-pub use providers::whatsapp;
-#[cfg(all(feature = "whatsapp-web", test))]
-pub use providers::whatsapp_web;
-#[cfg(all(feature = "channels", test))]
 pub use providers::yuanbao;
 
 #[cfg(all(feature = "channels", test))]
@@ -102,9 +98,6 @@ pub use slack::SlackChannel;
 #[cfg(all(feature = "channels", test))]
 pub use telegram::TelegramChannel;
 #[cfg(all(feature = "channels", test))]
-pub use whatsapp::WhatsAppChannel;
-#[cfg(all(feature = "whatsapp-web", test))]
-pub use whatsapp_web::WhatsAppWebChannel;
 #[cfg(all(feature = "channels", test))]
 pub use yuanbao::YuanbaoChannel;
 
