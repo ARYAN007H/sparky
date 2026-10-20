@@ -3,6 +3,33 @@ use crate::storage::StorageBackend;
 use tinymemory_api::{ConsolidateRequest, ItemKind, Namespace, Reach};
 use tinymemory_tools::BackgroundJob;
 
+async fn open_workspace_for_profile(
+    workspace: &std::path::Path,
+    backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
+    scope: &crate::storage::Scope,
+    profile: &str,
+) -> crate::storage::state_kv::StateKv {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.to_path_buf();
+    let context = CoreContext::for_test(DomainSet::full(), Some(workspace.to_path_buf()))
+        .derive_with(
+            ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).profile(profile),
+        );
+    CoreContext::scope(context, async {
+        super::open_workspace_quarantining_on::<Vec<crate::memory::deletion::PendingDeletion>>(
+            workspace,
+            backend,
+            scope,
+            "pending_deletions",
+        )
+        .unwrap()
+    })
+    .await
+}
+
 #[tokio::test]
 async fn host_memory_state_adapters_use_the_state_kv_port() {
     let tmp = tempfile::tempdir().unwrap();
@@ -97,8 +124,8 @@ fn workspace_scope_is_stable_before_creation_and_across_profile_layouts() {
     assert_eq!(super::workspace_scope(&v2.workspace_dir).unwrap(), v1_scope);
 }
 
-#[test]
-fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_marker() {
+#[tokio::test]
+async fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_marker() {
     use crate::config::schema::profile_layout::{LayoutVersion, ProfileLayout};
     use crate::memory::deletion::PendingDeletion;
 
@@ -155,13 +182,8 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
         .unwrap();
 
     let alice_scope = super::workspace_scope(&alice_workspace).unwrap();
-    let alice_target = super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
-        &alice_workspace,
-        &backend,
-        &alice_scope,
-        "pending_deletions",
-    )
-    .unwrap();
+    let alice_target =
+        open_workspace_for_profile(&alice_workspace, &backend, &alice_scope, "alice").await;
     assert_eq!(
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -185,13 +207,7 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
     );
 
     alice_target.delete("pending_deletions").unwrap();
-    super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
-        &alice_workspace,
-        &backend,
-        &alice_scope,
-        "pending_deletions",
-    )
-    .unwrap();
+    open_workspace_for_profile(&alice_workspace, &backend, &alice_scope, "alice").await;
     assert!(
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -206,13 +222,7 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
     alice_old
         .put("pending_deletions", &vec![late_item.clone()])
         .unwrap();
-    super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
-        &alice_workspace,
-        &backend,
-        &alice_scope,
-        "pending_deletions",
-    )
-    .unwrap();
+    open_workspace_for_profile(&alice_workspace, &backend, &alice_scope, "alice").await;
     assert_eq!(
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -222,13 +232,7 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
     );
 
     let bob_scope = super::workspace_scope(&bob_workspace).unwrap();
-    let bob_target = super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
-        &bob_workspace,
-        &backend,
-        &bob_scope,
-        "pending_deletions",
-    )
-    .unwrap();
+    let bob_target = open_workspace_for_profile(&bob_workspace, &backend, &bob_scope, "bob").await;
     assert_eq!(
         bob_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -266,7 +270,7 @@ async fn a_matching_active_agent_scope_is_a_legacy_source() {
     .unwrap();
 
     let migrated = CoreContext::scope(context.clone(), async {
-        let includes_own_scope = super::legacy_queue_scopes(&workspace).contains(&old_scope);
+        let includes_own_scope = super::legacy_queue_scopes(&workspace, true).contains(&old_scope);
         includes_own_scope
             && super::open_workspace_quarantining_on::<
                 Vec<crate::memory::deletion::PendingDeletion>,
@@ -298,6 +302,7 @@ async fn a_matching_active_agent_scope_is_a_legacy_source() {
             &backend,
             &other_scope,
             &other_target,
+            false,
         )
         .unwrap();
     })

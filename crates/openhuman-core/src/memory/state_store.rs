@@ -140,10 +140,7 @@ fn active_workspace_matches(workspace_dir: &Path) -> bool {
         .is_some_and(|(active, requested)| active == requested)
 }
 
-fn legacy_queue_scopes(
-    workspace_dir: &Path,
-    include_local: bool,
-) -> Vec<crate::storage::Scope> {
+fn legacy_queue_scopes(workspace_dir: &Path, include_local: bool) -> Vec<crate::storage::Scope> {
     let known_profile = profile_layout_for_workspace(workspace_dir)
         .and_then(|profile| profile.dir.file_name()?.to_str().map(str::to_owned));
     let mut scopes = Vec::new();
