@@ -49,6 +49,7 @@ pub(super) fn managed_chat_model(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn managed_chat_model_for(
     extensions: Option<&crate::core::slots::Extensions>,
     role: &str,

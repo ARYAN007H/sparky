@@ -97,6 +97,8 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         probe_inference_readiness(&dispatch, "chat", &config)
             .await
             .expect("explicit model entry is ready");
+        let missing = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None));
+        assert!(create_chat_model_with_model_id_in(&missing, "chat", &config, 0.0).is_err());
     })
     .await;
     assert!(a_probed.load(Ordering::SeqCst));
