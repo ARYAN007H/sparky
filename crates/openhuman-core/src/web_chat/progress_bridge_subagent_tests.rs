@@ -60,9 +60,6 @@ async fn subagent_completed_carries_parent_call_id_and_capped_output() {
         output_chars: 5,
         usage: None,
         output: "final answer".into(),
-        worktree_path: None,
-        changed_files: Vec::new(),
-        dirty_status: None,
         stop: None,
     })
     .await
