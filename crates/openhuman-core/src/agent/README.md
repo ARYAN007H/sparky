@@ -178,7 +178,7 @@ its `AgentStores`. See [session_host/README.md](session_host/README.md).
 
 A parent agent delegates by calling a tool. `spawn_subagent`
 ([`orchestration/tools/spawn_subagent.rs`](./orchestration/tools/spawn_subagent.rs)) and its siblings
-(`spawn_async_subagent`, `spawn_parallel_agents`, `continue_subagent`,
+(`spawn_async_subagent`, `continue_subagent`,
 `steer_subagent`, `wait_subagent`, `close_subagent`, `delegate`) look up the
 target `AgentDefinition` and call `subagent_host::run_subagent_with_parent`.
 
@@ -211,7 +211,7 @@ other `Subagent*` variants. Spawn depth is capped by
 `SteeringRegistry` ([`tinyagents/host/steering.rs`](./tinyagents/host/steering.rs)).
 
 `orchestration/` is the larger control plane on top of that: the command
-center, git worktrees for parallel coding workers, and background completion
+center and background completion
 delivery. See
 [orchestration/README.md](orchestration/README.md) and
 [subagent_host/README.md](subagent_host/README.md).
@@ -293,7 +293,7 @@ Delegation and coordination:
 | Path | What it does |
 | --- | --- |
 | `subagent_host/` | Runs a child agent: definition, model and tool narrowing, prompt, checkpoints, progress ([README](subagent_host/README.md)) |
-| `orchestration/` | Spawn/steer/wait tools, command center, worktrees, background delivery ([README](orchestration/README.md)) |
+| `orchestration/` | Spawn/steer/wait tools, command center, background delivery ([README](orchestration/README.md)) |
 | `triage/` | Classifies `TriggerEnvelope`s and escalates ([README](triage/README.md)) |
 | `goals/` | Host adapters around `tinyagents_graph::goals` and the `goal_*` tools ([README](goals/README.md)) |
 | `todos/` | Session-scoped todo list over the TinyAgents todo store ([README](todos/README.md)) |
@@ -366,7 +366,6 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 | `run_ledger` | `../sessions/` | `list`, `get`, `events` |
 | `session_import` | `../storage/import/` | `run` |
 | `agent_work` | [`orchestration/command_center`](./orchestration/command_center/) | `list`, `control` |
-| `worktree` | [`orchestration/worktree_schemas.rs`](./orchestration/worktree_schemas.rs) | `list`, `status`, `diff`, `remove` |
 | `subagent` | [`orchestration/subagent_control.rs`](./orchestration/subagent_control.rs) | `cancel`, `steer` for running sub-agents |
 
 `agent.chat` and `agent.chat_simple` load config and call

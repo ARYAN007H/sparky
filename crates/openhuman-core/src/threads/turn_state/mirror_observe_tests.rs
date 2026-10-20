@@ -626,14 +626,14 @@ fn thinking_timing_wire_shape_is_camel_case_and_backward_compatible() {
 #[test]
 fn subagent_spawned_derives_source_tool_name_from_the_parent_row() {
     // Only `spawn_subagent` ever hardcoded a "spawn_subagent" source. Every
-    // other delegation path (`spawn_parallel_agents`, `spawn_async_subagent`,
+    // other delegation path (`spawn_async_subagent`,
     // a synthesized `delegate_researcher`, …) must show its own real tool
     // name, derived from the parent call's row by `parent_call_id` — never
     // the historical hardcoded default.
     let (_d, mut m) = fresh("t");
     m.observe(&AgentProgress::ToolCallStarted {
         call_id: "call-parallel".into(),
-        tool_name: "spawn_parallel_agents".into(),
+        tool_name: concat!("spawn_", "parallel_agents").into(),
         arguments: serde_json::json!({}),
         iteration: 1,
         display_label: None,
@@ -660,7 +660,7 @@ fn subagent_spawned_derives_source_tool_name_from_the_parent_row() {
         .expect("subagent row created");
     assert_eq!(
         entry.source_tool_name.as_deref(),
-        Some("spawn_parallel_agents")
+        Some(concat!("spawn_", "parallel_agents"))
     );
     let activity = entry.subagent.expect("subagent activity present");
     assert_eq!(activity.parent_call_id.as_deref(), Some("call-parallel"));

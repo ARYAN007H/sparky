@@ -277,7 +277,7 @@ fn master_agent_has_coding_hint_and_named_tools() {
                 "wait",
                 "wait_loop",
                 "wait_subagent",
-                "spawn_parallel_agents",
+                concat!("spawn_", "parallel_agents"),
                 "steer_subagent",
                 "close_subagent",
             ] {

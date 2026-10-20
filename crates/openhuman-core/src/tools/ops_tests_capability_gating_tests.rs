@@ -83,7 +83,6 @@ fn tool_group_classifies_gate_and_harness_families() {
         "wait_loop",
         "delegate",
         "todo",
-        "spawn_parallel_agents",
     ] {
         assert_eq!(tool_group(name), DomainGroup::Agent);
     }

@@ -3,7 +3,7 @@
 //! # Why this exists
 //!
 //! Every spawn path (`spawn_subagent`, `spawn_async_subagent`,
-//! `spawn_parallel_agents`, `continue_subagent`, `dispatch`) creates an
+//! `continue_subagent`, `dispatch`) creates an
 //! `agent_runs` row at `status = "running"` and, on completion or user-input
 //! pause, fires **both**:
 //!   * `BUS.publish(DomainEvent::SubagentCompleted/Failed/AwaitingUser)` —

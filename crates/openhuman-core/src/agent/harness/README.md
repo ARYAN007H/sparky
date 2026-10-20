@@ -99,8 +99,8 @@ turn lifecycle are in `../session_host/`; `run_subagent`,
   `AgentDefinitionRegistry`/`ToolScope`.
 - `agent/tinyagents/middleware/credential_scrub.rs` calls
   `harness::credentials::scrub_credentials` on every tool result.
-- `agent/orchestration/tools/*` (`spawn_subagent`, `spawn_parallel_agents`,
-  `spawn_async_subagent`, `continue_subagent`, `steer_subagent`, and friends)
+- `agent/orchestration/tools/*` (`spawn_subagent`, `spawn_async_subagent`,
+  `continue_subagent`, `steer_subagent`, and friends)
   call into `../subagent_host/` and take this module's parent context
   explicitly.
 

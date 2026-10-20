@@ -1,7 +1,7 @@
 # orchestration
 
 `agent::orchestration` hosts live OpenHuman adapters for detached sub-agents:
-spawning, steering, waiting, worktree isolation, progress, and durable
+spawning, steering, waiting, progress, and durable
 subagent-session projections. TinyAgents owns generic task execution and
 registry behavior; OpenHuman supplies product policy, execution context, RPC,
 and UI-facing projections.
@@ -11,11 +11,8 @@ and UI-facing projections.
 - Host adapters that dispatch work through `agent::subagent_host::run_subagent`.
 - Background sub-agent task tracking, cancellation, steering, completion
   delivery, and run-ledger projection.
-- OpenHuman worktree isolation and its list/status/diff/remove RPC surface.
 - Manual cancellation and steering for detached `spawn_async_subagent` runs.
 - The shared root `ParentExecutionContext` builder used by background tasks.
-- `spawn_parallel_agents` policy and progress projection over TinyAgents
-  parallel execution.
 
 ## Key files
 
@@ -28,7 +25,6 @@ and UI-facing projections.
 - `subagent_control.rs`: manual cancel and steer RPCs.
 - `subagent_sessions/`: durable session reuse and deduplication.
 - `parent_context/builder.rs`: construction for tasks without a parent turn.
-- `worktree.rs` and `../../agent_runs/worktree_schemas.rs`: worktree adapter and RPCs.
 - `delegation.rs`: live TinyAgents delegation graph adapter.
 - `tools.rs`: callable sub-agent tools.
 
@@ -37,13 +33,12 @@ and UI-facing projections.
 | Namespace | Surface |
 | --- | --- |
 | `agent_work` | Background run list and controls |
-| `worktree` | List, status, diff, remove |
 | `subagent` | Cancel and steer |
 
 ## Tools
 
 The module exposes `spawn_subagent`, `spawn_async_subagent`,
-`spawn_parallel_agents`, `steer_subagent`, `continue_subagent`,
+`steer_subagent`, `continue_subagent`,
 `close_subagent`, `wait_subagent`, `wait`, `wait_loop`, and `list_subagents`.
 `delegate_graph` and archetype delegates provide optional delegation tools.
 Execution routes through `agent::subagent_host::run_subagent`.

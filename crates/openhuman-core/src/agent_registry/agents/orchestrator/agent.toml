@@ -224,7 +224,7 @@ named = [
     # `orchestration::background_delivery`. Nothing has to block for it, so
     # the collection surface that used to sit here — `wait`, `wait_loop`,
     # `wait_subagent` — bought nothing but tokens and an invitation to stall
-    # the turn. `spawn_parallel_agents` went the same way: several spawns are
+    # the turn. Multiple async sub-agent requests can also be sent in parallel:
     # already several workers in flight, so a dedicated fan-out tool was a
     # second way to say the same thing. `steer_subagent` and `close_subagent`
     # were fleet-management affordances for a fleet the model no longer
