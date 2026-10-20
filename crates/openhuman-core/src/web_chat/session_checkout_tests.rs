@@ -57,6 +57,7 @@ fn write_thread_transcript(workspace_dir: &Path, stem: &str, thread_id: &str, ro
     let meta = TranscriptMeta {
         session_id: None,
         parent_session_id: None,
+        prefix_reset: false,
         agent_name: "orchestrator_thread".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: Some("root".into()),
