@@ -379,7 +379,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                     args: Some(serde_json::json!(
                         crate::agent::artifacts::types::ArtifactReadyPayload {
                             artifact_id: artifact_id.clone(),
-                            kind: crate::agent::artifacts::types::ArtifactKind::parse(kind),
+                            kind: kind.clone(),
                             title: title.clone(),
                             workspace_dir: workspace_dir.clone(),
                             path: path.clone(),
@@ -419,7 +419,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                     args: Some(serde_json::json!(
                         crate::agent::artifacts::types::ArtifactFailedPayload {
                             artifact_id: artifact_id.clone(),
-                            kind: crate::agent::artifacts::types::ArtifactKind::parse(kind),
+                            kind: kind.clone(),
                             title: title.clone(),
                             workspace_dir: workspace_dir.clone(),
                             error: error.clone(),
@@ -457,7 +457,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                     args: Some(serde_json::json!(
                         crate::agent::artifacts::types::ArtifactPendingPayload {
                             artifact_id: artifact_id.clone(),
-                            kind: crate::agent::artifacts::types::ArtifactKind::parse(kind),
+                            kind: kind.clone(),
                             title: title.clone(),
                             workspace_dir: workspace_dir.clone(),
                             path: path.clone(),

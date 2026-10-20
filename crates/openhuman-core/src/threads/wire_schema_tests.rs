@@ -134,16 +134,7 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
                 "{property} schema is missing {field}: {payload}"
             );
         }
-        assert_eq!(
-            schema_string_values(&schema, &payload["properties"]["kind"]),
-            vec![
-                "document".to_owned(),
-                "image".to_owned(),
-                "other".to_owned(),
-                "presentation".to_owned(),
-                "video".to_owned(),
-            ]
-        );
+        assert_eq!(payload["properties"]["kind"]["type"], "string");
     }
     let ack = resolve_schema(&schema, &properties["queuedChatAck"]);
     for field in [

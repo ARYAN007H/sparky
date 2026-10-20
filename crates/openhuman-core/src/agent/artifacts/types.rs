@@ -74,7 +74,7 @@ impl ArtifactStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ArtifactPendingPayload {
     pub artifact_id: String,
-    pub kind: ArtifactKind,
+    pub kind: String,
     pub title: String,
     pub workspace_dir: String,
     pub path: String,
@@ -85,7 +85,7 @@ pub struct ArtifactPendingPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ArtifactReadyPayload {
     pub artifact_id: String,
-    pub kind: ArtifactKind,
+    pub kind: String,
     pub title: String,
     pub workspace_dir: String,
     pub path: String,
@@ -97,7 +97,7 @@ pub struct ArtifactReadyPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ArtifactFailedPayload {
     pub artifact_id: String,
-    pub kind: ArtifactKind,
+    pub kind: String,
     pub title: String,
     pub workspace_dir: String,
     pub error: String,

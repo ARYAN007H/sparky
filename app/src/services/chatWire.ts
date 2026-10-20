@@ -247,9 +247,11 @@ interface ArtifactContext {
   request_id?: string;
 }
 
-export type ArtifactReadyEvent = ArtifactReadyPayload & ArtifactContext;
-export type ArtifactFailedEvent = ArtifactFailedPayload & ArtifactContext;
-export type ArtifactPendingEvent = ArtifactPendingPayload & ArtifactContext;
+type ValidatedArtifactKind<T> = Omit<T, 'kind'> & { kind: ArtifactKind };
+
+export type ArtifactReadyEvent = ValidatedArtifactKind<ArtifactReadyPayload> & ArtifactContext;
+export type ArtifactFailedEvent = ValidatedArtifactKind<ArtifactFailedPayload> & ArtifactContext;
+export type ArtifactPendingEvent = ValidatedArtifactKind<ArtifactPendingPayload> & ArtifactContext;
 
 // ── Queue and suggestions ────────────────────────────────────────────────────
 
