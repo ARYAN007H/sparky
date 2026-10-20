@@ -62,16 +62,25 @@ async function resetCoreForWebUser(userId: string): Promise<void> {
   });
 }
 
-export async function seedBrowserCoreMode(page: Page): Promise<void> {
+export async function seedBrowserCoreMode(
+  page: Page,
+  options: { markWalkthroughComplete?: boolean } = {}
+): Promise<void> {
   await page.addInitScript(
-    ({ rpcUrl, token }) => {
+    ({ rpcUrl, token, markWalkthroughComplete }) => {
       window.localStorage.setItem('openhuman_core_mode', 'cloud');
       window.localStorage.setItem('openhuman_core_rpc_url', rpcUrl);
       window.localStorage.setItem('openhuman_core_rpc_token', token);
-      window.localStorage.setItem('openhuman:walkthrough_completed', 'true');
-      window.localStorage.removeItem('openhuman:walkthrough_pending');
+      if (markWalkthroughComplete) {
+        window.localStorage.setItem('openhuman:walkthrough_completed', 'true');
+        window.localStorage.removeItem('openhuman:walkthrough_pending');
+      }
     },
-    { rpcUrl: CORE_RPC_URL, token: CORE_RPC_TOKEN }
+    {
+      rpcUrl: CORE_RPC_URL,
+      token: CORE_RPC_TOKEN,
+      markWalkthroughComplete: options.markWalkthroughComplete !== false,
+    }
   );
 }
 
@@ -209,10 +218,11 @@ export async function signInViaBypassUser(
 export async function bootAuthenticatedPage(
   page: Page,
   userId: string,
-  hash: string = '/home'
+  hash: string = '/home',
+  options: { markWalkthroughComplete?: boolean } = {}
 ): Promise<void> {
   await resetCoreForWebUser(userId);
-  await seedBrowserCoreMode(page);
+  await seedBrowserCoreMode(page, options);
   await page.goto('/#/home');
   await waitForAuthenticatedSnapshot(page);
   await page.goto(`/#${hash}`);

@@ -31,7 +31,9 @@ test.describe('Guided tour gates', () => {
   test.beforeEach(async ({ page }) => {
     // Tour coverage does not exercise the auth callback. Seed the authenticated
     // core state directly so callback timing cannot obscure walkthrough failures.
-    await bootAuthenticatedPage(page, 'pw-guided-tour-user', '/home');
+    await bootAuthenticatedPage(page, 'pw-guided-tour-user', '/home', {
+      markWalkthroughComplete: false,
+    });
     await dismissWalkthroughIfPresent(page);
     await page.goto('/#/home');
     await waitForAppReady(page);
