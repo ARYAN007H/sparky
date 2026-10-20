@@ -49,9 +49,9 @@ async fn cached_probe_serves_definitive_negative_results() {
         ChatModelEntry {
             build: Arc::new(|_| {
                 Ok((
-                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies([
-                        "ready",
-                    ])),
+                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(
+                        ["ready"].to_vec(),
+                    )),
                     "fixture-model".to_string(),
                 ))
             }),
