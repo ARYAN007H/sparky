@@ -73,14 +73,14 @@ async fn ok(
     }
 }
 
-fn approval_gated_http_graph() -> Value {
+fn approval_gated_code_graph() -> Value {
     json!({
-        "name": "Published HTTP capability",
+        "name": "Published code capability",
         "nodes": [
             { "id": "trigger", "kind": "trigger", "name": "Manual" },
-            { "id": "request", "kind": "http_request", "name": "Blocked request",
-              "config": { "method": "POST", "url": "http://127.0.0.1:1/must-not-connect", "requires_approval": true } },
-            { "id": "after", "kind": "output_parser", "name": "After request" }
+            { "id": "request", "kind": "code", "name": "Blocked code",
+              "config": { "language": "javascript", "source": "return 1;", "requires_approval": true } },
+            { "id": "after", "kind": "output_parser", "name": "After code" }
         ],
         "edges": [
             { "from_node": "trigger", "to_node": "request" },
@@ -158,7 +158,7 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         TEST_TOKEN,
         1,
         "openhuman.flows_create",
-        json!({ "name": "Published capability flow", "graph": approval_gated_http_graph() }),
+        json!({ "name": "Published capability flow", "graph": approval_gated_code_graph() }),
     )
     .await;
     let flow_id = created["id"].as_str().expect("saved flow id").to_owned();
@@ -269,8 +269,8 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         .any(|v| v == "request"));
 
     // Resume reaches the real host CapsHost callback. The captured read-only
-    // policy denies Network before the deliberately closed loopback endpoint is
-    // contacted; TinyFlows then persists the failed terminal run through the
+    // policy denies the harmless code action before an interpreter is invoked;
+    // TinyFlows then persists the failed terminal run through the
     // owner-scoped CatalogStorage callback.
     let resumed = ok(
         addr,
@@ -299,7 +299,7 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         .to_lowercase();
     assert!(
         failure.contains("[policy-blocked]")
-            && failure.contains("flows http_request node is not permitted")
+            && failure.contains("flows code node is not permitted")
             && failure.contains("readonly"),
         "{terminal}"
     );
