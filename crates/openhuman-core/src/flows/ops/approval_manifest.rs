@@ -36,12 +36,12 @@ use super::*;
 pub async fn compute_approval_manifest(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Result<Vec<Value>, String> {
     compute_approval_manifest_json(
         ctx,
         config,
-        serde_json::to_value(graph).map_err(|e| e.to_string())?,
+        graph.clone(),
     )
     .await
 }

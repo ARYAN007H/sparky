@@ -19,7 +19,7 @@ pub(in crate::flows::schemas) fn handle_draft_create(
             .get("origin")
             .and_then(Value::as_str)
             .and_then(|s| serde_json::from_value(Value::String(s.to_string())).ok())
-            .unwrap_or(tinyflows_catalog::DraftOrigin::Canvas);
+            .unwrap_or(tinyflows_bus::catalog::DraftOrigin::Canvas);
         to_json(ops::flows_draft_create(
             &config, flow_id, name, graph, origin,
         )?)

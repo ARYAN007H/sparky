@@ -89,7 +89,11 @@ pub(crate) async fn flows_create_with_context(
     );
     let result = store::create_flow(config, name, graph, require_approval)
         .map_err(|e| e.to_string())?;
-    let flow = result.workflow;
+    let tinyflows_bus::catalog::PutWorkflowResult {
+        workflow: flow,
+        born_disabled,
+        approval_forced,
+    } = result;
 
     if flow.enabled {
         tracing::debug!(target: "flows", flow_id = %flow.id, "[flows] flows_create: flow is enabled — binding automatic-dispatch trigger");
@@ -97,7 +101,7 @@ pub(crate) async fn flows_create_with_context(
     }
 
     let mut logs = vec!["flow created".to_string()];
-    if result.born_disabled {
+    if born_disabled {
         let trigger_label = match bus::describe_trigger(config, &flow) {
             Ok(details) => details
                 .kind
@@ -112,7 +116,7 @@ pub(crate) async fn flows_create_with_context(
              Enable it explicitly (flows_set_enabled) when you are ready for it to fire."
         ));
     }
-    if result.approval_forced {
+    if approval_forced {
         logs.push(
             "require_approval forced to true because the graph contains outbound side-effect \
              nodes (tool_call / http_request / code)."

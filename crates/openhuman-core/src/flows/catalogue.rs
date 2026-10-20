@@ -88,12 +88,12 @@ pub fn flow_entries(config: &Config) -> Vec<Workflow> {
     entries
 }
 
-fn entry_for_with_config(config: &Config, flow: tinyflows_catalog::types::Flow) -> Workflow {
+fn entry_for_with_config(config: &Config, flow: tinyflows_bus::catalog::Workflow) -> Workflow {
     let description = describe(config, &flow);
     entry_with_description(flow, description)
 }
 
-fn entry_with_description(flow: tinyflows_catalog::types::Flow, description: String) -> Workflow {
+fn entry_with_description(flow: tinyflows_bus::catalog::Workflow, description: String) -> Workflow {
     Workflow {
         name: flow.name.clone(),
         // The flow id, because that is what `run_workflow` / `get_flow` take.
@@ -111,7 +111,7 @@ fn entry_with_description(flow: tinyflows_catalog::types::Flow, description: Str
 }
 
 /// A structural summary of the flow graph.
-fn describe(config: &Config, flow: &tinyflows_catalog::types::Flow) -> String {
+fn describe(config: &Config, flow: &tinyflows_bus::catalog::Workflow) -> String {
     let trigger = match bus::describe_trigger(config, flow) {
         Ok(details) => details.kind.unwrap_or_else(|| "manual".to_string()),
         Err(error) => {
@@ -127,11 +127,8 @@ fn describe(config: &Config, flow: &tinyflows_catalog::types::Flow) -> String {
 /// Deliberately structural — trigger, size, paused-ness — because that is all
 /// the record carries. See the module docs: inventing a purpose from node
 /// internals would read as authoritative and frequently be wrong.
-fn describe_shape(flow: &tinyflows_catalog::types::Flow, trigger: String) -> String {
-    let steps = flow
-        .graph
-        .nodes
-        .len()
+fn describe_shape(flow: &tinyflows_bus::catalog::Workflow, trigger: String) -> String {
+    let steps = flow.graph.get("nodes").and_then(serde_json::Value::as_array).map_or(0, Vec::len)
         // The trigger is not a step the user thinks about.
         .saturating_sub(1);
     let mut out = format!(
@@ -145,7 +142,7 @@ fn describe_shape(flow: &tinyflows_catalog::types::Flow, trigger: String) -> Str
 }
 
 #[cfg(test)]
-fn entry_for(flow: tinyflows_catalog::types::Flow) -> Workflow {
+fn entry_for(flow: tinyflows_bus::catalog::Workflow) -> Workflow {
     let tmp = tempfile::TempDir::new().expect("isolated workspace");
     let config = Config {
         workspace_dir: tmp.path().join("workspace"),

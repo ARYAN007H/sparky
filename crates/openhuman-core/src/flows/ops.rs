@@ -49,11 +49,10 @@ use crate::flows::store;
 use crate::security::approval::{ApprovalChatContext, ApprovalTurnContext};
 use crate::security::turn_origin::{with_origin, AgentTurnOrigin};
 mod build_registry;
-use tinyflows_bus::catalog::{FlowRun, FlowSuggestion, SuggestionStatus};
+use tinyflows_bus::catalog::{FlowRun, FlowSuggestion, SuggestionStatus, Workflow as Flow};
 use tinyflows_bus::runs::FlowRunTrigger;
 use tokio_util::sync::CancellationToken;
 
-pub(crate) use tinyflows_bus::catalog::Workflow as Flow;
 
 /// Overall safety bound on a single `flows_run` / `flows_resume`. Individual
 /// capabilities have their own timeouts (HTTP, sandbox), but a hung LLM/tool

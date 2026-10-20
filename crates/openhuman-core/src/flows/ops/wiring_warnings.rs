@@ -6,17 +6,9 @@ use crate::core::runtime::DispatchCtx;
 pub(crate) async fn graph_wiring_warnings(
     context: &DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Result<Vec<String>, String> {
-    let graph = match serde_json::to_value(graph) {
-        Ok(graph) => graph,
-        Err(error) => {
-            return Err(format!(
-                "wiring warnings could not serialize graph: {error}"
-            ))
-        }
-    };
-    wiring_warnings(context, config, graph).await
+    wiring_warnings(context, config, graph.clone()).await
 }
 
 /// Author-time WARNs for a portable Copilot graph payload.

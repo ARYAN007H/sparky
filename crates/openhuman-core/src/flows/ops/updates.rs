@@ -1,5 +1,4 @@
 use super::*;
-use tinyflows_catalog::graph_policy::{enforce_side_effect_approval, trigger_is_automatic};
 
 /// Maps the Catalog bus [`FlowUpdateError`](tinyflows_bus::catalog::FlowUpdateError) to the RPC
 /// error string. A concurrency conflict is encoded as a JSON object the UI can
@@ -139,7 +138,7 @@ async fn flows_update_inner(
             validate_and_migrate_graph(
                 ctx,
                 config,
-                serde_json::to_value(&existing.graph).map_err(|error| error.to_string())?,
+                existing.graph.clone(),
             )
             .await?;
             existing.graph.clone()
@@ -156,41 +155,19 @@ async fn flows_update_inner(
     // `store::update_flow_graph` actually performs its guarded write. That
     // decision now lives inside `update_flow_graph`, computed against the
     // row it just re-read there (see its doc comment).
-    let now_auto = trigger_is_automatic(&graph);
-    let forced_automatic_disarm = disarm_automatic && now_auto;
     tracing::debug!(
         target: "flows",
         flow_id = %id,
-        now_auto,
         currently_enabled = existing.enabled,
-        forced_automatic_disarm,
-        "[flows] flows_update: auto-trigger disarm decision inputs (transition itself decided \
-         store-side against a fresh read, see update_flow_graph)"
+        force_disarm_automatic = disarm_automatic,
+        "[flows] flows_update: delegating automatic-trigger transition policy to Catalog.PutWorkflow"
     );
-
-    // Rule 2 analogue (compound-bypass closure): re-apply the same outbound
-    // side-effect check `flows_create` applies on save — via the shared
-    // [`enforce_side_effect_approval`] helper — so an update that *adds* a
-    // tool_call/http_request/code node to a previously read-only graph can
-    // never persist `require_approval: false` just because the update path
-    // trusted the caller's toggle unconditionally.
-    let (effective_require_approval, side_effect_forced) =
-        enforce_side_effect_approval(&graph, new_require_approval);
-    if side_effect_forced {
-        tracing::info!(
-            target: "flows",
-            flow_id = %id,
-            "[flows] flows_update: forcing require_approval=true — graph contains outbound \
-             side-effect node(s) (tool_call / http_request / code)"
-        );
-    }
 
     tracing::debug!(
         target: "flows",
         flow_id = %id,
         has_expected = expected_version.is_some(),
-        require_approval = effective_require_approval,
-        side_effect_forced,
+        require_approval = new_require_approval,
         "[flows] flows_update: persisting changes"
     );
     // The auto-disarm decision (both the unconditional manual→automatic
@@ -204,7 +181,7 @@ async fn flows_update_inner(
         id,
         new_name,
         graph,
-        effective_require_approval,
+        new_require_approval,
         None,
         disarm_automatic,
         expected_version.as_deref(),
@@ -218,7 +195,11 @@ async fn flows_update_inner(
     // happened store-side against a fresh read, so this is purely for the
     // info log / result message wording below and can't desync from what
     // was actually persisted.
-    let should_disarm = now_auto && existing.enabled && !updated.enabled;
+    let tinyflows_bus::catalog::PutWorkflowResult {
+        workflow: updated,
+        born_disabled: should_disarm,
+        approval_forced,
+    } = updated;
     if should_disarm {
         tracing::info!(
             target: "flows",
@@ -267,7 +248,7 @@ async fn flows_update_inner(
         };
         logs.push(reason.to_string());
     }
-    if side_effect_forced {
+    if approval_forced {
         logs.push(
             "require_approval forced to true because the graph contains outbound side-effect \
              nodes (tool_call / http_request / code)."
@@ -283,7 +264,7 @@ pub fn flows_get_history(
     config: &Config,
     id: &str,
     limit: usize,
-) -> Result<Outcome<Vec<tinyflows_catalog::FlowRevision>>, String> {
+) -> Result<Outcome<Vec<tinyflows_bus::catalog::WorkflowRevision>>, String> {
     let revisions = store::list_revisions(config, id, limit).map_err(|e| e.to_string())?;
     let count = revisions.len();
     Ok(Outcome::single_log(

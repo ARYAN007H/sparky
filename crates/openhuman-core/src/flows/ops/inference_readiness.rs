@@ -10,10 +10,9 @@ pub(super) struct InferenceReadinessEvaluation {
 /// beside the graph adapter because it depends on TinyFlows node configuration.
 pub(super) async fn agent_node_role(
     config: &Config,
-    node: &tinyflows::model::Node,
+    node_config: &Value,
 ) -> &'static str {
-    if let Some(agent_ref) = node
-        .config
+    if let Some(agent_ref) = node_config
         .get("agent_ref")
         .and_then(Value::as_str)
         .map(str::trim)
@@ -41,7 +40,7 @@ pub(super) async fn agent_node_role(
                     .call::<tinyflows_bus::portability::PreparedAgentRun>(
                         tinyflows_bus::portability::methods::PREPARE_AGENT_RUN,
                         &(tinyflows_bus::portability::PrepareAgentRun {
-                            request: node.config.clone(),
+                            request: node_config.clone(),
                             entry_model: entry_model.map(str::to_owned),
                             system_prompt: None,
                             effective_iteration_cap,
@@ -66,8 +65,7 @@ pub(super) async fn agent_node_role(
             );
         }
     }
-    let pinned_model = node
-        .config
+    let pinned_model = node_config
         .get("model")
         .and_then(Value::as_str)
         .map(str::trim)
@@ -139,15 +137,13 @@ fn format_evaluation(
 pub(super) async fn evaluate_inference_readiness(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Option<InferenceReadinessEvaluation> {
     let mut roles = Vec::new();
-    for node in graph
-        .nodes
-        .iter()
-        .filter(|node| node.kind == NodeKind::Agent)
+    for node in crate::flows::host_gates::graph_json::nodes(graph)
+        .filter(|node| node.kind == "agent")
     {
-        roles.push((node.id.clone(), agent_node_role(config, node).await));
+        roles.push((node.id.to_owned(), agent_node_role(config, node.config).await));
     }
     let evaluation = crate::inference::readiness::evaluate(ctx, config, &roles).await?;
     let message = format_evaluation(&evaluation);
@@ -166,7 +162,7 @@ pub(super) async fn evaluate_inference_readiness(
 pub(crate) async fn validate_inference_readiness(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Vec<String> {
     let Some(evaluation) = evaluate_inference_readiness(ctx, config, graph).await else {
         return Vec::new();

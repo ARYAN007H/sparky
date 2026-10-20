@@ -92,7 +92,7 @@ pub(super) async fn ensure_config_aware_engine_compatible(
     config: &Config,
     graph: &Value,
 ) -> Result<(), String> {
-    match config_aware_engine_compatibility_errors(ctx, config, graph)
+    match config_aware_engine_compatibility_errors(ctx, config, graph.clone())
         .await?
         .into_iter()
         .next()
