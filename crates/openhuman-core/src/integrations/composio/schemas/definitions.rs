@@ -156,7 +156,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     name: "tool",
                     ty: TypeSchema::String,
                     comment: "Composio action slug, e.g. GMAIL_SEND_EMAIL.",
-                    required: false,
+                    required: true,
                 },
                 FieldSchema {
                     name: "arguments",
