@@ -110,6 +110,12 @@ fn thread_key(scope: &HostVoiceScope) -> &str {
         .unwrap_or(&scope.conversation.id)
 }
 
+fn has_authenticated_channel_identity(scope: &HostVoiceScope) -> bool {
+    !scope.configured_instance.trim().is_empty()
+        && scope.channel.id == tinychannels_bus::provider_id(&scope.configured_instance)
+        && scope.channel.account_id.as_deref() == Some(scope.configured_instance.as_str())
+}
+
 fn wire_mode(mode: VoiceReplyMode) -> HostVoiceReplyMode {
     match mode {
         VoiceReplyMode::Mirror => HostVoiceReplyMode::Mirror,
@@ -126,7 +132,11 @@ pub(crate) fn resolve_policy(
     tenant: &crate::core::runtime::Tenant,
 ) -> HostVoiceReplyPolicy {
     let mode = voice.resolve_mode(&scope.configured_instance, thread_key(scope));
-    let facts = turn_facts(scope, tenant);
+    let facts = if has_authenticated_channel_identity(scope) {
+        turn_facts(scope, tenant)
+    } else {
+        VoiceTurnFacts::default()
+    };
     HostVoiceReplyPolicy {
         mode: wire_mode(mode),
         inbound_has_voice: facts.inbound_has_voice,
@@ -135,7 +145,7 @@ pub(crate) fn resolve_policy(
 }
 
 fn validate_scope(scope: &HostVoiceScope) -> anyhow::Result<()> {
-    if scope.configured_instance.trim().is_empty()
+    if !has_authenticated_channel_identity(scope)
         || scope.conversation.id.trim().is_empty()
         || scope.turn_id.trim().is_empty()
     {

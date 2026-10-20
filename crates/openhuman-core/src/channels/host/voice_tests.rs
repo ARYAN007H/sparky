@@ -6,7 +6,7 @@ fn scope(channel: &str, conversation: &str, turn: &str) -> HostVoiceScope {
     HostVoiceScope {
         configured_instance: channel.into(),
         channel: ChannelRef {
-            id: channel.split(':').next().unwrap_or(channel).into(),
+            id: tinychannels_bus::provider_id(channel).into(),
             account_id: Some(channel.into()),
         },
         conversation: ConversationRef {
@@ -85,6 +85,36 @@ fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
     );
     assert!(alice.inbound_has_voice, "Alice's voice turn was overwritten by Bob's text turn");
     assert!(!bob.inbound_has_voice);
+}
+
+#[test]
+fn same_channel_account_and_turn_ids_do_not_cross_voice_facts_between_tenants() {
+    let alice = crate::core::runtime::Tenant {
+        profile: Some("profile-alice".into()),
+        agent: None,
+    };
+    let bob = crate::core::runtime::Tenant {
+        profile: Some("profile-bob".into()),
+        agent: None,
+    };
+    let envelope_voice = envelope("same-conversation", "same-turn", true);
+    let envelope_text = envelope("same-conversation", "same-turn", false);
+
+    record_inbound_envelope(&envelope_voice, &alice);
+    record_inbound_envelope(&envelope_text, &bob);
+
+    assert!(resolve_policy(
+        &ChannelVoiceConfig::default(),
+        &scope("telegram", "same-conversation", "same-turn"),
+        &alice,
+    )
+    .inbound_has_voice);
+    assert!(!resolve_policy(
+        &ChannelVoiceConfig::default(),
+        &scope("telegram", "same-conversation", "same-turn"),
+        &bob,
+    )
+    .inbound_has_voice);
 }
 
 #[test]
@@ -167,7 +197,7 @@ async fn incomplete_scope_is_rejected_before_any_voice_work() {
     };
     assert!(host.synthesize_speech(bad).await.is_err());
     let bad = HostVoiceTranscriptionRequest {
-        scope: scope("", "c", "t"),
+        scope: HostVoiceScope::default(),
         ..Default::default()
     };
     assert!(host.transcribe_voice(bad).await.is_err());
