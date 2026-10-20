@@ -55,11 +55,11 @@ pub(crate) async fn invoke(
     let result = crate::tools::native_ops::execute_tool_with_security(
         config, policy, tool_name, args, false,
     )
-        .await
-        .and_then(|outcome| {
-            reject_failed_native_tool_result(slug, &outcome.result)
-                .map(|()| native_tool_payload(&outcome.result))
-        });
+    .await
+    .and_then(|outcome| {
+        reject_failed_native_tool_result(slug, &outcome.result)
+            .map(|()| native_tool_payload(&outcome.result))
+    });
     hooks.record_execution(audit_id.as_deref(), &result);
     result
 }

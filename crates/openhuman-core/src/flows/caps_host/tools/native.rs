@@ -31,14 +31,9 @@ impl ToolBackend for NativeToolBackend {
         args: Value,
         _conn: Option<&str>,
     ) -> Result<Value> {
-        flow_backend::invoke(
-            ctx.config,
-            slug,
-            args,
-            &NativeFlowPolicyHooks { ctx },
-        )
-        .await
-        .map_err(EngineError::Capability)
+        flow_backend::invoke(ctx.config, slug, args, &NativeFlowPolicyHooks { ctx })
+            .await
+            .map_err(EngineError::Capability)
     }
 }
 
