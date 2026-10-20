@@ -459,7 +459,7 @@ fn managed_unknown_model_remains_user_configuration_state() {
     let facts = tinyinference_llm::failure::http::classify_http_failure(
         "openhuman",
         StatusCode::BAD_REQUEST.as_u16(),
-        "Model 'custom:model' is not available",
+        "Model 'custom:MiniMax-M2.7' is not available. Use GET /openai/v1/models to list available models.",
     );
     assert_eq!(
         demote_decision(&facts, true),
