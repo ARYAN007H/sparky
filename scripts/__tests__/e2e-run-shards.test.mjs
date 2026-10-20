@@ -98,7 +98,7 @@ test("local Linux E2E shards cover every CI suite", () => {
   assert.deepEqual([...suites].sort(), [...assignedSuites].sort());
   assert.ok(
     localShards.every(({ suites: list }) =>
-        list.split(",").some((suite) => suites.has(suite)),
+      list.split(",").some((suite) => suites.has(suite)),
     ),
     "every OS shard group contains at least one nonempty native suite",
   );
