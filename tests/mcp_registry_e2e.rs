@@ -159,6 +159,15 @@ async fn per_config_auth_failure_does_not_leak_across_workspaces() {
             .is_err(),
         "the module must report a 401 as a failed connection"
     );
+    assert_eq!(
+        connections::auth_hint_for_config(&config_a, &server_id).await,
+        Some("credential_required")
+    );
+    assert_eq!(
+        connections::last_error_for_config(&config_a, &server_id).await,
+        None,
+        "401 response text stays hidden; the typed auth hint carries the user-facing reason"
+    );
     assert!(connections::auth_hint_for_config(&config_b, &server_id)
         .await
         .is_none());
