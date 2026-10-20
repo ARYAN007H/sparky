@@ -110,10 +110,9 @@ pub(crate) async fn run_subagent_direct_with_native_context(
     // state) onto tokio's 2 MiB worker stack and abort with "thread
     // 'tokio-rt-worker' has overflowed its stack, fatal runtime error:
     // stack overflow" — observed at `[subagent_host] dispatching
-    // agent_id=<worker> ...` in the historical chat-harness subagent lane
-    // crash (the browser spec is now skipped under #6389). The inner
-    // `Box::pin`s around `run_typed_mode` and the child's tinyagents drive
-    // future further chunk the child's state so
+    // agent_id=<worker> ...` in the `chat-harness-subagent` Playwright
+    // lane crash. The inner `Box::pin`s around `run_typed_mode` and the
+    // child's tinyagents drive future further chunk the child's state so
     // a single sub-agent run can't blow the stack either.
     Box::pin(async move {
         // A nested delegate writes its terminal total to this run's isolated
