@@ -169,7 +169,7 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
             ));
         }
         if let Some(root) = binding.root_namespace() {
-            openhuman_core::memory::scope::validate_root(root)
+            tinymemory_tools::layout::identity::validate_root(root)
                 .map_err(|reason| AgentError::Invalid(format!("memory root {root:?}: {reason}")))?;
         }
         log::debug!("[embed][agent] id={id} binds its memory agent_id={agent_id}");
