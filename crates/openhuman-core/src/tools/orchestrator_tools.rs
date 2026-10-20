@@ -1,12 +1,9 @@
 //! Dynamic orchestrator tool generation.
 //!
-//! The orchestrator agent is direct-first and only delegates specialised
-//! work. Rather than exposing a single generic
-//! `spawn_subagent(agent_id, prompt)` mega-tool, we synthesise one named
-//! tool per [`SubagentEntry::AgentId`] in the orchestrator's
-//! `[subagents] allowlist = [...]` TOML section, so the LLM's function-calling schema
-//! contains discoverable, well-named tools like `manage_tasks`,
-//! `create_image`, `build_workflow`, etc.
+//! The orchestrator delegates specialist work through the single
+//! `spawn_subagent(agent_id, prompt)` tool. `AgentId` entries in its
+//! `[subagents]` allowlist constrain that tool; they do not create additional
+//! model-facing tools.
 //!
 //! For [`SubagentEntry::Skills`] wildcard expansions we synthesise one
 //! `ToolExposure::Deferred` [`ComposioActionTool`] per action of every
@@ -18,21 +15,15 @@
 //! blocking agentic round-trip and a second prompt for work the parent could
 //! do in one call.
 //!
-//! Each synthesised delegation tool's description is pulled live from the
-//! target agent's [`AgentDefinition::when_to_use`] — so descriptions
-//! automatically stay in sync with the definitions and never drift from a
-//! hardcoded table.
-//!
 //! Called from [`crate::agent::session_host::builder`] at
 //! agent-build time, with the orchestrator's own definition, the global
-//! registry (for delegation target lookups), and the current list of
-//! connected Composio integrations.
+//! definition and the current list of connected Composio integrations.
 //!
 //! [`AgentDefinition::when_to_use`]: crate::agent_registry::host_definition::AgentDefinition::when_to_use
 //! [`SubagentEntry::AgentId`]: tinyagents_definition::SubagentEntry::AgentId
 //! [`SubagentEntry::Skills`]: tinyagents_definition::SubagentEntry::Skills
 
-use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::integrations::composio::ComposioActionTool;
 use crate::integrations::ConnectedIntegration;
 use tinyagents_definition::SubagentEntry;
@@ -67,7 +58,6 @@ use tinytools::Tool;
 /// before this module existed.
 pub fn collect_orchestrator_tools(
     definition: &AgentDefinition,
-    _registry: &AgentDefinitionRegistry,
     connected_integrations: &[ConnectedIntegration],
 ) -> Vec<Box<dyn Tool>> {
     let mut tools: Vec<Box<dyn Tool>> = Vec::new();
@@ -76,7 +66,7 @@ pub fn collect_orchestrator_tools(
         match entry {
             SubagentEntry::AgentId(agent_id) => {
                 log::debug!(
-                    "[orchestrator_tools] agent '{}' is routed through spawn_subagent(agent_id)",
+                    "[orchestrator_tools] agent '{}' is allowed through spawn_subagent(agent_id)",
                     agent_id
                 );
             }
@@ -113,7 +103,7 @@ pub fn collect_orchestrator_tools(
     }
 
     log::info!(
-        "[orchestrator_tools] assembled {} delegation tool(s) for agent '{}' ({} integrations connected)",
+        "[orchestrator_tools] assembled {} deferred integration tool(s) for agent '{}' ({} integrations connected)",
         tools.len(),
         definition.id,
         connected_integrations.len()
