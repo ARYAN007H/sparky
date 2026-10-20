@@ -519,7 +519,7 @@ fn mark_collected_in_entry(entry: Arc<Entry>, task_id: &str) -> bool {
 }
 
 /// Drop every queued completion for `thread_id` and everything that finishes
-/// for it later. Called when the thread is deleted: the router's cancelled-parent
+/// for it later. Called when the thread is deleted: the router's deleted-parent
 /// marker is durable, and the thread is also remembered as deleted in memory, so
 /// a straggler that wins the cooperative-abort race, a child that registers after
 /// the delete, or a result that finishes after a restart is dropped rather than
@@ -565,29 +565,15 @@ fn is_marked_deleted(entry: &Entry, thread_id: &str) -> bool {
     entry.store.get(&deleted_marker_id(thread_id)).is_some()
 }
 
-/// Cancel `thread_id` for good in `entry`'s router and write the deleted marker.
-/// Failures are logged; the in-memory deleted set still gates this process.
+/// Permanently delete `thread_id` in the router. Failures are logged; the
+/// in-memory deleted set still gates this process.
 fn cancel_deleted_parent(entry: &Entry, thread_id: &str) -> usize {
-    let marker = CompletionRecord::new(
-        deleted_marker_id(thread_id),
-        "",
-        "",
-        CompletionStatus::Incomplete,
-        CompletionResult::default(),
-    )
-    .with_notify_mode(NotifyMode::Off);
-    if let Err(error) = entry.store.put(&marker) {
-        log::error!(
-            "[background_completions] could not persist the deleted marker thread_id={thread_id} \
-             error={error}"
-        );
-    }
     entry
         .router
-        .cancel_parent(thread_id)
+        .delete_parent(thread_id)
         .unwrap_or_else(|error| {
             log::error!(
-                "[background_completions] cancel_parent failed thread_id={thread_id} error={error}"
+                "[background_completions] delete_parent failed thread_id={thread_id} error={error}"
             );
             0
         })
@@ -680,20 +666,32 @@ pub(crate) fn mark_stopped_task_if_thread_stopped(
             st.stopped_threads.contains(&thread_key) || st.deleted_threads.contains(&thread_key);
         (first_sight, stopped)
     };
-    // A delete outlives a restart: the durable marker, not just this process's
-    // memory, decides whether a late child belongs to a dead thread.
-    if first_sight && !stopped && is_marked_deleted(&entry, thread_id) {
-        state().deleted_threads.insert(thread_key);
-        stopped = true;
+    // Existing host delete markers predate the router's distinct permanent
+    // deletion state. Preserve them, then consult the owner's lifecycle marker
+    // for threads deleted by current versions.
+    if first_sight && !stopped {
+        if is_marked_deleted(&entry, thread_id) {
+            state().deleted_threads.insert(thread_key.clone());
+            stopped = true;
+        } else {
+            // A Stop is explicitly lifted by a new accepted child, but a
+            // deleted parent cannot be resumed. Re-admit after attempting the
+            // resume so deletion and storage errors fail closed.
+            entry.router.resume_parent(thread_id);
+            match entry.router.admit_child_generation(thread_id) {
+                Ok(Some(_)) => {}
+                Ok(None) | Err(_) => {
+                    state().deleted_threads.insert(thread_key.clone());
+                    stopped = true;
+                }
+            }
+        }
     }
     if stopped {
         if let Err(error) = entry.router.tombstone(task_id) {
             log::warn!("[background_completions] tombstone failed task_id={task_id} error={error}");
         }
         return true;
-    }
-    if first_sight {
-        entry.router.resume_parent(thread_id);
     }
     false
 }

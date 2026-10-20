@@ -384,7 +384,7 @@ impl SpawnAsyncSubagentTool {
                 parent.workspace_dir.clone(),
                 parent_session.clone(),
                 parent_thread_id.clone(),
-            );
+            )?;
         let background_worker_thread_id = worker_thread_id.clone();
         let background_store = store.clone();
         let background_subagent_session_id = durable_session.subagent_session_id.clone();

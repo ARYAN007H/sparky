@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use super::background_completions::state;
 
-use super::background_completions::{record_awaiting_input, record_completion, record_failure};
+use super::background_completions::{record_outcome_with_parent_epoch, BackgroundAgentOutcome};
 
 #[cfg(test)]
 #[path = "completion_target_tests.rs"]
@@ -49,6 +49,7 @@ pub(crate) struct CompletionTarget {
     workspace_dir: PathBuf,
     parent_session: String,
     parent_thread_id: Option<String>,
+    parent_epoch: Option<u64>,
 }
 
 impl CompletionTarget {
@@ -57,18 +58,32 @@ impl CompletionTarget {
         workspace_dir: PathBuf,
         parent_session: String,
         parent_thread_id: Option<String>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        let parent_epoch = if let Some(thread_id) = parent_thread_id.as_deref() {
+            let router = super::background_completions::router_for_workspace_ctx(
+                &ctx,
+                &workspace_dir,
+            );
+            Some(
+                router
+                    .admit_child_generation(thread_id)?
+                    .ok_or_else(|| anyhow::anyhow!("parent thread is stopped or deleted"))?,
+            )
+        } else {
+            None
+        };
+        Ok(Self {
             ctx,
             workspace_dir,
             parent_session,
             parent_thread_id,
-        }
+            parent_epoch,
+        })
     }
 
     /// Queue a finished result. See [`record_completion`].
     pub(crate) async fn completed(&self, task_id: &str, agent_id: &str, summary: String) {
-        record_completion(
+        record_outcome_with_parent_epoch(
             &self.ctx,
             &self.workspace_dir,
             &self.parent_session,
@@ -76,20 +91,24 @@ impl CompletionTarget {
             agent_id,
             summary,
             self.parent_thread_id.clone(),
+            self.parent_epoch,
+            BackgroundAgentOutcome::Completed,
         )
         .await;
     }
 
     /// Queue a failure. See [`record_failure`].
     pub(crate) async fn failed(&self, task_id: &str, agent_id: &str, error: &str) {
-        record_failure(
+        record_outcome_with_parent_epoch(
             &self.ctx,
             &self.workspace_dir,
             &self.parent_session,
             task_id,
             agent_id,
-            error,
+            format!("[SUBAGENT_FAILED] the async sub-agent errored before producing a result: {error}"),
             self.parent_thread_id.clone(),
+            self.parent_epoch,
+            BackgroundAgentOutcome::Failed,
         )
         .await;
     }
@@ -102,15 +121,24 @@ impl CompletionTarget {
         question: &str,
         checkpointed: bool,
     ) {
-        record_awaiting_input(
+        let record_id = awaiting_input_record_id(task_id);
+        let summary = crate::agent::orchestration::tools::awaiting_user::awaiting_user_envelope(
+            task_id,
+            agent_id,
+            None,
+            question,
+            checkpointed,
+        );
+        record_outcome_with_parent_epoch(
             &self.ctx,
             &self.workspace_dir,
             &self.parent_session,
-            task_id,
+            record_id,
             agent_id,
-            question,
-            checkpointed,
+            summary,
             self.parent_thread_id.clone(),
+            self.parent_epoch,
+            BackgroundAgentOutcome::AwaitingInput,
         )
         .await;
     }
