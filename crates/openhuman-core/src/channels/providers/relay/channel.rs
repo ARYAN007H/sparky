@@ -80,8 +80,8 @@ impl RelayChannel {
     }
 
     /// Publish lossless typed output to the gateway that owns provider delivery.
-    /// The receipt acknowledges acceptance by this host event path; provider
-    /// receipt IDs arrive separately from the gateway and are never fabricated.
+    /// Host event acceptance has no provider receipt; receipt IDs arrive
+    /// separately from the gateway and are never fabricated.
     pub(crate) fn publish_typed_reply(
         &self,
         channel: &tinychannels_bus::ChannelRef,
@@ -119,7 +119,6 @@ impl RelayChannel {
                 "parts": parts,
             })),
         });
-
     }
 }
 

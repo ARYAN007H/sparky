@@ -339,6 +339,9 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
     };
     assert!(outcome.error.is_none());
     assert!(outcome.receipt.idempotency_key.as_deref().is_some());
+    assert!(outcome.receipt.primary_platform_message_id.is_none());
+    assert!(outcome.receipt.platform_message_ids.is_empty());
+    assert!(outcome.receipt.parts.is_empty());
     assert_eq!(outcome.receipt.channel.as_ref(), Some(&channel));
     assert_eq!(outcome.receipt.conversation.as_ref(), Some(&conversation));
     assert_eq!(outcome.receipt.thread_id.as_deref(), Some("topic-3"));
