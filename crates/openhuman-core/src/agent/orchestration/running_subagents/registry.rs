@@ -184,7 +184,6 @@ pub(crate) fn register(
     subagent_session_id: Option<String>,
     workspace_dir: PathBuf,
     parent_thread_id: Option<String>,
-    parent_epoch: Option<u64>,
     run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
     abort: AbortHandle,
     status: watch::Receiver<DetachedSubagentStatus>,
