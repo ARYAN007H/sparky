@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import type { SubagentActivity } from '../../../store/chatRuntimeSlice';
 import { SubagentActivityCard } from './SubagentActivityCard';
 
 function openDisclosure() {
@@ -65,7 +66,7 @@ describe('SubagentActivityCard', () => {
           status: 'awaiting_user',
           awaitingQuestion: 'Which repo should I use?',
           toolCalls: [],
-        }}
+        } as unknown as SubagentActivity}
       />
     );
     expect(screen.getByTestId('assistant-ui-subagent-call')).toHaveAttribute(

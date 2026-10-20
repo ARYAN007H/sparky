@@ -14,7 +14,6 @@ import {
 import { CronAddOrUpdateCall, CronListCall, CronRunsCall } from './ChatScheduleCard';
 import { GoalToolLine } from './GoalToolLine';
 import { DocumentArtifactCall, MediaGenerationCall } from './MediaAndDocumentCalls';
-import { ParallelAgentsCard } from './ParallelAgentsCard';
 import { PlanReviewPart } from './PlanReviewPart';
 import { SubagentTaskCard } from './SubagentTaskCard';
 import { TodoListPart } from './TodoListPart';
@@ -81,7 +80,6 @@ export function openHumanToolEntries(): Record<string, OpenHumanToolEntry> {
      * above each worker's own `TaskCard` row (`ParallelAgentsCard.tsx`),
      * grouped by `subagent.parentCallId === toolCallId`.
      */
-    spawn_parallel_agents: { type: 'backend', display: 'inline', render: ParallelAgentsCard },
 
     /**
      * Image / video generation: the `elements-image-generation` placeholder

@@ -303,7 +303,6 @@ export const EXACT_TOOL_SPECS: Record<string, ToolSpec> = {
   delegate_graph: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
   delegate: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent') }),
   delegate_to: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent', 'agent_id') }),
-  spawn_parallel_agents: spec('runAgentsInParallel', UsersIcon, 'agent'),
   continue_subagent: spec('messageAgent', MessageSquareReplyIcon, 'agent', {
     chip: chip.text('agent_id'),
   }),
