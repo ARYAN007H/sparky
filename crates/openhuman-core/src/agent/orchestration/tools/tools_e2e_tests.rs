@@ -1,4 +1,4 @@
-use super::SpawnSubagentTool;
+use super::*;
 use crate::agent::harness::ParentExecutionContext;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::integrations::ConnectedIntegration;
@@ -249,11 +249,19 @@ async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
 }
 
 #[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn failed_async_child_is_reported_to_the_parent_without_a_success_result() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
-    let mut parent = parent_context(workspace.path(), Arc::new(FailingModel), vec![]);
+    let invocations = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let mut parent = parent_context(
+        workspace.path(),
+        Arc::new(FailingModel {
+            invocations: Arc::clone(&invocations),
+        }),
+        vec![],
+    );
     parent.on_progress = Some(progress_tx);
     let live = super::live_parent_run_context("failed-async-child", parent);
     let accepted = SpawnSubagentTool::new()
@@ -275,7 +283,7 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         "child failure is delivered asynchronously"
     );
 
-    let failure = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    let failure_result = tokio::time::timeout(std::time::Duration::from_secs(120), async {
         loop {
             match progress_rx.recv().await {
                 Some(crate::progress::AgentProgress::SubagentFailed {
@@ -286,8 +294,12 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
             }
         }
     })
-    .await
-    .expect("asynchronous child failure reaches the parent");
+    .await;
+    let invocation_count = invocations.load(std::sync::atomic::Ordering::SeqCst);
+    assert!(invocation_count > 0, "the injected provider must be called");
+    let failure = failure_result.unwrap_or_else(|elapsed| {
+        panic!("asynchronous child failure reaches the parent after {elapsed}; provider calls={invocation_count}")
+    });
     assert!(
         failure.starts_with("spawn_subagent failed and did not complete."),
         "failure copy remains recognizable to the parent: {failure}"
@@ -354,7 +366,9 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
     );
 }
 
-struct FailingModel;
+struct FailingModel {
+    invocations: Arc<std::sync::atomic::AtomicUsize>,
+}
 
 #[async_trait]
 impl ChatModel<()> for FailingModel {
@@ -372,6 +386,8 @@ impl ChatModel<()> for FailingModel {
         _state: &(),
         _request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
+        self.invocations
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Err(tinyinference_llm::Error::Model(
             "scripted provider outage".into(),
         ))
