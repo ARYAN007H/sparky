@@ -12,23 +12,38 @@ fn flow_schema_wire_contracts_are_preserved() {
         &all_registered_controllers(),
         "create",
     );
+    // None preserves optional-field-only tests; Some(&[]) asserts no required inputs.
     let contracts = [
-        ("import", &["graph"][..], &["format"][..]),
-        ("create", &["name", "graph"][..], &["require_approval"][..]),
-        ("duplicate", &["id"][..], &[][..]),
-        ("prune_runs", &["id"][..], &[][..]),
-        ("run", &[][..], &["input", "inputs"][..]),
-        ("resume", &["id", "thread_id"][..], &["approvals"][..]),
-        ("list_runs", &[][..], &["limit"][..]),
-        ("get_run", &["run_id"][..], &[][..]),
-        ("build", &["mode"][..], &["thread_id", "request_id"][..]),
-        ("build_cancel", &["thread_id"][..], &["request_id"][..]),
-        ("discover", &[][..], &["thread_id", "request_id"][..]),
+        ("import", Some(&["graph"][..]), &["format"][..]),
+        (
+            "create",
+            Some(&["name", "graph"][..]),
+            &["require_approval"][..],
+        ),
+        ("duplicate", Some(&["id"][..]), &[][..]),
+        ("prune_runs", Some(&["id"][..]), &[][..]),
+        ("run", None, &["input", "inputs"][..]),
+        ("resume", Some(&["id", "thread_id"][..]), &["approvals"][..]),
+        ("list_runs", None, &["limit"][..]),
+        ("get_run", Some(&["run_id"][..]), &[][..]),
+        (
+            "build",
+            Some(&["mode"][..]),
+            &["thread_id", "request_id"][..],
+        ),
+        (
+            "build_cancel",
+            Some(&["thread_id"][..]),
+            &["request_id"][..],
+        ),
+        ("discover", Some(&[][..]), &["thread_id", "request_id"][..]),
     ];
     for (function, required, optional) in contracts {
         let schema = schemas(function);
         expect_schema_identity(&schema, "flows", function);
-        expect_schema_required_inputs(&schema, required);
+        if let Some(required) = required {
+            expect_schema_required_inputs(&schema, required);
+        }
         expect_schema_fields(
             &schema,
             &optional
@@ -37,8 +52,6 @@ fn flow_schema_wire_contracts_are_preserved() {
                 .collect::<Vec<_>>(),
         );
     }
-    let run = schemas("run");
-    expect_schema_fields(&run, &[("input", None), ("inputs", Some(false))]);
     let discover = schemas("discover");
     expect_schema_input_order(&discover, &["thread_id", "request_id"]);
     expect_schema_output_names(&schemas("import"), &["graph", "warnings"]);

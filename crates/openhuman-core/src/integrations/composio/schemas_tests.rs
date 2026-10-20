@@ -34,6 +34,7 @@ fn composio_schema_contracts_and_registration_are_preserved() {
     }
     let registered = all_registered_controllers();
     for function in [
+        "list_available_triggers",
         "list_triggers",
         "enable_trigger",
         "disable_trigger",
@@ -48,7 +49,10 @@ fn composio_schema_contracts_and_registration_are_preserved() {
     }
     let capabilities = schemas("list_capabilities");
     assert!(capabilities.inputs.is_empty());
-    expect_schema_fields(&capabilities, &[("capabilities", Some(true))]);
+    assert!(capabilities
+        .outputs
+        .iter()
+        .any(|field| field.name == "capabilities" && field.required));
     expect_schema_fields(&schemas("authorize"), &[("toolkit", Some(true))]);
     expect_schema_fields(
         &schemas("execute"),
