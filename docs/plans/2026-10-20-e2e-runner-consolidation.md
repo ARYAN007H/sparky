@@ -28,7 +28,7 @@ Paths in the table are relative to `app/test/{e2e,playwright}/specs/`; each base
 
 | # | Basename | Owner and required preservation before deletion |
 | --- | --- | --- |
-| 1 | `agent-review.spec.ts` | PW. Preserve reach-shell and privacy Product Analytics label/toggle copy. Managed onboarding now completes automatically; use the current self-hosted onboarding test for actual step interaction, not obsolete welcome-step text. |
+| 1 | `agent-review.spec.ts` | PW. Preserve reach-shell and privacy Product Analytics label/toggle copy plus native artifact checkpoints (screenshot, page source and mock request log), using browser screenshots/testInfo attachments rather than silently dropping the observability contract. Managed onboarding now completes automatically; use the current self-hosted onboarding test for actual step interaction, not obsolete welcome-step text. |
 | 2 | `auth-access-control.spec.ts` | Mixed. Preserve desktop reauth/device token consume and event-delivered expiration. Move four billing/dashboard entry/handoff assertions plus UI logout credential clearing and revoked-session return-to-Welcome into browser cases. PW bypass must continue asserting zero token-consume requests. |
 | 3 | `card-payment-flow.spec.ts` | PW. Current Account `account-open-billing` presence, Plan & billing handoff and back-to-settings navigation. No historical card processing claim. |
 | 4 | `channels-smoke.spec.ts` | PW with mandatory migration M1: actual Telegram badge Not configured → Connected → Not configured, matching real RPC status on both edges; retain Discord panel presence. |
@@ -156,7 +156,7 @@ Start fork CI Full baseline immediately, using a separate immutable measurement 
 
 ### Task 2 — migrate channels and cron
 
-Implement M1/M2 in the existing browser files; run each against current built core and pinned modules. Read complete raw output and exit code. Only after both pass delete their native files and `run(...)` entries in `app/scripts/e2e-run-all-flows.sh`; remove only now-unused helper exports/imports. Preserve issue-233 helper decisions until imports really vanish. Update matrix/README/example references that actually cite removed native paths.
+Implement M1/M2 in the existing browser files; run each against current built core and pinned modules. Read complete raw output and exit code. Only after both pass delete their native files and `run(...)` entries in `app/scripts/e2e-run-all-flows.sh`; remove only now-unused helper exports/imports. Preserve issue-233 helper decisions until imports really vanish. Update matrix/README/example references that actually cite removed native paths. Native agent-review artifact guide `docs/gitbooks/en/developing/agent-observability.md` must point to the browser checkpoint owner after its migration, preserving screenshot/page-source/mock-request artifacts.
 
 ### Task 3 — migrate chat contracts
 
