@@ -13,7 +13,6 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
         .iter()
         .copied()
         .chain([
-            "delegate",
             "delegate_researcher",
             "continue_subagent",
         ])

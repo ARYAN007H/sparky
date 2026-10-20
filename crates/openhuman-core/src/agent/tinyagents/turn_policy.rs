@@ -155,10 +155,10 @@ pub(crate) fn tool_call_limit(max_iterations: usize, cap: Option<usize>) -> usiz
 /// must never be able to invoke (issue #4452), re-asserted at registration as
 /// defense-in-depth so a misconfigured allowlist cannot reintroduce sub-agent
 /// spawning into a nested run. It shares TinyAgents' canonical spawn names and
-/// the host's fixed delegation controls; the caller-side strip additionally
+/// the host's fixed continuation control; the caller-side strip additionally
 /// resolves unprefixed `delegate_name` overrides through the registry.
 pub(crate) fn is_subagent_spawn_or_delegate_tool(name: &str) -> bool {
-    const HOST_SPAWN_TOOL_NAMES: &[&str] = &["delegate", "continue_subagent"];
+    const HOST_SPAWN_TOOL_NAMES: &[&str] = &["continue_subagent"];
 
     tinyagents_definition::SPAWN_TOOL_NAMES.contains(&name)
         || HOST_SPAWN_TOOL_NAMES.contains(&name)

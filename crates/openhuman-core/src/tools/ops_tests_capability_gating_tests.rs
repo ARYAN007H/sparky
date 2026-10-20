@@ -81,7 +81,6 @@ fn tool_group_classifies_gate_and_harness_families() {
         "ask_user_clarification",
         "wait",
         "wait_loop",
-        "delegate",
         "todo",
     ] {
         assert_eq!(tool_group(name), DomainGroup::Agent);
