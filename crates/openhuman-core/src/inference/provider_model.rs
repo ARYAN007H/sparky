@@ -12,7 +12,11 @@ pub fn role_for_model(provider_id: &str, model: &str) -> String {
 
 /// Generic workload role for a provider-owned model alias.
 pub fn role_for_provider_model(provider_id: &str, model: &str) -> &'static str {
-    let role = crate::inference::registry::provider_model_role(provider_id, model);
+    let role = model
+        .strip_prefix("hint:")
+        .filter(|role| WORKLOAD_ROLES.contains(role))
+        .map(str::to_string)
+        .or_else(|| crate::inference::registry::provider_model_role(provider_id, model));
     role.as_deref()
         .and_then(|role| WORKLOAD_ROLES.iter().copied().find(|known| *known == role))
         .unwrap_or("chat")
