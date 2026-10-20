@@ -949,7 +949,8 @@ async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
         post_json_rpc(&stack.rpc_base, 8_234, "openhuman.modules_list", json!({})).await;
     let modules_response = assert_no_jsonrpc_error(&modules_response, "modules_list after search");
     let tinysearch = modules_response
-        .pointer("/result/modules")
+        .get("modules")
+        .or_else(|| modules_response.pointer("/result/modules"))
         .and_then(Value::as_array)
         .and_then(|modules| {
             modules
