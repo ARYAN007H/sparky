@@ -62,6 +62,11 @@ pub struct ConversationThreadSummary {
 pub struct ConversationMessageRecord {
     pub id: String,
     pub content: String,
+    /// Opaque, persisted media references attached to this message.
+    /// Only OpenHuman returns these. Callers submit refs in the chat request,
+    /// and the trusted runner revalidates them against this exact user row.
+    #[serde(default, skip_serializing_if = "Vec::is_empty", skip_deserializing)]
+    pub attachments: Vec<tinychannels_bus::ContentPart>,
     #[serde(rename = "type")]
     pub message_type: String,
     #[serde(default)]
