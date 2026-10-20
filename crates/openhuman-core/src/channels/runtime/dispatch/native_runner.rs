@@ -9,9 +9,9 @@ use async_trait::async_trait;
 use tinyagents_harness::{
     run_queue::RunQueue,
     turn_runner::{
-        EventSink, FailureClassifier, IngressDecision, IngressPolicy, IngressStage,
-        QueueDisposition, ReplyStore, ScopeKey, Summarizer, TerminalEvent, TurnHost, TurnRequest,
-        TurnResult, TurnRunner, TurnRunnerConfig, TurnSession, TurnSignal,
+        EventSink, FailureClassification, FailureClassifier, IngressDecision, IngressPolicy,
+        IngressStage, QueueDisposition, ReplyStore, ScopeKey, Summarizer, TerminalEvent, TurnHost,
+        TurnRequest, TurnResult, TurnRunner, TurnRunnerConfig, TurnSession, TurnSignal,
     },
     CancellationToken,
 };
@@ -43,6 +43,8 @@ struct NativeSlot {
     progress_failed: bool,
     waiting_for_delivery: bool,
     delivery_succeeded: Option<bool>,
+    #[cfg(test)]
+    failure_message: Option<String>,
 }
 
 #[derive(Default)]
@@ -320,6 +322,23 @@ struct NativeEvents {
     shared: Arc<NativeShared>,
 }
 
+fn render_classified_native_failure(
+    config: Option<&crate::config::Config>,
+    fallback: &str,
+    classification: &FailureClassification,
+) -> String {
+    config.map_or_else(
+        || fallback.to_owned(),
+        |config| {
+            config.render_native_channel_failure(
+                fallback,
+                classification.copy_key.as_deref(),
+                classification.copy_params.as_ref(),
+            )
+        },
+    )
+}
+
 #[async_trait]
 impl EventSink<QueuedPayload> for NativeEvents {
     async fn progress(
@@ -384,6 +403,47 @@ impl EventSink<QueuedPayload> for NativeEvents {
         };
         self.shared.record_delivery(&request.request_id, delivered);
     }
+
+    async fn classified_failure(
+        &self,
+        request: &TurnRequest<QueuedPayload>,
+        event: TerminalEvent,
+        classification: FailureClassification,
+    ) {
+        let event = match event {
+            TerminalEvent::Failed {
+                request_id,
+                message,
+                class,
+                error,
+            } => {
+                let fallback = if classification.message.is_empty() {
+                    message
+                } else {
+                    classification.message.clone()
+                };
+                let config = if let Some(ctx) = request.payload.ctx.as_ref() {
+                    ctx.load_config().await.ok()
+                } else {
+                    None
+                };
+                let localized =
+                    render_classified_native_failure(config.as_ref(), &fallback, &classification);
+                #[cfg(test)]
+                self.shared.with(&request.request_id, |slot| {
+                    slot.failure_message = Some(localized.clone());
+                });
+                TerminalEvent::Failed {
+                    request_id,
+                    message: localized,
+                    class,
+                    error,
+                }
+            }
+            other => other,
+        };
+        self.terminal(request, event).await;
+    }
 }
 
 struct NativeFailures;
@@ -392,6 +452,16 @@ impl FailureClassifier for NativeFailures {
     fn classify(&self, error: &str) -> (String, String) {
         let classified = crate::web_chat::classify_inference_error(error);
         (classified.error_type.to_owned(), classified.message)
+    }
+
+    fn classify_failure(&self, error: &str) -> FailureClassification {
+        let classified = crate::web_chat::classify_inference_error(error);
+        FailureClassification {
+            class: classified.error_type.to_owned(),
+            message: classified.message,
+            copy_key: Some(classified.copy_key.to_owned()),
+            copy_params: classified.copy_params,
+        }
     }
 }
 
@@ -413,10 +483,17 @@ impl Summarizer<QueuedPayload> for NativeSummarizer {
             let deadline = request.deadline.unwrap_or_default();
             crate::web_chat::turn_timeout_error_message(deadline.as_secs())
         };
-        let (failure_type, message) = NativeFailures.classify(&error);
+        let classified = NativeFailures.classify_failure(&error);
+        let config = if let Some(ctx) = request.payload.ctx.as_ref() {
+            ctx.load_config().await.ok()
+        } else {
+            None
+        };
+        let message =
+            render_classified_native_failure(config.as_ref(), &classified.message, &classified);
         Some(TurnResult {
             reply: message,
-            data: serde_json::json!({"failure_type": failure_type}),
+            data: serde_json::json!({"failure_type": classified.class}),
         })
     }
 }

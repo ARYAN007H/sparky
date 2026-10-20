@@ -13,7 +13,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::turn_runner::{
-    EventSink, FailureClassifier, ReplyStore, Summarizer, TerminalEvent, TurnRequest, TurnResult,
+    EventSink, FailureClassification, FailureClassifier, ReplyStore, Summarizer, TerminalEvent,
+    TurnRequest, TurnResult,
 };
 use tinychannels_bus::web as bus_web;
 
@@ -101,6 +102,16 @@ impl FailureClassifier for WebFailures {
     fn classify(&self, error: &str) -> (String, String) {
         let classified = classify_inference_error(&host_error(error, None));
         (classified.error_type.to_owned(), classified.message)
+    }
+
+    fn classify_failure(&self, error: &str) -> FailureClassification {
+        let classified = classify_inference_error(&host_error(error, None));
+        FailureClassification {
+            class: classified.error_type.to_owned(),
+            message: classified.message,
+            copy_key: Some(classified.copy_key.to_owned()),
+            copy_params: classified.copy_params,
+        }
     }
 }
 
@@ -278,7 +289,13 @@ impl WebEvents {
         }
     }
 
-    async fn failed(&self, request: &TurnRequest<QueuedPayload>, surface: &Surface, error: &str) {
+    async fn failed(
+        &self,
+        request: &TurnRequest<QueuedPayload>,
+        surface: &Surface,
+        error: &str,
+        structured: Option<&FailureClassification>,
+    ) {
         #[cfg(test)]
         super::ops::set_last_run_chat_task_error_for_test(Some(error)).await;
         let parallel =
@@ -300,7 +317,7 @@ impl WebEvents {
         let classified = classify_inference_error(&raw);
         report_failure(&detailed, &classified, parallel, request);
         surface
-            .event(chat_error_event(surface.context(), classified))
+            .event(chat_error_event(surface.context(), classified, structured))
             .await;
     }
 
@@ -394,18 +411,28 @@ fn report_failure(
 fn chat_error_event(
     context: bus_web::WebEventContext,
     classified: ClassifiedError,
+    structured: Option<&FailureClassification>,
 ) -> bus_web::WebChannelEvent {
     bus_web::WebChannelEvent::ChatError {
         context,
-        message: Some(classified.message),
+        message: Some(
+            structured
+                .map(|failure| failure.message.clone())
+                .unwrap_or(classified.message),
+        ),
         error_type: Some(classified.error_type.to_owned()),
         error_source: Some(classified.source.to_owned()),
         error_retryable: Some(classified.retryable),
         error_retry_after_ms: classified.retry_after_ms,
         error_provider: classified.provider,
         error_fallback_available: classified.fallback_available,
-        copy_key: Some(classified.copy_key.to_owned()),
-        copy_params: classified.copy_params,
+        copy_key: structured.map_or_else(
+            || Some(classified.copy_key.to_owned()),
+            |failure| failure.copy_key.clone(),
+        ),
+        copy_params: structured.map_or(classified.copy_params, |failure| {
+            failure.copy_params.clone()
+        }),
         guardrail: None,
     }
 }
@@ -422,47 +449,18 @@ impl EventSink<QueuedPayload> for WebEvents {
     }
 
     async fn terminal(&self, request: &TurnRequest<QueuedPayload>, event: TerminalEvent) {
-        let slot = self.shared.take(&request.request_id);
-        // A message that waited in a run queue and never started was never
-        // announced as a turn, so its being dropped is silent too.
-        let never_started = self.shared.was_queued(&request.request_id);
-        let (projection, done, note, _session_lease, _profile_turn) = match slot {
-            Some(slot) => (
-                slot.projection,
-                slot.result,
-                slot.cancel,
-                slot.session_lease,
-                slot.profile_turn,
-            ),
-            None => (None, None, None, None, None),
-        };
-        if never_started && !matches!(event, TerminalEvent::Completed { .. }) {
-            log::debug!(
-                "[web-channel] queued message dropped before it started thread_id={} request_id={}",
-                request.thread_id,
-                request.request_id
-            );
-            return;
-        }
-        if let Some(surface) = self.surface_of(request, &projection).await {
-            match event {
-                TerminalEvent::Completed { .. } => self.completed(request, &surface, done).await,
-                TerminalEvent::Failed { error, .. } => {
-                    self.failed(request, &surface, &error).await;
-                }
-                TerminalEvent::Cancelled { .. } => {
-                    self.cancelled(request, &surface, note.unwrap_or_default())
-                        .await;
-                }
-            }
-        }
-        // The projection's trace export is best-effort I/O and must not hold
-        // up terminal delivery.
-        if let (Some(projection), Some(ctx)) = (projection, request.payload.ctx.clone()) {
-            ctx.spawn(async move {
-                projection.lock().await.finish().await;
-            });
-        }
+        self.terminal_with_classification(request, event, None)
+            .await;
+    }
+
+    async fn classified_failure(
+        &self,
+        request: &TurnRequest<QueuedPayload>,
+        event: TerminalEvent,
+        classification: FailureClassification,
+    ) {
+        self.terminal_with_classification(request, event, Some(classification))
+            .await;
     }
 
     async fn collected(
@@ -508,6 +506,58 @@ impl EventSink<QueuedPayload> for WebEvents {
                 }
             }
         });
+    }
+}
+
+impl WebEvents {
+    async fn terminal_with_classification(
+        &self,
+        request: &TurnRequest<QueuedPayload>,
+        event: TerminalEvent,
+        classification: Option<FailureClassification>,
+    ) {
+        let slot = self.shared.take(&request.request_id);
+        // A message that waited in a run queue and never started was never
+        // announced as a turn, so its being dropped is silent too.
+        let never_started = self.shared.was_queued(&request.request_id);
+        let (projection, done, note, _session_lease, _profile_turn) = match slot {
+            Some(slot) => (
+                slot.projection,
+                slot.result,
+                slot.cancel,
+                slot.session_lease,
+                slot.profile_turn,
+            ),
+            None => (None, None, None, None, None),
+        };
+        if never_started && !matches!(event, TerminalEvent::Completed { .. }) {
+            log::debug!(
+                "[web-channel] queued message dropped before it started thread_id={} request_id={}",
+                request.thread_id,
+                request.request_id
+            );
+            return;
+        }
+        if let Some(surface) = self.surface_of(request, &projection).await {
+            match event {
+                TerminalEvent::Completed { .. } => self.completed(request, &surface, done).await,
+                TerminalEvent::Failed { error, .. } => {
+                    self.failed(request, &surface, &error, classification.as_ref())
+                        .await;
+                }
+                TerminalEvent::Cancelled { .. } => {
+                    self.cancelled(request, &surface, note.unwrap_or_default())
+                        .await;
+                }
+            }
+        }
+        // The projection's trace export is best-effort I/O and must not hold
+        // up terminal delivery.
+        if let (Some(projection), Some(ctx)) = (projection, request.payload.ctx.clone()) {
+            ctx.spawn(async move {
+                projection.lock().await.finish().await;
+            });
+        }
     }
 }
 

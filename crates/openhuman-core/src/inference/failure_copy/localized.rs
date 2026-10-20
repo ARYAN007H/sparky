@@ -2,6 +2,8 @@
 
 use serde_json::Value;
 
+use super::chat_error_catalog;
+
 const QUEUED_FAILURE_PREFIX: &str = "queued turn was not run: ";
 
 pub(crate) fn supported_channel_locale(locale: Option<&str>) -> Option<&'static str> {
