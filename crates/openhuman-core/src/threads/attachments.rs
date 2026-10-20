@@ -21,6 +21,10 @@ const STORAGE_KEY: &str = "__openhumanStoredAttachments";
 #[path = "attachments/staged.rs"]
 mod staged;
 use staged::*;
+pub(crate) use staged::{
+    bind_staged_refs, consume_staged_parts, discard_staged_parts, resolve_staged_parts,
+    stage_queued_parts, validate_opaque_parts,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
