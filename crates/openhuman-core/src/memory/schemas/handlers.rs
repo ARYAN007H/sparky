@@ -20,6 +20,7 @@ use crate::memory::types::{
     SourcesSyncView,
 };
 use crate::memory::{backfill, brain, confine, engine, import, layout_migration, ops, sources};
+use tinymemory_tools::layout::identity::Identity as TinyMemoryIdentity;
 
 fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
     serde_json::from_value(Value::Object(params))
@@ -30,8 +31,8 @@ fn to_json<T: Serialize>(value: T) -> Result<Value, String> {
     Outcome::new(value, Vec::new()).into_cli_compatible_json()
 }
 
-fn finish<T: Serialize>(result: MemoryResult<T>) -> Result<Value, String> {
-    to_json(result.map_err(String::from)?)
+fn finish<T: Serialize, E: Into<MemoryError>>(result: std::result::Result<T, E>) -> Result<Value, String> {
+    to_json(result.map_err(Into::into).map_err(String::from)?)
 }
 
 async fn load(ctx: &DispatchCtx) -> Result<Config, String> {
@@ -148,7 +149,9 @@ pub(super) fn policy_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
     Box::pin(async move {
         let params = parse::<PolicySetParams>(params)?;
         let mut config = load(&ctx).await?;
-        views::apply_policy_set(&mut config, &params).map_err(String::from)?;
+        views::apply_policy_set(&mut config, &params)
+            .map_err(MemoryError::from)
+            .map_err(String::from)?;
         save(&config).await.map_err(String::from)?;
         to_json(views::policy_view(&config))
     })
@@ -157,14 +160,14 @@ pub(super) fn policy_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 pub(super) fn pack_preview(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<PackPreviewParams>(params)?;
-        finish(views::pack_preview(&load(&ctx).await?, &MemoryIdentity::root(), params).await)
+        finish(views::pack_preview(&load(&ctx).await?, &TinyMemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn agents_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
-        finish(views::agents_list(&load(&ctx).await?, &MemoryIdentity::root()).await)
+        finish(views::agents_list(&load(&ctx).await?, &TinyMemoryIdentity::root()).await)
     })
 }
 
@@ -191,28 +194,28 @@ pub(super) fn conversations_backfill_start(
 pub(super) fn brain_sources(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
-        finish(brain::sources(&load(&ctx).await?, &MemoryIdentity::root()).await)
+        finish(brain::sources(&load(&ctx).await?, &TinyMemoryIdentity::root()).await)
     })
 }
 
 pub(super) fn brain_search(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainSearchParams>(params)?;
-        finish(brain::search(&load(&ctx).await?, &MemoryIdentity::root(), params).await)
+        finish(brain::search(&load(&ctx).await?, &TinyMemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn brain_ingest(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainIngestParams>(params)?;
-        finish(brain::ingest(&load(&ctx).await?, &MemoryIdentity::root(), params).await)
+        finish(brain::ingest(&load(&ctx).await?, &TinyMemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn brain_forget(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainForgetParams>(params)?;
-        finish(brain::forget(&load(&ctx).await?, &MemoryIdentity::root(), params).await)
+        finish(brain::forget(&load(&ctx).await?, &TinyMemoryIdentity::root(), params).await)
     })
 }
 
@@ -243,7 +246,9 @@ pub(super) fn sources_add(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let params = parse::<SourcesAddParams>(params)?;
         let mut config = load(&ctx).await?;
-        let source = sources::apply_add(&mut config, &params).map_err(String::from)?;
+        let source = sources::apply_add(&mut config, &params)
+            .map_err(MemoryError::from)
+            .map_err(String::from)?;
         save(&config).await.map_err(String::from)?;
         to_json(SourceAddedView {
             source: sources::view(&source, None),
@@ -263,6 +268,7 @@ pub(super) fn sources_remove(ctx: DispatchCtx, params: Map<String, Value>) -> Co
         if params.forget_items.unwrap_or(false) {
             sources::forget_items(&config, &removed.id)
                 .await
+                .map_err(MemoryError::from)
                 .map_err(String::from)?;
         }
         to_json(SourceRemovedView { removed: true })
@@ -273,8 +279,9 @@ pub(super) fn sources_sync(ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     Box::pin(async move {
         let params = parse::<SourcesSyncParams>(params)?;
         let config = load(&ctx).await?;
-        let started =
-            sources::start_sync(&ctx, &config, params.id.as_deref()).map_err(String::from)?;
+        let started = sources::start_sync(&ctx, &config, params.id.as_deref())
+            .map_err(MemoryError::from)
+            .map_err(String::from)?;
         to_json(SourcesSyncView { started })
     })
 }
