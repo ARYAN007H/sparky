@@ -149,8 +149,8 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
             !disabled.iter().any(|skill| skill.id() == "flow-authoring"),
             "a profile with modules disabled cannot see the shared workspace builtin"
         );
-        let disabled_text = std::fs::read_to_string(&disabled_config_path)
-            .expect("read disabled module config");
+        let disabled_text =
+            std::fs::read_to_string(&disabled_config_path).expect("read disabled module config");
         for path in [&config_path, &local_config_path] {
             std::fs::write(path, &disabled_text).expect("disable module in active CLI config");
         }
