@@ -539,10 +539,13 @@ pub(crate) fn discard_for_thread(
         st.thread_workspaces.contains_key(&thread_key)
     };
     let entry = entry_for_ctx(ctx, workspace_dir);
-    // Nothing in this process or on disk refers to the thread (an ordinary chat
-    // thread that never spawned background work): the in-memory gate is enough
-    // and no log line is written for it.
-    if !seen && entry.router.pending_for(thread_id).is_empty() {
+    // An ordinary thread that never admitted background work needs only the
+    // in-memory fence. Durable lifecycle markers and settled completion history
+    // both remain in the store after compaction, so a previously used thread
+    // still gets a permanent delete marker after a restart.
+    let has_history = !entry.store.list(Some(thread_id)).is_empty();
+    let has_legacy_delete_marker = is_marked_deleted(&entry, thread_id);
+    if !seen && !has_history && !has_legacy_delete_marker {
         return 0;
     }
     let removed = cancel_deleted_parent(&entry, thread_id);
