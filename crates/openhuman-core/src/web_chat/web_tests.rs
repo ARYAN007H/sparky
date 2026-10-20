@@ -43,16 +43,6 @@ const LMSTUDIO_TEMPLATE_400: &str = "lmstudio returned: Engine protocol predict 
      messages.') }}...Error: Jinja Exception: No user query found in messages.\",\
      \"type\":\"invalid_request_error\"}}";
 
-// ── #870 managed-backend errorCode classification (F2/F3/F4/F6/F8) ──
-
-/// Build a flattened managed-backend error string the way it reaches
-/// `classify_inference_error` after the typed provider error is collapsed
-/// to a `String` (the `"OpenHuman API error (<status>): <body>"` envelope
-/// from `inference::provider::http_error::api_error`).
-fn managed_error(status: &str, body: &str) -> String {
-    format!("OpenHuman API error ({status}): {body}")
-}
-
 /// Run a web-copy assertion with explicit provider-neutral metadata. Hosted
 /// token/envelope parsing belongs to TinyHumans; core tests inject the semantic
 /// classification that the host registry supplies at runtime.
@@ -101,6 +91,27 @@ fn classify_with_backend_metadata(
             },
         );
     classify_inference_error(message)
+}
+
+fn classify_failure_fixture(case: &str, message: &str) -> ClassifiedError {
+    let metadata = match case {
+        "be_rate_limited" => Some((BackendErrorKind::RateLimited, false)),
+        "be_credits" => Some((BackendErrorKind::InsufficientCredits, false)),
+        "be_upstream" => Some((BackendErrorKind::UpstreamUnavailable, false)),
+        "be_model_unavailable" => Some((BackendErrorKind::ModelUnavailable, false)),
+        "be_payload" => Some((BackendErrorKind::PayloadTooLarge, false)),
+        "be_context" => Some((BackendErrorKind::ContextLengthExceeded, false)),
+        "be_bad_request" | "be_bad_request_history" => {
+            Some((BackendErrorKind::BadRequest, false))
+        }
+        "be_bad_request_malformed" => Some((BackendErrorKind::BadRequest, true)),
+        "be_internal" => Some((BackendErrorKind::Internal, false)),
+        _ => None,
+    };
+    match metadata {
+        Some((kind, malformed)) => classify_with_backend_metadata(message, kind, malformed),
+        None => classify_inference_error(message),
+    }
 }
 
 // ── SessionCacheFingerprint (thread-session cache invalidation) ───────
