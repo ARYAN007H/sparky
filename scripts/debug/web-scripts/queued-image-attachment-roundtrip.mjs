@@ -72,12 +72,23 @@ export default async function queuedImageAttachmentRoundtrip({
     try {
       const request = response.request();
       const body = JSON.parse(request.postData() ?? "{}");
-      rpcResponses.push({
-        method: body.method,
-        params: body.params,
-        result: unwrap(await response.json()),
-      });
-    } catch {}
+      const responseBody = await response.json();
+      try {
+        rpcResponses.push({
+          method: body.method,
+          params: body.params,
+          result: unwrap(responseBody),
+        });
+      } catch (error) {
+        rpcResponses.push({
+          method: body.method,
+          params: body.params,
+          error: String(error),
+        });
+      }
+    } catch (error) {
+      rpcResponses.push({ error: String(error) });
+    }
   });
 
   // The mock captures a script when each model request starts. Hold the first
@@ -150,6 +161,7 @@ export default async function queuedImageAttachmentRoundtrip({
       ),
     "the queued channel_web_chat acknowledgement",
   );
+  if (queuedAckResponse.error) throw new Error(queuedAckResponse.error);
   const ack = queuedAckResponse.result;
   if (ack?.queued !== true || !ack.request_id) {
     throw new Error(
