@@ -309,8 +309,14 @@ async fn edit_rpc_rejects_an_attachment_ref_owned_by_another_row_before_truncati
     .unwrap();
     let source_after = rows.iter().find(|row| row.id == source.id).unwrap();
     assert_eq!(source_after.content, "source row");
-    assert_eq!(source_after.attachments, source.attachments);
+    assert_eq!(
+        crate::threads::attachments::public_refs(&source_after.extra_metadata),
+        source.attachments
+    );
     let other_after = rows.iter().find(|row| row.id == other.id).unwrap();
     assert_eq!(other_after.content, "other row");
-    assert_eq!(other_after.attachments, other.attachments);
+    assert_eq!(
+        crate::threads::attachments::public_refs(&other_after.extra_metadata),
+        other.attachments
+    );
 }
