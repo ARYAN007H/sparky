@@ -3,6 +3,9 @@ use super::*;
 #[tokio::test]
 async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_driver() {
     use crate::agent::orchestration::tools::SpawnSubagentTool;
+    use crate::agent::orchestration::subagent_sessions::{
+        DurableSubagentStatus, SubagentSessionStore,
+    };
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
@@ -44,26 +47,42 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
-    let task_id = paused
+    let paused_ref = paused
         .output()
-        .lines()
-        .find_map(|line| line.strip_prefix("task_id: "))
-        .unwrap_or_else(|| panic!("pause envelope carries task id: {}", paused.output()))
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .unwrap_or_else(|| panic!("accepted envelope carries task reference: {}", paused.output()));
+    let task_id = paused_ref["task_id"]
+        .as_str()
+        .expect("accepted task id")
         .to_owned();
-    assert!(paused.output().contains("which file should I inspect?"));
 
     let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx());
-    let paused_job = jobs
+    let running_job = jobs
         .list()
         .into_iter()
-        .find(|job| {
-            job.extensions
-                .get("task_id")
-                .and_then(serde_json::Value::as_str)
-                == Some(task_id.as_str())
-        })
-        .expect("initial pause is registered in shared Jobs");
+        .find(|job| job.id.as_str() == task_id)
+        .expect("initial child is registered in shared Jobs");
+    let paused_job = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        jobs.wait_owned(running_job.id.as_str(), running_job.owner.clone()),
+    )
+    .await
+    .expect("child reaches its clarification checkpoint")
+    .expect("registered child remains available");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
+
+    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
+    let before_session = sessions
+        .load()
+        .expect("initial session persisted")
+        .into_iter()
+        .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
+        .expect("initial durable session points at the paused child");
+    assert_eq!(before_session.status, DurableSubagentStatus::AwaitingUser);
+    let before_job_count = jobs.list().len();
 
     let resumed = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
@@ -80,6 +99,24 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .await
         .expect("continue");
     assert!(!resumed.is_error, "{}", resumed.output());
+    let resumed_ref = resumed
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .unwrap_or_else(|| panic!("resumed result carries task reference: {}", resumed.output()));
+    assert_eq!(
+        resumed_ref["task_id"].as_str(),
+        Some(task_id.as_str()),
+        "resuming a checkpoint must keep its registered task identity"
+    );
+    assert_eq!(jobs.list().len(), before_job_count, "resume must not spawn a second child");
+    assert_eq!(
+        resumed_ref["subagent_session_id"].as_str(),
+        Some(before_session.subagent_session_id.as_str()),
+        "resume must keep the durable session identity"
+    );
     assert!(provider.saw("Inspect the README and continue."));
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
     let requests = provider.seen.lock();
