@@ -165,3 +165,100 @@ async fn editing_an_image_row_restages_only_its_exact_opaque_reference() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn edit_rpc_rejects_an_attachment_ref_owned_by_another_row_before_truncation() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = temp.path().join("workspace");
+    config.action_dir = temp.path().join("acting");
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config.clone(),
+    ));
+    store::blocking::ensure_thread(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+        CreateConversationThread {
+            id: "edit-image-scope".into(),
+            title: "Edit image scope".into(),
+            created_at: "2026-10-20T00:00:00Z".into(),
+            parent_thread_id: None,
+            labels: None,
+            personality_id: None,
+            working_dir: None,
+        },
+    )
+    .await
+    .unwrap();
+    let image = || ContentPart::Image {
+        media: MediaReference {
+            url: Some(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                    "../../../../../tests/fixtures/images/handoff-hero.png"
+                ))
+            )),
+            content_type: Some("image/png".into()),
+            kind: tinychannels_bus::MediaKind::Image,
+            ..Default::default()
+        },
+        caption: None,
+        alt_text: None,
+    };
+    let append_image_row = |id: &str, content: &str| {
+        let ctx = ctx.clone();
+        let id = id.to_owned();
+        let content = content.to_owned();
+        let image = image();
+        async move {
+            crate::threads::ops::message_append(
+                &ctx,
+                AppendConversationMessageRequest {
+                    thread_id: "edit-image-scope".into(),
+                    message: ConversationMessageRecord {
+                        id: id.into(),
+                        content: content.into(),
+                        attachments: Vec::new(),
+                        message_type: "text".into(),
+                        extra_metadata: serde_json::json!({}),
+                        sender: "user".into(),
+                        created_at: "2026-10-20T00:00:01Z".into(),
+                    },
+                    attachments: vec![image],
+                },
+            )
+            .await
+            .unwrap()
+            .value
+            .data
+            .unwrap()
+        }
+    };
+    let source = append_image_row("user-image-source", "source row").await;
+    let other = append_image_row("user-image-other", "other row").await;
+
+    let result = edit_message(
+        &ctx,
+        EditMessageRequest {
+            thread_id: "edit-image-scope".into(),
+            message_id: source.id.clone(),
+            content: "replacement text".into(),
+            attachments: other.attachments,
+            client_id: Some("test-client".into()),
+        },
+    )
+    .await;
+    assert!(result.is_err());
+
+    let rows = store::blocking::get_messages(ctx, config.workspace_dir, "edit-image-scope".into())
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].id, source.id);
+    assert_eq!(rows[0].content, "source row");
+    assert_eq!(rows[0].attachments, source.attachments);
+    assert_eq!(rows[1].id, other.id);
+    assert_eq!(rows[1].content, "other row");
+    assert_eq!(rows[1].attachments, other.attachments);
+}
