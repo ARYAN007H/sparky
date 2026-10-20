@@ -45,6 +45,7 @@ import {
 } from '../services/chatService';
 import { socketService } from '../services/socketService';
 import { store } from '../store';
+import { pendingFollowupCompleted } from '../store/queueSlice';
 import {
   appendSubagentStreamDelta,
   bumpInferenceHeartbeatForThread,
@@ -95,7 +96,6 @@ import { selectSocketStatus } from '../store/socketSelectors';
 import { clearThreadGoal, setThreadGoal } from '../store/threadGoalSlice';
 import {
   addInferenceResponse,
-  addMessageLocal,
   applyChannelEvent,
   CHAT_ERROR_METADATA_KEY,
   clearThreadInferenceActive,
@@ -632,36 +632,6 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
     const snapshotPolling = snapshotPollingRef.current;
     if (!snapshotPolling) return;
 
-    // When a turn ends, any follow-ups the user queued behind it are about to be
-    // dispatched by the backend as fresh turns. Nothing else persists their
-    // prompt — the web channel never writes user messages; the composer does
-    // (`addMessageLocal` → `appendMessage`) — so append them to the transcript
-    // now. Doing it here (after this turn's assistant reply was appended, before
-    // `endInferenceTurn` clears `queueSlice`) keeps the append-log order correct:
-    // user → assistant → queued follow-up. Without this the queued prompts are
-    // lost on reload and the dispatched answer has no visible user message.
-    const flushQueuedFollowups = async (threadId: string) => {
-      const queued = store.getState().queue.pendingFollowupsByThread[threadId] ?? [];
-      // Persist sequentially so the queued prompts land in the append-log in the
-      // order the user queued them (concurrent dispatches would race), and
-      // surface failures instead of dropping them silently. The typed
-      // attachments are held in memory beside the text; the append boundary
-      // saves the originals and returns durable references before writing history.
-      for (const item of queued) {
-        try {
-          await dispatch(
-            addMessageLocal({ threadId, message: item.message, attachments: item.attachments })
-          ).unwrap();
-        } catch (error) {
-          rtLog('flush_followup_append_failed', {
-            thread: threadId,
-            message: item.message.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-    };
-
     /**
      * Tell the user a finished reply could not be shown.
      *
@@ -729,6 +699,8 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
 
     const finishChatDoneTurn = async (event: ChatDoneEvent, path: string) => {
       if (snapshotPolling.signal.aborted) return;
+      const completedFollowup = (store.getState().queue.pendingFollowupsByThread[event.thread_id] ?? [])
+        .some(item => item.requestId === event.request_id);
       // One store update: freeze the turn's trail, end the tail, reveal the
       // persisted reply in the tail's slot. See `turnSettled`.
       rtLog('turn_settled', { thread: event.thread_id, request: event.request_id, path });
@@ -746,9 +718,26 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
         path,
       });
       refetchSnapshot();
-      // Persist queued follow-ups (in order, after this turn's assistant reply)
-      // and only then clear the queue + lifecycle.
-      await flushQueuedFollowups(event.thread_id);
+      // The core persists a queued user row under the runner lease before
+      // emitting this matching terminal event. Reload that authoritative row
+      // instead of appending a duplicate from the frontend.
+      if (completedFollowup) {
+        try {
+          await dispatch(loadThreadMessages(event.thread_id)).unwrap();
+          dispatch(
+            pendingFollowupCompleted({
+              threadId: event.thread_id,
+              requestId: event.request_id,
+            })
+          );
+        } catch (error) {
+          rtLog('queued_followup_reload_failed', {
+            thread: event.thread_id,
+            request: event.request_id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       if (snapshotPolling.signal.aborted) return;
       dispatch(endInferenceTurn({ threadId: event.thread_id }));
       dispatch(clearThreadInferenceActive(event.thread_id));
