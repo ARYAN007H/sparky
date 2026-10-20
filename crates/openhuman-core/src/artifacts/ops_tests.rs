@@ -17,7 +17,15 @@ fn test_config(tmp: &TempDir) -> Config {
 async fn list_empty() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let outcome = ai_list_artifacts(&config, None, None, None).await.unwrap();
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 0);
     assert_eq!(value["artifacts"].as_array().unwrap().len(), 0);
@@ -60,7 +68,15 @@ async fn list_without_thread_filter_returns_all_threads() {
         .unwrap();
     }
 
-    let outcome = ai_list_artifacts(&config, None, None, None).await.unwrap();
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 3, "unfiltered list returns every artifact");
 }
@@ -102,7 +118,13 @@ async fn list_with_thread_filter_returns_only_matching_thread() {
         .unwrap();
     }
 
-    let outcome = ai_list_artifacts(&config, None, None, Some("thread-a"))
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        Some("thread-a"),
+    )
         .await
         .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
@@ -153,7 +175,13 @@ async fn list_with_thread_filter_unknown_thread_returns_zero() {
     )
     .await
     .unwrap();
-    let outcome = ai_list_artifacts(&config, None, None, Some("thread-missing"))
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        Some("thread-missing"),
+    )
         .await
         .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
@@ -167,7 +195,9 @@ async fn list_with_thread_filter_unknown_thread_returns_zero() {
 async fn get_missing_id_error() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = ai_get_artifact(&config, "").await.unwrap_err();
+    let err = ai_get_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, "")
+        .await
+        .unwrap_err();
     assert!(err.contains("must not be empty"), "unexpected error: {err}");
 }
 
@@ -177,7 +207,9 @@ async fn get_missing_id_error() {
 async fn delete_missing_id_error() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = ai_delete_artifact(&config, "").await.unwrap_err();
+    let err = ai_delete_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, "")
+        .await
+        .unwrap_err();
     assert!(err.contains("must not be empty"), "unexpected error: {err}");
 }
 
