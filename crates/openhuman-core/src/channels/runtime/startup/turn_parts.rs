@@ -251,8 +251,6 @@ pub(crate) fn runtime_context(
         model: Arc::new(parts.model),
         temperature: config.default_temperature,
         max_tool_iterations: config.agent.max_tool_iterations,
-        #[cfg(test)]
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: config.api_url.clone(),

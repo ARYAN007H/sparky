@@ -421,7 +421,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         model: Arc::new("harness-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 3,
-        conversation_histories: Arc::clone(&conversation_histories),
         turn_model_source_cache: Arc::new(Mutex::new(provider_cache)),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,

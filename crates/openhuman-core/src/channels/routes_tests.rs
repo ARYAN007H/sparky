@@ -74,7 +74,6 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
         model: Arc::new("reasoning-v1".into()),
         temperature: 0.0,
         max_tool_iterations: 1,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: TurnModelSourceCacheMap::default(),
         route_overrides: RouteSelectionMap::default(),
         api_url: None,
