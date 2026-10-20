@@ -144,6 +144,28 @@ fn hosted_normalizer_selects_existing_managed_entry_for_legacy_managed_endpoint(
 }
 
 #[test]
+fn hosted_normalizer_leaves_custom_and_explicit_primary_choices_alone() {
+    let mut custom = Config::default();
+    custom.primary_cloud = None;
+    custom.inference_url = Some("https://custom.example/v1".into());
+    custom.cloud_providers.push(
+        openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
+            id: "p_hosted".into(),
+            slug: "openhuman".into(),
+            endpoint: "https://api.managed.test/v1".into(),
+            ..Default::default()
+        },
+    );
+    assert!(!normalize_with_hosted_registration(&mut custom));
+    assert_eq!(custom.primary_cloud, None);
+
+    let mut selected = custom.clone();
+    selected.primary_cloud = Some("p_custom".into());
+    assert!(!normalize_with_hosted_registration(&mut selected));
+    assert_eq!(selected.primary_cloud.as_deref(), Some("p_custom"));
+}
+
+#[test]
 fn managed_tier_vocabulary_maps_aliases_and_leaves_concrete_ids_raw() {
     for (model, role) in [
         ("reasoning-v1", "reasoning"),
