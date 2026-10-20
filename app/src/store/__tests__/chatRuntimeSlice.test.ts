@@ -393,8 +393,12 @@ describe('chatRuntimeSlice', () => {
             status: 'awaiting_user',
             workerThreadId: 'worker-1',
             checkpoint: { resumeTool: 'continue_subagent' },
+            checkpointPath: null,
+            completedAt: null,
+            error: null,
             summary: 'Which repository should I inspect?',
             metadata: { mode: 'typed', dedicatedThread: true, displayName: 'Researcher' },
+            promptRef: null,
             telemetry: {
               runId: 'sub-run-1',
               inputTokens: 0,

@@ -886,7 +886,7 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           fileName: 'archive.zip',
           caption: null,
           media: {
-            kind: 'document',
+            kind: 'document' as const,
             url: 'data:application/zip;name=archive.zip;base64,AQID',
             contentType: null,
             fileName: 'archive.zip',

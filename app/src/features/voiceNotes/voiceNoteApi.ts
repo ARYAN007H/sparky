@@ -60,9 +60,11 @@ export async function voiceNoteContentPart(
   return {
     kind: 'voice_note',
     voiceNote: {
+      codec: null,
       durationMs,
       waveform,
       pushToTalk: false,
+      transcript: null,
       media: {
         opaqueId: noteId,
         kind: 'audio',

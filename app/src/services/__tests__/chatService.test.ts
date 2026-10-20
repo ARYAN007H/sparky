@@ -515,7 +515,23 @@ describe('chatService typed attachments', () => {
 
   const image = {
     kind: 'image' as const,
-    media: { url: 'data:image/png;base64,AAA', contentType: 'image/png', fileName: 'a.png' },
+    altText: null,
+    caption: null,
+    media: {
+      kind: 'image' as const,
+      url: 'data:image/png;base64,AAA',
+      contentType: 'image/png',
+      fileName: 'a.png',
+      sizeBytes: null,
+      codec: null,
+      durationMs: null,
+      height: null,
+      localCachePath: null,
+      path: null,
+      platformMessageId: null,
+      transcribed: false,
+      width: null,
+    },
   };
 
   it('chatSend forwards attachments as typed parts and leaves the text alone', async () => {

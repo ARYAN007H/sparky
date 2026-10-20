@@ -110,6 +110,8 @@ describe('threadSlice synchronous reducers', () => {
       channel_event: {
         version: 2,
         eventId: 'event-9',
+        sourceEventId: null,
+        sourceTimestamp: null,
         channel: { id: 'telegram', accountId: 'bot-1' },
         conversation: { kind: 'group', id: 'room-1' },
         type: 'reaction_added',

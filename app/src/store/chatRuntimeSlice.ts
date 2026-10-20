@@ -1304,7 +1304,7 @@ function subagentTranscriptItemFromPersisted(
       detail: item.detail ?? undefined,
     };
   }
-  return { kind: item.kind, iteration: item.iteration, text: item.text };
+  return { kind: item.kind, iteration: item.iteration ?? undefined, text: item.text };
 }
 
 function subagentActivityFromPersisted(activity: PersistedSubagentActivity): SubagentActivity {
