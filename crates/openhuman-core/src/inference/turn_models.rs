@@ -219,11 +219,15 @@ fn build_turn_models_crate(
                 factory::PROVIDER_OPENHUMAN,
                 tier,
             );
-            let tier_role = registered_role.as_deref().unwrap_or_else(|| {
-                tier.strip_prefix("hint:")
-                    .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
-                    .unwrap_or("chat")
-            });
+            let tier_role = tier
+                .strip_prefix("hint:")
+                .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+                .or_else(|| {
+                    registered_role
+                        .as_deref()
+                        .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+                })
+                .unwrap_or("chat");
             if let Some(custom) = ctx.host_overrides().and_then(|local| {
                 local
                     .role_models
