@@ -72,13 +72,6 @@ export default async function queuedImageAttachmentRoundtrip({
       });
     } catch {}
   });
-  page.on("response", async (response) => {
-    if (!response.url().endsWith("/rpc")) return;
-    try {
-      const request = response.request();
-      const body = JSON.parse(request.postData() ?? "{}");
-    } catch {}
-  });
 
   // The mock captures a script when each model request starts. Hold the first
   // request before its first token, then change the script for the queued turn.
@@ -182,7 +175,7 @@ export default async function queuedImageAttachmentRoundtrip({
   }
   if (
     JSON.stringify(pending.attachments).match(
-      /data:|base64|"(?:path|url|localCachePath)"\\s*:/i,
+      /data:|base64|"(?:path|url|localCachePath)"\s*:/i,
     )
   ) {
     throw new Error("queued UI state retained upload bytes or a source path");
