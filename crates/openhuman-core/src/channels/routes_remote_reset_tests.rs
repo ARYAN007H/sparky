@@ -25,10 +25,10 @@ impl crate::channels::Channel for ConfiguredChannel {
     }
 }
 
-fn transcript_meta(thread_id: &str) -> TranscriptMeta {
+fn transcript_meta(thread_id: &str, agent_id: &str) -> TranscriptMeta {
     TranscriptMeta {
-        agent_name: "orchestrator".into(),
-        agent_id: Some("orchestrator".into()),
+        agent_name: agent_id.into(),
+        agent_id: Some(agent_id.into()),
         agent_type: Some("root".into()),
         dispatcher: "native".into(),
         provider: Some("mock".into()),
@@ -65,11 +65,11 @@ fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope
     }
 }
 
-fn seed_session(core: &CoreContext, workspace: &Path, key: &str) -> SessionRef {
-    let session = SessionRef::scoped(key, "orchestrator");
+fn seed_session(core: &CoreContext, workspace: &Path, key: &str, agent_id: &str) -> SessionRef {
+    let session = SessionRef::scoped(key, agent_id);
     let history =
-        crate::agent::session_store::transcripts_or_files_in(core, "orchestrator", workspace)
-            .open_session(&session, transcript_meta(key))
+        crate::agent::session_store::transcripts_or_files_in(core, agent_id, workspace)
+            .open_session(&session, transcript_meta(key, agent_id))
             .unwrap();
     history
         .append(TranscriptMessage::user("prior tenant turn"))
@@ -81,8 +81,11 @@ fn seed_session(core: &CoreContext, workspace: &Path, key: &str) -> SessionRef {
 }
 
 fn session_messages(core: &CoreContext, workspace: &Path, session: &SessionRef) -> Vec<String> {
-    let locator =
-        crate::agent::session_store::transcripts_or_files_in(core, "orchestrator", workspace);
+    let locator = crate::agent::session_store::transcripts_or_files_in(
+        core,
+        &session.agent_id,
+        workspace,
+    );
     let head = locator.head_generation(session);
     locator
         .read_session_transcript(&head)
@@ -144,16 +147,34 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     let bob_dispatch = DispatchCtx::new(Arc::clone(&bob_core));
     let alice_tenant = alice_dispatch.tenant().unwrap();
     let bob_tenant = bob_dispatch.tenant().unwrap();
+    let alice_route = crate::channels::routes::get_route_selection(&alice_runtime, "remote-reset");
+    let bob_route = crate::channels::routes::get_route_selection(&_bob_runtime, "remote-reset");
+    let alice_agent = crate::channels::runtime::dispatch::host_agent::configured_agent(
+        &alice_runtime,
+        &alice_route,
+    )
+    .await
+    .expect("Alice's configured channel agent resolves");
+    let bob_agent = crate::channels::runtime::dispatch::host_agent::configured_agent(
+        &_bob_runtime,
+        &bob_route,
+    )
+    .await
+    .expect("Bob's configured channel agent resolves");
     let canonical = "channel-session:telegram:bot-a:group:room-1";
     let alice_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, canonical);
     let bob_key = crate::core::runtime::tenant::tenant_key(&bob_tenant, canonical);
     assert_ne!(alice_key, bob_key);
-    let alice_session = seed_session(&alice_core, workspace, &alice_key);
-    let bob_session = seed_session(&bob_core, workspace, &bob_key);
-    let route = crate::channels::routes::get_route_selection(&alice_runtime, "remote-reset");
+    let alice_session = seed_session(&alice_core, workspace, &alice_key, &alice_agent.definition.id);
+    let bob_session = seed_session(&bob_core, workspace, &bob_key, &bob_agent.definition.id);
     assert_eq!(
-        super::durable_channel_history_len(&alice_runtime, &route, "telegram", Some(&alice_key),)
-            .await,
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &alice_route,
+            "telegram",
+            Some(&alice_key),
+        )
+        .await,
         2,
         "remote status history comes from the durable session",
     );
@@ -210,8 +231,13 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     assert!(matches!(cleared, RemoteHostResult::Completed));
     assert!(session_messages(&alice_core, workspace, &alice_session).is_empty());
     assert_eq!(
-        super::durable_channel_history_len(&alice_runtime, &route, "telegram", Some(&alice_key),)
-            .await,
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &alice_route,
+            "telegram",
+            Some(&alice_key),
+        )
+        .await,
         0,
         "a reset clears the durable status count",
     );
