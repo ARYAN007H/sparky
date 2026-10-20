@@ -1,6 +1,7 @@
 //! Host adapter for the owner-provided generic progress ledger recorder.
 
 pub(super) use tinyagents_orchestration::run_progress_ledger::ChildDone;
+pub(super) use tinyagents_orchestration::run_progress_ledger::ProgressLedgerContext;
 pub(super) type Ledger = tinyagents_orchestration::run_progress_ledger::RunProgressLedger;
 
 pub(super) fn for_turn(
@@ -8,9 +9,9 @@ pub(super) fn for_turn(
     client_id: &str,
     thread_id: &str,
     request_id: &str,
-) -> Option<Ledger> {
-    let store = crate::agent::session_store::ledger_for(workspace_dir)?;
-    Some(Ledger::new(
+) -> Ledger {
+    let store = crate::agent::session_store::ledger_for(workspace_dir);
+    Ledger::new(
         store,
         tinyagents_orchestration::run_progress_ledger::RunProgressIdentity {
             client_id: client_id.to_owned(),
@@ -19,5 +20,5 @@ pub(super) fn for_turn(
             source: "web_channel".to_owned(),
             agent_id: "orchestrator".to_owned(),
         },
-    ))
+    )
 }

@@ -9,7 +9,6 @@
 //! copilot drives the same projection from a channel through
 //! [`spawn_progress_bridge`].
 
-use std::collections::HashMap;
 use std::time::Instant;
 
 use serde_json::json;
@@ -19,7 +18,7 @@ use tinychannels_bus::web::{
     ChatRequestMetadata, TurnCostThrottle, TurnTimingSnapshot, TurnTimingState,
 };
 
-use super::progress_ledger::Ledger;
+use super::progress_ledger::{for_turn, Ledger};
 use super::progress_map as map;
 use super::surface::{Surface, TurnIds};
 use crate::agent::progress_tracing::SpanCollector;
@@ -80,12 +79,7 @@ pub(crate) struct ProgressProjection {
     timing: TurnTimingState,
     cost_throttle: TurnCostThrottle,
     events_seen: u64,
-    parent_completed: bool,
-    parent_tool_count: u64,
-    child_tool_counts: HashMap<String, u64>,
-    /// task id -> the parent tool call that spawned it, remembered from
-    /// `SubagentSpawned` so the later lifecycle events still carry it.
-    subagent_parent_call_ids: HashMap<String, Option<String>>,
+    ledger: Ledger,
     turn_state: Option<TurnStateMirror>,
     span_collector: Option<SpanCollector>,
     journal_trace_ctx: Option<tinyagents_harness::observability::trace_export::TraceContext>,
@@ -138,11 +132,12 @@ impl ProgressProjection {
             pending_narration: String::new(),
             timing: TurnTimingState::default(),
             cost_throttle: TurnCostThrottle::default(),
-            events_seen: 0,
-            parent_completed: false,
-            parent_tool_count: 0,
-            child_tool_counts: HashMap::new(),
-            subagent_parent_call_ids: HashMap::new(),
+            ledger: for_turn(
+                &config.workspace_dir,
+                &ids.client_id,
+                &ids.thread_id,
+                &ids.request_id,
+            ),
             span_collector,
             journal_trace_ctx,
             timing_snapshot: None,
@@ -163,15 +158,6 @@ impl ProgressProjection {
 
     fn elapsed_ms(&self) -> u64 {
         self.started.elapsed().as_millis() as u64
-    }
-
-    fn ledger(&self) -> Option<Ledger> {
-        super::progress_ledger::for_turn(
-            &self.config.workspace_dir,
-            &self.ids.client_id,
-            &self.ids.thread_id,
-            &self.ids.request_id,
-        )
     }
 
     /// One liveness beat; nothing before `TurnStarted` or after the parent
@@ -203,7 +189,7 @@ impl ProgressProjection {
 
     /// Project one event of the turn, in order.
     pub(crate) async fn on_event(&mut self, event: AgentProgress) {
-        self.events_seen += 1;
+        let ledger_context = self.ledger.observe(&event).await;
         if let Some(mirror) = self.turn_state.as_mut() {
             mirror.observe(&event);
         }
@@ -213,9 +199,6 @@ impl ProgressProjection {
         match event {
             AgentProgress::TurnStarted => {
                 self.turn_active = true;
-                if let Some(ledger) = self.ledger() {
-                    ledger.turn_started().await;
-                }
                 self.surface.output(map::inference_start()).await;
             }
             AgentProgress::IterationStarted {
@@ -247,12 +230,6 @@ impl ProgressProjection {
                 // once it calls a tool: persist it interleaved with the tool
                 // activity.
                 self.flush_interim_narration(iteration).await;
-                self.parent_tool_count += 1;
-                if let Some(ledger) = self.ledger() {
-                    ledger
-                        .tool_started(&call_id, &tool_name, iteration, self.parent_tool_count)
-                        .await;
-                }
                 log::debug!(
                     "[web_channel][bridge] tool_call round={iteration} tool={tool_name} call_id={call_id} request_id={}",
                     self.ids.request_id
@@ -325,17 +302,6 @@ impl ProgressProjection {
                 cached_input_tokens,
                 total_usd,
             } => {
-                if let Some(ledger) = self.ledger() {
-                    ledger
-                        .cost(
-                            &model,
-                            input_tokens,
-                            output_tokens,
-                            cached_input_tokens,
-                            total_usd,
-                        )
-                        .await;
-                }
                 log::debug!(
                     "[web_channel] turn cost update model={model} iter={iteration} in={input_tokens} out={output_tokens} cached_in={cached_input_tokens} total_usd={total_usd:.4} thread_id={}",
                     self.ids.thread_id
@@ -376,7 +342,7 @@ impl ProgressProjection {
                     self.ids.request_id
                 );
             }
-            other => self.on_subagent_event(other).await,
+            other => self.on_subagent_event(other, ledger_context).await,
         }
     }
 
@@ -393,19 +359,6 @@ impl ProgressProjection {
             ..
         } = &event
         {
-            if let Some(ledger) = self.ledger() {
-                ledger
-                    .tool_completed(json!({
-                        "callId": call_id,
-                        "toolName": tool_name,
-                        "success": success,
-                        "outputChars": output_chars,
-                        "elapsedMs": elapsed_ms,
-                        "iteration": iteration,
-                        "failure": failure.as_ref().and_then(|f| serde_json::to_value(f).ok()),
-                    }))
-                    .await;
-            }
             log::debug!(
                 "[web_channel][bridge] tool_result round={iteration} tool={tool_name} call_id={call_id} success={success} elapsed_ms={elapsed_ms} has_structured={} request_id={}",
                 structured.is_some(),
@@ -418,7 +371,6 @@ impl ProgressProjection {
     }
 
     async fn on_turn_completed(&mut self, iterations: u32) {
-        self.parent_completed = true;
         let snapshot = self.timing.snapshot(self.elapsed_ms());
         log::info!(
             "[web_channel][bridge] time-to-first-visible kind=turn_done total_ms={} first_text_ms={:?} first_tool_ms={:?} round_one_narration_chars={} interim_threshold={MIN_INTERIM_NARRATION_CHARS} iterations={iterations} request_id={}",
@@ -431,9 +383,6 @@ impl ProgressProjection {
         self.timing_snapshot = Some(snapshot);
         // The turn is done: stop liveness beats.
         self.turn_active = false;
-        if let Some(ledger) = self.ledger() {
-            ledger.turn_completed(iterations).await;
-        }
         log::debug!(
             "[web_channel] turn completed after {iterations} iteration(s) thread_id={} request_id={} speak_reply={:?} source={:?} session_id={:?}",
             self.ids.thread_id,
@@ -451,11 +400,7 @@ impl ProgressProjection {
         if let Some(mirror) = self.turn_state.take() {
             mirror.finish();
         }
-        if !self.parent_completed {
-            if let Some(ledger) = self.ledger() {
-                ledger.turn_interrupted(self.events_seen).await;
-            }
-        }
+        self.ledger.finish().await;
         if let Some(mut collector) = self.span_collector.take() {
             collector.finish(unix_epoch_ms());
             let live_spans = collector.spans().to_vec();
@@ -473,11 +418,7 @@ impl ProgressProjection {
                 None
             };
             if let Some((trace_ctx, observations)) = journal_export {
-                let run_telemetry = if let Some(ledger) = self.ledger() {
-                    ledger.read_telemetry().await
-                } else {
-                    None
-                };
+                let run_telemetry = self.ledger.read_telemetry().await;
                 crate::agent::progress_tracing::export_run_trace_from_journal(
                     &self.config,
                     &trace_ctx,
@@ -496,7 +437,7 @@ impl ProgressProjection {
             self.ids.thread_id,
             self.ids.request_id,
             self.round,
-            self.events_seen,
+            self.ledger.events_seen(),
         );
         self.surface.close().await;
     }
