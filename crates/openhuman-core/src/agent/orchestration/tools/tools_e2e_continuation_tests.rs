@@ -103,8 +103,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         completed_job.output.as_deref(),
         Some("paused-child-resumed-answer")
     );
-    parent_epoch: None,
-        crate::agent::orchestration::subagent_sessions::}
+}
 
 #[tokio::test]
 async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {

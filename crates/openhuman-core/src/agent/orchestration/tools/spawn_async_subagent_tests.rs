@@ -6,8 +6,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
-use tinytools::{ToolCallOptions, ToolRunContext    parent_epoch: None,
-            };
+use tinytools::{ToolCallOptions, ToolRunContext};
 use tinytools_agent::dialect::ToolCallFormat;
 
 struct ThreadContext(&'static str);

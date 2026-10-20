@@ -4,8 +4,7 @@ use tinyagents_orchestration::steering::SteerError;
 /// The context these tests dispatch under: the calling task's own.
 fn cx() -> crate::core::runtime::DispatchCtx {
     crate::core::runtime::DispatchCtx::ambient()
-    parent_epoch: None,
-            }
+}
 
 use crate::agent::orchestration::fleet_tools::FleetToolSet;
 use crate::agent::orchestration::running_subagents::resolve::resume_ref_for_task;
