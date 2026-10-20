@@ -602,6 +602,7 @@ const threadSlice = createSlice({
       const threadId = action.payload;
       state.threads = state.threads.filter(thread => thread.id !== threadId);
       delete state.messagesByThreadId[threadId];
+      delete state.channelActivityByThreadId[threadId];
       if (state.selectedThreadId === threadId) {
         state.selectionIntentVersion = (state.selectionIntentVersion ?? 0) + 1;
         state.selectedThreadId = null;
@@ -617,6 +618,7 @@ const threadSlice = createSlice({
       state.selectionIntentVersion = (state.selectionIntentVersion ?? 0) + 1;
       state.threads = [];
       state.messagesByThreadId = {};
+      state.channelActivityByThreadId = {};
       state.selectedThreadId = null;
       state.messages = [];
       state.activeThreadIds = {};
@@ -631,6 +633,7 @@ const threadSlice = createSlice({
     resetThreadCachesPreservingSelection: state => {
       state.threads = [];
       state.messagesByThreadId = {};
+      state.channelActivityByThreadId = {};
       state.messages = [];
       state.activeThreadIds = {};
       state.welcomeThreadId = null;
@@ -823,6 +826,7 @@ const threadSlice = createSlice({
       })
       .addCase(deleteThread.fulfilled, (state, action) => {
         delete state.messagesByThreadId[action.payload.threadId];
+        delete state.channelActivityByThreadId[action.payload.threadId];
       })
       .addCase(updateThreadTitle.fulfilled, (state, action) => {
         const idx = state.threads.findIndex(t => t.id === action.payload.id);
