@@ -211,6 +211,8 @@ function sourceParityFixture() {
   git(["init", "-q"]);
   git(["config", "user.email", "pin-check@example.test"]);
   git(["config", "user.name", "Pin Check"]);
+  git(["config", "commit.gpgsign", "false"]);
+  git(["config", "tag.gpgsign", "false"]);
   mkdirSync(join(root, "src"), { recursive: true });
   writeFileSync(join(root, "src/lib.rs"), '#[cfg(test)]\n#[path = "tests.rs"]\nmod tests;\npub fn value() -> u8 { 1 }\n');
   writeFileSync(join(root, "src/tests.rs"), "#[test] fn works() {}\n");

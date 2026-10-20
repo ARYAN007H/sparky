@@ -243,7 +243,14 @@ export function validateTestOnlySourceParity({
     if (runGit(["rev-parse", "HEAD"]) !== proof.candidateCommit) {
       throw new Error("checked-out HEAD differs from attested candidate");
     }
-    if (runGit(["status", "--porcelain", "--untracked-files=all"])) {
+    if (
+      runGit([
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+      ])
+    ) {
       throw new Error("module worktree is dirty");
     }
     if (
