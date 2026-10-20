@@ -35,11 +35,14 @@ pub(crate) fn wrap(
         .unwrap_or_default();
     if provider == "openhuman" || provider == "managed" {
         let resolved_context = ctx.resolved();
-        profile.modalities.image_in = crate::inference::registry::provider_model_supports_vision_for(
-            resolved_context.as_deref().map(crate::core::runtime::CoreContext::extensions),
-            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-            model,
-        );
+        profile.modalities.image_in =
+            crate::inference::registry::provider_model_supports_vision_for(
+                resolved_context
+                    .as_deref()
+                    .map(crate::core::runtime::CoreContext::extensions),
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                model,
+            );
     }
     let route = if matches!(provider, "openhuman" | "managed") {
         "openhuman".to_string()

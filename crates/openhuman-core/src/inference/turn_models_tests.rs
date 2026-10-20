@@ -23,7 +23,14 @@ fn scoped_model_entry(
             default_model: Arc::new(move || Some(name.to_string())),
             role_for_model: Arc::new(move |model| {
                 if model == "fixture-role" {
-                    Some(if supports_vision { "reasoning" } else { "coding" }.to_string())
+                    Some(
+                        if supports_vision {
+                            "reasoning"
+                        } else {
+                            "coding"
+                        }
+                        .to_string(),
+                    )
                 } else {
                     model.strip_prefix("hint:").map(str::to_string)
                 }

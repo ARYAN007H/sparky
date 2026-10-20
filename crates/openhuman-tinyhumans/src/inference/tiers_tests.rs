@@ -170,7 +170,9 @@ fn hosted_cost_defaults_include_the_registered_managed_model_price() {
     let _registry = crate::registry_test_lock();
     crate::register::register_all(&crate::install::InstallOptions::default());
 
-    let prices = openhuman_embed::__host::config::Config::default().cost.prices;
+    let prices = openhuman_embed::__host::config::Config::default()
+        .cost
+        .prices;
     let expected = super::super::tiers::default_pricing().expect("hosted default pricing");
     assert_eq!(expected.0, MODEL_MANAGED_DEFAULT);
     let actual = prices

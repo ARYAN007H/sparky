@@ -214,15 +214,16 @@ fn build_turn_models_crate(
             if tier == model {
                 continue;
             }
-            let tier_role = crate::inference::registry::provider_model_role_for(
+            let registered_role = crate::inference::registry::provider_model_role_for(
                 context_extensions,
                 factory::PROVIDER_OPENHUMAN,
                 tier,
-            )
-            .unwrap_or_else(|| crate::inference::provider_model::role_for_provider_model(
-                factory::PROVIDER_OPENHUMAN,
-                tier,
-            ));
+            );
+            let tier_role = registered_role.as_deref().unwrap_or_else(|| {
+                tier.strip_prefix("hint:")
+                    .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+                    .unwrap_or("chat")
+            });
             if let Some(custom) = ctx.host_overrides().and_then(|local| {
                 local
                     .role_models

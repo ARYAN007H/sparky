@@ -36,7 +36,17 @@ pub(super) fn managed_chat_model(
     thread_id: Option<&str>,
     egress: &EgressLedger,
 ) -> anyhow::Result<ManagedChatModel> {
-    managed_chat_model_for(None, role, config, model_override, default_model, native_tool_calling, thread_id, egress)
+    let extensions = crate::core::runtime::CoreContext::current_extensions();
+    managed_chat_model_for(
+        extensions.as_ref(),
+        role,
+        config,
+        model_override,
+        default_model,
+        native_tool_calling,
+        thread_id,
+        egress,
+    )
 }
 
 pub(super) fn managed_chat_model_for(
@@ -50,7 +60,8 @@ pub(super) fn managed_chat_model_for(
     egress: &EgressLedger,
 ) -> anyhow::Result<ManagedChatModel> {
     enforce_local_only_inference(role, PROVIDER_OPENHUMAN)?;
-    let Some(entry) = crate::inference::registry::chat_model_for(extensions, PROVIDER_OPENHUMAN) else {
+    let Some(entry) = crate::inference::registry::chat_model_for(extensions, PROVIDER_OPENHUMAN)
+    else {
         log::debug!("[providers][chat-factory] role={role} managed provider is not registered");
         return Err(managed_unavailable_error());
     };
