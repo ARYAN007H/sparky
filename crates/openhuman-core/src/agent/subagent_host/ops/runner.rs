@@ -571,12 +571,7 @@ async fn run_typed_mode(
     // (not per turn) keeps the sub-agent system
     // prompt byte-stable for prefix caching.
     let agents_md = if parent.agent_config.agents_md_enabled {
-        let local_dir = options
-            .workspace_descriptor
-            .as_ref()
-            .or(parent.workspace_descriptor.as_ref())
-            .map(|descriptor| descriptor.root.clone())
-            .or_else(|| config.as_ref().ok().map(|c| c.action_dir.clone()));
+        let local_dir = config.as_ref().ok().map(|c| c.action_dir.clone());
         match local_dir {
             Some(dir) => crate::agent::prompts::load_agents_md_layers(&parent.workspace_dir, &dir),
             None => {
