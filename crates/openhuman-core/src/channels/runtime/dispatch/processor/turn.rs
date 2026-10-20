@@ -1,6 +1,5 @@
-//! The per-message pipeline: typing indicator, ACK reaction, history
-//! assembly, dispatching the agentic turn over the native bus, and
-//! delivering the draft/final reply.
+//! The per-message pipeline: typing indicator, ACK reaction, durable-session
+//! dispatch through the shared runner, and final reply delivery.
 
 use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
 #[cfg(test)]
@@ -424,7 +423,7 @@ pub(crate) async fn process_channel_runtime_message(
                 &route,
                 &enriched_message,
                 active_turn_model_source,
-                _progress_tx,
+                None,
                 turn_origin,
                 approval,
             )
