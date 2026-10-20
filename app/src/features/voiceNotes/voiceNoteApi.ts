@@ -6,6 +6,7 @@
  * in its `extraMetadata.voiceNote`. Assistant spoken replies use the same
  * store, so one reader serves both directions.
  */
+import type { ContentPart } from '../../services/chatWire';
 import { callCoreRpc } from '../../services/coreRpcClient';
 import { openhumanVoiceTranscribeBytes } from '../../utils/tauriCommands/voice';
 
@@ -16,10 +17,21 @@ export interface VoiceNoteMeta {
   durationMs?: number;
   /** Normalised 0..1 bar heights, user recordings only. */
   waveform?: number[];
+  /** Provider timeline saved with synthesized replies; absent on legacy notes. */
+  visemes?: Array<{ viseme: string; start_ms: number; end_ms: number }>;
 }
 
 /** `source` the composer stamps on a turn that began as a voice note. */
 export const VOICE_NOTE_SOURCE = 'voice_note';
+
+/** Unwrap the core's Outcome `{ logs, result }` wire envelope for note RPCs. */
+function unwrapVoiceNoteResult<T>(value: T | { result?: T }): T {
+  if (value && typeof value === 'object' && 'result' in value) {
+    const result = (value as { result?: T }).result;
+    if (result && typeof result === 'object') return result;
+  }
+  return value as T;
+}
 
 export function extensionForMime(mime: string): string {
   if (mime.includes('ogg')) return 'ogg';
@@ -34,6 +46,26 @@ export function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+/** Keep the recorded media on the typed web-chat wire beside its transcript. */
+export async function voiceNoteContentPart(
+  noteId: string,
+  mime: string,
+  blob: Blob,
+  durationMs: number,
+  waveform: number[]
+): Promise<ContentPart> {
+  const contentType = mime || blob.type || 'audio/webm';
+  return {
+    kind: 'voice_note',
+    voiceNote: {
+      durationMs,
+      waveform,
+      pushToTalk: false,
+      media: { opaqueId: noteId, kind: 'audio', contentType, durationMs, sizeBytes: blob.size },
+    },
+  };
 }
 
 export function base64ToBytes(b64: string): Uint8Array {
@@ -57,25 +89,37 @@ export function readVoiceNoteMeta(extraMetadata: unknown): VoiceNoteMeta | null 
     waveform: Array.isArray(note.waveform)
       ? note.waveform.filter((v): v is number => typeof v === 'number')
       : undefined,
+    visemes: Array.isArray(note.visemes)
+      ? note.visemes.filter(
+          (frame): frame is { viseme: string; start_ms: number; end_ms: number } =>
+            !!frame &&
+            typeof frame === 'object' &&
+            typeof (frame as Record<string, unknown>).viseme === 'string' &&
+            Number.isFinite((frame as Record<string, unknown>).start_ms) &&
+            Number.isFinite((frame as Record<string, unknown>).end_ms)
+        )
+      : undefined,
   };
 }
 
 export async function storeVoiceNote(noteId: string, blob: Blob): Promise<{ mime: string }> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const mime = blob.type || 'audio/webm';
-  const result = await callCoreRpc<{ mime?: string }>({
+  const response = await callCoreRpc<{ mime?: string } | { result?: { mime?: string } }>({
     method: 'openhuman.channel_web_voice_note_store',
     params: { note_id: noteId, audio_base64: bytesToBase64(bytes), mime },
   });
+  const result = unwrapVoiceNoteResult(response);
   return { mime: result?.mime ?? mime };
 }
 
 /** Fetch a stored note's audio; `null` when the core has none. */
 export async function readVoiceNote(noteId: string): Promise<Blob | null> {
-  const result = await callCoreRpc<{ audio_base64?: string | null; mime?: string | null }>({
-    method: 'openhuman.channel_web_voice_note_read',
-    params: { note_id: noteId },
-  });
+  const response = await callCoreRpc<
+    | { audio_base64?: string | null; mime?: string | null }
+    | { result?: { audio_base64?: string | null; mime?: string | null } }
+  >({ method: 'openhuman.channel_web_voice_note_read', params: { note_id: noteId } });
+  const result = unwrapVoiceNoteResult(response);
   if (!result?.audio_base64) return null;
   const bytes = base64ToBytes(result.audio_base64);
   return new Blob([bytes as BlobPart], { type: result.mime || 'audio/webm' });

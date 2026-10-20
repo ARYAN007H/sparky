@@ -78,8 +78,9 @@ pub(crate) struct WebChatParams {
     pub(super) client_id: String,
     pub(super) thread_id: String,
     pub(super) message: String,
-    /// Typed attachments sent with `message`; folded into upload markers at
-    /// the RPC edge (`agent::attachments::parts`).
+    /// Typed attachments sent with `message`; ordinary media is folded into
+    /// upload markers at the RPC edge, while voice notes retain their typed
+    /// opaque reference and stay out of model-visible text.
     #[serde(default)]
     pub(super) attachments: Vec<tinychannels_bus::ContentPart>,
     pub(super) model_override: Option<String>,

@@ -9,6 +9,7 @@ import {
   readVoiceNoteMeta,
   storeVoiceNote,
   transcribeVoiceNote,
+  voiceNoteContentPart,
 } from './voiceNoteApi';
 
 const rpc = vi.hoisted(() => ({ callCoreRpc: vi.fn() }));
@@ -20,6 +21,32 @@ describe('voiceNoteApi', () => {
   beforeEach(() => {
     rpc.callCoreRpc.mockReset();
     voice.openhumanVoiceTranscribeBytes.mockReset();
+  });
+
+  it('keeps a recording as a typed voice-note part with its media and duration', async () => {
+    const part = await voiceNoteContentPart(
+      'note-123',
+      'audio/wav',
+      new Blob([new Uint8Array([0, 1, 2])], { type: 'audio/wav' }),
+      5000,
+      [0.2, 0.8]
+    );
+
+    expect(part).toEqual({
+      kind: 'voice_note',
+      voiceNote: {
+        durationMs: 5000,
+        waveform: [0.2, 0.8],
+        pushToTalk: false,
+        media: {
+          opaqueId: 'note-123',
+          kind: 'audio',
+          contentType: 'audio/wav',
+          durationMs: 5000,
+          sizeBytes: 3,
+        },
+      },
+    });
   });
 
   it('round-trips bytes through base64, including large buffers', () => {
@@ -42,9 +69,21 @@ describe('voiceNoteApi', () => {
   it('reads a voice note reference from persisted metadata and rejects junk', () => {
     expect(
       readVoiceNoteMeta({
-        voiceNote: { noteId: 'n1', mime: 'audio/mpeg', durationMs: 900, waveform: [0.1, 'x', 0.5] },
+        voiceNote: {
+          noteId: 'n1',
+          mime: 'audio/mpeg',
+          durationMs: 900,
+          waveform: [0.1, 'x', 0.5],
+          visemes: [{ viseme: 'aa', start_ms: 0, end_ms: 20 }, { viseme: 4 }],
+        },
       })
-    ).toEqual({ noteId: 'n1', mime: 'audio/mpeg', durationMs: 900, waveform: [0.1, 0.5] });
+    ).toEqual({
+      noteId: 'n1',
+      mime: 'audio/mpeg',
+      durationMs: 900,
+      waveform: [0.1, 0.5],
+      visemes: [{ viseme: 'aa', start_ms: 0, end_ms: 20 }],
+    });
     expect(readVoiceNoteMeta({ voiceNote: { noteId: '' } })).toBeNull();
     expect(readVoiceNoteMeta({ voiceNote: 'x' })).toBeNull();
     expect(readVoiceNoteMeta({})).toBeNull();
@@ -52,9 +91,12 @@ describe('voiceNoteApi', () => {
   });
 
   it('stores a recording through the core and reports the stored mime', async () => {
-    rpc.callCoreRpc.mockResolvedValue({ mime: 'audio/webm' });
+    rpc.callCoreRpc.mockResolvedValue({
+      logs: ['voice note stored'],
+      result: { note_id: 'vn_1', mime: 'audio/wav' },
+    });
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' });
-    await expect(storeVoiceNote('vn_1', blob)).resolves.toEqual({ mime: 'audio/webm' });
+    await expect(storeVoiceNote('vn_1', blob)).resolves.toEqual({ mime: 'audio/wav' });
     expect(rpc.callCoreRpc).toHaveBeenCalledWith({
       method: 'openhuman.channel_web_voice_note_store',
       params: { note_id: 'vn_1', audio_base64: 'AQID', mime: 'audio/webm' },
@@ -68,6 +110,16 @@ describe('voiceNoteApi', () => {
     expect(blob?.size).toBe(3);
     rpc.callCoreRpc.mockResolvedValueOnce({ audio_base64: null, mime: null });
     await expect(readVoiceNote('gone')).resolves.toBeNull();
+  });
+
+  it('unwraps the core Outcome envelope when reading persisted note audio', async () => {
+    rpc.callCoreRpc.mockResolvedValue({
+      logs: ['voice note read'],
+      result: { note_id: 'n', audio_base64: 'AQID', mime: 'audio/wav' },
+    });
+    const blob = await readVoiceNote('n');
+    expect(blob?.type).toBe('audio/wav');
+    expect(blob?.size).toBe(3);
   });
 
   it('transcribes with the recording extension and prefers cleaned text', async () => {

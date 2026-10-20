@@ -5,8 +5,8 @@
 use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
-use crate::core::Outcome;
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use super::ops::{
@@ -76,7 +76,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 FieldSchema {
                     name: "attachments",
                     ty: TypeSchema::Option(Box::new(TypeSchema::Json)),
-                    comment: "Typed attachments (tinychannels ContentPart[]: image/video/audio/file parts whose media carries an inline data: or http(s) url). Replaces splicing [IMAGE:]/[FILE:] markers into `message`.",
+                    comment: "Typed attachments (tinychannels ContentPart[]). VoiceNote parts carry an opaque id for audio already stored by channel.web_voice_note_store; the core validates and binds it to the user row without adding audio markers to model text. Other media parts use the regular attachment staging path.",
                     required: false,
                 },
                 optional_string("model_override", "Optional model override."),
@@ -199,6 +199,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<WebChatParams>(params)?;
+        let voice_note_id = validate_voice_note_attachment(&ctx, &p).await?;
         let message =
             crate::agent::attachments::parts::fold_into_message(&p.message, &p.attachments)
                 .map_err(|e| e.to_string())?;
@@ -230,10 +231,49 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
                     // arm is known.
                     hold_text_stream: false,
                 },
+                voice_note_id,
             )
             .await?,
         )
     })
+}
+
+async fn validate_voice_note_attachment(
+    ctx: &DispatchCtx,
+    params: &WebChatParams,
+) -> Result<Option<String>, String> {
+    let voice_notes = params
+        .attachments
+        .iter()
+        .filter_map(|part| match part {
+            tinychannels_bus::ContentPart::VoiceNote { voice_note } => Some(voice_note),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if voice_notes.len() > 1 {
+        return Err("a chat message can carry only one typed voice note".into());
+    }
+    let Some(voice_note) = voice_notes.first() else {
+        if params.source.as_deref() == Some(super::voice_notes::VOICE_NOTE_SOURCE) {
+            return Err("voice-note turns require their typed audio part".into());
+        }
+        return Ok(None);
+    };
+    if params.source.as_deref() != Some(super::voice_notes::VOICE_NOTE_SOURCE) {
+        return Err("typed voice-note audio requires source=voice_note".into());
+    }
+    let note_id = voice_note
+        .media
+        .opaque_id
+        .as_deref()
+        .ok_or_else(|| "typed voice-note audio requires its stored note id".to_string())?;
+    let workspace_dir = ctx
+        .load_config()
+        .await
+        .map_err(|error| format!("load voice note workspace: {error}"))?
+        .workspace_dir;
+    super::voice_notes::validate_typed_media(&workspace_dir, note_id, &voice_note.media)?;
+    Ok(Some(note_id.to_string()))
 }
 
 fn handle_queue_status(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {

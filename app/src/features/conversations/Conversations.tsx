@@ -39,6 +39,7 @@ import {
   storeVoiceNote,
   transcribeVoiceNote,
   VOICE_NOTE_SOURCE,
+  voiceNoteContentPart,
   type VoiceNoteMeta,
 } from '../../features/voiceNotes/voiceNoteApi';
 import { VoiceNoteComposer } from '../../features/voiceNotes/VoiceNoteComposer';
@@ -67,6 +68,7 @@ import {
   editMessage,
   useRustChat,
 } from '../../services/chatService';
+import type { ContentPart } from '../../services/chatWire';
 import { callCoreRpc } from '../../services/coreRpcClient';
 import type { RootState } from '../../store';
 import {
@@ -1253,7 +1255,10 @@ const Conversations = ({
     return run;
   };
 
-  const handleSendMessage = async (text?: string, opts?: { voiceNote?: VoiceNoteMeta }) => {
+  const handleSendMessage = async (
+    text?: string,
+    opts?: { voiceNote?: VoiceNoteMeta; voicePart?: ContentPart }
+  ) => {
     // Guard double-submit to the SAME thread only; a send to another thread
     // may proceed concurrently.
     if (selectedThreadId && pendingSendsRef.current.has(selectedThreadId)) return;
@@ -1431,6 +1436,7 @@ const Conversations = ({
       await chatSend({
         threadId: sendingThreadId,
         message: messageText,
+        ...(opts?.voicePart ? { attachments: [opts.voicePart] } : {}),
         ...(modelOverride !== undefined ? { model: modelOverride } : {}),
         locale: uiLocale,
         reasoningEffort: composerReasoningEffort,
@@ -1502,8 +1508,16 @@ const Conversations = ({
     if (!transcript) throw new Error(t('voiceNote.transcribeFailed'));
     const noteId = `vn_${globalThis.crypto.randomUUID().replace(/-/g, '')}`;
     const { mime } = await storeVoiceNote(noteId, draft.blob);
+    const voicePart = await voiceNoteContentPart(
+      noteId,
+      mime,
+      draft.blob,
+      draft.durationMs,
+      draft.waveform
+    );
     await handleSendMessage(transcript, {
       voiceNote: { noteId, mime, durationMs: draft.durationMs, waveform: draft.waveform },
+      voicePart,
     });
   };
 

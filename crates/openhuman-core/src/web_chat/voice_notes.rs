@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 const LOG_PREFIX: &str = "[web_channel][voice_note]";
 /// `source` the composer stamps on a turn that began as a voice note.
@@ -97,6 +97,7 @@ pub(crate) fn store_note(
     for (other, _) in KNOWN.iter().filter(|(e, _)| *e != ext) {
         let _ = std::fs::remove_file(root.join(format!("{id}.{other}")));
     }
+    let _ = std::fs::remove_file(root.join(format!("{id}.visemes.json")));
     std::fs::write(root.join(format!("{id}.{ext}")), bytes)
         .map_err(|e| format!("write voice note: {e}"))?;
     log::debug!(
@@ -129,14 +130,57 @@ pub(crate) fn read_note(
     Ok(None)
 }
 
+/// Ensure a typed chat attachment names and carries the already stored note.
+/// The RPC upload happens before chat submission; this comparison binds the
+/// following typed part to those durable bytes instead of resending audio or
+/// treating the opaque reference as model-visible attachment text.
+pub(crate) fn validate_typed_media(
+    workspace: &Path,
+    note_id: &str,
+    media: &tinychannels_bus::MediaReference,
+) -> Result<(), String> {
+    if !is_valid_note_id(note_id) || media.opaque_id.as_deref() != Some(note_id) {
+        return Err("voice note media must name its stored note id".into());
+    }
+    if media.url.is_some() || media.path.is_some() || media.local_cache_path.is_some() {
+        return Err("typed voice note must use its opaque stored-media reference".into());
+    }
+    if media.kind != tinychannels_bus::MediaKind::Audio {
+        return Err("typed voice note reference must have audio kind".into());
+    }
+    let (_, stored_mime) = read_note(workspace, note_id)?
+        .ok_or_else(|| "typed voice note has no stored audio".to_string())?;
+    if media.content_type.as_deref().is_some_and(|content_type| {
+        content_type
+            .split(';')
+            .next()
+            .unwrap_or(content_type)
+            .trim()
+            != stored_mime
+    }) {
+        return Err("typed voice note mime does not match the stored audio".into());
+    }
+    Ok(())
+}
+
 /// The `voiceNote` metadata for a reply whose audio was stored, if any.
 pub(crate) fn reply_note_metadata(workspace: &Path, request_id: &str) -> Option<Value> {
     let id = reply_note_id(request_id);
     let root = dir(workspace);
     KNOWN.iter().find_map(|(ext, mime)| {
-        root.join(format!("{id}.{ext}"))
-            .is_file()
-            .then(|| json!({ "noteId": id, "mime": mime }))
+        if !root.join(format!("{id}.{ext}")).is_file() {
+            return None;
+        }
+        let mut metadata = json!({ "noteId": id, "mime": mime });
+        let viseme_path = root.join(format!("{id}.visemes.json"));
+        if let Ok(bytes) = std::fs::read(viseme_path) {
+            if let Ok(frames) = serde_json::from_slice::<Vec<Value>>(&bytes) {
+                if !frames.is_empty() {
+                    metadata["visemes"] = json!(frames);
+                }
+            }
+        }
+        Some(metadata)
     })
 }
 
@@ -202,6 +246,7 @@ pub(crate) fn store_synthesized_reply(
     request_id: &str,
     audio_base64: &str,
     audio_mime: &str,
+    visemes: &[impl serde::Serialize],
 ) -> bool {
     use base64::Engine as _;
     if audio_base64.is_empty() {
@@ -214,8 +259,24 @@ pub(crate) fn store_synthesized_reply(
             return false;
         }
     };
-    match store_note(workspace, &reply_note_id(request_id), audio_mime, &bytes) {
-        Ok(_) => true,
+    let id = reply_note_id(request_id);
+    match store_note(workspace, &id, audio_mime, &bytes) {
+        Ok(_) => {
+            if !visemes.is_empty() {
+                let path = dir(workspace).join(format!("{id}.visemes.json"));
+                if let Err(err) = serde_json::to_vec(visemes)
+                    .map_err(|err| err.to_string())
+                    .and_then(|encoded| {
+                        std::fs::write(path, encoded).map_err(|err| err.to_string())
+                    })
+                {
+                    log::warn!(
+                        "{LOG_PREFIX} could not store reply visemes request_id={request_id}: {err}"
+                    );
+                }
+            }
+            true
+        }
         Err(err) => {
             log::warn!("{LOG_PREFIX} could not store reply audio request_id={request_id}: {err}");
             false
