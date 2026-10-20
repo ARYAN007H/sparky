@@ -226,12 +226,13 @@ export function treeGraph(output) {
     if (deduplicated) {
       if (!id) throw new Error(`Cargo tree references an unseen deduplicated package: ${display}`);
     } else {
-      if (id) throw new Error(`Cargo tree repeats a package without a dedup marker: ${display}`);
-      const pkg = parseTreePackage(display);
-      id = `tree:${index}:${display}`;
-      packages.set(id, { ...pkg, id });
-      nodes.set(id, { id, deps: [] });
-      byDisplay.set(display, id);
+      if (!id) {
+        const pkg = parseTreePackage(display);
+        id = `tree:${index}:${display}`;
+        packages.set(id, { ...pkg, id });
+        nodes.set(id, { id, deps: [] });
+        byDisplay.set(display, id);
+      }
     }
     if (parent) {
       nodes.get(parent).deps.push({
