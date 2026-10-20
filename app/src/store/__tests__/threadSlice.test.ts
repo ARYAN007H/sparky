@@ -5,6 +5,7 @@ import { threadApi } from '../../services/api/threadApi';
 import { CoreRpcError } from '../../services/coreRpcClient';
 import type { Thread, ThreadMessage } from '../../types/thread';
 import threadReducer, {
+  applyChannelEvent,
   addInferenceResponse,
   addMessageLocal,
   clearAllThreads,
@@ -84,6 +85,42 @@ describe('threadSlice synchronous reducers', () => {
     expect(state.messages).toEqual([]);
     expect(state.isLoadingThreads).toBe(false);
     expect(state.isLoadingMessages).toBe(false);
+  });
+
+  it('applies provider reactions only to the exact OpenHuman row and persists read state in metadata', async () => {
+    const store = createStore();
+    const message = makeMessage({ id: 'user:row-42' });
+    mockedThreadApi.getThreadMessages.mockResolvedValueOnce({ messages: [message], count: 1 });
+    await store.dispatch(loadThreadMessages('channel:telegram/alice/room-1'));
+
+    const event = {
+      event: 'channel_event',
+      client_id: 'channel-runtime',
+      thread_id: 'channel:telegram/alice/room-1',
+      request_id: 'event-9',
+      openhuman_message_id: 'user:row-42',
+      channel_event: {
+        version: 2,
+        eventId: 'event-9',
+        channel: { id: 'telegram', accountId: 'bot-1' },
+        conversation: { kind: 'group', id: 'room-1' },
+        type: 'reaction_added',
+        messageId: 'provider-message-42',
+        actor: { id: 'alice', altIds: [], name: null, isBot: false, roles: [] },
+        reaction: { value: '🔥', customEmojiId: null },
+      },
+    } as Parameters<typeof applyChannelEvent>[0];
+    store.dispatch(applyChannelEvent(event));
+
+    expect(
+      store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]
+        ?.extraMetadata.channelActivity
+    ).toEqual({
+      reactions: [{ actorId: 'alice', value: '🔥' }],
+      readReceipts: [],
+    });
+    expect(store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]?.id)
+      .toBe('user:row-42');
   });
 
   // [#1123] setWelcomeThreadId is now a true no-op — kept for TS compat but

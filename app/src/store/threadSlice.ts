@@ -530,7 +530,7 @@ const threadSlice = createSlice({
           item =>
             item.actorId !== providerEvent.actor.id ||
             item.value !== providerEvent.reaction.value ||
-            item.customEmojiId !== providerEvent.reaction.customEmojiId
+            item.customEmojiId !== (providerEvent.reaction.customEmojiId ?? undefined)
         );
       } else if (providerEvent.type === 'read_receipt') {
         const receipt = {

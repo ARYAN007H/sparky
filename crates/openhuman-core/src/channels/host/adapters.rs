@@ -388,7 +388,9 @@ async fn project_channel_event(
     }))
 }
 
-fn channel_event_target_message_id(event: &tinychannels_bus::ChannelEvent) -> Option<&str> {
+pub(super) fn channel_event_target_message_id(
+    event: &tinychannels_bus::ChannelEvent,
+) -> Option<&str> {
     use tinychannels_bus::ChannelEventKind as Kind;
     match &event.event {
         Kind::ReadReceipt { message_id, .. }
