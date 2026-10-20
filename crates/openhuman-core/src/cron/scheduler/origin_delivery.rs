@@ -9,7 +9,7 @@
 //!   announced on the web channel as a `proactive_message` event addressed to
 //!   that thread. Re-delivering the same run lands on the same row.
 //! - Channel origin: the reply is sent to the origin's reply target, then
-//!   appended to that chat's history so its next turn sees it.
+//!   appended to its durable agent transcript so the next turn sees it.
 
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
@@ -62,7 +62,7 @@ const TRANSCRIPT_APPEND_TIMEOUT: std::time::Duration = std::time::Duration::from
 /// waits for any live turn of the session (the per-session turn lock), dedupes
 /// on the idempotency key and records `{kind: "cron", job_id, run_id}`
 /// provenance. The session is addressed exactly as the session host does it
-/// (`SessionRef::scoped(thread_id, agent_id)`) in `transcripts`, the store
+/// (`SessionRef::scoped(session_key, agent_id)`) in `transcripts`, the store
 /// the host wrote it to, which the caller resolved from the job's tenant
 /// ([`origin_transcripts`]). A thread that never had an agent turn has no
 /// transcript (`NoSession`) and is skipped. Must never be called from inside a

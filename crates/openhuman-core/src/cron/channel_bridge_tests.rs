@@ -1,6 +1,7 @@
 use super::*;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 use tinychannels_bus::ChannelMessage;
 use tokio::sync::mpsc;
 
