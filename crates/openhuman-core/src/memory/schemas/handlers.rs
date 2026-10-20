@@ -127,22 +127,6 @@ pub(super) fn engine_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::engine_set_save_error;
-
-    #[test]
-    fn nonconflict_save_failures_remain_engine_errors() {
-        let raw = engine_set_save_error(anyhow::anyhow!("disk unavailable"));
-        let error = crate::core::StructuredRpcError::decode(&raw).unwrap();
-        assert_eq!(error.data.as_ref().unwrap()["code"], "ENGINE");
-        assert_eq!(
-            error.message,
-            "engine error: saving config failed: disk unavailable"
-        );
-    }
-}
-
 pub(super) fn recall(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<RecallParams, _>(
         ctx,
@@ -433,4 +417,20 @@ pub(super) fn migration_retry(ctx: DispatchCtx, params: Map<String, Value>) -> C
     rpc::<EmptyParams, _>(ctx, params, |_, config, _| async move {
         layout_migration::retry(&config)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::engine_set_save_error;
+
+    #[test]
+    fn nonconflict_save_failures_remain_engine_errors() {
+        let raw = engine_set_save_error(anyhow::anyhow!("disk unavailable"));
+        let error = crate::core::StructuredRpcError::decode(&raw).unwrap();
+        assert_eq!(error.data.as_ref().unwrap()["code"], "ENGINE");
+        assert_eq!(
+            error.message,
+            "engine error: saving config failed: disk unavailable"
+        );
+    }
 }
