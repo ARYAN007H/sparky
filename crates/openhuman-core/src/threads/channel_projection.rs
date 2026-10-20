@@ -15,7 +15,10 @@ use tinychannels_bus::{ChannelRef, ConversationRef};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use crate::core::runtime::{DispatchCtx, Tenant, tenant::tenant_key};
-use crate::storage::{self, documents::{Repo, compare_and_swap}};
+use crate::storage::{
+    self,
+    documents::{Repo, compare_and_swap},
+};
 
 const DOMAIN: &str = "threads::channel_projection";
 const COLLECTION: &str = "thread_channel_messages";

@@ -129,7 +129,10 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
     .await
     .unwrap();
     assert_eq!(
-        persisted.iter().filter(|message| message.id == row_id).count(),
+        persisted
+            .iter()
+            .filter(|message| message.id == row_id)
+            .count(),
         1,
         "concurrent duplicate channel delivery persists one authoritative row"
     );
