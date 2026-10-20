@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tinybus::EventHandler;
 use tinymemory_api::{Error, Result};
 use tinymemory_api::{ItemKind, MetaFilter, StoreItem};
-use {crate::flows::flow_meta, crate::flows::flow_tag, tinyflows_catalog::FlowRun};
+use {crate::flows::flow_meta, crate::flows::flow_tag, tinyflows_bus::catalog::FlowRun};
 
 /// Bounds a post-run memory digest to a compact, LLM-cheap size — a single
 /// run's summary must never dominate a later `flow_memory_recall`.
@@ -133,13 +133,7 @@ impl FlowRunDigestSubscriber {
             tracing::warn!(target: "flows", %flow_id, %run_id, "[flows] digest: run row not found — skipping");
             return;
         };
-        let run: FlowRun = match store::roundtrip(wire_run) {
-            Ok(run) => run,
-            Err(error) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, %error, "[flows] digest: failed to decode run — skipping");
-                return;
-            }
-        };
+        let run: FlowRun = wire_run;
 
         let digest = render_run_digest(&flow_name, &run);
         let mut meta = flow_meta(flow_id, &[FLOW_RUN_DIGEST_TAG.to_string()]);

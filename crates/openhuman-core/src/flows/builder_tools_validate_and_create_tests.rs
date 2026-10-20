@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn edit_workflow_rejects_a_result_that_is_structurally_invalid() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let draft = ops::flows_draft_create(
@@ -38,7 +38,7 @@ async fn edit_workflow_rejects_a_result_that_is_structurally_invalid() {
 
 #[tokio::test]
 async fn edit_workflow_rejects_an_engine_incompatible_result() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let safe_graph = json!({
@@ -99,7 +99,7 @@ async fn edit_workflow_rejects_an_engine_incompatible_result() {
 
 #[tokio::test]
 async fn edit_workflow_does_not_persist_an_incompatible_saved_child_reference() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let legacy_child = json!({
@@ -129,7 +129,7 @@ async fn edit_workflow_does_not_persist_an_incompatible_saved_child_reference() 
     let child = crate::flows::store::create_flow(
         &config,
         "Legacy unsafe child".to_string(),
-        child_graph,
+        serde_json::to_value(child_graph).unwrap(),
         false,
         false,
     )
@@ -185,7 +185,7 @@ async fn edit_workflow_does_not_persist_an_incompatible_saved_child_reference() 
 
 #[tokio::test]
 async fn edit_workflow_preserves_non_engine_gate_edits_in_the_draft() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let draft = ops::flows_draft_create(
@@ -303,7 +303,7 @@ async fn validate_workflow_requires_a_base() {
 
 #[tokio::test]
 async fn edit_workflow_edits_a_draft_and_writes_back() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -343,7 +343,7 @@ async fn edit_workflow_edits_a_draft_and_writes_back() {
 // actually landed.
 #[tokio::test]
 async fn edit_workflow_surfaces_draft_write_back_failure() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
 
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
@@ -535,7 +535,7 @@ async fn cancel_flow_run_refuses_a_run_the_caller_does_not_own() {
         &owner_flow.id,
         json!({}),
         serde_json::Map::new(),
-        tinyflows_catalog::FlowRunTrigger::Rpc,
+        tinyflows_bus::runs::FlowRunTrigger::Rpc,
     )
     .await
     .unwrap();

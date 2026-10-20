@@ -1,7 +1,10 @@
 use super::*;
 
-use tinyflows_bus::catalog::{self as wire, FlowRun as WireFlowRun};
-use tinyflows_catalog::run_management as rm;
+use tinyflows_bus::catalog as wire;
+/// OpenHuman's default explicit run-history retention request. The module
+/// owns pruning mechanics and protects live rows; this is the host-selected
+/// history cap exposed by the manual prune RPC.
+const FLOW_RUN_HISTORY_LIMIT: usize = 100;
 
 /// Cancel a workflow run through its owner-scoped Runs.CancelRun operation.
 pub async fn flows_cancel_run(config: &Config, run_id: &str) -> Result<Outcome<Value>, String> {
@@ -9,23 +12,12 @@ pub async fn flows_cancel_run(config: &Config, run_id: &str) -> Result<Outcome<V
     let storage = crate::flows::catalog_storage::register(&ctx, config)
         .await?
         .storage();
-    let run = get_run_with_storage(config, storage.clone(), run_id)
+    let _run = get_run_with_storage(config, storage.clone(), run_id)
         .await?
         .ok_or_else(|| format!("flow run '{run_id}' not found"))?;
-    if rm::is_terminal_run_status(&run.status) {
-        return Err(rm::already_terminal_error(run_id, &run.status));
-    }
-
     let (signalled, was_in_flight) =
         crate::flows::runs_adapter::cancel_run(config, storage.clone(), run_id).await?;
     if !signalled {
-        let current = get_run_with_storage(config, storage, run_id).await?;
-        if current
-            .as_ref()
-            .is_some_and(|current| rm::is_terminal_run_status(&current.status))
-        {
-            return Err(rm::settled_concurrently_error(run_id));
-        }
         return Err(format!("flow run '{run_id}' cancellation was not accepted"));
     }
 
@@ -59,12 +51,7 @@ pub async fn flows_list_runs(
         flow_id: flow_id.to_owned(),
         limit,
     };
-    let runs: Vec<WireFlowRun> = catalog_call(config, wire::members::LIST_RUNS, request).await?;
-    let runs = runs
-        .into_iter()
-        .map(crate::flows::store::roundtrip)
-        .collect::<anyhow::Result<Vec<_>>>()
-        .map_err(|error| error.to_string())?;
+    let runs: Vec<FlowRun> = catalog_call(config, wire::members::LIST_RUNS, request).await?;
     Ok(Outcome::single_log(
         runs,
         format!("flow runs listed: {flow_id}"),
@@ -82,13 +69,7 @@ pub async fn flows_list_all_runs(
         .await?
         .storage();
     let request = wire::ListAllRunsRequest { storage, limit };
-    let runs: Vec<WireFlowRun> =
-        catalog_call(config, wire::members::LIST_ALL_RUNS, request).await?;
-    let runs = runs
-        .into_iter()
-        .map(crate::flows::store::roundtrip)
-        .collect::<anyhow::Result<Vec<_>>>()
-        .map_err(|error| error.to_string())?;
+    let runs: Vec<FlowRun> = catalog_call(config, wire::members::LIST_ALL_RUNS, request).await?;
     let count = runs.len();
     Ok(Outcome::single_log(
         runs,
@@ -96,10 +77,10 @@ pub async fn flows_list_all_runs(
     ))
 }
 
-/// Prune terminal run history while retaining the module's standard cap and
-/// every live or approval-parked run.
+/// Prune terminal run history at the host-selected retention cap; the module
+/// protects every live or approval-parked run.
 pub async fn flows_prune_runs(config: &Config, flow_id: &str) -> Result<Outcome<Value>, String> {
-    let keep = tinyflows_catalog::store::MAX_FLOW_RUNS_PER_FLOW;
+    let keep = FLOW_RUN_HISTORY_LIMIT;
     let ctx = crate::core::runtime::DispatchCtx::ambient();
     let storage = crate::flows::catalog_storage::register(&ctx, config)
         .await?

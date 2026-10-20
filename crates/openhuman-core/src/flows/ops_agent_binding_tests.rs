@@ -45,29 +45,13 @@ async fn inference_gate_reports_signed_out_for_dynamic_agent_ref_only_graph() {
 
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let g = WorkflowGraph {
-        nodes: vec![
-            tinyflows::model::Node {
-                id: "t".to_string(),
-                kind: NodeKind::Trigger,
-                type_version: 1,
-                name: "Manual".to_string(),
-                config: json!({ "trigger_kind": "manual" }),
-                ports: Vec::new(),
-                position: None,
-            },
-            tinyflows::model::Node {
-                id: "a".to_string(),
-                kind: NodeKind::Agent,
-                type_version: 1,
-                name: "Dynamic".to_string(),
-                config: json!({ "agent_ref": "=nodes.t.item.agent_choice", "prompt": "go" }),
-                ports: Vec::new(),
-                position: None,
-            },
+    let g = json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual", "config": { "trigger_kind": "manual" } },
+            { "id": "a", "kind": "agent", "name": "Dynamic", "config": { "agent_ref": "=nodes.t.item.agent_choice", "prompt": "go" } }
         ],
-        ..Default::default()
-    };
+        "edges": []
+    });
 
     let errors =
         validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g)
