@@ -16,8 +16,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use axum::extract::State;
 use axum::body::Bytes;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -43,7 +43,7 @@ struct MockState {
     sent_messages: Mutex<Vec<Value>>,
     transcription_uploads: Mutex<Vec<usize>>,
     speech_requests: Mutex<Vec<String>>,
-    sent_voice_uploads: Mutex<Vec<usize>>,
+    sent_voice_uploads: Mutex<Vec<Vec<u8>>>,
 }
 
 struct MockServers {
@@ -67,7 +67,10 @@ async fn start_mock_servers() -> MockServers {
         .route("/botsession-restart-token/deleteWebhook", post(ok))
         .route("/botsession-restart-token/getMe", get(get_me))
         .route("/botsession-restart-token/getFile", post(get_voice_file))
-        .route("/file/botsession-restart-token/voice/input.oga", get(download_voice_file))
+        .route(
+            "/file/botsession-restart-token/voice/input.oga",
+            get(download_voice_file),
+        )
         .route("/botsession-restart-token/sendVoice", post(send_voice))
         .with_state(Arc::clone(&state));
     let inference_app = Router::new()
@@ -158,22 +161,40 @@ async fn get_voice_file() -> Json<Value> {
 }
 
 async fn download_voice_file() -> impl IntoResponse {
-    ([(axum::http::header::CONTENT_TYPE, "audio/ogg")], include_bytes!("../vendor/tinychannels/src/providers/telegram/fixtures/sine-ogg-opus.ogg").as_slice())
+    (
+        [(axum::http::header::CONTENT_TYPE, "audio/ogg")],
+        include_bytes!("../vendor/tinychannels/src/providers/telegram/fixtures/sine-ogg-opus.ogg")
+            .as_slice(),
+    )
 }
 
 async fn send_voice(State(state): State<Arc<MockState>>, body: Bytes) -> Json<Value> {
-    state.sent_voice_uploads.lock().expect("voice uploads").push(body.len());
+    state
+        .sent_voice_uploads
+        .lock()
+        .expect("voice uploads")
+        .push(body.to_vec());
     Json(json!({ "ok": true, "result": { "message_id": 700, "chat": { "id": 42 } } }))
 }
 
 async fn transcribe_voice(State(state): State<Arc<MockState>>, body: Bytes) -> Json<Value> {
-    state.transcription_uploads.lock().expect("STT uploads").push(body.len());
+    state
+        .transcription_uploads
+        .lock()
+        .expect("STT uploads")
+        .push(body.len());
     Json(json!({ "text": "the dictated voice request" }))
 }
 
-async fn synthesize_voice(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
+async fn synthesize_voice(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
     state.speech_requests.lock().expect("TTS requests").push(
-        body.get("text").and_then(Value::as_str).unwrap_or_default().to_owned(),
+        body.get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
     );
     let audio = base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
@@ -717,35 +738,103 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
         .map(std::path::PathBuf::from)
         .expect("build TinyChannels and TinyVoice and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
     for module in ["tinychannels", "tinyvoice"] {
-        assert!(module_source_dir.join(module).join("modules.toml").is_file(),
-            "compiled {module} descriptor missing from {}", module_source_dir.display());
+        assert!(
+            module_source_dir
+                .join(module)
+                .join("modules.toml")
+                .is_file(),
+            "compiled {module} descriptor missing from {}",
+            module_source_dir.display()
+        );
     }
 
     let mocks = start_mock_servers().await;
     write_config(&home, &workspace, &mocks.inference);
     let (mut core, rpc) = start_core(
-        &home, &workspace, &mocks.telegram, &mocks.inference,
-        &module_source_dir, &logs.join("voice.log"),
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &module_source_dir,
+        &logs.join("voice.log"),
         true,
     );
     wait_healthy(&rpc, &mut core, &logs.join("voice.log")).await;
-    mocks.state.updates.lock().expect("Telegram updates")
+    mocks
+        .state
+        .updates
+        .lock()
+        .expect("Telegram updates")
         .push_back(voice_update(200, 20));
 
     wait_until("voice note reaches inference and sendVoice", || {
-        !mocks.state.completions.lock().expect("model requests").is_empty()
-            && !mocks.state.sent_voice_uploads.lock().expect("voice uploads").is_empty()
-    }).await;
+        !mocks
+            .state
+            .completions
+            .lock()
+            .expect("model requests")
+            .is_empty()
+            && !mocks
+                .state
+                .sent_voice_uploads
+                .lock()
+                .expect("voice uploads")
+                .is_empty()
+    })
+    .await;
 
-    let requests = mocks.state.completions.lock().expect("model requests").clone();
-    assert_eq!(requests.len(), 1, "one inbound voice update produces one agent turn");
-    assert!(model_saw_user_text(&requests[0], "the dictated voice request"),
-        "the model receives the transcript produced by the scoped cloud STT callback");
-    assert_eq!(mocks.state.transcription_uploads.lock().expect("STT uploads").len(), 1,
-        "Telegram voice media is downloaded and transcribed once");
-    assert!(!mocks.state.transcription_uploads.lock().expect("STT uploads")[0].eq(&0));
-    assert_eq!(mocks.state.speech_requests.lock().expect("TTS requests").as_slice(), &["mock reply 1"]);
-    assert!(mocks.state.sent_voice_uploads.lock().expect("voice uploads")[0] > 0,
-        "mirror mode uploads synthesized audio through Telegram sendVoice");
+    let requests = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .clone();
+    assert_eq!(
+        requests.len(),
+        1,
+        "one inbound voice update produces one agent turn"
+    );
+    assert!(
+        model_saw_user_text(&requests[0], "the dictated voice request"),
+        "the model receives the transcript produced by the scoped cloud STT callback"
+    );
+    assert_eq!(
+        mocks
+            .state
+            .transcription_uploads
+            .lock()
+            .expect("STT uploads")
+            .len(),
+        1,
+        "Telegram voice media is downloaded and transcribed once"
+    );
+    assert!(
+        mocks
+            .state
+            .transcription_uploads
+            .lock()
+            .expect("STT uploads")[0]
+            > 0,
+        "the cloud STT mock receives the downloaded audio multipart payload"
+    );
+    assert_eq!(
+        mocks
+            .state
+            .speech_requests
+            .lock()
+            .expect("TTS requests")
+            .as_slice(),
+        &["mock reply 1"]
+    );
+    assert!(
+        mocks
+            .state
+            .sent_voice_uploads
+            .lock()
+            .expect("voice uploads")[0]
+            .windows(4)
+            .any(|window| window == b"OggS"),
+        "mirror mode uploads encoded Ogg audio through Telegram sendVoice"
+    );
     core.stop();
 }

@@ -12,10 +12,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Instant;
 use tinychannels_bus::{
-    ChannelInboundEnvelope, ChannelRef, ContentPart, ConversationRef,
-    HostSpeechSynthesisRequest, HostSpeechSynthesisResult, HostTranscriptionRequest,
-    HostTranscriptionResult, HostVoiceReplyMode, HostVoiceReplyPolicy, HostVoiceScope,
-    HostVoiceTranscriptionRequest,
+    ChannelInboundEnvelope, ChannelRef, ContentPart, ConversationRef, HostSpeechSynthesisRequest,
+    HostSpeechSynthesisResult, HostTranscriptionRequest, HostTranscriptionResult,
+    HostVoiceReplyMode, HostVoiceReplyPolicy, HostVoiceScope, HostVoiceTranscriptionRequest,
 };
 
 const LOG_PREFIX: &str = "[channels_voice]";

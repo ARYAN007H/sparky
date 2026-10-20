@@ -83,7 +83,10 @@ fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
         &scope("telegram:bob", "shared-conversation", "shared-turn"),
         &tenant,
     );
-    assert!(alice.inbound_has_voice, "Alice's voice turn was overwritten by Bob's text turn");
+    assert!(
+        alice.inbound_has_voice,
+        "Alice's voice turn was overwritten by Bob's text turn"
+    );
     assert!(!bob.inbound_has_voice);
 }
 
@@ -138,18 +141,22 @@ fn same_channel_account_and_turn_ids_do_not_cross_voice_facts_between_tenants() 
     record_inbound_envelope(&envelope_voice, &alice);
     record_inbound_envelope(&envelope_text, &bob);
 
-    assert!(resolve_policy(
-        &ChannelVoiceConfig::default(),
-        &scope("telegram", "same-conversation", "same-turn"),
-        &alice,
-    )
-    .inbound_has_voice);
-    assert!(!resolve_policy(
-        &ChannelVoiceConfig::default(),
-        &scope("telegram", "same-conversation", "same-turn"),
-        &bob,
-    )
-    .inbound_has_voice);
+    assert!(
+        resolve_policy(
+            &ChannelVoiceConfig::default(),
+            &scope("telegram", "same-conversation", "same-turn"),
+            &alice,
+        )
+        .inbound_has_voice
+    );
+    assert!(
+        !resolve_policy(
+            &ChannelVoiceConfig::default(),
+            &scope("telegram", "same-conversation", "same-turn"),
+            &bob,
+        )
+        .inbound_has_voice
+    );
 }
 
 #[test]
@@ -174,16 +181,31 @@ fn policy_mode_follows_thread_then_channel_overrides() {
         },
     );
     assert_eq!(
-        resolve_policy(&cfg, &scope("telegram", "c", "t"), &crate::core::runtime::Tenant::default()).mode,
+        resolve_policy(
+            &cfg,
+            &scope("telegram", "c", "t"),
+            &crate::core::runtime::Tenant::default()
+        )
+        .mode,
         HostVoiceReplyMode::Always
     );
     cfg.threads.insert("c".into(), VoiceReplyMode::Never);
     assert_eq!(
-        resolve_policy(&cfg, &scope("telegram", "c", "t"), &crate::core::runtime::Tenant::default()).mode,
+        resolve_policy(
+            &cfg,
+            &scope("telegram", "c", "t"),
+            &crate::core::runtime::Tenant::default()
+        )
+        .mode,
         HostVoiceReplyMode::Never
     );
     assert_eq!(
-        resolve_policy(&cfg, &scope("slack", "other", "t"), &crate::core::runtime::Tenant::default()).mode,
+        resolve_policy(
+            &cfg,
+            &scope("slack", "other", "t"),
+            &crate::core::runtime::Tenant::default()
+        )
+        .mode,
         HostVoiceReplyMode::Mirror
     );
 }
@@ -197,7 +219,12 @@ fn registry_is_bounded() {
             ..ConversationRef::default()
         };
         record_turn(
-            turn_key(&tenant, &ChannelRef::default(), &conversation, &index.to_string()),
+            turn_key(
+                &tenant,
+                &ChannelRef::default(),
+                &conversation,
+                &index.to_string(),
+            ),
             VoiceTurnFacts::default(),
         );
     }
