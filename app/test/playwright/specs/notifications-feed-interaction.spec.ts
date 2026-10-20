@@ -157,11 +157,15 @@ async function openFeedWith(page: Page, items: SeedItem[]): Promise<void> {
     { key: `${user}:persist:notifications`, marker: 'pw:notif-seed-applied', payload: items }
   );
 
-  // A fresh document: the init script above runs first, so the store rehydrates
-  // with the seed instead of the empty blob the previous boot left behind.
-  await page.goto('/#/notifications');
+  // A same-origin hash navigation does not create a new document, so it would
+  // not run the init script above. Reload explicitly to let Redux rehydrate
+  // the seeded blob before the app mounts.
+  await page.reload();
   await waitForAppReady(page);
   await dismissWalkthroughIfPresent(page);
+  // Notifications now opens on its Welcome view. Enter the real feed through
+  // its user-facing action before asserting the persisted system-event rows.
+  await page.getByTestId('notifications-welcome-cta-view').click();
   await expect(page.getByTestId('system-events-section')).toBeVisible({ timeout: 20_000 });
 }
 
@@ -251,7 +255,7 @@ test.describe('Notifications — read state', () => {
       item('n-system-1', 'system', 'Core restarted'),
     ]);
 
-    const markAll = page.getByRole('button', { name: /mark all read/i });
+    const markAll = page.getByRole('button', { name: /mark all as read/i });
     await expect(markAll).toBeEnabled({ timeout: 20_000 });
 
     await markAll.click();
@@ -264,7 +268,7 @@ test.describe('Notifications — read state', () => {
     await openFeedWith(page, [item('n-agents-1', 'agents', 'Agent finished a task', true)]);
 
     await expect(rows(page)).toHaveCount(1, { timeout: 20_000 });
-    await expect(page.getByRole('button', { name: /mark all read/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /mark all as read/i })).toBeDisabled();
   });
 
   test('read state survives a reload', async ({ page }) => {
@@ -272,8 +276,8 @@ test.describe('Notifications — read state', () => {
     // not, the feed re-accuses the user of everything they just dismissed.
     await openFeedWith(page, [item('n-agents-1', 'agents', 'Agent finished a task')]);
 
-    await page.getByRole('button', { name: /mark all read/i }).click();
-    await expect(page.getByRole('button', { name: /mark all read/i })).toBeDisabled({
+    await page.getByRole('button', { name: /mark all as read/i }).click();
+    await expect(page.getByRole('button', { name: /mark all as read/i })).toBeDisabled({
       timeout: 10_000,
     });
 
@@ -306,7 +310,7 @@ test.describe('Notifications — read state', () => {
     await waitForAppReady(page);
     await dismissWalkthroughIfPresent(page);
 
-    await expect(page.getByRole('button', { name: /mark all read/i })).toBeDisabled({
+    await expect(page.getByRole('button', { name: /mark all as read/i })).toBeDisabled({
       timeout: 20_000,
     });
   });

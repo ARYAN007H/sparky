@@ -177,15 +177,15 @@ runs on a pull request to `main`.
 on every push to it. Its final gate requires the Playwright matrix, native
 desktop suite and Rust E2E:
 
-| Lane              | Job                                   | Platform                                                                   |
-| ----------------- | ------------------------------------- | -------------------------------------------------------------------------- |
-| Rust mock backend | `rust-e2e`                            | Linux                                                                      |
-| Playwright web    | `playwright-e2e`                      | Four Linux jobs, 16 ordinary shards per job plus round-robin special cases |
-| Desktop           | `e2e-desktop`, via `e2e-reusable.yml` | Four Linux suite groups                                                    |
+| Lane              | Job                                   | Platform                                                                            |
+| ----------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Rust mock backend | `rust-e2e`                            | Linux                                                                               |
+| Playwright web    | `playwright-e2e`                      | Four required Linux jobs, 16 ordinary shards per job plus round-robin special cases |
+| Desktop           | `e2e-desktop`, via `e2e-reusable.yml` | Four Linux suite groups                                                             |
 
-Playwright builds its web bundle and standalone core once, then uploads the same artifact to all four lanes. Each of the 64 ordinary Playwright shards starts its own core and workspace. The nine isolated cases (Connections aliases, Connections deep links, and seven Skills search/install cases) also each start their own core and workspace. Every lane is required; the scheduler continues through assigned units to collect failures and exits nonzero if any unit fails. The final gate checks the Playwright matrix result. Manual Playwright uses the same artifact and scheduler.
+Playwright builds its web bundle and standalone core once, then uploads the same artifact to all four required lanes. The required selection runs 109 of the 110 discovered specs: all 48 active browser owners from the consolidation inventory and their assertion recipients remain required, as do every other healthy browser spec. It schedules 64 ordinary shards and nine isolated cases (Connections aliases, Connections deep links, and seven Skills search/install cases), each with its own core and workspace: 73 required units total. A separate `playwright-legacy-diagnostic` job runs the unchanged `aui-tool-result-elements.spec.ts` as one file-atomic unit. Its component compatibility blocker is tracked in [issue #236](https://github.com/senamakel/openhuman/issues/236#issuecomment-6284472501). Only this diagnostic job is advisory; it is excluded from the final gate, while all four required lanes remain strict. The scheduler continues through assigned units to collect failures and exits nonzero if any required unit fails. CI Full therefore runs 74 fresh Playwright units across the required and diagnostic jobs, without claiming the legacy diagnostic passed. Manual Playwright selects all 110 specs strictly, using the same 64 shards and nine isolated cases (73 units); it has no advisory selection.
 
-The desktop lane calls the reusable workflow with `run_linux: true`, `run_macos: false` and `run_windows: false`, so only the Linux harness runs. Linux uses four fresh WDIO sessions: `foundation` (`auth,navigation,system`), `chat` (`chat,skills,journeys`), `connections` (`providers,provider-web,connectors`), and `settings` (`settings,notifications`). Payments and webhooks have no native flows after their browser owners moved to Playwright, so they are absent from the native shard assignments. The native runner contains host-owned flows and the five mixed cases listed below; browser-rendered duplicates live in Playwright. The reusable workflow applies the same group definitions to its macOS and Windows full-suite jobs, but those jobs are currently disabled.
+The desktop lane calls the reusable workflow with `run_linux: true`, `run_macos: false` and `run_windows: false`, so only the Linux harness runs. Linux uses four fresh WDIO sessions: `foundation` (`auth,navigation,system`), `chat` (`chat,skills,journeys`), `connections` (`providers,provider-web,connectors`), and `settings` (`settings,notifications`). Payments and webhooks have no native flows after their browser owners moved to Playwright, so they are absent from the native shard assignments. The consolidation reviewed 51 same-basename native/Playwright pairs; it retained only five narrowly split mixed cases and retired one obsolete offline-banner pair. The native suite also retains 24 preexisting native-only files outside that duplicate inventory, plus `tauri-commands.spec.ts`, whose browser bootstrap checks moved to the Playwright smoke owner while its native IPC checks remain. The 24 native-only files were not assessed for whether they require the desktop host. The reusable workflow applies the same group definitions to its macOS and Windows full-suite jobs, but those jobs are currently disabled.
 
 macOS and Windows desktop E2E therefore have no scheduled coverage on any branch. `.github/workflows/e2e.yml` is a manual dispatch whose `run_macos` and `run_windows` inputs also default to `false`. The older Chromium-based driver depended on CEF/CDP and is unavailable under Wry; do not describe those jobs as active coverage.
 
@@ -218,10 +218,13 @@ cover distinct behavior, name and document both responsibilities explicitly;
 never keep a second full copy as extra confidence.
 
 The current inventory has 30 native spec files and 110 Playwright spec files,
-with only the five mixed files above shared by basename. The offline-banner E2Es
-were retired because their only UI consumer was removed before this baseline;
-focused connectivity-selector and listener unit tests retain the device/backend
-distinction, and no E2E banner coverage is claimed.
+with only the five mixed files above shared by basename. The 24 preexisting
+native-only files were outside the duplicate inventory and were not assessed
+for whether they need a desktop host; `tauri-commands.spec.ts` retains the
+native IPC checks described above.
+The offline-banner E2Es were retired because their only UI consumer was removed
+before this baseline; focused connectivity-selector and listener unit tests
+retain the device/backend distinction, and no E2E banner coverage is claimed.
 
 ---
 
@@ -297,7 +300,13 @@ For a canonical, inspectable run that drops screenshots, page-source dumps, and 
 bash app/scripts/e2e-agent-review.sh
 ```
 
-Artifacts land in `app/test/e2e/artifacts/<timestamp>-agent-review/`. Full details and the helper API: [`agent-observability.md`](agent-observability.md). Any failing test triggers `wdio.conf.ts`'s `afterTest` hook, which writes `failure-*.png` and `failure-*.source.xml` into the same run dir.
+Artifacts land in `app/test/e2e/artifacts/<timestamp>-agent-review/` by default;
+set `E2E_ARTIFACT_DIR` to override the path. The script passes that directory
+to Playwright as its output path, where the test result and attachments are
+saved. The review case attaches checkpoint screenshots, page HTML, and a
+redacted mock request log with `testInfo.attach`.
+Playwright also retains its configured trace, screenshot, and video artifacts
+on failure. Full details and the helper API: [`agent-observability.md`](agent-observability.md).
 
 ---
 
