@@ -81,7 +81,7 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
         tokio::fs::read(config.action_dir.join(&files[0].path))
             .await
             .unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
     assert!(first.extra_metadata.get("attachmentDataUris").is_none());
     assert!(first.extra_metadata.get("attachmentData").is_none());
@@ -383,7 +383,12 @@ async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
     let mut req = request("typed", "look", "user");
     req.attachments = vec![ContentPart::Image {
         media: MediaReference {
-            url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+            url: Some(format!(
+                    "data:image/png;base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                        "../../../../../tests/fixtures/images/handoff-hero.png"
+                    ))
+                )),
             ..Default::default()
         },
         caption: None,
@@ -431,7 +436,7 @@ async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
     let path = entries[0]["path"].as_str().unwrap();
     assert_eq!(
         tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
 }
 
@@ -463,7 +468,12 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     let mut req = request("metadata-image", "look", "user");
     req.attachments = vec![ContentPart::Image {
         media: MediaReference {
-            url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+            url: Some(format!(
+                    "data:image/png;base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                        "../../../../../tests/fixtures/images/handoff-hero.png"
+                    ))
+                )),
             ..Default::default()
         },
         caption: None,
@@ -536,7 +546,7 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     };
     assert_eq!(
         tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
 }
 
@@ -555,7 +565,12 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
         "uploads",
         &[ContentPart::Image {
             media: MediaReference {
-                url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+                url: Some(format!(
+                    "data:image/png;base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                        "../../../../../tests/fixtures/images/handoff-hero.png"
+                    ))
+                )),
                 ..Default::default()
             },
             caption: None,
@@ -585,7 +600,7 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
     };
     assert_eq!(
         tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
-        b"\x89PNG\r\n\x1a\n"
+        include_bytes!("../../../../../tests/fixtures/images/handoff-hero.png")
     );
 
     let retry = persist_queued_user_message(&ctx, "uploads", "request-1", "", &staged)
