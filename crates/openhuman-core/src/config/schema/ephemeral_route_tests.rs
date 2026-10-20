@@ -185,7 +185,7 @@ fn the_route_cannot_be_serialized_into_a_config_file() {
 #[test]
 fn debug_never_discloses_route_bearer_or_header_values() {
     let route = EphemeralRoute {
-        endpoint: "https://route-user:route-password@fixture.example/v1?key=route-query-secret#route-fragment-secret".into(),
+        endpoint: "https://route-user:route-password@fixture.example/route-path-secret/v1?key=route-query-secret#route-fragment-secret".into(),
         api_key: "u2-unique-route-secret".into(),
         headers: vec![("x-private".into(), "u2-unique-header-secret".into())],
     };
@@ -194,6 +194,7 @@ fn debug_never_discloses_route_bearer_or_header_values() {
     assert!(!debug.contains("u2-unique-header-secret"));
     assert!(!debug.contains("route-user"));
     assert!(!debug.contains("route-password"));
+    assert!(!debug.contains("route-path-secret"));
     assert!(!debug.contains("route-query-secret"));
     assert!(!debug.contains("route-fragment-secret"));
 }
