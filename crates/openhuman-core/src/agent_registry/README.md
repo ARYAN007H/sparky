@@ -138,7 +138,7 @@ ranking works.
 - [`agent/session_host/builder/factory.rs`](../agent/session_host/builder/factory.rs):
   `Agent::from_config_for_agent` falls back to `find_custom_in_config` +
   `definition_from_registry_entry` when an id is not in the harness registry.
-- [`agent_runs/schemas.rs`](../agent_runs/schemas.rs): `agent.graph_topologies` and `agent.registry_snapshot`
+- [`agent_runs/schemas.rs`](../agent_runs/schemas.rs): `agent.registry_snapshot`
   enumerate `load_builtins()`.
 - `flows/` (`ops/inference_readiness.rs`, `ops/builder_gates.rs`,
   `builder_tools/kind_reads.rs`, `tinyflows/caps/agent.rs`): resolve a flow

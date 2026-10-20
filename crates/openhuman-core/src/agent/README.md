@@ -357,7 +357,7 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 
 | Namespace | Owner | Methods |
 | --- | --- | --- |
-| `agent` | `schemas.rs` | `chat`, `chat_simple`, `server_status`, `list_definitions`, `get_definition`, `reload_definitions`, `triage_evaluate`, `graph_topologies`, `registry_snapshot`, `context_breakdown` |
+| `agent` | `schemas.rs` | `chat`, `chat_simple`, `server_status`, `list_definitions`, `get_definition`, `reload_definitions`, `triage_evaluate`, `registry_snapshot`, `context_breakdown` |
 | `agent` | [`tinyagents/replay/`](./tinyagents/replay/) | `runs_active`, `run_status`, `run_events` (read-only journal replay) |
 | `agent` | [`../threads/run_mode.rs`](./../threads/run_mode.rs) | `set_run_mode`, `get_run_mode` |
 | `agent_registry` | `registry/` | `list`, `available_tools`, `get`, `upsert_custom`, `create_custom`, `update`, `set_enabled`, `remove` |

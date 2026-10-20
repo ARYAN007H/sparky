@@ -335,7 +335,7 @@ Note `action_dir/workspace/` is a scratch folder inside the agent's action root.
 
 Two halves enforce the convention:
 
-- Prompt. A sub-agent that actually holds `file_write` gets a Long-horizon Artifact Offload contract in its system prompt: results past roughly 2 000 tokens go to a file under `outputs/`, and the reply is that relative path plus a short abstract. The gate is deliberate, a prompt may only name tools the agent can really call, or the model emits calls that fail. Skill-filtered specialists get no contract text, and a dedicated guard asserts their prompts never mention a filesystem tool. They stay covered by the harness half below, which needs no cooperation from the model. The `planner` prompt spells out what the convention means for its own work; the planner is told to reference artifact paths across DAG nodes rather than pasting payloads forward.
+- Prompt. A sub-agent that actually holds `file_write` gets a Long-horizon Artifact Offload contract in its system prompt: results past roughly 2 000 tokens go to a file under `outputs/`, and the reply is that relative path plus a short abstract. The gate is deliberate, a prompt may only name tools the agent can really call, or the model emits calls that fail. Skill-filtered specialists get no contract text, and a dedicated guard asserts their prompts never mention a filesystem tool. They stay covered by the harness half below, which needs no cooperation from the model.
 - Harness. `offload_oversized_result` runs on every sub-agent outcome, so an oversized result is offloaded even when the worker inlined it anyway. It fires before the definition's `max_result_chars` cap, so the full body lands on disk instead of being cut.
 
 What the parent receives is a pointer, not a payload:
@@ -460,8 +460,8 @@ Each `AgentDefinition` carries an `agent_tier` field (`chat` / `reasoning` / `wo
 | Tier        | May spawn             | Must NOT spawn                  | Typical members                                                                 |
 | ----------- | --------------------- | ------------------------------- | ------------------------------------------------------------------------------- |
 | `chat`      | `reasoning`, `worker` | another `chat`                  | `orchestrator`                                                                  |
-| `reasoning` | `worker`              | another `reasoning`, any `chat` | `planner` (today the canonical one)                                             |
-| `worker`    | nothing[^1]           | anything                        | critic, image_agent, task_manager_agent, …               |
+| `reasoning` | `worker`              | another `reasoning`, any `chat` | reasoning-tier custom agents                                             |
+| `worker`    | nothing[^1]           | anything                        | image_agent, task_manager_agent, …               |
 
 [^1]: Skill-wildcard entries (`{ skills = "*" }`) are exempt because they name no agent: they expand to the connected Composio actions as `Deferred` tools the agent reaches through `tool_search`, not to a spawn.
 
