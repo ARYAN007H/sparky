@@ -954,7 +954,10 @@ fn start_capture_proxy(
             return;
         }
         let mut discarded = String::new();
-        while stdout.read_line(&mut discarded).is_ok_and(|count| count > 0) {
+        while stdout
+            .read_line(&mut discarded)
+            .is_ok_and(|count| count > 0)
+        {
             discarded.clear();
         }
     });
@@ -1227,7 +1230,9 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
         let after = capture_request_bodies(&capture_request_files(&request_dir));
         assert!(
             after.len() == batches[1].len() * 2
-                && after.chunks_exact(batches[1].len()).all(|batch| batch == batches[1])
+                && after
+                    .chunks_exact(batches[1].len())
+                    .all(|batch| batch == batches[1])
                 && before == after,
             "managed request bytes changed between before and after migration"
         );
