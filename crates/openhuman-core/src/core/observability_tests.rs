@@ -60,9 +60,7 @@ fn managed_body(status: &str, code: &str) -> String {
 fn register_backend_classifier_fixture(message: &str, classification: BackendErrorClassification) {
     static FIXTURES: OnceLock<Arc<Mutex<HashMap<String, BackendErrorClassification>>>> =
         OnceLock::new();
-    let fixtures = Arc::clone(FIXTURES.get_or_init(|| {
-        Arc::new(Mutex::new(HashMap::new()))
-    }));
+    let fixtures = Arc::clone(FIXTURES.get_or_init(|| Arc::new(Mutex::new(HashMap::new()))));
     let classifier_fixtures = Arc::clone(&fixtures);
     register_backend_error_classifier(Arc::new(move |_provider, error| {
         classifier_fixtures

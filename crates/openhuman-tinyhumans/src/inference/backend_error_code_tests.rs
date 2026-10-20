@@ -164,18 +164,15 @@ fn hosted_classifier_drives_core_observability_without_core_token_ownership() {
 
     let malformed =
         r#"OpenHuman API error (400): {"error":{"errorCode":"BAD_REQUEST","malformed":true}}"#;
-    assert_ne!(
-        expected_error_kind(malformed),
-        Some(ExpectedErrorKind::BackendErrorCodeOwned)
-    );
+    assert_eq!(expected_error_kind(malformed), None);
 
     for code in ["PAYLOAD_TOO_LARGE", "CONTEXT_LENGTH_EXCEEDED"] {
         let guard_leak = format!(
             "OpenHuman API error (413): {{\"error\":{{\"errorCode\":\"{code}\",\"message\":\"x\"}}}}"
         );
-        assert_ne!(
+        assert_eq!(
             expected_error_kind(&guard_leak),
-            Some(ExpectedErrorKind::BackendErrorCodeOwned),
+            None,
             "{code} must remain reportable as a client guard leak"
         );
     }
