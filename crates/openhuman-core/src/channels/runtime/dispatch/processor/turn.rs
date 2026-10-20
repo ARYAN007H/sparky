@@ -5,7 +5,7 @@
 use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
 #[cfg(test)]
 use crate::channels::routes::get_or_create_turn_model_source;
-use crate::channels::routes::{get_route_selection, handle_runtime_command_if_needed};
+use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
 use crate::channels::{ChannelSendExt, SendMessage};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
@@ -123,8 +123,28 @@ pub(crate) async fn process_channel_runtime_message(
     });
 
     let target_channel = ctx.channels_by_name.get(&msg.channel).cloned();
-    if handle_runtime_command_if_needed(ctx.as_ref(), &msg, target_channel.as_ref(), &history_key)
-        .await
+    let reset_context = Arc::clone(&ctx);
+    let reset_message = msg.clone();
+    let reset_session_key = session_key.clone();
+    let reset_history_key = history_key.clone();
+    if handle_runtime_command_with_reset(
+        ctx.as_ref(),
+        &msg,
+        target_channel.as_ref(),
+        &history_key,
+        || async move {
+            reset_durable_channel_session(
+                &reset_context,
+                &reset_message,
+                &reset_session_key,
+                &reset_history_key,
+            )
+            .await
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+        },
+    )
+    .await
     {
         return;
     }
@@ -728,4 +748,40 @@ pub(crate) async fn process_channel_runtime_message(
         success,
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
+}
+
+async fn reset_durable_channel_session(
+    ctx: &ChannelRuntimeContext,
+    msg: &traits::ChannelMessage,
+    session_key: &str,
+    history_key: &str,
+) -> anyhow::Result<bool> {
+    let host = match host_agent::route(ctx, &msg.channel) {
+        HostRoute::Agent(host) => *host,
+        HostRoute::Missing(agent_id) => {
+            anyhow::bail!("configured channel agent {agent_id} is unavailable")
+        }
+        HostRoute::Unbound => {
+            host_agent::configured_agent(ctx, &get_route_selection(ctx, history_key))
+                .await
+                .map_err(anyhow::Error::msg)?
+        }
+    };
+    let dispatch = ctx.dispatch_ctx();
+    let tenant = dispatch.tenant().map_err(anyhow::Error::msg)?;
+    let lease = crate::agent::session_lease::SessionLease::acquire(
+        crate::agent::session_lease::SessionLeaseKey::new(
+            crate::core::runtime::tenant::tenant_key(&tenant, ""),
+            host.definition.id.clone(),
+            session_key.to_owned(),
+        ),
+        None,
+    )
+    .await
+    .map_err(|()| anyhow::anyhow!("channel session reset was cancelled"))?;
+    let reset = host
+        .reset_external_channel_history(session_key, history_key, &msg.channel)
+        .await;
+    drop(lease);
+    reset
 }
