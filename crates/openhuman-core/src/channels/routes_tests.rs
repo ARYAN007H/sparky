@@ -349,10 +349,6 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 async fn clear_history_command_uses_reset_callback_and_persists_route_override() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let key = "telegram_alice_room";
-    ctx.conversation_histories
-        .lock()
-        .unwrap()
-        .insert(key.to_string(), vec![ChatMessage::user("old history")]);
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let msg = ChannelMessage {
@@ -387,7 +383,6 @@ async fn clear_history_command_uses_reset_callback_and_persists_route_override()
     assert!(handled);
     assert!(reset_called.load(std::sync::atomic::Ordering::SeqCst));
 
-    assert!(ctx.conversation_histories.lock().unwrap().contains_key(key));
     assert_eq!(
         get_route_selection(&ctx, key),
         ChannelRouteSelection {
@@ -542,11 +537,6 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let sender_key = "telegram_alice_chat-remote";
 
-    ctx.conversation_histories.lock().unwrap().insert(
-        sender_key.to_string(),
-        vec![ChatMessage::user("old history")],
-    );
-
     let new_msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -568,17 +558,6 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         )
         .await
     );
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(sender_key)
-        .is_none());
-
-    ctx.conversation_histories
-        .lock()
-        .unwrap()
-        .insert(sender_key.to_string(), vec![ChatMessage::user("after new")]);
     set_route_selection(
         &ctx,
         sender_key,
@@ -674,11 +653,6 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let sender_key = "telegram_alice_chat-remote";
-
-    ctx.conversation_histories.lock().unwrap().insert(
-        sender_key.to_string(),
-        vec![ChatMessage::user("old history")],
-    );
 
     let msg = ChannelMessage {
         reply_to_id: None,
