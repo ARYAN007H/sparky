@@ -90,11 +90,11 @@ pub async fn edit_message(
 ) -> Result<Outcome<Value>, ThreadsError> {
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
-    // Typed attachments become upload markers before anything is cancelled or
-    // truncated, so a bad attachment fails the edit without side effects.
-    let content =
-        crate::agent::attachments::parts::fold_into_message(&request.content, &request.attachments)
-            .map_err(|e| ThreadsError::Message(e.to_string()))?;
+    // Validate typed uploads before cancellation or truncation. The folded
+    // marker form is deliberately discarded: modern edits persist opaque refs
+    // on the replacement row and give those refs to the trusted runner.
+    crate::agent::attachments::parts::fold_into_message(&request.content, &request.attachments)
+        .map_err(|e| ThreadsError::Message(e.to_string()))?;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
     // The request's own tenant picks the store key, so a SaaS profile edits
     // the transcript its turns were written to.
@@ -132,19 +132,74 @@ pub async fn edit_message(
 
     crate::web_chat::invalidate_thread_sessions(ctx, &thread_id).await;
 
-    let new_request_id = crate::web_chat::start_chat(
-        ctx,
-        &client_id,
-        &thread_id,
-        &content,
-        None,
-        None,
-        None,
-        None,
-        crate::web_chat::ChatRequestMetadata::default(),
-    )
-    .await
-    .map_err(|e| ThreadsError::Message(e.to_string()))?;
+    let new_request_id = if request.attachments.is_empty() {
+        crate::web_chat::start_chat(
+            ctx,
+            &client_id,
+            &thread_id,
+            &request.content,
+            None,
+            None,
+            None,
+            None,
+            crate::web_chat::ChatRequestMetadata::default(),
+        )
+        .await
+        .map_err(|e| ThreadsError::Message(e.to_string()))?
+    } else {
+        if request.content.trim().is_empty() {
+            return Err(ThreadsError::Message(
+                "edited attachment messages require text".into(),
+            ));
+        }
+        let appended = super::message_append(
+            ctx,
+            crate::threads::AppendConversationMessageRequest {
+                thread_id: thread_id.clone(),
+                message: crate::threads::ConversationMessageRecord {
+                    id: request.message_id.clone(),
+                    content: request.content.clone(),
+                    attachments: Vec::new(),
+                    message_type: "text".into(),
+                    extra_metadata: json!({}),
+                    sender: "user".into(),
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                },
+                attachments: request.attachments,
+            },
+        )
+        .await
+        .map_err(|error| ThreadsError::Message(error.to_string()))?;
+        let row = appended
+            .value
+            .data
+            .ok_or_else(|| ThreadsError::Message("edited message append returned no row".into()))?;
+        let started = crate::web_chat::channel_web_chat_with_stored_attachments(
+            ctx,
+            &client_id,
+            &thread_id,
+            &request.content,
+            None,
+            None,
+            None,
+            None,
+            None,
+            crate::web_chat::ChatRequestMetadata::default(),
+            None,
+            Some(crate::agent::queued_turn::StoredAttachmentInput {
+                persisted_message_id: row.id,
+                parts: row.attachments,
+            }),
+        )
+        .await
+        .map_err(ThreadsError::Message)?;
+        started
+            .value
+            .get("request_id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .ok_or_else(|| ThreadsError::Message("edited chat returned no request ID".into()))?
+    };
 
     Ok(Outcome::single_log(
         json!(EditOrRegenerateResponse {
