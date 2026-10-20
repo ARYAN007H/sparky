@@ -398,16 +398,16 @@ The thread JSONL store moved to `tinyagents_session::threads` (`vendor/tinyagent
 
 | ID    | Feature       | Layer | Test path(s)             | Status | Notes |
 | ----- | ------------- | ----- | ------------------------ | ------ | ----- |
-| 9.1.1 | Task Creation | WD    | `cron-jobs-flow.spec.ts` | ✅     |       |
-| 9.1.2 | Task Update   | WD    | `cron-jobs-flow.spec.ts` | ✅     |       |
-| 9.1.3 | Task Deletion | WD    | `cron-jobs-flow.spec.ts` | ✅     |       |
+| 9.1.1 | Task Creation | PW    | `app/test/playwright/specs/cron-jobs-flow.spec.ts` | ✅     | Verifies an actual cron row and persisted state. |
+| 9.1.2 | Task Update   | PW    | `app/test/playwright/specs/cron-jobs-flow.spec.ts` | ✅     | Pause and resume persist across refresh. |
+| 9.1.3 | Task Deletion | PW    | `app/test/playwright/specs/cron-jobs-flow.spec.ts` | ✅     | Remove action clears the row and RPC state. |
 
 ### 9.2 Cron Jobs
 
 | ID    | Feature                    | Layer | Test path(s)             | Status | Notes |
 | ----- | -------------------------- | ----- | ------------------------ | ------ | ----- |
 | 9.2.1 | Cron Expression Validation | RU    | `crates/openhuman-core/src/cron/`    | ✅     | Incl. the 5-minute agent-job floor (`validate_agent_schedule`, #6158) |
-| 9.2.2 | Recurring Execution        | WD+RI | `cron-jobs-flow.spec.ts` | ✅     |       |
+| 9.2.2 | Recurring Execution        | PW+RI | `app/test/playwright/specs/cron-jobs-flow.spec.ts` | ✅     | Covers cron state and runner wiring, not wall-clock scheduler execution. |
 | 9.2.3 | Agent Job Transcript Isolation | RU | `crates/openhuman-core/src/cron/scheduler_transcript_isolation_tests.rs`, `agent/session_host/runtime_adapter_tests.rs` | ✅ | Cron orchestration suppresses transcript autoload; the session host consumes that override as `ResumeMode::Never` before dispatch. |
 
 ### 9.3 Remote Execution
@@ -415,7 +415,7 @@ The thread JSONL store moved to `tinyagents_session::threads` (`vendor/tinyagent
 | ID    | Feature                 | Layer | Test path(s)             | Status | Notes                    |
 | ----- | ----------------------- | ----- | ------------------------ | ------ | ------------------------ |
 | 9.3.1 | Remote Agent Scheduling | RI    | `tests/in_process/domain_modules_e2e.rs::cron_update_applies_a_partial_patch_without_clobbering_unset_fields` (CRUD); manual execution + history (`cron_run`/`cron_runs`) in `tests/raw_coverage/automation_scheduling_e2e.rs::cron_run_records_history_and_remove_is_not_idempotent` (live again: restored from the #6382 quarantine) | 🟡     | **Evidence corrected 2026-09-24; updated when the file was restored.** This row cited `tests/json_rpc_e2e.rs`, which contains **zero** occurrences of `cron` (verified with a positive control: 425 `openhuman.` matches in the same file). So "Coverage thin" was assessed against a file with no scheduling coverage at all. What is live is CRUD plus a manual `cron_run` with its history; nothing live asserts a scheduled agent job actually RUNS on its schedule (the scheduler tick), which is why this stays 🟡. |
-| 9.3.2 | Execution Trigger       | WD    | `cron-jobs-flow.spec.ts` | ✅     |                          |
+| 9.3.2 | Execution Trigger       | PW    | `app/test/playwright/specs/cron-jobs-flow.spec.ts` | ✅     |                          |
 | 9.3.3 | Retry Handling          | RU    | `crates/openhuman-core/src/cron/`    | 🟡     | Backoff branches partial |
 
 ### 9.4 Workflow Run History

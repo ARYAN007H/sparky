@@ -18,7 +18,6 @@ run() {
 run "test/e2e/specs/card-payment-flow.spec.ts"              "card-payment"
 run "test/e2e/specs/crypto-payment-flow.spec.ts"            "crypto-payment"
 run "test/e2e/specs/skill-execution-flow.spec.ts"           "skill-execution"
-run "test/e2e/specs/cron-jobs-flow.spec.ts"                 "cron-jobs"
 run "test/e2e/specs/notifications.spec.ts"                  "notifications"
 run "test/e2e/specs/settings-channels-permissions.spec.ts"  "settings-channels"
 run "test/e2e/specs/settings-data-management.spec.ts"       "settings-data"
