@@ -1,5 +1,77 @@
 use super::*;
 
+#[tokio::test]
+async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    fn entry(name: &'static str, probed: Arc<AtomicBool>) -> ChatModelEntry {
+        ChatModelEntry {
+            build: Arc::new(move |_| {
+                Ok((
+                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![])),
+                    name.to_string(),
+                ))
+            }),
+            probe: Some(Arc::new(move |_, model, _| {
+                let actual = probed.clone();
+                Box::pin(async move {
+                    assert_eq!(model, name);
+                    actual.store(true, Ordering::SeqCst);
+                    Ok(())
+                })
+            })),
+            models: Some(ProviderModelHooks {
+                default_model: Arc::new(move || Some(name.to_string())),
+                role_for_model: Arc::new(|_| None),
+                is_alias: Arc::new(|_| false),
+                is_raw_model: Arc::new(|model| !model.trim().is_empty()),
+                supports_vision: Arc::new(|_| false),
+                resolve_model: Arc::new(move |_, _, _| Some(name.to_string())),
+                context_window: Arc::new(|_| None),
+                default_pricing: Arc::new(|| None),
+                without_reasoning: Arc::new(|request| request),
+            }),
+        }
+    }
+
+    let provider = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let a_probed = Arc::new(AtomicBool::new(false));
+    let b_probed = Arc::new(AtomicBool::new(false));
+    let a_extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &a_extensions,
+        provider,
+        entry("context-a-one-shot", Arc::clone(&a_probed)),
+    );
+    let context_a = CoreContext::for_test_with_extensions(DomainSet::full(), None, a_extensions);
+    let b_extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &b_extensions,
+        provider,
+        entry("context-b-one-shot", Arc::clone(&b_probed)),
+    );
+    let context_b = CoreContext::for_test_with_extensions(DomainSet::full(), None, b_extensions);
+    let dispatch = DispatchCtx::new(context_a);
+    let config = Config::default();
+
+    CoreContext::scope(context_b, async {
+        let (_, model) = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
+            .expect("explicit model entry builds");
+        assert_eq!(model, "context-a-one-shot");
+        probe_inference_readiness(&dispatch, "chat", &config)
+            .await
+            .expect("explicit model entry is ready");
+    })
+    .await;
+    assert!(a_probed.load(Ordering::SeqCst));
+    assert!(!b_probed.load(Ordering::SeqCst));
+}
+
 /// A flow's LLM capability builds its model under the context it was handed,
 /// not the calling task's: the host override of the explicit context wins over
 /// an installed ambient model, and two contexts never see each other's model.
