@@ -70,3 +70,7 @@ pub fn resolve_provider_model_hint(provider_id: &str, hint: &str, config: &Confi
     }
     route.to_string()
 }
+
+#[cfg(test)]
+#[path = "provider_model_tests.rs"]
+mod tests;
