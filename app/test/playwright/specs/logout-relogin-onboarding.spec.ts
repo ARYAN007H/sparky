@@ -56,7 +56,12 @@ async function expectLandedInChat(page: Page): Promise<void> {
 async function logoutViaSettings(page: Page): Promise<void> {
   await page.goto('/#/settings/account');
   await waitForAppReady(page);
-  await page.getByTestId('settings-nav-logout').click();
+  await expect
+    .poll(async () => page.evaluate(() => window.location.hash))
+    .toMatch(/^#\/settings\/account(?:\?|$)/);
+  const logout = page.getByTestId('settings-nav-logout');
+  await expect(logout).toBeVisible();
+  await logout.click();
   await expect(page.getByTestId('welcome-cta-tinyhumans')).toBeVisible({ timeout: 20_000 });
   // A core RPC response only confirms that persistence was updated. Wait for
   // the browser's CoreStateProvider to observe that signed-out snapshot before
