@@ -725,7 +725,7 @@ struct Stack {
     _workspace_guard: EnvVarGuard,
     _backend_guard: EnvVarGuard,
     _vite_guard: EnvVarGuard,
-    _tmp: Option<tempfile::TempDir>,
+    _tmp: tempfile::TempDir,
     mock_join: Option<tokio::task::JoinHandle<Result<(), std::io::Error>>>,
     rpc_join: Option<tokio::task::JoinHandle<Result<(), std::io::Error>>>,
 }
@@ -804,13 +804,8 @@ async fn boot_stack_with_options(
     tinyhumans_boot::boot();
 
     let home_is_override = home_override.is_some();
-    let tmp = home_override.is_none().then(|| tempdir().expect("tempdir"));
-    let home = home_override.unwrap_or_else(|| {
-        tmp.as_ref()
-            .expect("temporary home exists without override")
-            .path()
-            .to_path_buf()
-    });
+    let tmp = tempdir().expect("tempdir");
+    let home = home_override.unwrap_or_else(|| tmp.path().to_path_buf());
     let openhuman_home = home.join(".openhuman");
     let action_dir = home.join("OpenHuman/projects");
     std::fs::create_dir_all(&action_dir).expect("create action directory");
