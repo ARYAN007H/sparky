@@ -358,15 +358,10 @@ fn project_channel_event(
     ctx: &crate::core::runtime::DispatchCtx,
     event: tinychannels_bus::ChannelEvent,
 ) -> Result<Option<crate::web_chat::WebChannelEvent>, String> {
-    use tinychannels_bus::ChannelEventKind as Kind;
-
     // The provider event's target is its nested message_id. event_id identifies
     // the event itself and must never be used to find a transcript row.
-    let target_message_id = match &event.event {
-        Kind::ReadReceipt { message_id, .. }
-        | Kind::ReactionAdded { message_id, .. }
-        | Kind::ReactionRemoved { message_id, .. } => message_id,
-        _ => return Ok(None),
+    let Some(target_message_id) = channel_event_target_message_id(&event) else {
+        return Ok(None);
     };
     let Some(conversation) = event.conversation.as_ref() else {
         return Ok(None);
@@ -390,6 +385,16 @@ fn project_channel_event(
         openhuman_message_id: Some(target.row_id),
         channel_event: event,
     }))
+}
+
+fn channel_event_target_message_id(event: &tinychannels_bus::ChannelEvent) -> Option<&str> {
+    use tinychannels_bus::ChannelEventKind as Kind;
+    match &event.event {
+        Kind::ReadReceipt { message_id, .. }
+        | Kind::ReactionAdded { message_id, .. }
+        | Kind::ReactionRemoved { message_id, .. } => Some(message_id),
+        _ => None,
+    }
 }
 
 fn json_str(payload: &serde_json::Value, key: &str) -> String {
