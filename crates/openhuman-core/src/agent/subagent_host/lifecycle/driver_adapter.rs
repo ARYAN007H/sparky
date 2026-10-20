@@ -183,7 +183,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .last()
             .map(Message::text)
             .unwrap_or_default();
-        {
+        let definition = invocation;
                 let native = crate::agent::tinyagents::NativeSubagentRunContext {
                     depth: native_run_config.lineage.depth,
                     config: native_run_config,
@@ -225,7 +225,6 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                         ))
                     }
                 }
-        }
     }
 }
 
