@@ -102,7 +102,6 @@ describe('threadSlice synchronous reducers', () => {
     await store.dispatch(loadThreadMessages('channel:telegram/alice/room-1'));
 
     const event = {
-      event: 'channel_event',
       client_id: 'channel-runtime',
       thread_id: 'channel:telegram/alice/room-1',
       request_id: 'event-9',
