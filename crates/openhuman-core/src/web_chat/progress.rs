@@ -276,19 +276,13 @@ impl ProgressProjection {
                 self.pending_narration.push_str(&delta);
                 if !self.metadata.hold_text_stream {
                     self.surface
-                        .output(ChannelOutputEvent::TextDelta {
-                            text: delta,
-                            iteration: Some(iteration),
-                        })
+                        .output(map::text_delta(delta, iteration))
                         .await;
                 }
             }
             AgentProgress::ThinkingDelta { delta, iteration } => {
                 self.surface
-                    .output(ChannelOutputEvent::ThinkingDelta {
-                        text: delta,
-                        iteration: Some(iteration),
-                    })
+                    .output(map::thinking_delta(delta, iteration))
                     .await;
             }
             AgentProgress::ToolCallArgsDelta {
@@ -312,7 +306,7 @@ impl ProgressProjection {
                     self.ids.request_id
                 );
                 self.surface
-                    .output(ChannelOutputEvent::ToolCallProgress { call_id, message })
+                    .output(map::tool_progress(call_id, message))
                     .await;
             }
             AgentProgress::TurnCompleted { iterations, .. } => {

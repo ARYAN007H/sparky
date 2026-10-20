@@ -43,6 +43,50 @@ fn native_tool_progress_keeps_correlation_and_display_metadata() {
 }
 
 #[test]
+fn native_tool_completion_preserves_failure_and_shared_payload_caps() {
+    let failure = tinytools::status::classify("[not-found] missing file", false);
+    let event = output_event(AgentProgress::ToolCallCompleted {
+        call_id: "call-failed".into(),
+        tool_name: "file_read".into(),
+        success: false,
+        output_chars: 4,
+        output: "x".repeat(tinychannels_bus::web::MAX_WEB_TOOL_PAYLOAD_BYTES + 32),
+        arguments: Some(serde_json::json!({
+            "path": "y".repeat(tinychannels_bus::web::MAX_WEB_TOOL_PAYLOAD_BYTES)
+        })),
+        elapsed_ms: 12,
+        iteration: 4,
+        failure: Some(failure.clone()),
+        display_label: None,
+        display_detail: None,
+        structured: Some(serde_json::json!({"kind": "read"})),
+    })
+    .expect("tool completion is projected");
+    let ChannelOutputEvent::ToolCallCompleted {
+        output,
+        arguments,
+        failure: summary,
+        success,
+        structured,
+        ..
+    } = event
+    else {
+        panic!("tool completion")
+    };
+    assert!(output.len() <= tinychannels_bus::web::MAX_WEB_TOOL_PAYLOAD_BYTES);
+    assert!(output.contains("truncated"));
+    let arguments = arguments.expect("arguments");
+    assert!(arguments.to_string().contains("truncated"));
+    let summary = summary.expect("classified failure");
+    assert_eq!(summary.cause_plain, failure.cause_plain);
+    assert_eq!(summary.recoverable, failure.recoverable);
+    assert!(!summary.class.is_empty());
+    assert!(!summary.category.is_empty());
+    assert!(!success);
+    assert_eq!(structured, Some(serde_json::json!({"kind": "read"})));
+}
+
+#[test]
 fn progressive_delivery_status_rejects_partial_or_unsupported_terminal_results() {
     use tinychannels_bus::module_progressive::{ProgressiveOutputFailure, ProgressiveResult};
 

@@ -16,6 +16,67 @@ use tinyagents_harness::progress::AgentProgress;
 
 type Failure = tinytools::status::ClassifiedFailure;
 
+/// The shared per-turn progress events understood by both web and native
+/// channel projections. Surface-specific lifecycle and sub-agent orchestration
+/// remains in each adapter, while tool result handling stays canonical here.
+pub(crate) fn turn_event(event: AgentProgress) -> Option<ChannelOutputEvent> {
+    match event {
+        AgentProgress::TextDelta { delta, iteration } => Some(text_delta(delta, iteration)),
+        AgentProgress::ThinkingDelta { delta, iteration } => {
+            Some(thinking_delta(delta, iteration))
+        }
+        AgentProgress::ToolCallStarted {
+            call_id,
+            tool_name,
+            arguments,
+            iteration,
+            display_label,
+            display_detail,
+        } => Some(tool_started(
+            call_id,
+            tool_name,
+            arguments,
+            iteration,
+            display_label,
+            display_detail,
+        )),
+        AgentProgress::ToolCallArgsDelta {
+            call_id,
+            tool_name,
+            delta,
+            iteration,
+        } => Some(ChannelOutputEvent::ToolCallArgsDelta {
+            call_id,
+            tool_name,
+            delta,
+            iteration,
+        }),
+        AgentProgress::ToolCallProgress { call_id, message } => {
+            Some(tool_progress(call_id, message))
+        }
+        completed @ AgentProgress::ToolCallCompleted { .. } => tool_completed(completed),
+        _ => None,
+    }
+}
+
+pub(crate) fn text_delta(text: String, iteration: u32) -> ChannelOutputEvent {
+    ChannelOutputEvent::TextDelta {
+        text,
+        iteration: Some(iteration),
+    }
+}
+
+pub(crate) fn thinking_delta(text: String, iteration: u32) -> ChannelOutputEvent {
+    ChannelOutputEvent::ThinkingDelta {
+        text,
+        iteration: Some(iteration),
+    }
+}
+
+pub(crate) fn tool_progress(call_id: String, message: String) -> ChannelOutputEvent {
+    ChannelOutputEvent::ToolCallProgress { call_id, message }
+}
+
 /// Wire spelling of a unit-variant enum (`ClassifiedFailure` serializes its
 /// class and category as the bare variant name).
 fn variant_name<T: Serialize>(value: &T) -> String {

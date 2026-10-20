@@ -183,64 +183,7 @@ fn delivery_unsupported_count(
 }
 
 pub(crate) fn output_event(progress: AgentProgress) -> Option<ChannelOutputEvent> {
-    match progress {
-        AgentProgress::TextDelta { delta, iteration } => Some(ChannelOutputEvent::TextDelta {
-            text: delta,
-            iteration: Some(iteration),
-        }),
-        AgentProgress::ThinkingDelta { delta, iteration } => {
-            Some(ChannelOutputEvent::ThinkingDelta {
-                text: delta,
-                iteration: Some(iteration),
-            })
-        }
-        AgentProgress::ToolCallStarted {
-            call_id,
-            tool_name,
-            arguments,
-            iteration,
-            display_label,
-            display_detail,
-        } => Some(ChannelOutputEvent::ToolCallStarted {
-            call_id,
-            tool_name,
-            arguments,
-            iteration,
-            display_label,
-            display_detail,
-        }),
-        AgentProgress::ToolCallProgress { call_id, message } => {
-            Some(ChannelOutputEvent::ToolCallProgress { call_id, message })
-        }
-        AgentProgress::ToolCallCompleted {
-            call_id,
-            tool_name,
-            success,
-            output_chars,
-            output,
-            arguments,
-            elapsed_ms,
-            iteration,
-            display_label,
-            display_detail,
-            structured,
-            ..
-        } => Some(ChannelOutputEvent::ToolCallCompleted {
-            call_id,
-            tool_name,
-            success,
-            output_chars,
-            output,
-            arguments,
-            elapsed_ms,
-            iteration,
-            failure: None,
-            display_label,
-            display_detail,
-            structured,
-        }),
-        _ => None,
-    }
+    crate::agent::turn_progress::turn_event(progress)
 }
 
 #[cfg(test)]
