@@ -436,59 +436,6 @@ impl Channel for ModuleChannel {
         self.interaction.supports_reactions
     }
 
-    fn supports_draft_updates(&self) -> bool {
-        self.interaction.supports_draft_updates
-    }
-
-    async fn send_draft(&self, message: &SendMessage) -> anyhow::Result<Option<String>> {
-        match self
-            .object
-            .call_confidential::<ChannelInteractionResult>(
-                tinychannels_bus::methods::CHANNEL_INTERACTION,
-                tinychannels_bus::ChannelInteractionRequest {
-                    channel: self.name.clone(),
-                    interaction: ChannelInteraction::SendDraft {
-                        message: message.clone(),
-                    },
-                },
-            )
-            .await
-            .map_err(anyhow::Error::new)?
-        {
-            ChannelInteractionResult::Draft(id) => Ok(id),
-            _ => anyhow::bail!("channel returned an invalid draft result"),
-        }
-    }
-
-    async fn update_draft(
-        &self,
-        recipient: &str,
-        message_id: &str,
-        text: &str,
-    ) -> anyhow::Result<()> {
-        self.interact(ChannelInteraction::UpdateDraft {
-            recipient: recipient.into(),
-            message_id: message_id.into(),
-            text: text.into(),
-        })
-        .await
-    }
-
-    async fn finalize_draft(
-        &self,
-        recipient: &str,
-        message_id: &str,
-        text: &str,
-        thread_ts: Option<&str>,
-    ) -> anyhow::Result<()> {
-        self.interact(ChannelInteraction::FinalizeDraft {
-            recipient: recipient.into(),
-            message_id: message_id.into(),
-            text: text.into(),
-            thread_ts: thread_ts.map(str::to_owned),
-        })
-        .await
-    }
 }
 
 impl ModuleChannel {

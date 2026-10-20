@@ -31,7 +31,6 @@ pub struct DispatchHarnessOptions {
     pub content: String,
     pub thread_ts: Option<String>,
     pub inbound_envelope: Option<tinychannels_bus::ChannelInboundEnvelope>,
-    pub streaming: bool,
     pub supports_reactions: bool,
     pub response_text: Option<String>,
     pub handler_error: Option<String>,
@@ -101,7 +100,6 @@ impl Default for DispatchHarnessOptions {
             content: "hello".to_string(),
             thread_ts: None,
             inbound_envelope: None,
-            streaming: false,
             supports_reactions: false,
             response_text: Some("dispatch ok".to_string()),
             handler_error: None,
@@ -143,7 +141,6 @@ struct HarnessState {
 
 struct HarnessChannel {
     name: String,
-    streaming: bool,
     supports_reactions: bool,
     state: Arc<HarnessState>,
 }
@@ -182,45 +179,7 @@ impl Channel for HarnessChannel {
         self.supports_reactions
     }
 
-    fn supports_draft_updates(&self) -> bool {
-        self.streaming
-    }
 
-    async fn send_draft(&self, message: &SendMessage) -> Result<Option<String>> {
-        self.state.sends.lock().await.push(ObservedSend {
-            kind: "draft",
-            recipient: message.recipient.clone(),
-            content: message.content.clone(),
-            thread_ts: message.thread_ts.clone(),
-        });
-        Ok(Some("draft-1".to_string()))
-    }
-
-    async fn update_draft(&self, recipient: &str, message_id: &str, text: &str) -> Result<()> {
-        self.state.sends.lock().await.push(ObservedSend {
-            kind: "update_draft",
-            recipient: format!("{recipient}:{message_id}"),
-            content: text.to_string(),
-            thread_ts: None,
-        });
-        Ok(())
-    }
-
-    async fn finalize_draft(
-        &self,
-        recipient: &str,
-        message_id: &str,
-        text: &str,
-        thread_ts: Option<&str>,
-    ) -> Result<()> {
-        self.state.sends.lock().await.push(ObservedSend {
-            kind: "finalize_draft",
-            recipient: format!("{recipient}:{message_id}"),
-            content: text.to_string(),
-            thread_ts: thread_ts.map(str::to_string),
-        });
-        Ok(())
-    }
 }
 
 struct HarnessModel;
@@ -366,7 +325,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     let state = Arc::new(HarnessState::default());
     let channel_impl = Arc::new(HarnessChannel {
         name: options.channel_name.clone(),
-        streaming: options.streaming,
         supports_reactions: options.supports_reactions,
         state: Arc::clone(&state),
     });
