@@ -147,11 +147,10 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
-/// finished delegation: the parent's tool result must be a failure, so its own
-/// failure policy and its trace see it, and the `SubagentCompleted` progress
-/// event must say how the child was stopped.
+/// successful result: asynchronous completion preserves the incomplete marker
+/// for delivery and reports the child's stop through parent progress.
 #[tokio::test(start_paused = true)]
-async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
+async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(512);
@@ -171,8 +170,7 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "List the task sources",
-                "model": "test-model",
-                "blocking": true
+                "model": "test-model"
             }),
             None,
             run_context,
@@ -184,24 +182,47 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
     .expect("tool execution");
 
     assert!(
-        result.is_error,
-        "a stopped child must fail the parent's tool call: {}",
+        !result.is_error,
+        "the asynchronous spawn is accepted before the child settles: {}",
         result.output()
     );
-    assert!(
-        result.output().contains("[SUBAGENT_INCOMPLETE]"),
-        "{}",
-        result.output()
-    );
+    let task_id = result
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|payload| payload.get("task_id")?.as_str().map(str::to_owned))
+        .expect("accepted result carries the child task id");
 
-    let mut stop = None;
-    while let Ok(event) = progress_rx.try_recv() {
-        if let crate::progress::AgentProgress::SubagentCompleted { stop: s, .. } = event {
-            stop = Some(s);
+    let (output, stop) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    agent_id,
+                    task_id: event_task_id,
+                    output,
+                    stop,
+                    ..
+                }) if agent_id == "task_manager_agent" && event_task_id == task_id => {
+                    break (output, stop)
+                }
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    agent_id,
+                    task_id: event_task_id,
+                    error,
+                }) if agent_id == "task_manager_agent" && event_task_id == task_id => {
+                    panic!("stopped child was reported as a provider failure: {error}")
+                }
+                Some(_) => {}
+                None => panic!("parent progress stream closed before child stop"),
+            }
         }
-    }
-    let stop = stop
-        .expect("SubagentCompleted was emitted")
+    })
+    .await
+    .expect("the async completion reaches the parent");
+    assert!(!output.is_empty(), "the incomplete child retains partial output");
+    assert!(stop
         .expect("SubagentCompleted carries the child's stop");
     assert!(matches!(
         stop.kind,
