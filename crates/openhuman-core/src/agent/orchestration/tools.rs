@@ -3,7 +3,7 @@
 //! Tools, by role:
 //! - **Spawn**: `spawn_subagent` and `spawn_async_subagent`.
 //! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
-//!   `wait_subagent`, `wait` / `wait_loop`, `list_subagents`.
+//!   `wait_subagent`, `list_subagents`.
 //! - **Delegation**: `ArchetypeDelegationTool`.
 //!
 //! TinyAgents owns generic control operations; the host control module keeps

@@ -36,7 +36,7 @@ and UI-facing projections.
 
 The module exposes `spawn_subagent`, `spawn_async_subagent`,
 `steer_subagent`, `continue_subagent`,
-`close_subagent`, `wait_subagent`, `wait`, `wait_loop`, and `list_subagents`.
+`close_subagent`, `wait_subagent`, and `list_subagents`.
 Archetype delegates provide focused synchronous calls over the live sub-agent host.
 Execution routes through `agent::subagent_host::run_subagent`.
 
