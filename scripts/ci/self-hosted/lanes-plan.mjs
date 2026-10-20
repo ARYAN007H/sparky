@@ -412,7 +412,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         },
         // ex63: lcov-core.info is written (even after a failed suite), so drop
         // its ~90 GB of instrumented test executables and profiles before the
-        // next lanes build on the same 160 GB disk. No `needs`: it must run
+        // next lanes build on the same 320 GB disk. No `needs`: it must run
         // after a failure too.
         {
           name: "prune-coverage-binaries",
