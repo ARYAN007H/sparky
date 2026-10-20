@@ -27,7 +27,7 @@ fn configured_models_lists_sentinel_and_strips_temperature_suffix() {
 #[test]
 fn configured_managed_default_keeps_colon_bearing_model_owner() {
     let config = Config {
-        default_model: Some("qwen3:14b".to_string()),
+        default_model: Some("qwen3:14b@NaN".to_string()),
         ..Config::default()
     };
     let listed = configured_models(&config);

@@ -103,7 +103,7 @@ pub(super) fn configured_models(config: &Config) -> Vec<ListedModel> {
     {
         // A configured default is known to be managed even when its model id
         // contains a colon (for example `qwen3:14b`).
-        push(default_model.to_string(), "openhuman");
+        push(route_owner(default_model).0, "openhuman");
     }
 
     for cp in &config.cloud_providers {
