@@ -484,3 +484,7 @@ impl CatalogStoragePort {
 #[cfg(test)]
 #[path = "catalog_storage_tests.rs"]
 mod tests;
+
+#[cfg(all(test, unix))]
+#[path = "catalog_storage_resource_tests.rs"]
+mod resource_tests;
