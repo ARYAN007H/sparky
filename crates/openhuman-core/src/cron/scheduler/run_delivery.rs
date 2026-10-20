@@ -111,6 +111,7 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                     success: false,
                     output: refusal,
                     retryable: false,
+                    raw_detail: None,
                 };
             }
             let config = binding.config();
@@ -134,6 +135,7 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                     success: false,
                     output: "no handler is registered for flow jobs".to_string(),
                     retryable: false,
+                    raw_detail: None,
                 };
             };
             let outcome = handler
@@ -143,6 +145,7 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                 success: outcome.success,
                 output: outcome.output,
                 retryable: !outcome.permanent,
+                raw_detail: None,
             }
         })
         .await

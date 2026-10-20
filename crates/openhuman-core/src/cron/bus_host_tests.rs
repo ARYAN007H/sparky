@@ -180,6 +180,7 @@ async fn failed_is_accepted_for_any_job() {
         success: false,
         output: "boom".into(),
         retryable: false,
+        raw_detail: None,
     };
     proxy
         .call::<()>(callbacks::FAILED, (&job, "run-e", &attempt))
@@ -197,6 +198,7 @@ async fn deliver_answers_with_the_delivery_status_string() {
         success: true,
         output: "result".into(),
         retryable: true,
+        raw_detail: None,
     };
     let status: String = proxy
         .call(callbacks::DELIVER, (&job, "run-f", &attempt))
@@ -271,6 +273,7 @@ async fn dropping_the_registration_stops_serving_the_object() {
         success: true,
         output: String::new(),
         retryable: true,
+        raw_detail: None,
     };
     drop(registration);
     for _ in 0..100 {

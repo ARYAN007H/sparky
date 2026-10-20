@@ -113,6 +113,7 @@ impl HostExecutor {
                 success: false,
                 output: refusal,
                 retryable: false,
+                raw_detail: None,
             };
         }
         // Operator limits (`cron::limits`) also bind rows stored before they
@@ -123,6 +124,7 @@ impl HostExecutor {
                 success: false,
                 output: error.to_string(),
                 retryable: false,
+                raw_detail: None,
             };
         }
         let Some(handler) = kind_handler(&job.job_type) else {
@@ -134,6 +136,7 @@ impl HostExecutor {
                     job.job_type.as_str()
                 ),
                 retryable: false,
+                raw_detail: None,
             };
         };
         tracing::debug!(
@@ -156,6 +159,7 @@ impl HostExecutor {
                 success: true,
                 output,
                 retryable: true,
+                raw_detail: None,
             };
         }
         let last_agent_error = self.note_error(run_id, agent_error);
@@ -165,6 +169,7 @@ impl HostExecutor {
                 success: false,
                 output,
                 retryable: false,
+                raw_detail: None,
             };
         }
         self.classify_failure(job, run_id, output, last_agent_error.as_deref())
@@ -184,6 +189,7 @@ impl HostExecutor {
                 success: false,
                 output,
                 retryable: false,
+                raw_detail: None,
             }
         };
         if output.starts_with("blocked by security policy:") {
@@ -231,6 +237,7 @@ impl HostExecutor {
             success: false,
             output,
             retryable: true,
+            raw_detail: None,
         }
     }
 }

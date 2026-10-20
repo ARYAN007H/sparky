@@ -105,7 +105,6 @@ async fn origin_messages(
                 let head = locator.head_generation(&session);
                 locator
                     .read_session_transcript(&head)
-                    .ok()
                     .and_then(|read| read.read_session().ok().flatten())
                     .map(|history| {
                         history
