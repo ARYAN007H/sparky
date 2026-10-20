@@ -377,28 +377,51 @@ test("source parity proof rejects production, manifest, build, lock, and unknown
 });
 
 test("source parity proof rejects descendants, dirty files, asset drift, renames, symlinks, and gitlinks", () => {
-  const fixture = sourceParityFixture();
-  try {
-    writeFileSync(join(fixture.root, "src/tests.rs"), "#[test] fn later() {}\n");
-    fixture.git(["add", "."]);
-    fixture.git(["commit", "-qm", "later test change"]);
-    const descendant = execFileSync("git", ["rev-parse", "HEAD"], { cwd: fixture.root, encoding: "utf8" }).trim();
-    const input = {
+  const assets = [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }];
+  const validate = (fixture, overrides = {}) =>
+    validateTestOnlySourceParity({
       repoPath: fixture.root,
       version: "1.0.0",
-      assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+      assets,
+      actualHead: fixture.candidateCommit,
       proof: fixture.parity,
-    };
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: descendant }).ok, false, "descendant commits must not inherit an attestation");
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: descendant, proof: { ...fixture.parity, candidateCommit: descendant } }).ok, false, "a changed test blob cannot silently widen the pair");
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, assets: [] }).ok, false, "registry asset changes invalidate the proof");
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, version: "1.1.0", proof: { ...fixture.parity, tag: "v1.1.0" } }).ok, false, "registry version changes invalidate the proof");
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, unknown: true } }).ok, false, "unknown metadata must fail closed");
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, unchangedTreeSha256: "f".repeat(64) } }).ok, false, "the whole-tree parity hash is mandatory");
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, testFile: { ...fixture.parity.testFile, candidateMode: "100755" } } }).ok, false, "file-mode changes cannot be attested");
-    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, binding: { ...fixture.parity.binding, moduleBlob: "f".repeat(40) } } }).ok, false, "the cfg(test) binding source blob is pinned");
-  } finally {
-    rmSync(fixture.root, { recursive: true, force: true });
+      ...overrides,
+    });
+
+  // A descendant cannot inherit the pair, even when the proof is widened: its
+  // candidate test blob must still match the exact attested blob.
+  {
+    const f = sourceParityFixture();
+    try {
+      writeFileSync(join(f.root, "src/tests.rs"), "#[test] fn later() {}\n");
+      f.git(["add", "."]);
+      f.git(["commit", "-qm", "later test change"]);
+      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
+      assert.match(validate(f, { actualHead: head }).message, /HEAD is not the exact attested candidate/);
+      assert.match(validate(f, { actualHead: head, proof: { ...f.parity, candidateCommit: head } }).message, /test file path, mode, or blob/);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  }
+
+  // Metadata mutants stay at the exact candidate HEAD, so each reaches and
+  // proves its own invariant rather than failing the earlier HEAD check.
+  for (const [name, overrides, diagnostic] of [
+    ["asset map", { assets: [] }, /registry version or artifact asset map changed/],
+    ["registry version", { version: "1.1.0", proof: { tag: "v1.1.0" } }, /release tag does not match/],
+    ["unknown field", { proof: { unknown: true } }, /proof fields are missing or unknown/],
+    ["whole-tree digest", { proof: { unchangedTreeSha256: "f".repeat(64) } }, /other source, manifest, lock, build input, or gitlink differs/],
+    ["mode", { proof: { testFile: { candidateMode: "100755" } } }, /regular non-executable/],
+    ["binding blob", { proof: { binding: { moduleBlob: "f".repeat(40) } } }, /binding source differs/],
+  ]) {
+    const f = sourceParityFixture();
+    try {
+      const proof = { ...f.parity, ...overrides.proof };
+      const result = validate(f, { ...overrides, proof });
+      assert.match(result.message, diagnostic, `${name} mutant failed for the wrong reason: ${result.message}`);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
   }
 
   for (const kind of ["dirty-untracked", "dirty-tracked", "symlink", "rename", "gitlink"]) {
@@ -407,7 +430,7 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
       if (kind === "dirty-untracked" || kind === "dirty-tracked") {
         const path = kind === "dirty-tracked" ? "src/lib.rs" : "production.rs";
         writeFileSync(join(f.root, path), "uncommitted production input\n");
-        assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: f.candidateCommit, proof: f.parity }).ok, false, `${kind} module changes must fail closed`);
+        assert.match(validate(f).message, /module worktree is dirty/, `${kind} must fail at the cleanliness check`);
         continue;
       }
       if (kind === "symlink") {
@@ -421,7 +444,11 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
       }
       f.git(["commit", "-qm", `${kind} change`]);
       const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
-      assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: head, proof: f.parity }).ok, false, `${kind} changes must fail closed`);
+      // Bind the actual new head but deliberately keep the original path/blob,
+      // mode and whole-tree claims so the structural mutation is what rejects.
+      const result = validate(f, { actualHead: head, proof: { ...f.parity, candidateCommit: head } });
+      assert.match(result.message, kind === "gitlink" ? /other source, manifest, lock, build input, or gitlink differs/ : /test file path, mode, or blob/,
+        `${kind} failed for the wrong reason: ${result.message}`);
     } finally {
       rmSync(f.root, { recursive: true, force: true });
     }
@@ -431,7 +458,7 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
     const f = sourceParityFixture();
     try {
       f.git(tagChange === "moved" ? ["tag", "-f", "-a", "-m", "moved", "v1.0.0", f.candidateCommit] : ["tag", "-d", "v1.0.0"]);
-      assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: f.candidateCommit, proof: f.parity }).ok, false, `${tagChange} release tags must fail closed`);
+      assert.match(validate(f).message, /release tag does not resolve to the attested release commit/, `${tagChange} tag failed for the wrong reason`);
     } finally {
       rmSync(f.root, { recursive: true, force: true });
     }
