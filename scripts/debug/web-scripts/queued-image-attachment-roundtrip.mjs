@@ -452,7 +452,9 @@ export default async function queuedImageAttachmentRoundtrip({
   const imageRequest = mock
     .requests()
     .filter((request) => /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url))
-    .at(-1);
+    .findLast((request) =>
+      JSON.stringify(JSON.parse(request.body).messages ?? []).includes(QUEUED_PROMPT),
+    );
   if (!imageRequest) throw new Error("queued turn did not reach the mock model");
   const input = JSON.stringify(JSON.parse(imageRequest.body).messages ?? []);
   if (/\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(input)) {
