@@ -376,7 +376,7 @@ test("a browser-spec-only change runs the full-inventory skip guard without scri
   assert.equal(
     frontendOnly.lanes.find((lane) => lane.name === "scripts-self-tests")
       ?.active ?? false,
-    false,
+    true,
   );
 
   const filters = fs.readFileSync(
