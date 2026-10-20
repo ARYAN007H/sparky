@@ -93,12 +93,8 @@ impl SpawnSubagentTool {
         let workspace_descriptor = tool_context
             .and_then(|ctx| ctx.workspace().cloned())
             .or_else(|| run_context.workspace.clone());
-        let target_model = model_override.as_deref().unwrap_or_else(|| {
-            definition
-                .model
-                .resolve(parent.model_name.as_str())
-                .leak()
-        });
+        let resolved_model = definition.model.resolve(parent.model_name.as_str());
+        let target_model = model_override.as_deref().unwrap_or(&resolved_model);
         if crate::attachments::should_forward_parent_images(&prompt)
             && !run_context.attachment_placeholders.is_empty()
             && (definition.id == "vision_agent"
