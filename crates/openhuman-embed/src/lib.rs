@@ -261,7 +261,9 @@ pub mod session_store {
 }
 pub use complete::{
     ChatMessage, Completer, CompletionObserver, CompletionRequest, CompletionResponse,
-    CompletionTrace, CompletionUsage,
+    CompletionTrace, CompletionUsage, PhysicalDispatchMetadata, PhysicalDispatchObserver,
+    PhysicalDispatchOutcome, PhysicalDispatchStatus, PhysicalDispatchTerminal,
+    PhysicalDispatchUsage,
 };
 pub use session_store::{InMemorySessionStores, SessionStoreProvider};
 pub use turn::{absolute, Route, Turn, TurnOutcome, TurnRequest};
