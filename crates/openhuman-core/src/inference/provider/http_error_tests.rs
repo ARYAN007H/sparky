@@ -472,3 +472,78 @@ fn managed_provider_config_phrase_remains_reportable_but_unknown_model_demotes()
         Some(DemotionKind::ConfigurationRejected)
     );
 }
+
+#[test]
+fn config_rejection_demotion_keeps_provider_status_and_polarity() {
+    use tinyinference_llm::failure::{demote_decision, DemotionKind};
+    let cases = [
+        (
+            "custom_openai",
+            StatusCode::BAD_REQUEST,
+            "The supported API model names are deepseek-v4-pro or deepseek-v4-flash, but you passed reasoning-v1.",
+            false,
+            Some(DemotionKind::ConfigurationRejected),
+        ),
+        (
+            "custom_openai",
+            StatusCode::BAD_REQUEST,
+            "invalid temperature: only 1 is allowed for this model",
+            false,
+            Some(DemotionKind::ConfigurationRejected),
+        ),
+        (
+            "custom_openai",
+            StatusCode::NOT_FOUND,
+            "The model `gpt-5.5` does not exist or you do not have access to it.",
+            false,
+            Some(DemotionKind::ConfigurationRejected),
+        ),
+        (
+            "ollama",
+            StatusCode::FORBIDDEN,
+            "this model requires a subscription, upgrade for access",
+            false,
+            Some(DemotionKind::ConfigurationRejected),
+        ),
+        (
+            "custom_openai",
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "invalid temperature: only 1 is allowed for this model",
+            false,
+            None,
+        ),
+        (
+            "custom_openai",
+            StatusCode::TOO_MANY_REQUESTS,
+            "invalid temperature: only 1 is allowed for this model",
+            false,
+            None,
+        ),
+        (
+            "custom_openai",
+            StatusCode::BAD_REQUEST,
+            "Bad request: missing required field 'messages'",
+            false,
+            None,
+        ),
+        (
+            "openhuman",
+            StatusCode::FORBIDDEN,
+            "this model requires a subscription, upgrade for access",
+            true,
+            None,
+        ),
+    ];
+    for (provider, status, body, managed, expected) in cases {
+        let facts = tinyinference_llm::failure::http::classify_http_failure(
+            provider,
+            status.as_u16(),
+            body,
+        );
+        assert_eq!(
+            demote_decision(&facts, managed),
+            expected,
+            "provider={provider}, status={status}, body={body}"
+        );
+    }
+}
