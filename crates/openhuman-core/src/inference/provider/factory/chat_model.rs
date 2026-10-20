@@ -103,16 +103,22 @@ pub(super) fn create_chat_model_with_model_id_inner(
         // codex-oauth or `/v1/responses` fallback) → crate-native `ChatModel`
         // (issue #4727 Phase 3, conservative subset). `openai`/codex, custom
         // proxy slugs, and the managed entry return `None` and fall through.
-        if let Some(result) = try_create_cloud_slug_chat_model(role, config, &EgressLedger::none())
-        {
+        if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools_for(
+            role,
+            config,
+            true,
+            &EgressLedger::none(),
+            extensions,
+        ) {
             return result;
         }
     }
-    Err(unresolved_chat_model_error(
+    Err(unresolved_chat_model_error_for(
         role,
         &provider_for_role(role, config),
         config,
         &EgressLedger::none(),
+        extensions,
     ))
 }
 
@@ -385,6 +391,17 @@ pub(super) fn unresolved_chat_model_error(
     config: &Config,
     egress: &EgressLedger,
 ) -> anyhow::Error {
+    let extensions = crate::core::runtime::CoreContext::current_extensions();
+    unresolved_chat_model_error_for(role, provider, config, egress, extensions.as_deref())
+}
+
+pub(super) fn unresolved_chat_model_error_for(
+    role: &str,
+    provider: &str,
+    config: &Config,
+    egress: &EgressLedger,
+    extensions: Option<&crate::core::slots::Extensions>,
+) -> anyhow::Error {
     let p = provider.trim();
 
     if let Err(error) = enforce_local_only_inference(role, p) {
@@ -434,7 +451,7 @@ pub(super) fn unresolved_chat_model_error(
             );
         }
         let (model, _) = split_model_and_temperature(model_with_temperature);
-        return match resolve_cloud_slug(role, slug.trim(), &model, config) {
+        return match resolve_cloud_slug_for(role, slug.trim(), &model, config, extensions) {
             Err(error) => error,
             Ok(_) => anyhow::anyhow!(
                 "[chat-factory] configured provider '{}' for role '{}' did not produce a crate-native chat model",
