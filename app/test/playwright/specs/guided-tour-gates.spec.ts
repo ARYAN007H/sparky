@@ -21,10 +21,12 @@ async function tooltip(page: Page): Promise<Locator> {
   return page.locator('[role="alertdialog"]');
 }
 
-async function clickTourNext(page: Page): Promise<void> {
+async function clickTourNext(page: Page, currentIndex: number): Promise<void> {
   const panel = await tooltip(page);
   await expect(panel).toBeVisible();
+  await expect(panel).toContainText(`${currentIndex + 1} of 7`);
   await panel.getByRole('button', { name: /Next|Let's go!/ }).click();
+  await expect(panel).toContainText(`${currentIndex + 2} of 7`);
 }
 
 test.describe('Guided tour gates', () => {
@@ -53,10 +55,12 @@ test.describe('Guided tour gates', () => {
     ];
     for (let index = 0; index < steps.length; index += 1) {
       const step = steps[index];
-      await expect(await tooltip(page)).toBeVisible();
+      const panel = await tooltip(page);
+      await expect(panel).toBeVisible();
+      await expect(panel).toContainText(`${index + 1} of 7`);
       await expect.poll(() => page.evaluate(() => window.location.hash)).toMatch(step.hash);
       await expect(page.locator(`[data-walkthrough="${step.target}"]`)).toBeVisible();
-      if (index < steps.length - 1) await clickTourNext(page);
+      if (index < steps.length - 1) await clickTourNext(page, index);
     }
     const finalPanel = await tooltip(page);
     await expect(finalPanel).toContainText("You're all set!");
