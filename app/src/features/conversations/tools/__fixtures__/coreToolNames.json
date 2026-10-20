@@ -162,8 +162,6 @@
   "update_check",
   "use_skill",
   "validate_workflow",
-  "wait",
-  "wait_loop",
   "wallet_chain_status",
   "wallet_lookup_tx",
   "wallet_prepare_transfer",

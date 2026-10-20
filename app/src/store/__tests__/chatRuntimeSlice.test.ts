@@ -1382,7 +1382,28 @@ describe('subagent event reducers (Phase 3)', () => {
   it('reattaches a resumed task to its newest parent spawn call', () => {
     const rowId = 't1:subagent:task-1:researcher';
     let state = reducer(
-      undefined,
+      reducer(
+        undefined,
+        setToolTimelineForThread({
+          threadId: 't1',
+          entries: [
+            {
+              id: 'spawn-original',
+              name: 'spawn_subagent',
+              round: 0,
+              seq: 0,
+              status: 'success',
+            },
+            {
+              id: 'spawn-resume',
+              name: 'spawn_subagent',
+              round: 0,
+              seq: 1,
+              status: 'running',
+            },
+          ],
+        })
+      ),
       subagentSpawned({
         threadId: 't1',
         requestId: 'request-1',
@@ -1416,6 +1437,9 @@ describe('subagent event reducers (Phase 3)', () => {
       parentCallId: 'spawn-resume',
     });
     expect(state.toolTimelineByThread.t1[0].subagent?.awaitingQuestion).toBeUndefined();
+    expect(state.toolTimelineByThread.t1.find(entry => entry.id === 'spawn-resume')?.name).toBe(
+      'spawn_subagent'
+    );
   });
 
   it('subagentToolCallReceived appends and de-dupes on callId; result settles it', () => {

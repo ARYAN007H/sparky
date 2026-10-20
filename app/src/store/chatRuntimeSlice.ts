@@ -119,7 +119,7 @@ export interface SubagentActivity {
    */
   spawnEventId?: string;
   /**
-   * Provider-assigned id of the `spawn_subagent`/`spawn_subagent`/
+   * Provider-assigned id of the `spawn_subagent`/`spawn_async_subagent`/
    * `delegate_*` tool call that started this delegation
    * (`SubagentProgressDetail.parent_call_id` on the `subagent_spawned`
    * event). When present, `assistantUiMessages.ts` renders this activity's
@@ -361,7 +361,7 @@ export function findPendingDelegationContext(
     const entry = entries[i];
     if (entry.status !== 'running' || entry.round !== round) continue;
     if (
-      ['spawn_subagent', 'spawn_subagent'].includes(entry.name) ||
+      ['spawn_subagent', 'spawn_async_subagent'].includes(entry.name) ||
       entry.name.startsWith('delegate_')
     ) {
       return {
@@ -2004,6 +2004,10 @@ const chatRuntimeSlice = createSlice({
             existing.subagent.status = 'running';
             existing.subagent.awaitingQuestion = undefined;
             existing.subagent.spawnEventId = spawnEventId;
+            // A resumed task belongs to the latest spawn call in the parent
+            // transcript. Keep its live card attached to that call so the
+            // previous call's card does not claim the resumed work.
+            if (parentCallId) existing.subagent.parentCallId = parentCallId;
             // A resumed task belongs to the latest spawn call in the parent
             // transcript. Keep its live card attached to that call so the
             // previous call's card does not claim the resumed work.
