@@ -483,7 +483,7 @@ test("nextest product suites share one Cargo argument set and differ only in the
   // The old per-package nextest selections are gone; rpc, tui and the default
   // feature suites keep their own resolutions.
   assert.doesNotMatch(source, /-p openhuman-cli --tests/);
-  
+
   assert.match(source, /suite "openhuman-rpc" llvm_cov_package .*-p openhuman-rpc --all-targets/);
   assert.match(source, /suite "openhuman-tui" llvm_cov_package .*-p openhuman-tui --all-targets/);
   assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package .*-p openhuman-embed --all-targets/);
