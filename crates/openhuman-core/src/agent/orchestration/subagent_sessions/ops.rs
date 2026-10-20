@@ -304,7 +304,7 @@ pub fn reuse_decision(reuse: Option<&DurableSubagentSession>, force_fresh: bool)
 fn update_session<F>(
     store: &SubagentSessionStore,
     subagent_session_id: &str,
-    mut update: F,
+    update: F,
 ) -> Result<bool, String>
 where
     F: FnMut(&mut DurableSubagentSession, String) + Send + 'static,
@@ -324,7 +324,7 @@ fn update_session_for_task<F>(
     store: &SubagentSessionStore,
     subagent_session_id: &str,
     task_id: &str,
-    update: F,
+    mut update: F,
 ) -> Result<bool, String>
 where
     F: FnMut(&mut DurableSubagentSession, String) + Send + 'static,

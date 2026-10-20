@@ -276,7 +276,7 @@ impl CapsHostService {
                     crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
                 registry
                     .and_then(|registry| registry.get(&id).cloned())
-                    .map(to_bus_agent_definition)
+                    .map(|definition| to_bus_agent_definition(&definition))
                     .transpose()
             })
             .await
@@ -294,15 +294,14 @@ impl CapsHostService {
                 .map_err(|error| error.to_string())?;
                 let registry =
                     crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
-                registry
-                    .map(|registry| {
-                        registry
-                            .list()
-                            .into_iter()
-                            .map(to_bus_agent_definition)
-                            .collect()
-                    })
-                    .ok_or_else(|| "agent definition registry is unavailable".to_owned())
+                match registry {
+                    Some(registry) => registry
+                        .list()
+                        .into_iter()
+                        .map(to_bus_agent_definition)
+                        .collect(),
+                    None => Err("agent definition registry is unavailable".to_owned()),
+                }
             })
             .await
             .map_err(bus_error)
