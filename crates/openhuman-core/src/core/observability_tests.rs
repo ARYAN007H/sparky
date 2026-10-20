@@ -89,6 +89,17 @@ fn register_backend_classifier_fixture(
         .insert(message.to_string(), classification);
 }
 
+fn reportable_fixture(kind: BackendErrorKind, malformed_bad_request: bool) -> BackendErrorClassification {
+    BackendErrorClassification {
+        provider_owned: true,
+        backend_owned: true,
+        reportable: true,
+        token: Some("fixture-reportable".to_string()),
+        kind: Some(kind),
+        malformed_bad_request,
+    }
+}
+
 #[cfg(feature = "crash-reporting")]
 fn event_with_tags_and_message(
     pairs: &[(&str, &str)],
