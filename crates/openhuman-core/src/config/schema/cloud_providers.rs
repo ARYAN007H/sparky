@@ -38,10 +38,27 @@ pub fn register_hosted_cloud_preset(id: impl Into<String>, preset: BuiltinCloudP
     HOSTED_PRESETS.register(id, preset);
 }
 
+/// Register a host preset for one runtime context.
+pub fn register_hosted_cloud_preset_in(
+    extensions: &crate::core::slots::Extensions,
+    id: impl Into<String>,
+    preset: BuiltinCloudProvider,
+) {
+    HOSTED_PRESETS.register_in(extensions, id, preset);
+}
+
 /// Register host-owned auth-style classification without making it core
 /// inference policy.
 pub fn register_hosted_cloud_provider_policy(classifier: HostedCloudProviderClassifier) {
     HOSTED_CLOUD_PROVIDER.register("default", classifier);
+}
+
+/// Register hosted-provider classification for one runtime context.
+pub fn register_hosted_cloud_provider_policy_in(
+    extensions: &crate::core::slots::Extensions,
+    classifier: HostedCloudProviderClassifier,
+) {
+    HOSTED_CLOUD_PROVIDER.register_in(extensions, "default", classifier);
 }
 
 /// Whether the installed host treats this compatibility auth style as hosted.
