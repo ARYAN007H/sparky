@@ -173,18 +173,12 @@ fn emit_parser_defaults_data_to_null_and_preserves_any_json_value() {
 
 #[test]
 fn ignored_map_parser_accepts_unknown_values() {
-    let params = serde_json::from_value(serde_json::json!({
+    let params: Map<String, Value> = serde_json::from_value(serde_json::json!({
         "anything":[null, true, {"nested":42}],
         "other":"ignored"
     }))
     .expect("object params");
-    assert_eq!(parse_ignored_params(params), Ok(()));
-
-    let params = serde_json::from_value(serde_json::json!({
-        "anything":[null, true, {"nested":42}],
-        "other":"ignored"
-    }))
-    .expect("object params");
+    assert_eq!(parse_ignored_params(params.clone()), Ok(()));
     let entries = all_controller_entries();
     for method in [
         "socket.disconnect",
