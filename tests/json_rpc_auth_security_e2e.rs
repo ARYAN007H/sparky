@@ -777,6 +777,29 @@ async fn credential_channel_describe_fields_are_wired_over_json_rpc_e2e() {
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{}", rpc_addr);
 
+    let list = post_json_rpc(&rpc_base, 7003, "openhuman.channels_list", json!({})).await;
+    let list_result = peel_logs_envelope(assert_no_jsonrpc_error(&list, "channels_list"));
+    let channels = list_result
+        .as_array()
+        .or_else(|| list_result.get("channels").and_then(Value::as_array))
+        .unwrap_or_else(|| panic!("channels_list should return an array: {list_result}"));
+    for channel in ["email", "yuanbao"] {
+        let definition = channels
+            .iter()
+            .find(|entry| entry.get("id").and_then(Value::as_str) == Some(channel))
+            .unwrap_or_else(|| panic!("channels_list omitted {channel}: {channels:?}"));
+        let modes = definition
+            .get("auth_modes")
+            .and_then(Value::as_array)
+            .unwrap_or_else(|| panic!("{channel} has no auth_modes: {definition}"));
+        assert!(
+            modes
+                .iter()
+                .any(|mode| { mode.get("mode").and_then(Value::as_str) == Some("api_key") }),
+            "{channel} must advertise api_key credentials: {definition}"
+        );
+    }
+
     for (id, channel, required_fields, optional_default) in [
         (
             7004,
@@ -847,6 +870,413 @@ async fn credential_channel_describe_fields_are_wired_over_json_rpc_e2e() {
 
     mock_join.abort();
     rpc_join.abort();
+}
+
+#[tokio::test]
+async fn yuanbao_credential_connect_and_disconnect_roundtrip_over_json_rpc_e2e() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+
+    let sign_token_requests = Arc::new(AtomicUsize::new(0));
+    let requests_for_route = Arc::clone(&sign_token_requests);
+    let yuanbao_mock = Router::new().route(
+        "/api/v5/robotLogic/sign-token",
+        post(move || {
+            let requests = Arc::clone(&requests_for_route);
+            async move {
+                requests.fetch_add(1, Ordering::SeqCst);
+                Json(json!({
+                    "code": 0,
+                    "data": { "token": "local-yuanbao-token", "bot_id": "local-bot", "duration": 600 }
+                }))
+            }
+        }),
+    );
+    let (yuanbao_addr, yuanbao_join) = serve_on_ephemeral(yuanbao_mock).await;
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+
+    let connect = post_json_rpc(
+        &rpc_base,
+        7101,
+        "openhuman.channels_connect",
+        json!({
+            "channel": "yuanbao",
+            "authMode": "api_key",
+            "credentials": {
+                "app_key": "e2e-yuanbao-key",
+                "app_secret": "e2e-yuanbao-secret",
+                "api_domain": format!("http://{}", yuanbao_addr),
+            }
+        }),
+    )
+    .await;
+    let connected = peel_logs_envelope(assert_no_jsonrpc_error(
+        &connect,
+        "channels_connect Yuanbao",
+    ));
+    assert_eq!(
+        connected.get("status").and_then(Value::as_str),
+        Some("connected"),
+        "Yuanbao connect should report connected: {connected}"
+    );
+    assert_eq!(
+        connected.get("restart_required").and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        sign_token_requests.load(Ordering::SeqCst),
+        1,
+        "the pinned module must verify credentials through the test-owned endpoint"
+    );
+
+    let status = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7102,
+            "openhuman.channels_status",
+            json!({ "channel": "yuanbao" }),
+        )
+        .await,
+        "Yuanbao status after connect",
+        "yuanbao",
+        "api_key",
+    );
+    assert_eq!(status.get("connected").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        status.get("has_credentials").and_then(Value::as_bool),
+        Some(true)
+    );
+
+    let user_config = openhuman_home.join("users/local/config.toml");
+    let config_text = std::fs::read_to_string(&user_config).expect("Yuanbao config persisted");
+    let parsed_config: toml::Value = toml::from_str(&config_text).expect("config parses");
+    let yuanbao_config = parsed_config
+        .get("channels_config")
+        .and_then(|channels| channels.get("yuanbao"))
+        .expect("Yuanbao config saved");
+    assert_eq!(
+        yuanbao_config.get("app_key").and_then(toml::Value::as_str),
+        Some("e2e-yuanbao-key")
+    );
+    assert!(
+        yuanbao_config
+            .get("app_secret")
+            .and_then(toml::Value::as_str)
+            .is_none_or(str::is_empty),
+        "Yuanbao app_secret must not be persisted in config.toml: {yuanbao_config}"
+    );
+    assert!(
+        !config_text.contains("e2e-yuanbao-secret"),
+        "Yuanbao secret must not be persisted in config.toml"
+    );
+
+    let disconnect = post_json_rpc(
+        &rpc_base,
+        7103,
+        "openhuman.channels_disconnect",
+        json!({ "channel": "yuanbao", "authMode": "api_key" }),
+    )
+    .await;
+    let disconnected = peel_logs_envelope(assert_no_jsonrpc_error(
+        &disconnect,
+        "channels_disconnect Yuanbao",
+    ));
+    assert_eq!(
+        disconnected.get("disconnected").and_then(Value::as_bool),
+        Some(true)
+    );
+    let status = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7104,
+            "openhuman.channels_status",
+            json!({ "channel": "yuanbao" }),
+        )
+        .await,
+        "Yuanbao status after disconnect",
+        "yuanbao",
+        "api_key",
+    );
+    assert_eq!(
+        status.get("connected").and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        status.get("has_credentials").and_then(Value::as_bool),
+        Some(false)
+    );
+    let config_text = std::fs::read_to_string(&user_config).expect("config remains present");
+    let parsed_config: toml::Value = toml::from_str(&config_text).expect("config parses");
+    assert!(
+        parsed_config
+            .get("channels_config")
+            .and_then(|channels| channels.get("yuanbao"))
+            .is_none(),
+        "Yuanbao disconnect should remove its config"
+    );
+
+    mock_join.abort();
+    yuanbao_join.abort();
+    rpc_join.abort();
+}
+
+#[tokio::test]
+async fn credential_channels_reject_missing_required_fields_over_json_rpc_e2e() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+
+    for (id, channel, credentials) in [
+        (
+            7201,
+            "yuanbao",
+            json!({ "app_key": "incomplete-yuanbao-key" }),
+        ),
+        (
+            7203,
+            "email",
+            json!({
+                "imap_host": "127.0.0.1",
+                "smtp_host": "smtp.example.invalid",
+                "password": "incomplete-email-password",
+            }),
+        ),
+    ] {
+        let response = post_json_rpc(
+            &rpc_base,
+            id,
+            "openhuman.channels_connect",
+            json!({ "channel": channel, "authMode": "api_key", "credentials": credentials }),
+        )
+        .await;
+        assert!(
+            response.get("error").is_some(),
+            "{channel} must reject missing required credentials: {response}"
+        );
+        let status = channel_status_entry(
+            &post_json_rpc(
+                &rpc_base,
+                id + 1,
+                "openhuman.channels_status",
+                json!({ "channel": channel }),
+            )
+            .await,
+            &format!("{channel} status after rejected connect"),
+            channel,
+            "api_key",
+        );
+        assert_eq!(
+            status.get("connected").and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            status.get("has_credentials").and_then(Value::as_bool),
+            Some(false),
+            "{channel} must not store incomplete credentials"
+        );
+    }
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
+#[tokio::test]
+async fn email_connect_refusal_does_not_store_credentials_over_json_rpc_e2e() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+
+    let imap_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind loopback IMAP fixture");
+    let imap_port = imap_listener
+        .local_addr()
+        .expect("IMAP fixture address")
+        .port();
+    let accept_task = tokio::spawn(async move {
+        let (socket, _) = imap_listener.accept().await.expect("accept IMAP probe");
+        drop(socket); // Refuse the TLS handshake before any credentials can be sent.
+    });
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+    let credentials = json!({
+        "imap_host": "127.0.0.1",
+        "imap_port": imap_port.to_string(),
+        "smtp_host": "smtp.example.invalid",
+        "smtp_port": "465",
+        "username": "e2e@example.invalid",
+        "password": "e2e-email-password",
+    });
+    let response = post_json_rpc(
+        &rpc_base,
+        7301,
+        "openhuman.channels_connect",
+        json!({ "channel": "email", "authMode": "api_key", "credentials": credentials }),
+    )
+    .await;
+    assert!(
+        response.get("error").is_some(),
+        "Email connect should surface the local IMAP verifier refusal: {response}"
+    );
+    tokio::time::timeout(Duration::from_secs(5), accept_task)
+        .await
+        .expect("email verifier should reach the test-owned IMAP endpoint")
+        .expect("IMAP fixture task should not panic");
+
+    let error_text = response.get("error").expect("RPC error").to_string();
+    for secret in ["e2e-email-password", "e2e@example.invalid"] {
+        assert!(
+            !error_text.contains(secret),
+            "email verifier error must not expose credentials: {error_text}"
+        );
+    }
+    let status = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7302,
+            "openhuman.channels_status",
+            json!({ "channel": "email" }),
+        )
+        .await,
+        "Email status after local verifier refusal",
+        "email",
+        "api_key",
+    );
+    assert_eq!(
+        status.get("connected").and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        status.get("has_credentials").and_then(Value::as_bool),
+        Some(false),
+        "failed IMAP verification must not store email credentials"
+    );
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
+#[tokio::test]
+async fn email_disconnect_clears_config_over_json_rpc_e2e() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+    let user_config = openhuman_home.join("users/local/config.toml");
+    let mut config_text = std::fs::read_to_string(&user_config).expect("base config exists");
+    config_text.push_str(
+        "\n[channels_config.email]\nimap_host = \"127.0.0.1\"\nsmtp_host = \"127.0.0.1\"\nusername = \"e2e@example.invalid\"\npassword = \"\"\nfrom_address = \"e2e@example.invalid\"\nallowed_senders = [\"*\"]\n",
+    );
+    std::fs::write(&user_config, config_text).expect("seed email config for disconnect");
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+    let disconnect = post_json_rpc(
+        &rpc_base,
+        7401,
+        "openhuman.channels_disconnect",
+        json!({ "channel": "email", "authMode": "api_key" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&disconnect, "channels_disconnect Email");
+
+    let config_text = std::fs::read_to_string(&user_config).expect("config remains present");
+    let parsed_config: toml::Value = toml::from_str(&config_text).expect("config parses");
+    assert!(
+        parsed_config
+            .get("channels_config")
+            .and_then(|channels| channels.get("email"))
+            .is_none(),
+        "Email disconnect should remove its config"
+    );
+    let status = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7402,
+            "openhuman.channels_status",
+            json!({ "channel": "email" }),
+        )
+        .await,
+        "Email status after disconnect",
+        "email",
+        "api_key",
+    );
+    assert_eq!(
+        status.get("connected").and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        status.get("has_credentials").and_then(Value::as_bool),
+        Some(false)
+    );
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
+fn channel_status_entry(response: &Value, context: &str, channel: &str, mode: &str) -> Value {
+    let result = assert_no_jsonrpc_error(response, context);
+    let statuses = peel_logs_envelope(result)
+        .as_array()
+        .unwrap_or_else(|| panic!("{context}: expected channel status array, got {result}"));
+    statuses
+        .iter()
+        .find(|entry| {
+            entry.get("channel_id").and_then(Value::as_str) == Some(channel)
+                && entry.get("auth_mode").and_then(Value::as_str) == Some(mode)
+        })
+        .cloned()
+        .unwrap_or_else(|| panic!("{context}: missing {channel}/{mode} entry: {statuses:?}"))
 }
 
 /// Set on the re-exec below so the child runs the test body instead of
