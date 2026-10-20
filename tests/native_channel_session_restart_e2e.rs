@@ -5,9 +5,9 @@
 //! new update for the same Telegram conversation. The second model request
 //! must contain the first user's message from the session transcript.
 //!
-//! Both Telegram and inference are loopback mocks. This target needs the
-//! linked TinyChannels module implementation so it exercises the native
-//! Telegram listener rather than a host-side REST adapter.
+//! Both Telegram and inference are loopback mocks. This target loads a locally
+//! compiled TinyChannels module so it exercises the native Telegram listener
+//! through the production TinyBus artifact path.
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -294,6 +294,7 @@ fn start_core(
     workspace: &Path,
     telegram: &str,
     inference: &str,
+    module_source_dir: &Path,
     log_path: &Path,
 ) -> (CoreProcess, String) {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
@@ -321,7 +322,8 @@ fn start_core(
         .env("OPENHUMAN_AUTO_UPDATE_ENABLED", "false")
         .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
         .env("OPENHUMAN_COMPONENT_CHANNELS", "1")
-        .env("OPENHUMAN_MODULE_SOURCE", "linked")
+        .env("OPENHUMAN_MODULE_SOURCE", "source")
+        .env("OPENHUMAN_MODULE_SOURCE_DIR", module_source_dir)
         .env(
             "OPENHUMAN_STORAGE_URL",
             format!("sqlite:{}", workspace.join("sessions.db").display()),
@@ -329,7 +331,6 @@ fn start_core(
         .env("OPENHUMAN_KEYRING_MASTER_KEY", "44".repeat(32))
         .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
         .env_remove("OPENHUMAN_MODULE_PATH")
-        .env_remove("OPENHUMAN_MODULE_SOURCE_DIR")
         .env_remove("OPENHUMAN_MODE")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
         .envs(
@@ -466,6 +467,14 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     let workspace = home.join("workspace");
     let logs = home.join("logs");
     std::fs::create_dir_all(&logs).expect("create logs");
+    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
+        .map(std::path::PathBuf::from)
+        .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
+    assert!(
+        module_source_dir.join("tinychannels/modules.toml").is_file(),
+        "compiled TinyChannels source descriptor is missing from {}",
+        module_source_dir.display()
+    );
 
     let mocks = start_mock_servers().await;
     write_config(&home, &workspace, &mocks.inference);
@@ -476,6 +485,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &workspace,
         &mocks.telegram,
         &mocks.inference,
+        &module_source_dir,
         &logs.join("first.log"),
     );
     wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
@@ -577,6 +587,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &workspace,
         &mocks.telegram,
         &mocks.inference,
+        &module_source_dir,
         &logs.join("second.log"),
     );
     assert_ne!(
