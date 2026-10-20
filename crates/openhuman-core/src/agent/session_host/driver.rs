@@ -517,6 +517,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             interrupted: outcome.early_exit_tool.is_some() || outcome.hit_cap,
             // `None` lets the runtime derive the outcome from `interrupted`.
             outcome: None,
+            tool_outcomes: outcome.tool_outcomes.clone(),
         })
     }
 }
@@ -653,6 +654,7 @@ fn driver_error_with_snapshot(
             partial: Some(TranscriptPartial::new(display)),
             interrupted: true,
             outcome: terminal.clone(),
+            tool_outcomes: guard.tool_outcomes.clone(),
         }),
         outcome: terminal,
     }
@@ -716,6 +718,7 @@ fn driver_cancelled_with_snapshot(
             partial: None,
             interrupted: true,
             outcome: None,
+            tool_outcomes: guard.tool_outcomes.clone(),
         }),
         outcome: None,
     }

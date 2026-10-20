@@ -38,6 +38,7 @@ impl SessionDriver<OpenHumanRunContext> for RecordingDriver {
             partial: None,
             interrupted: false,
             outcome: None,
+            tool_outcomes: Vec::new(),
         })
     }
 }

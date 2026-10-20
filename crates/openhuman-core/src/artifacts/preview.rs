@@ -59,25 +59,24 @@ pub async fn read_body(
         None,
         ctx,
     );
-    let versioned = artifacts
-        .get(id)
-    .await
-    .map_err(|e| e.to_string())?;
+    let file_store = super::tiny_store::file_store_for(&config.workspace_dir, ctx);
+    let versioned = artifacts.get(id).await.map_err(|e| e.to_string())?;
     let record = match versioned {
         Some(record) => record,
         // An artifact made before versioning has only its legacy record: show
         // the file that record vouches for.
         None => {
-            legacy_record(&config.workspace_dir, &files, id, &artifacts).await?
+            legacy_record(
+                &config.workspace_dir,
+                &files,
+                id,
+                file_store.as_ref(),
+            )
+            .await?
         }
     };
     let converter = DocumentConverter::for_config(config);
-    Ok(body_of(
-        &record,
-        artifacts.file_store(),
-        &converter,
-    )
-    .await)
+    Ok(body_of(&record, file_store.as_ref(), &converter).await)
 }
 
 /// A one-version file record for an artifact that has only its legacy
@@ -87,7 +86,7 @@ async fn legacy_record(
     workspace_dir: &Path,
     files: &super::files::FileRoots,
     id: &str,
-    artifacts: &tiny_artifacts::Artifacts,
+    file_store: Option<&std::sync::Arc<dyn FileStore>>,
 ) -> Result<ArtifactRecord, String> {
     let meta = super::store::get_artifact(workspace_dir, id)
         .await
@@ -100,16 +99,11 @@ async fn legacy_record(
         size_bytes: meta.size_bytes,
         media_type: None,
     };
-    let file_store = super::tiny_store::file_store_for(
-        workspace_dir,
-        &crate::core::runtime::DispatchCtx::ambient(),
-    )
-    .ok_or_else(|| "artifact file storage is unavailable".to_string())?;
-    let roots = super::tiny_store::guarded_roots(super::tiny_store::file_roots(
-        workspace_dir,
-        files,
-        None,
-    ));
+    let file_store = file_store.ok_or_else(|| "artifact file storage is unavailable".to_string())?;
+    let parent = Path::new(&path)
+        .parent()
+        .ok_or_else(|| "legacy artifact file has no parent folder".to_string())?;
+    let roots = super::tiny_store::guarded_roots(vec![parent.to_path_buf()]);
     let imported = tiny_artifacts::import_legacy_file(
         file_store.as_ref(),
         &roots,
