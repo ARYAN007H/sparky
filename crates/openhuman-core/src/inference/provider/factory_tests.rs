@@ -15,7 +15,9 @@ impl ChatModel<()> for ManagedRouteFixtureModel {
         _state: &(),
         _request: tinyinference_llm::model::ModelRequest,
     ) -> tinyinference_llm::Result<tinyinference_llm::model::ModelResponse> {
-        Ok(tinyinference_llm::model::ModelResponse::assistant("fixture"))
+        Ok(tinyinference_llm::model::ModelResponse::assistant(
+            "fixture",
+        ))
     }
 }
 

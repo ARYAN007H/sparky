@@ -81,10 +81,10 @@ fn byok_and_local_models_are_not_managed() {
 
 #[test]
 fn normalizes_case_whitespace_and_prefixes() {
-    assert_eq!(route_for_model("  Chat-V1 "), CostRoute::Managed);
-    assert_eq!(route_for_model("hint:chat-v1"), CostRoute::Managed);
+    assert_eq!(route_for_model("  HINT:CHAT "), CostRoute::Managed);
+    assert_eq!(route_for_model("hint:chat"), CostRoute::Managed);
     assert_eq!(
-        route_for_model("openhuman/reasoning-v1"),
+        route_for_model("openhuman/hint:reasoning"),
         CostRoute::Managed
     );
 }

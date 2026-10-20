@@ -126,8 +126,9 @@ async fn unregistered_managed_catalog_lists_no_models() {
         "https://managed.example/v1",
         AuthStyle::OpenhumanJwt,
     );
-    let outcome = super::catalog_listing::list_configured_models_from_config("fixture-managed", &config)
-        .await
-        .expect("an unregistered host-owned catalog is empty, not an error");
+    let outcome =
+        super::catalog_listing::list_configured_models_from_config("fixture-managed", &config)
+            .await
+            .expect("an unregistered host-owned catalog is empty, not an error");
     assert_eq!(outcome.value["models"], serde_json::json!([]));
 }

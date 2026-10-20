@@ -152,7 +152,9 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
     )
     .await;
     let rejected = drain_until(&mut rx, |e| match e {
-        DomainEvent::ProviderApiKeyRejected { provider, .. } if provider == FIXTURE_BACKEND => Some(()),
+        DomainEvent::ProviderApiKeyRejected { provider, .. } if provider == FIXTURE_BACKEND => {
+            Some(())
+        }
         _ => None,
     });
     assert!(
