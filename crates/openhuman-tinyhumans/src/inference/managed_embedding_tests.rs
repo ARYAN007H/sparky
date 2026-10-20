@@ -2,7 +2,7 @@ use super::*;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::AuthService;
 use std::collections::HashMap;
-use tinyinference_embeddings::{DEFAULT_CLOUD_DIMENSIONS, DEFAULT_CLOUD_MODEL};
+use tinyinference_embeddings::{CloudEmbeddingModel, DEFAULT_CLOUD_DIMENSIONS, DEFAULT_CLOUD_MODEL};
 
 fn test_config(tmp: &tempfile::TempDir) -> Config {
     Config {
@@ -25,8 +25,8 @@ fn build_through_registry(
     config: &Config,
     model: &str,
     dimensions: usize,
-) -> ManagedEmbeddingModel {
-    ManagedEmbeddingModel::from_request(&EmbeddingRequest {
+) -> CloudEmbeddingModel {
+    from_request(&EmbeddingRequest {
         config: Some(config),
         model,
         dimensions,
@@ -72,7 +72,7 @@ async fn api_key_alone_authenticates_cloud_embeddings() {
         "tiny_test_emb",
     )
     .unwrap();
-    let provider = ManagedEmbeddingModel::new(
+    let provider = build_cloud_model(
         Some(format!("http://{addr}")),
         state.path().to_path_buf(),
         false,
@@ -102,7 +102,7 @@ async fn api_key_is_refused_over_plaintext_non_loopback() {
         "tiny_test_emb",
     )
     .unwrap();
-    let provider = ManagedEmbeddingModel::new(
+    let provider = build_cloud_model(
         Some("http://embeddings.example.test".into()),
         state.path().to_path_buf(),
         false,
@@ -138,8 +138,8 @@ async fn find_embedding_disclosure(
     }
 }
 
-fn unreachable_embedder(model: &str) -> ManagedEmbeddingModel {
-    ManagedEmbeddingModel::new(
+fn unreachable_embedder(model: &str) -> CloudEmbeddingModel {
+    build_cloud_model(
         Some("http://127.0.0.1:0".into()),
         std::env::temp_dir().join("openhuman_embeddings_routing_state"),
         false,
@@ -168,7 +168,7 @@ async fn a_cloud_embedding_call_in_a_chat_turn_discloses_to_that_chat() {
         client_id: "client-embed".into(),
         request_id: Some("req-embed".into()),
     };
-    let embedder = unreachable_embedder(marker).routed_to(Some(chat));
+    let embedder = unreachable_embedder_with_chat(marker, Some(chat));
 
     // The transport has nowhere to go; the disclosure precedes it.
     let _ = embedder
@@ -215,8 +215,7 @@ async fn an_unrouted_embedder_discloses_without_a_chat() {
     );
 }
 
-/// `routed_to` re-routes a shared embedder per turn without touching the
-/// original: each turn's disclosure reaches its own chat.
+/// Each embedding model carries the approval context for its own turn.
 #[tokio::test]
 async fn routing_is_per_embedder_not_shared() {
     openhuman_embed::__host::core::bus::init()
@@ -227,15 +226,13 @@ async fn routing_is_per_embedder_not_shared() {
         .unwrap()
         .receiver();
     let marker = "embed-routed-per-turn";
-    let base = unreachable_embedder(marker);
     let chat = |thread: &str| ApprovalChatContext {
         thread_id: thread.into(),
         client_id: "c".into(),
         request_id: None,
     };
 
-    let _ = base
-        .routed_to(Some(chat("thread-a")))
+    let _ = unreachable_embedder_with_chat(marker, Some(chat("thread-a")))
         .embed(&["a".into()])
         .await;
     assert_eq!(
@@ -245,8 +242,7 @@ async fn routing_is_per_embedder_not_shared() {
             .as_deref(),
         Some("thread-a")
     );
-    let _ = base
-        .routed_to(Some(chat("thread-b")))
+    let _ = unreachable_embedder_with_chat(marker, Some(chat("thread-b")))
         .embed(&["b".into()])
         .await;
     assert_eq!(
@@ -256,7 +252,7 @@ async fn routing_is_per_embedder_not_shared() {
             .as_deref(),
         Some("thread-b")
     );
-    let _ = base.embed(&["c".into()]).await;
+    let _ = unreachable_embedder(marker).embed(&["c".into()]).await;
     assert_eq!(find_embedding_disclosure(&mut rx, marker).await.0, None);
 }
 

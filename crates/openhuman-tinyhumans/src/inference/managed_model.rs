@@ -5,8 +5,6 @@
 //! supplies OpenHuman's live credential resolver and client policy.
 
 use std::path::PathBuf;
-use std::time::Duration;
-
 use tinyinference_llm::providers::tinyhumans::{TinyHumansFailurePoint, TinyHumansModel};
 
 use super::managed_session::{publish_managed_auth_failure, resolve_session_bearer};
@@ -90,7 +88,6 @@ pub(super) fn build_chat_model(
     .with_cache_namespace("openhuman")
     .with_native_tool_calling(native_tool_calling)
     .with_thread_id(thread_id)
-    .with_http_client(managed_inference_http_client())
     .with_error_observer(log_managed_error);
 
     if observe_auth_failures {
@@ -130,32 +127,3 @@ fn log_managed_error(error: &tinyinference_llm::Error, point: TinyHumansFailureP
 #[path = "managed_model_tests.rs"]
 mod tests;
 
-/// Connect timeout for managed inference; matches the previous host adapter.
-const MANAGED_INFERENCE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-/// Keep pooled connections below the backend ALB's idle timeout.
-const MANAGED_INFERENCE_POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(50);
-
-/// Shared HTTP client retains TLS connections across managed turns.
-fn managed_inference_http_client() -> reqwest::Client {
-    static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
-    CLIENT
-        .get_or_init(|| {
-            tracing::debug!(
-                idle_timeout_secs = MANAGED_INFERENCE_POOL_IDLE_TIMEOUT.as_secs(),
-                "[inference][managed] building shared pooled HTTP client"
-            );
-            reqwest::Client::builder()
-                .connect_timeout(MANAGED_INFERENCE_CONNECT_TIMEOUT)
-                .pool_idle_timeout(MANAGED_INFERENCE_POOL_IDLE_TIMEOUT)
-                .tcp_keepalive(Duration::from_secs(30))
-                .build()
-                .unwrap_or_else(|error| {
-                    tracing::warn!(
-                        error = %error,
-                        "[inference][managed] pooled client build failed; using reqwest defaults"
-                    );
-                    reqwest::Client::new()
-                })
-        })
-        .clone()
-}

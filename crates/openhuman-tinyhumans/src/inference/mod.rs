@@ -7,7 +7,7 @@
 //! | Registry | Registered value |
 //! | --- | --- |
 //! | chat models | TinyInference's [`tinyinference_llm::providers::tinyhumans::TinyHumansModel`] with host credentials, plus its readiness probe |
-//! | embeddings | [`managed_embedding::ManagedEmbeddingModel`] |
+//! | embeddings | TinyInference's `CloudEmbeddingModel` with OpenHuman's credential and egress policy |
 //! | catalogs | the managed `/openai/v1/models?catalog=openrouter` listing and its limits request |
 //!
 //! `register` is the one place it does so; `crate::register::register_all`
@@ -17,7 +17,6 @@ mod backend_error_code;
 mod managed_catalog;
 mod managed_embedding;
 mod managed_model;
-mod managed_reasoning;
 mod managed_session;
 mod tiers;
 #[cfg(test)]
@@ -33,7 +32,6 @@ use openhuman_embed::__host::inference_registry::{
 };
 use tinyinference_llm::model::ChatModel;
 
-pub use managed_embedding::ManagedEmbeddingModel;
 pub use managed_model::ManagedOptions;
 
 use crate::install::InstallOptions;
@@ -128,12 +126,12 @@ pub(crate) fn register(_options: &InstallOptions) {
                 resolve_model: Arc::new(tiers::resolve_model),
                 context_window: Arc::new(tiers::context_window),
                 default_pricing: Arc::new(tiers::default_pricing),
-                without_reasoning: Arc::new(managed_reasoning::without_reasoning),
+                without_reasoning: Arc::new(tinyinference_llm::model::without_reasoning),
             }),
         },
     );
     register_embedding(PROVIDER_OPENHUMAN, |request| {
-        Ok(Box::new(ManagedEmbeddingModel::from_request(request)))
+        Ok(Box::new(managed_embedding::from_request(request)))
     });
     register_catalog(PROVIDER_OPENHUMAN, managed_catalog::entry());
     register_config_normalizer(PROVIDER_OPENHUMAN, Arc::new(tiers::normalize_config));
