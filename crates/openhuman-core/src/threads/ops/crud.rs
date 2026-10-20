@@ -5,11 +5,11 @@ use super::support::{
     counts, envelope, message_to_record, record_to_message, run_to_completion, thread_to_summary,
     workspace_dir,
 };
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
+use crate::threads::ThreadsError;
 use crate::threads::store as conversations;
 use crate::threads::store::{ConversationMessagePatch, CrossThreadHit};
-use crate::threads::ThreadsError;
 use crate::threads::{
     ApiEnvelope, AppendConversationMessageRequest, ConversationMessageRecord,
     ConversationMessagesRequest, ConversationMessagesResponse, ConversationThreadSummary,
@@ -232,7 +232,9 @@ async fn message_append_with_config(
     if !typed_attachments.is_empty()
         && (original_content.contains("[IMAGE:")
             || original_content.contains("[FILE:")
-            || !crate::agent::attachments::parse(&original_content).1.is_empty())
+            || !crate::agent::attachments::parse(&original_content)
+                .1
+                .is_empty())
     {
         return Err(ThreadsError::Message(
             "typed attachments cannot be combined with legacy attachment markers".into(),
@@ -350,22 +352,17 @@ async fn message_append_with_config(
         .await
         .map_err(|error| ThreadsError::Message(format!("stage user attachments: {error}")))?;
         if typed_media_count > 0 {
-            let (clean_content, staged_files) =
-                crate::agent::attachments::parse(&staged_content);
+            let (clean_content, staged_files) = crate::agent::attachments::parse(&staged_content);
             if staged_files.len() != typed_media_count {
                 return Err(ThreadsError::Message(
                     "typed attachment staging did not preserve media order".into(),
                 ));
             }
-            let entries = crate::threads::attachments::from_staged_parts(
-                &typed_attachments,
-                &staged_files,
-            )
-            .map_err(ThreadsError::Message)?;
-            request.message.attachments = crate::threads::attachments::save(
-                &mut request.message.extra_metadata,
-                entries,
-            );
+            let entries =
+                crate::threads::attachments::from_staged_parts(&typed_attachments, &staged_files)
+                    .map_err(ThreadsError::Message)?;
+            request.message.attachments =
+                crate::threads::attachments::save(&mut request.message.extra_metadata, entries);
             request.message.content = clean_content.trim().to_string();
         } else {
             request.message.content = staged_content;

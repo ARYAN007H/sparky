@@ -5,8 +5,8 @@
 use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use super::ops::{
@@ -207,9 +207,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
         let stored_parts = p
             .attachments
             .iter()
-            .filter(|part| {
-                !matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. })
-            })
+            .filter(|part| !matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. }))
             .cloned()
             .collect::<Vec<_>>();
         let stored_attachments = if stored_parts.is_empty() {
@@ -219,11 +217,11 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             None
         } else {
             crate::threads::attachments::validate_opaque_parts(&stored_parts)?;
-            let persisted_message_id = p
-                .persisted_message_id
-                .clone()
-                .filter(|id| !id.is_empty())
-                .ok_or_else(|| "opaque media refs require persisted_message_id".to_string())?;
+            let persisted_message_id =
+                p.persisted_message_id
+                    .clone()
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| "opaque media refs require persisted_message_id".to_string())?;
             Some(crate::agent::queued_turn::StoredAttachmentInput {
                 persisted_message_id,
                 parts: stored_parts,

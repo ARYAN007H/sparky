@@ -81,7 +81,7 @@ fn describe(error: &ConversationError, subject: Subject<'_>) -> String {
             let text = inner.to_string();
             match (subject.thread, subject.message) {
                 (Some(t), Some(m)) if text.contains("message") => {
-                    return format!("message {m} not found in thread {t}")
+                    return format!("message {m} not found in thread {t}");
                 }
                 (Some(t), _) => return format!("thread {t} not found"),
                 _ => {}

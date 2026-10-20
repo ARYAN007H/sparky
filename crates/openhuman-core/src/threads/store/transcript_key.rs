@@ -12,7 +12,7 @@
 //! recorded key. A thread with no record falls back to the current rule.
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Precondition};
 
 use super::backend::ConversationStore;

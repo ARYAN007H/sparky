@@ -27,11 +27,11 @@ pub use observe::ObserveProgress;
 #[cfg(test)]
 use tinyagents_session::port::{InMemoryTurnStates, TurnStates};
 #[cfg(test)]
+use tinyagents_session::turn_state::TurnStateMirror;
+#[cfg(test)]
 use tinyagents_session::turn_state::mirror::MAX_PERSISTED_TRANSCRIPT_ITEM;
 #[cfg(test)]
 use tinyagents_session::turn_state::types::{
     SubagentToolCall, SubagentTranscriptItem, ToolTimelineStatus, TranscriptItem, TurnLifecycle,
     TurnPhase,
 };
-#[cfg(test)]
-use tinyagents_session::turn_state::TurnStateMirror;

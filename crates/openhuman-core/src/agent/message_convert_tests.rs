@@ -61,18 +61,21 @@ fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
     let Message::User(user) = replay else {
         panic!("user row expected")
     };
-    assert!(user
-        .content
-        .iter()
-        .any(|part| matches!(part, ContentBlock::Audio(MediaRef::Path { .. }))));
-    assert!(user
-        .content
-        .iter()
-        .any(|part| matches!(part, ContentBlock::Video(MediaRef::Path { .. }))));
-    assert!(user
-        .content
-        .iter()
-        .any(|part| matches!(part, ContentBlock::Document(MediaRef::Path { .. }))));
+    assert!(
+        user.content
+            .iter()
+            .any(|part| matches!(part, ContentBlock::Audio(MediaRef::Path { .. })))
+    );
+    assert!(
+        user.content
+            .iter()
+            .any(|part| matches!(part, ContentBlock::Video(MediaRef::Path { .. })))
+    );
+    assert!(
+        user.content
+            .iter()
+            .any(|part| matches!(part, ContentBlock::Document(MediaRef::Path { .. })))
+    );
     assert!(!serde_json::to_string(&row).unwrap().contains("base64"));
 }
 use tinyinference_llm::model::ModelRequest;
@@ -339,10 +342,12 @@ fn reasoning_content_uses_typed_thinking_block_and_round_trips_metadata() {
             ContentBlock::Thinking { text, signature: None } if text == "private thoughts"
         )
     }));
-    assert!(!assistant
-        .content
-        .iter()
-        .any(|block| matches!(block, ContentBlock::ProviderExtension(_))));
+    assert!(
+        !assistant
+            .content
+            .iter()
+            .any(|block| matches!(block, ContentBlock::ProviderExtension(_)))
+    );
 
     let back = message_to_chat_message(&msg).expect("assistant converts");
     assert_eq!(back.content, "visible answer");

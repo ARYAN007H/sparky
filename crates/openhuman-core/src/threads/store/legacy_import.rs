@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tinyagents_session::threads::{
@@ -155,7 +155,7 @@ pub(super) fn import_once(
             Ok(_) => return Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(error) => {
-                return Err(anyhow::Error::new(error).context("stat the legacy threads log"))
+                return Err(anyhow::Error::new(error).context("stat the legacy threads log"));
             }
         }
         let marked = repo.run(|docs| {

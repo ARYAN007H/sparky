@@ -3,12 +3,12 @@
 
 use super::support::{counts, envelope, thread_to_summary, update_thread_with_fallback_title};
 use crate::config::Config;
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
 use crate::inference::provider;
-use crate::threads::store as conversations;
-use crate::threads::ThreadsError;
 use crate::threads::THREAD_TITLE_LOG_PREFIX;
+use crate::threads::ThreadsError;
+use crate::threads::store as conversations;
 use crate::threads::{
     ApiEnvelope, ConversationThreadSummary, GenerateConversationThreadTitleRequest,
 };

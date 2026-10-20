@@ -43,9 +43,17 @@ fn public_projection_hides_paths_but_keeps_opaque_attachment_refs() {
         ..Default::default()
     });
     let mut metadata = json!({"keep": true});
-    let public = save(&mut metadata, vec![(part.clone(), "uploads/thread/a.png".into())]);
+    let public = save(
+        &mut metadata,
+        vec![(part.clone(), "uploads/thread/a.png".into())],
+    );
     assert_eq!(public, vec![part]);
-    assert!(metadata[STORAGE_KEY][0]["path"].as_str().unwrap().contains("uploads/"));
+    assert!(
+        metadata[STORAGE_KEY][0]["path"]
+            .as_str()
+            .unwrap()
+            .contains("uploads/")
+    );
 
     let projected = public_refs(&metadata);
     assert_eq!(projected, public);
