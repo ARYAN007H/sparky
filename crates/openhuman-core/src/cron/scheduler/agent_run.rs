@@ -122,7 +122,7 @@ pub(super) async fn run_agent_job_for_run(
                                     agent_id = %agent_id,
                                     workload = %workload,
                                     error = %e,
-                                    fallback = %fallback_model,
+                                    fallback = ?fallback_model,
                                     "[cron] workload factory failed; using fallback model"
                                 );
                                 fallback_model.clone()

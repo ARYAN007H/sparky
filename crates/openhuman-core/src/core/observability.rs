@@ -2297,10 +2297,12 @@ fn report_expected_message(kind: ExpectedErrorKind, message: &str, domain: &str,
         ExpectedErrorKind::BackendErrorCodeOwned => {
             // The classifier's canonical token aids triage without re-parsing
             // provider-specific strings in this generic module.
-            let code = crate::inference::registry::classify_backend_error(None, message)
+            let classification = crate::inference::registry::classify_backend_error(None, message);
+            let code = classification
                 .as_ref()
                 .and_then(|classification| classification.token.as_deref())
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             tracing::warn!(
                 domain = domain,
                 operation = operation,
