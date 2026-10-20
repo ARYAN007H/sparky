@@ -477,7 +477,6 @@ async fn remote_clear_rejects_an_unconfigured_captured_account() {
     assert!(result.is_err(), "unknown provider account must fail closed");
 }
 
-#[cfg(feature = "modules")]
 #[tokio::test]
 async fn remote_clear_resets_only_the_captured_tenant_session() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
