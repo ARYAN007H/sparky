@@ -1105,7 +1105,7 @@ async fn run_managed_capture_turn(
             .and_then(Value::as_str)
             .unwrap_or("missing")
     );
-    let completed = wait_for_capture_summaries(&capture_dir, expected_summary_count).await;
+    let completed = wait_for_capture_summaries(capture_dir, expected_summary_count).await;
     assert!(
         completed[..expected_summary_count]
             .iter()
