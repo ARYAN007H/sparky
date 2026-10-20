@@ -358,10 +358,20 @@ async fn goal_resume_and_account_updates_reach_the_web_channel() {
             std::time::Duration::from_secs(1),
         )
         .await;
-        assert!(matches!(
-            web_rx.try_recv(),
-            Err(broadcast::error::TryRecvError::Empty)
-        ));
+        loop {
+            match web_rx.try_recv() {
+                Ok(event)
+                    if event.event == "thread_goal_updated" && event.thread_id == thread_id =>
+                {
+                    panic!("account update published before the throttle threshold")
+                }
+                Ok(_) | Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                Err(broadcast::error::TryRecvError::Empty) => break,
+                Err(broadcast::error::TryRecvError::Closed) => {
+                    panic!("web-channel bus closed before the account threshold")
+                }
+            }
+        }
         crate::agent::goals::account_turn(
             workspace.path(),
             &dispatch,

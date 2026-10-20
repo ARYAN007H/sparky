@@ -20,9 +20,13 @@ async fn goal_store_is_reused_within_a_context_and_isolated_between_agents() {
     let first = goal_store(first_workspace.path(), &first_dispatch);
     let repeated = goal_store(first_workspace.path(), &first_dispatch);
     assert!(Arc::ptr_eq(&first, &repeated));
+    let cache_owns_store = Arc::downgrade(&first);
     drop(first);
     drop(repeated);
     let reacquired = goal_store(first_workspace.path(), &first_dispatch);
+    assert!(cache_owns_store
+        .upgrade()
+        .is_some_and(|cached| Arc::ptr_eq(&cached, &reacquired)));
     let isolated = goal_store(first_workspace.path(), &second_dispatch);
     let other_workspace = goal_store(second_workspace.path(), &first_dispatch);
 
@@ -127,25 +131,23 @@ async fn goal_store_uses_the_explicit_dispatch_context_provider() {
             .await
             .expect("write explicit A store");
 
-        let stored_a = provider_a
-            .for_agent(&agent_a_key)
-            .kv
-            .get(
-                tinyagents_harness_tools::goals::store::GOALS_NAMESPACE,
-                "same-thread",
-            )
-            .await
-            .expect("read A provider");
-        let stored_b = provider_b
-            .for_agent("agent-b")
-            .kv
-            .get(
-                tinyagents_harness_tools::goals::store::GOALS_NAMESPACE,
-                "same-thread",
-            )
-            .await
-            .expect("read B provider");
-        assert!(stored_a.is_some(), "goal belongs to explicit agent A");
+        let stored_a = tinyagents_harness_tools::goals::store::get(
+            &provider_a.for_agent(&agent_a_key).kv,
+            "same-thread",
+        )
+        .await
+        .expect("read A provider");
+        let stored_b = tinyagents_harness_tools::goals::store::get(
+            &provider_b.for_agent(&agent_a_key).kv,
+            "same-thread",
+        )
+        .await
+        .expect("read B provider");
+        assert_eq!(
+            stored_a.as_ref().map(|goal| goal.objective.as_str()),
+            Some("belongs to agent A"),
+            "goal belongs to explicit agent A"
+        );
         assert!(stored_b.is_none(), "ambient agent B must remain isolated");
     })
     .await;
