@@ -90,10 +90,16 @@ describe('threadSlice synchronous reducers', () => {
 
   it('deletes a thread from legacy persisted state without channel activity', () => {
     const current = threadReducer(undefined, { type: '@@test/init' });
-    const legacyState = { ...current, channelActivityByThreadId: undefined } as unknown as typeof current;
+    const legacyState = {
+      ...current,
+      channelActivityByThreadId: undefined,
+    } as unknown as typeof current;
 
     expect(() =>
-      threadReducer(legacyState, deleteThread.fulfilled({ threadId: 't-legacy' }, 'request-1', 't-legacy'))
+      threadReducer(
+        legacyState,
+        deleteThread.fulfilled({ threadId: 't-legacy' }, 'request-1', 't-legacy')
+      )
     ).not.toThrow();
   });
 

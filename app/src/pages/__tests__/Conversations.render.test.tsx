@@ -16,7 +16,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SidebarSlotOutlet, SidebarSlotProvider } from '../../components/layout/shell/SidebarSlot';
 import { threadApi } from '../../services/api/threadApi';
-import { chatCancel, chatRemoveQueueItem, chatSend, chatSendWithAck } from '../../services/chatService';
+import {
+  chatCancel,
+  chatRemoveQueueItem,
+  chatSend,
+  chatSendWithAck,
+} from '../../services/chatService';
 import { CoreRpcError } from '../../services/coreRpcClient';
 import chatRuntimeReducer, {
   beginInferenceTurn,
@@ -2556,7 +2561,9 @@ describe('Conversations — queued follow-ups while a turn streams', () => {
     });
 
     await waitFor(() => {
-      expect(chatSendWithAck).toHaveBeenCalledWith(expect.objectContaining({ queueMode: 'followup' }));
+      expect(chatSendWithAck).toHaveBeenCalledWith(
+        expect.objectContaining({ queueMode: 'followup' })
+      );
     });
     await waitFor(() =>
       expect(
@@ -2579,7 +2586,9 @@ describe('Conversations — queued follow-ups while a turn streams', () => {
     });
 
     await waitFor(() => {
-      expect(chatSendWithAck).toHaveBeenCalledWith(expect.objectContaining({ queueMode: 'followup' }));
+      expect(chatSendWithAck).toHaveBeenCalledWith(
+        expect.objectContaining({ queueMode: 'followup' })
+      );
     });
   });
 
