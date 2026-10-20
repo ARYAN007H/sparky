@@ -105,6 +105,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
     vi.clearAllMocks();
     resetRuntimeState();
     vi.mocked(threadApi.appendMessage).mockImplementation(async (_tid, msg) => msg);
+    vi.mocked(threadApi.getThreadMessages).mockResolvedValue({
+      messages: [],
+    } as unknown as Awaited<ReturnType<typeof threadApi.getThreadMessages>>);
     vi.mocked(threadApi.getThreads).mockResolvedValue({ threads: [], count: 0 });
     vi.mocked(threadApi.getTurnState).mockResolvedValue(null);
     vi.mocked(threadApi.listRuns).mockResolvedValue([]);
@@ -878,7 +881,7 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       expect(store.getState().chatRuntime.pendingPlanReviewByThread['t-plan']).toBeUndefined();
     });
 
-    it('flushes queued upload originals through core staging and caches only returned references', async () => {
+    it('reloads a runner-persisted queued upload without appending a duplicate', async () => {
       const listeners = renderProvider();
       const parts = [
         {
@@ -902,11 +905,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           },
         },
       ];
-      const durable =
-        '[ATTACHMENT:%7B%22path%22%3A%22uploads%2Ft%2Fa%2Farchive.zip%22%2C%22name%22%3A%22archive.zip%22%2C%22mime%22%3A%22application%2Fzip%22%2C%22size_bytes%22%3A3%7D]';
-      vi.mocked(threadApi.appendMessage).mockImplementation(async (_tid, message) =>
-        message.sender === 'user' ? { ...message, content: durable } : message
-      );
       store.dispatch(
         pendingFollowupAdded({
           threadId: 't-upload',
@@ -919,6 +917,7 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
             createdAt: '2026-01-01T00:00:00.000Z',
           },
           text: '',
+          requestId: 'r-upload',
           attachments: parts,
         })
       );
@@ -931,22 +930,12 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           total_output_tokens: 1,
         });
       });
-      await waitFor(() =>
-        expect(threadApi.appendMessage).toHaveBeenCalledWith(
-          't-upload',
-          expect.objectContaining({ content: '', sender: 'user' }),
-          parts
-        )
-      );
-      const row = store
-        .getState()
-        .thread.messagesByThreadId['t-upload'].find(message => message.id === 'queued-upload');
-      expect(row?.content).toBe(durable);
-      expect(JSON.stringify(row?.extraMetadata)).not.toContain('base64');
+      await waitFor(() => expect(threadApi.getThreadMessages).toHaveBeenCalledWith('t-upload'));
+      expect(threadApi.appendMessage).not.toHaveBeenCalled();
       expect(store.getState().queue.pendingFollowupsByThread['t-upload']).toBeUndefined();
     });
 
-    it('flushes queued follow-ups into the transcript when a turn ends', async () => {
+    it('keeps a follow-up pending until its own terminal event reloads the persisted row', async () => {
       const listeners = renderProvider();
       store.dispatch(
         pendingFollowupAdded({
@@ -960,28 +949,32 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
             createdAt: '2026-01-01T00:00:00.000Z',
           },
           text: 'queued follow-up text',
+          requestId: 'r-fup',
         })
       );
 
       await act(async () => {
         listeners.onDone?.({
           thread_id: 't-fup',
-          request_id: 'r-fup',
+          request_id: 'r-current',
           full_response: 'assistant reply',
           total_input_tokens: 1,
           total_output_tokens: 1,
         });
       });
+      expect(store.getState().queue.pendingFollowupsByThread['t-fup']).toHaveLength(1);
+      expect(threadApi.appendMessage).not.toHaveBeenCalled();
 
-      // The queued prompt is persisted as a real user message (survives reload,
-      // appended AFTER the assistant reply) and the pills are cleared.
-      await waitFor(() =>
-        expect(threadApi.appendMessage).toHaveBeenCalledWith(
-          't-fup',
-          expect.objectContaining({ content: 'queued follow-up text', sender: 'user' }),
-          []
-        )
-      );
+      await act(async () => {
+        listeners.onDone?.({
+          thread_id: 't-fup',
+          request_id: 'r-fup',
+          full_response: 'queued reply',
+          total_input_tokens: 1,
+          total_output_tokens: 1,
+        });
+      });
+      await waitFor(() => expect(threadApi.getThreadMessages).toHaveBeenCalledWith('t-fup'));
       expect(store.getState().queue.pendingFollowupsByThread['t-fup']).toBeUndefined();
     });
 
