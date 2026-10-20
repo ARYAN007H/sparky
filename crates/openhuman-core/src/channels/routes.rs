@@ -15,7 +15,8 @@ fn provider_descriptors(config: &crate::config::Config) -> Vec<ProviderDescripto
         .map(|provider| ProviderDescriptor {
             name: provider.slug.clone(),
             aliases: if provider.slug == crate::inference::provider::factory::PROVIDER_OPENHUMAN
-                || crate::config::schema::cloud_providers::is_hosted_auth_style(
+                || crate::config::schema::cloud_providers::is_hosted_cloud_provider(
+                    &provider.slug,
                     provider.auth_style,
                 )
             {

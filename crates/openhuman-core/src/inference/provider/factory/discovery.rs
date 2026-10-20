@@ -39,7 +39,7 @@ pub(crate) fn model_limits_request(
     let (slug, raw) = p.split_once(':')?;
     let slug = slug.trim();
     let entry = config.cloud_providers.iter().find(|e| e.slug == slug)?;
-    if crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style) {
+    if crate::config::schema::cloud_providers::is_hosted_cloud_provider(&entry.slug, entry.auth_style) {
         let (raw_model, _) = split_model_and_temperature(raw);
         let model = if raw_model.trim().is_empty() {
             model

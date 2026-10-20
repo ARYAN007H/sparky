@@ -90,7 +90,10 @@ pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
     let is_openhuman_provider_entry =
         |entry: &super::super::cloud_providers::CloudProviderCreds| {
             entry.slug == "openhuman"
-                || crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style)
+                || crate::config::schema::cloud_providers::is_hosted_cloud_provider(
+                    &entry.slug,
+                    entry.auth_style,
+                )
                 || looks_like_openhuman_provider_endpoint(&entry.endpoint)
         };
 

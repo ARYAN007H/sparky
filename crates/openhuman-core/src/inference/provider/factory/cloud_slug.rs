@@ -64,7 +64,10 @@ pub(super) fn resolve_cloud_slug<'a>(
     // OpenhumanJwt entries are exempt: they always delegate to
     // make_openhuman_backend which derives the model from config.default_model,
     // ignoring whatever effective_model we computed here.
-    let hosted = crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style);
+    let hosted = crate::config::schema::cloud_providers::is_hosted_cloud_provider(
+        &entry.slug,
+        entry.auth_style,
+    );
     if !hosted && effective_model.trim().is_empty() {
         log::warn!(
             "[providers][chat-factory] role={} slug={} resolved to empty model — \
@@ -333,7 +336,7 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
             );
         }
         AuthStyle::Anthropic | AuthStyle::None => {}
-        style if crate::config::schema::cloud_providers::is_hosted_auth_style(style) => {
+        style if crate::config::schema::cloud_providers::is_hosted_cloud_provider(&entry.slug, style) => {
             #[cfg(not(test))]
             if let Err(error) = verify_backend_session_active(config) {
                 return Some(Err(error));

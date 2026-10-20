@@ -14,5 +14,7 @@ pub(crate) fn register() {
             auth_style: AuthStyle::OpenhumanJwt,
         },
     );
-    register_hosted_cloud_provider_policy(Arc::new(|style| style == AuthStyle::OpenhumanJwt));
+    register_hosted_cloud_provider_policy(Arc::new(|slug, style| {
+        slug == "openhuman" || style == AuthStyle::OpenhumanJwt
+    }));
 }
