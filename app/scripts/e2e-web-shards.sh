@@ -136,7 +136,7 @@ if [[ "$selection" == diagnostic ]]; then
       run_unit "diagnostic-$i" "${selected_files[$i]}"
       assigned=$((assigned + 1))
     fi
-  fi
+  done
   (( assigned > 0 )) || { echo "$selection selection assigns no units to lane $lane" >&2; exit 2; }
 else
 for i in "${!special_files[@]}"; do
