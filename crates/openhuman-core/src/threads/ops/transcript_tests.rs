@@ -84,7 +84,7 @@ async fn write_thread(ctx: &DispatchCtx) {
         .locator();
     let root_meta = meta("orchestrator", "root");
     let turn = vec![
-        TranscriptMessage::user("hello"),
+        TranscriptMessage::user("Current Date & Time: today\n\nhello"),
         TranscriptMessage::assistant("hi there"),
     ];
     locator
@@ -193,12 +193,13 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
         .unwrap()
         .locator();
     let root_meta = meta("orchestrator", "root");
+    let decorated_user = "Current Date & Time: today\n\nhello";
     let prior = vec![
-        TranscriptMessage::user("hello"),
+        TranscriptMessage::user(decorated_user),
         TranscriptMessage::assistant("hi there"),
     ];
     let complete = vec![
-        TranscriptMessage::user("hello"),
+        TranscriptMessage::user(decorated_user),
         TranscriptMessage::assistant("hi there"),
         TranscriptMessage::user("hello"),
         TranscriptMessage::assistant("hi again"),
@@ -238,7 +239,7 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
             request_id,
             extra_metadata,
             ..
-        } if content == "hello" && request_id.as_deref() == Some("req-1") => {
+        } if content == decorated_user && request_id.as_deref() == Some("req-1") => {
             extra_metadata.as_ref()
         }
         _ => None,
