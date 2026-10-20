@@ -544,6 +544,14 @@ fn before_send_filter_drops_backend_owned_error_code_events() {
          {\"error\":{\"errorCode\":\"PAYLOAD_TOO_LARGE\",\"message\":\"request entity too large\"}}";
     let context = "OpenHuman API error (400 Bad Request): \
          {\"error\":{\"errorCode\":\"CONTEXT_LENGTH_EXCEEDED\",\"message\":\"This model's maximum context length is 128000 tokens\"}}";
+    register_backend_classifier_fixture(
+        payload,
+        reportable_fixture(BackendErrorKind::PayloadTooLarge, false),
+    );
+    register_backend_classifier_fixture(
+        context,
+        reportable_fixture(BackendErrorKind::ContextLengthExceeded, false),
+    );
     for body in [payload, context] {
         let event = event_with_message(body);
         assert!(
@@ -556,10 +564,13 @@ fn before_send_filter_drops_backend_owned_error_code_events() {
 #[cfg(feature = "crash-reporting")]
 #[test]
 fn before_send_filter_keeps_malformed_bad_request_event() {
-    let event = event_with_message(
-        "OpenHuman API error (400 Bad Request): \
-         {\"error\":{\"errorCode\":\"BAD_REQUEST\",\"malformed\":true}}",
+    let body = "OpenHuman API error (400 Bad Request): \
+         {\"error\":{\"errorCode\":\"BAD_REQUEST\",\"malformed\":true}}";
+    register_backend_classifier_fixture(
+        body,
+        reportable_fixture(BackendErrorKind::BadRequest, true),
     );
+    let event = event_with_message(body);
     assert!(
         !is_backend_error_code_event(&event),
         "malformed BAD_REQUEST must survive before_send and page (F8)"
