@@ -1991,10 +1991,9 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
           // live lifecycle and composer now belong to the follow-up request.
           if (olderTurn) return;
 
-          // The backend drains + dispatches queued follow-ups even when the turn
-          // errored, so flush them to the transcript here too (otherwise their
-          // prompts are lost). Mirrors the done path (sequential internally).
-          void flushQueuedFollowups(event.thread_id);
+          // Queued user rows are persisted by their own runner lease. Keep the
+          // pending local projection until each matching terminal event reloads
+          // that row from the core.
           dispatch(endInferenceTurn({ threadId: event.thread_id }));
           dispatch(clearThreadInferenceActive(event.thread_id));
         },
