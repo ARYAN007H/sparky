@@ -90,3 +90,58 @@ async fn goal_tool_with_context_uses_the_business_goal_store() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn goal_store_uses_the_explicit_dispatch_context_provider() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
+
+    fn context_for(
+        agent: &str,
+        provider: Arc<dyn SessionStoreProvider>,
+    ) -> Arc<CoreContext> {
+        let mut overrides = crate::agent::host_overrides::HostOverrides::default();
+        overrides.session_store = Some(provider);
+        let overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .session_agent(agent)
+        .host_overrides(Arc::new(overrides));
+        CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
+    }
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let provider_a: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
+    let provider_b: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
+    let context_a = context_for("agent-a", Arc::clone(&provider_a));
+    let context_b = context_for("agent-b", Arc::clone(&provider_b));
+    let dispatch_a = DispatchCtx::new(context_a);
+    let context_a_tenant = dispatch_a.tenant().expect("agent A tenant");
+    let agent_a_key = crate::core::runtime::session_key(&context_a_tenant);
+
+    CoreContext::scope(context_b, async {
+        let explicit_store = goal_store(workspace.path(), &dispatch_a);
+        explicit_store
+            .set("same-thread", "belongs to agent A", None)
+            .await
+            .expect("write explicit A store");
+
+        let stored_a = provider_a
+            .for_agent(&agent_a_key)
+            .kv
+            .get("thread_goals", "same-thread")
+            .await
+            .expect("read A provider");
+        let stored_b = provider_b
+            .for_agent("agent-b")
+            .kv
+            .get("thread_goals", "same-thread")
+            .await
+            .expect("read B provider");
+        assert!(stored_a.is_some(), "goal belongs to explicit agent A");
+        assert!(stored_b.is_none(), "ambient agent B must remain isolated");
+    })
+    .await;
+}

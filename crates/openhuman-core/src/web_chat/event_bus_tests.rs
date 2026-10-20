@@ -321,7 +321,7 @@ async fn goal_resume_and_account_updates_reach_the_web_channel() {
         let thread_id = "goal-observer-resume-account";
 
         store
-            .set(thread_id, "resume this goal", None)
+            .set(thread_id, "resume this goal", Some(100))
             .await
             .expect("set goal");
         let _ = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
@@ -339,17 +339,48 @@ async fn goal_resume_and_account_updates_reach_the_web_channel() {
             Some(&serde_json::json!("active"))
         );
 
-        store
-            .account_turn(thread_id, 2, 1, std::time::Duration::from_secs(1))
+        crate::agent::goals::account_turn(
+            workspace.path(),
+            &dispatch,
+            Some(thread_id),
+            2,
+            0,
+            std::time::Duration::from_secs(1),
+        )
             .await
-            .expect("account turn");
-        let accounted = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+            ;
+        drop(store);
+        crate::agent::goals::account_turn(
+            workspace.path(),
+            &dispatch,
+            Some(thread_id),
+            2,
+            0,
+            std::time::Duration::from_secs(1),
+        )
+        .await;
+        assert!(matches!(web_rx.try_recv(), Err(broadcast::error::TryRecvError::Empty)));
+        crate::agent::goals::account_turn(
+            workspace.path(),
+            &dispatch,
+            Some(thread_id),
+            1,
+            0,
+            std::time::Duration::from_secs(1),
+        )
+        .await;
+        let accounted = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id),
+        )
+        .await
+        .expect("throttled account event arrives after the threshold");
         assert_eq!(
             accounted
                 .goal
                 .as_ref()
                 .and_then(|goal| goal.get("tokensUsed")),
-            Some(&serde_json::json!(3))
+            Some(&serde_json::json!(5))
         );
     })
     .await;
