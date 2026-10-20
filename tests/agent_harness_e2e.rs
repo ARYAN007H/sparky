@@ -27,7 +27,7 @@ use scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
 };
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
@@ -865,6 +865,8 @@ where
 
 /// A released TinySearch module calls the managed Gemini route and returns its
 /// grounded answer to the following model request through the host tool seam.
+/// The standard Rust E2E runners stage the registry-pinned release on
+/// `OPENHUMAN_MODULE_PATH`; on Linux x86_64 that uses the Ubuntu 22.04 asset.
 #[cfg(all(
     target_os = "linux",
     target_arch = "x86_64",
@@ -890,29 +892,29 @@ async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
     let pinned = openhuman_core::modules::registry::find("tinysearch")
         .expect("TinySearch is registered in the module asset registry");
     assert_eq!(pinned.version, "0.5.1", "use the pinned module release");
-    const HOST_KEY: &str = "ubuntu-24.04-x86_64";
-    let asset = pinned
-        .asset_for(HOST_KEY)
-        .expect("the pinned TinySearch release has its Linux x86_64 asset");
-    let bundle_root = PathBuf::from(
-        std::env::var_os("OPENHUMAN_BUNDLED_MODULES")
-            .expect("the pinned TinySearch archive must be staged as a bundled release"),
-    );
-    let archive = bundle_root
-        .join(pinned.id)
-        .join(pinned.version)
-        .join(asset.host_key)
-        .join(asset.archive);
     assert!(
-        archive.is_file(),
-        "the registry-pinned TinySearch archive must be present: {archive:?}"
+        std::env::var_os("OPENHUMAN_MODULE_SOURCE").is_none()
+            && std::env::var_os("OPENHUMAN_MODULE_SOURCE_DIR").is_none()
+            && std::env::var_os("OPENHUMAN_MODULE_SOURCE_TINYSEARCH").is_none(),
+        "the integration must use the staged release, not a source or linked override"
     );
-    let _bundle_guard = EnvVarGuard::set_to_path("OPENHUMAN_BUNDLED_MODULES", &bundle_root);
-    let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
-    let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
-    let _module_source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYSEARCH");
+    let module_paths = std::env::var_os("OPENHUMAN_MODULE_PATH")
+        .map(std::env::split_paths)
+        .expect("the standard Rust test runner must stage TinySearch on OPENHUMAN_MODULE_PATH")
+        .collect::<Vec<_>>();
+    let artifact = openhuman_core::modules::local_artifact("tinysearch")
+        .expect("the standard Rust test runner must stage the pinned TinySearch library");
+    let artifact_dir = artifact
+        .parent()
+        .expect("the staged TinySearch artifact has a parent directory");
+    assert!(
+        module_paths.iter().any(|path| path == artifact_dir),
+        "TinySearch must resolve to the standard runner's staged release path: {artifact:?}"
+    );
     let module_cache = tempdir().expect("isolated module cache");
     let _module_cache_guard = EnvVarGuard::set_to_path("XDG_CACHE_HOME", module_cache.path());
+    let module_data = tempdir().expect("isolated module data directory");
+    let _module_data_guard = EnvVarGuard::set_to_path("XDG_DATA_HOME", module_data.path());
 
     const QUERY: &str = "What color is the fixture's named answer?";
     const ANSWER: &str = "The fixture's distinct grounded answer is cerulean.";
