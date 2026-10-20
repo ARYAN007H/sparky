@@ -326,14 +326,16 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
         .expect("qualified_name is an independently required input");
     assert!(entry.schema.inputs.iter().all(|field| field.required));
 
-    let params = json!({"qualified_name":"example/server"})
-        .as_object()
-        .expect("example object")
-        .clone();
-    validate_params(&entry.schema, &params).expect("schema accepts independent example");
-    entry
-        .decode_params(params)
-        .expect("bound decoder accepts independent example");
+    for example in [
+        json!({"qualified_name":"example/server"}),
+        json!({"qualified_name":" example/server "}),
+    ] {
+        let params = example.as_object().expect("example object").clone();
+        validate_params(&entry.schema, &params).expect("schema accepts independent example");
+        entry
+            .decode_params(params)
+            .expect("bound decoder accepts independent example");
+    }
 
     for remove in [true, false] {
         let mut broken = entry.schema.clone();
@@ -381,7 +383,7 @@ fn production_registry_binds_computer_status_to_its_declared_parser() {
     assert_eq!(entry.schema.inputs[0].name, "load");
     assert!(!entry.schema.inputs[0].required);
 
-    for example in [json!({}), json!({"load":true})] {
+    for example in [json!({}), json!({"load":true}), json!({"load":false})] {
         let params = example.as_object().expect("example object").clone();
         validate_params(&entry.schema, &params).expect("schema accepts independent example");
         entry
