@@ -38,6 +38,26 @@ fn lifecycle_events_name_the_stage_and_the_round() {
 }
 
 #[test]
+fn native_progress_mapping_projects_subagent_spawn_events() {
+    let event = turn_event(AgentProgress::SubagentSpawned {
+        agent_id: "researcher".into(),
+        task_id: "task-native".into(),
+        mode: "typed".into(),
+        dedicated_thread: false,
+        prompt_chars: 4,
+        prompt: "help".into(),
+        worker_thread_id: None,
+        display_name: Some("Researcher".into()),
+        parent_call_id: Some("parent-call".into()),
+    })
+    .expect("native subagent lifecycle is projected");
+    let out = expect_subagent(event);
+    assert_eq!(out.state, "spawned");
+    assert_eq!(out.agent_id, "researcher");
+    assert_eq!(out.parent_call_id.as_deref(), Some("parent-call"));
+}
+
+#[test]
 fn a_started_tool_call_keeps_small_arguments_and_nulls_empty_ones() {
     let ChannelOutputEvent::ToolCallStarted { arguments, .. } = tool_started(
         "c".into(),
