@@ -58,21 +58,19 @@ fn model_fixture_entry() -> ChatModelEntry {
                 !model.starts_with("hint:") && model != "fixture-reasoning"
             }),
             supports_vision: Arc::new(|_| false),
-            resolve_model: Arc::new(|role, config, model| {
-                match model {
-                    Some("fixture-reasoning") => Some("test/selected-reasoning".to_string()),
-                    Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
-                    Some(model) => model
-                        .strip_prefix("hint:")
-                        .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
-                        .map(|_| "test/session-fixture".to_string()),
-                    None if role == "agentic" => Some("test/session-fixture".into()),
-                    None => match config.default_model.as_deref() {
-                        Some("fixture-reasoning") => Some("test/selected-reasoning".into()),
-                        Some(model) => Some(model.to_string()),
-                        None => Some("test/session-fixture".into()),
-                    },
-                }
+            resolve_model: Arc::new(|role, config, model| match model {
+                Some("fixture-reasoning") => Some("test/selected-reasoning".to_string()),
+                Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
+                Some(model) => model
+                    .strip_prefix("hint:")
+                    .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+                    .map(|_| "test/session-fixture".to_string()),
+                None if role == "agentic" => Some("test/session-fixture".into()),
+                None => match config.default_model.as_deref() {
+                    Some("fixture-reasoning") => Some("test/selected-reasoning".into()),
+                    Some(model) => Some(model.to_string()),
+                    None => Some("test/session-fixture".into()),
+                },
             }),
             context_window: Arc::new(|_| None),
             default_pricing: Arc::new(|| None),

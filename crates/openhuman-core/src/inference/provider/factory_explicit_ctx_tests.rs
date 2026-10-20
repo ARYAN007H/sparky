@@ -14,7 +14,9 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         ChatModelEntry {
             build: Arc::new(move |_| {
                 Ok((
-                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![name])),
+                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+                        name,
+                    ])),
                     name.to_string(),
                 ))
             }),
