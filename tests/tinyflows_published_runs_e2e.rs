@@ -298,5 +298,11 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     .await;
     assert_eq!(cancelled_row["status"], "cancelled");
 
+    // Switching the host back to workspace storage must not expose workflows
+    // that the published module wrote through the installed backend callback.
+    assert!(openhuman_core::storage::clear());
+    let fallback_flows = ok(addr, TEST_TOKEN, 12, "openhuman.flows_list", json!({})).await;
+    assert_eq!(fallback_flows.as_array().map(Vec::len), Some(0));
+
     server.abort();
 }
