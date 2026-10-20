@@ -36,7 +36,6 @@ fn corrupt_legacy_channel_threads_are_skipped_without_modifying_the_source() {
     );
 }
 
-
 #[cfg(feature = "channels")]
 #[tokio::test]
 async fn reserved_thread_matching_uses_module_identity_boundaries() {
