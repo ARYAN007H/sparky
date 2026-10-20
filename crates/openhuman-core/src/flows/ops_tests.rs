@@ -26,6 +26,10 @@ fn structurally_valid_graph(value: Value) -> Value {
     serde_json::to_value(graph).expect("graph serializes to portable JSON")
 }
 
+fn graph(value: Value) -> Value {
+    structurally_valid_graph(value)
+}
+
 fn trigger_only_graph() -> Value {
     json!({
         "name": "trigger-only",
