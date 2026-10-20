@@ -141,17 +141,40 @@ export function bridgeReach(metadata, roots, policy) {
   return found;
 }
 
-/** Check bridge incoming edges without auditing feature-unified descendants. */
+/** Check bridge edges while accounting only for implementation edges in its closure. */
 export function linkedHostAudit(metadata, root, policy) {
   const target = policy.linkedHost?.package;
-  if (!target) return [];
+  if (!target) return { violations: [], exceptions: [] };
   const { packages, edges } = graph(metadata);
   const candidates = [...packages.values()].filter(pkg => pkg.name === root);
   if (candidates.length !== 1) throw new Error(`expected exactly one root package ${root}`);
   const rootId = candidates[0].id;
+  const packageKey = pkg => JSON.stringify([pkg.name, pkg.version, pkg.source, pkg.manifest_path]);
+  const edgeKey = (parent, child) => `${packageKey(packages.get(parent))} -> ${packageKey(packages.get(child))}`;
+  const bridgeRoots = edges(rootId).filter(id => packages.get(id).name === target);
+  if (bridgeRoots.length === 0) throw new Error(`linked-modules graph for ${root} does not contain ${target}`);
+
+  // The bridge subtree is an intentional local implementation link. Its
+  // dependencies may also enable features on packages already in the host
+  // graph, so allow only implementation edges proven to occur in that closure.
+  const bridgeEdges = new Set();
+  const bridgeQueue = [...bridgeRoots];
+  const bridgeSeen = new Set();
+  while (bridgeQueue.length) {
+    const parent = bridgeQueue.pop();
+    if (bridgeSeen.has(parent)) continue;
+    bridgeSeen.add(parent);
+    for (const child of edges(parent)) {
+      bridgeEdges.add(edgeKey(parent, child));
+      bridgeQueue.push(child);
+    }
+  }
+
   const queue = [[rootId]];
   const seen = new Set();
   const violations = [];
+  const exceptions = [];
+  const recorded = new Set();
   for (let at = 0; at < queue.length; at++) {
     const path = queue[at];
     const id = path.at(-1);
@@ -164,10 +187,23 @@ export function linkedHostAudit(metadata, root, policy) {
         }
         continue;
       }
+      const child = packages.get(next);
+      const sourceMismatch = policy.contractManifests?.[child.name] &&
+        child.manifest_path !== policy.contractManifests[child.name];
+      const forbiddenImplementation = isImplementation(child.name, policy) && !bridgeEdges.has(edgeKey(id, next));
+      if (sourceMismatch || forbiddenImplementation) {
+        const key = `${child.name}:${edgeKey(id, next)}`;
+        if (!recorded.has(key)) {
+          recorded.add(key);
+          const finding = { scope: 'hosts', package: child.name, path: [...path, next].map(item => packages.get(item).name) };
+          const exemption = policy.exceptions.find(item => item.scope === 'hosts' && item.package === child.name);
+          (exemption ? exceptions : violations).push(finding);
+        }
+      }
       queue.push([...path, next]);
     }
   }
-  return violations;
+  return { violations, exceptions };
 }
 
 export function validatePolicy(policy) {
@@ -318,7 +354,7 @@ function cliFeatures(root, execute) {
   if (!pkg || !pkg.features || !Object.hasOwn(pkg.features, 'linked-modules')) {
     throw new Error('openhuman-cli must declare its isolated linked-modules feature');
   }
-  return Object.keys(pkg.features).filter(feature => feature !== 'default' && feature !== 'linked-modules');
+  return Object.keys(pkg.features).filter(feature => feature !== 'linked-modules');
 }
 
 function linkedCliTree(root, execute) {
@@ -371,9 +407,7 @@ export function run(root, strict = false, execute = execFileSync) {
   // separately rooted graph for a direct CLI edge; do not let its feature
   // unification contaminate the CLI's shipping feature graph above.
   results.push({
-    violations: linkedHostAudit(linkedCliTree(root, execute), 'openhuman-cli', policy),
-    exceptions: [],
-  });
+  results.push(linkedHostAudit(linkedCliTree(root, execute), 'openhuman-cli', policy));
   // Default-feature graphs also guard against accidental bridge activation.
   for (const packageName of ['openhuman-cli', 'openhuman-tui', 'openhuman']) {
     results.push({
