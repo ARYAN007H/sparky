@@ -1,7 +1,9 @@
 use super::*;
 
 fn base() -> Config {
-    Config::default()
+    let mut config = Config::default();
+    config.default_model = Some("test-model".to_string());
+    config
 }
 
 #[test]
@@ -13,10 +15,10 @@ fn maps_the_path_roots_verbatim() {
 }
 
 #[test]
-fn falls_back_to_default_model_when_none_is_configured() {
+fn missing_model_is_reported_without_inventing_a_default() {
     let mut c = base();
     c.default_model = None;
-    assert_eq!(session_config_from(&c).unwrap().model, DEFAULT_MODEL);
+    assert!(session_config_from(&c).is_err());
 
     c.default_model = Some("some-model".into());
     assert_eq!(session_config_from(&c).unwrap().model, "some-model");
