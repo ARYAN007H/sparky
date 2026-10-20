@@ -214,7 +214,10 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
             Err(anyhow::anyhow!("legacy store unavailable"))
         })
         .await;
-    assert!(absent.is_err(), "legacy read failure must stop first admission");
+    assert!(
+        absent.is_err(),
+        "legacy read failure must stop first admission"
+    );
     assert!(
         !locator.session_exists(&session),
         "failed legacy read must not create an absent session"
