@@ -266,9 +266,8 @@ pub(crate) fn classify_error(message: String) -> ArmError {
         FailoverDecision::RetrySame => ArmError::Retryable {
             retry_after_ms: (reason == FailoverReason::RateLimit)
                 .then(|| {
-                    message
-                        .lines()
-                        .find_map(|line| {
+                    tinyinference_llm::failure::parse_retry_after_ms(&message).or_else(|| {
+                        message.lines().find_map(|line| {
                             line.trim()
                                 .strip_prefix("Retry-After:")
                                 .or_else(|| line.trim().strip_prefix("retry-after:"))
@@ -278,7 +277,7 @@ pub(crate) fn classify_error(message: String) -> ArmError {
                                     ))
                                 })
                         })
-                        .or_else(|| tinyinference_llm::failure::parse_retry_after_ms(&message))
+                    })
                 })
                 .flatten(),
             source: err,

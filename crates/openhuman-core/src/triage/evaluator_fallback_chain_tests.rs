@@ -71,7 +71,7 @@ fn classify_string_recognises_429_with_retry_after() {
 #[test]
 fn classify_string_preserves_long_fractional_and_inline_retry_hints() {
     for (message, expected) in [
-        ("HTTP 429 Too Many Requests; Retry-After: 60", 60_000),
+        ("HTTP 429 Too Many Requests\nRetry-After: 60", 60_000),
         (
             "HTTP 429 Too Many Requests; Retry-After: 2.5 seconds",
             2_500,

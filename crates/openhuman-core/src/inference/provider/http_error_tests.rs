@@ -435,6 +435,21 @@ fn quota_demotion_precedes_backend_owned_error_code_guard() {
             select_demotion(&facts, true, is_backend_error_code_owned(PROVIDER, BODY)),
             HostDemotion::Provider(DemotionKind::QuotaExhausted)
         );
+
+        let later_provider_state = "insufficient credits OWNED_CODE";
+        let later_facts = tinyinference_llm::failure::http::classify_http_failure(
+            PROVIDER,
+            StatusCode::PAYMENT_REQUIRED.as_u16(),
+            later_provider_state,
+        );
+        assert_eq!(
+            select_demotion(
+                &later_facts,
+                true,
+                is_backend_error_code_owned(PROVIDER, later_provider_state)
+            ),
+            HostDemotion::BackendOwned
+        );
     });
 }
 
