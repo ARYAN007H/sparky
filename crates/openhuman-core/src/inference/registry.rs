@@ -94,6 +94,68 @@ pub struct ProviderModelHooks {
     pub supports_vision: Arc<dyn Fn(&str) -> bool + Send + Sync>,
     /// Resolves the provider's default/alias policy for a managed construction.
     pub resolve_model: Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>,
+    /// The default model's static context window, if the provider knows it.
+    pub context_window: Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>,
+}
+
+/// A provider-neutral semantic category for a backend error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackendErrorKind {
+    RateLimited,
+    InsufficientCredits,
+    UpstreamUnavailable,
+    ModelUnavailable,
+    PayloadTooLarge,
+    ContextLengthExceeded,
+    BadRequest,
+    Internal,
+}
+
+/// Provider-owned classification, with reporting ownership kept separate from
+/// display semantics and the optional canonical backend token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendErrorClassification {
+    /// Whether the backend owns the response for duplicate-report purposes.
+    pub backend_owned: bool,
+    /// Whether this client should still report the event (for known client bugs).
+    pub reportable: bool,
+    /// Canonical raw token, including unknown future tokens.
+    pub token: Option<String>,
+    /// Recognized provider-neutral display category.
+    pub kind: Option<BackendErrorKind>,
+    /// Whether a BAD_REQUEST was explicitly marked as malformed.
+    pub malformed_bad_request: bool,
+}
+
+/// Classifies a provider's backend error. `provider` is present at a typed
+/// provider boundary and absent for flattened, string-only host call sites.
+pub type BackendErrorCodeClassifier =
+    Arc<dyn Fn(Option<&str>, &str) -> BackendErrorClassification + Send + Sync>;
+
+static BACKEND_ERROR_CLASSIFIER: HookSlot<BackendErrorCodeClassifier> =
+    HookSlot::new("inference::backend_error_classifier");
+
+/// Registers a backend error classifier process-wide.
+pub fn register_backend_error_classifier(classifier: BackendErrorCodeClassifier) {
+    BACKEND_ERROR_CLASSIFIER.register("default", classifier);
+}
+
+/// Registers a backend error classifier for a CoreContext.
+pub fn register_backend_error_classifier_in(
+    extensions: &Extensions,
+    classifier: BackendErrorCodeClassifier,
+) {
+    BACKEND_ERROR_CLASSIFIER.register_in(extensions, "default", classifier);
+}
+
+/// Classifies an error when a host has supplied a classifier.
+pub fn classify_backend_error(
+    provider: Option<&str>,
+    error: &str,
+) -> Option<BackendErrorClassification> {
+    BACKEND_ERROR_CLASSIFIER
+        .get("default")
+        .map(|classifier| classifier(provider, error))
 }
 
 static CHAT_MODELS: HookSlot<ChatModelEntry> = HookSlot::new("inference::chat_models");
