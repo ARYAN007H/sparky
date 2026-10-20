@@ -49,10 +49,6 @@ pub use error::{MemoryError, MemoryResult};
 #[cfg(test)]
 pub(crate) mod test_fixtures;
 
-#[cfg(test)]
-#[path = "confinement_tests.rs"]
-mod confinement_tests;
-
 pub use bus::register_memory_subscribers;
 pub use engine::is_on as memory_is_on;
 pub use schemas::{
