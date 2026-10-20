@@ -18,7 +18,7 @@ pub(crate) struct RelayProgressiveTransport {
     channel_ref: tinychannels_bus::ChannelRef,
     conversation: tinychannels_bus::ConversationRef,
     turn_id: String,
-    projection: Arc<crate::web_chat::surface::Surface>,
+    projection: Arc<crate::web_chat::Surface>,
 }
 
 impl RelayProgressiveTransport {
@@ -27,7 +27,7 @@ impl RelayProgressiveTransport {
         channel_ref: tinychannels_bus::ChannelRef,
         conversation: tinychannels_bus::ConversationRef,
         turn_id: String,
-        projection: Arc<crate::web_chat::surface::Surface>,
+        projection: Arc<crate::web_chat::Surface>,
     ) -> Self {
         Self {
             channel,
@@ -78,7 +78,7 @@ impl RelayProgressiveTransport {
                 // Project canonical events through the same compiled web
                 // adapter used by desktop and TUI turns. Provider delivery is
                 // still performed only by the typed terminal send below.
-                self.projection.output(event).await;
+                self.projection.output(*event).await;
                 Ok(ProgressiveTransportResult::Acknowledged)
             }
             ProgressiveTransportRequest::SendTyped {

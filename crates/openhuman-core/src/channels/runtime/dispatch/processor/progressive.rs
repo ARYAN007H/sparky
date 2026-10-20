@@ -55,9 +55,9 @@ impl NativeProgressiveTarget {
                 request_id,
             } => {
                 let projection = Arc::new(
-                    crate::web_chat::surface::Surface::new(
+                    crate::web_chat::Surface::new(
                         ctx,
-                        crate::web_chat::surface::TurnIds {
+                        crate::web_chat::TurnIds {
                             client_id: client_id.clone(),
                             thread_id: self.conversation.id.clone(),
                             request_id: request_id.clone(),

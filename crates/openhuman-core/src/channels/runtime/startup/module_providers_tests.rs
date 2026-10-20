@@ -285,9 +285,9 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
     };
     let mut web_events = crate::web_chat::subscribe_web_channel_events();
     let projection = Arc::new(
-        crate::web_chat::surface::Surface::new(
+        crate::web_chat::Surface::new(
             &crate::core::runtime::DispatchCtx::ambient(),
-            crate::web_chat::surface::TurnIds {
+            crate::web_chat::TurnIds {
                 client_id: "relay-fixture-client".into(),
                 thread_id: "channel:telegram/sender-7/chat-42".into(),
                 request_id: "relay-fixture-request".into(),
