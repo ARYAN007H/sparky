@@ -170,3 +170,7 @@ pub(crate) struct VoiceNoteStoreParams {
 pub(crate) struct VoiceNoteReadParams {
     pub(super) note_id: String,
 }
+
+#[cfg(test)]
+#[path = "types_tests.rs"]
+mod tests;
