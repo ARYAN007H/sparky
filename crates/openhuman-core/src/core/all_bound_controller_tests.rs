@@ -672,3 +672,5 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
         }
     }
 }
+#[path = "all_profiles_controller_tests.rs"]
+mod profiles_controller_tests;
