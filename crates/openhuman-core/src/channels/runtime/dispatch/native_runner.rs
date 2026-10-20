@@ -142,7 +142,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
             .ok_or_else(|| "channel turn has no trusted host context".to_owned())?;
         let (agent_progress, mut progress_rx) = mpsc::channel(64);
         let progress_forwarder = request.payload.ctx.as_ref().map(|dispatch| {
-            dispatch.clone().spawn(async move {
+            tokio_util::task::AbortOnDropHandle::new(dispatch.clone().spawn(async move {
                 while let Some(event) = progress_rx.recv().await {
                     if progress
                         .send(TurnSignal::Progress(Box::new(event)))
@@ -152,7 +152,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
                         break;
                     }
                 }
-            })
+            }))
         });
         let response = crate::channels::runtime::dispatch::host_agent::run_host_agent_turn(
             trusted.host_agent.clone(),
