@@ -1,7 +1,7 @@
 //! Registration of agent dialogue and delegation tools.
 
 use super::orchestration::tools::{
-    CloseSubagentTool, ContinueSubagentTool, DelegateGraphTool, ListSubagentsTool,
+    CloseSubagentTool, ContinueSubagentTool, ListSubagentsTool,
     SpawnAsyncSubagentTool, SpawnSubagentTool, SteerSubagentTool, WaitSubagentTool,
 };
 use super::tools::{PlanExitTool, TodoTool};
@@ -44,11 +44,6 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         Box::new(WaitSubagentTool::new()),
         Box::new(CloseSubagentTool::new()),
         Box::new(ContinueSubagentTool::new()),
-        // Multi-stage durable delegation (issue #4249, Phase 3): runs the chosen
-        // sub-agent through the tinyagents plan→execute→review→finalize graph,
-        // checkpointed to the session DB. Heavier than spawn_subagent; for
-        // sub-tasks that benefit from a self-review/revision loop.
-        Box::new(DelegateGraphTool::new()),
         // The session todo list is scoped to the conversation thread.
         // `plan_exit` hands a completed plan-mode pass to the build-mode pass.
         Box::new(TodoTool::new(root_config.workspace_dir.clone())),

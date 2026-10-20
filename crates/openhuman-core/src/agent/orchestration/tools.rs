@@ -20,8 +20,6 @@ mod archetype_delegation;
 pub(crate) mod awaiting_user;
 #[path = "tools/continue_subagent_host.rs"]
 mod continue_subagent;
-#[path = "tools/delegate_graph.rs"]
-mod delegate_graph;
 #[path = "tools/subagent_dispatch_host.rs"]
 mod dispatch;
 #[path = "tools/spawn_async_subagent_surface.rs"]
@@ -63,8 +61,6 @@ pub(crate) fn live_parent_run_context(
 pub use archetype_delegation::{ArchetypeDelegationTool, DelegationTarget};
 pub(crate) use continue_subagent::ContinueSubagentDispatch;
 pub use continue_subagent::ContinueSubagentTool;
-pub(crate) use delegate_graph::DelegateGraphDispatch;
-pub use delegate_graph::DelegateGraphTool;
 pub(crate) use spawn_async_subagent::SpawnAsyncSubagentDispatch;
 pub use spawn_async_subagent::{scope_spawn_async_subagent_spec, SpawnAsyncSubagentTool};
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;
