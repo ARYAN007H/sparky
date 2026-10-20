@@ -29,7 +29,6 @@ const BOT_TOKEN: &str = "session-restart-token";
 const MOCK_API_KEY: &str = "loopback-session-restart-key";
 const RPC_TOKEN: &str = "native-session-restart-rpc-token";
 const FIRST_TEXT: &str = "remember this after the core restarts";
-const SECOND_TEXT: &str = "what did I ask before the restart?";
 const OTHER_CHAT_TEXT: &str = "remember a separate chat history";
 const AFTER_RESET_TEXT: &str = "this starts a fresh session after new";
 const RESET_AFTER_RESTART_TEXT: &str = "continue the reset conversation after restart";
