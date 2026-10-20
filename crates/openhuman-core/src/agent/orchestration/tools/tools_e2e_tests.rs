@@ -48,7 +48,7 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     let release = Arc::new(tokio::sync::Notify::new());
     let model = Arc::new(StopGateModel {
         started: started_tx,
-        release,
+        release: Arc::clone(&release),
     });
     let mut parent = parent_context(workspace.path(), model, vec![]);
     parent.session_id = "stop-detached-subagent-session".into();
@@ -145,6 +145,7 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     assert_eq!(stop.value["cancelled"], serde_json::json!(true));
     assert_eq!(stop.value["request_id"], serde_json::Value::Null);
     assert_eq!(stop.value["subagents_cancelled"], serde_json::json!(1));
+    release.notify_one();
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             if jobs.get(job.id.as_str()).is_some_and(|job| {
