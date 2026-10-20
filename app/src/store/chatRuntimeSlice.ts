@@ -2004,10 +2004,6 @@ const chatRuntimeSlice = createSlice({
             existing.subagent.status = 'running';
             existing.subagent.awaitingQuestion = undefined;
             existing.subagent.spawnEventId = spawnEventId;
-            // A resumed task belongs to the latest spawn call in the parent
-            // transcript. Keep its live card attached to that call so the
-            // previous call's card does not claim the resumed work.
-            if (parentCallId) existing.subagent.parentCallId = parentCallId;
           }
         }
         return;
