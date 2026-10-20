@@ -290,7 +290,7 @@ jobs:
           - { name: foundation, suites: "auth,navigation,system" }
           - { name: chat, suites: "chat,skills,journeys" }
           - { name: connections, suites: "providers,provider-web,connectors" }
-          - { name: settings, suites: "settings,notifications" }
+          - { name: settings, suites: "settings,notifications,payments,webhooks" }
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -796,7 +796,7 @@ jobs:
           - { name: foundation, suites: "auth,navigation,system" }
           - { name: chat, suites: "chat,skills,journeys" }
           - { name: connections, suites: "providers,provider-web,connectors" }
-          - { name: settings, suites: "settings,notifications" }
+          - { name: settings, suites: "settings,notifications,payments,webhooks" }
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -995,7 +995,7 @@ jobs:
           - { name: foundation, suites: "auth,navigation,system" }
           - { name: chat, suites: "chat,skills,journeys" }
           - { name: connections, suites: "providers,provider-web,connectors" }
-          - { name: settings, suites: "settings,notifications" }
+          - { name: settings, suites: "settings,notifications,payments,webhooks" }
     steps:
       - name: Checkout code
         uses: actions/checkout@v7

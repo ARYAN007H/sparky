@@ -53,7 +53,7 @@ test("local Linux E2E shards cover every CI suite", () => {
     { name: "foundation", suites: "auth,navigation,system" },
     { name: "chat", suites: "chat,skills,journeys" },
     { name: "connections", suites: "providers,provider-web,connectors" },
-    { name: "settings", suites: "settings,notifications" },
+    { name: "settings", suites: "settings,notifications,payments,webhooks" },
   ];
   assert.deepEqual(localShards, expectedShards);
   assert.equal(allWorkflowShards.length, expectedShards.length * 3, "three OS matrices each have four groups");
