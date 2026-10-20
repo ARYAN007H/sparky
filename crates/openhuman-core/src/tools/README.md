@@ -74,11 +74,9 @@ for tests and the lightweight CLI surface.
 
 ### Orchestrator tools
 
-The orchestrator agent does not get one generic `spawn_subagent` mega-tool.
-`orchestrator_tools::collect_orchestrator_tools` synthesizes one named
-`delegate_*` tool per `SubagentEntry::AgentId` in the orchestrator's
-`[subagents]` allowlist, with its description taken live from the target's
-`AgentDefinition::when_to_use`. A `SubagentEntry::Skills` wildcard expands to
+The orchestrator uses the single `spawn_subagent` tool, whose `agent_id` enum
+is derived from the `[subagents]` allowlist. `orchestrator_tools::collect_orchestrator_tools`
+only expands a `SubagentEntry::Skills` wildcard to
 one `ToolExposure::Deferred` `ComposioActionTool` per action of every
 connected Composio toolkit. Deferred tools never reach the wire: an agent that
 opted into discovery finds them through the harness's `tool_search` bridge and
