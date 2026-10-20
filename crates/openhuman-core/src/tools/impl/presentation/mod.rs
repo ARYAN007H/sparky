@@ -360,7 +360,8 @@ impl PresentationTool {
         // Reserve the file and open the artifact: a new one, or a new version
         // of `artifact_id` / the regenerate target (same id, same file,
         // history kept).
-        let production = Production::start(
+        let production = Production::start_in(
+            ctx,
             &self.workspace_dir,
             self.files_dir.clone(),
             tiny_artifacts::ArtifactKind::File,
