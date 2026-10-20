@@ -476,6 +476,7 @@ pub(crate) async fn process_channel_runtime_message(
                 message: enriched_message.clone(),
                 origin: turn_origin,
                 progress: progress_tx,
+                run_queue: None,
                 approval,
                 cancellation: cancellation.clone(),
                 turn_deadline: crate::agent::session_host::turn_backstop::configured_backstop(),
