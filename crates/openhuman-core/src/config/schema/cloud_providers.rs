@@ -20,9 +20,12 @@ use tinyinference_providers::builtin::{
 
 static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
     HookSlot::new("config::hosted_cloud_presets");
-pub type HostedCloudProviderClassifier = Arc<dyn Fn(&str, AuthStyle) -> bool + Send + Sync>;
-static HOSTED_CLOUD_PROVIDER: HookSlot<HostedCloudProviderClassifier> =
-    HookSlot::new("config::hosted_cloud_provider");
+pub type HostedCloudIdentityClassifier = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+pub type HostedAuthStyleClassifier = Arc<dyn Fn(AuthStyle) -> bool + Send + Sync>;
+static HOSTED_CLOUD_IDENTITY: HookSlot<HostedCloudIdentityClassifier> =
+    HookSlot::new("config::hosted_cloud_identity");
+static HOSTED_AUTH_STYLE: HookSlot<HostedAuthStyleClassifier> =
+    HookSlot::new("config::hosted_auth_style");
 
 /// A built-in cloud provider preset in the host's [`AuthStyle`] vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,23 +52,41 @@ pub fn register_hosted_cloud_preset_in(
 
 /// Register host-owned auth-style classification without making it core
 /// inference policy.
-pub fn register_hosted_cloud_provider_policy(classifier: HostedCloudProviderClassifier) {
-    HOSTED_CLOUD_PROVIDER.register("default", classifier);
+pub fn register_hosted_cloud_provider_policy(
+    identity: HostedCloudIdentityClassifier,
+    auth_style: HostedAuthStyleClassifier,
+) {
+    HOSTED_CLOUD_IDENTITY.register("default", identity);
+    HOSTED_AUTH_STYLE.register("default", auth_style);
 }
 
 /// Register hosted-provider classification for one runtime context.
 pub fn register_hosted_cloud_provider_policy_in(
     extensions: &crate::core::slots::Extensions,
-    classifier: HostedCloudProviderClassifier,
+    identity: HostedCloudIdentityClassifier,
+    auth_style: HostedAuthStyleClassifier,
 ) {
-    HOSTED_CLOUD_PROVIDER.register_in(extensions, "default", classifier);
+    HOSTED_CLOUD_IDENTITY.register_in(extensions, "default", identity);
+    HOSTED_AUTH_STYLE.register_in(extensions, "default", auth_style);
 }
 
-/// Whether the installed host treats this compatibility auth style as hosted.
-pub fn is_hosted_cloud_provider(slug: &str, style: AuthStyle) -> bool {
-    HOSTED_CLOUD_PROVIDER
+/// Whether the installed host owns this reserved cloud-provider identity.
+pub fn is_hosted_cloud_identity(slug: &str) -> bool {
+    HOSTED_CLOUD_IDENTITY
         .get("default")
-        .is_some_and(|classify| classify(slug, style))
+        .is_some_and(|classify| classify(slug))
+}
+
+/// Whether the installed host owns this passive compatibility auth style.
+pub fn is_hosted_auth_style(style: AuthStyle) -> bool {
+    HOSTED_AUTH_STYLE
+        .get("default")
+        .is_some_and(|classify| classify(style))
+}
+
+/// Whether either the provider identity or auth style routes through the host.
+pub fn is_hosted_cloud_provider(slug: &str, style: AuthStyle) -> bool {
+    is_hosted_cloud_identity(slug) || is_hosted_auth_style(style)
 }
 
 impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
