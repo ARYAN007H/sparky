@@ -5,7 +5,8 @@
 use crate::agent::prompts::types::*;
 use crate::prompts::sections::*;
 use anyhow::Result;
-use std::sync::OnceLock;
+use chrono::{DateTime, Utc};
+use std::sync::{Arc, OnceLock};
 use tinytools_agent::dialect::ToolCallFormat;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,14 +71,58 @@ pub fn render_datetime(ctx: &PromptContext<'_>) -> Result<String> {
 ///
 /// `zone` is the user's IANA zone ([`crate::config::Config::time_zone`]);
 /// `None`, or a name chrono-tz does not know, stamps the device's.
-pub fn current_datetime_line(zone: Option<&str>) -> String {
+type PromptClock = Arc<dyn Fn() -> DateTime<Utc> + Send + Sync>;
+
+static PROMPT_CLOCKS: crate::core::slots::HookSlot<PromptClock> =
+    crate::core::slots::HookSlot::new("openhuman.prompts.clock");
+static NEXT_PROMPT_CLOCK_ID: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+
+/// A temporary prompt-clock registration, removed when this guard is dropped.
+///
+/// Registrations are process-scoped and selected newest-first. Keeping this
+/// guard on the registering thread also keeps the test build's thread-local
+/// HookSlot registration and its removal paired.
+pub struct PromptClockRegistration {
+    id: String,
+    _not_send: std::marker::PhantomData<std::rc::Rc<()>>,
+}
+
+impl Drop for PromptClockRegistration {
+    fn drop(&mut self) {
+        PROMPT_CLOCKS.unregister(&self.id);
+    }
+}
+
+/// Temporarily provide the instant used by per-turn prompt date lines.
+///
+/// This is process-scoped; the most recently registered live clock wins, and
+/// dropping registrations in any order restores the newest remaining clock.
+/// With no registration, prompt rendering uses the system clock.
+pub fn register_prompt_clock(
+    clock: impl Fn() -> DateTime<Utc> + Send + Sync + 'static,
+) -> PromptClockRegistration {
+    let id = format!(
+        "{}",
+        NEXT_PROMPT_CLOCK_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    PROMPT_CLOCKS.register(id.clone(), Arc::new(clock));
+    PromptClockRegistration {
+        id,
+        _not_send: std::marker::PhantomData,
+    }
+}
+
+/// Render the canonical one-line timestamp at a supplied UTC instant.
+///
+/// The zone and profile-force-UTC behavior match [`current_datetime_line`].
+pub fn current_datetime_line_at(now: DateTime<Utc>, zone: Option<&str>) -> String {
     // `library-cpu.sh` sets `OPENHUMAN_PROFILE_FORCE_UTC=1` to skip
     // `iana_time_zone`/CoreFoundation timezone resolution, which is itself a
     // measurable cost in a cold CPU profile. Gated on `rss-bench`, so it does
     // not exist in any shipped build.
     #[cfg(feature = "rss-bench")]
     if std::env::var_os("OPENHUMAN_PROFILE_FORCE_UTC").is_some() {
-        let now = chrono::Utc::now();
         return format!(
             "Current Date & Time: {} UTC (UTC, UTC+00:00), {}",
             now.format("%Y-%m-%d %H:%M:%S"),
@@ -86,7 +131,7 @@ pub fn current_datetime_line(zone: Option<&str>) -> String {
     }
 
     if let Some(tz) = zone.and_then(|zone| zone.parse::<chrono_tz::Tz>().ok()) {
-        let now = chrono::Utc::now().with_timezone(&tz);
+        let now = now.with_timezone(&tz);
         return format!(
             "Current Date & Time: {} {} ({}, UTC{}), {}",
             now.format("%Y-%m-%d %H:%M:%S"),
@@ -103,7 +148,7 @@ pub fn current_datetime_line(zone: Option<&str>) -> String {
     // pairing a "UTC" label with a local clock/offset.
     match iana_time_zone::get_timezone() {
         Ok(iana) => {
-            let now = chrono::Local::now();
+            let now = now.with_timezone(&chrono::Local);
             format!(
                 "Current Date & Time: {} {} ({}, UTC{}), {}",
                 now.format("%Y-%m-%d %H:%M:%S"),
@@ -114,7 +159,6 @@ pub fn current_datetime_line(zone: Option<&str>) -> String {
             )
         }
         Err(_) => {
-            let now = chrono::Utc::now();
             format!(
                 "Current Date & Time: {} UTC (UTC, UTC+00:00), {}",
                 now.format("%Y-%m-%d %H:%M:%S"),
@@ -122,6 +166,17 @@ pub fn current_datetime_line(zone: Option<&str>) -> String {
             )
         }
     }
+}
+
+/// Render the current timestamp using the newest scoped provider, or the
+/// system clock when no provider is registered.
+pub fn current_datetime_line(zone: Option<&str>) -> String {
+    let now = PROMPT_CLOCKS
+        .entries()
+        .last()
+        .map(|(_, clock)| clock())
+        .unwrap_or_else(Utc::now);
+    current_datetime_line_at(now, zone)
 }
 
 /// What leads every user message: [`current_datetime_line`], then the
