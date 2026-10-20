@@ -53,6 +53,61 @@ type WorkspaceBackend = Arc<tokio::sync::OnceCell<Arc<dyn StorageBackend>>>;
 static WORKSPACES: LazyLock<Mutex<HashMap<PathBuf, WorkspaceBackend>>> =
     LazyLock::new(Mutex::default);
 
+#[cfg(test)]
+struct BackendOpenTestGate {
+    started: tokio::sync::oneshot::Sender<()>,
+    release: tokio::sync::oneshot::Receiver<()>,
+}
+
+#[cfg(test)]
+static BACKEND_OPEN_TEST_GATE: LazyLock<Mutex<Option<BackendOpenTestGate>>> =
+    LazyLock::new(Mutex::default);
+
+#[cfg(test)]
+static SYNC_BACKEND_ENTRY_TEST_SIGNAL:
+    LazyLock<Mutex<Option<std::sync::mpsc::Sender<()>>>> =
+    LazyLock::new(Mutex::default);
+
+#[cfg(test)]
+pub(super) fn install_test_backend_open_gate(
+    started: tokio::sync::oneshot::Sender<()>,
+    release: tokio::sync::oneshot::Receiver<()>,
+) {
+    *BACKEND_OPEN_TEST_GATE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner) = Some(BackendOpenTestGate { started, release });
+}
+
+#[cfg(test)]
+pub(super) fn arm_test_sync_backend_entry_signal(sender: std::sync::mpsc::Sender<()>) {
+    *SYNC_BACKEND_ENTRY_TEST_SIGNAL
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner) = Some(sender);
+}
+
+#[cfg(test)]
+async fn await_test_backend_open_gate() {
+    let gate = BACKEND_OPEN_TEST_GATE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .take();
+    if let Some(gate) = gate {
+        let _ = gate.started.send(());
+        let _ = gate.release.await;
+    }
+}
+
+#[cfg(test)]
+fn signal_test_sync_backend_entry() {
+    if let Some(sender) = SYNC_BACKEND_ENTRY_TEST_SIGNAL
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .take()
+    {
+        let _ = sender.send(());
+    }
+}
+
 fn workspace_backend(workspace_dir: &Path) -> WorkspaceBackend {
     let mut opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
     Arc::clone(
@@ -63,6 +118,9 @@ fn workspace_backend(workspace_dir: &Path) -> WorkspaceBackend {
 }
 
 async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageBackend>> {
+    #[cfg(test)]
+    await_test_backend_open_gate().await;
+
     let url = super::config::default_url(&workspace_dir);
     super::config::prepare_default_dir(&workspace_dir).with_context(|| {
         format!(
@@ -100,6 +158,9 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = installed() {
         return Ok(backend);
     }
+    #[cfg(test)]
+    signal_test_sync_backend_entry();
+
     let cell = workspace_backend(workspace_dir);
     let workspace_dir = workspace_dir.to_path_buf();
     super::block_on_anyhow(async move { initialized_backend(cell, workspace_dir).await })
