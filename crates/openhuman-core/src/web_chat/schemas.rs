@@ -204,9 +204,43 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
     Box::pin(async move {
         let p = deserialize_params::<WebChatParams>(params)?;
         let voice_note_id = validate_voice_note_attachment(&ctx, &p).await?;
-        let message =
+        let stored_parts = p
+            .attachments
+            .iter()
+            .filter(|part| {
+                !matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let stored_attachments = if stored_parts.is_empty() {
+            if p.persisted_message_id.is_some() {
+                return Err("persisted_message_id requires opaque media refs".into());
+            }
+            None
+        } else {
+            crate::threads::attachments::validate_opaque_parts(&stored_parts)?;
+            let persisted_message_id = p
+                .persisted_message_id
+                .clone()
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| "opaque media refs require persisted_message_id".to_string())?;
+            Some(crate::agent::queued_turn::StoredAttachmentInput {
+                persisted_message_id,
+                parts: stored_parts,
+            })
+        };
+        let message = if stored_attachments.is_some() {
+            if p.message.contains("[ATTACHMENT:")
+                || p.message.contains("[IMAGE:")
+                || p.message.contains("[FILE:")
+            {
+                return Err("opaque media refs require marker-free user text".into());
+            }
+            p.message.clone()
+        } else {
             crate::agent::attachments::parts::fold_into_message(&p.message, &p.attachments)
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| e.to_string())?
+        };
         // Recorded before the turn starts so it reads the new choice.
         crate::agent::tinyagents::apply_requested_effort(
             &ctx,
@@ -214,7 +248,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             p.reasoning_effort.as_deref(),
         )?;
         to_json(
-            channel_web_chat(
+            channel_web_chat_with_stored_attachments(
                 &ctx,
                 &p.client_id,
                 &p.thread_id,
@@ -236,6 +270,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
                     hold_text_stream: false,
                 },
                 voice_note_id,
+                stored_attachments,
             )
             .await?,
         )
