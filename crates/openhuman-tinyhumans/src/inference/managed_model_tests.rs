@@ -1,16 +1,28 @@
-use super::super::managed_reasoning::REASONING_OFF_METADATA_KEY;
-use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
 use super::*;
+
+use super::super::managed_reasoning::REASONING_OFF_METADATA_KEY;
+use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id, without_reasoning};
 use serde_json::Value;
 use tinyinference_llm::model::ChatModel;
 
-/// Mirror of the core's `without_reasoning` hint: the metadata flag the managed
-/// model turns into `reasoning: { enabled: false }`.
-fn without_reasoning(mut request: ModelRequest) -> ModelRequest {
-    request.metadata = serde_json::json!({ REASONING_OFF_METADATA_KEY: true });
-    request
-}
 use tinyinference_llm::message::Message;
+
+#[test]
+fn without_reasoning_sets_the_managed_hint_and_preserves_request_data() {
+    let options = serde_json::json!({ "transport": { "trace": true } });
+    let mut request =
+        ModelRequest::new(vec![Message::user("hi")]).with_provider_options(options.clone());
+    request.metadata = serde_json::json!({ "caller": "kept" });
+
+    let updated = without_reasoning(request);
+
+    assert_eq!(updated.metadata["caller"], "kept");
+    assert_eq!(
+        updated.metadata[REASONING_OFF_METADATA_KEY],
+        serde_json::Value::Bool(true)
+    );
+    assert_eq!(updated.provider_options, options);
+}
 
 fn backend() -> OpenHumanBackendModel {
     OpenHumanBackendModel::new(
