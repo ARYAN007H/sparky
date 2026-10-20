@@ -38,6 +38,7 @@ import path from 'node:path';
 
 import {
   resetMock,
+  mockRequests,
   sendTurn,
   setKeywordRules,
   setMockBehavior,
@@ -372,24 +373,38 @@ test.describe('assistant-ui tool-result elements', () => {
         ],
       })
     );
-    await setKeywordRules([
-      {
-        keyword: 'AUI-TABLE-CASE',
-        toolCalls: [{ name: 'tool_search', arguments: { query: 'list GitHub repositories' } }],
-      },
-      {
-        // Match the result's stable action identity, not a hit count. The
-        // query can legitimately return multiple nearby GitHub actions, and
-        // the count is a ranking detail rather than the action we intend to
-        // exercise.
-        keyword: GITHUB_REPOSITORY_ACTION,
-        toolCalls: [{ name: GITHUB_REPOSITORY_ACTION, arguments: { limit: 2 } }],
-      },
-    ]);
+    await setMockBehavior(
+      'llmForcedResponses',
+      JSON.stringify([
+        {
+          content: '',
+          toolCalls: [
+            {
+              id: 'call_github_list_repositories',
+              name: GITHUB_REPOSITORY_ACTION,
+              arguments: JSON.stringify({ limit: 2 }),
+            },
+          ],
+        },
+        { content: 'Listed the two repositories from the connected account.' },
+      ])
+    );
     await setMockBehavior('llmStreamChunkDelayMs', '10');
 
-    await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
+    await sendTurn(page, threadId, 'List my GitHub repositories');
     await waitForTurnCompletion(page, threadId);
+    const execution = (await mockRequests()).find(request => {
+      if (request.method !== 'POST' || !request.url.includes('/agent-integrations/composio/execute')) {
+        return false;
+      }
+      try {
+        const body = JSON.parse(request.body) as { action?: string; tool?: string };
+        return (body.action ?? body.tool) === GITHUB_REPOSITORY_ACTION;
+      } catch {
+        return false;
+      }
+    });
+    expect(execution, 'the core executed the scripted Composio action against the mock').toBeDefined();
     if (progress) {
       console.log(
         '[epic235 tool progress]',
