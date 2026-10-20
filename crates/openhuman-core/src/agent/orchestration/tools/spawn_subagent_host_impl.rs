@@ -95,13 +95,6 @@ impl SpawnSubagentTool {
             .or(run_context.thread_id.as_deref())
             .map(str::to_owned);
 
-        if let Some(refusal) = refuse_missing_delivery_thread(
-            parent_thread_id.as_deref(),
-            &parent.agent_definition_id,
-            &definition.id,
-        ) {
-            return Ok(refusal);
-        }
         let store = SubagentSessionStore::new(parent.workspace_dir.clone());
         let workspace_descriptor = tool_context
             .and_then(|ctx| ctx.workspace().cloned())
