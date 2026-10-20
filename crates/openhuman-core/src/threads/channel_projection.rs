@@ -7,14 +7,14 @@
 //! guesses from a sender, recent message, or equality between provider and row
 //! identifiers.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tinychannels_bus::{ChannelRef, ConversationRef};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
-use crate::core::runtime::{tenant::tenant_key, DispatchCtx, Tenant};
+use crate::core::runtime::{DispatchCtx, Tenant, tenant::tenant_key};
 use crate::storage::{self, documents::Repo};
 
 const DOMAIN: &str = "threads::channel_projection";
@@ -199,7 +199,7 @@ pub(crate) async fn persist_activity(
         )
         .await
         .map_err(|error| anyhow!("persist channel activity: {error}"))?;
-        Ok(())
+        Ok::<(), anyhow::Error>(())
     }
     .await;
     result.map_err(|error| format!("{LOG_PREFIX} persist activity: {error:#}"))
