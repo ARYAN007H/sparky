@@ -20,7 +20,7 @@ enum ProgressiveTargetKind {
     Configured(tinybus::module::ModuleObjectClient),
     HostedRelay {
         client: tinybus::module::ModuleClient,
-        channel: std::sync::Arc<super::super::super::providers::relay::channel::RelayChannel>,
+        channel: std::sync::Arc<crate::channels::providers::relay::RelayChannel>,
     },
 }
 
@@ -69,7 +69,7 @@ impl NativeProgressiveTarget {
 
 pub(crate) fn hosted_relay_target(
     config: &crate::config::Config,
-    channel: std::sync::Arc<super::super::super::providers::relay::channel::RelayChannel>,
+    channel: std::sync::Arc<crate::channels::providers::relay::RelayChannel>,
     channel_ref: tinychannels_bus::channel::ChannelRef,
     conversation: tinychannels_bus::channel::ConversationRef,
 ) -> NativeProgressiveTarget {

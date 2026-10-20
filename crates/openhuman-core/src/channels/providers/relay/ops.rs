@@ -267,6 +267,29 @@ pub(crate) async fn run_relay_turn(
         }
     };
 
+    let tenant = match dispatch_ctx.tenant() {
+        Ok(tenant) => tenant,
+        Err(error) => {
+            tracing::warn!("relayed channel turn lost its tenant scope: {error}");
+            return channel.sent();
+        }
+    };
+    let mut channel_ref = prepared.envelope.channel.clone();
+    channel_ref.id = params.channel.clone();
+    // A hosted relay has no local provider account. Bind the host callback to
+    // an account scope derived from the trusted tenant and provider instead;
+    // this value is never accepted from relay parameters or model metadata.
+    channel_ref.account_id = Some(crate::core::runtime::tenant::tenant_key(
+        &tenant,
+        &format!("hosted-channel:{}", params.channel),
+    ));
+    let progressive_target = Arc::new(crate::channels::runtime::dispatch::processor::progressive::hosted_relay_target(
+        &config,
+        Arc::clone(&channel),
+        channel_ref,
+        prepared.envelope.conversation.clone(),
+    ));
+
     tracing::debug!(
         channel = %params.channel,
         thread_id = %thread_id,
@@ -276,6 +299,7 @@ pub(crate) async fn run_relay_turn(
     let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
     runtime_message.imported_history = imported_history;
+    runtime_message.progressive_target = Some(progressive_target);
     let turn = process_channel_runtime_message(ctx, runtime_message);
     if let Some(context) = dispatch_ctx.core() {
         crate::core::runtime::CoreContext::scope(
