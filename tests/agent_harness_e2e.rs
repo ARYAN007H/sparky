@@ -2066,7 +2066,10 @@ async fn provider_error_retry_inner() {
 /// flip. What each worker was asked is deterministic; when it asked is not.
 #[test]
 fn concurrent_async_subagents_overlap() {
-    run_on_agent_stack("concurrent_async_subagents_overlap", concurrent_async_subagents_overlap_inner);
+    run_on_agent_stack(
+        "concurrent_async_subagents_overlap",
+        concurrent_async_subagents_overlap_inner,
+    );
 }
 
 async fn concurrent_async_subagents_overlap_inner() {
