@@ -5,7 +5,7 @@ use serde_json::Value;
 use tinyflows_bus::catalog::{
     self, CatalogDocumentPrecondition, CatalogStorageReply, ListWorkflowsResult,
 };
-use tinyflows_catalog::Flow;
+use tinyflows_bus::catalog::Workflow as Flow;
 
 use crate::{config::Config, flows::store};
 

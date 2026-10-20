@@ -34,7 +34,7 @@ fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
 /// **B29 Rule 1 analogue for saves** (save/enable safety — same issue
 /// `flows_create` guards at creation time, see its doc): `flows_create`
 /// refuses to persist an automatic-trigger graph (`schedule` / `app_event` /
-/// `webhook`, see [`trigger_is_automatic`]) as `enabled`, but that guard only
+/// `webhook`) as `enabled`, but that guard only
 /// runs once, at creation. Without an equivalent here, a flow created
 /// `enabled: true` with a manual/no-op trigger could later have an
 /// automatic-trigger graph saved onto it — via the `save_workflow` agent
@@ -44,7 +44,7 @@ fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
 /// So: when the *new* graph's trigger is automatic and the *previous*
 /// graph's trigger was NOT automatic (a manual/none → automatic
 /// transition), this forces the persisted `enabled` back to `false` in the
-/// same store write — the user must explicitly re-arm via
+/// the same Catalog write — the user must explicitly re-arm via
 /// `flows_set_enabled` after reviewing the new trigger. An automatic →
 /// automatic re-edit (e.g. tweaking a cron expression) is left alone — the
 /// user already opted in once, and re-disarming on every edit would just be
@@ -53,7 +53,7 @@ fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
 /// The override is applied **unconditionally** on a manual/none → automatic
 /// transition — it does *not* gate on whether the flow *looked* enabled in
 /// the `existing` read above. That read is a snapshot taken before
-/// `store::update_flow_graph`'s own guarded UPDATE re-reads the row; a
+/// Catalog.PutWorkflow's guarded UPDATE re-reads the row; a
 /// concurrent `flows_set_enabled(id, true)` landing in the gap would leave
 /// this snapshot stale while the row is actually enabled by the time the
 /// guarded UPDATE runs — and since `set_enabled` bumps `updated_at` too,
