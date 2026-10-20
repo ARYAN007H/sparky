@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tinychannels_bus::{ContentPart, MediaReference};
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
+use tinystoragedrivers::{CollectionSpec, Precondition};
 
 use crate::agent::attachments::Attachment;
 use crate::storage::{
@@ -272,6 +272,7 @@ async fn read_staged_entries(
     let tenant = tenant_for(ctx)?;
     let repo = staged_repo(ctx, &config.workspace_dir)?;
     let mut entries = Vec::with_capacity(requested.len());
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
     for part in requested {
         let opaque_id = opaque_media(part)
             .and_then(|media| media.opaque_id.as_deref())
@@ -709,40 +710,24 @@ pub(crate) async fn consume_staged_parts(
         let id = opaque_media(part)
             .and_then(|media| media.opaque_id.as_deref())
             .ok_or_else(|| "staged attachment reference is missing".to_string())?;
-        let path = staged_manifest_path(&config.workspace_dir, id)?;
-        let claim_path = path.with_extension("claim.json");
-        let claim: StagedAttachmentClaim =
-            serde_json::from_slice(&tokio::fs::read(&claim_path).await.map_err(|_| {
-                "staged attachment is not bound to a persisted message".to_string()
-            })?)
-            .map_err(|error| format!("staged attachment claim is invalid: {error}"))?;
-        if claim.tenant != tenant
+        let record = get_staged_record(&repo, &staged_doc_id(id)?)?
+            .ok_or_else(|| "staged attachment is not bound to a persisted message".to_string())?;
+        let Some(claim) = record.claim else {
+            return Err("staged attachment is not bound to a persisted message".into());
+        };
+        if record.tenant != tenant
+            || record.thread_id != thread_id
+            || claim.tenant != tenant
             || claim.thread_id != thread_id
             || claim.message_id != message_id
             || claim.part != *part
             || claim.canceled
+            || record.attachment.part != *part
         {
             return Err("staged attachment is bound to a different message or scope".into());
         }
-        match tokio::fs::read(&path).await {
-            Ok(bytes) => {
-                let manifest: StagedAttachment = serde_json::from_slice(&bytes)
-                    .map_err(|error| format!("staged attachment record is invalid: {error}"))?;
-                if manifest.tenant != tenant
-                    || manifest.thread_id != thread_id
-                    || manifest.attachment.part != *part
-                {
-                    return Err("staged attachment belongs to a different scope".into());
-                }
-                match tokio::fs::remove_file(path).await {
-                    Ok(()) => {}
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(error) => return Err(format!("remove staged attachment record: {error}")),
-                }
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(format!("read staged attachment record: {error}")),
-        }
+        // Keep the durable claim as the monotonic staged->row transfer record.
+        // Deleting it would let a retry/cancel race reclaim the same media.
     }
     Ok(())
 }
