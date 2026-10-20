@@ -13,7 +13,6 @@ use std::task::{Context, Poll, Waker};
 use tinybus::EventHandler;
 use tinychannels::routes::resolve_provider_alias;
 use tinychannels_bus::ChannelMessage;
-use tinychannels_runtime::context::ChatMessage;
 use tinytools::{Tool, ToolResult};
 
 struct DummyTool;
@@ -652,8 +651,6 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
-    let sender_key = "telegram_alice_chat-remote";
-
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,

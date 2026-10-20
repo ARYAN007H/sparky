@@ -1,7 +1,6 @@
 //! OpenHuman-specific dispatch prompt context plus TinyChannels helpers.
 
 use crate::channels::context::CHANNEL_TYPING_REFRESH_INTERVAL_SECS;
-use crate::channels::Channel;
 use tinychannels_bus as traits;
 
 /// Maximum characters shown in the debug reply println.

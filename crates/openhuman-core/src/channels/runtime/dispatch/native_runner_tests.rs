@@ -33,7 +33,7 @@ async fn active_terminal_delivery_is_returned_to_its_waiting_caller() {
 }
 
 #[tokio::test]
-async fn terminal_delivery_releases_session_profile_and_busy_guards() {
+async fn native_runner_checkouts_serialize_and_cancel_waiters_cleanly() {
     use crate::agent::host_agents::HostAgent;
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
@@ -44,11 +44,11 @@ async fn terminal_delivery_releases_session_profile_and_busy_guards() {
         request_id: &str,
     ) -> TurnRequest<QueuedPayload> {
         let core = dispatch.core().expect("profile context").clone();
-        let definition = crate::agent::harness::host_definition::AgentDefinitionRegistry::
-            builtins_only()
-            .get("orchestrator")
-            .cloned()
-            .expect("built-in orchestrator definition");
+        let definition =
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+                .get("orchestrator")
+                .cloned()
+                .expect("built-in orchestrator definition");
         let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
             host_agent: HostAgent {
                 definition,
