@@ -6,7 +6,7 @@
  * and the existing shared-flows / element-helpers modules.
  */
 import { setMockBehavior } from '../mock-server';
-import { waitForText } from './element-helpers';
+import { textExists, waitForText } from './element-helpers';
 import { navigateToHome, navigateToSkills, waitForHomePage } from './shared-flows';
 
 const LOG = '[ComposioHelpers]';
