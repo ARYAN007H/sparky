@@ -21,10 +21,10 @@ the `[memory]` config into either `Binding::On(BoundEngine)` or
 `Binding::Off` with a reason. Built-in and host-provided engines are bound
 through TinyMemory's native binder:
 
-| Engine       | Endpoint                                                          | Credential                                             | Off when                                              |
-| ------------ | ----------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------- |
-| `tinyhumans` | registered by `openhuman-tinyhumans` through `engine_registry` (`[memory.engines.tinyhumans] endpoint`, else its control-plane origin) | the host's backend credential, resolved per request | not registered, or signed out |
-| `cortexdb`   | `[memory.engines.cortexdb] endpoint`, else CortexDB's managed API | the API key stored in the keyring as `memory-cortexdb` | no key stored                                         |
+| Engine       | Endpoint                                                                                                                               | Credential                                             | Off when                      |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------- |
+| `tinyhumans` | registered by `openhuman-tinyhumans` through `engine_registry` (`[memory.engines.tinyhumans] endpoint`, else its control-plane origin) | the host's backend credential, resolved per request    | not registered, or signed out |
+| `cortexdb`   | `[memory.engines.cortexdb] endpoint`, else CortexDB's managed API                                                                      | the API key stored in the keyring as `memory-cortexdb` | no key stored                 |
 
 The core never keeps a TinyHumans credential or owns that engine's
 configuration. The registered host builder resolves the bearer on every
