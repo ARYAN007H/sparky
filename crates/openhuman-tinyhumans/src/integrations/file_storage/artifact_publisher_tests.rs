@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
+use anyhow::Result;
+use async_trait::async_trait;
 use serde_json::json;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tiny_artifacts::{
     ArtifactKind, ArtifactPublisher, ArtifactRecord, ArtifactVersion, Artifacts, Author, Content,
     FileMetadata, FileRef, FileStore, PublishOptions,
 };
-use anyhow::{Result, bail};
-use async_trait::async_trait;
-use std::collections::HashMap;
-use std::sync::Mutex;
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -32,19 +32,38 @@ impl MemoryFileStore {
 impl FileStore for MemoryFileStore {
     async fn put(&self, key: &str, bytes: &[u8], media_type: Option<&str>) -> Result<FileMetadata> {
         self.add(key, bytes, media_type);
-        Ok(FileMetadata { size_bytes: bytes.len() as u64, media_type: media_type.map(str::to_string) })
+        Ok(FileMetadata {
+            size_bytes: bytes.len() as u64,
+            media_type: media_type.map(str::to_string),
+        })
     }
 
     async fn read(&self, key: &str) -> Result<Vec<u8>> {
-        self.0.lock().unwrap().get(key).map(|(bytes, _)| bytes.clone()).ok_or_else(|| anyhow::anyhow!("missing file key"))
+        self.0
+            .lock()
+            .unwrap()
+            .get(key)
+            .map(|(bytes, _)| bytes.clone())
+            .ok_or_else(|| anyhow::anyhow!("missing file key"))
     }
 
     async fn metadata(&self, key: &str) -> Result<Option<FileMetadata>> {
-        Ok(self.0.lock().unwrap().get(key).map(|(bytes, media_type)| FileMetadata { size_bytes: bytes.len() as u64, media_type: media_type.clone() }))
+        Ok(self
+            .0
+            .lock()
+            .unwrap()
+            .get(key)
+            .map(|(bytes, media_type)| FileMetadata {
+                size_bytes: bytes.len() as u64,
+                media_type: media_type.clone(),
+            }))
     }
 
     async fn delete_prefix(&self, prefix: &str) -> Result<()> {
-        self.0.lock().unwrap().retain(|key, _| !key.starts_with(prefix));
+        self.0
+            .lock()
+            .unwrap()
+            .retain(|key, _| !key.starts_with(prefix));
         Ok(())
     }
 }
@@ -385,7 +404,7 @@ async fn a_server_failure_on_the_link_is_not_retried() {
 }
 
 #[tokio::test]
-async fn a_file_in_a_protected_location_is_never_uploaded() {
+async fn a_storage_key_is_never_read_as_a_local_secret_path() {
     let dir = tempfile::tempdir().unwrap();
     let key = dir.path().join(".ssh").join("id_ed25519");
     std::fs::create_dir_all(key.parent().unwrap()).unwrap();
@@ -411,5 +430,8 @@ async fn a_file_in_a_protected_location_is_never_uploaded() {
         .publish(&record, &version, &PublishOptions::default())
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("protected location"), "{err}");
+    assert!(
+        err.to_string().contains("cannot read the artifact's file"),
+        "{err}"
+    );
 }
