@@ -33,10 +33,13 @@ async fn host_memory_state_adapters_use_the_state_kv_port() {
         "layout_migration",
         "jobs",
     ] {
-        assert!(
+        let stored = if name == "pending_deletions" {
+            load_workspace::<serde_json::Value>(workspace, name)
+        } else {
             load::<serde_json::Value>(workspace, name)
-                .unwrap()
-                .is_some(),
+        };
+        assert!(
+            stored.unwrap().is_some(),
             "memory state value {name} is stored through the KV port"
         );
     }
@@ -260,10 +263,14 @@ async fn a_matching_active_agent_scope_is_a_legacy_source() {
 
     let other_workspace = tmp.path().join("other-workspace");
     let other_scope = super::workspace_scope(&other_workspace).unwrap();
-    let other_target = super::open_workspace_quarantining_on::<
-        Vec<crate::memory::deletion::PendingDeletion>,
-    >(&other_workspace, &backend, &other_scope, "pending_deletions")
-    .unwrap();
+    let other_target =
+        super::open_workspace_quarantining_on::<Vec<crate::memory::deletion::PendingDeletion>>(
+            &other_workspace,
+            &backend,
+            &other_scope,
+            "pending_deletions",
+        )
+        .unwrap();
     CoreContext::scope(context, async {
         super::migrate_existing_queue_scopes(
             &other_workspace,
