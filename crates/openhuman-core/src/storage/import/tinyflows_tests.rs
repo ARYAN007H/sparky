@@ -356,6 +356,71 @@ fn an_invalid_flow_record_keeps_the_import_open_for_retry() {
     assert_eq!(tree(dir.path()), before, "the legacy files were modified");
 }
 
+#[tokio::test]
+async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files() {
+    struct FallbackStorageRestore {
+        previous: Option<Arc<dyn StorageBackend>>,
+        workspace: PathBuf,
+    }
+
+    impl Drop for FallbackStorageRestore {
+        fn drop(&mut self) {
+            crate::storage::clear();
+            crate::storage::local::forget(&self.workspace);
+            if let Some(backend) = self.previous.take() {
+                crate::storage::install(backend);
+            }
+        }
+    }
+
+    let (dir, mut config) = workspace();
+    config.components.tinyflows = true;
+    let _restore = FallbackStorageRestore {
+        previous: crate::storage::installed(),
+        workspace: config.workspace_dir.clone(),
+    };
+    crate::storage::clear();
+    crate::storage::local::forget(&config.workspace_dir);
+    let backend = crate::storage::local::backend_for(&config.workspace_dir).unwrap();
+    let scoped = backend.for_scope(&Scope::local()).unwrap();
+    scoped
+        .documents()
+        .ensure_collection(&tinystoragedrivers::CollectionSpec::new("flows_kv"))
+        .await
+        .unwrap();
+    scoped
+        .documents()
+        .put(
+            "flows_kv",
+            "legacy-kv",
+            json!({
+                "namespace": "profile",
+                "key": "welcome",
+                "value_json": "{\"seen\":true}"
+            }),
+            tinystoragedrivers::Precondition::None,
+        )
+        .await
+        .unwrap();
+
+    ensure_flow_scope_ready(&config).await.unwrap();
+
+    let docs = Arc::clone(scoped.documents());
+    assert!(docs.get("flows_kv", "legacy-kv").await.unwrap().is_none());
+    let catalog = FlowCatalogDocuments::new(docs);
+    assert_eq!(
+        crate::storage::block_on_anyhow(async move { catalog.kv_get("profile", "welcome").await })
+            .unwrap(),
+        Some(json!({"seen": true}))
+    );
+    assert!(
+        flow_import_marker_done(&backend, &config).is_ok_and(|done| !done),
+        "the unbooted local fallback must not run the workspace-file importer"
+    );
+    assert!(dir.path().join("flows/flows.db").is_file());
+    crate::storage::local::forget(&config.workspace_dir);
+}
+
 #[test]
 fn a_workspace_without_legacy_files_imports_nothing_and_leaves_no_marker() {
     let dir = TempDir::new().unwrap();
