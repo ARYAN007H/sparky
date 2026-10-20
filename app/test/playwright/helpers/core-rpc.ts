@@ -215,6 +215,24 @@ export async function signInViaBypassUser(
   }
 }
 
+/** Re-authenticate the same local test user without resetting persisted config. */
+export async function signInViaBypassUserPreservingConfig(page: Page, userId: string): Promise<void> {
+  await callCoreRpc('openhuman.auth_store_session', {
+    token: buildBypassJwt(userId),
+    userId,
+    user: { _id: userId, id: userId, displayName: 'Playwright User' },
+  });
+  await applyBrowserCoreModeInPage(page);
+  await page.goto('/#/home');
+  await waitForAuthenticatedSnapshot(page);
+  await expect
+    .poll(async () => page.evaluate(() => window.location.hash), {
+      timeout: AUTH_CALLBACK_HOME_TIMEOUT_MS,
+    })
+    .toMatch(/^#\/chat/);
+  await waitForAppReady(page);
+}
+
 export async function bootAuthenticatedPage(
   page: Page,
   userId: string,

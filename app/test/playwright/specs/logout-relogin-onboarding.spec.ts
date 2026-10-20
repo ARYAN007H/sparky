@@ -4,6 +4,7 @@ import {
   bootRuntimeReadyGuestPage,
   callCoreRpc,
   signInViaBypassUser,
+  signInViaBypassUserPreservingConfig,
   waitForAppReady,
 } from '../helpers/core-rpc';
 
@@ -103,14 +104,13 @@ test.describe('Logout -> re-login onboarding overlay', () => {
   test('same-account completed onboarding survives UI logout and re-login', async ({ page }) => {
     const userId = 'pw-logout-relogin-completed-user';
     await signInViaBypassUser(page, userId);
-    await callCoreRpc('openhuman.config_set_onboarding_completed', { value: true });
-    await waitForAppReady(page);
-    await expect.poll(readOnboardingCompleted).toBe(true);
+    await expectLandedInChat(page);
 
     await logoutViaSettings(page);
+    await expect.poll(readOnboardingCompleted).toBe(true);
     await expect(page.getByTestId('onboarding-layout')).toHaveCount(0);
 
-    await signInViaBypassUser(page, userId);
+    await signInViaBypassUserPreservingConfig(page, userId);
     await page.goto('/#/onboarding/welcome');
     await waitForAppReady(page);
     await expect
