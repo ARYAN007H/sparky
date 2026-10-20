@@ -152,7 +152,7 @@ pub(super) async fn resolve_target_agent(channel: &str) -> AgentScoping {
             connected_integration_count = connected.len(),
             "[dispatch::routing] fetched connected integrations for delegation expansion"
         );
-        orchestrator_tools::collect_orchestrator_tools(definition, &registry, &connected)
+        orchestrator_tools::collect_orchestrator_tools(definition, &connected)
     } else {
         Vec::new()
     };

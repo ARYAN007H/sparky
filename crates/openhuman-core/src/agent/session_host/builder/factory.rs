@@ -425,7 +425,6 @@ impl OpenHumanSessionHost {
                 let synthed = if should_synthesize_delegation_tools(def) {
                     tools::orchestrator_tools::collect_orchestrator_tools(
                         def,
-                        &reg,
                         prewarmed_integrations_slice,
                     )
                 } else {
@@ -485,7 +484,6 @@ impl OpenHumanSessionHost {
                 let synthed = match reg.get("orchestrator") {
                     Some(orch_def) => tools::orchestrator_tools::collect_orchestrator_tools(
                         orch_def,
-                        &reg,
                         prewarmed_integrations_slice,
                     ),
                     None => {
