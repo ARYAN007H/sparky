@@ -53,11 +53,20 @@ test.describe('Recovery Phrase wallet setup', () => {
       rel_path: 'state/wallet-state.json',
       max_bytes: 131_072,
     });
-    const stateText = JSON.stringify(walletState);
-    expect(stateText).toMatch(/"consentGranted"\s*:\s*true/);
-    expect(stateText).toMatch(/"source"\s*:\s*"generated"/);
+    const content =
+      walletState && typeof walletState === 'object' && 'result' in walletState
+        ? (walletState as { result?: { content_utf8?: unknown } }).result?.content_utf8
+        : undefined;
+    expect(typeof content).toBe('string');
+    const state = JSON.parse(content as string) as {
+      consentGranted?: boolean;
+      source?: string;
+      accounts?: Array<{ chain?: string }>;
+    };
+    expect(state.consentGranted).toBe(true);
+    expect(state.source).toBe('generated');
     for (const chain of ['evm', 'btc', 'solana', 'tron']) {
-      expect(stateText).toMatch(new RegExp(`"chain"\\s*:\\s*"${chain}"`));
+      expect(state.accounts?.some(account => account.chain === chain)).toBe(true);
     }
   });
 });
