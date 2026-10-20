@@ -107,7 +107,7 @@ for i in "${!special_titles[@]}"; do
 done
 for ((shard=1; shard<=64; shard++)); do
   if (( (shard - 1) % lanes + 1 == lane )); then
-    run_unit "shard-$shard" --shard="$shard/64" --grep-invert='Connections (aliases|deep links)|Skills explorer|Chat Harness - Subagent'
+    run_unit "shard-$shard" --shard="$shard/64" --grep-invert='Connections (aliases|deep links)|Skills explorer'
   fi
 done
 exit "$overall"

@@ -21,6 +21,9 @@ function run(args, env = {}) {
 
 test("four lanes assign each of 64 shards and nine special units once", () => {
   const units = [];
+  const schedulerSource = fs.readFileSync(script, "utf8");
+  assert.match(schedulerSource, /--grep-invert='Connections \(aliases\|deep links\)\|Skills explorer'/);
+  assert.doesNotMatch(schedulerSource, /Chat Harness - Subagent/);
   for (let lane = 1; lane <= 4; lane += 1) {
     const result = run([`--lane=${lane}`, "--lanes=4", "--list"]);
     assert.equal(result.status, 0, result.stderr);
