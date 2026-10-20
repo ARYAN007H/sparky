@@ -3,6 +3,13 @@ use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::{oneshot, Notify};
 
+#[test]
+fn sandbox_callback_path_is_accepted_by_tinybus() {
+    let path = super::sandbox_callback_object_path(uuid::Uuid::new_v4())
+        .expect("generated callback path is a valid TinyBus object path");
+    assert!(path.as_str().starts_with("/ai/tinyhumans/openhuman/FlowSandbox/"));
+}
+
 struct DropNotice {
     drops: Arc<AtomicUsize>,
     completed: Arc<Notify>,
