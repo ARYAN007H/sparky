@@ -467,7 +467,9 @@ async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files(
         Some(json!({"seen": true}))
     );
     assert!(
-        flow_import_marker_done(&backend, &config).await.is_ok_and(|done| !done),
+        flow_import_marker_done(&backend, &config)
+            .await
+            .is_ok_and(|done| !done),
         "the unbooted local fallback must not run the workspace-file importer"
     );
     assert_eq!(tree(&legacy_dir), legacy_files_before);
