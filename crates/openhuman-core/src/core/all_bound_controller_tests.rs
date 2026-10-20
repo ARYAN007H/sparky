@@ -11,6 +11,8 @@ static EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
 fn staged_bound_methods() -> Vec<&'static str> {
     let mut methods = vec!["composio.execute"];
+    #[cfg(feature = "mcp")]
+    methods.push("mcp_clients.registry_get");
     methods.extend([
         "socket.connect",
         "socket.disconnect",
@@ -18,8 +20,6 @@ fn staged_bound_methods() -> Vec<&'static str> {
         "socket.emit",
         "socket.connect_with_session",
     ]);
-    #[cfg(feature = "mcp")]
-    methods.push("mcp_clients.registry_get");
     #[cfg(feature = "voice")]
     methods.extend([
         "voice.status",
@@ -46,8 +46,6 @@ fn staged_bound_methods() -> Vec<&'static str> {
 
 #[test]
 fn production_registry_binds_every_socket_controller_to_its_declared_parser() {
-    use serde_json::json;
-
     let entries: Vec<_> = registry()
         .iter()
         .filter(|grouped| {
@@ -67,41 +65,7 @@ fn production_registry_binds_every_socket_controller_to_its_declared_parser() {
             .starts_with("socket.")),
         "socket methods remain public registry entries"
     );
-    let contracts = [
-        ControllerParamContract {
-            method: "socket.connect",
-            required: &["url", "token"],
-            optional: &[],
-            examples: vec![json!({"url":"https://example.invalid/socket", "token":"test-token"})],
-        },
-        ControllerParamContract {
-            method: "socket.disconnect",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-        ControllerParamContract {
-            method: "socket.state",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-        ControllerParamContract {
-            method: "socket.emit",
-            required: &["event"],
-            optional: &["data"],
-            examples: vec![
-                json!({"event":"message", "data":{"text":"hello"}}),
-                json!({"event":"message"}),
-            ],
-        },
-        ControllerParamContract {
-            method: "socket.connect_with_session",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-    ];
+    let contracts = crate::platform::socket::socket_parameter_contracts();
     assert_eq!(
         entries.len(),
         contracts.len(),
@@ -595,9 +559,11 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
         .find(|field| field.name == "tool")
         .expect("tool schema field")
         .required = false;
-        assert!(required_input_contract(&optional_required, &["tool"])
+    assert!(
+        required_input_contract(&optional_required, &["tool"])
             .unwrap_err()
-            .contains("required inputs mismatch"));
+            .contains("required inputs mismatch")
+    );
 
     for example in [
         json!({"tool":"GMAIL_SEND_EMAIL"}),

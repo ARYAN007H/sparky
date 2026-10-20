@@ -1,56 +1,173 @@
 use super::*;
 use crate::core::all::{
-    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
-    expect_schema_required_inputs,
+    ControllerHandler, ControllerParamContract, assert_schema_controller_parity,
+    verify_parameter_schema,
 };
 use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn socket_schema_contracts_are_preserved() {
-    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "socket");
-    assert_schema_controller_parity(
-        &all_controller_schemas(),
-        &all_registered_controllers(),
-        "connect",
-    );
-    let functions: Vec<_> = all_controller_schemas()
-        .iter()
-        .map(|schema| schema.function)
-        .collect();
-    assert_eq!(functions.len(), 5);
-    for expected in [
-        "connect",
-        "disconnect",
-        "state",
-        "emit",
-        "connect_with_session",
-    ] {
-        assert!(functions.contains(&expected), "missing socket.{expected}");
+    let schemas = all_controller_schemas();
+    crate::core::all::expect_schema_namespace(&schemas, "socket");
+    assert_schema_controller_parity(&schemas, &all_registered_controllers(), "connect");
+    let contracts = socket_parameter_contracts();
+    for contract in &contracts {
+        let schema = schemas
+            .iter()
+            .find(|schema| schema.method_name() == contract.method)
+            .expect("socket schema has an independent contract");
+        verify_parameter_schema(schema, contract)
+            .expect("independent socket schema contract matches");
     }
-    for schema in all_controller_schemas() {
-        assert_eq!(schema.namespace, "socket");
+    for schema in schemas {
         assert!(
             !schema.outputs.is_empty(),
             "{} output fields",
             schema.function
         );
     }
-    for (function, required) in [
-        ("connect", &["url", "token"][..]),
-        ("disconnect", &[][..]),
-        ("state", &[][..]),
-        ("connect_with_session", &[][..]),
-    ] {
-        let schema = schemas(function);
-        expect_schema_identity(&schema, "socket", function);
-        expect_schema_required_inputs(&schema, required);
-        if required.is_empty() {
-            assert!(schema.inputs.is_empty());
-        }
+}
+
+pub(super) fn socket_parameter_contracts() -> Vec<ControllerParamContract> {
+    use serde_json::json;
+
+    vec![
+        ControllerParamContract {
+            method: "socket.connect",
+            required: &["url", "token"],
+            optional: &[],
+            examples: vec![json!({"url":"https://example.invalid/socket", "token":"test-token"})],
+        },
+        ControllerParamContract {
+            method: "socket.disconnect",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+        ControllerParamContract {
+            method: "socket.state",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+        ControllerParamContract {
+            method: "socket.emit",
+            required: &["event"],
+            optional: &["data"],
+            examples: vec![
+                json!({"event":"message", "data":{"text":"hello"}}),
+                json!({"event":"message"}),
+            ],
+        },
+        ControllerParamContract {
+            method: "socket.connect_with_session",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+    ]
+}
+
+#[test]
+fn socket_legacy_catalog_keeps_handler_identities() {
+    let expected: [(&str, ControllerHandler); 5] = [
+        ("socket.connect", handle_connect),
+        ("socket.disconnect", handle_disconnect),
+        ("socket.state", handle_state),
+        ("socket.emit", handle_emit),
+        ("socket.connect_with_session", handle_connect_with_session),
+    ];
+    let registered = all_registered_controllers();
+    assert_eq!(registered.len(), expected.len());
+    for ((method, handler), controller) in expected.iter().zip(&registered) {
+        assert_eq!(controller.schema.method_name(), *method);
+        assert!(std::ptr::fn_addr_eq(controller.handler, *handler));
     }
-    let emit = schemas("emit");
-    expect_schema_identity(&emit, "socket", "emit");
-    expect_schema_fields(&emit, &[("event", Some(true)), ("data", Some(false))]);
+}
+
+#[test]
+fn connect_parser_keeps_reader_order_and_string_values() {
+    let error = parse_connect(Map::new()).err().expect("missing URL fails");
+    assert_eq!(error, "missing required param 'url'");
+
+    let params = serde_json::from_value(serde_json::json!({"url":" ", "extra":true}))
+        .expect("object params");
+    assert_eq!(
+        parse_connect(params).err().expect("missing token fails"),
+        "missing required param 'token'"
+    );
+
+    let params = serde_json::from_value(serde_json::json!({
+        "url":"  https://example.invalid/socket  ",
+        "token":" token ",
+        "unknown":{"ignored":true}
+    }))
+    .expect("object params");
+    let parsed = parse_connect(params).expect("string values remain permissive");
+    assert_eq!(parsed.url, "  https://example.invalid/socket  ");
+    assert_eq!(parsed.token, " token ");
+
+    for invalid in [
+        serde_json::json!({"url":null,"token":"token"}),
+        serde_json::json!({"url":42,"token":"token"}),
+    ] {
+        let params = serde_json::from_value(invalid).expect("object params");
+        assert_eq!(
+            parse_connect(params)
+                .err()
+                .expect("invalid URL is rejected before token"),
+            "missing required param 'url'"
+        );
+    }
+    for invalid_token in [
+        serde_json::Value::Null,
+        serde_json::json!(42),
+        serde_json::json!({"token":"nested"}),
+    ] {
+        let params = serde_json::json!({"url":"url", "token":invalid_token});
+        assert_eq!(
+            parse_connect(serde_json::from_value(params).expect("object params"))
+                .err()
+                .expect("non-string token is rejected"),
+            "missing required param 'token'"
+        );
+    }
+}
+
+#[test]
+fn emit_parser_defaults_data_to_null_and_preserves_any_json_value() {
+    let missing = serde_json::from_value(serde_json::json!({"event":" message ", "extra":1}))
+        .expect("object params");
+    let parsed = parse_emit(missing).expect("event is a string");
+    assert_eq!(parsed.event, " message ");
+    assert_eq!(parsed.data, Value::Null);
+
+    for data in [
+        serde_json::Value::Null,
+        serde_json::json!(42),
+        serde_json::json!("payload"),
+        serde_json::json!([true, null]),
+        serde_json::json!({"nested":{"value":true}}),
+    ] {
+        let params = serde_json::json!({"event":"message", "data":data.clone()});
+        let parsed = parse_emit(serde_json::from_value(params).expect("object params"))
+            .expect("all JSON payload values remain accepted");
+        assert_eq!(parsed.data, data);
+    }
+    assert_eq!(
+        parse_emit(Map::new()).err().expect("missing event fails"),
+        "missing required param 'event'"
+    );
+}
+
+#[test]
+fn ignored_map_parser_accepts_unknown_values() {
+    let params = serde_json::from_value(serde_json::json!({
+        "anything":[null, true, {"nested":42}],
+        "other":"ignored"
+    }))
+    .expect("object params");
+    assert_eq!(parse_ignored_params(params), Ok(()));
 }
 
 // ── handlers (without manager): require_manager errors ─────────
@@ -89,6 +206,11 @@ async fn handlers_error_without_initialized_manager() {
     assert!(err.contains("SocketManager not initialized"));
 
     let err = handle_emit(DispatchCtx::process_default(), Map::new())
+        .await
+        .unwrap_err();
+    assert!(err.contains("SocketManager not initialized"));
+
+    let err = handle_connect_with_session(DispatchCtx::process_default(), Map::new())
         .await
         .unwrap_err();
     assert!(err.contains("SocketManager not initialized"));

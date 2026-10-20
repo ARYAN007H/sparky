@@ -510,10 +510,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::sandbox::all_sandbox_registered_controllers(),
     );
     // Backend Socket.IO bridge + related runtime plumbing
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Platform,
-        crate::platform::socket::all_socket_registered_controllers(),
+        crate::platform::socket::all_controller_entries(),
     );
     // Discovered SKILL.md skills and their bundled resources
     push(
