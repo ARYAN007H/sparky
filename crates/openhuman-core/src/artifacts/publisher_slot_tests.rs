@@ -35,27 +35,40 @@ fn the_first_factory_that_answers_serves_sharing() {
 async fn publisher_lookup_uses_the_carried_context_not_the_ambient_profile() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    let root = CoreContext::for_test(DomainSet::full(), None);
     let overlay = |profile: &'static str| {
         ContextOverlay::new(Config::default(), DomainSet::kernel(), ToolGroups::none())
             .profile(profile)
     };
-    let core_a = root.derive_with(overlay("publisher-a"));
-    let core_b = root.derive_with(overlay("publisher-b"));
+    // Derived contexts share their parent's extension table, so start each
+    // test context from its own root to model separate host registrations.
+    let core_a = CoreContext::for_test(DomainSet::full(), None).derive_with(overlay("publisher-a"));
+    let core_b = CoreContext::for_test(DomainSet::full(), None).derive_with(overlay("publisher-b"));
     let ctx_a = DispatchCtx::new(core_a.clone());
     let ctx_b = DispatchCtx::new(core_b.clone());
     let binder: ArtifactPublisherBinder = Arc::new(|_files| Arc::new(FixedPublisher));
+    let selected_a = Arc::new(AtomicUsize::new(0));
+    let selected_b = Arc::new(AtomicUsize::new(0));
+    let factory_a = selected_a.clone();
     register_artifact_publisher_in(core_a.extensions(), "publisher-context-a", move |_| {
+        factory_a.fetch_add(1, Ordering::SeqCst);
         Some(binder.clone())
     });
-    register_artifact_publisher_in(core_b.extensions(), "publisher-context-b-declines", |_| {
-        None
+    let factory_b = selected_b.clone();
+    register_artifact_publisher_in(core_b.extensions(), "publisher-context-b", move |_| {
+        factory_b.fetch_add(1, Ordering::SeqCst);
+        Some(Arc::new(|_files| Arc::new(FixedPublisher)))
     });
 
     CoreContext::scope(core_b, async {
         assert!(artifact_publisher_in(&Config::default(), &ctx_a).is_some());
-        assert!(artifact_publisher_in(&Config::default(), &ctx_b).is_none());
+        assert_eq!(selected_a.load(Ordering::SeqCst), 1);
+        assert_eq!(selected_b.load(Ordering::SeqCst), 0);
+
+        assert!(artifact_publisher_in(&Config::default(), &ctx_b).is_some());
+        assert_eq!(selected_a.load(Ordering::SeqCst), 1);
+        assert_eq!(selected_b.load(Ordering::SeqCst), 1);
     })
     .await;
 }
