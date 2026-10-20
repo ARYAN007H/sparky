@@ -379,7 +379,11 @@ pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     // decision is gated on the managed-backend envelope so a BYO payload
     // carrying an `errorCode`-shaped field is not wrongly suppressed
     // (CodeRabbit).
-    if crate::inference::provider::managed_error_skips_sentry(message) {
+    let backend_error = crate::inference::registry::classify_backend_error(None, message);
+    if backend_error
+        .as_ref()
+        .is_some_and(|classification| classification.backend_owned && !classification.reportable)
+    {
         return Some(ExpectedErrorKind::BackendErrorCodeOwned);
     }
     // A managed-backend client-guard-leak code (`PAYLOAD_TOO_LARGE` /
@@ -392,9 +396,17 @@ pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     // `ContextWindowExceeded` bucket (CodeRabbit). Gated on the managed envelope
     // so a BYO provider's own context-overflow — genuine user-state, not our
     // guard — still flows to that matcher and stays demoted.
-    if crate::inference::provider::is_managed_backend_envelope(message)
-        && crate::inference::provider::is_backend_client_guard_leak(message)
-    {
+    if backend_error.as_ref().is_some_and(|classification| {
+        classification.provider_owned
+            && classification.reportable
+            && matches!(
+                classification.kind,
+                Some(
+                    crate::inference::registry::BackendErrorKind::PayloadTooLarge
+                        | crate::inference::registry::BackendErrorKind::ContextLengthExceeded
+                )
+            )
+    }) {
         return None;
     }
     // Check the Codex-CLI import envelope first: it is highly specific
@@ -2306,7 +2318,9 @@ fn report_expected_message(kind: ExpectedErrorKind, message: &str, domain: &str,
             // The FE surfaces actionable copy via `classify_inference_error`;
             // Sentry must not double-report (F2/F4). Demote at `warn!` so the
             // breadcrumb retains the code for triage without spawning an event.
-            let code = crate::inference::provider::extract_backend_error_code_token(message)
+            let code = backend_error
+                .as_ref()
+                .and_then(|classification| classification.token.as_deref())
                 .unwrap_or_default();
             tracing::warn!(
                 domain = domain,
@@ -2595,7 +2609,13 @@ pub fn is_backend_error_code_event(event: &sentry::protocol::Event<'_>) -> bool 
     [direct, from_logentry, from_exception]
         .into_iter()
         .flatten()
-        .any(crate::inference::provider::managed_error_skips_sentry)
+        .any(|message| {
+            crate::inference::registry::classify_backend_error(None, message).is_some_and(
+                |classification| {
+                    classification.backend_owned && !classification.reportable
+                },
+            )
+        })
 }
 
 /// Defense-in-depth `before_send` filter for transient streaming **transport**
