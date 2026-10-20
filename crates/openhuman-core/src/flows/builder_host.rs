@@ -277,10 +277,6 @@ impl Drop for SandboxCallbackLease {
     }
 }
 
-#[cfg(test)]
-#[path = "builder_host_tests.rs"]
-mod tests;
-
 #[async_trait]
 impl BuilderGates for FlowsHost {
     async fn validate(&self, graph: Value) -> FlowValidation {
@@ -374,3 +370,7 @@ impl NodeKindSource for OverlayNodeKinds {
         super::node_contracts::node_kind_contract(kind)
     }
 }
+
+#[cfg(test)]
+#[path = "builder_host_tests.rs"]
+mod tests;
