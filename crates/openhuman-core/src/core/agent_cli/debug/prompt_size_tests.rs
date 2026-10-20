@@ -87,10 +87,11 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
         ..crate::config::Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
-    let mut definition = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
-        .get("orchestrator")
-        .expect("built-in orchestrator")
-        .clone();
+    let mut definition =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
+            .get("orchestrator")
+            .expect("built-in orchestrator")
+            .clone();
     definition.id = "prompt_size_probe".to_string();
     definition.tools = tinyagents_definition::ToolScope::Named(vec!["file_read".to_string()]);
     let agent = crate::agent::OpenHumanSessionHost::from_config_with_definition(
@@ -100,11 +101,8 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
     )
     .expect("test-owned prompt-size session build");
 
-    let dumped = crate::core::agent_cli::debug::session_dump(
-        &agent,
-        "prompt_size_probe",
-        String::new(),
-    );
+    let dumped =
+        crate::core::agent_cli::debug::session_dump(&agent, "prompt_size_probe", String::new());
     let report = PromptSizeReport::from_dump(&dumped);
 
     let mut visible: Vec<String> = agent

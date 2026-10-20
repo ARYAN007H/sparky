@@ -48,7 +48,8 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
     // `delegate_name` override (`plan`, `manage_tasks`, `create_image`, …).
     // They must be stripped from every sub-agent surface, exactly like
     // the `delegate_*`-prefixed defaults.
-    let mut registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    let mut registry =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
     let mut plan_alias = registry
         .get("orchestrator")
         .expect("built-in orchestrator")
