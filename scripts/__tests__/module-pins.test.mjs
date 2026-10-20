@@ -32,6 +32,7 @@ import {
   parseRecords,
   rewindDeclared,
   toplevelProvesSubmodule,
+  validateTestOnlySourceParity,
 } from "../lib/module-pins.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -197,6 +198,42 @@ test("parses a crate-visible record definition", () => {
 
 const SHA_A = "a".repeat(40);
 const SHA_B = "b".repeat(40);
+
+function sourceParityFixture() {
+  const root = mkdtempSync(join(tmpdir(), "module-source-parity-"));
+  const git = (args) =>
+    execFileSync("git", args, { cwd: root, stdio: "ignore" });
+  git(["init", "-q"]);
+  git(["config", "user.email", "pin-check@example.test"]);
+  git(["config", "user.name", "Pin Check"]);
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src/lib.rs"), '#[cfg(test)] #[path = "tests.rs"] mod tests;\npub fn value() -> u8 { 1 }\n');
+  writeFileSync(join(root, "src/tests.rs"), "#[test] fn works() {}\n");
+  writeFileSync(join(root, "Cargo.toml"), "[package]\nname = \"fixture\"\nversion = \"1.0.0\"\n");
+  git(["add", "."]);
+  git(["commit", "-qm", "release"]);
+  git(["tag", "v1.0.0"]);
+  const releaseCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  writeFileSync(join(root, "src/tests.rs"), "#[test] fn works() { assert_eq!(1, 1); }\n");
+  git(["add", "."]);
+  git(["commit", "-qm", "owner tests"]);
+  const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const parity = {
+    tag: "v1.0.0",
+    releaseCommit,
+    candidateCommit,
+    assetsSha256: "a".repeat(64),
+    testFile: {
+      path: "src/tests.rs",
+      releaseMode: "100644",
+      releaseBlob: execFileSync("git", ["rev-parse", `${releaseCommit}:src/tests.rs`], { cwd: root, encoding: "utf8" }).trim(),
+      candidateMode: "100644",
+      candidateBlob: execFileSync("git", ["rev-parse", `${candidateCommit}:src/tests.rs`], { cwd: root, encoding: "utf8" }).trim(),
+    },
+    unchangedTreeSha256: "",
+  };
+  return { root, git, releaseCommit, candidateCommit, parity };
+}
 const provider = {
   id: "tinyx-lang",
   version: "0.2.4",
@@ -205,6 +242,44 @@ const provider = {
   sourceSubmodule: "vendor/tinyx",
   sourceHead: SHA_A,
 };
+
+test("source parity proof accepts only its exact clean test-only Git pair", () => {
+  const fixture = sourceParityFixture();
+  try {
+    const result = validateTestOnlySourceParity({
+      repoPath: fixture.root,
+      version: "1.0.0",
+      assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+      actualHead: fixture.candidateCommit,
+      proof: fixture.parity,
+    });
+    assert.equal(result.ok, true, result.message);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("source parity proof rejects production, manifest, build, lock, and unknown changes", () => {
+  for (const changedFile of ["src/lib.rs", "Cargo.toml", "build.rs", "Cargo.lock", "unknown.txt"]) {
+    const fixture = sourceParityFixture();
+    try {
+      writeFileSync(join(fixture.root, changedFile), "changed\n");
+      fixture.git(["add", changedFile]);
+      fixture.git(["commit", "-qm", `change ${changedFile}`]);
+      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: fixture.root, encoding: "utf8" }).trim();
+      const result = validateTestOnlySourceParity({
+        repoPath: fixture.root,
+        version: "1.0.0",
+        assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+        actualHead: head,
+        proof: fixture.parity,
+      });
+      assert.equal(result.ok, false, `${changedFile} was incorrectly accepted`);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  }
+});
 
 test("a provider released against the host's source pin passes", () => {
   assert.equal(classifyProviderPin(provider).ok, true);
