@@ -171,6 +171,105 @@ pub(crate) fn resolve_message(
     result.map_err(|error| format!("{LOG_PREFIX} resolve: {error:#}"))
 }
 
+/// Persist provider read/reaction state onto the exact OpenHuman message row.
+/// The caller already resolved the provider receipt through the durable,
+/// tenant-scoped binding; no message id is inferred here.
+pub(crate) fn persist_activity(
+    ctx: &DispatchCtx,
+    target: &ProjectedMessageTarget,
+    event: &tinychannels_bus::ChannelEvent,
+) -> Result<(), String> {
+    let result = (|| -> Result<()> {
+        let core = ctx
+            .resolved()
+            .ok_or_else(|| anyhow!("no trusted core context for channel projection"))?;
+        let workspace = core
+            .workspace_dir()
+            .map_err(|error| anyhow!("resolve projection workspace: {error}"))?;
+        let messages = crate::threads::store::blocking::get_messages(
+            ctx.clone(),
+            workspace.clone(),
+            target.thread_id.clone(),
+        )
+        .map_err(|error| anyhow!("read projected thread: {error}"))?;
+        let Some(message) = messages.iter().find(|message| message.id == target.row_id) else {
+            return Err(anyhow!("bound OpenHuman message row no longer exists"));
+        };
+        let metadata = channel_activity_metadata(&message.extra_metadata, event)?;
+        crate::threads::store::blocking::update_message(
+            ctx.clone(),
+            workspace,
+            target.thread_id.clone(),
+            target.row_id.clone(),
+            crate::threads::store::ConversationMessagePatch {
+                extra_metadata: Some(metadata),
+            },
+        )
+        .map_err(|error| anyhow!("persist channel activity: {error}"))?;
+        Ok(())
+    })();
+    result.map_err(|error| format!("{LOG_PREFIX} persist activity: {error:#}"))
+}
+
+fn channel_activity_metadata(
+    existing: &Value,
+    event: &tinychannels_bus::ChannelEvent,
+) -> Result<Value> {
+    use tinychannels_bus::ChannelEventKind as Kind;
+
+    let mut metadata = existing.as_object().cloned().unwrap_or_default();
+    let activity = metadata
+        .entry("channelActivity")
+        .or_insert_with(|| json!({"reactions": [], "readReceipts": []}));
+    let activity = activity
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("channelActivity metadata is not an object"))?;
+    let reactions = activity
+        .entry("reactions")
+        .or_insert_with(|| json!([]))
+        .as_array_mut()
+        .ok_or_else(|| anyhow!("channelActivity.reactions is not an array"))?;
+    let read_receipts = activity
+        .entry("readReceipts")
+        .or_insert_with(|| json!([]))
+        .as_array_mut()
+        .ok_or_else(|| anyhow!("channelActivity.readReceipts is not an array"))?;
+
+    match &event.event {
+        Kind::ReadReceipt { actor, timestamp, .. } => {
+            let actor_id = actor.as_ref().map(|actor| actor.id.as_str()).unwrap_or("");
+            if let Some(existing) = read_receipts.iter_mut().find(|receipt| {
+                receipt.get("actorId").and_then(Value::as_str).unwrap_or("") == actor_id
+            }) {
+                *existing = json!({"actorId": actor_id, "timestamp": timestamp});
+            } else {
+                read_receipts.push(json!({"actorId": actor_id, "timestamp": timestamp}));
+            }
+        }
+        Kind::ReactionAdded { actor, reaction, .. } => {
+            let value = json!({
+                "actorId": actor.id,
+                "value": reaction.value,
+                "customEmojiId": reaction.custom_emoji_id,
+            });
+            if !reactions.contains(&value) {
+                reactions.push(value);
+            }
+        }
+        Kind::ReactionRemoved { actor, reaction, .. } => {
+            reactions.retain(|existing| {
+                existing.get("actorId").and_then(Value::as_str) != Some(&actor.id)
+                    || existing.get("value").and_then(Value::as_str)
+                        != Some(&reaction.value)
+                    || existing.get("customEmojiId").and_then(Value::as_str)
+                        != reaction.custom_emoji_id.as_deref()
+            });
+        }
+        _ => return Err(anyhow!("event does not target persisted channel activity")),
+    }
+    Ok(Value::Object(metadata))
+}
+
 fn bind_in(repo: &Repo, key: MessageBindingKey, thread_id: &str) -> Result<()> {
     let id = doc_id(&key)?;
     let binding = MessageBinding {
