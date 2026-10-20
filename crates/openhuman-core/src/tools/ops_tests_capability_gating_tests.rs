@@ -77,12 +77,7 @@ fn tool_group_classifies_gate_and_harness_families() {
     }
     assert_eq!(tool_group("learning_list_facets"), DomainGroup::Agent);
     assert_eq!(tool_group("spawn_subagent"), DomainGroup::Agent);
-    for name in [
-        "ask_user_clarification",
-        "wait",
-        "wait_loop",
-        "todo",
-    ] {
+    for name in ["ask_user_clarification", "wait", "wait_loop", "todo"] {
         assert_eq!(tool_group(name), DomainGroup::Agent);
     }
     assert_eq!(tool_group("config_snapshot"), DomainGroup::Config);

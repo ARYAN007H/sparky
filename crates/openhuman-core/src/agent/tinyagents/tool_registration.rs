@@ -19,8 +19,7 @@ use tinyinference_llm::model::ChatModel;
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 use crate::agent::orchestration::tools::{
-    ContinueSubagentDispatch, DelegationDispatch,
-    SpawnAsyncSubagentDispatch, SpawnSubagentDispatch,
+    ContinueSubagentDispatch, DelegationDispatch, SpawnAsyncSubagentDispatch, SpawnSubagentDispatch,
 };
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;

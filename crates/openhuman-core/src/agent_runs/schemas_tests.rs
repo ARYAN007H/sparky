@@ -78,7 +78,6 @@ fn deserialize_params_and_helpers_cover_success_and_failure_paths() {
     assert!(matches!(json_output("result", "x").ty, TypeSchema::Json));
 }
 
-
 #[tokio::test]
 async fn registry_snapshot_omits_retired_graphs() {
     let result = handle_registry_snapshot(DispatchCtx::process_default(), Map::new())

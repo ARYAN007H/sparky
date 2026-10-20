@@ -77,7 +77,9 @@ mod tools;
 mod update;
 mod web_chat_config;
 
-pub use agent::{AgentConfig, OrchestratorModelConfig, RequiredOutputContract, TeamModelConfig, ToolSearchConfig};
+pub use agent::{
+    AgentConfig, OrchestratorModelConfig, RequiredOutputContract, TeamModelConfig, ToolSearchConfig,
+};
 pub use autonomy::AutonomyConfig;
 pub use capability_providers::{CapabilityProviderConfig, CapabilityProviderTrustState};
 pub use channels::{

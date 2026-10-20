@@ -121,7 +121,10 @@ fn capability_diagnostics_omit_retired_graphs() {
         .iter()
         .map(|diagnostic| diagnostic.name.as_str())
         .collect();
-    assert!(reused_names.is_empty(), "retired graph diagnostics: {reused_names:?}");
+    assert!(
+        reused_names.is_empty(),
+        "retired graph diagnostics: {reused_names:?}"
+    );
 }
 
 #[tokio::test]

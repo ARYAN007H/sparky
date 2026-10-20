@@ -1,8 +1,8 @@
 //! Registration of agent dialogue and delegation tools.
 
 use super::orchestration::tools::{
-    CloseSubagentTool, ContinueSubagentTool, ListSubagentsTool,
-    SpawnAsyncSubagentTool, SpawnSubagentTool, SteerSubagentTool, WaitSubagentTool,
+    CloseSubagentTool, ContinueSubagentTool, ListSubagentsTool, SpawnAsyncSubagentTool,
+    SpawnSubagentTool, SteerSubagentTool, WaitSubagentTool,
 };
 use super::tools::{PlanExitTool, TodoTool};
 use crate::config::Config;

@@ -233,4 +233,3 @@ fn a_blank_team_pin_does_not_displace_the_default() {
     assert_eq!(s.effective_lead_model(), "sonnet");
     assert_eq!(s.effective_subagent_model(), "sonnet");
 }
-

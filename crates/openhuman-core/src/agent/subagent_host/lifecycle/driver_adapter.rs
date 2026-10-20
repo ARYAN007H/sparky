@@ -184,47 +184,46 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .map(Message::text)
             .unwrap_or_default();
         let definition = invocation;
-                let native = crate::agent::tinyagents::NativeSubagentRunContext {
-                    depth: native_run_config.lineage.depth,
-                    config: native_run_config,
-                    parent_events,
-                    child_events: std::sync::Arc::default(),
-                    child_journal: std::sync::Arc::default(),
-                    name: definition.id.clone(),
-                };
-                let run = Box::pin(
-                    crate::agent::subagent_host::ops::run_subagent_direct_with_native_context(
-                        &definition,
-                        &input,
-                        options.clone(),
-                        native,
-                    ),
-                );
-                let result = match dispatch.into_core() {
-                    Some(core) => {
-                        crate::core::runtime::CoreContext::scope_with_turn_origin(core, origin, run)
-                            .await
-                    }
-                    None => run.await,
-                };
-                match result {
-                    Ok(outcome) => {
-                        self.host_outcome
-                            .lock()
-                            .unwrap_or_else(|p| p.into_inner())
-                            .insert(task_key, outcome.clone());
-                        Ok(host_outcome_to_neutral(outcome, &definition, &options))
-                    }
-                    Err(error) => {
-                        self.failures
-                            .lock()
-                            .unwrap_or_else(|p| p.into_inner())
-                            .insert(task_key, error);
-                        Err(SubagentError::Execution(
-                            "OpenHuman execution failed".into(),
-                        ))
-                    }
-                }
+        let native = crate::agent::tinyagents::NativeSubagentRunContext {
+            depth: native_run_config.lineage.depth,
+            config: native_run_config,
+            parent_events,
+            child_events: std::sync::Arc::default(),
+            child_journal: std::sync::Arc::default(),
+            name: definition.id.clone(),
+        };
+        let run = Box::pin(
+            crate::agent::subagent_host::ops::run_subagent_direct_with_native_context(
+                &definition,
+                &input,
+                options.clone(),
+                native,
+            ),
+        );
+        let result = match dispatch.into_core() {
+            Some(core) => {
+                crate::core::runtime::CoreContext::scope_with_turn_origin(core, origin, run).await
+            }
+            None => run.await,
+        };
+        match result {
+            Ok(outcome) => {
+                self.host_outcome
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .insert(task_key, outcome.clone());
+                Ok(host_outcome_to_neutral(outcome, &definition, &options))
+            }
+            Err(error) => {
+                self.failures
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .insert(task_key, error);
+                Err(SubagentError::Execution(
+                    "OpenHuman execution failed".into(),
+                ))
+            }
+        }
     }
 }
 

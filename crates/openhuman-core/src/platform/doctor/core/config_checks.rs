@@ -184,7 +184,6 @@ pub(super) fn check_config_semantics(config: &Config, items: &mut Vec<Diagnostic
             "no channels configured - configure one in the UI",
         ));
     }
-
 }
 
 pub(super) fn embedding_provider_validation_error(name: &str) -> Option<String> {

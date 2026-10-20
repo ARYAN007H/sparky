@@ -185,7 +185,10 @@ async fn a_detached_lifecycle_write_uses_its_carried_actor_scope() {
     let mut outcome = SubagentOutcome::cancelled(task_id);
     outcome.output = "detached actor result".into();
     let detached = tokio::spawn(async move {
-        persistence.record_terminal(&key, &outcome, None).await.unwrap();
+        persistence
+            .record_terminal(&key, &outcome, None)
+            .await
+            .unwrap();
         key
     });
     let key = detached.await.unwrap();
@@ -193,18 +196,17 @@ async fn a_detached_lifecycle_write_uses_its_carried_actor_scope() {
         crate::core::runtime::DispatchCtx::ambient()
     })
     .await;
-    let alice_persistence = super::super::persistence::OpenHumanPersistence::new(checkpoints.clone())
-        .with_dispatch(alice_dispatch);
+    let alice_persistence =
+        super::super::persistence::OpenHumanPersistence::new(checkpoints.clone())
+            .with_dispatch(alice_dispatch);
     let durable = alice_persistence
         .load_terminal(&key)
         .await
         .unwrap()
         .expect("detached lifecycle write committed in its carried actor scope");
     assert_eq!(durable.output, "detached actor result");
-    let bob_dispatch = CoreContext::scope(bob, async {
-        crate::core::runtime::DispatchCtx::ambient()
-    })
-    .await;
+    let bob_dispatch =
+        CoreContext::scope(bob, async { crate::core::runtime::DispatchCtx::ambient() }).await;
     let other = super::super::persistence::OpenHumanPersistence::new(checkpoints)
         .with_dispatch(bob_dispatch);
     assert!(other.load_terminal(&key).await.unwrap().is_none());

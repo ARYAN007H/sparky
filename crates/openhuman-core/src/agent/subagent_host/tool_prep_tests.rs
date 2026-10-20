@@ -12,10 +12,7 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
     let spawn_names = tinyagents_definition::SPAWN_TOOL_NAMES
         .iter()
         .copied()
-        .chain([
-            "delegate_researcher",
-            "continue_subagent",
-        ])
+        .chain(["delegate_researcher", "continue_subagent"])
         .collect::<Vec<_>>();
     for name in &spawn_names {
         assert!(

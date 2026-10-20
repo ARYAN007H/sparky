@@ -14,5 +14,7 @@ fn removes_only_the_top_level_agents_table_idempotently() {
     assert_eq!(document, first);
     assert_eq!(document["default_model"].as_str(), Some("kept"));
     assert!(document.get("agents").is_none());
-    assert!(document["memory"]["agents"]["local"]["recall"].as_bool().unwrap());
+    assert!(document["memory"]["agents"]["local"]["recall"]
+        .as_bool()
+        .unwrap());
 }

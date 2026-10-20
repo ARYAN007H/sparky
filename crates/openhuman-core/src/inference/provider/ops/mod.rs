@@ -23,9 +23,7 @@ pub use models::{
     list_configured_models, list_configured_models_from_config, synthesize_local_runtime_entry,
 };
 
-pub use provider_factory::{
-    list_providers, ProviderInfo, INFERENCE_BACKEND_ID,
-};
+pub use provider_factory::{list_providers, ProviderInfo, INFERENCE_BACKEND_ID};
 
 // ── test re-exports for ops_tests.rs ──
 

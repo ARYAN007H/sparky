@@ -326,4 +326,3 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     forget_workspace_for_test(workspace.path());
     assert!(!parent_cancellation.is_cancelled());
 }
-

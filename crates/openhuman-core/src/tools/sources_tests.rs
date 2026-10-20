@@ -175,6 +175,9 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     // The post-image-info anchor precedes Composio, while end sources and
     // sources with an unknown anchor trail every built-in.
     assert!(pos("image_info") < pos("anchor_fake_delegate"));
+    if let Some(composio) = names.iter().position(|name| name.starts_with("composio")) {
+        assert!(pos("anchor_fake_delegate") < composio);
+    }
     assert!(pos("anchor_fake_delegate") < pos("anchor_fake_end"));
     assert!(pos("anchor_fake_end") < pos("anchor_fake_unknown"));
     // Sibling tests register sources on the same process-wide slot, so only

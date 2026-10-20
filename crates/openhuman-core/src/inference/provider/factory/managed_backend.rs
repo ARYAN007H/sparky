@@ -132,4 +132,3 @@ pub(crate) fn make_openhuman_backend_model(
 ) -> anyhow::Result<ManagedChatModel> {
     managed_chat_model(role, config, None, None, true, None, &EgressLedger::none())
 }
-
