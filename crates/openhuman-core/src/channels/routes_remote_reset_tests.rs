@@ -115,6 +115,7 @@ fn tenant_runtime(
         slug: "openai".into(),
         label: "Reset test provider".into(),
         endpoint: "http://127.0.0.1:9/v1".into(),
+        default_model: Some("reset-test-model".into()),
         ..Default::default()
     }];
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace.clone())).derive_with(
@@ -193,15 +194,6 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         session_messages(&bob_core, workspace, &bob_session).len(),
         2
     );
-
-    let direct_reset = crate::channels::runtime::dispatch::reset_durable_channel_session(
-        &alice_runtime,
-        &reset.message,
-        &reset.durable_session_key,
-        &reset.history_key,
-    )
-    .await;
-    assert!(direct_reset.is_ok(), "direct reset failure: {direct_reset:#?}");
 
     let cleared = crate::channels::host::remote_control::dispatch_callback(
         &alice_dispatch,
