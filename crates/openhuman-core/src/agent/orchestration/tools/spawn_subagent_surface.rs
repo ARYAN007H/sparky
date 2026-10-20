@@ -267,6 +267,11 @@ impl Tool for SpawnSubagentTool {
                     "type": "string",
                     "description": "Optional identity key for reusing an existing worker."
                 },
+                "image_paths": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Optional image paths to include with the worker's task."
+                },
                 "fresh": {
                     "type": "boolean",
                     "description": "Force a fresh worker instead of reusing a matching one."
