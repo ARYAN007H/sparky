@@ -428,7 +428,7 @@ impl EventSink<QueuedPayload> for NativeEvents {
                     None
                 };
                 let localized =
-                    render_classified_native_failure(None, &fallback, &classification);
+                    render_classified_native_failure(config.as_ref(), &fallback, &classification);
                 #[cfg(test)]
                 self.shared.with(&request.request_id, |slot| {
                     slot.failure_message = Some(localized.clone());
