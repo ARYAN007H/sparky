@@ -71,9 +71,8 @@ pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
     for entry in &mut config.cloud_providers {
         if entry.label.is_empty() {
             entry.label = builtin_cloud_provider(&entry.slug)
-                .map(|provider| provider.label)
-                .unwrap_or("Custom")
-                .to_string();
+                .map(|provider| provider.label.to_string())
+                .unwrap_or_else(|| "Custom".to_string());
         }
     }
 

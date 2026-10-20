@@ -3,7 +3,7 @@
 use super::{
     builtin_cloud_supports_responses_api, endpoint_host, endpoint_host_is_chat_completions_only,
     host_is_builtin_cloud_provider, is_builtin_cloud_slug, is_slug_reserved, AuthStyle,
-    BUILTIN_CLOUD_PROVIDERS,
+    builtin_cloud_providers,
 };
 
 #[test]
@@ -93,7 +93,7 @@ fn builtin_cloud_provider_defaults_cover_phase_one_presets() {
 #[test]
 fn builtin_cloud_provider_slugs_are_unique() {
     let mut slugs = std::collections::HashSet::new();
-    for provider in BUILTIN_CLOUD_PROVIDERS.iter() {
+    for provider in builtin_cloud_providers().iter() {
         assert!(
             slugs.insert(provider.slug),
             "duplicate built-in cloud provider slug {}",
@@ -133,7 +133,7 @@ fn only_openai_builtin_exposes_responses_api() {
 /// is the only built-in that serves `/v1/responses`.
 #[test]
 fn responses_api_capability_is_coupled_to_the_preset_list() {
-    for provider in BUILTIN_CLOUD_PROVIDERS.iter() {
+    for provider in builtin_cloud_providers().iter() {
         let expected = provider.slug == "openai";
         assert_eq!(
             builtin_cloud_supports_responses_api(provider.slug),
@@ -198,7 +198,7 @@ fn host_is_builtin_cloud_provider_recognises_inference_hosts() {
         );
     }
     // Every registry endpoint's own host must classify as builtin.
-    for provider in BUILTIN_CLOUD_PROVIDERS.iter() {
+    for provider in builtin_cloud_providers().iter() {
         let host = endpoint_host(provider.endpoint).expect("preset endpoint has a host");
         assert!(
             host_is_builtin_cloud_provider(&host),
@@ -256,7 +256,7 @@ fn openai_host_and_unknown_proxies_keep_the_responses_fallback() {
 /// can't silently desync the two gates.
 #[test]
 fn host_gate_agrees_with_slug_capability_for_every_builtin() {
-    for provider in BUILTIN_CLOUD_PROVIDERS.iter() {
+    for provider in builtin_cloud_providers().iter() {
         // OpenhumanJwt / Anthropic presets never route through the
         // OpenAI-compatible Responses fallback; the gate only matters for
         // the Bearer OpenAI-compatible hosts.
@@ -300,7 +300,7 @@ fn generated_provider_ids_sanitize_and_bound_the_slug_prefix() {
 #[test]
 fn builtin_table_is_the_upstream_catalog_plus_the_managed_route() {
     use tinyinference_providers::builtin::BUILTIN_CLOUD_PROVIDERS as UPSTREAM;
-    let host = &*BUILTIN_CLOUD_PROVIDERS;
+    let host = builtin_cloud_providers();
     assert_eq!(host.len(), UPSTREAM.len() + 1);
     assert_eq!(host[0].slug, "openhuman");
     assert_eq!(host[0].auth_style, AuthStyle::OpenhumanJwt);
