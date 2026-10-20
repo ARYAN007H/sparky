@@ -87,14 +87,24 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
         ..crate::config::Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
-    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+    let mut definition = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
+        .get("orchestrator")
+        .expect("built-in orchestrator")
+        .clone();
+    definition.id = "prompt_size_probe".to_string();
+    definition.tools = tinyagents_definition::ToolScope::Named(vec!["file_read".to_string()]);
+    let agent = crate::agent::OpenHumanSessionHost::from_config_with_definition(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
-        "critic",
+        &definition,
     )
-    .expect("critic session build");
+    .expect("test-owned prompt-size session build");
 
-    let dumped = crate::core::agent_cli::debug::session_dump(&agent, "critic", String::new());
+    let dumped = crate::core::agent_cli::debug::session_dump(
+        &agent,
+        "prompt_size_probe",
+        String::new(),
+    );
     let report = PromptSizeReport::from_dump(&dumped);
 
     let mut visible: Vec<String> = agent
@@ -111,7 +121,7 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
     );
     assert!(
         report.tool_count < dumped.tool_names.len(),
-        "critic's belt ({}) must be narrower than its registry ({}), or this test \
+        "the test-owned named belt ({}) must be narrower than its registry ({}), or this test \
          cannot tell the two apart",
         report.tool_count,
         dumped.tool_names.len()

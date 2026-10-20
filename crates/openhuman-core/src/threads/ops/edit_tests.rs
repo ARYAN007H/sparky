@@ -407,7 +407,7 @@ async fn edit_and_regenerate_use_the_threads_recorded_key_after_a_chat_agent_cha
         );
         DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay))
     };
-    let (before, after) = (ctx_with(None), ctx_with(Some("planner")));
+    let (before, after) = (ctx_with(None), ctx_with(Some("summarizer")));
     let thread_id = "thread-flipped";
 
     // The first session records its key and writes the transcript there.

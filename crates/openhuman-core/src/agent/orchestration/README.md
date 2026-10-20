@@ -28,7 +28,7 @@ and UI-facing projections.
 - `subagent_control.rs`: manual cancel and steer RPCs.
 - `subagent_sessions/`: durable session reuse and deduplication.
 - `parent_context/builder.rs`: construction for tasks without a parent turn.
-- `worktree.rs` and `worktree_schemas.rs`: worktree adapter and RPCs.
+- `worktree.rs` and `../../agent_runs/worktree_schemas.rs`: worktree adapter and RPCs.
 - `delegation.rs`: live TinyAgents delegation graph adapter.
 - `tools.rs`: callable sub-agent tools.
 
@@ -58,7 +58,7 @@ sandbox context, spawn depth, and progress derive from the parent
 
 ## Used by
 
-- `crate::tools` re-exports the callable tools.
+- `agent/registration.rs` registers the callable tools; `tools::ops` composes that family.
 - `threads` cancels detached work when a thread closes.
 - `crate::core::all` registers the remaining controller pairs.
 - The frontend uses the background run and sub-agent controls.

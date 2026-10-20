@@ -413,24 +413,22 @@ fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
     let config = resolver_test_config(&tmp);
     assert_eq!(config.agent.max_tool_iterations, 10);
 
-    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
-        &config.workspace_dir,
-    )
-    .expect("agent registry init");
-    let def = crate::agent_registry::host_definition::AgentDefinitionRegistry::global()
-        .expect("registry initialised")
-        .get("planner")
-        .expect("planner definition registered")
+    let mut def = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
+        .get("orchestrator")
+        .expect("built-in orchestrator")
         .clone();
+    def.id = "flow_iteration_cap_probe".to_string();
+    def.max_iterations = 50;
+    def.iteration_policy = tinyagents_definition::IterationPolicy::Extended;
     let expected = def.effective_max_iterations();
     assert_eq!(expected, 50);
 
-    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+    let agent = crate::agent::OpenHumanSessionHost::from_config_with_definition(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
-        "planner",
+        &def,
     )
-    .expect("build planner agent");
+    .expect("build test-owned extended-policy agent");
     assert_eq!(agent.agent_config().max_tool_iterations, expected);
 
     // And the timeout scaling this cap feeds into actually widens the

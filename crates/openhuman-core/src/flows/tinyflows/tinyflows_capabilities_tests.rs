@@ -479,7 +479,7 @@ fn route_for_agent_ref_selects_harness_for_definitions_else_fallback() {
 
     // A shipped harness definition → full-loop harness path.
     assert_eq!(route_for_agent_ref("workflow_builder"), AgentRoute::Harness);
-    assert_eq!(route_for_agent_ref("planner"), AgentRoute::Harness);
+    assert_eq!(route_for_agent_ref("flow_discovery"), AgentRoute::Harness);
 
     // An id with no harness definition → the custom-registry completion fallback.
     assert_eq!(

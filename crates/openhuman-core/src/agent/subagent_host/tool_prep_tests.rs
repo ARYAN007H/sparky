@@ -48,14 +48,20 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
     // `delegate_name` override (`plan`, `manage_tasks`, `create_image`, …).
     // They must be stripped from every sub-agent surface, exactly like
     // the `delegate_*`-prefixed defaults.
-    let tmp = tempfile::TempDir::new().unwrap();
-    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(tmp.path())
-        .unwrap();
+    let mut registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    let mut plan_alias = registry
+        .get("orchestrator")
+        .expect("built-in orchestrator")
+        .clone();
+    plan_alias.id = "test_plan_alias".to_string();
+    plan_alias.delegate_name = Some("plan".to_string());
+    registry.insert(plan_alias);
     for delegate in [
         "plan",
-        "review_code",
         "manage_tasks",
         "create_image",
+        "build_workflow",
+        "discover_workflows",
         // `make_presentation` is `presentation_agent`'s `delegate_name`; the agent —
         // and therefore this delegate tool — is compiled out with the
         // `documents` feature.
@@ -63,7 +69,7 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
         "make_presentation",
     ] {
         assert!(
-            is_subagent_spawn_tool(delegate),
+            super::is_subagent_spawn_tool_with_registry(delegate, Some(&registry)),
             "`{delegate}` is a synthesised delegation tool and must be \
              stripped from sub-agent tool surfaces"
         );
@@ -71,7 +77,7 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
     // Ordinary worker tools stay visible.
     for plain in ["shell", "file_read", "web_fetch", "todo"] {
         assert!(
-            !is_subagent_spawn_tool(plain),
+            !super::is_subagent_spawn_tool_with_registry(plain, Some(&registry)),
             "`{plain}` must not be classified as a spawn tool"
         );
     }

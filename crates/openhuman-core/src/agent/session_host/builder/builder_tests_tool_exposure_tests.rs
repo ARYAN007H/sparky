@@ -199,11 +199,13 @@ fn named_belt_without_tool_search_reaches_no_deferred_tool() {
 }
 
 /// A hand-written `[tools] named` belt is left exactly as written: exposure is
-/// only for the wildcard belt. `critic` names `file_read` among its tools; it
-/// must keep it and gain nothing a wildcard would add.
+/// only for the wildcard belt. This test-owned definition names `file_read`;
+/// it must keep that tool and gain nothing a wildcard would add.
 #[test]
 fn named_belt_keeps_its_listed_members() {
-    let visible = visible_names("critic");
+    let mut definition = super::wildcard_probe_def();
+    definition.tools = tinyagents_definition::ToolScope::Named(vec!["file_read".to_owned()]);
+    let visible = visible_names_for(&definition);
     assert!(
         visible.contains("file_read"),
         "named belt must keep the members it lists; got {visible:?}"

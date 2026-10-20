@@ -43,6 +43,14 @@ pub(crate) fn subagent_prompt_protocol(
 /// The shared static names stay aligned with TinyAgents; registry lookup is
 /// needed only for host-defined, unprefixed `delegate_name` overrides.
 pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
+    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
+    is_subagent_spawn_tool_with_registry(name, registry.as_deref())
+}
+
+fn is_subagent_spawn_tool_with_registry(
+    name: &str,
+    registry: Option<&crate::agent_registry::host_definition::AgentDefinitionRegistry>,
+) -> bool {
     if crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool(name) {
         return true;
     }
@@ -53,9 +61,7 @@ pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
     // which let wildcard-scoped children inherit the orchestrator's spawn
     // surface. Resolve the override names via the registry so the strip
     // stays in lockstep with `collect_orchestrator_tools`'s naming.
-    if let Some(registry) =
-        crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
-    {
+    if let Some(registry) = registry {
         return registry
             .list()
             .iter()

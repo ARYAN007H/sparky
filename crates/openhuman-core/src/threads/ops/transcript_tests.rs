@@ -206,7 +206,7 @@ async fn changing_the_chat_agent_does_not_strand_an_existing_threads_turns() {
     let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let dir = tempfile::tempdir().unwrap();
     let before = ctx_with_chat_agent(dir.path(), None, None);
-    let after = ctx_with_chat_agent(dir.path(), None, Some("planner"));
+    let after = ctx_with_chat_agent(dir.path(), None, Some("summarizer"));
 
     // The two configs derive different keys, or this proves nothing.
     let rule_before = super::super::support::transcript_store(&before, THREAD)
