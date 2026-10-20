@@ -431,6 +431,7 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
 
   for (const kind of ["dirty-untracked", "dirty-tracked", "symlink", "rename", "gitlink"]) {
     const f = sourceParityFixture();
+    let nestedRoot;
     try {
       if (kind === "dirty-untracked" || kind === "dirty-tracked") {
         const path = kind === "dirty-tracked" ? "src/lib.rs" : "production.rs";
@@ -445,7 +446,14 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
       } else if (kind === "rename") {
         f.git(["mv", "src/tests.rs", "src/renamed.rs"]);
       } else {
-        f.git(["update-index", "--add", "--cacheinfo", `160000,${f.releaseCommit},nested-module`]);
+        nestedRoot = mkdtempSync(join(tmpdir(), "module-source-parity-nested-"));
+        execFileSync("git", ["init", "-q"], { cwd: nestedRoot, stdio: "ignore" });
+        execFileSync("git", ["config", "user.email", "pin-check@example.test"], { cwd: nestedRoot, stdio: "ignore" });
+        execFileSync("git", ["config", "user.name", "Pin Check"], { cwd: nestedRoot, stdio: "ignore" });
+        writeFileSync(join(nestedRoot, "module.rs"), "pub fn nested() {}\n");
+        execFileSync("git", ["add", "."], { cwd: nestedRoot, stdio: "ignore" });
+        execFileSync("git", ["commit", "-qm", "nested module"], { cwd: nestedRoot, stdio: "ignore" });
+        f.git(["-c", "protocol.file.allow=always", "submodule", "add", nestedRoot, "nested-module"]);
       }
       f.git(["commit", "-qm", `${kind} change`]);
       const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
@@ -456,6 +464,7 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
         `${kind} failed for the wrong reason: ${result.message}`);
     } finally {
       rmSync(f.root, { recursive: true, force: true });
+      if (nestedRoot) rmSync(nestedRoot, { recursive: true, force: true });
     }
   }
 
