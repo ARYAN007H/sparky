@@ -499,7 +499,10 @@ pub async fn message_update(
         request.thread_id.clone(),
         request.message_id.clone(),
         ConversationMessagePatch {
-            extra_metadata: request.extra_metadata,
+            // Merge public metadata inside the store's CAS retry. This keeps
+            // the private attachment path map invisible to callers while
+            // preventing an ordinary UI metadata update from erasing it.
+            merge_extra_metadata: request.extra_metadata,
             ..Default::default()
         },
     )

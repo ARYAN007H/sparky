@@ -10,7 +10,7 @@ use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use super::ops::{
-    channel_web_cancel, channel_web_chat_with_stored_attachments, channel_web_queue_clear,
+    channel_web_cancel, channel_web_chat_with_attachments, channel_web_queue_clear,
     channel_web_queue_remove, channel_web_queue_status,
 };
 use super::types::{
@@ -210,11 +210,23 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             .filter(|part| !matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. }))
             .cloned()
             .collect::<Vec<_>>();
-        let stored_attachments = if stored_parts.is_empty() {
+        let is_queued_followup = p.queue_mode.as_deref() == Some("followup");
+        let (stored_attachments, attachment_uploads) = if is_queued_followup {
+            if p.persisted_message_id.is_some() {
+                return Err("queued follow-ups must submit fresh attachment uploads".into());
+            }
+            if p.message.contains("[ATTACHMENT:")
+                || p.message.contains("[IMAGE:")
+                || p.message.contains("[FILE:")
+            {
+                return Err("typed media uploads require marker-free user text".into());
+            }
+            (None, (!stored_parts.is_empty()).then_some(stored_parts))
+        } else if stored_parts.is_empty() {
             if p.persisted_message_id.is_some() {
                 return Err("persisted_message_id requires opaque media refs".into());
             }
-            None
+            (None, None)
         } else {
             crate::threads::attachments::validate_opaque_parts(&stored_parts)?;
             let persisted_message_id =
@@ -222,12 +234,15 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
                     .clone()
                     .filter(|id| !id.is_empty())
                     .ok_or_else(|| "opaque media refs require persisted_message_id".to_string())?;
-            Some(crate::agent::queued_turn::StoredAttachmentInput {
-                persisted_message_id,
-                parts: stored_parts,
-            })
+            (
+                Some(crate::agent::queued_turn::StoredAttachmentInput {
+                    persisted_message_id,
+                    parts: stored_parts,
+                }),
+                None,
+            )
         };
-        let message = if stored_attachments.is_some() {
+        let message = if stored_attachments.is_some() || is_queued_followup {
             if p.message.contains("[ATTACHMENT:")
                 || p.message.contains("[IMAGE:")
                 || p.message.contains("[FILE:")
@@ -246,7 +261,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             p.reasoning_effort.as_deref(),
         )?;
         to_json(
-            channel_web_chat_with_stored_attachments(
+            channel_web_chat_with_attachments(
                 &ctx,
                 &p.client_id,
                 &p.thread_id,
@@ -269,6 +284,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
                 },
                 voice_note_id,
                 stored_attachments,
+                attachment_uploads,
             )
             .await?,
         )
