@@ -138,7 +138,8 @@ pub(super) async fn list_models(
         String::new(),
     )
     .with_listing_url(url.clone())
-    .with_single_model_probe(false);
+    .with_single_model_probe(false)
+    .with_timeout(std::time::Duration::from_secs(30));
     if attach {
         discovery = discovery.with_header("Authorization", format!("Bearer {token}"));
         if let Ok(headers) = attribution_headers() {

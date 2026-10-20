@@ -220,7 +220,8 @@ pub async fn list_configured_models_from_config(
 
     let mut request = DiscoveryRequest::new(routing.endpoint.clone(), String::new())
         .with_listing_url(models_url.clone())
-        .with_single_model_probe(false);
+        .with_single_model_probe(false)
+        .with_timeout(std::time::Duration::from_secs(30));
     if routing.using_oauth {
         request = request
             .with_header(
