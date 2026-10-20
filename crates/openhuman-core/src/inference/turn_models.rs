@@ -147,7 +147,7 @@ fn build_turn_models_crate(
             .unwrap_or_else(|| factory::resolves_to_managed_backend(role, config));
         if managed {
             let (backend, _) = factory::make_openhuman_backend_model_for_thread(
-                role, config, m, true, thread_id, &egress,
+                role, config, Some(m), true, thread_id, &egress,
             )?;
             return Ok(Arc::new(RouteRecordingModel::new(
                 crate::attachments::provider::wrap(
@@ -224,7 +224,7 @@ fn build_turn_models_crate(
             }
             let route = if factory::resolves_to_managed_backend(tier_role, config) {
                 factory::make_openhuman_backend_model_for_thread(
-                    tier_role, config, tier, true, thread_id, &egress,
+                    tier_role, config, Some(tier), true, thread_id, &egress,
                 )
                 .map(|(backend, _)| (backend, "openhuman".to_string(), tier.to_string()))
             } else {
@@ -642,7 +642,7 @@ impl TurnModelSource {
                 return crate::inference::provider::factory::make_openhuman_backend_model_for_thread(
                     &cn.role,
                     &cn.config,
-                    model,
+                    Some(model),
                     true,
                     thread_id,
                     &crate::security::egress::EgressLedger::none(),

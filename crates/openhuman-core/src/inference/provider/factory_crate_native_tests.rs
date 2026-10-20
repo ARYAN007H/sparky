@@ -93,7 +93,7 @@ fn enforce_local_only_inference_errors_on_external_when_local_only() {
             managed_backend::make_openhuman_backend_model_for_thread(
                 "chat",
                 &Config::default(),
-                route,
+                Some(route),
                 true,
                 Some("privacy-test-thread"),
                 &EgressLedger::none(),

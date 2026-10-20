@@ -59,7 +59,7 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
     let built = make_openhuman_backend_model_for_thread(
         "chat",
         &Config::default(),
-        "hint:reasoning",
+        Some("hint:reasoning"),
         true,
         Some("thread-1"),
         &EgressLedger::none(),
@@ -104,7 +104,7 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
     });
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
         "cloud",
-        "any-model",
+        Some("any-model"),
         8,
         "",
         None,

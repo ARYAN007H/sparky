@@ -20,7 +20,7 @@ async fn managed_construction_ledger_collapses_repeat_disclosures() {
         managed_backend::make_openhuman_backend_model_for_thread(
             "chat",
             &config,
-            "egress-ledger-factory-test-model",
+            Some("egress-ledger-factory-test-model"),
             true,
             Some("ledger-test-thread"),
             ledger,
