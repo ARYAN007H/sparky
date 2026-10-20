@@ -76,7 +76,22 @@ pub async fn read_body(
         }
     };
     let converter = DocumentConverter::for_config(config);
-    Ok(body_of(&record, file_store.as_ref(), &converter).await)
+    let display_path = super::store::get_artifact(&config.workspace_dir, id)
+        .await
+        .ok()
+        .and_then(|meta| async {
+            super::files::resolve_file(&config.workspace_dir, &meta, &files)
+                .await
+                .ok()
+        }.await)
+        .map(|path| path.to_string_lossy().into_owned());
+    Ok(body_of(
+        &record,
+        file_store.as_ref(),
+        display_path.as_deref(),
+        &converter,
+    )
+    .await)
 }
 
 /// A one-version file record for an artifact that has only its legacy
@@ -184,6 +199,7 @@ impl<'a> DocumentConverter<'a> {
 pub(crate) async fn body_of(
     record: &ArtifactRecord,
     file_store: Option<&std::sync::Arc<dyn FileStore>>,
+    display_path: Option<&str>,
     converter: &DocumentConverter<'_>,
 ) -> ArtifactBody {
     let latest = record.latest();
@@ -203,7 +219,9 @@ pub(crate) async fn body_of(
         preview.body = stored;
         return preview;
     };
-    preview.body = file.file_name().unwrap_or(&file.key).to_string();
+    preview.body = display_path
+        .map(str::to_string)
+        .unwrap_or_else(|| file.file_name().unwrap_or(&file.key).to_string());
     let Some(file_store) = file_store else {
         return preview;
     };
