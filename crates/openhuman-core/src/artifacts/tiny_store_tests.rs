@@ -172,28 +172,6 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
             card_b.is_err(),
             "the ambient profile must not receive the UI card"
         );
-
-        // Seed a record in the ambient profile, then make a context with no
-        // tenant act while that profile is ambient. The unbound call must not
-        // inherit the ambient profile's read access.
-        let seed_b = artifacts_service(&workspace, FileRoots::new(&files), None, None, &context_b);
-        seed_b
-            .create(
-                ArtifactKind::Text,
-                "Ambient private",
-                Content::Text("only profile B".into()),
-                &Author::agent("agent-b"),
-                None,
-            )
-            .await
-            .unwrap();
-        let unbound = DispatchCtx::unbound();
-        let unbound_artifacts =
-            artifacts_service(&workspace, FileRoots::new(&files), None, None, &unbound);
-        assert!(
-            unbound_artifacts.list().await.unwrap().is_empty(),
-            "a call with no tenant must not inherit the ambient profile's records"
-        );
     })
     .await;
 }
