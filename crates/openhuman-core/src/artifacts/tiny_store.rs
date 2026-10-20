@@ -31,11 +31,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tiny_artifacts::{
     ArtifactEvent, ArtifactEventKind, ArtifactKind, ArtifactObserver, ArtifactRecord,
-    ArtifactStore, Artifacts, Author, Content, FileRef, FileStore,
+    ArtifactStore, Artifacts, Author, Content, FileRef, FileStore, FsFileStore,
 };
 
 use super::files::FileRoots;
-use super::types::ArtifactKind as LegacyArtifactKind;
+use super::types::{ArtifactKind as LegacyArtifactKind, ArtifactMeta};
 use crate::security::approval::ApprovalChatContext;
 use crate::tools::per_call::PerCallTool;
 
@@ -192,6 +192,7 @@ pub fn legacy_versioned_dir(workspace_dir: &Path) -> PathBuf {
 pub struct LegacyUiBridge {
     workspace_dir: PathBuf,
     files: FileRoots,
+    source_roots: tiny_artifacts::FileRoots,
     file_store: Option<Arc<dyn FileStore>>,
     chat: Option<ApprovalChatContext>,
     ctx: crate::core::runtime::DispatchCtx,
@@ -203,6 +204,7 @@ impl LegacyUiBridge {
     pub fn new(
         workspace_dir: impl Into<PathBuf>,
         files: FileRoots,
+        source_roots: tiny_artifacts::FileRoots,
         file_store: Option<Arc<dyn FileStore>>,
         chat: Option<&ApprovalChatContext>,
         ctx: &crate::core::runtime::DispatchCtx,
@@ -210,6 +212,7 @@ impl LegacyUiBridge {
         Self {
             workspace_dir: workspace_dir.into(),
             files,
+            source_roots,
             file_store,
             chat: chat.cloned(),
             ctx: ctx.clone(),
