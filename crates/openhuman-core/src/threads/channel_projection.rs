@@ -7,14 +7,14 @@
 //! guesses from a sender, recent message, or equality between provider and row
 //! identifiers.
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 use tinychannels_bus::{ChannelRef, ConversationRef};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
-use crate::core::runtime::{DispatchCtx, Tenant, tenant::tenant_key};
+use crate::core::runtime::{tenant::tenant_key, DispatchCtx, Tenant};
 use crate::storage::{self, documents::Repo};
 
 const DOMAIN: &str = "threads::channel_projection";
@@ -94,7 +94,9 @@ fn binding_key(
     provider_message_id: &str,
 ) -> Result<MessageBindingKey> {
     if channel.id.is_empty() || conversation.id.is_empty() || provider_message_id.is_empty() {
-        return Err(anyhow!("channel, conversation, and provider message IDs must be non-empty"));
+        return Err(anyhow!(
+            "channel, conversation, and provider message IDs must be non-empty"
+        ));
     }
     Ok(MessageBindingKey {
         tenant_key,
@@ -201,12 +203,7 @@ fn bind_in(repo: &Repo, key: MessageBindingKey, thread_id: &str) -> Result<()> {
     Ok(())
 }
 
-fn bind_row_in(
-    repo: &Repo,
-    key: MessageBindingKey,
-    thread_id: &str,
-    row_id: &str,
-) -> Result<()> {
+fn bind_row_in(repo: &Repo, key: MessageBindingKey, thread_id: &str, row_id: &str) -> Result<()> {
     let id = doc_id(&key)?;
     let (thread_id, row_id) = (thread_id.to_string(), row_id.to_string());
     repo.run(|docs| async move {
@@ -223,7 +220,11 @@ fn bind_row_in(
                 "provider message thread binding does not match persisted row",
             ));
         }
-        if binding.row_id.as_deref().is_some_and(|existing| existing != row_id) {
+        if binding
+            .row_id
+            .as_deref()
+            .is_some_and(|existing| existing != row_id)
+        {
             return Err(tinystoragedrivers::StorageError::conflict(
                 "provider message is already bound to another OpenHuman row",
             ));
@@ -231,7 +232,8 @@ fn bind_row_in(
         binding.row_id = Some(row_id);
         let body: Value = serde_json::to_value(binding)
             .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
-        docs.put(COLLECTION, &id, json!(body), stored.unchanged()).await?;
+        docs.put(COLLECTION, &id, json!(body), stored.unchanged())
+            .await?;
         Ok(())
     })?;
     Ok(())
@@ -244,8 +246,8 @@ fn resolve_in(repo: &Repo, key: &MessageBindingKey) -> Result<Option<ProjectedMe
     let Some(stored) = stored else {
         return Ok(None);
     };
-    let binding: MessageBinding = serde_json::from_value(stored.doc)
-        .context("decode channel message binding")?;
+    let binding: MessageBinding =
+        serde_json::from_value(stored.doc).context("decode channel message binding")?;
     if binding.key != expected || binding.thread_id.is_empty() {
         return Ok(None);
     }

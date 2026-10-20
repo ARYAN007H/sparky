@@ -13,8 +13,8 @@
 //! subscriber (see `logging::init_for_tui`); nothing is ever `println!`'d.
 
 use std::io::Write;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -22,9 +22,9 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use serde_json::json;
 use tokio::sync::broadcast;
 
-use openhuman_rpc::embed::CoreRuntime;
 use openhuman_rpc::embed::chat_surface as web_chat;
 use openhuman_rpc::embed::chat_surface::ScopedWebEvent;
+use openhuman_rpc::embed::CoreRuntime;
 
 use super::actions::Action;
 use super::cockpit::{Overlay, OverlayKind, OverlayRow, PendingApproval, PendingPlanReview};

@@ -14,8 +14,8 @@
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::web_chat::{WebChannelEvent, publish_web_channel_event};
-use anyhow::{Result, anyhow};
+use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
+use anyhow::{anyhow, Result};
 use std::path::Path;
 use {
     crate::cron::channel_bridge, tinyflows_bus::schedule::types::CronJob,
@@ -72,8 +72,8 @@ pub(crate) async fn append_to_origin_transcript(
     append: &TranscriptAppend<'_>,
 ) -> Result<(), String> {
     use tinyagents_session::transcript::{
-        BackgroundAppend, BackgroundAppendOutcome, SessionRef, TranscriptMessage,
-        append_background_message_in,
+        append_background_message_in, BackgroundAppend, BackgroundAppendOutcome, SessionRef,
+        TranscriptMessage,
     };
     let session = SessionRef::scoped(append.thread_id.to_string(), append.agent_id.to_string());
     let options = BackgroundAppend::new(

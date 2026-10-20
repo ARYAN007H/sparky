@@ -117,6 +117,20 @@ export default async function typedImageAttachmentRoundtrip({ page, mock, log, l
   if (chatRequest.params?.attachments?.length)
     throw new Error("ordinary attachment was staged twice as a chat part and durable reference");
 
+  const inferenceRequest = mock.requests().find((request) =>
+    /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url),
+  );
+  if (!inferenceRequest)
+    throw new Error("mock backend did not receive the model request for the image turn");
+  const inferenceBody = JSON.parse(inferenceRequest.body);
+  const userMessages = inferenceBody.messages?.filter((message) => message.role === "user") ?? [];
+  const userText = JSON.stringify(userMessages);
+  if (/\[(?:ATTACHMENT|IMAGE|FILE):/i.test(userText))
+    throw new Error("legacy or durable staging markers reached the model's user text");
+  if (!userText.includes(IMAGE_BYTES.toString("base64")))
+    throw new Error("model request did not receive the uploaded image bytes as typed media");
+  log("mock model request contained typed image bytes and clean user text");
+
   await page.reload();
   await composer.waitFor({ state: "visible", timeout: 30_000 });
   await page.evaluate((id) => window.__OPENHUMAN_STORE__?.dispatch({

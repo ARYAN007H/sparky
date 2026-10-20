@@ -22,6 +22,9 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         "runEvent",
         "runTelemetry",
     ] {
-        assert!(properties.contains_key(property), "schema is missing {property}");
+        assert!(
+            properties.contains_key(property),
+            "schema is missing {property}"
+        );
     }
 }

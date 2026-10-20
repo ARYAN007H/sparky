@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::web_chat::{WebChannelEvent, publish_web_channel_event};
+use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
 use tinychannels_bus::{ChannelMessage, SendMessage};
 use tinychannels_runtime::Channel;
 

@@ -6,7 +6,7 @@ use super::backend_error_code::classify_by_backend_error_code;
 use super::budget::{is_action_budget_exhausted, is_inference_budget_exceeded_error};
 use super::retry::{is_non_retryable_rate_limit_text, retry_after_hint};
 use super::timeout::is_turn_timeout_error;
-use crate::inference::failure_copy::{FailureClass, failure_copy};
+use crate::inference::failure_copy::{failure_copy, FailureClass};
 use tinyinference_llm::failure::{
     extract_provider_error_detail, extract_provider_name, is_auth_error_text,
     is_codex_token_expired_text, is_connection_dropped_text, is_context_length_text,
