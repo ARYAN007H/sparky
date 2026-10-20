@@ -15,7 +15,6 @@ use std::time::Instant;
 use serde_json::json;
 use tinyagents_session::port::TurnStates;
 use tinyagents_session::turn_state::TurnStateMirror;
-use tinychannels_bus::module_progressive::ChannelOutputEvent;
 use tinychannels_bus::web::{
     ChatRequestMetadata, TurnCostThrottle, TurnTimingSnapshot, TurnTimingState,
 };

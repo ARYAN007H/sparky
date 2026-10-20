@@ -34,6 +34,7 @@ pub(crate) fn job_origin_from_turn(origin: &AgentTurnOrigin) -> Option<JobOrigin
             reply_target,
             history_key: Some(history_key),
             channel_session: Some(channel_session),
+            ..
         } if !channel.trim().is_empty() && !reply_target.trim().is_empty() => {
             Some(JobOrigin::Channel {
                 channel: channel.clone(),
