@@ -156,17 +156,43 @@ pub(crate) async fn resolve_context_window(
     model: &str,
     config: &Config,
 ) -> Option<u64> {
+    resolve_context_window_inner(role, provider, model, config, None)
+        .await
+        .window
+}
+
+/// Resolve a context window using provider metadata from an explicitly
+/// selected runtime context.
+pub(crate) async fn resolve_context_window_in(
+    role: &str,
+    provider: &str,
+    model: &str,
+    config: &Config,
+    extensions: Option<&crate::core::slots::Extensions>,
+) -> Option<u64> {
+    resolve_context_window_inner(role, provider, model, config, Some(extensions))
+        .await
+        .window
+}
+
+async fn resolve_context_window_inner(
+    role: &str,
+    provider: &str,
+    model: &str,
+    config: &Config,
+    extensions: Option<Option<&crate::core::slots::Extensions>>,
+) -> ResolvedWindow {
     let fetcher = default_fetcher(config, provider);
-    resolve_context_window_with(
+    resolve_context_window_with_inner(
         fetcher.as_ref(),
         model_limits_cache(),
         role,
         provider,
         model,
         config,
+        extensions,
     )
     .await
-    .window
 }
 
 /// [`resolve_context_window`] with an explicit fetcher and cache.
@@ -178,6 +204,18 @@ pub(crate) async fn resolve_context_window_with(
     model: &str,
     config: &Config,
 ) -> ResolvedWindow {
+    resolve_context_window_with_inner(fetcher, cache, role, provider, model, config, None).await
+}
+
+async fn resolve_context_window_with_inner(
+    fetcher: &dyn ModelListingFetcher,
+    cache: &ModelLimitsCache,
+    role: &str,
+    provider: &str,
+    model: &str,
+    config: &Config,
+    extensions: Option<Option<&crate::core::slots::Extensions>>,
+) -> ResolvedWindow {
     let local_kind = tinyinference_local::profile::kind_from_provider_string(provider);
     let request = match local_kind {
         None => {
@@ -188,7 +226,12 @@ pub(crate) async fn resolve_context_window_with(
         }
         Some(_) => None,
     };
-    let static_window = super::model_context::static_context_window_for_model(model);
+    let static_window = match extensions {
+        Some(extensions) => {
+            super::model_context::static_context_window_for_model_in(extensions, model)
+        }
+        None => super::model_context::static_context_window_for_model(model),
+    };
     let local_window = local_kind.and_then(|kind| {
         tinyinference_local::profile::context_window_with_local_fallback(
             model,

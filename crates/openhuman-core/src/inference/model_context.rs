@@ -33,15 +33,41 @@ pub(crate) fn context_window_for_route(
 /// then the generic id-pattern hints. These never override a provider-reported
 /// window; [`crate::inference::context_window`] consults them last.
 pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
+    static_context_window_for_model_with_provider_window(
+        model,
+        crate::inference::registry::provider_model_context_window(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            model.trim(),
+        ),
+    )
+}
+
+/// Context-aware counterpart used when a dispatch carries its own provider
+/// registry. An empty context does not borrow model metadata from ambient work.
+pub(crate) fn static_context_window_for_model_in(
+    extensions: Option<&crate::core::slots::Extensions>,
+    model: &str,
+) -> Option<u64> {
+    static_context_window_for_model_with_provider_window(
+        model,
+        crate::inference::registry::provider_model_context_window_for(
+            extensions,
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            model.trim(),
+        ),
+    )
+}
+
+fn static_context_window_for_model_with_provider_window(
+    model: &str,
+    provider_window: Option<u64>,
+) -> Option<u64> {
     let normalized = model.trim();
     if normalized.is_empty() {
         return None;
     }
 
-    if let Some(window) = crate::inference::registry::provider_model_context_window(
-        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        normalized,
-    ) {
+    if let Some(window) = provider_window {
         return Some(window);
     }
 
