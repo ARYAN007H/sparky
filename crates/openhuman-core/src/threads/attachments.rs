@@ -248,6 +248,46 @@ pub(crate) async fn resolve_persisted_parts(
     Ok(resolved)
 }
 
+/// Re-stage media already owned by the exact source row for an edit.
+///
+/// The request supplies only opaque refs. Paths are recovered from the
+/// profile/thread-scoped persisted row, validated under the trusted context,
+/// then copied into fresh staging records so the replacement row receives
+/// fresh opaque IDs and does not inherit the deleted row's claim.
+pub(crate) async fn restage_persisted_parts(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    persisted_message_id: &str,
+    requested: &[ContentPart],
+) -> Result<Vec<ContentPart>, String> {
+    use base64::Engine as _;
+
+    let mut resolved = resolve_persisted_parts(ctx, thread_id, persisted_message_id, requested)
+        .await?;
+    for part in &mut resolved {
+        let media = opaque_media_mut(part)
+            .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;
+        let path = media
+            .path
+            .take()
+            .ok_or_else(|| "stored attachment path is unavailable".to_string())?;
+        let mime = media
+            .content_type
+            .as_deref()
+            .filter(|mime| !mime.is_empty() && !mime.contains(['\r', '\n', ']']))
+            .ok_or_else(|| "stored attachment content type is unavailable".to_string())?;
+        let bytes = tokio::fs::read(&path)
+            .await
+            .map_err(|error| format!("read validated stored attachment: {error}"))?;
+        media.opaque_id = None;
+        media.url = Some(format!(
+            "data:{mime};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ));
+    }
+    stage_queued_parts(ctx, thread_id, &resolved).await
+}
+
 fn opaque_media_mut(part: &mut ContentPart) -> Option<&mut MediaReference> {
     match part {
         ContentPart::Image { media, .. }

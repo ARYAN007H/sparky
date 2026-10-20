@@ -116,8 +116,25 @@ pub async fn edit_message(
     let store = transcript_store(ctx, &thread_id)
         .await
         .map_err(ThreadsError::Message)?;
+    let has_existing_refs = request.attachments.iter().any(|part| {
+        crate::threads::attachments::opaque_media(part)
+            .is_some_and(|media| media.opaque_id.is_some())
+    });
     let staged_parts = if request.attachments.is_empty() {
         Vec::new()
+    } else if has_existing_refs {
+        // Opaque refs are accepted only when they match the exact source user
+        // row being edited. Re-staging copies validated bytes into fresh
+        // records before cancellation/truncation; callers cannot nominate
+        // paths or reuse another row's refs.
+        crate::threads::attachments::restage_persisted_parts(
+            ctx,
+            &thread_id,
+            &request.message_id,
+            &request.attachments,
+        )
+        .await
+        .map_err(ThreadsError::Message)?
     } else {
         // This is the only staging pass. The marker-form intermediate stays
         // inside the staging helper and is never persisted or sent to a turn.
