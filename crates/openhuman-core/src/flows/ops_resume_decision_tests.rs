@@ -320,4 +320,12 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
         err.contains(expected),
         "expected a clear non-paused-run error, got: {err}"
     );
+    let completed = flows_get_run(&config, &thread_id)
+        .await
+        .expect("read the completed run after refused resume")
+        .value;
+    assert_eq!(
+        completed.status, "completed",
+        "refusing a resume must leave the completed run unchanged"
+    );
 }
