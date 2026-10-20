@@ -1,0 +1,19 @@
+use super::*;
+use std::sync::Arc;
+
+#[test]
+fn builder_requires_a_model_when_no_host_policy_is_installed() {
+    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
+        Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
+    let error = crate::agent::SessionHostBuilder::new()
+        .chat_model(model)
+        .tools(Vec::new())
+        .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
+        .build()
+        .err()
+        .expect("a bare core builder needs an explicit model");
+
+    assert!(error
+        .to_string()
+        .contains("model_name or configured provider default is required"));
+}

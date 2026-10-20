@@ -49,10 +49,6 @@ impl Tool for StubTool {
 }
 
 fn base_builder() -> openhuman_core::agent::SessionHostBuilder {
-    base_builder_without_model().model_name("stub-model".into())
-}
-
-fn base_builder_without_model() -> openhuman_core::agent::SessionHostBuilder {
     OpenHumanSessionHost::builder()
         .chat_model(Arc::new(StubModel))
         .tools(vec![
@@ -60,6 +56,7 @@ fn base_builder_without_model() -> openhuman_core::agent::SessionHostBuilder {
             Box::new(StubTool("beta")),
         ])
         .tool_dispatcher(Box::new(XmlDialect))
+        .model_name("stub-model".into())
 }
 
 #[test]
@@ -84,15 +81,6 @@ fn builder_validates_required_fields() {
         .err()
         .expect("missing dispatcher should error");
     assert!(err.to_string().contains("tool_dispatcher is required"));
-}
-
-#[test]
-fn builder_requires_a_model_when_no_host_policy_is_installed() {
-    let err = base_builder_without_model()
-        .build()
-        .err()
-        .expect("a bare core builder needs an explicit model");
-    assert!(err.to_string().contains("model_name or configured provider default is required"));
 }
 
 #[test]
