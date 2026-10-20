@@ -407,8 +407,8 @@
   },
   {
     "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/inference/host_runtime/ops/agent_chat.rs",
-    "line": 577,
+    "path": "crates/openhuman-core/src/agent_runs/agent_chat/session_turn.rs",
+    "line": 512,
     "text": "tokio::spawn(async move { while rx.recv().await.is_some() {} });",
     "occurrence": 1
   },

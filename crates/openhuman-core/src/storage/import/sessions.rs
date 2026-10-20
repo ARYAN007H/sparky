@@ -6,6 +6,7 @@
 //! snapshots as JSON under `memory/conversations/turn_states/`. TinyAgents owns
 //! those formats and the importer that reads them
 //! (`tinyagents_session::legacy`): read-only, id-preserving, only-if-absent.
+//! The current importer does not import legacy entry-tree rows.
 //! This module is the host's side of it:
 //!
 //! - **Quiescence.** The importer refuses a database with a WAL or journal

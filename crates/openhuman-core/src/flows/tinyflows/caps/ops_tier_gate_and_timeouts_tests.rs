@@ -409,6 +409,7 @@ fn nested_harness_does_not_escalate_without_an_origin() {
 /// provider to exercise).
 #[test]
 fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::TempDir::new().unwrap();
     let config = resolver_test_config(&tmp);
     assert_eq!(config.agent.max_tool_iterations, 10);

@@ -247,9 +247,9 @@ async fn inference_gate_probes_every_distinct_agent_node_role() {
         "nodes": [
             { "id": "t", "kind": "trigger", "name": "Manual" },
             { "id": "a", "kind": "agent", "name": "Chat step",
-              "config": { "prompt": "chat", "model": "chat-v1" } },
+              "config": { "prompt": "chat", "model": "hint:chat" } },
             { "id": "b", "kind": "agent", "name": "Reasoning step",
-              "config": { "prompt": "reason", "model": "reasoning-v1" } }
+              "config": { "prompt": "reason", "model": "hint:reasoning" } }
         ],
         "edges": [
             { "from_node": "t", "to_node": "a" },

@@ -2,6 +2,7 @@
 //! managed-credits bypass check and the `<model>[@<temp>]` suffix parser.
 
 use super::*;
+use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::inference::provider::fallback_diagnostics;
 
 /// The provider route a role has **explicitly** configured, before any
