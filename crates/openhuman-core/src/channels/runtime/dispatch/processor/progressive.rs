@@ -25,6 +25,7 @@ enum ProgressiveTargetKind {
         ctx: crate::core::runtime::DispatchCtx,
         config: crate::config::Config,
         client_id: String,
+        thread_id: String,
         request_id: String,
     },
 }
@@ -52,6 +53,7 @@ impl NativeProgressiveTarget {
                 ctx,
                 config,
                 client_id,
+                thread_id,
                 request_id,
             } => {
                 let projection = Arc::new(
@@ -59,7 +61,7 @@ impl NativeProgressiveTarget {
                         ctx,
                         crate::web_chat::TurnIds {
                             client_id: client_id.clone(),
-                            thread_id: self.conversation.id.clone(),
+                            thread_id: thread_id.clone(),
                             request_id: request_id.clone(),
                         },
                         config.clone(),
@@ -100,6 +102,7 @@ pub(crate) fn hosted_relay_target(
     channel_ref: tinychannels_bus::channel::ChannelRef,
     conversation: tinychannels_bus::channel::ConversationRef,
     client_id: String,
+    thread_id: String,
     request_id: String,
 ) -> NativeProgressiveTarget {
     NativeProgressiveTarget {
@@ -109,6 +112,7 @@ pub(crate) fn hosted_relay_target(
             ctx: ctx.clone(),
             config: config.clone(),
             client_id,
+            thread_id,
             request_id,
         },
         channel: channel_ref,

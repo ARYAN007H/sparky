@@ -311,6 +311,7 @@ pub(crate) async fn run_relay_turn(
         channel_ref,
         prepared.envelope.conversation.clone(),
         params.client_id().to_owned(),
+        thread_id.clone(),
         request_id.clone(),
     ));
 

@@ -401,6 +401,98 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         .expect("hosted module runtime should close after the turn");
 }
 
+#[tokio::test]
+async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_terminal() {
+    let _env_lock = EnvVarGuard::locked_async().await;
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
+
+    let request_id = "relay-target-projection-request";
+    let client_id = "relay-target-projection-client";
+    let thread_id = "channel:telegram/sender-7/chat-42";
+    let mut web_events = crate::web_chat::subscribe_web_channel_events();
+    let relay = Arc::new(crate::channels::providers::relay::RelayChannel::new(
+        "telegram",
+        client_id,
+        thread_id,
+        request_id,
+        "provider-message-9",
+    ));
+    let channel = tinychannels_bus::ChannelRef {
+        id: "telegram".into(),
+        account_id: Some("trusted-account-7".into()),
+    };
+    let conversation = tinychannels_bus::ConversationRef {
+        kind: tinychannels_bus::ConversationKind::Group,
+        id: "chat-42".into(),
+        thread_id: Some("topic-3".into()),
+        topic_id: Some("topic-3".into()),
+        ..Default::default()
+    };
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let target = crate::channels::runtime::dispatch::hosted_relay_target(
+        &ctx,
+        &Config::default(),
+        Arc::clone(&relay),
+        channel,
+        conversation,
+        client_id.into(),
+        thread_id.into(),
+        request_id.into(),
+    );
+    let reply = target
+        .open("relay-target-projection-turn")
+        .await
+        .expect("hosted target opens the compiled progressive module");
+    let delivery = reply
+        .finish("projected hosted reply")
+        .await
+        .expect("compiled relay output is delivered");
+    assert!(crate::channels::runtime::dispatch::delivery_succeeded(
+        &delivery
+    ));
+    assert_eq!(relay.sent(), vec!["projected hosted reply"]);
+
+    let mut projected = None;
+    let mut gateway_terminal = None;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while projected.is_none() || gateway_terminal.is_none() {
+            let event = web_events.recv().await.expect("web event bus");
+            if event.context().request_id != request_id {
+                continue;
+            }
+            match event.event_name() {
+                "chat_done" => projected = Some(event),
+                crate::channels::providers::relay::CHANNEL_OUTBOUND_EVENT => {
+                    gateway_terminal = Some(event)
+                }
+                _ => panic!("unexpected relayed output event: {}", event.event_name()),
+            }
+        }
+    })
+    .await
+    .expect("projected renderer event and SaaS gateway terminal both arrive");
+
+    let projected = projected.expect("canonical projector output");
+    let projected_wire = serde_json::to_value(&projected).expect("web renderer wire");
+    assert_eq!(projected.context().client_id, client_id);
+    assert_eq!(projected.context().thread_id, thread_id);
+    assert_eq!(projected.context().seq, Some(1));
+    assert_eq!(projected_wire["full_response"], "projected hosted reply");
+
+    let gateway_terminal = gateway_terminal.expect("legacy SaaS terminal");
+    let terminal_wire = serde_json::to_value(&gateway_terminal).expect("gateway wire");
+    assert_eq!(gateway_terminal.context().client_id, client_id);
+    assert_eq!(gateway_terminal.context().thread_id, thread_id);
+    assert_eq!(terminal_wire["structured"]["kind"], "channel_outbound");
+    assert_eq!(relay.sent().len(), 1, "one provider terminal is published");
+
+    while let Ok(event) = web_events.try_recv() {
+        assert_ne!(event.context().request_id, request_id, "no duplicate output");
+    }
+    reply.close().await.expect("hosted projection runtime closes");
+}
+
 async fn run_hosted_compiled_turn(
     object: &tinybus::module::ModuleObjectClient,
     channel: tinychannels_bus::ChannelRef,
