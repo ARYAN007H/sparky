@@ -112,6 +112,14 @@ impl CompletionStore for FullDisk {
 struct ToggleStore {
     inner: InMemoryCompletionStore,
     fail_writes: AtomicBool,
+    fail_next_write: AtomicBool,
+}
+
+impl ToggleStore {
+    fn should_fail_write(&self) -> bool {
+        self.fail_writes.load(Ordering::SeqCst)
+            || self.fail_next_write.swap(false, Ordering::SeqCst)
+    }
 }
 
 impl CompletionStore for ToggleStore {
@@ -164,7 +172,7 @@ impl CompletionStore for ToggleStore {
     }
 
     fn put(&self, record: &CompletionRecord) -> tinyagents_harness::error::Result<()> {
-        if self.fail_writes.load(Ordering::SeqCst) {
+        if self.should_fail_write() {
             return Err(tinyagents_harness::error::TinyAgentsError::Graph(
                 "disk full".into(),
             ));
@@ -178,7 +186,7 @@ impl CompletionStore for ToggleStore {
         parent_key: &str,
         gate: &tinyagents_tasks::ParentGateClaim,
     ) -> tinyagents_harness::error::Result<()> {
-        if self.fail_writes.load(Ordering::SeqCst) {
+        if self.should_fail_write() {
             return Err(tinyagents_harness::error::TinyAgentsError::Graph(
                 "disk full".into(),
             ));
@@ -191,7 +199,7 @@ impl CompletionStore for ToggleStore {
         record: &CompletionRecord,
         gate: &tinyagents_tasks::ParentGateClaim,
     ) -> tinyagents_harness::error::Result<bool> {
-        if self.fail_writes.load(Ordering::SeqCst) {
+        if self.should_fail_write() {
             return Err(tinyagents_harness::error::TinyAgentsError::Graph(
                 "disk full".into(),
             ));
@@ -384,6 +392,40 @@ async fn transient_parent_admission_failure_does_not_permanently_delete_thread()
         w.to_path_buf(),
         "retryable-session".into(),
         Some("retryable-parent".into()),
+    )
+    .is_ok());
+}
+
+#[tokio::test]
+async fn failed_stop_resume_does_not_cache_permanent_deletion() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let ws = workspace();
+    let w = ws.path();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let store = Arc::new(ToggleStore::default());
+    install_store_for_test(w, store.clone());
+    router_for_workspace(w)
+        .cancel_parent("retry-after-resume-error")
+        .expect("the stop marker is durable before simulating the resume error");
+    store.fail_next_write.store(true, Ordering::SeqCst);
+
+    assert!(mark_stopped_task_if_thread_stopped(
+        &ctx,
+        w,
+        "retry-after-resume-error",
+        "rejected-child",
+    ));
+    assert!(!mark_stopped_task_if_thread_stopped(
+        &ctx,
+        w,
+        "retry-after-resume-error",
+        "accepted-child",
+    ));
+    assert!(CompletionTarget::new(
+        ctx,
+        w.to_path_buf(),
+        "retry-after-resume-session".into(),
+        Some("retry-after-resume-error".into()),
     )
     .is_ok());
 }
