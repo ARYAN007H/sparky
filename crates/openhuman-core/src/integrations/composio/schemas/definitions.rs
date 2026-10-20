@@ -67,7 +67,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     name: "toolkit",
                     ty: TypeSchema::String,
                     comment: "Toolkit slug to authorize (must be in the backend allowlist).",
-                    required: false,
+                    required: true,
                 },
                 FieldSchema {
                     name: "extra_params",
@@ -156,7 +156,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     name: "tool",
                     ty: TypeSchema::String,
                     comment: "Composio action slug, e.g. GMAIL_SEND_EMAIL.",
-                    required: true,
+                    required: false,
                 },
                 FieldSchema {
                     name: "arguments",
