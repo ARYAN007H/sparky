@@ -205,13 +205,6 @@ pub fn builtin_cloud_supports_responses_api(slug: &str) -> bool {
     provider_presets(&hosted).builtin_cloud_supports_responses_api(slug)
 }
 
-/// Extract the lowercased authority host from an endpoint URL, dropping the
-/// scheme, any userinfo, the port, and the path. Returns `None` when no host
-/// can be parsed. Tolerant of a missing scheme and of IPv6 literals.
-pub fn endpoint_host(endpoint: &str) -> Option<String> {
-    tinyinference_providers::builtin::endpoint_host(endpoint)
-}
-
 /// Whether `host` is the authority host of any built-in cloud **inference**
 /// provider (e.g. `openrouter.ai`, `api.openai.com`, `api.groq.com`).
 ///
