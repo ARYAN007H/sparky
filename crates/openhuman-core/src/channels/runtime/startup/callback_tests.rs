@@ -220,7 +220,10 @@ async fn voice_media_projection_accepts_only_durable_refs_for_the_configured_acc
             turn_id: "telegram_42_7".into(),
         },
         direction: tinychannels_bus::HostVoiceMediaDirection::Inbound,
-        audio_base64: "fixture bytes are already stored by the module".into(),
+        audio_base64: base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            vec![7; 200 * 1024],
+        ),
         mime_type: "audio/ogg".into(),
         codec: Some("ogg_opus".into()),
         duration_ms: Some(1000),
@@ -251,6 +254,13 @@ async fn voice_media_projection_accepts_only_durable_refs_for_the_configured_acc
     let mut unscoped = request();
     unscoped.media_reference.as_mut().unwrap().opaque_id = Some("external-id".into());
     assert!(callback.store_voice_media(unscoped).await.is_err());
+
+    let mut oversized = request();
+    oversized.audio_base64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        vec![7; 8 * 1024 * 1024 + 1],
+    );
+    assert!(callback.store_voice_media(oversized).await.is_err());
 }
 
 #[tokio::test]

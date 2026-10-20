@@ -18,6 +18,8 @@ use tokio::sync::mpsc;
 
 const MAX_CALLBACK_BYTES: usize = 128 * 1024;
 const MAX_TRANSCRIPTION_BYTES: usize = 12 * 1024 * 1024;
+const MAX_VOICE_MEDIA_BYTES: usize = 12 * 1024 * 1024;
+const MAX_VOICE_MEDIA_DECODED_BYTES: usize = 8 * 1024 * 1024;
 const MAX_CONTROLLER_BYTES: usize = 1024 * 1024;
 
 type ProgressiveChannelRegistry =
@@ -245,12 +247,22 @@ impl ChannelHostCallbacks {
         &self,
         request: tinychannels_bus::HostStoreVoiceMediaRequest,
     ) -> Result<tinychannels_bus::HostStoreVoiceMediaResult> {
-        Self::validate_callback_size(&request)?;
+        if serde_json::to_vec(&request)
+            .map_or(true, |bytes| bytes.len() > MAX_VOICE_MEDIA_BYTES)
+        {
+            return Err(Error::failed("voice media callback exceeds its limit"));
+        }
+        let decoded = base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            &request.audio_base64,
+        )
+        .map_err(|_| Error::failed("voice media payload is invalid"))?;
+        if decoded.is_empty() || decoded.len() > MAX_VOICE_MEDIA_DECODED_BYTES {
+            return Err(Error::failed("voice media exceeds its size limit"));
+        }
         let scope = &request.scope;
-        let Some(channel) = self
-            .context()?
-            .channels_by_name
-            .get(&scope.configured_instance)
+        let context = self.context()?;
+        let Some(channel) = context.channels_by_name.get(&scope.configured_instance)
         else {
             return Err(Error::failed("voice media account is not configured"));
         };

@@ -742,6 +742,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg(feature = "voice")]
 async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_modules() {
     let tmp = tempfile::tempdir().expect("temporary core home");
     let home = std::fs::canonicalize(tmp.path()).expect("canonicalize temporary home");
