@@ -170,86 +170,92 @@ export default async function queuedImageAttachmentRoundtrip({
   );
 
   // The queued turn will use this fast script; the already-running request has
-  // retained its delayed script.
+  // retained its delayed script. The normal composer disables a second send
+  // while a turn runs, so exercise the same public RPC directly here.
   mock.set("llmStreamScript", [
     { text: QUEUED_REPLY },
     { finish: "stop" },
   ]);
-  await page.locator('input[type="file"]').setInputFiles({
-    name: FILE_NAME,
-    mimeType: "image/png",
-    buffer: IMAGE_BYTES,
-  });
-  await page
-    .getByText(FILE_NAME, { exact: true })
-    .waitFor({ state: "visible" });
-  await composer.fill(QUEUED_PROMPT);
-  await page.getByTestId("send-message-button").click();
-  await page.getByTestId("queued-followups").waitFor({
-    state: "visible",
-    timeout: 15_000,
-  });
-  await page
-    .getByTestId("queued-followups")
-    .getByText(QUEUED_PROMPT, { exact: false })
-    .waitFor({ state: "visible" });
-
-  const queuedAckResponse = await waitUntil(
-    () =>
-      rpcResponses.find(
-        (call) =>
-          call.method === "openhuman.channel_web_chat" &&
-          call.params?.message === QUEUED_PROMPT,
-      ),
-    "the queued channel_web_chat acknowledgement",
+  const firstRequest = rpcCalls.find(
+    (call) =>
+      call.method === "openhuman.channel_web_chat" &&
+      call.params?.message === "Hold this turn while I queue an image.",
   );
-  if (queuedAckResponse.error) throw new Error(queuedAckResponse.error);
-  const ack = queuedAckResponse.result;
+  if (!firstRequest?.params?.client_id) {
+    throw new Error("the first chat RPC did not expose its socket client ID");
+  }
+  const queuedResponse = await page.evaluate(
+    async ({ url, token, clientId, id, imageBase64 }) => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { authorization: token, "content-type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "queued-image-admission",
+          method: "openhuman.channel_web_chat",
+          params: {
+            client_id: clientId,
+            thread_id: id,
+            message: "Describe this queued image.",
+            queue_mode: "followup",
+            attachments: [
+              {
+                kind: "image",
+                altText: null,
+                caption: null,
+                media: {
+                  kind: "image",
+                  url: `data:image/png;base64,${imageBase64}`,
+                  contentType: "image/png",
+                  fileName: "queued-roundtrip.png",
+                  sizeBytes: atob(imageBase64).length,
+                  codec: null,
+                  durationMs: null,
+                  height: null,
+                  localCachePath: null,
+                  path: null,
+                  platformMessageId: null,
+                  transcribed: false,
+                  width: null,
+                },
+              },
+            ],
+          },
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(`chat RPC failed with HTTP ${response.status}`);
+      if (body.error) throw new Error(`chat RPC failed: ${JSON.stringify(body.error)}`);
+      return body.result;
+    },
+    {
+      url: rpcUrl,
+      token: authorization,
+      clientId: firstRequest.params.client_id,
+      id: threadId,
+      imageBase64: IMAGE_BYTES.toString("base64"),
+    },
+  );
+  const ack = unwrap(queuedResponse);
   if (ack?.queued !== true || !ack.request_id) {
     throw new Error(
       `queued channel_web_chat ACK is malformed: ${JSON.stringify(ack)}`,
     );
   }
-  const pendingHandle = await page.waitForFunction(
-    ({ id, requestId, attachments }) => {
-      const pending = Object.values(
-        window.__OPENHUMAN_STORE__?.getState?.().queue?.pendingFollowupsByThread?.[
-          id
-        ] ?? {},
-      ).find((entry) => entry.requestId === requestId);
-      return (
-        pending &&
-        JSON.stringify(pending.attachments) === JSON.stringify(attachments)
-      );
-    },
-    {
-      id: threadId,
-      requestId: ack.request_id,
-      attachments: ack.queued_attachments,
-    },
-    { timeout: 10_000 },
-  );
-  const pending = await pendingHandle.jsonValue();
-  if (!pending?.requestId || pending.message?.content !== QUEUED_PROMPT) {
-    throw new Error("accepted queued image did not remain as a matching pending follow-up");
-  }
-  if (JSON.stringify(ack.queued_attachments) !== JSON.stringify(pending.attachments)) {
-    throw new Error(`queued ACK attachments differ from UI state: ${JSON.stringify(ack)}`);
-  }
   if (
-    pending.attachments?.length !== 1 ||
-    pending.attachments[0]?.kind !== "image" ||
-    !pending.attachments[0]?.media?.opaqueId
+    ack.queued_attachments?.length !== 1 ||
+    ack.queued_attachments[0]?.kind !== "image" ||
+    !ack.queued_attachments[0]?.media?.opaqueId
   ) {
     throw new Error(
-      `queued ACK did not retain the core's opaque image ref: ${JSON.stringify(pending)}`,
+      `queued ACK did not retain the core's opaque image ref: ${JSON.stringify(ack)}`,
     );
   }
   if (
-    /data:[^\s\"]+|base64,/i.test(JSON.stringify(pending.attachments)) ||
-    hasSourceAuthority(pending.attachments)
+    /data:[^\s\"]+|base64,/i.test(JSON.stringify(ack.queued_attachments)) ||
+    hasSourceAuthority(ack.queued_attachments)
   ) {
-    throw new Error("queued UI state retained upload bytes or a source path");
+    throw new Error("queued ACK retained upload bytes or a source path");
   }
 
   const earlyRows = await page.evaluate(
@@ -289,6 +295,11 @@ export default async function queuedImageAttachmentRoundtrip({
   if (earlyUiRows.some((row) => row.content === QUEUED_PROMPT)) {
     throw new Error("queued image appeared as a persisted transcript row before flush");
   }
+  const stillActive = await page.evaluate(
+    (id) => window.__OPENHUMAN_STORE__?.getState?.().thread?.activeThreadIds?.[id] === true,
+    threadId,
+  );
+  if (!stillActive) throw new Error("queued ACK arrived after the first turn stopped being active");
   await page.getByTestId("stop-generation-button").waitFor({
     state: "visible",
     timeout: 5_000,
@@ -331,7 +342,7 @@ export default async function queuedImageAttachmentRoundtrip({
     throw new Error(`queued image produced ${userRows.length} persisted user rows, expected one`);
   }
   const persisted = userRows[0];
-  if (persisted.id !== `user:${pending.requestId}`) {
+  if (persisted.id !== `user:${ack.request_id}`) {
     throw new Error(
       `queued row ID ${persisted.id} does not match request-key ownership`,
     );
