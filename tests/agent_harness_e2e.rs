@@ -1096,6 +1096,11 @@ fn managed_host_requests_repeat_with_the_same_capture_identity() {
 
 async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
     let _lock = env_lock();
+    let _prompt_clock = openhuman_core::prompts::register_prompt_clock(|| {
+        chrono::DateTime::parse_from_rfc3339("2024-01-15T12:00:00Z")
+            .expect("fixed capture instant")
+            .with_timezone(&chrono::Utc)
+    });
     let phase = std::env::var("OPENHUMAN_MANAGED_CAPTURE_PHASE")
         .unwrap_or_else(|_| "self-contained".to_owned());
     let (capture_root, _temp_guard) = match std::env::var_os("OPENHUMAN_MANAGED_CAPTURE_DIR") {
