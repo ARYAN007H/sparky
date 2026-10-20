@@ -1,6 +1,7 @@
 use super::*;
 
 fn config_with_rules(tmp: &tempfile::TempDir) -> crate::config::Config {
+    crate::agent::session_host::test_support::install_model_fixture();
     let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
