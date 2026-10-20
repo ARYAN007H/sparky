@@ -312,3 +312,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
 #[cfg(test)]
 #[path = "routes_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "routes_remote_reset_tests.rs"]
+mod remote_reset_tests;

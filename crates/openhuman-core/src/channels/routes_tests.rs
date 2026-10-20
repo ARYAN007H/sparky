@@ -58,7 +58,7 @@ impl Channel for RecordingChannel {
     }
 }
 
-fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
+pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
             "ok",
@@ -90,7 +90,7 @@ fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     }
 }
 
-fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope {
+pub(super) fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope {
     tinychannels_bus::module_remote::RemoteSessionScope {
         channel: tinychannels_bus::ChannelRef {
             id: "telegram".into(),
