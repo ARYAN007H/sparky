@@ -154,7 +154,7 @@ impl FlowStore for FlowsHost {
 #[async_trait]
 impl SandboxRunner for FlowsHost {
     async fn run(&self, request: SandboxRunRequest) -> PortResult<Value> {
-        use tinybus::{ObjectPath, Proxy};
+        use tinybus::Proxy;
         use tinyflows_bus::runs::{self, SandboxRun, SandboxRunResponse};
 
         // Loading the module first applies the normal component/registry gate.
@@ -165,11 +165,9 @@ impl SandboxRunner for FlowsHost {
             .await
             .map_err(|error| error.to_string())?;
         let connection = runtime.connection().clone();
-        let path = format!(
-            "/ai/tinyhumans/openhuman/FlowSandbox/{}",
-            uuid::Uuid::new_v4()
-        );
-        let object_path = ObjectPath::new(&path).map_err(|error| error.to_string())?;
+        let object_path = sandbox_callback_object_path(uuid::Uuid::new_v4())
+            .map_err(|error| error.to_string())?;
+        let path = object_path.to_string();
         let served_path = object_path.clone();
         let callback = SandboxToolPreflight {
             config: self.config.clone(),
@@ -221,6 +219,13 @@ impl SandboxRunner for FlowsHost {
 }
 
 const SANDBOX_CALLBACK_BUS: &str = "ai.tinyhumans.openhuman.FlowSandboxHost";
+
+fn sandbox_callback_object_path(id: uuid::Uuid) -> Result<tinybus::ObjectPath, tinybus::Error> {
+    tinybus::ObjectPath::new(format!(
+        "/ai/tinyhumans/openhuman/FlowSandbox/{}",
+        id.simple()
+    ))
+}
 
 struct SandboxToolPreflight {
     config: Arc<Config>,
