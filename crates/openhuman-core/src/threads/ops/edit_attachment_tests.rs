@@ -145,7 +145,7 @@ async fn editing_an_image_row_restages_only_its_exact_opaque_reference() {
         &ctx,
         "edit-image-source",
         &source.id,
-        &[original_ref.clone()],
+        std::slice::from_ref(&original_ref),
     )
     .await
     .unwrap();
@@ -218,8 +218,8 @@ async fn edit_rpc_rejects_an_attachment_ref_owned_by_another_row_before_truncati
                 AppendConversationMessageRequest {
                     thread_id: "edit-image-scope".into(),
                     message: ConversationMessageRecord {
-                        id: id.into(),
-                        content: content.into(),
+                        id,
+                        content,
                         attachments: Vec::new(),
                         message_type: "text".into(),
                         extra_metadata: serde_json::json!({}),

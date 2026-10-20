@@ -119,7 +119,7 @@ pub async fn edit_message(
     let has_existing_refs = request
         .attachments
         .iter()
-        .any(|part| crate::threads::attachments::has_opaque_ref(part));
+        .any(crate::threads::attachments::has_opaque_ref);
     let staged_parts = if request.attachments.is_empty() {
         Vec::new()
     } else if has_existing_refs {
