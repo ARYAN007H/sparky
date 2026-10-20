@@ -50,9 +50,7 @@ pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
     if normalized == "chat" {
         return Some(1_000_000);
     }
-    if normalized.starts_with("gemma")
-        || normalized.contains(":1b")
-        || normalized.contains("270m")
+    if normalized.starts_with("gemma") || normalized.contains(":1b") || normalized.contains("270m")
     {
         return Some(8_192);
     }
