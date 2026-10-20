@@ -16,6 +16,7 @@ use crate::security::credentials::channel_credential_provider;
 use tinychannels_bus::controllers::{
     all_channel_controller_schemas, channel_controller_schema, ChannelAuthMode,
     ChannelConnectRequest as ConnectParams, ChannelCreateThreadRequest as CreateThreadParams,
+    ChannelDescribeRequest as DescribeParams,
     ChannelDisconnectRequest as DisconnectParams, ChannelListThreadsRequest as ListThreadsParams,
     ChannelSendMessageRequest as SendMessageParams,
     ChannelSendReactionRequest as SendReactionParams, ChannelStatusRequest as StatusParams,
@@ -27,12 +28,6 @@ use tinychannels_bus::controllers::{
 // ---------------------------------------------------------------------------
 // Param structs
 // ---------------------------------------------------------------------------
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct DescribeParams {
-    channel: String,
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
