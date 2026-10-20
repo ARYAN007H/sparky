@@ -91,7 +91,8 @@ fn required_output_contract_is_carried_across() {
         required_keys: vec!["next_action".into()],
     });
 
-    let r = session_config_from(&c).unwrap()
+    let r = session_config_from(&c)
+        .unwrap()
         .turn
         .required_output
         .expect("contract is mapped");

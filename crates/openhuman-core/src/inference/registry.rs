@@ -99,7 +99,11 @@ pub struct ProviderModelHooks {
     /// Provider default pricing as (model id, input USD/1M, output USD/1M).
     pub default_pricing: Arc<dyn Fn() -> Option<(String, f64, f64)> + Send + Sync>,
     /// Applies a provider-specific request hint without exposing its wire key.
-    pub without_reasoning: Arc<dyn Fn(tinyinference_llm::model::ModelRequest) -> tinyinference_llm::model::ModelRequest + Send + Sync>,
+    pub without_reasoning: Arc<
+        dyn Fn(tinyinference_llm::model::ModelRequest) -> tinyinference_llm::model::ModelRequest
+            + Send
+            + Sync,
+    >,
 }
 
 /// A provider-neutral semantic category for a backend error.
@@ -221,8 +225,7 @@ pub fn provider_model_role(provider_id: &str, model: &str) -> Option<String> {
 
 /// Whether the provider recognizes `model` as an abstract alias.
 pub fn provider_model_is_alias(provider_id: &str, model: &str) -> bool {
-    provider_model_hooks(provider_id)
-        .is_some_and(|hooks| (hooks.is_alias)(model))
+    provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.is_alias)(model))
 }
 
 /// Whether the provider regards `model` as a concrete id for pass-through.
@@ -230,14 +233,12 @@ pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
     let model = model.trim();
     !model.is_empty()
         && !model.starts_with("hint:")
-        && provider_model_hooks(provider_id)
-            .map_or(true, |hooks| (hooks.is_raw_model)(model))
+        && provider_model_hooks(provider_id).map_or(true, |hooks| (hooks.is_raw_model)(model))
 }
 
 /// Whether the provider says `model` supports image input.
 pub fn provider_model_supports_vision(provider_id: &str, model: &str) -> bool {
-    provider_model_hooks(provider_id)
-        .is_some_and(|hooks| (hooks.supports_vision)(model))
+    provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.supports_vision)(model))
 }
 
 /// Provider-specific resolution of a role alias, configured default, or pin.
@@ -294,7 +295,9 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
     CONFIG_NORMALIZERS
         .entries_context_first()
         .into_iter()
-        .fold(false, |changed, (_, normalize)| normalize(config) || changed)
+        .fold(false, |changed, (_, normalize)| {
+            normalize(config) || changed
+        })
 }
 
 // ---------------------------------------------------------------------------

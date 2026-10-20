@@ -104,8 +104,7 @@ pub fn model_supports_vision(model: &str, config: &crate::config::Config) -> boo
     crate::inference::registry::provider_model_supports_vision(
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         model,
-    )
-        || model_vision_enabled(model, config)
+    ) || model_vision_enabled(model, config)
 }
 
 #[cfg(test)]

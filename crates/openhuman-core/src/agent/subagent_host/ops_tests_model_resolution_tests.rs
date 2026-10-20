@@ -491,8 +491,7 @@ fn resolve_subagent_source_hint_with_config_routes_via_factory() {
         0.0,
     );
     assert_eq!(
-        resolved_model,
-        "openrouter/deepseek/deepseek-v4-flash",
+        resolved_model, "openrouter/deepseek/deepseek-v4-flash",
         "Hint must resolve to the managed default model, not a retired tier \
          slug from default_model or the parent's model"
     );

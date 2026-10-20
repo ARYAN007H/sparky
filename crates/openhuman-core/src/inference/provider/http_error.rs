@@ -148,8 +148,8 @@ impl ErrorReporter for HostErrorReporter<'_> {
             status,
             facts,
         } = failure;
-        let is_backend = classify_backend_error(Some(provider), "")
-            .is_some_and(|result| result.provider_owned);
+        let is_backend =
+            classify_backend_error(Some(provider), "").is_some_and(|result| result.provider_owned);
         let status_code =
             reqwest::StatusCode::from_u16(status).unwrap_or(reqwest::StatusCode::BAD_GATEWAY);
         let demote = |kind: &str, reason: &str, warn: bool| {

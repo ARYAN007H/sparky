@@ -2611,9 +2611,7 @@ pub fn is_backend_error_code_event(event: &sentry::protocol::Event<'_>) -> bool 
         .flatten()
         .any(|message| {
             crate::inference::registry::classify_backend_error(None, message).is_some_and(
-                |classification| {
-                    classification.backend_owned && !classification.reportable
-                },
+                |classification| classification.backend_owned && !classification.reportable,
             )
         })
 }

@@ -86,13 +86,13 @@ pub(super) fn resolve_cloud_slug<'a>(
         );
     }
 
-    if !hosted && crate::inference::provider_model::is_abstract_model(PROVIDER_OPENHUMAN, &effective_model) {
-        if let Some(default_model) = entry
-            .default_model
-            .as_deref()
-            .map(str::trim)
-            .filter(|m| !m.is_empty() && !crate::inference::provider_model::is_abstract_model(PROVIDER_OPENHUMAN, m))
-        {
+    if !hosted
+        && crate::inference::provider_model::is_abstract_model(PROVIDER_OPENHUMAN, &effective_model)
+    {
+        if let Some(default_model) = entry.default_model.as_deref().map(str::trim).filter(|m| {
+            !m.is_empty()
+                && !crate::inference::provider_model::is_abstract_model(PROVIDER_OPENHUMAN, m)
+        }) {
             log::info!(
                 "[providers][chat-factory] role={} slug={} remapping abstract model {} -> {}",
                 role,
@@ -336,7 +336,12 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
             );
         }
         AuthStyle::Anthropic | AuthStyle::None => {}
-        style if crate::config::schema::cloud_providers::is_hosted_cloud_provider(&entry.slug, style) => {
+        style
+            if crate::config::schema::cloud_providers::is_hosted_cloud_provider(
+                &entry.slug,
+                style,
+            ) =>
+        {
             #[cfg(not(test))]
             if let Err(error) = verify_backend_session_active(config) {
                 return Some(Err(error));

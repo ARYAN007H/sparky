@@ -216,9 +216,7 @@ impl Default for CostConfig {
         let prices = crate::inference::registry::provider_default_pricing(
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         )
-        .map(|(model, input, output)| {
-            HashMap::from([(model, ModelPricing { input, output })])
-        })
+        .map(|(model, input, output)| HashMap::from([(model, ModelPricing { input, output })]))
         .unwrap_or_default();
         Self {
             enabled: default_cost_enabled(),

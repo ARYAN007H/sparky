@@ -57,10 +57,7 @@ fn managed_body(status: &str, code: &str) -> String {
 /// Installs exact-message metadata for core tests of the generic classifier
 /// hook. The tests supply ownership and reportability directly; this fixture
 /// deliberately contains no hosted token parser or vocabulary.
-fn register_backend_classifier_fixture(
-    message: &str,
-    classification: BackendErrorClassification,
-) {
+fn register_backend_classifier_fixture(message: &str, classification: BackendErrorClassification) {
     static FIXTURES: OnceLock<Arc<Mutex<HashMap<String, BackendErrorClassification>>>> =
         OnceLock::new();
     let fixtures = Arc::clone(FIXTURES.get_or_init(|| {
@@ -89,7 +86,10 @@ fn register_backend_classifier_fixture(
         .insert(message.to_string(), classification);
 }
 
-fn reportable_fixture(kind: BackendErrorKind, malformed_bad_request: bool) -> BackendErrorClassification {
+fn reportable_fixture(
+    kind: BackendErrorKind,
+    malformed_bad_request: bool,
+) -> BackendErrorClassification {
     BackendErrorClassification {
         provider_owned: true,
         backend_owned: true,

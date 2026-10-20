@@ -86,7 +86,10 @@ fn seed_legacy_custom_provider(config: &mut Config, stats: &mut MigrationStats) 
         if !trimmed.is_empty()
             && !looks_like_managed_backend(&hosts, trimmed)
             && !config.cloud_providers.iter().any(|entry| {
-                entry.endpoint.trim().trim_end_matches('/')
+                entry
+                    .endpoint
+                    .trim()
+                    .trim_end_matches('/')
                     .eq_ignore_ascii_case(trimmed.trim_end_matches('/'))
             })
         {
@@ -133,11 +136,12 @@ fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
         .and_then(|url| {
             let normalized = url.trim_end_matches('/').to_ascii_lowercase();
             config.cloud_providers.iter().find(|entry| {
-                entry.endpoint
-                        .trim()
-                        .trim_end_matches('/')
-                        .to_ascii_lowercase()
-                        == normalized
+                entry
+                    .endpoint
+                    .trim()
+                    .trim_end_matches('/')
+                    .to_ascii_lowercase()
+                    == normalized
             })
         });
     if let Some(entry) = legacy_custom {
@@ -149,7 +153,6 @@ fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
         );
         return;
     }
-
 }
 
 /// Derive each per-workload `*_provider` field from the legacy flags.

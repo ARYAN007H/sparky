@@ -79,11 +79,7 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
     let seen = seen.lock().unwrap();
     assert_eq!(
         seen[0],
-        (
-            "chat".to_string(),
-            None,
-            Some("thread-1".to_string())
-        )
+        ("chat".to_string(), None, Some("thread-1".to_string()))
     );
     assert_eq!(
         seen.len(),

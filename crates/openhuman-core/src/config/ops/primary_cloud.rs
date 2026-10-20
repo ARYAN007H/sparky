@@ -145,10 +145,7 @@ fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> S
 }
 
 fn is_openhuman_cloud_entry(config: &Config, entry: &CloudProviderCreds) -> bool {
-    crate::config::schema::cloud_providers::is_hosted_cloud_provider(
-        &entry.slug,
-        entry.auth_style,
-    )
+    crate::config::schema::cloud_providers::is_hosted_cloud_provider(&entry.slug, entry.auth_style)
         || looks_like_openhuman_backend(config, &entry.endpoint)
 }
 

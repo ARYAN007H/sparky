@@ -85,11 +85,7 @@ async fn backend_401_publishes_session_expired_through_reporter() {
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
     let marker = "REPORTER_MARKER_SESSION";
-    let _ = api_error(
-        "OpenHuman",
-        response(StatusCode::UNAUTHORIZED, marker),
-    )
-    .await;
+    let _ = api_error("OpenHuman", response(StatusCode::UNAUTHORIZED, marker)).await;
     let seen = drain_until(&mut rx, |e| match e {
         DomainEvent::SessionExpired { reason, .. } if reason.contains(marker) => Some(()),
         _ => None,
@@ -136,11 +132,7 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
     )
     .await;
     let rejected = drain_until(&mut rx, |e| match e {
-        DomainEvent::ProviderApiKeyRejected { provider, .. }
-            if provider == "OpenHuman" =>
-        {
-            Some(())
-        }
+        DomainEvent::ProviderApiKeyRejected { provider, .. } if provider == "OpenHuman" => Some(()),
         _ => None,
     });
     assert!(

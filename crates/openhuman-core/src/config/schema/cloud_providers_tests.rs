@@ -1,9 +1,9 @@
 //! Tests for the surrounding module.
 
 use super::{
-    builtin_cloud_supports_responses_api, endpoint_host, endpoint_host_is_chat_completions_only,
-    host_is_builtin_cloud_provider, is_builtin_cloud_slug, is_slug_reserved, AuthStyle,
-    builtin_cloud_providers,
+    builtin_cloud_providers, builtin_cloud_supports_responses_api, endpoint_host,
+    endpoint_host_is_chat_completions_only, host_is_builtin_cloud_provider, is_builtin_cloud_slug,
+    is_slug_reserved, AuthStyle,
 };
 
 #[test]
@@ -154,11 +154,20 @@ fn hosted_presets_and_classification_are_context_scoped() {
     assert!(super::builtin_cloud_provider("tenant-hosted").is_none());
     crate::core::runtime::CoreContext::sync_scope(context, || {
         assert!(super::builtin_cloud_provider("tenant-hosted").is_some());
-        assert!(super::is_hosted_cloud_provider("tenant-hosted", AuthStyle::Bearer));
-        assert!(!super::is_hosted_cloud_provider("openai", AuthStyle::Bearer));
+        assert!(super::is_hosted_cloud_provider(
+            "tenant-hosted",
+            AuthStyle::Bearer
+        ));
+        assert!(!super::is_hosted_cloud_provider(
+            "openai",
+            AuthStyle::Bearer
+        ));
     });
     assert!(super::builtin_cloud_provider("tenant-hosted").is_none());
-    assert!(!super::is_hosted_cloud_provider("tenant-hosted", AuthStyle::Bearer));
+    assert!(!super::is_hosted_cloud_provider(
+        "tenant-hosted",
+        AuthStyle::Bearer
+    ));
 }
 
 /// Drift guard (TAURI-RUST-5EN): couple the capability helper to the

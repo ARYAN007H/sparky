@@ -1,6 +1,5 @@
 use super::*;
 
-
 use crate::inference::provider::factory::access_gates::local_only_violation;
 /// When the provider string includes a model id the factory should build
 /// successfully and return that model id unchanged.
@@ -252,11 +251,22 @@ fn local_provider_string_detection() {
 fn resolve_model_for_hint_extracts_model_from_byok_provider() {
     let mut config = Config::default();
     config.reasoning_provider = Some("openai:gpt-4o".to_string());
-    assert_eq!(crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config), "gpt-4o");
+    assert_eq!(
+        crate::inference::provider_model::resolve_provider_model_hint(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            "hint:reasoning",
+            &config
+        ),
+        "gpt-4o"
+    );
 
     config.chat_provider = Some("anthropic:claude-sonnet-4-20250514".to_string());
     assert_eq!(
-        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:chat", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            "hint:chat",
+            &config
+        ),
         "claude-sonnet-4-20250514"
     );
 }
@@ -266,19 +276,31 @@ fn unresolved_managed_route_keeps_the_abstract_hint() {
     let mut config = Config::default();
     config.reasoning_provider = Some("openhuman".to_string());
     assert_eq!(
-        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            "hint:reasoning",
+            &config
+        ),
         "hint:reasoning"
     );
 
     config.reasoning_provider = Some("cloud".to_string());
     assert_eq!(
-        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            "hint:reasoning",
+            &config
+        ),
         "hint:reasoning"
     );
 
     config.reasoning_provider = Some("".to_string());
     assert_eq!(
-        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            "hint:reasoning",
+            &config
+        ),
         "hint:reasoning"
     );
 }
@@ -286,7 +308,11 @@ fn unresolved_managed_route_keeps_the_abstract_hint() {
 #[test]
 fn resolve_model_for_hint_handles_unknown_hint_passthrough() {
     let config = Config::default();
-    let result = crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:unknown_tier", &config);
+    let result = crate::inference::provider_model::resolve_provider_model_hint(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        "hint:unknown_tier",
+        &config,
+    );
     assert_eq!(result, "hint:unknown_tier");
 }
 

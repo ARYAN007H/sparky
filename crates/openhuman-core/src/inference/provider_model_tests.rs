@@ -18,16 +18,20 @@ fn abstract_hint_markers_do_not_become_raw_model_ids() {
     assert!(is_abstract_model("missing-provider", "hint:unknown"));
     assert!(!is_raw_model("missing-provider", "hint:unknown"));
     assert!(is_raw_model("missing-provider", "vendor/model-id"));
-    assert_eq!(role_for_provider_model("missing-provider", "hint:coding"), "coding");
-    assert_eq!(role_for_provider_model("missing-provider", "hint:unknown"), "chat");
+    assert_eq!(
+        role_for_provider_model("missing-provider", "hint:coding"),
+        "coding"
+    );
+    assert_eq!(
+        role_for_provider_model("missing-provider", "hint:unknown"),
+        "chat"
+    );
 }
 
 #[test]
 fn registered_model_defaults_and_aliases_are_context_scoped() {
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{
-        register_chat_model_in, ChatModelEntry, ProviderModelHooks,
-    };
+    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelHooks};
     use std::sync::Arc;
 
     let extensions = Extensions::new();

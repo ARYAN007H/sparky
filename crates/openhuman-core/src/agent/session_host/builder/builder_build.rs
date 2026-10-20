@@ -312,7 +312,9 @@ impl SessionHostBuilder {
                     crate::inference::provider::factory::PROVIDER_OPENHUMAN,
                 )
             })
-            .ok_or_else(|| anyhow::anyhow!("model_name or configured provider default is required"))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!("model_name or configured provider default is required")
+            })?;
 
         let context_config = self.context_config.unwrap_or_default();
 

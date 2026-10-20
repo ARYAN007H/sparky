@@ -14,9 +14,7 @@ use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
-use crate::inference::provider::{
-    create_chat_model_with_model_id_in, is_raw_passthrough_model,
-};
+use crate::inference::provider::{create_chat_model_with_model_id_in, is_raw_passthrough_model};
 use tinyflows::nodes::integration::agent_prompt;
 use tinyinference_llm::model::ModelRequest;
 

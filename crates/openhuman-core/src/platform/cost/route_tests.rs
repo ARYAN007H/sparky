@@ -37,12 +37,23 @@ fn decorations_do_not_promote_a_byok_model_to_managed() {
 /// managed like every other catalog model the backend serves.
 #[test]
 fn managed_default_model_is_managed() {
-    assert_eq!(route_for_model("openrouter/deepseek/deepseek-v4-flash"), CostRoute::Managed);
+    assert_eq!(
+        route_for_model("openrouter/deepseek/deepseek-v4-flash"),
+        CostRoute::Managed
+    );
 }
 
 #[test]
 fn retired_provider_aliases_need_a_registered_provider_policy() {
-    for tier in ["chat-v1", "reasoning-v1", "agentic-v1", "burst-v1", "coding-v1", "vision-v1", "summarization-v1"] {
+    for tier in [
+        "chat-v1",
+        "reasoning-v1",
+        "agentic-v1",
+        "burst-v1",
+        "coding-v1",
+        "vision-v1",
+        "summarization-v1",
+    ] {
         assert_eq!(route_for_model(tier), CostRoute::Byok);
     }
 }

@@ -69,12 +69,11 @@ pub(super) fn handle_inference_resolve_model(
     Box::pin(async move {
         let p = deserialize_params::<InferenceResolveModelParams>(params)?;
         let config = ctx.load_config().await?;
-        let resolved =
-            crate::inference::provider_model::resolve_provider_model_hint(
-                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-                &p.hint,
-                &config,
-            );
+        let resolved = crate::inference::provider_model::resolve_provider_model_hint(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            &p.hint,
+            &config,
+        );
         // Whether the resolved model accepts image input — drives the chat UI's
         // image-attachment affordance. Managed OpenHuman tiers consult the
         // core-owned per-tier map, which returns `true` for the reasoning and

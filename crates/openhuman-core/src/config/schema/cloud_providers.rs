@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
 
+use crate::core::slots::HookSlot;
 use tinyinference_providers::builtin::{
     BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
 };
-use crate::core::slots::HookSlot;
 
 static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
     HookSlot::new("config::hosted_cloud_presets");

@@ -113,7 +113,10 @@ fn o1_o3_segment_match_does_not_overmatch() {
 fn managed_vision_capability_is_absent_without_provider_policy() {
     let config = crate::config::Config::default();
     assert!(!model_supports_vision("hint:reasoning", &config));
-    assert!(!model_supports_vision("openrouter/qwen/qwen3.5-flash-02-23", &config));
+    assert!(!model_supports_vision(
+        "openrouter/qwen/qwen3.5-flash-02-23",
+        &config
+    ));
 }
 
 #[test]

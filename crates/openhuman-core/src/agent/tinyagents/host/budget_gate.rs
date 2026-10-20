@@ -238,7 +238,9 @@ impl OpenHumanBudgetGate {
             Some(est.model.clone())
         };
         let Some(model) = model else {
-            log::debug!("[tinyagents][budget] no model available for estimate; skipping budget check");
+            log::debug!(
+                "[tinyagents][budget] no model available for estimate; skipping budget check"
+            );
             return None;
         };
         let call = cost::budget::CallUnderCheck {

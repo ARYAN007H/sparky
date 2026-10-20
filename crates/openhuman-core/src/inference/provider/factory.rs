@@ -82,10 +82,10 @@ use local_runtime::{
     try_create_local_runtime_chat_model, try_create_local_runtime_chat_model_from_string,
     OptionalChatModelResult,
 };
+use managed_backend::managed_chat_model;
 pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread,
 };
-use managed_backend::managed_chat_model;
 use subprocess_providers::{
     prepare_claude_agent_sdk_chat_model, try_create_claude_agent_sdk_chat_model,
     try_create_claude_agent_sdk_chat_model_from_string, try_create_claude_code_chat_model,
