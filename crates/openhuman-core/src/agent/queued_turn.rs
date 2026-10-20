@@ -61,7 +61,10 @@ impl std::fmt::Debug for QueuedPayload {
             .field("queued_at_ms", &self.queued_at_ms)
             .field("has_trusted_turn", &self.trusted_turn.is_some())
             .field("has_stored_attachments", &self.stored_attachments.is_some())
-            .field("has_pending_attachments", &self.pending_attachments.is_some())
+            .field(
+                "has_pending_attachments",
+                &self.pending_attachments.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }

@@ -13,8 +13,8 @@ use crate::web_chat::WebChannelEvent;
 use super::super::event_bus::publish_web_channel_event_in;
 use super::super::runner::{runtime, scope_of, CancelNote};
 use super::super::types::ChatRequestMetadata;
-use crate::agent::queued_turn::StoredAttachmentInput;
 use super::start_chat::start_chat_with_stored_attachments;
+use crate::agent::queued_turn::StoredAttachmentInput;
 
 /// Cancel the in-flight turn(s) for a thread.
 ///
