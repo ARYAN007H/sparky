@@ -140,7 +140,7 @@ async function openLatestActivityGroup(page: Page) {
 }
 
 test.describe('Chat Multi Tool Round', () => {
-  test('runs file_read then grep before the final answer', async ({ page }) => {
+  test('renders web_fetch then web_search_tool cards before the final answer', async ({ page }) => {
     await resetMock();
     await setMockBehavior('llmForcedResponses', JSON.stringify(FORCED_RESPONSES));
     await setMockBehavior('llmStreamChunkDelayMs', '10');
