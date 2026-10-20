@@ -5,7 +5,10 @@ use tinychannels_bus::{ChannelRef, ConversationRef, VoiceNote};
 fn scope(channel: &str, conversation: &str, turn: &str) -> HostVoiceScope {
     HostVoiceScope {
         configured_instance: channel.into(),
-        channel: ChannelRef::default(),
+        channel: ChannelRef {
+            id: channel.split(':').next().unwrap_or(channel).into(),
+            account_id: Some(channel.into()),
+        },
         conversation: ConversationRef {
             id: conversation.into(),
             ..ConversationRef::default()
@@ -46,6 +49,34 @@ fn mirror_policy_reports_inbound_voice_from_recorded_envelope() {
     assert!(voice.inbound_has_voice);
     let text = resolve_policy(&cfg, &scope("telegram", "c-text", "m2"));
     assert!(!text.inbound_has_voice);
+}
+
+#[test]
+fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
+    let mut voice = envelope("shared-conversation", "shared-turn", true);
+    voice.channel = ChannelRef {
+        id: "telegram".into(),
+        account_id: Some("telegram:alice".into()),
+    };
+    let mut text = envelope("shared-conversation", "shared-turn", false);
+    text.channel = ChannelRef {
+        id: "telegram".into(),
+        account_id: Some("telegram:bob".into()),
+    };
+
+    record_inbound_envelope(&voice);
+    record_inbound_envelope(&text);
+
+    let alice = resolve_policy(
+        &ChannelVoiceConfig::default(),
+        &scope("telegram:alice", "shared-conversation", "shared-turn"),
+    );
+    let bob = resolve_policy(
+        &ChannelVoiceConfig::default(),
+        &scope("telegram:bob", "shared-conversation", "shared-turn"),
+    );
+    assert!(alice.inbound_has_voice, "Alice's voice turn was overwritten by Bob's text turn");
+    assert!(!bob.inbound_has_voice);
 }
 
 #[test]
