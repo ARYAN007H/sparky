@@ -26,6 +26,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 mod parent_lifecycle;
 mod store_adapter;
 mod thread_index;
+pub(super) use parent_lifecycle::is_marked_deleted;
 pub(crate) use parent_lifecycle::{
     clear_all, discard_for_thread, discard_pending_for_thread, finish_stop_for_thread,
     mark_stopped_task_if_thread_stopped, resume_stopped_thread,

@@ -55,7 +55,7 @@ fn deleted_marker_id(thread_id: &str) -> String {
     format!("\u{1}host-thread-deleted:{thread_id}")
 }
 
-fn is_marked_deleted(entry: &Entry, thread_id: &str) -> bool {
+pub(super) fn is_marked_deleted(entry: &Entry, thread_id: &str) -> bool {
     entry.store.get(&deleted_marker_id(thread_id)).is_some()
 }
 
