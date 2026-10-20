@@ -131,13 +131,19 @@ async fn goal_store_uses_the_explicit_dispatch_context_provider() {
         let stored_a = provider_a
             .for_agent(&agent_a_key)
             .kv
-            .get("thread_goals", "same-thread")
+            .get(
+                tinyagents_harness_tools::goals::store::GOALS_NAMESPACE,
+                "same-thread",
+            )
             .await
             .expect("read A provider");
         let stored_b = provider_b
             .for_agent("agent-b")
             .kv
-            .get("thread_goals", "same-thread")
+            .get(
+                tinyagents_harness_tools::goals::store::GOALS_NAMESPACE,
+                "same-thread",
+            )
             .await
             .expect("read B provider");
         assert!(stored_a.is_some(), "goal belongs to explicit agent A");

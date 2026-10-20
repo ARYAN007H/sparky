@@ -30,6 +30,18 @@ pub fn goal_store(
     workspace_dir: &Path,
     context: &crate::core::runtime::DispatchCtx,
 ) -> Arc<GoalStore> {
+    let tenant = match context.tenant() {
+        Ok(tenant) => tenant,
+        Err(no_tenant) => {
+            log::warn!("[thread_goals] {no_tenant}; using throwaway in-memory store");
+            return Arc::new(GoalStore::with_observer(
+                tinyagents_session::port::InMemorySessionStores::new()
+                    .for_agent("ephemeral")
+                    .kv,
+                Arc::new(OpenHumanGoalObserver),
+            ));
+        }
+    };
     let stores = crate::core::runtime::slot_for::<ScopedGoalStores>(context);
     let mut stores = stores
         .0
@@ -39,14 +51,8 @@ pub fn goal_store(
         return Arc::clone(store);
     }
 
-    let owner_stores = match context.tenant() {
-        Ok(tenant) => crate::storage::sessions::provider_for_workspace_in(workspace_dir, context)
-            .for_agent(&crate::core::runtime::session_key(&tenant)),
-        Err(no_tenant) => {
-            log::warn!("[thread_goals] {no_tenant}; using throwaway in-memory store");
-            tinyagents_session::port::InMemorySessionStores::new().for_agent("ephemeral")
-        }
-    };
+    let owner_stores = crate::storage::sessions::provider_for_workspace_in(workspace_dir, context)
+        .for_agent(&crate::core::runtime::session_key(&tenant));
     let kv = owner_stores.kv;
     let store = Arc::new(GoalStore::with_observer(
         kv,

@@ -347,8 +347,7 @@ async fn goal_resume_and_account_updates_reach_the_web_channel() {
             0,
             std::time::Duration::from_secs(1),
         )
-            .await
-            ;
+        .await;
         drop(store);
         crate::agent::goals::account_turn(
             workspace.path(),
