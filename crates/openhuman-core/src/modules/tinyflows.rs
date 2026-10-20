@@ -42,7 +42,7 @@ pub(crate) fn disabled_message() -> String {
 
 #[cfg(feature = "modules")]
 mod imp {
-    use super::{disabled_message, HOST_BUS_NAME, MODULE_ID};
+    use super::{disabled_message, HOST_BUS_NAME};
     use crate::config::Config;
     #[cfg(not(test))]
     use crate::modules::ops;
@@ -73,7 +73,7 @@ mod imp {
         }
         #[cfg(not(test))]
         {
-            ops::ensure_loaded(config, MODULE_ID).await
+            ops::ensure_loaded(config, super::MODULE_ID).await
         }
     }
 

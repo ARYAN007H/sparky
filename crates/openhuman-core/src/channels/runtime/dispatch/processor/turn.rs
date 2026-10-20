@@ -13,7 +13,6 @@ use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::Instant;
 use tinyagents_harness::progress::AgentProgress;
-use tinychannels_bus as traits;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 

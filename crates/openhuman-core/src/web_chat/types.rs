@@ -2,7 +2,7 @@
 //! `SessionEntry`/`SessionCacheFingerprint`, the turn result
 //! (`WebChatTaskResult`), and the `channel.web_*` request param structs.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::agent::OpenHumanSessionHost;
 
