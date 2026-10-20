@@ -1,7 +1,5 @@
-//! JSON-RPC E2E coverage for the agent-orchestration controllers that no e2e
-//! target reached: detached sub-agent control, the command
-//! center's `agent_work_control`, the
-//! detached sub-agent controls (`subagent_cancel` / `subagent_steer`).
+//! JSON-RPC E2E coverage for detached sub-agent control
+//! (`subagent_cancel` / `subagent_steer`).
 //!
 //! Every case boots the real Axum JSON-RPC router over HTTP against an
 //! isolated `HOME` and asserts on the **content** of the response. Nothing
