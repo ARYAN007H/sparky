@@ -230,7 +230,7 @@ export function validateTestOnlySourceParity({
     if (!file || Object.keys(file).sort().join(",") !== "candidateBlob,candidateMode,path,releaseBlob,releaseMode") {
       throw new Error("test-file proof fields are missing or unknown");
     }
-    if (file.path !== proof.binding.testPath || !/^[A-Za-z0-9_./-]+\.rs$/.test(file.path)) throw new Error("test path does not match the attested binding");
+    if (!proof.binding || file.path !== proof.binding.testPath || !/^[A-Za-z0-9_./-]+\.rs$/.test(file.path) || posix.dirname(file.path) !== posix.dirname(proof.binding.modulePath)) throw new Error("test path is not a sibling of the attested module binding");
     if (file.releaseMode !== "100644" || file.candidateMode !== "100644") throw new Error("attested test file must remain a regular non-executable file");
     if (![file.releaseBlob, file.candidateBlob].every((sha) => /^[0-9a-f]{40}$/.test(sha)) || file.releaseBlob === file.candidateBlob) throw new Error("test-file blob pair is malformed or unchanged");
     const entries = (ref) => runGit(["ls-tree", "-r", "--full-tree", "-z", ref])
