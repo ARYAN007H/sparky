@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const contractPath = path.join(appRoot, 'scripts/e2e-web-selection-contract.json');
+const allowedDiagnosticPaths = new Set([
+  'test/playwright/specs/aui-tool-result-elements.spec.ts',
+]);
 
 function sortedUnique(paths, label) {
   const sorted = [...paths].sort();
@@ -29,6 +32,12 @@ export function classifySpecFiles(discoveredPaths, contract) {
     diagnosticEntries.map(entry => entry.path),
     'diagnostic inventory'
   );
+  const unknownDiagnosticPolicy = diagnostic.filter(file => !allowedDiagnosticPaths.has(file));
+  if (unknownDiagnosticPolicy.length || diagnostic.length !== allowedDiagnosticPaths.size) {
+    throw new Error(
+      `diagnostic inventory differs from the reviewed file allowlist: ${diagnostic.join(', ')}`
+    );
+  }
   const unknownDiagnostics = diagnostic.filter(file => !discoveredSet.has(file));
   if (unknownDiagnostics.length) {
     throw new Error(`stale or unknown diagnostic spec: ${unknownDiagnostics.join(', ')}`);
