@@ -1,16 +1,78 @@
 use super::*;
 
 #[test]
-fn every_controller_has_a_schema_and_a_handler() {
-    let schemas = all_profiles_controller_schemas();
+fn legacy_controller_handler_identities_and_order_are_preserved() {
+    use crate::core::all::ControllerHandler;
+
     let controllers = all_profiles_registered_controllers();
-    assert_eq!(schemas.len(), FUNCTIONS.len());
     assert_eq!(controllers.len(), FUNCTIONS.len());
-    for (schema, controller) in schemas.iter().zip(&controllers) {
-        assert_eq!(schema.namespace, "profiles");
-        assert_eq!(schema.function, controller.schema.function);
-        assert_ne!(schema.function, "unknown");
+    let expected: [(&str, ControllerHandler); 7] = [
+        ("provision", handle_provision),
+        ("deprovision", handle_deprovision),
+        ("list", handle_list),
+        ("status", handle_status),
+        ("set_credential", handle_set_credential),
+        ("clear_credential", handle_clear_credential),
+        ("release", handle_release),
+    ];
+    for ((function, handler), controller) in expected.iter().zip(&controllers) {
+        assert_eq!(controller.schema.namespace, "profiles");
+        assert_eq!(controller.schema.function, *function);
+        assert!(std::ptr::fn_addr_eq(controller.handler, *handler));
     }
+}
+
+pub(crate) fn profile_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    use serde_json::json;
+
+    vec![
+        crate::core::all::ControllerParamContract {
+            method: "profiles.provision",
+            required: &["user_id"],
+            optional: &[],
+            examples: vec![json!({"user_id":"gateway-user-1"})],
+        },
+        crate::core::all::ControllerParamContract {
+            method: "profiles.deprovision",
+            required: &["profile_id"],
+            optional: &[],
+            examples: vec![json!({"profile_id":"profile-1"})],
+        },
+        crate::core::all::ControllerParamContract {
+            method: "profiles.list",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+        crate::core::all::ControllerParamContract {
+            method: "profiles.status",
+            required: &["profile_id"],
+            optional: &[],
+            examples: vec![json!({"profile_id":"profile-1"})],
+        },
+        crate::core::all::ControllerParamContract {
+            method: "profiles.set_credential",
+            required: &["profile_id", "kind", "token"],
+            optional: &["expires_at"],
+            examples: vec![json!({
+                "profile_id":"profile-1",
+                "kind":"api_key",
+                "token":"fixture-only-token"
+            })],
+        },
+        crate::core::all::ControllerParamContract {
+            method: "profiles.clear_credential",
+            required: &["profile_id"],
+            optional: &[],
+            examples: vec![json!({"profile_id":"profile-1"})],
+        },
+        crate::core::all::ControllerParamContract {
+            method: "profiles.release",
+            required: &["profile_id"],
+            optional: &[],
+            examples: vec![json!({"profile_id":"profile-1"})],
+        },
+    ]
 }
 
 #[test]

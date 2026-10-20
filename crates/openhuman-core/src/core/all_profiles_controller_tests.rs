@@ -1,56 +1,4 @@
 use super::*;
-use serde_json::json;
-
-fn profile_parameter_contracts() -> Vec<ControllerParamContract> {
-    vec![
-        ControllerParamContract {
-            method: "profiles.provision",
-            required: &["user_id"],
-            optional: &[],
-            examples: vec![json!({"user_id":"gateway-user-1"})],
-        },
-        ControllerParamContract {
-            method: "profiles.deprovision",
-            required: &["profile_id"],
-            optional: &[],
-            examples: vec![json!({"profile_id":"profile-1"})],
-        },
-        ControllerParamContract {
-            method: "profiles.list",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-        ControllerParamContract {
-            method: "profiles.status",
-            required: &["profile_id"],
-            optional: &[],
-            examples: vec![json!({"profile_id":"profile-1"})],
-        },
-        ControllerParamContract {
-            method: "profiles.set_credential",
-            required: &["profile_id", "kind", "token"],
-            optional: &["expires_at"],
-            examples: vec![json!({
-                "profile_id":"profile-1",
-                "kind":"api_key",
-                "token":"fixture-only-token"
-            })],
-        },
-        ControllerParamContract {
-            method: "profiles.clear_credential",
-            required: &["profile_id"],
-            optional: &[],
-            examples: vec![json!({"profile_id":"profile-1"})],
-        },
-        ControllerParamContract {
-            method: "profiles.release",
-            required: &["profile_id"],
-            optional: &[],
-            examples: vec![json!({"profile_id":"profile-1"})],
-        },
-    ]
-}
 
 #[test]
 fn raw_profiles_operator_registry_matches_its_independent_contract() {
@@ -58,7 +6,7 @@ fn raw_profiles_operator_registry_matches_its_independent_contract() {
         .iter()
         .filter(|row| row.controller.schema.namespace == "profiles")
         .collect();
-    let contracts = profile_parameter_contracts();
+    let contracts = crate::profiles::schemas::tests::profile_parameter_contracts();
     assert_eq!(entries.len(), 7, "complete raw Profiles inventory");
     assert_eq!(
         entries
