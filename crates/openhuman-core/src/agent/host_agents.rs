@@ -119,7 +119,10 @@ impl HostAgent {
                         .await
                         .map_err(anyhow::Error::msg)
                 })
-                .await?;
+                .await
+                .map_err(|_| {
+                    anyhow::anyhow!(crate::channels::failure_copy::LEGACY_HISTORY_UNAVAILABLE)
+                })?;
         }
         self.scope(crate::agent::turn_host::AgentTurnHost::run(
             &mut session,

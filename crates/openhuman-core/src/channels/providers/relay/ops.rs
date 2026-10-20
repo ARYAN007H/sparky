@@ -179,11 +179,10 @@ pub(crate) async fn run_relay_turn(
             Ok(limits) => limits,
             Err(error) => {
                 tracing::warn!("relayed channel runtime limits unavailable: {error}");
-                let reply =
-                    "⚠️ This chat's assistant is not available right now. Please try again later.";
+                let reply = crate::channels::failure_copy::generic_failure(Some(&config));
                 let _ = tinychannels_runtime::Channel::send(
                     channel.as_ref(),
-                    &crate::channels::SendMessage::new(reply, &params.chat_id),
+                    &crate::channels::SendMessage::new(&reply, &params.chat_id),
                 )
                 .await;
                 record(
@@ -217,10 +216,10 @@ pub(crate) async fn run_relay_turn(
                 "[channels::relay] could not build the turn"
             );
             let reply =
-                "⚠️ This chat's assistant is not available right now. Please try again later.";
+                crate::channels::failure_copy::generic_failure(Some(&config));
             let _ = tinychannels_runtime::Channel::send(
                 channel.as_ref(),
-                &crate::channels::SendMessage::new(reply, &params.chat_id),
+                &crate::channels::SendMessage::new(&reply, &params.chat_id),
             )
             .await;
             record(
@@ -268,6 +267,20 @@ pub(crate) async fn run_relay_turn(
         Ok(prepared) => prepared,
         Err(error) => {
             tracing::warn!("relayed channel preparation failed: {error}");
+            let reply = crate::channels::failure_copy::generic_failure(Some(&config));
+            let _ = tinychannels_runtime::Channel::send(
+                channel.as_ref(),
+                &crate::channels::SendMessage::new(&reply, &params.chat_id),
+            )
+            .await;
+            record(
+                &dispatch_ctx,
+                &workspace_dir,
+                &params,
+                &thread_id,
+                &channel.sent(),
+            )
+            .await;
             return channel.sent();
         }
     };

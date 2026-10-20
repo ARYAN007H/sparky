@@ -451,11 +451,25 @@ struct NativeFailures;
 
 impl FailureClassifier for NativeFailures {
     fn classify(&self, error: &str) -> (String, String) {
+        if error == crate::channels::failure_copy::LEGACY_HISTORY_UNAVAILABLE {
+            return (
+                "channel_history_unavailable".to_owned(),
+                "Something went wrong. Please try again.".to_owned(),
+            );
+        }
         let classified = crate::web_chat::classify_inference_error(error);
         (classified.error_type.to_owned(), classified.message)
     }
 
     fn classify_failure(&self, error: &str) -> FailureClassification {
+        if error == crate::channels::failure_copy::LEGACY_HISTORY_UNAVAILABLE {
+            return FailureClassification {
+                class: "channel_history_unavailable".to_owned(),
+                message: "Something went wrong. Please try again.".to_owned(),
+                copy_key: Some("chat_error.inference".to_owned()),
+                copy_params: None,
+            };
+        }
         let classified = crate::web_chat::classify_inference_error(error);
         FailureClassification {
             class: classified.error_type.to_owned(),
