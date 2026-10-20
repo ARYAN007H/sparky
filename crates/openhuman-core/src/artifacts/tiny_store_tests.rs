@@ -108,8 +108,10 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
         .profile(profile);
         CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
     };
-    let context_a = DispatchCtx::new(context_for("artifact-a"));
-    let context_b = DispatchCtx::new(context_for("ambient-b"));
+    let core_a = context_for("artifact-a");
+    let core_b = context_for("ambient-b");
+    let context_a = DispatchCtx::new(core_a.clone());
+    let context_b = DispatchCtx::new(core_b.clone());
 
     CoreContext::scope(context_for("ambient-b"), async {
         let (artifacts_a, files_a) = artifacts_service_with_file_store(
@@ -151,6 +153,39 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
             .await
             .unwrap()
             .is_none());
+
+        let card_a = CoreContext::scope(core_a.clone(), async {
+            super::super::store::get_artifact(&workspace, &id).await
+        })
+        .await;
+        assert!(card_a.is_ok(), "the explicit artifact profile owns its UI card");
+        let card_b = CoreContext::scope(core_b.clone(), async {
+            super::super::store::get_artifact(&workspace, &id).await
+        })
+        .await;
+        assert!(card_b.is_err(), "the ambient profile must not receive the UI card");
+
+        // Seed a record in the ambient profile, then make a context with no
+        // tenant act while that profile is ambient. The unbound call must not
+        // inherit the ambient profile's read access.
+        let seed_b = artifacts_service(&workspace, FileRoots::new(&files), None, None, &context_b);
+        seed_b
+            .create(
+                ArtifactKind::Text,
+                "Ambient private",
+                Content::Text("only profile B".into()),
+                &Author::agent("agent-b"),
+                None,
+            )
+            .await
+            .unwrap();
+        let unbound = DispatchCtx::unbound();
+        let unbound_artifacts =
+            artifacts_service(&workspace, FileRoots::new(&files), None, None, &unbound);
+        assert!(
+            unbound_artifacts.list(0, 20).await.unwrap().0.is_empty(),
+            "a call with no tenant must not inherit the ambient profile's records"
+        );
     })
     .await;
 }
