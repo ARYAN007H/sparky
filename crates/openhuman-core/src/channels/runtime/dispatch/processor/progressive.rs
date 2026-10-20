@@ -1,6 +1,7 @@
 //! Progress projection onto the compiled TinyChannels progressive engine.
 
 use crate::channels::bus::NativeProgressiveReply;
+use std::sync::Arc;
 use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus::module_progressive::ChannelOutputEvent;
 use tokio::sync::mpsc;

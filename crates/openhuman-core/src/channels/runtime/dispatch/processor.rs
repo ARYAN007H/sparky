@@ -36,7 +36,7 @@ pub(crate) struct RuntimeChannelMessage {
     pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
     /// Trusted per-turn callback target installed by a hosted relay. Native
     /// configured channels resolve their target from the prepared envelope.
-    pub(crate) progressive_target: Option<Arc<super::progressive::NativeProgressiveTarget>>,
+    pub(crate) progressive_target: Option<Arc<progressive::NativeProgressiveTarget>>,
 }
 
 impl RuntimeChannelMessage {

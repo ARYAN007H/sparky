@@ -306,9 +306,9 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         "must not escape the captured account",
     )
     .await;
-    assert!(
-        !crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(&rejected)
-    );
+    assert!(!crate::channels::runtime::dispatch::delivery_succeeded(
+        &rejected
+    ));
     assert!(relay.sent().is_empty());
 
     let mut wrong_conversation = conversation.clone();
@@ -321,9 +321,9 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         "must not escape the captured conversation",
     )
     .await;
-    assert!(
-        !crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(&rejected)
-    );
+    assert!(!crate::channels::runtime::dispatch::delivery_succeeded(
+        &rejected
+    ));
     assert!(relay.sent().is_empty());
 
     let delivered = run_hosted_compiled_turn(
