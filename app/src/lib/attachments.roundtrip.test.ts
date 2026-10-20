@@ -70,7 +70,12 @@ describe('image attachment round trip (composer -> wire -> durable reference)', 
     expect(JSON.stringify(appendCall.params)).not.toMatch(/\[(IMAGE|FILE):/);
 
     // The turn is started with the durable content the core returned.
-    mockCallCoreRpc.mockResolvedValueOnce({});
+    mockCallCoreRpc.mockResolvedValueOnce({
+      accepted: true,
+      client_id: 'sock-1',
+      thread_id: 't1',
+      request_id: 'request-1',
+    });
     await chatSend({ threadId: 't1', message: saved.content });
     expect(mockCallCoreRpc.mock.calls[1][0].params.message).toBe(`look ${DURABLE}`);
 
