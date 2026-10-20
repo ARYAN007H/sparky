@@ -83,7 +83,13 @@ fn seed_legacy_custom_provider(config: &mut Config, stats: &mut MigrationStats) 
     // doesn't apply here; users will re-enter via the new UI).
     if let Some(raw) = config.inference_url.as_deref() {
         let trimmed = raw.trim();
-        if !trimmed.is_empty() && !looks_like_openhuman(&hosts, trimmed) {
+        if !trimmed.is_empty()
+            && !looks_like_managed_backend(&hosts, trimmed)
+            && !config.cloud_providers.iter().any(|entry| {
+                entry.endpoint.trim().trim_end_matches('/')
+                    .eq_ignore_ascii_case(trimmed.trim_end_matches('/'))
+            })
+        {
             // Derive a sensible default model from the legacy model_routes
             // (prefer "reasoning" hint, fall back to whatever is set).
             let default_model = config
@@ -123,13 +129,11 @@ fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
         .inference_url
         .as_deref()
         .map(str::trim)
-        .filter(|url| !url.is_empty() && !looks_like_openhuman(&hosts, url))
+        .filter(|url| !url.is_empty() && !looks_like_managed_backend(&hosts, url))
         .and_then(|url| {
             let normalized = url.trim_end_matches('/').to_ascii_lowercase();
             config.cloud_providers.iter().find(|entry| {
-                entry.slug != "openhuman"
-                    && entry
-                        .endpoint
+                entry.endpoint
                         .trim()
                         .trim_end_matches('/')
                         .to_ascii_lowercase()
@@ -146,18 +150,6 @@ fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
         return;
     }
 
-    let oh = config
-        .cloud_providers
-        .iter()
-        .find(|e| e.slug == "openhuman");
-    if let Some(entry) = oh {
-        config.primary_cloud = Some(entry.id.clone());
-        stats.primary_cloud_set = true;
-        log::debug!(
-            "[migrations][unify-ai] primary_cloud set to openhuman entry id={}",
-            entry.id
-        );
-    }
 }
 
 /// Derive each per-workload `*_provider` field from the legacy flags.
@@ -202,7 +194,7 @@ fn derive_workload_providers(config: &mut Config, stats: &mut MigrationStats) {
 ///
 /// Matches only on the host component to avoid false positives from custom
 /// endpoints that happen to contain a managed name in a path or query string.
-fn looks_like_openhuman(hosts: &[String], url: &str) -> bool {
+fn looks_like_managed_backend(hosts: &[String], url: &str) -> bool {
     crate::config::schema::resolved_endpoints::host_matches_any(url, hosts)
 }
 
