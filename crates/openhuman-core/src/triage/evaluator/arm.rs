@@ -11,7 +11,6 @@ use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METH
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
-use crate::inference::provider::error_classify::parse_retry_after_ms;
 use tinyagents_harness::retry::{decide, FailoverDecision, FailoverReason, FailoverState};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinybus::NativeRequestError;
@@ -245,18 +244,46 @@ pub(crate) fn classify_error(message: String) -> ArmError {
     if is_prompt_guard_rejection(&message) {
         return ArmError::SafetyFlagged(err);
     }
-    let reason = FailoverReason::classify_unstructured(&message);
-    match decide(
+    let failure = tinyinference_llm::failure::classify_provider_failure_with(
+        None,
+        None,
+        &message,
+        crate::core::observability::is_session_expired_message,
+    );
+    let reason = match failure {
+        tinyinference_llm::failure::ProviderFailureClass::RateLimited
+        | tinyinference_llm::failure::ProviderFailureClass::NonRetryableRateLimit => {
+            FailoverReason::RateLimit
+        }
+        tinyinference_llm::failure::ProviderFailureClass::UpstreamUnhealthy => {
+            FailoverReason::UpstreamUnavailable
+        }
+        tinyinference_llm::failure::ProviderFailureClass::Retryable => {
+            FailoverReason::Unknown
+        }
+        tinyinference_llm::failure::ProviderFailureClass::NonRetryable => FailoverReason::Unknown,
+    };
+    let decision = decide(
         reason,
         FailoverState {
-            retryable: reason != FailoverReason::Unknown,
+            retryable: failure.is_retryable(),
             attempts_remaining: true,
             larger_window_available: false,
         },
-    ) {
+    );
+    match decision {
         FailoverDecision::RetrySame => ArmError::Retryable {
             retry_after_ms: (reason == FailoverReason::RateLimit)
-                .then(|| parse_retry_after_ms(&err))
+                .then(|| {
+                    message.lines().find_map(|line| {
+                        line.trim()
+                            .strip_prefix("Retry-After:")
+                            .or_else(|| line.trim().strip_prefix("retry-after:"))
+                            .and_then(|value| {
+                                tinyinference_core::retry_after::parse_retry_after_ms(Some(value))
+                            })
+                    })
+                })
                 .flatten(),
             source: err,
         },
