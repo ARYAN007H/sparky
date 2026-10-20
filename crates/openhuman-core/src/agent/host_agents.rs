@@ -95,7 +95,9 @@ impl HostAgent {
         approval: crate::security::approval::ApprovalTurnContext,
         progress: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
         run_queue: Option<
-            std::sync::Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>,
+            std::sync::Arc<
+                tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
+            >,
         >,
         cancellation: tinyagents_harness::CancellationToken,
         turn_deadline: Option<std::time::Duration>,

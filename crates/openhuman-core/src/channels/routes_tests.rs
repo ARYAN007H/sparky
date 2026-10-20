@@ -396,6 +396,54 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
 }
 
 #[tokio::test]
+async fn clear_history_command_uses_durable_reset_callback_without_clearing_ram_history() {
+    let ctx = runtime_context(PathBuf::from("/tmp"));
+    let key = "telegram_alice_room";
+    ctx.conversation_histories
+        .lock()
+        .unwrap()
+        .insert(key.to_string(), vec![ChatMessage::user("old history")]);
+    let channel_impl = Arc::new(RecordingChannel::default());
+    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
+        id: "reset-1".into(),
+        sender: "alice".into(),
+        reply_target: "room".into(),
+        content: "/model gpt-5-mini".into(),
+        channel: "telegram".into(),
+        timestamp: 0,
+        thread_ts: None,
+        sender_name: None,
+    };
+    let reset_called = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let reset_called_by_callback = Arc::clone(&reset_called);
+
+    let handled = handle_runtime_command_with_reset(
+        &ctx,
+        &msg,
+        Some(&channel),
+        &conversation_history_key(&msg),
+        move || async move {
+            reset_called_by_callback.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        },
+    )
+    .await;
+
+    assert!(handled);
+    assert!(reset_called.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(ctx.conversation_histories.lock().unwrap().contains_key(key));
+    assert_eq!(
+        get_route_selection(&ctx, key).model,
+        "gpt-5-mini",
+        "route changes are applied before the durable reset callback runs"
+    );
+    assert_eq!(channel_impl.sent.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn handle_runtime_command_telegram_status_replies_without_agent() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_impl = Arc::new(RecordingChannel::default());
