@@ -412,7 +412,7 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
     ["unknown field", { proof: { unknown: true } }, /proof fields are missing or unknown/],
     ["whole-tree digest", { proof: { unchangedTreeSha256: "f".repeat(64) } }, /other source, manifest, lock, build input, or gitlink differs/],
     ["mode", { proof: { testFile: { candidateMode: "100755" } } }, /regular non-executable/],
-    ["binding blob", { proof: { binding: { moduleBlob: "f".repeat(40) } } }, /binding source differs/],
+    ["binding blob", { proof: { binding: { moduleBlob: "f".repeat(40) } } }, /module declaration source differs/],
   ]) {
     const f = sourceParityFixture();
     try {
