@@ -515,17 +515,19 @@ pub fn version_files_dir(workspace_dir: &Path) -> PathBuf {
 /// around a service whose UI bridge carries that call's chat routing
 /// ([`PerCallTool`]); the card then reaches the chat the agent is answering.
 pub fn registered_tools(
-    workspace_dir: &Path,
+    config: crate::config::Config,
     files: FileRoots,
     action_dir: &Path,
-    publisher: Option<super::publisher_slot::ArtifactPublisherBinder>,
+    publisher_available: bool,
 ) -> Vec<Box<dyn tinytools::Tool>> {
-    let can_publish = publisher.is_some();
+    let can_publish = publisher_available;
     let service = {
-        let workspace_dir = workspace_dir.to_path_buf();
+        let workspace_dir = config.workspace_dir.clone();
         let action_dir = action_dir.to_path_buf();
+        let publisher_config = config.clone();
         Arc::new(
             move |chat: Option<&ApprovalChatContext>, ctx: &crate::core::runtime::DispatchCtx| {
+                let publisher = super::artifact_publisher_in(&publisher_config, ctx);
                 Arc::new(artifacts_service_with_publisher(
                     &workspace_dir,
                     files.clone(),

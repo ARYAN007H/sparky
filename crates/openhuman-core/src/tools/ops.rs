@@ -163,11 +163,12 @@ pub fn all_tools_with_runtime(
         // default-OFF via `tools::user_filter` (their toggle IDs default off
         // in onboarding). The per-call permission ladder still gates them.
     ]);
+    let artifact_publisher_available = crate::artifacts::artifact_publisher(&config).is_some();
     tools.extend(crate::artifacts::tiny_store::registered_tools(
-        &config.workspace_dir,
+        config.as_ref().clone(),
         crate::artifacts::FileRoots::from_config(&config),
         action_dir,
-        crate::artifacts::artifact_publisher(&config),
+        artifact_publisher_available,
     ));
     tools.extend(crate::integrations::task_sources::tools::registered_tools(
         config.clone(),

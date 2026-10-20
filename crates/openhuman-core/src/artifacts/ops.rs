@@ -336,7 +336,7 @@ pub async fn ai_share_artifact(
     public: bool,
     ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<Outcome<Value>, String> {
-    let publisher = super::artifact_publisher(config)
+    let publisher = super::artifact_publisher_in(config, ctx)
         .ok_or_else(|| "sign in to share artifacts".to_string())?;
     let artifacts = super::tiny_store::artifacts_service_with_publisher(
         &config.workspace_dir,

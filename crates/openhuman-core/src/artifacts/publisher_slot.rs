@@ -60,6 +60,16 @@ pub fn artifact_publisher(config: &Config) -> Option<ArtifactPublisherBinder> {
     None
 }
 
+/// Selects a publisher using the hook registrations of the supplied call
+/// context, then falls back to process registrations as usual.
+pub fn artifact_publisher_in(
+    config: &Config,
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> Option<ArtifactPublisherBinder> {
+    let context = ctx.resolved()?;
+    crate::core::runtime::CoreContext::sync_scope(context, || artifact_publisher(config))
+}
+
 #[cfg(test)]
 #[path = "publisher_slot_tests.rs"]
 mod tests;

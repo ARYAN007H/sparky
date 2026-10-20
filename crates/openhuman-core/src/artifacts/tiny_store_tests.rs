@@ -370,43 +370,31 @@ async fn deleting_an_artifact_removes_its_card() {
         .is_err());
 }
 
-struct NoopPublisher;
-
-#[async_trait::async_trait]
-impl tiny_artifacts::ArtifactPublisher for NoopPublisher {
-    async fn publish(
-        &self,
-        _record: &ArtifactRecord,
-        _version: &tiny_artifacts::ArtifactVersion,
-        options: &tiny_artifacts::PublishOptions,
-    ) -> anyhow::Result<tiny_artifacts::PublishedLink> {
-        Ok(tiny_artifacts::PublishedLink {
-            url: "https://example/x".into(),
-            expires_at_millis: None,
-            published_at_millis: 0,
-            public: options.public,
-        })
-    }
-}
-
 #[test]
 fn share_artifact_is_offered_only_with_a_publisher() {
     let (workspace, files) = temp_dirs();
-    let names = |publisher: Option<super::super::publisher_slot::ArtifactPublisherBinder>| {
-        registered_tools(&workspace, FileRoots::new(&files), &workspace, publisher)
+    let names = |publisher_available: bool| {
+        registered_tools(
+            crate::config::Config {
+                workspace_dir: workspace.clone(),
+                action_dir: workspace.clone(),
+                ..crate::config::Config::default()
+            },
+            FileRoots::new(&files),
+            &workspace,
+            publisher_available,
+        )
             .iter()
             .map(|t| t.name().to_string())
             .collect::<Vec<_>>()
     };
-    let without = names(None);
+    let without = names(false);
     assert!(
         !without.contains(&"share_artifact".to_string()),
         "{without:?}"
     );
     assert!(without.contains(&"delete_artifact".to_string()));
-    let binder: super::super::publisher_slot::ArtifactPublisherBinder =
-        std::sync::Arc::new(|_files| std::sync::Arc::new(NoopPublisher));
-    let with = names(Some(binder));
+    let with = names(true);
     assert!(with.contains(&"share_artifact".to_string()), "{with:?}");
 }
 
