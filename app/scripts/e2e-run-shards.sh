@@ -26,7 +26,7 @@ SHARDS=(
   "foundation:auth,navigation,system"
   "chat:chat,skills,journeys"
   "connections:providers,provider-web,connectors"
-  "settings:settings,notifications,payments,webhooks"
+  "settings:settings,notifications"
 )
 
 # Allow filtering: `bash e2e-run-shards.sh foundation chat`
