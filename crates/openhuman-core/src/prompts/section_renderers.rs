@@ -75,8 +75,7 @@ type PromptClock = Arc<dyn Fn() -> DateTime<Utc> + Send + Sync>;
 
 static PROMPT_CLOCKS: crate::core::slots::HookSlot<PromptClock> =
     crate::core::slots::HookSlot::new("openhuman.prompts.clock");
-static NEXT_PROMPT_CLOCK_ID: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(1);
+static NEXT_PROMPT_CLOCK_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// A temporary prompt-clock registration, removed when this guard is dropped.
 ///
