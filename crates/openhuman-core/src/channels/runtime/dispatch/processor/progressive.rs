@@ -10,14 +10,21 @@ pub(super) async fn open_native_reply(
     envelope: &tinychannels_bus::channel::ChannelInboundEnvelope,
     turn_id: &str,
 ) -> anyhow::Result<Option<std::sync::Arc<NativeProgressiveReply>>> {
+    #[cfg(test)]
+    if ctx.config.is_none() && ctx.module_objects.is_empty() {
+        return Ok(None);
+    }
+    let account = envelope
+        .channel
+        .account_id
+        .as_deref()
+        .filter(|account| tinychannels_bus::provider_id(account) == envelope.channel.id)
+        .ok_or_else(|| anyhow::anyhow!("native channel has no configured account identity"))?;
     let object = ctx
         .module_objects
-        .get(&envelope.channel.id)
-        .or_else(|| ctx.module_objects.values().next())
-        .cloned();
-    let Some(object) = object else {
-        return Ok(None);
-    };
+        .get(account)
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("native channel account is not configured"))?;
     let reply = NativeProgressiveReply::open(
         object,
         envelope.channel.clone(),
