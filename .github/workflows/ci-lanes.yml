@@ -83,6 +83,11 @@ jobs:
           install: none
           backend: remote
           store: /scratch/tinymold
+          # Instrumented test executables link the whole core (~0.5-1 GB each,
+          # ~90 GB per run). Stored, they share inodes with the target, so
+          # neither copy can be freed and the 160 GB scratch disk fills
+          # (runs 39315551099, 39331958941, 39340683561). Relink them instead.
+          max-executable-size: 256M
           remote-url: ${{ env.TINYMOLD_REMOTE_URL }}
           remote-auth: ${{ env.TINYMOLD_REMOTE_AUTH }}
           remote-signing-key: ${{ env.TINYMOLD_REMOTE_SIGNING_KEY }}
