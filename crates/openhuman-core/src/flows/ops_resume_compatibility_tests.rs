@@ -1,4 +1,3 @@
-use super::resume_checkpoint_tests::update_parked_run_document_for_test;
 use super::*;
 
 #[tokio::test]
@@ -39,12 +38,16 @@ async fn flows_resume_marks_an_incompatible_legacy_checkpoint_failed() {
     .unwrap();
     // Keep the compatibility refusal under test distinct from the stale-pin
     // refusal: a pre-pin parked row has no graph hash to compare.
-    update_parked_run_document_for_test(&config, &thread_id, |document| {
-        document
-            .as_object_mut()
-            .expect("run document is an object")
-            .remove("graph_hash");
-    });
+    super::resume_checkpoint_tests::update_parked_run_document_for_test(
+        &config,
+        &thread_id,
+        |document| {
+            document
+                .as_object_mut()
+                .expect("run document is an object")
+                .remove("graph_hash");
+        },
+    );
     let error = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -116,12 +119,16 @@ async fn flows_resume_marks_a_checkpoint_with_an_incompatible_saved_child_failed
     .unwrap();
     // Keep the compatibility refusal under test distinct from the stale-pin
     // refusal: a pre-pin parked row has no graph hash to compare.
-    update_parked_run_document_for_test(&config, &thread_id, |document| {
-        document
-            .as_object_mut()
-            .expect("run document is an object")
-            .remove("graph_hash");
-    });
+    super::resume_checkpoint_tests::update_parked_run_document_for_test(
+        &config,
+        &thread_id,
+        |document| {
+            document
+                .as_object_mut()
+                .expect("run document is an object")
+                .remove("graph_hash");
+        },
+    );
     let error = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
