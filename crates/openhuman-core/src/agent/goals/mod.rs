@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use tinyagents_harness_tools::goals::{
     GoalObserver, GoalStore, GoalTool, GoalToolKind, ThreadGoal,
 };
+use tinyagents_session::port::SessionStoreProvider;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolPolicy, ToolResult, ToolRunContext};
 
 /// Serialize a [`ThreadGoal`] for the existing goal event and RPC payload.
