@@ -138,8 +138,10 @@ fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> S
                 .as_deref()
                 .map(str::trim)
                 .filter(|model| !model.is_empty())
-        })
-        .unwrap_or(BYOK_INCOMPLETE_SENTINEL);
+        });
+    let Some(model) = model else {
+        return BYOK_INCOMPLETE_SENTINEL.to_string();
+    };
 
     format!("{}:{model}", entry.slug)
 }

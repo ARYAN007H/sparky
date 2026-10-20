@@ -58,6 +58,25 @@ fn explicit_managed_primary_fails_closed_for_unmatched_custom_intent() {
 }
 
 #[test]
+fn custom_primary_without_any_model_fails_closed_without_a_synthetic_route() {
+    let mut config = Config::default();
+    config.cloud_providers = vec![provider(
+        "custom",
+        "my-provider",
+        "https://example.test/v1",
+        AuthStyle::Bearer,
+    )];
+    config.cloud_providers[0].default_model = None;
+    config.primary_cloud = Some("custom".to_string());
+    config.default_model = None;
+
+    assert_eq!(
+        resolve_primary_cloud_provider_string(&config),
+        crate::inference::provider::factory::BYOK_INCOMPLETE_SENTINEL
+    );
+}
+
+#[test]
 fn absent_primary_without_custom_intent_retains_managed_route() {
     let config = Config::default();
     assert_eq!(
