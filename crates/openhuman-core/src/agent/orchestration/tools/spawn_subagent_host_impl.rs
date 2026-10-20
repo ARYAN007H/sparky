@@ -14,7 +14,7 @@ impl SpawnSubagentTool {
         let dispatch = run_context.dispatch_ctx();
         let AsyncSpawnArgs {
             agent_id,
-            prompt,
+            mut prompt,
             context,
             model_override,
             task_title,
@@ -93,6 +93,45 @@ impl SpawnSubagentTool {
         let workspace_descriptor = tool_context
             .and_then(|ctx| ctx.workspace().cloned())
             .or_else(|| run_context.workspace.clone());
+        let target_model = model_override.as_deref().unwrap_or_else(|| {
+            definition
+                .model
+                .resolve(parent.model_name.as_str())
+                .leak()
+        });
+        if crate::attachments::should_forward_parent_images(&prompt)
+            && !run_context.attachment_placeholders.is_empty()
+            && (definition.id == "vision_agent"
+                || crate::inference::provider::factory::oh_tier_supports_vision(target_model))
+        {
+            prompt = format!(
+                "{}\n\n{}",
+                run_context.attachment_placeholders.join("\n"),
+                prompt
+            );
+        }
+        if definition.id == "vision_agent" {
+            match crate::attachments::has_resolvable_image(
+                &dispatch,
+                &prompt,
+                workspace_descriptor.as_ref(),
+                run_context.origin.as_ref(),
+            )
+            .await
+            {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Ok(ToolResult::error(
+                        "vision_agent requires a resolvable image attachment or image_paths.",
+                    ));
+                }
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "vision image unavailable: {error}"
+                    )));
+                }
+            }
+        }
         let effective_action_root = workspace_descriptor
             .as_ref()
             .map(|workspace| {
