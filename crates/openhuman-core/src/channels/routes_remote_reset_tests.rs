@@ -310,6 +310,60 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         0,
         "a reset clears the durable status count",
     );
+
+    let alice_locator = crate::agent::session_store::transcripts_or_files_in(
+        &alice_core,
+        &alice_store_agent,
+        workspace,
+    );
+    let cleared_head = alice_locator.head_generation(&alice_session);
+    let repeated = crate::channels::host::remote_control::dispatch_callback(
+        &alice_dispatch,
+        &alice_runtime,
+        &alice_tenant,
+        &cancellation,
+        Some(&reset),
+        RemoteHostRequest::ClearHistory {
+            session_scope: remote_session_scope(canonical),
+        },
+    )
+    .await
+    .expect("resetting an already-empty durable session is an idempotent success");
+    assert!(matches!(repeated, RemoteHostResult::Completed));
+    assert_eq!(alice_locator.head_generation(&alice_session), cleared_head);
+    assert!(session_messages(&alice_core, workspace, &alice_store_agent, &alice_session).is_empty());
+
+    let empty_canonical = "channel-session:telegram:bot-a:group:empty-room";
+    let empty_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, empty_canonical);
+    let empty_session = SessionRef::scoped(empty_key, &alice_agent.definition.id);
+    let empty_scope = remote_session_scope(empty_canonical);
+    let empty_reset = crate::channels::host::remote_control::RemoteResetContext {
+        scope: empty_scope.clone(),
+        durable_session_key: empty_session.session_key.clone(),
+        message: tinychannels_bus::ChannelMessage {
+            channel: "telegram".into(),
+            reply_target: "empty-room".into(),
+            content: "/new".into(),
+            ..Default::default()
+        },
+        history_key: "legacy-key-is-not-authority".into(),
+    };
+    let absent = crate::channels::host::remote_control::dispatch_callback(
+        &alice_dispatch,
+        &alice_runtime,
+        &alice_tenant,
+        &cancellation,
+        Some(&empty_reset),
+        RemoteHostRequest::ClearHistory {
+            session_scope: empty_scope,
+        },
+    )
+    .await
+    .expect("clearing a valid but not-yet-created conversation is a no-op");
+    assert!(matches!(absent, RemoteHostResult::Completed));
+    let empty_head = alice_locator.head_generation(&empty_session);
+    assert!(alice_locator.read_session_transcript(&empty_head).is_none());
+
     assert_eq!(
         session_messages(&bob_core, workspace, &bob_store_agent, &bob_session),
         ["prior tenant turn", "prior tenant reply"]
