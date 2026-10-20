@@ -133,3 +133,31 @@ fn managed_envelope_gate_rejects_byo_payload_carrying_error_code() {
     assert!(is_managed_backend_envelope(managed_stream));
     assert!(managed_error_skips_sentry(managed_stream));
 }
+
+#[test]
+fn classification_keeps_provider_ownership_separate_from_raw_token_and_reportability() {
+    let unknown = classify(
+        Some(PROVIDER_LABEL),
+        r#"{"error":{"errorCode":"FUTURE_BACKEND_CODE"}}"#,
+    );
+    assert!(unknown.provider_owned);
+    assert!(unknown.backend_owned);
+    assert!(!unknown.reportable);
+    assert_eq!(unknown.token.as_deref(), Some("FUTURE_BACKEND_CODE"));
+    assert_eq!(unknown.kind, None);
+
+    let null_code = classify(Some(PROVIDER_LABEL), r#"{"errorCode":null}"#);
+    assert!(null_code.provider_owned);
+    assert!(!null_code.backend_owned);
+    assert!(null_code.reportable);
+    assert_eq!(null_code.token, None);
+
+    let malformed = classify(
+        Some(PROVIDER_LABEL),
+        r#"{"error":{"errorCode":"BAD_REQUEST","malformed":true}}"#,
+    );
+    assert!(malformed.provider_owned);
+    assert!(malformed.backend_owned);
+    assert!(malformed.reportable);
+    assert!(malformed.malformed_bad_request);
+}
