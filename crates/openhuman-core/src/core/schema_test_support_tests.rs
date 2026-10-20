@@ -1,17 +1,23 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 
-fn handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    panic!("the pure contract runner must never execute handlers");
+fn parse_fixture(params: Map<String, Value>) -> Result<(), String> {
+    match params.get("id").and_then(Value::as_str) {
+        Some("example") => Ok(()),
+        _ => Err("fixture id must be example".into()),
+    }
 }
 
-fn other_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    panic!("this distinct handler must never be executed");
+fn panic_runner(_ctx: DispatchCtx, _parsed: ()) -> ControllerFuture {
+    panic!("the pure contract verifier must never execute a business runner");
 }
 
-fn fixture() -> (RegisteredController, ControllerParamContract) {
-    let controller = RegisteredController {
-        schema: ControllerSchema {
+fn legacy_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    panic!("legacy rejection must not execute a handler");
+}
+
+fn fixture() -> (ControllerEntry, ControllerParamContract) {
+    let schema = ControllerSchema {
             namespace: "fixture",
             function: "read",
             description: "Read a fixture.",
@@ -22,24 +28,23 @@ fn fixture() -> (RegisteredController, ControllerParamContract) {
                 required: true,
             }],
             outputs: vec![],
-        },
-        handler,
     };
+    let controller = ControllerEntry::bound(BoundRegisteredController::typed(
+        schema,
+        parse_fixture,
+        panic_runner,
+    ));
     let contract = ControllerParamContract {
         method: "fixture.read",
         required: &["id"],
-        handler,
+        optional: &[],
         examples: vec![serde_json::json!({"id":"example"})],
-        parse: |params| match params.get("id").and_then(Value::as_str) {
-            Some("example") => Ok(()),
-            _ => Err("fixture id must be example".into()),
-        },
     };
     (controller, contract)
 }
 
 #[test]
-fn explicit_example_reaches_pure_parser_without_executing_handler() {
+fn explicit_example_reaches_actual_bound_decoder_without_running_business_handler() {
     let (controller, contract) = fixture();
     verify_parameter_contracts(&[controller], &[contract]).unwrap();
 }
@@ -77,24 +82,19 @@ fn contract_rejects_each_removed_or_optional_required_declaration() {
         } else {
             broken.schema.inputs[0].required = false;
         }
-        assert!(
-            verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
-                .unwrap_err()
-                .contains("required inputs mismatch")
-        );
+        let broken = ControllerEntry {
+            schema: broken.schema,
+            ..broken
+        };
+        assert!(verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
+            .unwrap_err()
+            .contains("required inputs mismatch"));
     }
 }
 
 #[test]
-fn callback_identity_and_explicit_example_failures_are_not_hidden() {
+fn missing_examples_and_actual_parser_rejection_are_not_hidden() {
     let (controller, contract) = fixture();
-    let mut broken = contract.clone();
-    broken.handler = other_handler;
-    assert!(
-        verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
-            .unwrap_err()
-            .contains("handler identity")
-    );
     let mut broken = contract.clone();
     broken.examples.clear();
     assert!(
@@ -107,7 +107,7 @@ fn callback_identity_and_explicit_example_failures_are_not_hidden() {
     assert!(
         verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
             .unwrap_err()
-            .contains("pure parser")
+            .contains("bound decoder rejects example")
     );
     let mut broken = contract;
     broken.examples = vec![serde_json::json!({"id":7})];
@@ -135,6 +135,29 @@ fn duplicate_controller_and_schema_identity_failures_are_rejected() {
     assert!(verify_parameter_schema(&broken, &contract)
         .unwrap_err()
         .contains("no description"));
+}
+
+#[test]
+fn legacy_entries_are_rejected_without_running_the_legacy_handler() {
+    let (_, contract) = fixture();
+    let legacy = ControllerEntry::legacy(RegisteredController {
+        schema: ControllerSchema {
+            namespace: "fixture",
+            function: "read",
+            description: "Read a fixture.",
+            inputs: vec![crate::core::FieldSchema {
+                name: "id",
+                ty: crate::core::TypeSchema::String,
+                comment: "Fixture identifier.",
+                required: true,
+            }],
+            outputs: vec![],
+        },
+        handler: legacy_handler,
+    });
+    assert!(verify_parameter_contracts(&[legacy], &[contract])
+        .unwrap_err()
+        .contains("registry entry is legacy"));
 }
 
 #[test]

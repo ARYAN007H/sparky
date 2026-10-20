@@ -501,209 +501,48 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
 #[cfg(feature = "voice")]
 #[test]
 fn production_registry_binds_every_core_voice_controller_to_its_parser() {
-    use serde_json::json;
-
-    struct Contract {
-        method: &'static str,
-        required: &'static [&'static str],
-        optional: &'static [&'static str],
-        examples: Vec<Value>,
-    }
-
-    let contracts = [
-        Contract {
-            method: "voice.status",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-        Contract {
-            method: "voice.transcribe",
-            required: &["audio_path"],
-            optional: &["context", "skip_cleanup"],
-            examples: vec![
-                json!({"audio_path":"fixture.wav"}),
-                json!({"audio_path":"fixture.wav","context":"example","skip_cleanup":true}),
-            ],
-        },
-        Contract {
-            method: "voice.transcribe_bytes",
-            required: &["audio_bytes"],
-            optional: &["extension", "context", "skip_cleanup"],
-            examples: vec![
-                json!({"audio_bytes":[0,1]}),
-                json!({"audio_bytes":[0,1],"extension":"wav","context":"example","skip_cleanup":true}),
-            ],
-        },
-        Contract {
-            method: "voice.tts",
-            required: &["text"],
-            optional: &["output_path"],
-            examples: vec![
-                json!({"text":"Hello"}),
-                json!({"text":"Hello","output_path":"fixture.wav"}),
-            ],
-        },
-        Contract {
-            method: "voice.reply_synthesize",
-            required: &["text"],
-            optional: &["voice_id", "model_id", "output_format"],
-            examples: vec![
-                json!({"text":"Hello"}),
-                json!({"text":"Hello","voice_id":"fixture","model_id":"fixture","output_format":"mp3_44100"}),
-            ],
-        },
-        Contract {
-            method: "voice.stt_dispatch",
-            required: &["audio_base64"],
-            optional: &["provider", "model", "mime_type", "file_name", "language"],
-            examples: vec![
-                json!({"audio_base64":"AA=="}),
-                json!({"audio_base64":"AA==","provider":"cloud","model":"fixture","mime_type":"audio/wav","file_name":"fixture.wav","language":"en"}),
-            ],
-        },
-        Contract {
-            method: "voice.tts_dispatch",
-            required: &["text"],
-            optional: &["provider", "voice"],
-            examples: vec![
-                json!({"text":"Hello"}),
-                json!({"text":"Hello","provider":"cloud","voice":"fixture"}),
-            ],
-        },
-        Contract {
-            method: "voice.set_providers",
-            required: &[],
-            optional: &["stt_provider", "tts_provider", "stt_model", "tts_voice"],
-            examples: vec![
-                json!({}),
-                json!({"stt_provider":"cloud","tts_provider":"cloud","stt_model":"fixture","tts_voice":"fixture"}),
-            ],
-        },
-        Contract {
-            method: "voice.update_provider_settings",
-            required: &[],
-            optional: &["voice_providers", "stt_provider", "tts_provider"],
-            examples: vec![
-                json!({}),
-                json!({"voice_providers":[{"slug":"fixture-provider"}],"stt_provider":"cloud","tts_provider":"cloud"}),
-            ],
-        },
-        Contract {
-            method: "voice.list_models",
-            required: &["provider_id"],
-            optional: &["capability"],
-            examples: vec![
-                json!({"provider_id":"fixture"}),
-                json!({"provider_id":"fixture","capability":"stt"}),
-            ],
-        },
-        Contract {
-            method: "voice.test_provider",
-            required: &["workload", "provider"],
-            optional: &["validate_only", "api_key"],
-            examples: vec![
-                json!({"workload":"tts","provider":"cloud"}),
-                json!({"workload":"stt","provider":"cloud","validate_only":true,"api_key":"fixture-key"}),
-            ],
-        },
-        Contract {
-            method: "voice.live_providers",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-        Contract {
-            method: "voice.live_settings_get",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-        Contract {
-            method: "voice.live_settings_set",
-            required: &[],
-            optional: &["default_provider", "gemini", "sarvam", "elevenlabs"],
-            examples: vec![
-                json!({}),
-                json!({"default_provider":"gemini","gemini":{"model":"fixture","voice":null},"sarvam":{"language":"en"},"elevenlabs":{"voice_id":"fixture"}}),
-            ],
-        },
-        Contract {
-            method: "voice.live_test_provider",
-            required: &["provider"],
-            optional: &[],
-            examples: vec![json!({"provider":"gemini"})],
-        },
-    ];
-
-    // Select raw production rows, before DomainSet, surface, or extension filtering.
-    let entries: Vec<_> = registry()
+    // Discover the namespace from raw registries independently of the fixture
+    // rows; surface/domain filters must not hide a missing binding.
+    let grouped: Vec<_> = registry()
         .iter()
         .chain(internal_registry())
-        .filter_map(|grouped| {
-            grouped
-                .controller
-                .schema
-                .method_name()
-                .starts_with("voice.")
-                .then_some(&grouped.controller)
-        })
+        .filter(|row| row.controller.schema.method_name().starts_with("voice."))
         .collect();
+    let entries: Vec<_> = grouped.iter().map(|row| &row.controller).collect();
+    let contracts = crate::voice::parameter_contracts();
+    let expected_methods = [
+        "voice.status",
+        "voice.transcribe",
+        "voice.transcribe_bytes",
+        "voice.tts",
+        "voice.reply_synthesize",
+        "voice.stt_dispatch",
+        "voice.tts_dispatch",
+        "voice.set_providers",
+        "voice.update_provider_settings",
+        "voice.list_models",
+        "voice.test_provider",
+        "voice.live_providers",
+        "voice.live_settings_get",
+        "voice.live_settings_set",
+        "voice.live_test_provider",
+    ];
+    assert_eq!(entries.len(), expected_methods.len(), "complete core voice inventory");
+    assert!(grouped.iter().all(|row| row.group == DomainGroup::Voice));
     assert_eq!(
-        entries.len(),
-        contracts.len(),
-        "complete core voice inventory"
+        entries.iter().map(|entry| entry.schema.method_name()).collect::<Vec<_>>(),
+        expected_methods,
+        "independent core voice inventory and registry order"
     );
-    let methods: Vec<_> = entries
-        .iter()
-        .map(|entry| entry.schema.method_name())
-        .collect();
     assert_eq!(
-        methods,
-        contracts
-            .iter()
-            .map(|contract| contract.method)
-            .collect::<Vec<_>>(),
-        "independent core voice method inventory and registry order"
+        contracts.iter().map(|contract| contract.method).collect::<Vec<_>>(),
+        expected_methods,
+        "authored parameter fixtures cover the complete ordered voice inventory"
     );
+    crate::core::all::verify_parameter_contracts(&entries, &contracts)
+        .expect("raw voice entries use their declared schemas and runtime decoders");
 
     for (entry, contract) in entries.into_iter().zip(contracts) {
-        assert!(
-            entry.is_bound(),
-            "{} must have a production-bound parser",
-            contract.method
-        );
-        assert_eq!(
-            required_input_contract(&entry.schema, contract.required),
-            Ok(()),
-            "{} independent required-field contract",
-            contract.method
-        );
-        let optional: Vec<_> = entry
-            .schema
-            .inputs
-            .iter()
-            .filter(|input| !input.required)
-            .map(|input| input.name)
-            .collect();
-        assert_eq!(
-            optional, contract.optional,
-            "{} optional fields",
-            contract.method
-        );
-
-        for example in &contract.examples {
-            let params = example
-                .as_object()
-                .expect("voice example is an object")
-                .clone();
-            validate_params(&entry.schema, &params)
-                .expect("registered schema accepts voice example");
-            entry
-                .decode_params(params)
-                .expect("actual raw registry parser accepts voice example");
-        }
-
         for &name in contract.required {
             for remove in [true, false] {
                 let mut broken = entry.schema.clone();
