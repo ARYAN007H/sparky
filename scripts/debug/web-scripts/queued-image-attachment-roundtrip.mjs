@@ -107,7 +107,7 @@ export default async function queuedImageAttachmentRoundtrip({
   // The mock captures a script when each model request starts. Hold the first
   // request before its first token, then change the script for the queued turn.
   mock.set("llmStreamScript", [
-    ...Array.from({ length: 20 }, (_, index) => ({
+    ...Array.from({ length: 60 }, (_, index) => ({
       thinking: `Holding the first turn ${index + 1}.`,
       delayMs: 1_000,
     })),
