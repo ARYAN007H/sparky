@@ -102,6 +102,7 @@ impl HostAgent {
         cancellation: tinyagents_harness::CancellationToken,
         turn_deadline: Option<std::time::Duration>,
         imported_history: &[tinyagents_session::transcript::TranscriptMessage],
+        legacy_history: Option<crate::channels::providers::relay::LegacyHistoryImport>,
     ) -> anyhow::Result<String> {
         let config = self.config.clone();
         let agent_id = self.definition.id.clone();
@@ -109,6 +110,17 @@ impl HostAgent {
         session.set_thread_id(Some(session_key));
         session.set_event_context(event_session_id, channel);
         session.adopt_imported_history(imported_history)?;
+        if let Some(source) = legacy_history {
+            let dispatch = crate::core::runtime::DispatchCtx::new(Arc::clone(&self.context));
+            session
+                .adopt_legacy_history_if_needed(|| async {
+                    source
+                        .load(&dispatch)
+                        .await
+                        .map_err(anyhow::Error::msg)
+                })
+                .await?;
+        }
         self.scope(crate::agent::turn_host::AgentTurnHost::run(
             &mut session,
             crate::agent::turn_host::AgentTurnRequest {
