@@ -146,6 +146,13 @@ export default async function queuedImageAttachmentRoundtrip({
     "the first model request",
     30_000,
   );
+  await page.waitForFunction(
+    (id) =>
+      window.__OPENHUMAN_STORE__?.getState?.().thread?.activeThreadIds?.[id] ===
+      true,
+    threadId,
+    { timeout: 10_000 },
+  );
 
   // The queued turn will use this fast script; the already-running request has
   // retained its delayed script.
