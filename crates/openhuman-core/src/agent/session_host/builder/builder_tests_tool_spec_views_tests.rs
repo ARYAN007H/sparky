@@ -162,6 +162,7 @@ fn spec_views_stay_consistent_for_a_tool_less_agent() {
         std::sync::Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     let agent = crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
         .build()
