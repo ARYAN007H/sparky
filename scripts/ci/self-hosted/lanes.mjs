@@ -327,7 +327,7 @@ export class Runner {
     this.out = out;
     this.maxParallel =
       plan.profile === "ex63"
-        ? 1
+        ? 2
         : maxParallel > 0
           ? maxParallel
           : plan.lanes.length;
@@ -551,20 +551,39 @@ export class Runner {
     }
   }
 
+  /**
+   * Lanes in one chain run one at a time, in plan order. On ex63 every lane
+   * with a target dir is in the cargo chain (two whole-core compiles at once
+   * would not fit the VM, and they share build products) and the rest in the
+   * light chain, so frontend and static work overlaps the Rust lanes.
+   * Elsewhere each lane is its own chain.
+   */
+  chainOf(lane) {
+    if (this.plan.profile !== "ex63") return lane.name;
+    return lane.targetDir ? "cargo" : "light";
+  }
+
   async runQueue() {
     const queue = [...this.plan.lanes];
-    const running = new Set();
+    const running = new Map(); // promise -> chain
     const finished = [];
     await new Promise((resolveAll) => {
       const pump = () => {
-        while (running.size < this.maxParallel && queue.length > 0) {
-          const lane = queue.shift();
+        const busy = () => new Set(running.values());
+        let i = 0;
+        while (running.size < this.maxParallel && i < queue.length) {
+          const chain = this.chainOf(queue[i]);
+          if (busy().has(chain)) {
+            i++;
+            continue;
+          }
+          const [lane] = queue.splice(i, 1);
           const p = this.runLane(lane).then((r) => {
             running.delete(p);
             finished.push(r);
             pump();
           });
-          running.add(p);
+          running.set(p, chain);
         }
         if (running.size === 0 && queue.length === 0) resolveAll();
       };
