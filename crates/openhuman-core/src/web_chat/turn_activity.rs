@@ -14,9 +14,7 @@ use std::sync::{Arc, Mutex};
 
 use tinyagents_harness::progress::AgentProgress;
 
-pub(crate) use crate::agent::turn_policy::{
-    configured_idle_window, parse_idle_window,
-};
+pub(crate) use crate::agent::turn_policy::{configured_idle_window, parse_idle_window};
 
 #[derive(Debug, Default)]
 struct State {
