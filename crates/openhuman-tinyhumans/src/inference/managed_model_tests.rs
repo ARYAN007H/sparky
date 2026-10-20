@@ -15,7 +15,7 @@ fn managed_model_preserves_the_openhuman_response_cache_identity() {
 
     assert_eq!(
         model.cache_identity().as_deref(),
-        Some("openhuman:https://api.example.test/openai/v1:reasoning-v1")
+        Some("openhuman:https://api.example.test/openai/v1:openrouter/deepseek/deepseek-v4-flash")
     );
 }
 
