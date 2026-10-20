@@ -122,9 +122,10 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         reason,
     )?;
     let parent_epoch = match selected.as_ref().and_then(|selected| {
-        selected
-            .was_paused
-            .then_some((selected.parent_thread_id.as_deref(), selected.task_id.as_str()))
+        selected.was_paused.then_some((
+            selected.parent_thread_id.as_deref(),
+            selected.task_id.as_str(),
+        ))
     }) {
         Some((Some(thread_id), selected_task_id)) => {
             match crate::agent::orchestration::background_completions::paused_task_parent_epoch(

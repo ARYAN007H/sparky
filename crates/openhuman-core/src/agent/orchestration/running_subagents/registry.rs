@@ -233,18 +233,20 @@ pub(crate) fn register(
     }
 
     let parent_epoch = match parent_thread_id.as_deref() {
-        Some(thread_id) => match crate::agent::orchestration::background_completions::CompletionTarget::new(
-            ctx.clone(),
-            workspace_dir.clone(),
-            parent_session.clone(),
-            Some(thread_id.to_owned()),
-        ) {
-            Ok(target) => target.parent_epoch(),
-            Err(error) => {
-                abort.abort();
-                return Err(RegistrationError::ParentLifecycle(error));
+        Some(thread_id) => {
+            match crate::agent::orchestration::background_completions::CompletionTarget::new(
+                ctx.clone(),
+                workspace_dir.clone(),
+                parent_session.clone(),
+                Some(thread_id.to_owned()),
+            ) {
+                Ok(target) => target.parent_epoch(),
+                Err(error) => {
+                    abort.abort();
+                    return Err(RegistrationError::ParentLifecycle(error));
+                }
             }
-        },
+        }
         None => None,
     };
 
