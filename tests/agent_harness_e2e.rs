@@ -907,6 +907,27 @@ struct CaptureProxy {
     port: u16,
 }
 
+struct AbortOnDropMock {
+    join: Option<tokio::task::JoinHandle<Result<(), std::io::Error>>>,
+}
+
+impl AbortOnDropMock {
+    async fn shutdown_and_wait(mut self) {
+        if let Some(join) = self.join.take() {
+            join.abort();
+            let _ = join.await;
+        }
+    }
+}
+
+impl Drop for AbortOnDropMock {
+    fn drop(&mut self) {
+        if let Some(join) = &self.join {
+            join.abort();
+        }
+    }
+}
+
 impl Drop for CaptureProxy {
     fn drop(&mut self) {
         let _ = self.child.kill();
@@ -1123,6 +1144,9 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
         }
         None => serve_on_ephemeral(scripted_upstream_router()).await,
     };
+    let mock_join = AbortOnDropMock {
+        join: Some(mock_join),
+    };
     let mock_origin = format!("http://{actual_mock_addr}");
     if let Some(endpoints) = endpoints.as_ref() {
         assert_eq!(
@@ -1238,8 +1262,7 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
         );
     }
     drop(proxy);
-    mock_join.abort();
-    let _ = mock_join.await;
+    mock_join.shutdown_and_wait().await;
 }
 
 async fn bind_thread_action_dir(stack: &Stack, thread_id: &str, action_dir: &Path) {
