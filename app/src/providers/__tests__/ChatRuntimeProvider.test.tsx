@@ -905,6 +905,16 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           },
         },
       ];
+      const stagedParts = [
+        {
+          ...parts[0],
+          media: {
+            ...parts[0].media,
+            url: null,
+            opaqueId: 'opaque-upload',
+          },
+        },
+      ];
       store.dispatch(
         pendingFollowupAdded({
           threadId: 't-upload',
@@ -918,9 +928,22 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           },
           text: '',
           requestId: 'r-upload',
-          attachments: parts,
+          attachments: stagedParts,
         })
       );
+      vi.mocked(threadApi.getThreadMessages).mockResolvedValueOnce({
+        messages: [
+          {
+            id: 'user:r-upload',
+            content: 'look',
+            type: 'text',
+            extraMetadata: {},
+            sender: 'user',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            attachments: stagedParts,
+          },
+        ],
+      } as never);
       await act(async () => {
         listeners.onDone?.({
           thread_id: 't-upload',
@@ -934,6 +957,13 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       expect(
         vi.mocked(threadApi.appendMessage).mock.calls.some(([, message]) => message.sender === 'user')
       ).toBe(false);
+      const persisted = store
+        .getState()
+        .thread.messagesByThreadId['t-upload']
+        .find(message => message.id === 'user:r-upload');
+      expect(persisted?.content).toBe('look');
+      expect(JSON.stringify(persisted?.attachments)).toContain('opaque-upload');
+      expect(JSON.stringify(persisted)).not.toMatch(/base64|\[(ATTACHMENT|IMAGE|FILE):/i);
       expect(store.getState().queue.pendingFollowupsByThread['t-upload']).toBeUndefined();
     });
 
@@ -980,6 +1010,38 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       });
       await waitFor(() => expect(threadApi.getThreadMessages).toHaveBeenCalledWith('t-fup'));
       expect(store.getState().queue.pendingFollowupsByThread['t-fup']).toBeUndefined();
+    });
+
+    it('retains a queued follow-up if its terminal history reload fails', async () => {
+      const listeners = renderProvider();
+      store.dispatch(
+        pendingFollowupAdded({
+          threadId: 't-fup-failed-reload',
+          message: {
+            id: 'f1',
+            content: 'queued follow-up text',
+            type: 'text',
+            extraMetadata: {},
+            sender: 'user',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          text: 'queued follow-up text',
+          requestId: 'r-fup-failed-reload',
+        })
+      );
+      vi.mocked(threadApi.getThreadMessages).mockRejectedValueOnce(new Error('reload failed'));
+
+      await act(async () => {
+        listeners.onDone?.({
+          thread_id: 't-fup-failed-reload',
+          request_id: 'r-fup-failed-reload',
+          full_response: 'queued reply',
+          total_input_tokens: 1,
+          total_output_tokens: 1,
+        });
+      });
+
+      expect(store.getState().queue.pendingFollowupsByThread['t-fup-failed-reload']).toHaveLength(1);
     });
 
     it('stamps the assistant answer with the producing turn requestId on chat_done', async () => {
