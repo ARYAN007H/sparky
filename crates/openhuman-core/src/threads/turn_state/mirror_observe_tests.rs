@@ -633,7 +633,7 @@ fn subagent_spawned_derives_source_tool_name_from_the_parent_row() {
     let (_d, mut m) = fresh("t");
     m.observe(&AgentProgress::ToolCallStarted {
         call_id: "call-parallel".into(),
-        tool_name: concat!("spawn_", "parallel_agents").into(),
+        tool_name: "spawn_parallel_agents".into(),
         arguments: serde_json::json!({}),
         iteration: 1,
         display_label: None,
@@ -660,7 +660,7 @@ fn subagent_spawned_derives_source_tool_name_from_the_parent_row() {
         .expect("subagent row created");
     assert_eq!(
         entry.source_tool_name.as_deref(),
-        Some(concat!("spawn_", "parallel_agents"))
+        Some("spawn_parallel_agents")
     );
     let activity = entry.subagent.expect("subagent activity present");
     assert_eq!(activity.parent_call_id.as_deref(), Some("call-parallel"));

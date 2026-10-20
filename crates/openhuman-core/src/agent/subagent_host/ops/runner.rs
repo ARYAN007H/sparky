@@ -729,8 +729,10 @@ async fn run_typed_mode(
         };
         format!("{parent_chain}__{child_session_key}")
     };
-    let workspace_descriptor =
-        workspace_descriptor_for_subagent(definition, options, parent, task_id);
+    let workspace_descriptor = options
+        .workspace_descriptor
+        .clone()
+        .or_else(|| parent.workspace_descriptor.clone());
     if let Some(descriptor) = &workspace_descriptor {
         tracing::debug!(
             agent_id = %definition.id,
