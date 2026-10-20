@@ -177,6 +177,31 @@ pub(crate) async fn record_outcome(
     parent_thread_id: Option<String>,
     outcome: BackgroundAgentOutcome,
 ) {
+    record_outcome_with_parent_epoch(
+        ctx,
+        workspace_dir,
+        parent_session,
+        task_id,
+        agent_id,
+        summary,
+        parent_thread_id,
+        None,
+        outcome,
+    )
+    .await;
+}
+
+pub(super) async fn record_outcome_with_parent_epoch(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    parent_session: &str,
+    task_id: impl Into<String>,
+    agent_id: impl Into<String>,
+    summary: impl Into<String>,
+    parent_thread_id: Option<String>,
+    parent_epoch: Option<u64>,
+    outcome: BackgroundAgentOutcome,
+) {
     let task_id = task_id.into();
     let Some(thread_id) = parent_thread_id else {
         // Delivery is thread-addressed; a headless spawn has nowhere to land
@@ -218,8 +243,11 @@ pub(crate) async fn record_outcome(
 
     let router = router_for_workspace_ctx(ctx, workspace_dir);
     let summary = summary.into();
-    let target = DetachedCompletionTarget::new(router.clone(), thread_id.clone(), agent_id)
+    let mut target = DetachedCompletionTarget::new(router.clone(), thread_id.clone(), agent_id)
         .with_notify_mode(NotifyMode::Followup);
+    if let Some(parent_epoch) = parent_epoch {
+        target.parent_epoch = parent_epoch;
+    }
     let status = match outcome {
         BackgroundAgentOutcome::Completed => DetachedSubagentStatus::Completed {
             output: summary,
@@ -229,7 +257,7 @@ pub(crate) async fn record_outcome(
         BackgroundAgentOutcome::AwaitingInput => {
             // TinyAgents deliberately excludes pauses from terminal dedupe; the
             // host gives each paused checkpoint its own record identity above.
-            let record = CompletionRecord::new(
+            let mut record = CompletionRecord::new(
                 task_id.clone(),
                 thread_id.clone(),
                 target.agent_id.clone(),
@@ -238,6 +266,9 @@ pub(crate) async fn record_outcome(
             )
             .with_notify_mode(NotifyMode::Followup)
             .with_label(AWAITING_INPUT_LABEL);
+            if let Some(parent_epoch) = parent_epoch {
+                record.parent_epoch = parent_epoch;
+            }
             record_completion_record(ctx, workspace_dir, &router, record, &task_id, &thread_id)
                 .await;
             return;
@@ -256,12 +287,15 @@ pub(crate) async fn record_outcome(
              task_id={task_id} thread_id={thread_id}"
         );
         let fallback = degrade_to_memory(ctx, workspace_dir, &router);
-        let fallback_target = DetachedCompletionTarget::new(
+        let mut fallback_target = DetachedCompletionTarget::new(
             fallback.router.clone(),
             thread_id.clone(),
             target.agent_id.clone(),
         )
         .with_notify_mode(NotifyMode::Followup);
+        if let Some(parent_epoch) = parent_epoch {
+            fallback_target.parent_epoch = parent_epoch;
+        }
         if !record_detached_completion(&fallback_target, &task_id, &status).await {
             log::error!(
                 "[background_completions] completion LOST — in-memory fallback failed task_id={task_id} thread_id={thread_id}"
