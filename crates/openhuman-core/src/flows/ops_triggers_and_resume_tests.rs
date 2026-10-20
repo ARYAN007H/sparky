@@ -570,7 +570,10 @@ async fn flows_resume_refuses_when_the_graph_changed_after_park() {
     )
     .await
     .expect_err("resume must refuse once the graph changed after park");
-    assert!(error.contains("workflow graph changed after the run parked"), "{error}");
+    assert!(
+        error.contains("workflow graph changed after the run parked"),
+        "{error}"
+    );
 
     // Must NOT have executed: the engine must never have run, so "downstream"
     // must not appear among the run's persisted steps.

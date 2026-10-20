@@ -65,7 +65,10 @@ async fn flows_resume_rejects_a_stale_graph_and_settles_the_parked_run() {
         Some("workflow graph changed after the run parked; refusing resume")
     );
     assert!(
-        !after_run.steps.iter().any(|step| step.node_id == "downstream"),
+        !after_run
+            .steps
+            .iter()
+            .any(|step| step.node_id == "downstream"),
         "the stale approval must not execute the replacement graph: {after_run:?}"
     );
     let after_flow = flows_get(&config, &flow.id).await.unwrap().value;

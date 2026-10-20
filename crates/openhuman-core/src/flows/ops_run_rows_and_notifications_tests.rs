@@ -604,10 +604,7 @@ async fn flows_cancel_run_cancels_a_parked_pending_approval_run() {
     let run_row = flows_get_run(&config, &thread_id).await.unwrap();
     assert_eq!(run_row.value.status, "cancelled");
     assert!(run_row.value.pending_approvals.is_empty());
-    assert_eq!(
-        run_row.value.error.as_deref(),
-        Some("parked run cancelled")
-    );
+    assert_eq!(run_row.value.error.as_deref(), Some("parked run cancelled"));
 
     let reloaded = flows_get(&config, &created.value.id).await.unwrap();
     assert_eq!(reloaded.value.last_status.as_deref(), Some("cancelled"));
