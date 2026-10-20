@@ -188,7 +188,7 @@ async fn run_imported_history_prefix_regression() {
 
 #[tokio::test]
 async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
-    use tinyagents_session::transcript::{SessionRef, TranscriptMeta, TranscriptMessage};
+    use tinyagents_session::transcript::{TranscriptMeta, TranscriptMessage};
 
     let root = tempfile::tempdir().expect("workspace");
     let locator = crate::agent::session_store::splice_fixture::memory_locator();
@@ -284,6 +284,4 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
         })
         .await
         .unwrap());
-
-    let _ = SessionRef::root("unused");
 }
