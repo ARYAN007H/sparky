@@ -23,8 +23,6 @@ use super::super::helpers::{
 };
 use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
-#[cfg(test)]
-use super::bus_turn::dispatch_bus_turn;
 use super::reset_durable_channel_session;
 use super::RuntimeChannelMessage;
 
@@ -504,16 +502,11 @@ pub(crate) async fn process_channel_runtime_message(
         }
         #[cfg(test)]
         None => {
-            let system_prompt = ctx.system_prompt.current();
-            let history = vec![
-                tinyagents_session::transcript::TranscriptMessage::system(system_prompt.as_str()),
-                tinyagents_session::transcript::TranscriptMessage::user(&enriched_message),
-            ];
-            let result = dispatch_bus_turn(
+            let result = super::bus_turn::dispatch_test_turn(
                 ctx.as_ref(),
                 &msg,
                 &route,
-                history,
+                &enriched_message,
                 active_turn_model_source,
                 progress_tx,
                 turn_origin,
