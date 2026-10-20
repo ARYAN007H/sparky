@@ -149,3 +149,58 @@ fn bound_controller_preserves_parser_errors() {
         .expect_err("missing value is rejected");
     assert_eq!(error, "`value` is required");
 }
+
+#[test]
+fn production_registry_binds_threads_upsert_to_its_declared_parser() {
+    use serde_json::json;
+
+    // Read the unfiltered production registry directly. The domain catalog is
+    // useful for wire-shape checks, but it can remain correct if production
+    // registration accidentally falls back to a legacy handler.
+    let entries: Vec<_> = registry()
+        .iter()
+        .chain(internal_registry())
+        .map(|grouped| &grouped.controller)
+        .filter(|entry| entry.schema.method_name() == "threads.upsert")
+        .collect();
+    assert_eq!(entries.len(), 1, "threads.upsert has one raw registry entry");
+    let entry = entries[0];
+
+    let required = ["id", "title", "created_at"];
+    let declared: Vec<_> = entry
+        .schema
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_eq!(declared, required, "required fields are independent contract");
+
+    for example in [
+        json!({"id":"t1", "title":"Hello", "created_at":"2026-04-22T00:00:00Z"}),
+        json!({"id":"t2", "title":"Thread", "created_at":"2026-04-22T00:00:00Z", "labels":["work"]}),
+    ] {
+        let params = example.as_object().expect("example is an object").clone();
+        validate_params(&entry.schema, &params)
+            .expect("actual registered schema accepts the example");
+        entry
+            .decode_params(params)
+            .expect("actual raw registry entry uses the runtime parser");
+    }
+
+    for missing in ["id", "title", "created_at"] {
+        let mut params = serde_json::from_value(json!({
+            "id":"t1", "title":"Hello", "created_at":"2026-04-22T00:00:00Z"
+        }))
+        .expect("valid upsert params");
+        params.remove(missing);
+        assert!(
+            validate_params(&entry.schema, &params).is_err(),
+            "registered schema requires `{missing}`"
+        );
+        assert!(
+            entry.decode_params(params).is_err(),
+            "runtime parser rejects missing `{missing}`"
+        );
+    }
+}
