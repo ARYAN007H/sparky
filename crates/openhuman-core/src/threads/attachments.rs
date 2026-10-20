@@ -272,7 +272,6 @@ async fn read_staged_entries(
     let tenant = tenant_for(ctx)?;
     let repo = staged_repo(ctx, &config.workspace_dir)?;
     let mut entries = Vec::with_capacity(requested.len());
-    let repo = staged_repo(ctx, &config.workspace_dir)?;
     for part in requested {
         let opaque_id = opaque_media(part)
             .and_then(|media| media.opaque_id.as_deref())
@@ -706,6 +705,7 @@ pub(crate) async fn consume_staged_parts(
         .await
         .map_err(|error| format!("staged attachment configuration unavailable: {error}"))?;
     let tenant = tenant_for(ctx)?;
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
     for part in requested {
         let id = opaque_media(part)
             .and_then(|media| media.opaque_id.as_deref())
