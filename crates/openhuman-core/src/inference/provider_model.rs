@@ -34,6 +34,21 @@ pub fn is_abstract_model(provider_id: &str, model: &str) -> bool {
         || crate::inference::registry::provider_model_is_alias(provider_id, model)
 }
 
+/// Context-selected counterpart to [`is_abstract_model`]. Generic `hint:*`
+/// markers remain abstract even when no host provider is registered.
+pub(crate) fn is_abstract_model_for(
+    extensions: Option<&crate::core::slots::Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> bool {
+    model.trim().starts_with("hint:")
+        || crate::inference::registry::provider_model_is_alias_for(
+            extensions,
+            provider_id,
+            model,
+        )
+}
+
 /// Resolve a model hint according to the configured provider route and the
 /// route's registered provider model policy.
 pub fn resolve_provider_model_hint(provider_id: &str, hint: &str, config: &Config) -> String {

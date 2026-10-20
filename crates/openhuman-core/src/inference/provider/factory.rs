@@ -58,7 +58,7 @@ pub use chat_model::{
 };
 pub(crate) use credentials::openai_bearer_is_oauth;
 pub use credentials::{auth_key_for_slug, lookup_key_for_slug, redact_endpoint};
-pub(crate) use discovery::model_limits_request;
+pub(crate) use discovery::{model_limits_request, model_limits_request_for};
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use managed_backend::make_openhuman_backend_model;
 pub(crate) use routing::role_uses_implicit_cloud_fallback;
@@ -74,9 +74,11 @@ pub(crate) use turn_model::{
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
 use chat_model::{unresolved_chat_model_error, with_default_temperature};
 use cloud_slug::{
-    resolve_cloud_slug, try_create_cloud_slug_chat_model,
+    resolve_cloud_slug, resolve_cloud_slug_for, try_create_cloud_slug_chat_model,
     try_create_cloud_slug_chat_model_from_string,
+    try_create_cloud_slug_chat_model_from_string_with_native_tools_for,
     try_create_cloud_slug_chat_model_with_native_tools,
+    try_create_cloud_slug_chat_model_with_native_tools_for,
 };
 use local_runtime::{
     try_create_local_runtime_chat_model, try_create_local_runtime_chat_model_from_string,

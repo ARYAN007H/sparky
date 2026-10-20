@@ -23,9 +23,20 @@ pub(crate) fn model_limits_request(
     model: &str,
     config: &Config,
 ) -> Option<DiscoveryRequest> {
+    let extensions = crate::core::runtime::CoreContext::current_extensions();
+    model_limits_request_for(role, provider, model, config, extensions.as_deref())
+}
+
+pub(crate) fn model_limits_request_for(
+    role: &str,
+    provider: &str,
+    model: &str,
+    config: &Config,
+    extensions: Option<&crate::core::slots::Extensions>,
+) -> Option<DiscoveryRequest> {
     let p = provider.trim();
     if p.is_empty() || p == "cloud" || p == PROVIDER_OPENHUMAN {
-        return managed_limits_request(model, config);
+        return managed_limits_request(model, config, extensions);
     }
     if p == BYOK_INCOMPLETE_SENTINEL
         || p == CLAUDE_AGENT_SDK_PROVIDER
@@ -39,18 +50,18 @@ pub(crate) fn model_limits_request(
     let (slug, raw) = p.split_once(':')?;
     let slug = slug.trim();
     let entry = config.cloud_providers.iter().find(|e| e.slug == slug)?;
-    if crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style) {
+    if crate::config::schema::cloud_providers::is_hosted_auth_style_for(extensions, entry.auth_style) {
         let (raw_model, _) = split_model_and_temperature(raw);
         let model = if raw_model.trim().is_empty() {
             model
         } else {
             raw_model.trim()
         };
-        return managed_limits_request(model, config);
+        return managed_limits_request(model, config, extensions);
     }
 
     let (raw_model, _) = split_model_and_temperature(raw);
-    let resolution = match resolve_cloud_slug(role, slug, &raw_model, config) {
+    let resolution = match resolve_cloud_slug_for(role, slug, &raw_model, config, extensions) {
         Ok(resolution) => resolution,
         Err(error) => {
             log::debug!(
@@ -85,9 +96,13 @@ pub(crate) fn model_limits_request(
 /// The managed backend's catalogue listing request, from the registered
 /// catalog's limits function (`inference::registry`). With none registered the
 /// managed route has no listing to ask.
-fn managed_limits_request(model: &str, config: &Config) -> Option<DiscoveryRequest> {
-    let Some(limits) =
-        crate::inference::registry::catalog(PROVIDER_OPENHUMAN).and_then(|entry| entry.limits)
+fn managed_limits_request(
+    model: &str,
+    config: &Config,
+    extensions: Option<&crate::core::slots::Extensions>,
+) -> Option<DiscoveryRequest> {
+    let Some(limits) = crate::inference::registry::catalog_for(extensions, PROVIDER_OPENHUMAN)
+        .and_then(|entry| entry.limits)
     else {
         log::debug!("[model_limits] no managed catalog registered");
         return None;

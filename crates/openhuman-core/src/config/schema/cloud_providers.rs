@@ -84,6 +84,16 @@ pub fn is_hosted_auth_style(style: AuthStyle) -> bool {
         .is_some_and(|classify| classify(style))
 }
 
+/// Whether the selected runtime or process host owns this compatibility auth style.
+pub(crate) fn is_hosted_auth_style_for(
+    extensions: Option<&crate::core::slots::Extensions>,
+    style: AuthStyle,
+) -> bool {
+    HOSTED_AUTH_STYLE
+        .get_for(extensions, "default")
+        .is_some_and(|classify| classify(style))
+}
+
 impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
     for BuiltinCloudProvider
 {

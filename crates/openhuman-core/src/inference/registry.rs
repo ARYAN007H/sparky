@@ -246,6 +246,16 @@ pub fn provider_model_is_alias(provider_id: &str, model: &str) -> bool {
     provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.is_alias)(model))
 }
 
+pub(crate) fn provider_model_is_alias_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> bool {
+    chat_model_for(extensions, provider_id)
+        .and_then(|entry| entry.models)
+        .is_some_and(|hooks| (hooks.is_alias)(model))
+}
+
 /// Whether the provider regards `model` as a concrete id for pass-through.
 pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
     let model = model.trim();
@@ -471,6 +481,13 @@ pub fn unregister_catalog(provider_id: &str) -> bool {
 /// The registered catalog, if any.
 pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry> {
     CATALOGS.get(provider_id)
+}
+
+pub(crate) fn catalog_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+) -> Option<CatalogEntry> {
+    CATALOGS.get_for(extensions, provider_id)
 }
 
 #[cfg(test)]

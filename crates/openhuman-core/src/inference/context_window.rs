@@ -218,9 +218,14 @@ async fn resolve_context_window_with_inner(
 ) -> ResolvedWindow {
     let local_kind = tinyinference_local::profile::kind_from_provider_string(provider);
     let request = match local_kind {
-        None => {
-            crate::inference::provider::factory::model_limits_request(role, provider, model, config)
-        }
+        None => match extensions {
+            Some(extensions) => crate::inference::provider::factory::model_limits_request_for(
+                role, provider, model, config, extensions,
+            ),
+            None => crate::inference::provider::factory::model_limits_request(
+                role, provider, model, config,
+            ),
+        },
         Some(tinyinference_local::profile::LocalProviderKind::Ollama) => {
             ollama_limits_request(model, config)
         }
