@@ -12,14 +12,13 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tinyflows::caps::Capabilities;
 use tinyflows::catalog::NodeKindContract;
 use tinyflows::model::WorkflowGraph;
 use tinyflows_catalog::types::FlowSuggestion;
 use tinyflows_catalog::{DraftOrigin, Flow, FlowDraft, FlowRevision, FlowRun, FlowValidation};
 use tinyflows_copilot::tools::ports::{
     AgentDefinition, AgentDirectory, BuilderGates, DraftStore, FlowStore, NodeKindSource,
-    PortResult, SuggestionStore, Written,
+    PortResult, SandboxRunRequest, SandboxRunner, SuggestionStore, Written,
 };
 
 use crate::config::Config;
@@ -153,6 +152,93 @@ impl FlowStore for FlowsHost {
 }
 
 #[async_trait]
+impl SandboxRunner for FlowsHost {
+    async fn run(&self, request: SandboxRunRequest) -> PortResult<Value> {
+        use tinybus::{ObjectPath, Proxy};
+        use tinyflows_bus::runs::{self, SandboxRun, SandboxRunResponse};
+
+        // Loading the module first applies the normal component/registry gate.
+        let _schedule = crate::modules::tinyflows::proxy(&self.config)
+            .await
+            .map_err(|error| error.to_string())?;
+        let runtime = crate::modules::runtime::runtime()
+            .await
+            .map_err(|error| error.to_string())?;
+        let connection = runtime.connection().clone();
+        let path = format!("/ai/tinyhumans/openhuman/FlowSandbox/{}", uuid::Uuid::new_v4());
+        let object_path = ObjectPath::new(&path).map_err(|error| error.to_string())?;
+        let served_path = object_path.clone();
+        let callback = SandboxToolPreflight {
+            config: self.config.clone(),
+        };
+        runtime
+            .spawn(async move {
+                connection
+                    .request_name(SANDBOX_CALLBACK_BUS)
+                    .await?;
+                connection.serve_at(served_path, callback).await
+            })
+            .await
+            .map_err(|error| error.to_string())?
+            .map_err(|error| error.to_string())?;
+
+        let response = async {
+            let proxy: Proxy = runtime
+                .connection()
+                .proxy(runs::BUS_NAME, runs::OBJECT_PATH, runs::INTERFACE)
+                .map_err(|error| error.to_string())?;
+            let report: SandboxRunResponse = proxy
+                .with_timeout(std::time::Duration::from_secs(60))
+                .call(
+                    runs::methods::SANDBOX_RUN,
+                    (SandboxRun {
+                        graph: request.graph,
+                        input: request.input,
+                        tool_invoker: runs::CallbackAddress {
+                            destination: SANDBOX_CALLBACK_BUS.to_string(),
+                            object_path: path.clone(),
+                        },
+                        permissions_manifest: request.permissions_manifest,
+                    },),
+                )
+                .await
+                .map_err(|error| error.to_string())?;
+            Ok::<_, String>(report.result)
+        }
+        .await;
+        runtime
+            .spawn(async move { runtime.connection().unserve(&object_path).await })
+            .await
+            .map_err(|error| error.to_string())?;
+        response
+    }
+}
+
+const SANDBOX_CALLBACK_BUS: &str = "ai.tinyhumans.openhuman.FlowSandboxHost";
+
+struct SandboxToolPreflight {
+    config: Arc<Config>,
+}
+
+#[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
+impl SandboxToolPreflight {
+    async fn tool_invoke(
+        &self,
+        slug: String,
+        args: Value,
+        _connection: Option<String>,
+    ) -> tinybus::Result<Value> {
+        if let Some(backend) = crate::flows::tinyflows::caps::tools::backend_for(&slug) {
+            backend
+                .preflight(&self.config, &slug, &args)
+                .await
+                .map_err(tinybus::Error::failed)?;
+        }
+        Ok(serde_json::json!({"preflight": "passed"}))
+    }
+}
+
+#[async_trait]
 impl BuilderGates for FlowsHost {
     async fn validate(&self, graph: Value) -> FlowValidation {
         ops::flows_validate(graph).value
@@ -204,28 +290,6 @@ impl BuilderGates for FlowsHost {
         .await
     }
 
-    fn sandbox_capabilities(&self) -> Capabilities {
-        use crate::flows::tinyflows::caps::{
-            PreflightToolInvoker, SchemaAwareMockAgentRunner, SchemaAwareMockLlm,
-        };
-        // The schema-aware mock `AgentRunner` makes a draft with `agent` nodes
-        // exercise the agent-node path instead of erroring on a missing
-        // capability, and honors `config.output_parser.schema` so the
-        // null-resolution check does not false-positive on an agent node that
-        // declared a schema. Plain agent nodes (no `agent_ref`) never reach the
-        // runner; they go to the `llm` slot, so that is swapped for the
-        // schema-aware mock too. The tool invoker is wrapped in the wiring
-        // preflight, so a Composio `tool_call` whose required arg is missing or
-        // null fails the dry run even over the echo mocks.
-        let mut caps =
-            tinyflows::caps::mock::mock_capabilities_with_agent(SchemaAwareMockAgentRunner);
-        caps.llm = Arc::new(SchemaAwareMockLlm);
-        caps.tools = Arc::new(PreflightToolInvoker {
-            config: self.config.clone(),
-            inner: caps.tools.clone(),
-        });
-        caps
-    }
 }
 
 #[async_trait]
