@@ -61,4 +61,3 @@ fn tiny_artifacts_blob_namespace_composes_with_host_artifact_collections() {
         .iter()
         .any(|prefix| prefix == "artifacts/files/"));
 }
-
