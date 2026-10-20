@@ -7,8 +7,6 @@
 //! - `AskClarificationTool` (`ask_user_clarification`, from `tinyagents_harness::tools`) — returns the
 //!   question as its output; the turn actually pauses only because callers
 //!   list this name in the harness seam's `early_exit_tools`.
-//! - [`DelegateTool`] — hands a subtask to a named agent with its own
-//!   provider/model configuration.
 //! - [`PlanExitTool`] — ends a plan-mode pass by returning the plan plus
 //!   [`PLAN_EXIT_MARKER`], which TinyAgents consumes to switch to build mode.
 //! - `RunWorkflowTool` / `AwaitWorkflowTool` — spawn a
