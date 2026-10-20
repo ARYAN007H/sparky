@@ -22,16 +22,6 @@ pub(super) struct CloudSlugResolution<'a> {
     pub(super) codex: tinyinference_llm::providers::openai::codex::OpenAiCodexRouting,
 }
 
-pub(super) fn resolve_cloud_slug<'a>(
-    role: &str,
-    slug: &str,
-    model: &str,
-    config: &'a Config,
-) -> anyhow::Result<CloudSlugResolution<'a>> {
-    let extensions = crate::core::runtime::CoreContext::current_extensions();
-    resolve_cloud_slug_for(role, slug, model, config, extensions.as_deref())
-}
-
 pub(super) fn resolve_cloud_slug_for<'a>(
     role: &str,
     slug: &str,
@@ -224,31 +214,23 @@ pub(super) fn resolve_cloud_slug_for<'a>(
 /// non-codex slugs is not replicated (the crate has responses-*primary*, not
 /// fallback); chat completions is the primary path those slugs use in practice.
 ///
-/// The resolution is shared via [`resolve_cloud_slug`], so slugs resolve
+/// The resolution is shared via [`resolve_cloud_slug_for`], so slugs resolve
 /// identically to the legacy path; only the wire client differs. The **same**
 /// access gate the `Provider` path applies (`enforce_local_only_inference` +
 /// `verify_session_active`) runs before building. Temperature rides the per-call
 /// `ModelRequest` (managed/local parity; the `@<temp>` suffix still bakes a fixed
 /// override).
+#[cfg(test)]
 pub(super) fn try_create_cloud_slug_chat_model(
     role: &str,
     config: &Config,
-    egress: &EgressLedger,
-) -> OptionalChatModelResult {
-    try_create_cloud_slug_chat_model_with_native_tools(role, config, true, egress)
-}
-
-pub(super) fn try_create_cloud_slug_chat_model_with_native_tools(
-    role: &str,
-    config: &Config,
-    native_tool_calling: bool,
     egress: &EgressLedger,
 ) -> OptionalChatModelResult {
     let extensions = crate::core::runtime::CoreContext::current_extensions();
     try_create_cloud_slug_chat_model_with_native_tools_for(
         role,
         config,
-        native_tool_calling,
+        true,
         egress,
         extensions.as_deref(),
     )
