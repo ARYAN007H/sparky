@@ -166,7 +166,8 @@ fn owner_file_pause_is_imported_and_the_original_bytes_stay_unchanged() {
 }
 
 #[tokio::test]
-async fn a_detached_lifecycle_write_uses_its_carried_actor_scope() {
+async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
+    use crate::agent::harness::fork_context::ParentExecutionContext;
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use tinyagents_harness::context::{RunConfig, RunContext};
 
@@ -174,24 +175,80 @@ async fn a_detached_lifecycle_write_uses_its_carried_actor_scope() {
     let checkpoints = workspace.path().join(".openhuman/subagent_checkpoints");
     let alice = actor(workspace.path(), "detached-lifecycle-alice");
     let bob = actor(workspace.path(), "detached-lifecycle-bob");
+    let parent_execution = ParentExecutionContext {
+        agent_definition_id: "detached-lifecycle-root".into(),
+        allowed_subagent_ids: ["same-agent".to_string()].into_iter().collect(),
+        turn_model_source: crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(
+            tinyagents_harness::testkit::ScriptedModel::replies(vec!["detached actor result"]),
+        )),
+        all_tools: Arc::new(Vec::new()),
+        all_tool_specs: Arc::new(Vec::new()),
+        visible_tool_specs: Arc::new(Vec::new()),
+        visible_tool_names: std::collections::HashSet::new(),
+        subagent_tool_ceiling_names: std::collections::HashSet::new(),
+        model_name: "test-model".into(),
+        temperature: 0.0,
+        workspace_dir: workspace.path().to_path_buf(),
+        workspace_descriptor: None,
+        agent_config: crate::config::AgentConfig::default(),
+        workflows: Arc::new(Vec::new()),
+        memory_context: Arc::new(None),
+        session_id: "detached-lifecycle-session".into(),
+        channel: "test".into(),
+        connected_integrations: Vec::new(),
+        tool_call_format: tinytools_agent::dialect::ToolCallFormat::Native,
+        session_key: "detached-lifecycle-key".into(),
+        session_parent_prefix: None,
+        on_progress: None,
+        run_queue: None,
+        host_env: Default::default(),
+    };
+    let mut definition = crate::agent_registry::host_definition::AgentDefinition::default();
+    definition.id = "same-agent".into();
+    definition.system_prompt = crate::agent_registry::host_definition::PromptSource::Inline(
+        "You are a test worker.".into(),
+    );
+    definition.max_iterations = 2;
     let parent = RunContext::new(
         RunConfig::new("detached-lifecycle-root").with_thread("detached-lifecycle-thread"),
-        OpenHumanRunContext::new().with_core(Some(alice.clone())),
+        OpenHumanRunContext::new()
+            .with_core(Some(alice.clone()))
+            .with_parent(parent_execution),
     );
     let task_id = "detached-actor-child";
     let key = SubagentTaskKey::from_context(&parent, task_id, None);
-    let persistence = super::super::persistence::OpenHumanPersistence::new(checkpoints.clone())
-        .with_dispatch(parent.data.dispatch_ctx());
-    let mut outcome = SubagentOutcome::cancelled(task_id);
-    outcome.output = "detached actor result".into();
-    let detached = tokio::spawn(async move {
-        persistence
-            .record_terminal(&key, &outcome, None)
-            .await
-            .unwrap();
-        key
+    let options = crate::agent::subagent_host::SubagentRunOptions {
+        task_id: Some(task_id.into()),
+        checkpoint_dir: Some(checkpoints.clone()),
+        run_context: parent.data.clone(),
+        ..Default::default()
+    };
+    let (done, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+    let completion: super::super::HostCompletion = Arc::new(move |_, result, _| {
+        let done = done.clone();
+        Box::pin(async move {
+            done.send(result).unwrap();
+        })
     });
-    let key = detached.await.unwrap();
+    let (_, bundle) = super::super::invoke_driver_tool_with_request(
+        &parent,
+        super::super::driver_adapter::HostRequest {
+            invocation: definition,
+            options,
+        },
+        "finish".into(),
+        "background",
+        Some(completion),
+        Some(tinyagents_orchestration::subagent::SubAgentJobRegistry::default()),
+        None,
+    )
+    .await
+    .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(10), receiver.recv())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
     let alice_dispatch = CoreContext::scope(alice, async {
         crate::core::runtime::DispatchCtx::ambient()
     })
@@ -210,6 +267,7 @@ async fn a_detached_lifecycle_write_uses_its_carried_actor_scope() {
     let other = super::super::persistence::OpenHumanPersistence::new(checkpoints)
         .with_dispatch(bob_dispatch);
     assert!(other.load_terminal(&key).await.unwrap().is_none());
+    drop(bundle);
 }
 
 async fn assert_legacy_owner_terminal(format: &str) {
