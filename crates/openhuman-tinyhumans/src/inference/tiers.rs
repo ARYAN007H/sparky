@@ -169,15 +169,53 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
                     default_model: config.default_model.clone(),
                 },
             );
-            if config.primary_cloud.is_none()
-                && config
-                    .inference_url
-                    .as_deref()
-                    .is_none_or(|url| url.trim().is_empty())
-            {
-                config.primary_cloud = Some(id);
-            }
             changed = true;
+        }
+    }
+
+    if config.primary_cloud.is_none() {
+        let legacy_url = config
+            .inference_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|url| !url.is_empty());
+        let managed_hosts = if config.resolved_endpoints.managed_hosts.is_empty() {
+            crate::client::enricher::resolve(config).managed_hosts
+        } else {
+            config.resolved_endpoints.managed_hosts.clone()
+        };
+        let is_managed_legacy_url = legacy_url.is_none_or(|url| {
+            openhuman_embed::__host::config_enrichers::ResolvedEndpoints {
+                managed_hosts,
+                ..Default::default()
+            }
+            .is_managed_host(url)
+        });
+        if is_managed_legacy_url {
+            let hosted_identity = |entry: &openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds| {
+                openhuman_embed::__host::config::schema::cloud_providers::is_hosted_cloud_identity(
+                    &entry.slug,
+                ) || openhuman_embed::__host::config::schema::cloud_providers::is_hosted_auth_style(
+                    entry.auth_style,
+                )
+            };
+            let hosted = legacy_url
+                .and_then(|url| {
+                    config
+                        .cloud_providers
+                        .iter()
+                        .find(|entry| hosted_identity(entry) && entry.endpoint.trim() == url)
+                })
+                .or_else(|| {
+                    config
+                        .cloud_providers
+                        .iter()
+                        .find(|entry| hosted_identity(entry))
+                });
+            if let Some(entry) = hosted {
+                config.primary_cloud = Some(entry.id.clone());
+                changed = true;
+            }
         }
     }
     changed
