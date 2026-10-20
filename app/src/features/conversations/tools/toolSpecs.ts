@@ -63,7 +63,6 @@ import {
   MailXIcon,
   MapPinIcon,
   MessageCircleQuestionIcon,
-  MessageSquareReplyIcon,
   MousePointerClickIcon,
   NetworkIcon,
   NewspaperIcon,

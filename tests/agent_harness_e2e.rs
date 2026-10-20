@@ -1110,13 +1110,13 @@ async fn subagent_delegation_happy_path_inner() {
 // The orchestrator selects task_manager_agent through spawn_subagent, and
 // ask_user_clarification is in that agent's named tools. A child that needs a
 // detail pauses and hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
-// the `manage_tasks` tool result (#4291). That envelope is an ordinary tool
-// result to the orchestrator — `manage_tasks` is not in its `early_exit_tools`
+// the spawn_subagent result (#4291). That envelope is an ordinary tool result
+// to the orchestrator — spawn_subagent is not in its `early_exit_tools`
 // — so the orchestrator relays the question in its OWN next reply, and turn 1
 // ends on that text.
 //
 // Actual LLM request ordering (4 upstream calls total):
-//   request[0] = orchestrator turn 1 → manage_tasks (blocking) tool call
+//   request[0] = orchestrator turn 1 → spawn_subagent tool call
 //   request[1] = task_manager_agent → ask_user_clarification pauses the child
 //   request[2] = orchestrator, with the awaiting-user envelope in context →
 //                relays the question as text; turn 1 ends (chat_done)
@@ -1137,14 +1137,17 @@ async fn delegated_clarification_flow_inner() {
     let _lock = env_lock();
     reset_script(vec![
         // ── turn 1 ──
-        // request[0]: Orchestrator delegates to task_manager_agent via manage_tasks.
+        // request[0]: Orchestrator selects the task manager.
         tool_call_completion(
-            "manage_tasks",
-            json!({ "prompt": "Add my GitHub issues as a task source", "blocking": true }),
+            "spawn_subagent",
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "Add my GitHub issues as a task source"
+            }),
         ),
         // request[1]: task_manager_agent asks for the missing detail. This pauses
         //   the child; the question comes back to the orchestrator inside the
-        //   `[SUBAGENT_AWAITING_USER]` envelope as the manage_tasks result.
+        //   `[SUBAGENT_AWAITING_USER]` envelope as the spawn_subagent result.
         tool_call_completion(
             "ask_user_clarification",
             json!({ "question": "WHICH_VERSION_CANARY?" }),
@@ -3369,8 +3372,11 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     reset_script(vec![
         // Orchestrator hands the install to `skill_setup` (a direct hand-off, #6302).
         tool_call_completion(
-            "setup_skills",
-            json!({ "prompt": "Install the harness registry skill", "blocking": true }),
+        "spawn_subagent",
+        json!({
+            "agent_id": "skill_setup",
+            "prompt": "Install the harness registry skill"
+        }),
         ),
         // skill_setup finds the entry, then installs it (the gate parks here).
         tool_call_completion(
@@ -3621,7 +3627,10 @@ async fn assert_packed_hand_off_reaches_specialist(
         packed_tool_call_completion(
             pack,
             hand_off,
-            json!({ "prompt": format!("Handle this through {hand_off}"), "blocking": true }),
+            json!({
+                "agent_id": hand_off,
+                "prompt": format!("Handle this through {hand_off}")
+            }),
         ),
         text_completion("The specialist finished the task."),
         text_completion("The specialist handled it."),
