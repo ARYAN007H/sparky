@@ -6,6 +6,30 @@ mod env_guard;
 mod published_tinyflows;
 
 use env_guard::EnvVarGuard;
+use std::path::Path;
+use std::process::Command;
+
+fn dump_published_prompt(agent_id: &str, workspace: &Path) -> serde_json::Value {
+    let output = Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
+        .args([
+            "agent",
+            "dump-prompt",
+            "--agent",
+            agent_id,
+            "--workspace",
+            workspace.to_str().expect("workspace path is UTF-8"),
+            "--json",
+            "--with-tools",
+        ])
+        .output()
+        .expect("run the public prompt-dump command");
+    assert!(
+        output.status.success(),
+        "prompt dump for {agent_id} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("decode public prompt-dump JSON")
+}
 
 #[tokio::test]
 async fn published_module_prompts_render_through_the_normal_host_path() {
@@ -24,41 +48,42 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     let workspace = temp.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("workspace directory");
     let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
-    let config_path = temp.path().join("config.toml");
+    let openhuman_home = temp.path().join(".openhuman");
+    let local_config_dir = openhuman_home.join("users/local");
+    std::fs::create_dir_all(&local_config_dir).expect("create isolated local config directory");
+    let config_path = openhuman_home.join("config.toml");
+    let local_config_path = local_config_dir.join("config.toml");
     let quoted_library = serde_json::to_string(
         library
             .to_str()
             .expect("published module path is valid UTF-8"),
     )
     .expect("TOML-compatible quoted path");
-    std::fs::write(
-        &config_path,
-        format!(
-            "api_url = \"http://127.0.0.1:1\"\n\n[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_library}\n"
-        ),
-    )
-    .expect("module override config");
+    let enabled_config = format!(
+        "api_url = \"http://127.0.0.1:1\"\n\n[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_library}\n"
+    );
+    for path in [&config_path, &local_config_path] {
+        std::fs::write(path, &enabled_config).expect("write enabled module override config");
+    }
 
     for (agent_id, required, invariant) in [
         ("workflow_builder", "propose_workflow", "propose-only"),
         ("flow_discovery", "suggest_workflows", "read-only"),
     ] {
-        let mut options = openhuman_core::agent::debug::DumpPromptOptions::new(agent_id);
-        options.workspace_dir_override = Some(workspace.clone());
-        options.config_path_override = Some(config_path.clone());
-        let prompt = openhuman_core::agent::debug::dump_agent_prompt(options)
-            .await
-            .unwrap_or_else(|error| panic!("rendering {agent_id} prompt: {error:#}"));
-        let lower = prompt.text.to_lowercase();
+        let prompt = dump_published_prompt(agent_id, &workspace);
+        let text = prompt["system_prompt"]
+            .as_str()
+            .expect("public prompt dump returns system_prompt text");
+        let lower = text.to_lowercase();
         assert!(
-            prompt.text.contains(required),
+            text.contains(required),
             "{agent_id} prompt missing {required}"
         );
         assert!(
             lower.contains(invariant),
             "{agent_id} prompt missing {invariant}"
         );
-        assert!(prompt.text.contains("## Workspace"));
+        assert!(text.contains("## Workspace"));
     }
 
     #[cfg(feature = "skills")]
@@ -124,24 +149,23 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
             !disabled.iter().any(|skill| skill.id() == "flow-authoring"),
             "a profile with modules disabled cannot see the shared workspace builtin"
         );
-        let mut disabled_options =
-            openhuman_core::agent::debug::DumpPromptOptions::new("orchestrator");
-        disabled_options.workspace_dir_override = Some(workspace.clone());
-        disabled_options.config_path_override = Some(disabled_config_path);
-        let ordinary_prompt = openhuman_core::agent::debug::dump_agent_prompt(disabled_options)
-            .await
-            .expect("ordinary prompt construction continues when modules are disabled");
-        assert!(ordinary_prompt.text.contains("## Workspace"));
+        let disabled_text = std::fs::read_to_string(&disabled_config_path)
+            .expect("read disabled module config");
+        for path in [&config_path, &local_config_path] {
+            std::fs::write(path, &disabled_text).expect("disable module in active CLI config");
+        }
+        let ordinary_prompt = dump_published_prompt("orchestrator", &workspace);
+        assert!(ordinary_prompt["system_prompt"]
+            .as_str()
+            .expect("ordinary prompt text")
+            .contains("## Workspace"));
 
         // Re-enable the same profile after the disabled view and ensure the
         // async host preflight restores the module-backed catalogue.
-        let mut enabled_options =
-            openhuman_core::agent::debug::DumpPromptOptions::new("workflow_builder");
-        enabled_options.workspace_dir_override = Some(workspace.clone());
-        enabled_options.config_path_override = Some(config_path.clone());
-        openhuman_core::agent::debug::dump_agent_prompt(enabled_options)
-            .await
-            .expect("enabled profile prompt after disabled profile");
+        for path in [&config_path, &local_config_path] {
+            std::fs::write(path, &enabled_config).expect("re-enable module in CLI config");
+        }
+        dump_published_prompt("workflow_builder", &workspace);
         let reenabled = openhuman_core::skills::load_workflow_metadata_for(&ctx, &config);
         assert!(
             reenabled.iter().any(|skill| skill.id() == "flow-authoring"),
