@@ -15,11 +15,10 @@ use axum::http::header::AUTHORIZATION;
 use env_guard::EnvVarGuard;
 use serde_json::{json, Value};
 
-#[path = "support/storage_drivers.rs"]
-#[macro_use]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::{Case, Driver};
+use storage_case::Case;
 
 fn write_config(home: &Path, module: &Path) -> std::path::PathBuf {
     let quoted_module = serde_json::to_string(
@@ -120,7 +119,7 @@ fn deduplicating_graph() -> Value {
 #[tokio::test]
 async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     let _env_lock = env_guard::env_lock_async().await;
-    let case = Case::open(Driver::Memory).expect("memory storage driver is always available");
+    let case = Case::open();
     case.install();
 
     let temp = tempfile::tempdir().expect("isolated home/workspace");
