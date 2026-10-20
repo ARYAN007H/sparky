@@ -2,21 +2,19 @@ use super::*;
 use tinymemory_integrations::sources::SourceStatus;
 
 #[test]
-fn corrupt_source_state_file_is_set_aside() {
+fn corrupt_legacy_source_state_is_skipped_and_left_in_place() {
     let tmp = tempfile::tempdir().unwrap();
-    let file = path(tmp.path());
+    let file = crate::memory::state_store::legacy_path(tmp.path(), "sources_state");
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-    std::fs::write(&file, b"{\"source-1\":").unwrap();
+    let corrupt = b"{\"source-1\":";
+    std::fs::write(&file, corrupt).unwrap();
 
     assert!(load(tmp.path()).is_empty());
     assert!(
-        !file.exists(),
-        "corrupt state must not be silently replaced"
+        file.exists(),
+        "the read-only legacy load must not move the file"
     );
-    assert_eq!(
-        std::fs::read(file.with_extension("json.corrupt")).unwrap(),
-        b"{\"source-1\":"
-    );
+    assert_eq!(std::fs::read(file).unwrap(), corrupt);
 }
 
 #[test]

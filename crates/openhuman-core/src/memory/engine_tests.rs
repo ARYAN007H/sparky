@@ -1,5 +1,6 @@
 use super::*;
 use crate::memory::test_fixtures::config_in;
+use crate::security::credentials::{AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME};
 
 struct ClearInstalledHostEngine;
 
@@ -159,6 +160,22 @@ async fn profile_engine_binding_uses_the_host_scrub_policy() {
         assert_host_scrubbing(bound, &reference).await;
     })
     .await;
+}
+
+#[test]
+fn a_local_session_token_is_not_a_tinyhumans_credential() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    AuthService::from_config(&config)
+        .store_provider_token(
+            APP_SESSION_PROVIDER,
+            DEFAULT_AUTH_PROFILE_NAME,
+            "desktop.test.local",
+            std::collections::HashMap::new(),
+            true,
+        )
+        .unwrap();
+    assert!(!has_key(&config, TINYHUMANS_ENGINE));
 }
 
 #[test]

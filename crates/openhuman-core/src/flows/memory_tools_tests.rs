@@ -142,6 +142,39 @@ async fn failed_replacement_keeps_the_previous_value() {
 }
 
 #[tokio::test]
+async fn remembering_identical_content_keeps_the_replayed_item() {
+    let (_tmp, config) = engine_config();
+    let first = remember_keyed(&config, "f1", "k", "same", LearningKind::Fact)
+        .await
+        .unwrap();
+    let replay = remember_keyed(&config, "f1", "k", "same", LearningKind::Fact)
+        .await
+        .unwrap();
+
+    assert_eq!(replay, first);
+    let items = list(&config, flow_filter("f1")).await;
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id.0, first);
+}
+
+#[tokio::test]
+async fn remember_keyed_cleans_up_legacy_values_across_pages() {
+    let (_tmp, config) = engine_config();
+    for index in 0..101 {
+        seed_keyed(&config, "k", &format!("legacy value {index}")).await;
+    }
+
+    let replacement = remember_keyed(&config, "f1", "k", "current", LearningKind::Fact)
+        .await
+        .unwrap();
+    let items = list(&config, flow_filter("f1")).await;
+
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id.0, replacement);
+    assert!(items[0].text.contains("current"));
+}
+
+#[tokio::test]
 async fn remember_keyed_preserves_a_write_after_its_snapshot() {
     let tmp = TempDir::new().unwrap();
     let mut config = Config::default();

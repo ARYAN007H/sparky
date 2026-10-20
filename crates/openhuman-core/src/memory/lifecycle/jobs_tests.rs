@@ -36,9 +36,9 @@ fn build(agent: &str) -> BackgroundJob {
 }
 
 #[test]
-fn corrupt_job_queue_file_is_set_aside() {
+fn corrupt_legacy_job_queue_is_skipped_without_replacing_the_file() {
     let tmp = tempfile::tempdir().unwrap();
-    let file = path(tmp.path());
+    let file = crate::memory::state_store::legacy_path(tmp.path(), "jobs");
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     std::fs::write(&file, b"{\"pending\":[").unwrap();
     let store = FileQueueStore {
@@ -47,13 +47,10 @@ fn corrupt_job_queue_file_is_set_aside() {
 
     assert_eq!(store.load(), QueueState::default());
     assert!(
-        !file.exists(),
-        "corrupt queue must not be silently replaced"
+        file.exists(),
+        "the read-only legacy import must leave corrupt bytes in place"
     );
-    assert_eq!(
-        std::fs::read(file.with_extension("json.corrupt")).unwrap(),
-        b"{\"pending\":["
-    );
+    assert_eq!(std::fs::read(file).unwrap(), b"{\"pending\":[");
 }
 
 #[tokio::test]
