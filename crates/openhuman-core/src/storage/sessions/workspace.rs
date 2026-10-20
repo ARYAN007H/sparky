@@ -229,16 +229,12 @@ pub fn artifact_scoped_for_in(
             return None;
         }
     };
-    // Artifacts are shared across the profile, like the artifacts domain's
-    // existing document records. Session state is agent-scoped, so using its
-    // session key here would strand records in a narrower namespace.
-    let agent = tenant
-        .agent
-        .as_deref()
-        .filter(|agent| tenant.profile.is_none() && *agent != super::DEFAULT_AGENT);
+    // Match the storage domain's established scope for this tenant. Session
+    // keys encode a default agent even when the storage scope is local, so do
+    // not derive artifact scope from the session key.
     let scope = match crate::storage::scope_from(
         tenant.profile.as_deref(),
-        agent,
+        tenant.agent.as_deref(),
         crate::core::runtime::mode::is_saas(),
     ) {
         Ok(scope) => scope,

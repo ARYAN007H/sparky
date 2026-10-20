@@ -108,6 +108,14 @@ fn artifact_scope_uses_agent_scope_only_for_unprofiled_named_agents() {
     let default_agent = artifact_scoped_for_in(ws.path(), &context_for(None))
         .expect("the default agent has the local scope");
     assert!(default_agent.scope().is_local());
+
+    let explicitly_named_default =
+        artifact_scoped_for_in(ws.path(), &context_for(Some(super::DEFAULT_AGENT)))
+            .expect("an explicitly named agent uses the agent scope");
+    assert_eq!(
+        explicitly_named_default.scope(),
+        &crate::storage::scope_for_agent(super::DEFAULT_AGENT)
+    );
 }
 
 #[test]
