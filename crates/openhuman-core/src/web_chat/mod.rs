@@ -78,6 +78,7 @@ pub use progress::unix_epoch_ms;
 pub use event_bus::fresh_approval_surface_subscription;
 
 // Public API — operations
+pub(crate) use ops::channel_web_chat_with_stored_attachments;
 #[cfg(test)]
 pub use ops::drain_queued_turns_for_test;
 pub(crate) use ops::invalidate_thread_sessions_for_tenant;

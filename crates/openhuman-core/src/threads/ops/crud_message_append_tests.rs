@@ -351,7 +351,7 @@ async fn append_cannot_forge_private_attachment_storage_metadata() {
     let stored = crate::threads::store::get_messages(
         &crate::core::runtime::DispatchCtx::ambient(),
         config.workspace_dir.clone(),
-        "uploads",
+        "uploads".to_string(),
     )
     .unwrap();
     assert!(stored[0]
@@ -511,16 +511,13 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     );
     left.expect("concurrent metadata update one");
     right.expect("concurrent metadata update two");
-    let current = conversations::blocking::get_messages(
-        ctx.clone(),
-        config.workspace_dir.clone(),
-        "uploads",
-    )
-    .await
-    .unwrap()
-    .into_iter()
-    .find(|message| message.id == saved.id)
-    .unwrap();
+    let current =
+        conversations::blocking::get_messages(ctx.clone(), config.workspace_dir.clone(), "uploads")
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|message| message.id == saved.id)
+            .unwrap();
     assert_eq!(current.extra_metadata["pinned"], true);
     assert_eq!(current.extra_metadata["seen"], true);
     assert_eq!(current.extra_metadata["reactionSummary"]["heart"], 1);
@@ -567,15 +564,10 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
     )
     .await
     .unwrap();
-    let first = persist_queued_user_message(
-        &ctx,
-        "uploads",
-        "request-1",
-        "queued follow-up",
-        &staged,
-    )
-    .await
-    .unwrap();
+    let first =
+        persist_queued_user_message(&ctx, "uploads", "request-1", "queued follow-up", &staged)
+            .await
+            .unwrap();
     assert_eq!(first.id, "user:request-1");
     assert_eq!(first.sender, "user");
     assert_eq!(first.attachments, staged);
@@ -596,33 +588,20 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
         b"\x89PNG\r\n\x1a\n"
     );
 
-    let retry = persist_queued_user_message(
-        &ctx,
-        "uploads",
-        "request-1",
-        "queued follow-up",
-        &staged,
-    )
-    .await
-    .unwrap();
+    let retry =
+        persist_queued_user_message(&ctx, "uploads", "request-1", "queued follow-up", &staged)
+            .await
+            .unwrap();
     assert_eq!(retry.id, first.id);
 
-    let conflicting_retry = persist_queued_user_message(
-        &ctx,
-        "uploads",
-        "request-1",
-        "different content",
-        &staged,
-    )
-    .await;
+    let conflicting_retry =
+        persist_queued_user_message(&ctx, "uploads", "request-1", "different content", &staged)
+            .await;
     assert!(conflicting_retry.is_err());
 
-    let rows = conversations::blocking::get_messages(
-        ctx,
-        config.workspace_dir.clone(),
-        "uploads".into(),
-    )
-    .await
-    .unwrap();
+    let rows =
+        conversations::blocking::get_messages(ctx, config.workspace_dir.clone(), "uploads".into())
+            .await
+            .unwrap();
     assert_eq!(rows.iter().filter(|row| row.id == first.id).count(), 1);
 }

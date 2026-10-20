@@ -237,10 +237,7 @@ async fn persist_queued_user_message_with_config(
         .find(|message| message.id == row_id);
     if let Some(existing) = existing {
         let stored_parts = crate::threads::attachments::public_refs(&existing.extra_metadata);
-        if existing.sender != "user"
-            || existing.content != text
-            || stored_parts != opaque_parts
-        {
+        if existing.sender != "user" || existing.content != text || stored_parts != opaque_parts {
             return Err("queued message request ID conflicts with an existing row".into());
         }
         return Ok(message_to_record(existing));
