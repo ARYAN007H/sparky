@@ -229,18 +229,37 @@ pub fn artifact_scoped_for_in(
             return None;
         }
     };
-    let key = crate::core::runtime::session_key(&tenant);
-    let backend = match crate::storage::local::backend_for(workspace_dir) {
+    // Artifacts are shared across the profile, like the artifacts domain's
+    // existing document records. Session state is agent-scoped, so using its
+    // session key here would strand records in a narrower namespace.
+    let agent = tenant.agent.as_deref().filter(|agent| {
+        tenant.profile.is_none() && *agent != super::DEFAULT_AGENT
+    });
+    let scope = match crate::storage::scope_from(
+        tenant.profile.as_deref(),
+        agent,
+        crate::core::runtime::mode::is_saas(),
+    ) {
+        Ok(scope) => scope,
+        Err(error) => {
+            log::warn!("[session_store] no artifact storage scope: {error}");
+            return None;
+        }
+    };
+    let core = context.resolved()?;
+    let backend = match crate::core::runtime::CoreContext::sync_scope(core, || {
+        crate::storage::local::backend_for(workspace_dir)
+    }) {
         Ok(backend) => backend,
         Err(error) => {
             log::warn!("[session_store] no storage backend for artifacts: {error:#}");
             return None;
         }
     };
-    match backend.for_scope(&session_scope(&key)) {
+    match backend.for_scope(&scope) {
         Ok(scoped) => Some(scoped),
         Err(error) => {
-            log::warn!("[session_store] artifact scope refused agent={key}: {error}");
+            log::warn!("[session_store] artifact scope refused scope={scope}: {error}");
             None
         }
     }
