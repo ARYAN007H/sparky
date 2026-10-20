@@ -25,8 +25,8 @@ use std::sync::Arc;
 
 use openhuman_core::agent::tinyagents::host::OpenHumanBudgetGate;
 use openhuman_core::config::Config;
-use openhuman_core::platform::cost::{self, TokenUsage};
 use openhuman_core::platform::cost::route::CostRoute;
+use openhuman_core::platform::cost::{self, TokenUsage};
 use tinyagents_harness::host::budget_gate::{BudgetGate, CallEstimate};
 
 /// Spend far past every limit the cap ever enforced: the retired daily default
