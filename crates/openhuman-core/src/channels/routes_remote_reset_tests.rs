@@ -73,13 +73,10 @@ fn seed_session(
     store_agent_id: &str,
 ) -> SessionRef {
     let session = SessionRef::scoped(key, agent_id);
-    let history = crate::agent::session_store::transcripts_or_files_in(
-        core,
-        store_agent_id,
-        workspace,
-    )
-    .open_session(&session, transcript_meta(key, agent_id))
-    .unwrap();
+    let history =
+        crate::agent::session_store::transcripts_or_files_in(core, store_agent_id, workspace)
+            .open_session(&session, transcript_meta(key, agent_id))
+            .unwrap();
     history
         .append(TranscriptMessage::user("prior tenant turn"))
         .unwrap();
@@ -95,11 +92,8 @@ fn session_messages(
     store_agent_id: &str,
     session: &SessionRef,
 ) -> Vec<String> {
-    let locator = crate::agent::session_store::transcripts_or_files_in(
-        core,
-        store_agent_id,
-        workspace,
-    );
+    let locator =
+        crate::agent::session_store::transcripts_or_files_in(core, store_agent_id, workspace);
     let head = locator.head_generation(session);
     locator
         .read_session_transcript(&head)
@@ -331,7 +325,9 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     .expect("resetting an already-empty durable session is an idempotent success");
     assert!(matches!(repeated, RemoteHostResult::Completed));
     assert_eq!(alice_locator.head_generation(&alice_session), cleared_head);
-    assert!(session_messages(&alice_core, workspace, &alice_store_agent, &alice_session).is_empty());
+    assert!(
+        session_messages(&alice_core, workspace, &alice_store_agent, &alice_session).is_empty()
+    );
 
     let empty_canonical = "channel-session:telegram:bot-a:group:empty-room";
     let empty_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, empty_canonical);

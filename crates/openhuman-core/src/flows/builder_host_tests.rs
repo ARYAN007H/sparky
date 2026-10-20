@@ -7,7 +7,9 @@ use tokio::sync::{oneshot, Notify};
 fn sandbox_callback_path_is_accepted_by_tinybus() {
     let path = super::sandbox_callback_object_path(uuid::Uuid::new_v4())
         .expect("generated callback path is a valid TinyBus object path");
-    assert!(path.as_str().starts_with("/ai/tinyhumans/openhuman/FlowSandbox/"));
+    assert!(path
+        .as_str()
+        .starts_with("/ai/tinyhumans/openhuman/FlowSandbox/"));
 }
 
 #[cfg(feature = "modules")]
@@ -31,10 +33,7 @@ async fn sandbox_callback_serves_scoped_tool_preflight() {
     ));
     let path = super::sandbox_callback_object_path(uuid::Uuid::new_v4()).unwrap();
     service
-        .serve_at(
-            path.clone(),
-            SandboxToolPreflight { config, dispatch },
-        )
+        .serve_at(path.clone(), SandboxToolPreflight { config, dispatch })
         .await
         .unwrap();
     service.request_name(SANDBOX_CALLBACK_BUS).await.unwrap();
@@ -49,7 +48,11 @@ async fn sandbox_callback_serves_scoped_tool_preflight() {
     let output: serde_json::Value = proxy
         .call(
             tinyflows_bus::runs::caps::TOOL_INVOKE,
-            &("unknown-tool", serde_json::json!({}), Option::<String>::None),
+            &(
+                "unknown-tool",
+                serde_json::json!({}),
+                Option::<String>::None,
+            ),
         )
         .await
         .unwrap();
