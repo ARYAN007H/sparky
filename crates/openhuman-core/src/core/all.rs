@@ -18,6 +18,9 @@ use crate::core::ControllerSchema;
 /// A pinned, boxed future returned by a controller handler.
 pub type ControllerFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'static>>;
 
+/// A boxed future used by typed controller parsers and gates.
+pub type ControllerTask<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send + 'static>>;
+
 /// A function pointer type for controller handlers.
 ///
 /// Handlers take the call's explicit [`DispatchCtx`] and a map of parameters,
@@ -51,6 +54,88 @@ impl RegisteredController {
     }
 }
 
+/// A controller whose runtime path and validation seam share one typed parser.
+#[derive(Clone)]
+pub struct BoundRegisteredController {
+    pub schema: ControllerSchema,
+    invoke: Arc<dyn Fn(DispatchCtx, Map<String, Value>) -> ControllerFuture + Send + Sync>,
+    decode: Arc<dyn Fn(Map<String, Value>) -> Result<(), String> + Send + Sync>,
+}
+
+impl BoundRegisteredController {
+    /// Bind decoding and execution to the same parser function.
+    pub fn typed<P: Send + 'static>(
+        schema: ControllerSchema,
+        parse: fn(Map<String, Value>) -> Result<P, String>,
+        run: fn(DispatchCtx, P) -> ControllerFuture,
+    ) -> Self {
+        let decode = Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
+        let invoke = Arc::new(move |ctx, params| {
+            Box::pin(async move { run(ctx, parse(params)?).await }) as ControllerFuture
+        }) as Arc<dyn Fn(_, _) -> _ + Send + Sync>;
+        Self { schema, invoke, decode }
+    }
+
+    /// Preserve a manual pre-parse gate while sharing the parser with validation.
+    pub fn after_gate<G: Send + 'static, P: Send + 'static>(
+        schema: ControllerSchema,
+        gate: fn(DispatchCtx) -> ControllerTask<G>,
+        parse: fn(Map<String, Value>) -> Result<P, String>,
+        run: fn(DispatchCtx, G, P) -> ControllerFuture,
+    ) -> Self {
+        let decode = Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
+        let invoke = Arc::new(move |ctx, params| {
+            Box::pin(async move {
+                let gated = gate(ctx.clone()).await?;
+                run(ctx, gated, parse(params)?).await
+            }) as ControllerFuture
+        }) as Arc<dyn Fn(_, _) -> _ + Send + Sync>;
+        Self { schema, invoke, decode }
+    }
+
+    /// Decode params through the parser used by runtime invocation.
+    pub fn decode_params(&self, params: Map<String, Value>) -> Result<(), String> {
+        (self.decode)(params)
+    }
+
+    fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+        (self.invoke)(ctx, params)
+    }
+}
+
+/// Runtime registry entry, retaining the compatible legacy controller type.
+#[derive(Clone)]
+pub struct ControllerEntry {
+    pub schema: ControllerSchema,
+    handler: EntryHandler,
+}
+
+#[derive(Clone)]
+enum EntryHandler {
+    Legacy(ControllerHandler),
+    Bound(BoundRegisteredController),
+}
+
+impl ControllerEntry {
+    fn legacy(controller: RegisteredController) -> Self {
+        Self { schema: controller.schema, handler: EntryHandler::Legacy(controller.handler) }
+    }
+
+    fn bound(controller: BoundRegisteredController) -> Self {
+        Self { schema: controller.schema.clone(), handler: EntryHandler::Bound(controller) }
+    }
+
+    /// Returns the canonical RPC method name for this controller.
+    pub fn rpc_method_name(&self) -> String { rpc_method_name(&self.schema) }
+
+    fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+        match &self.handler {
+            EntryHandler::Legacy(handler) => handler(ctx, params),
+            EntryHandler::Bound(handler) => handler.invoke(ctx, params),
+        }
+    }
+}
+
 pub use super::domain_group::DomainGroup;
 mod components_gate;
 mod validate;
@@ -66,7 +151,7 @@ use validate::validate_registry;
 #[derive(Clone)]
 struct GroupedController {
     group: DomainGroup,
-    controller: RegisteredController,
+    controller: ControllerEntry,
 }
 
 /// Append `items` to `dst`, tagging each with `group`.
@@ -76,8 +161,12 @@ fn push(dst: &mut Vec<GroupedController>, group: DomainGroup, items: Vec<Registe
     dst.extend(
         items
             .into_iter()
-            .map(|controller| GroupedController { group, controller }),
+            .map(|controller| GroupedController { group, controller: ControllerEntry::legacy(controller) }),
     );
+}
+
+fn push_entries(dst: &mut Vec<GroupedController>, group: DomainGroup, items: Vec<ControllerEntry>) {
+    dst.extend(items.into_iter().map(|controller| GroupedController { group, controller }));
 }
 
 /// The [`DomainSet`](crate::core::runtime::DomainSet) of the ambient dispatch
