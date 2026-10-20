@@ -248,7 +248,9 @@ pub async fn list_configured_models_from_config(
             r
         }
         // Handled above: the managed catalog is served by the registered provider.
-        AuthStyle::OpenhumanJwt => request,
+        AuthStyle::OpenhumanJwt => {
+            return Err("hosted cloud catalog is unavailable without a registered host".into());
+        }
         AuthStyle::None => request,
     };
 
