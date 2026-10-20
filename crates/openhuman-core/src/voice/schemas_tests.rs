@@ -33,7 +33,10 @@ fn legacy_voice_catalog_keeps_its_handlers_and_schema_fixtures() {
     }
 
     let contracts = crate::voice::parameter_contracts();
-    for contract in contracts.iter().filter(|contract| !contract.method.contains(".live_")) {
+    for contract in contracts
+        .iter()
+        .filter(|contract| !contract.method.contains(".live_"))
+    {
         let controller = controllers
             .iter()
             .find(|controller| controller.schema.method_name() == contract.method)

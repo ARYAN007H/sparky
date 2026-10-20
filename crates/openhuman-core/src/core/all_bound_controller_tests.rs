@@ -323,9 +323,11 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
         "openhuman.mcp_clients_registry_get"
     );
     let contract = crate::mcp::registry::schemas::registry_get_parameter_contract();
-    crate::core::all::verify_parameter_contracts(std::slice::from_ref(entry),
-        std::slice::from_ref(&contract))
-        .expect("raw MCP entry matches its independent contract and bound decoder");
+    crate::core::all::verify_parameter_contracts(
+        std::slice::from_ref(entry),
+        std::slice::from_ref(&contract),
+    )
+    .expect("raw MCP entry matches its independent contract and bound decoder");
     assert!(entry.schema.inputs.iter().all(|field| field.required));
 
     for remove in [true, false] {
@@ -374,9 +376,11 @@ fn production_registry_binds_computer_status_to_its_declared_parser() {
     );
     assert_eq!(entry.rpc_method_name(), "openhuman.modules_computer_status");
     let contract = crate::modules::schemas::computer_status_parameter_contract();
-    crate::core::all::verify_parameter_contracts(std::slice::from_ref(entry),
-        std::slice::from_ref(&contract))
-        .expect("raw Modules entry matches its independent contract and bound decoder");
+    crate::core::all::verify_parameter_contracts(
+        std::slice::from_ref(entry),
+        std::slice::from_ref(&contract),
+    )
+    .expect("raw Modules entry matches its independent contract and bound decoder");
 
     // Runtime parsing intentionally keeps its permissive false default for
     // non-boolean inputs; these maps are parser cases, not schema examples.
@@ -510,15 +514,25 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
         "voice.live_settings_set",
         "voice.live_test_provider",
     ];
-    assert_eq!(entries.len(), expected_methods.len(), "complete core voice inventory");
+    assert_eq!(
+        entries.len(),
+        expected_methods.len(),
+        "complete core voice inventory"
+    );
     assert!(grouped.iter().all(|row| row.group == DomainGroup::Voice));
     assert_eq!(
-        entries.iter().map(|entry| entry.schema.method_name()).collect::<Vec<_>>(),
+        entries
+            .iter()
+            .map(|entry| entry.schema.method_name())
+            .collect::<Vec<_>>(),
         expected_methods,
         "independent core voice inventory and registry order"
     );
     assert_eq!(
-        contracts.iter().map(|contract| contract.method).collect::<Vec<_>>(),
+        contracts
+            .iter()
+            .map(|contract| contract.method)
+            .collect::<Vec<_>>(),
         expected_methods,
         "authored parameter fixtures cover the complete ordered voice inventory"
     );

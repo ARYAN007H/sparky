@@ -40,7 +40,10 @@ fn live_legacy_catalog_keeps_private_handler_identities_and_schema_fixtures() {
     }
 
     let contracts = crate::voice::parameter_contracts();
-    for contract in contracts.iter().filter(|contract| contract.method.contains(".live_")) {
+    for contract in contracts
+        .iter()
+        .filter(|contract| contract.method.contains(".live_"))
+    {
         let controller = controllers
             .iter()
             .find(|controller| controller.schema.method_name() == contract.method)

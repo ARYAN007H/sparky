@@ -18,16 +18,24 @@ fn legacy_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerF
 
 fn fixture() -> (ControllerEntry, ControllerParamContract) {
     let schema = ControllerSchema {
-            namespace: "fixture",
-            function: "read",
-            description: "Read a fixture.",
-            inputs: vec![crate::core::FieldSchema {
+        namespace: "fixture",
+        function: "read",
+        description: "Read a fixture.",
+        inputs: vec![
+            crate::core::FieldSchema {
                 name: "id",
                 ty: crate::core::TypeSchema::String,
                 comment: "Fixture identifier.",
                 required: true,
-            }],
-            outputs: vec![],
+            },
+            crate::core::FieldSchema {
+                name: "label",
+                ty: crate::core::TypeSchema::String,
+                comment: "Optional fixture label.",
+                required: false,
+            },
+        ],
+        outputs: vec![],
     };
     let controller = ControllerEntry::bound(BoundRegisteredController::typed(
         schema,
@@ -37,8 +45,11 @@ fn fixture() -> (ControllerEntry, ControllerParamContract) {
     let contract = ControllerParamContract {
         method: "fixture.read",
         required: &["id"],
-        optional: &[],
-        examples: vec![serde_json::json!({"id":"example"})],
+        optional: &["label"],
+        examples: vec![
+            serde_json::json!({"id":"example"}),
+            serde_json::json!({"id":"example","label":"fixture"}),
+        ],
     };
     (controller, contract)
 }
@@ -82,9 +93,35 @@ fn contract_rejects_each_removed_or_optional_required_declaration() {
         } else {
             broken.schema.inputs[0].required = false;
         }
-        assert!(verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
-            .unwrap_err()
-            .contains("required inputs mismatch"));
+        assert!(
+            verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
+                .unwrap_err()
+                .contains("required inputs mismatch")
+        );
+    }
+}
+
+#[test]
+fn contract_rejects_removed_or_required_optional_declarations() {
+    let (controller, contract) = fixture();
+    for remove in [true, false] {
+        let mut broken = controller.clone();
+        if remove {
+            broken.schema.inputs.retain(|field| field.name != "label");
+        } else {
+            broken
+                .schema
+                .inputs
+                .iter_mut()
+                .find(|field| field.name == "label")
+                .expect("independent optional field is present")
+                .required = true;
+        }
+        assert!(
+            verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
+                .unwrap_err()
+                .contains("optional inputs mismatch")
+        );
     }
 }
 

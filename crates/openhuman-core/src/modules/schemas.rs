@@ -376,4 +376,3 @@ pub(crate) fn computer_status_parameter_contract() -> crate::core::all::Controll
         ],
     }
 }
-
