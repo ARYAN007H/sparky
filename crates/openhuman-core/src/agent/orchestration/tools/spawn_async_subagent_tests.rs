@@ -88,6 +88,7 @@ async fn late_registration_refusal_aborts_the_worker_and_settles_its_durable_ses
         Some(session.subagent_session_id.clone()),
         workspace.path().to_path_buf(),
         None,
+        None,
         Arc::new(RunQueue::new()),
         join.abort_handle(),
         rx,

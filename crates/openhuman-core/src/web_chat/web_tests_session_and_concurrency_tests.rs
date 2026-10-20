@@ -619,8 +619,17 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
     let workspace = tempfile::tempdir().expect("workspace");
     let child = tokio::spawn(std::future::pending::<()>());
     let (_status_tx, status_rx) = running_subagents::status_channel();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let parent_epoch = crate::agent::orchestration::background_completions::CompletionTarget::new(
+        ctx.clone(),
+        workspace.path().to_path_buf(),
+        "session-web-stop".into(),
+        Some(thread_id.into()),
+    )
+    .expect("capture generation at spawn")
+    .parent_epoch();
     running_subagents::register(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &ctx,
         "task-web-stop-1".into(),
         "researcher".into(),
         "session-web-stop".into(),
@@ -628,6 +637,7 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
         None,
         workspace.path().to_path_buf(),
         Some(thread_id.into()),
+        parent_epoch,
         std::sync::Arc::new(tinyagents_harness::run_queue::RunQueue::new()),
         child.abort_handle(),
         status_rx,

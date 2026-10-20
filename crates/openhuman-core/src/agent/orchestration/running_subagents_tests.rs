@@ -101,21 +101,83 @@ fn register_test_with_thread(
     rq: Arc<RunQueue<QueuedTurn>>,
 ) -> watch::Sender<DetachedSubagentStatus> {
     let (tx, rx) = status_channel();
+    let ctx = cx();
+    let workspace = test_workspace();
+    let parent_epoch = parent_thread_id.map(|thread_id| {
+        crate::agent::orchestration::background_completions::CompletionTarget::new(
+            ctx.clone(),
+            workspace.clone(),
+            parent_session.to_owned(),
+            Some(thread_id.to_owned()),
+        )
+        .expect("capture parent generation at spawn")
+        .parent_epoch()
+        .expect("threaded spawn has a parent generation")
+    });
     register(
-        &cx(),
+        &ctx,
         task_id.into(),
         "researcher".into(),
         parent_session.into(),
         None,
         None,
-        test_workspace(),
+        workspace,
         parent_thread_id.map(Into::into),
+        parent_epoch,
         rq,
         dummy_abort(),
         rx,
     )
     .expect("fixture registration admitted");
     tx
+}
+
+#[tokio::test]
+async fn late_registration_rejects_a_parent_generation_reopened_after_spawn() {
+    let _guard = test_guard_async().await;
+    let ctx = cx();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let thread_id = "late-register-old-generation";
+    let old_epoch = crate::agent::orchestration::background_completions::CompletionTarget::new(
+        ctx.clone(),
+        workspace.path().to_path_buf(),
+        "late-register-parent".into(),
+        Some(thread_id.into()),
+    )
+    .expect("initial spawn admitted")
+    .parent_epoch()
+    .unwrap();
+    let router = crate::agent::orchestration::background_completions::router_for_workspace_ctx(
+        &ctx,
+        workspace.path(),
+    );
+    router
+        .cancel_parent(thread_id)
+        .expect("stop old generation");
+    router.resume_parent(thread_id);
+    assert!(!router
+        .parent_generation_admitted(thread_id, old_epoch)
+        .unwrap());
+
+    let child = tokio::spawn(std::future::pending::<()>());
+    let (_status_tx, status_rx) = status_channel();
+    let result = register(
+        &ctx,
+        "late-register-old-task".into(),
+        "researcher".into(),
+        "late-register-parent".into(),
+        None,
+        None,
+        workspace.path().to_path_buf(),
+        Some(thread_id.into()),
+        Some(old_epoch),
+        run_queue(),
+        child.abort_handle(),
+        status_rx,
+    );
+    assert!(matches!(result, Err(RegistrationError::ParentLifecycle(_))));
+    assert!(child.await.unwrap_err().is_cancelled());
+    assert!(cancel_by_task(&ctx, "late-register-old-task").is_none());
 }
 
 #[tokio::test]

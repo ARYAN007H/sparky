@@ -184,6 +184,7 @@ pub(crate) fn register(
     subagent_session_id: Option<String>,
     workspace_dir: PathBuf,
     parent_thread_id: Option<String>,
+    parent_epoch: Option<u64>,
     run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
     abort: AbortHandle,
     status: watch::Receiver<DetachedSubagentStatus>,
@@ -232,23 +233,38 @@ pub(crate) fn register(
         crate::agent::orchestration::background_delivery::recover_on_boot(ctx, &workspace_dir);
     }
 
-    let parent_epoch = match parent_thread_id.as_deref() {
-        Some(thread_id) => {
-            match crate::agent::orchestration::background_completions::CompletionTarget::new(
-                ctx.clone(),
-                workspace_dir.clone(),
-                parent_session.clone(),
-                Some(thread_id.to_owned()),
-            ) {
-                Ok(target) => target.parent_epoch(),
-                Err(error) => {
-                    abort.abort();
-                    return Err(RegistrationError::ParentLifecycle(error));
-                }
+    if let Some(thread_id) = parent_thread_id.as_deref() {
+        let Some(parent_epoch) = parent_epoch else {
+            abort.abort();
+            return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+                "parent admission generation was not captured at spawn"
+            )));
+        };
+        let router = crate::agent::orchestration::background_completions::router_for_workspace_ctx(
+            ctx,
+            &workspace_dir,
+        );
+        match router.parent_generation_admitted(thread_id, parent_epoch) {
+            Ok(true) => {}
+            Ok(false) => {
+                let _ = router.tombstone(&task_id);
+                abort.abort();
+                return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+                    "parent admission generation is no longer current"
+                )));
+            }
+            Err(error) => {
+                let _ = router.tombstone(&task_id);
+                abort.abort();
+                return Err(RegistrationError::ParentLifecycle(error.into()));
             }
         }
-        None => None,
-    };
+    } else if parent_epoch.is_some() {
+        abort.abort();
+        return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+            "threadless child cannot carry a parent admission generation"
+        )));
+    }
 
     let metadata = RunningSubagentMetadata {
         profile,
