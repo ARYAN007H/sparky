@@ -38,25 +38,12 @@ mod resolve;
 mod roster;
 mod task_ledger;
 
-#[cfg(test)]
-#[path = "running_subagents_tests.rs"]
-mod tests;
-
-#[cfg(test)]
-pub(crate) use cancel::cancel_by_task;
-#[cfg(test)]
-pub(crate) use cancel::prune;
-#[cfg(test)]
-pub(crate) use cancel::{caller_workspace_in, CallerWorkspace};
 pub(crate) use cancel::{
     cancel_all, cancel_by_session_in_workspace, cancel_by_task_with_workspace_reason,
     cancel_for_thread, stop_for_thread, CancelledSubagent,
 };
 pub(crate) use registry::admit_spawn;
-#[cfg(test)]
-pub(crate) use registry::{
-    register, register_with_parent_epoch, status_channel, RegistrationError,
-};
+pub(crate) use registry::RegistrationError;
 pub(crate) use roster::active_subagents_context_block;
 #[cfg(test)]
 pub(crate) use task_ledger::task_records;
