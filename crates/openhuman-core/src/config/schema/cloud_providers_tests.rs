@@ -1,10 +1,11 @@
 //! Tests for the surrounding module.
 
 use super::{
-    builtin_cloud_providers, builtin_cloud_supports_responses_api, endpoint_host,
+    builtin_cloud_providers, builtin_cloud_supports_responses_api,
     endpoint_host_is_chat_completions_only, host_is_builtin_cloud_provider, is_builtin_cloud_slug,
     is_slug_reserved, AuthStyle,
 };
+use tinyinference_providers::builtin::endpoint_host;
 
 #[test]
 fn reserved_slugs() {
