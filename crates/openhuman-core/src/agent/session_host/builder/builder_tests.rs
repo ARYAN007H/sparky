@@ -21,12 +21,19 @@ fn spec(name: &str) -> ToolSpec {
 // `AgentDefinitionRegistry` singleton's init-once state.
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn test_config(tmp: &tempfile::TempDir) -> crate::config::Config {
-    let mut config = crate::agent::session_host::test_support::config_with_model_fixture();
+fn test_config_without_inference(tmp: &tempfile::TempDir) -> crate::config::Config {
+    let mut config = crate::config::Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     config.action_dir = tmp.path().join("workspace");
     config.config_path = tmp.path().join("config.toml");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    config
+}
+
+fn test_config(tmp: &tempfile::TempDir) -> crate::config::Config {
+    let mut config = test_config_without_inference(tmp);
+    crate::agent::session_host::test_support::install_model_fixture();
+    config.default_model = Some("test/session-fixture".to_string());
     config
 }
 

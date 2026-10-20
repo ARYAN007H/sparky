@@ -1,6 +1,5 @@
 use super::*;
 
-use crate::config::Config;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
 use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelHooks};
 use std::sync::Arc;
@@ -86,9 +85,3 @@ pub(crate) fn install_model_fixture_in(extensions: &crate::core::slots::Extensio
     );
 }
 
-pub(crate) fn config_with_model_fixture() -> Config {
-    install_model_fixture();
-    let mut config = Config::default();
-    config.default_model = Some("test/session-fixture".into());
-    config
-}
