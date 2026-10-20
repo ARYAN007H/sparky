@@ -517,3 +517,6 @@ mod profile_cancel_tests;
 
 #[path = "tools_e2e_continuation_tests.rs"]
 mod continuation_tests;
+
+#[path = "tools_e2e_paused_cancel_tests.rs"]
+mod paused_cancel_tests;
