@@ -82,10 +82,6 @@ fn contract_rejects_each_removed_or_optional_required_declaration() {
         } else {
             broken.schema.inputs[0].required = false;
         }
-        let broken = ControllerEntry {
-            schema: broken.schema,
-            ..broken
-        };
         assert!(verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
             .unwrap_err()
             .contains("required inputs mismatch"));
