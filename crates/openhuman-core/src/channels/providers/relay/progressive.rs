@@ -81,7 +81,7 @@ impl RelayProgressiveTransport {
                 // Project canonical events through the same compiled web
                 // adapter used by desktop and TUI turns. Provider delivery is
                 // still performed only by the typed terminal send below.
-                // Controlled RED reproduction: temporarily suppress projection.
+                self.projection.output(*event).await;
                 Ok(ProgressiveTransportResult::Acknowledged)
             }
             ProgressiveTransportRequest::SendTyped {
