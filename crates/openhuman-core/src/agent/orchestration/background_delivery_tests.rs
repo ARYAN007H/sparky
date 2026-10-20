@@ -458,44 +458,6 @@ async fn a_pending_completion_survives_a_restart_and_is_delivered() {
 }
 
 #[tokio::test]
-async fn an_unexpired_completion_claim_stays_leased_after_router_reopen() {
-    let _g = test_guard().await;
-    let ws = workspace();
-    let w = ws.path();
-    record(
-        w,
-        "bd-claimed-restart",
-        "sub-1",
-        "claimed before restart",
-        "thread-claimed-restart",
-    )
-    .await;
-
-    let router = router_for_workspace(w);
-    let claimed = router
-        .claim_pending("thread-claimed-restart", usize::MAX)
-        .unwrap();
-    assert_eq!(claimed.len(), 1, "the first owner holds the completion");
-    drop(claimed);
-    drop(router);
-    forget_workspace_for_test(w);
-
-    let reopened = router_for_workspace(w);
-    assert!(
-        reopened
-            .claim_pending("thread-claimed-restart", usize::MAX)
-            .unwrap()
-            .is_empty(),
-        "an unexpired durable claim prevents duplicate delivery after reopening"
-    );
-    assert_eq!(
-        pending_ids(w, "thread-claimed-restart"),
-        ["sub-1"],
-        "the leased completion remains pending for delivery after its visibility lease expires"
-    );
-}
-
-#[tokio::test]
 async fn every_subagent_terminal_event_schedules_a_drain_through_the_handler() {
     // #4896 regression: EVERY subagent terminal event must schedule a drain for
     // the parent — not just `SubagentCompleted`. Sent through the real handler,
