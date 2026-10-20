@@ -3,6 +3,7 @@
 //! rejected session.
 
 use tinyinference_llm::model::ProviderError;
+use tinyinference_llm::providers::tinyhumans::{TinyHumansAuthFailure, TinyHumansAuthFailureKind, TinyHumansOperation};
 use tinyinference_llm::Error as TiError;
 
 /// Resolve the persisted app-session token for a managed inference caller.
@@ -91,30 +92,32 @@ fn maybe_publish_local_session_expiry(operation: &str) {
     );
 }
 
-/// Publish a `SessionExpired` event when the backend rejects a crate-native
-/// model call with `401`/`403` Unauthorized — mirroring the check in
-/// the core `CrateBackedProvider::invoke` which the
-/// crate-native path bypasses.
-pub(super) fn maybe_publish_session_expired(err: &TiError, operation: &str) {
-    if let TiError::Provider(pe) = err {
-        maybe_publish_provider_session_expired(pe, operation);
-    }
-}
-
-pub(super) fn maybe_publish_provider_session_expired(pe: &ProviderError, operation: &str) {
-    if pe.provider.as_str() == "OpenHuman" && matches!(pe.status, Some(401 | 403)) {
-        let reason = tinyinference_core::sanitize::sanitize_api_error(&pe.message);
-        openhuman_embed::__host::core::bus::BUS.publish(
-            openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
-                source: format!(
-                    "openhuman_backend_model.{}({})",
-                    operation,
-                    pe.status.unwrap_or(0)
-                ),
-                reason,
-            },
-        );
-    }
+/// Publish expiry only from TinyInference's explicit managed-endpoint
+/// provenance. The provider label is a wire diagnostic and is not an auth
+/// ownership signal.
+pub(super) fn publish_managed_auth_failure(
+    error: &ProviderError,
+    context: TinyHumansAuthFailure,
+) {
+    let status = match context.kind() {
+        TinyHumansAuthFailureKind::Unauthorized => 401,
+        TinyHumansAuthFailureKind::Forbidden => 403,
+        TinyHumansAuthFailureKind::Other => return,
+    };
+    let operation = match context.operation() {
+        TinyHumansOperation::Invoke => "invoke",
+        TinyHumansOperation::Stream => "stream",
+        // Readiness deliberately remains fail-open and does not sign the user
+        // out, matching its previous host behavior.
+        TinyHumansOperation::Readiness => return,
+    };
+    let reason = tinyinference_core::sanitize::sanitize_api_error(&error.message);
+    openhuman_embed::__host::core::bus::BUS.publish(
+        openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
+            source: format!("openhuman_backend_model.{operation}({status})"),
+            reason,
+        },
+    );
 }
 
 #[cfg(test)]
