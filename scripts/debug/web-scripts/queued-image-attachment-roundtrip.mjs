@@ -11,8 +11,15 @@ const IMAGE_BYTES = Buffer.from(
 );
 
 function unwrap(value) {
-  for (let depth = 0; depth < 6 && value && !value.message; depth += 1) {
-    value = value.result ?? value.data ?? value.value;
+  for (let depth = 0; depth < 6 && value && typeof value === "object"; depth += 1) {
+    if (Object.hasOwn(value, "error")) {
+      throw new Error(`RPC returned an error: ${JSON.stringify(value.error)}`);
+    }
+    const wrapper = ["result", "data", "value"].find((key) =>
+      Object.hasOwn(value, key),
+    );
+    if (!wrapper) break;
+    value = value[wrapper];
   }
   return value;
 }
@@ -76,7 +83,7 @@ export default async function queuedImageAttachmentRoundtrip({
   // The mock captures a script when each model request starts. Hold the first
   // request before its first token, then change the script for the queued turn.
   mock.set("llmStreamScript", [
-    { text: FIRST_REPLY, delayMs: 12_000 },
+    { text: FIRST_REPLY, delayMs: 60_000 },
     { finish: "stop" },
   ]);
   await page.goto(new URL("/#/chat", page.url()).toString());
@@ -134,17 +141,6 @@ export default async function queuedImageAttachmentRoundtrip({
     .getByText(QUEUED_PROMPT, { exact: false })
     .waitFor({ state: "visible" });
 
-  const queuedAck = await page.waitForFunction(
-    () =>
-      window.__OPENHUMAN_STORE__?.getState?.().queue?.pendingFollowupsByThread,
-    null,
-    { timeout: 5_000 },
-  );
-  const queueState = await queuedAck.jsonValue();
-  const pending = Object.values(queueState[threadId] ?? {})[0];
-  if (!pending?.requestId || pending.message?.content !== QUEUED_PROMPT) {
-    throw new Error("accepted queued image did not remain as a pending follow-up");
-  }
   const queuedAckResponse = await waitUntil(
     () =>
       rpcResponses.find(
@@ -155,14 +151,36 @@ export default async function queuedImageAttachmentRoundtrip({
     "the queued channel_web_chat acknowledgement",
   );
   const ack = queuedAckResponse.result;
-  if (
-    ack?.queued !== true ||
-    ack.request_id !== pending.requestId ||
-    JSON.stringify(ack.queued_attachments) !== JSON.stringify(pending.attachments)
-  ) {
+  if (ack?.queued !== true || !ack.request_id) {
     throw new Error(
-      `queued ACK does not match sanitized UI state: ${JSON.stringify(ack)}`,
+      `queued channel_web_chat ACK is malformed: ${JSON.stringify(ack)}`,
     );
+  }
+  const pendingHandle = await page.waitForFunction(
+    ({ id, requestId, attachments }) => {
+      const pending = Object.values(
+        window.__OPENHUMAN_STORE__?.getState?.().queue?.pendingFollowupsByThread?.[
+          id
+        ] ?? {},
+      ).find((entry) => entry.requestId === requestId);
+      return (
+        pending &&
+        JSON.stringify(pending.attachments) === JSON.stringify(attachments)
+      );
+    },
+    {
+      id: threadId,
+      requestId: ack.request_id,
+      attachments: ack.queued_attachments,
+    },
+    { timeout: 10_000 },
+  );
+  const pending = await pendingHandle.jsonValue();
+  if (!pending?.requestId || pending.message?.content !== QUEUED_PROMPT) {
+    throw new Error("accepted queued image did not remain as a matching pending follow-up");
+  }
+  if (JSON.stringify(ack.queued_attachments) !== JSON.stringify(pending.attachments)) {
+    throw new Error(`queued ACK attachments differ from UI state: ${JSON.stringify(ack)}`);
   }
   if (
     pending.attachments?.length !== 1 ||
@@ -194,7 +212,13 @@ export default async function queuedImageAttachmentRoundtrip({
         }),
       });
       const body = await response.json();
-      return body.result?.messages ?? body.messages ?? [];
+      if (!response.ok) throw new Error(`thread list failed with HTTP ${response.status}`);
+      if (body.error) throw new Error(`thread list RPC failed: ${JSON.stringify(body.error)}`);
+      const messages = body.result?.messages ?? body.messages;
+      if (!Array.isArray(messages)) {
+        throw new Error(`thread list response has no messages: ${JSON.stringify(body)}`);
+      }
+      return messages;
     },
     { url: rpcUrl, token: authorization, id: threadId },
   );
@@ -211,6 +235,13 @@ export default async function queuedImageAttachmentRoundtrip({
     )) ?? [];
   if (earlyUiRows.some((row) => row.content === QUEUED_PROMPT)) {
     throw new Error("queued image appeared as a persisted transcript row before flush");
+  }
+  await page.getByTestId("stop-generation-button").waitFor({
+    state: "visible",
+    timeout: 5_000,
+  });
+  if (await page.getByText(FIRST_REPLY, { exact: false }).isVisible().catch(() => false)) {
+    throw new Error("held active turn completed before the queued-row timing assertion");
   }
   log("queued image ACK retained only an opaque ref; no transcript row existed before the active turn completed");
 
@@ -230,7 +261,13 @@ export default async function queuedImageAttachmentRoundtrip({
         }),
       });
       const body = await response.json();
-      return body.result?.messages ?? body.messages ?? [];
+      if (!response.ok) throw new Error(`thread list failed with HTTP ${response.status}`);
+      if (body.error) throw new Error(`thread list RPC failed: ${JSON.stringify(body.error)}`);
+      const messages = body.result?.messages ?? body.messages;
+      if (!Array.isArray(messages)) {
+        throw new Error(`thread list response has no messages: ${JSON.stringify(body)}`);
+      }
+      return messages;
     },
     { url: rpcUrl, token: authorization, id: threadId },
   );
