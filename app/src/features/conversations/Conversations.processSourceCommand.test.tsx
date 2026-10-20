@@ -255,6 +255,7 @@ async function renderChat(
 }
 
 async function submitComposerText(text: string) {
+  const previousSends = mockChatSend.mock.calls.length + mockChatSendWithAck.mock.calls.length;
   const input = screen.getByRole('textbox');
   await act(async () => {
     input.textContent = text;
@@ -265,7 +266,11 @@ async function submitComposerText(text: string) {
   await act(async () => {
     fireEvent.click(sendButton);
   });
-  await waitFor(() => expect(mockChatSend).toHaveBeenCalledTimes(1));
+  await waitFor(() =>
+    expect(mockChatSend.mock.calls.length + mockChatSendWithAck.mock.calls.length).toBeGreaterThan(
+      previousSends
+    )
+  );
 }
 
 async function clickSendButtonWithDraft(text: string) {
