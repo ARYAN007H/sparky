@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub use crate::core::envelope::{ApiEnvelope, ApiError, ApiMeta, EmptyRequest, PaginationMeta};
 
 /// Request to create a new conversation thread.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateConversationThreadRequest {
     #[serde(default)]
@@ -25,7 +25,7 @@ pub struct CreateConversationThreadRequest {
 
 /// Request to bind or clear the working folder of a thread that has no
 /// messages yet.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateConversationThreadWorkingDirRequest {
     pub thread_id: String,
