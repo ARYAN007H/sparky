@@ -171,8 +171,82 @@ test("CI Full requires every Playwright lane and manual workflow shares the arti
   assert.match(manual, /lane:\s*\[1, 2, 3, 4\]/);
   assert.match(
     manual,
-    /e2e-web-shards\.sh --lane=\$\{\{ matrix\.lane \}\} --lanes=4/,
+    /e2e-web-shards\.sh --lane=\$\{\{ matrix\.lane \}\} --lanes=4 --selection=all/,
   );
+});
+
+test("required selection forwards every healthy spec and never the diagnostic file", () => {
+  const runner = path.join(fixtureRoot, "selection-runner.sh");
+  fs.writeFileSync(
+    runner,
+    '#!/usr/bin/env bash\nprintf "%s|%s\\n" "$OPENHUMAN_WORKSPACE" "$*" >> "$CALL_LOG"\n',
+  );
+  fs.chmodSync(runner, 0o755);
+  const callLog = path.join(fixtureRoot, "required-calls.log");
+  const workspace = path.join(fixtureRoot, "required-workspaces");
+  const result = run(["--lane=4", "--lanes=4", "--selection=required"], {
+    E2E_WEB_SESSION_RUNNER: `bash ${runner}`,
+    CALL_LOG: callLog,
+    OPENHUMAN_WORKSPACE: workspace,
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const calls = fs.readFileSync(callLog, "utf8").trim().split("\n");
+  assert.equal(calls.length, 18);
+  const joined = calls.join("\n");
+  assert.doesNotMatch(joined, /aui-tool-result-elements\.spec\.ts/);
+  for (const required of [
+    "agent-review.spec.ts",
+    "auth-access-control.spec.ts",
+    "command-palette-keyboard.spec.ts",
+    "skills-search-install.spec.ts",
+    "connections-tab-deeplinks.spec.ts",
+    "webhooks-tunnel-flow.spec.ts",
+  ]) {
+    assert.match(joined, new RegExp(required.replaceAll(".", "\\.")));
+  }
+  assert.ok(calls.every((call) => call.includes("/selection-required/lane-4/")));
+});
+
+test("diagnostic selection is one file-atomic unit and propagates failure", () => {
+  const runner = path.join(fixtureRoot, "diagnostic-runner.sh");
+  fs.writeFileSync(
+    runner,
+    '#!/usr/bin/env bash\nprintf "%s|%s\\n" "$OPENHUMAN_WORKSPACE" "$*" >> "$CALL_LOG"\nexit 1\n',
+  );
+  fs.chmodSync(runner, 0o755);
+  const callLog = path.join(fixtureRoot, "diagnostic-calls.log");
+  const workspace = path.join(fixtureRoot, "diagnostic-workspaces");
+  const result = run(["--lane=1", "--lanes=1", "--selection=diagnostic"], {
+    E2E_WEB_SESSION_RUNNER: `bash ${runner}`,
+    CALL_LOG: callLog,
+    OPENHUMAN_WORKSPACE: workspace,
+  });
+
+  assert.equal(result.status, 1, result.stderr);
+  const calls = fs.readFileSync(callLog, "utf8").trim().split("\n");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /aui-tool-result-elements\.spec\.ts/);
+  assert.match(calls[0], /selection-diagnostic\/lane-1\/diagnostic-0/);
+  assert.equal(
+    fs
+      .readFileSync(
+        path.join(workspace, "selection-diagnostic/lane-1/receipts/diagnostic-0.exit"),
+        "utf8",
+      )
+      .trim(),
+    "1",
+  );
+});
+
+test("diagnostic lane with no assigned file is rejected before launching a runner", () => {
+  const callLog = path.join(fixtureRoot, "empty-diagnostic-calls.log");
+  const result = run(["--lane=2", "--lanes=4", "--selection=diagnostic"], {
+    CALL_LOG: callLog,
+  });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /assigns no units/);
+  assert.equal(fs.existsSync(callLog), false);
 });
 
 test("failure artifact names are unique across all four Playwright lanes", () => {
@@ -254,11 +328,11 @@ fi
   assert.ok(fs.existsSync(path.join(firstOutput, "trace.zip")));
   assert.notEqual(firstOutput, secondOutput);
   assert.equal(
-    fs.readFileSync(path.join(workspace, "lane-4/receipts/special-3.exit"), "utf8").trim(),
+    fs.readFileSync(path.join(workspace, "selection-all/lane-4/receipts/special-3.exit"), "utf8").trim(),
     "1",
   );
   assert.equal(
-    fs.readFileSync(path.join(workspace, "lane-4/receipts/special-7.exit"), "utf8").trim(),
+    fs.readFileSync(path.join(workspace, "selection-all/lane-4/receipts/special-7.exit"), "utf8").trim(),
     "0",
   );
 });
@@ -287,7 +361,7 @@ test("failed units retain failure while later units run in distinct workspaces",
   assert.equal(
     fs
       .readFileSync(
-        path.join(workspace, "lane-4/receipts/shard-4.exit"),
+        path.join(workspace, "selection-all/lane-4/receipts/shard-4.exit"),
         "utf8",
       )
       .trim(),
@@ -296,7 +370,7 @@ test("failed units retain failure while later units run in distinct workspaces",
   assert.equal(
     fs
       .readFileSync(
-        path.join(workspace, "lane-4/receipts/shard-64.exit"),
+        path.join(workspace, "selection-all/lane-4/receipts/shard-64.exit"),
         "utf8",
       )
       .trim(),
