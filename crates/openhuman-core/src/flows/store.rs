@@ -27,7 +27,7 @@ pub fn dir(config: &Config) -> PathBuf {
 pub(crate) fn call_catalog<T, A>(config: &Config, member: &'static str, args: A) -> Result<T>
 where
     T: DeserializeOwned + Send + 'static,
-    A: Serialize + Send + 'static,
+    A: Serialize + Send + Sync + 'static,
 {
     let config = config.clone();
     crate::storage::block_on_anyhow(async move {

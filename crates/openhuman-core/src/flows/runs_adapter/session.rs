@@ -290,6 +290,7 @@ pub(crate) fn insert(session: Arc<RunSession>) -> Result<(), String> {
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let key = RunKey::new(&bindings.storage(), &session.run_id);
+    drop(bindings);
     let mut sessions = SESSIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);

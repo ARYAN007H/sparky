@@ -21,7 +21,7 @@ pub(super) fn bus_error(error: impl std::fmt::Display) -> tinybus::Error {
 }
 
 pub(super) fn to_bus_agent_definition(
-    definition: crate::agent_registry::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
 ) -> Result<runs::AgentDefinition, String> {
     use tinyagents_definition::{ModelSpec, PromptSource, ToolScope};
 

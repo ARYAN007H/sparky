@@ -188,10 +188,11 @@ pub fn mark_finished(
     history: Vec<TranscriptMessage>,
 ) -> Result<(), String> {
     let task_id = task_id.to_owned();
+    let task_id_for_update = task_id.clone();
     let status = DurableSubagentStatus::from_run_status(run_status);
     let updated =
         update_session_for_task(store, subagent_session_id, &task_id, move |session, now| {
-            session.current_task_id = Some(task_id.clone());
+            session.current_task_id = Some(task_id_for_update.clone());
             session.status = status;
             session.latest_history = Some(history.clone());
             session.latest_error = None;
@@ -214,9 +215,10 @@ pub fn mark_failed(
     error: String,
 ) -> Result<(), String> {
     let task_id = task_id.to_owned();
+    let task_id_for_update = task_id.clone();
     let updated =
         update_session_for_task(store, subagent_session_id, &task_id, move |session, now| {
-            session.current_task_id = Some(task_id.clone());
+            session.current_task_id = Some(task_id_for_update.clone());
             session.status = DurableSubagentStatus::Failed;
             session.latest_error = Some(error.clone());
             session.updated_at = now.clone();
@@ -302,7 +304,7 @@ pub fn reuse_decision(reuse: Option<&DurableSubagentSession>, force_fresh: bool)
 fn update_session<F>(
     store: &SubagentSessionStore,
     subagent_session_id: &str,
-    update: F,
+    mut update: F,
 ) -> Result<bool, String>
 where
     F: FnMut(&mut DurableSubagentSession, String) + Send + 'static,

@@ -376,7 +376,7 @@ impl CatalogStoragePort {
                 .map(|record| {
                     Ok(CatalogVersionedDocument {
                         id: record.id,
-                        version: record.version,
+                        version: record.version.0,
                         doc: record.doc,
                         meta: CatalogDocumentMeta {
                             schema: record.meta.schema,
@@ -444,7 +444,7 @@ impl CatalogStoragePort {
                     .into_iter()
                     .map(|record| CatalogVersionedDocument {
                         id: record.id,
-                        version: record.version,
+                        version: record.version.0,
                         doc: record.doc,
                         meta: CatalogDocumentMeta {
                             schema: record.meta.schema,

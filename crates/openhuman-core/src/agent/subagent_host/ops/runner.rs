@@ -860,7 +860,7 @@ async fn run_typed_mode(
         );
         crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
             reason,
-            failure_cause,
+            failure_cause: failure_cause.clone(),
         }
     } else if hit_cap {
         // The tinyagents run stopped at the model-call cap with work still

@@ -87,7 +87,7 @@ impl RepeatedToolFailureMiddleware {
     pub(crate) fn current_classified_cause(
         &self,
     ) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
-        self.stop.current_classified_cause()
+        self.policy.stop.current_classified_cause()
     }
 
     /// Judge each call's side effect from the registered tools' own
