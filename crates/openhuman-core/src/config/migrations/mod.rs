@@ -40,35 +40,10 @@ mod unify_ai_provider_settings;
 /// Current target schema version. Bumped alongside every new migration.
 pub const CURRENT_SCHEMA_VERSION: u32 = 14;
 
-/// Give a brand-new [`Config`] the managed `openhuman` cloud-provider entry.
-///
-/// A fresh workspace is created already stamped at [`CURRENT_SCHEMA_VERSION`]
-/// (`Config::load_or_init`), so **every** version gate in [`run_pending`] is
-/// false on its first launch — including the `== 1` step that is the only place
-/// the managed entry has ever been seeded. Nothing was missed and no migration
-/// failed: the entry was simply never created, and no later run can create it,
-/// because the gate that would have is behind a version the workspace skipped.
-///
-/// That is why this is called at the creation site rather than expressed as a
-/// migration. A migration cannot fix a config that is born at the target
-/// version, and bumping [`CURRENT_SCHEMA_VERSION`] to add one only moves the
-/// same hole forward a number.
-///
-/// Seeding is *not* folded into `Config::default()` on purpose. `Config` has no
-/// container-level `#[serde(default)]`, so a default-constructed provider list
-/// would not reach deserialization anyway — but it would reach every test and
-/// helper that builds a `Config` from `Default`, and [`seed_cloud_providers`]
-/// early-returns on a non-empty list. The migration tests that assert "empty
-/// list gets seeded" would then be asserting nothing at all.
-///
-/// [`seed_cloud_providers`]: unify_ai_provider_settings::seed_cloud_providers
+/// Run registered host initializers for a new configuration before its first
+/// save. Bare core has no initializer and remains host-neutral.
 pub(crate) fn seed_new_workspace(config: &mut Config) {
-    let mut stats = unify_ai_provider_settings::MigrationStats::default();
-    unify_ai_provider_settings::seed_cloud_providers(config, &mut stats);
-    log::debug!(
-        "[migrations] new workspace seeded with {} cloud provider(s)",
-        stats.cloud_providers_seeded
-    );
+    crate::inference::registry::normalize_config(config);
 }
 
 /// Run any migrations whose `schema_version` gate hasn't yet been

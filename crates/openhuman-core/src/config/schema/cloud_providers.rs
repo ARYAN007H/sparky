@@ -78,7 +78,7 @@ pub fn builtin_cloud_providers() -> Vec<BuiltinCloudProvider> {
         .collect()
 }
 
-pub(crate) fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
+pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
     builtin_cloud_providers()
         .into_iter()
         .find(|provider| provider.slug == type_str)

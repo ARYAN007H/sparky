@@ -1,5 +1,5 @@
 //! Migration 1 → 2: unify the scattered AI provider settings into the new
-//! per-workload provider-string fields, and seed the `cloud_providers` list.
+//! per-workload provider-string fields and preserve legacy custom endpoints.
 //!
 //! ## What this migration consolidates
 //!
@@ -36,14 +36,10 @@
 //!   successful run is a no-op.
 //! - Never touches keys / secrets. API keys remain in
 //!   `auth-profiles.json` via [`crate::security::credentials::AuthService`].
-//! - Always seeds an `Openhuman` entry into `cloud_providers` (idempotent —
-//!   only when the list is empty).
 //! - Migrates `inference_url` into a `Custom` cloud provider entry when the
-//!   URL doesn't look like the OpenHuman backend.
+//!   URL doesn't look like a registered managed backend.
 
-use crate::config::schema::cloud_providers::{
-    builtin_cloud_provider, generate_provider_id, AuthStyle, CloudProviderCreds,
-};
+use crate::config::schema::cloud_providers::{generate_provider_id, AuthStyle, CloudProviderCreds};
 use crate::config::Config;
 
 /// Counters returned by [`run`] for diagnostics. Logged at INFO once per
@@ -63,7 +59,7 @@ pub struct MigrationStats {
 pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
     let mut stats = MigrationStats::default();
 
-    seed_cloud_providers(config, &mut stats);
+    seed_legacy_custom_provider(config, &mut stats);
     set_primary_cloud(config, &mut stats);
     derive_workload_providers(config, &mut stats);
 
@@ -76,44 +72,8 @@ pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
     Ok(stats)
 }
 
-/// Seed `cloud_providers` with an OpenHuman entry (and optionally a Custom
-/// entry derived from a legacy `inference_url`).
-pub(super) fn seed_cloud_providers(config: &mut Config, stats: &mut MigrationStats) {
-    if !config.cloud_providers.is_empty() {
-        log::debug!(
-            "[migrations][unify-ai] cloud_providers already populated ({} entries), skipping seed",
-            config.cloud_providers.len()
-        );
-        return;
-    }
-
-    // Always seed the OpenHuman entry — even if api_url is None, the factory
-    // resolves a sensible default at runtime.
-    let oh_endpoint = config
-        .api_url
-        .clone()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| {
-            builtin_cloud_provider("openhuman")
-                .expect("managed builtin")
-                .endpoint
-                .to_string()
-        });
-    let oh_default_model = config
-        .default_model
-        .clone()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| crate::config::MODEL_MANAGED_DEFAULT.to_string());
-    config.cloud_providers.push(CloudProviderCreds {
-        id: generate_provider_id("openhuman"),
-        slug: "openhuman".to_string(),
-        label: "OpenHuman".to_string(),
-        endpoint: oh_endpoint,
-        auth_style: AuthStyle::OpenhumanJwt,
-        default_model: Some(oh_default_model),
-    });
-    stats.cloud_providers_seeded += 1;
-
+/// Preserve a custom endpoint from the legacy `inference_url` field.
+fn seed_legacy_custom_provider(config: &mut Config, stats: &mut MigrationStats) {
     let hosts = crate::config::enrichers::managed_hosts_for(config);
 
     // If there's a legacy `inference_url` pointing at a non-OpenHuman

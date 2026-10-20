@@ -131,5 +131,22 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
     for route in &mut config.model_routes {
         changed |= rewrite(&mut route.model);
     }
+    if config.cloud_providers.is_empty() {
+        if let Some(preset) = openhuman_embed::__host::config::schema::cloud_providers::builtin_cloud_provider("openhuman") {
+            let id = openhuman_embed::__host::config::schema::cloud_providers::generate_provider_id("openhuman");
+            config.cloud_providers.push(openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
+                id: id.clone(),
+                slug: preset.slug.to_string(),
+                label: preset.label.to_string(),
+                endpoint: config.api_url.as_deref().filter(|url| !url.trim().is_empty()).unwrap_or(preset.endpoint).to_string(),
+                auth_style: preset.auth_style,
+                default_model: config.default_model.clone(),
+            });
+            if config.primary_cloud.is_none() && config.inference_url.as_deref().is_none_or(|url| url.trim().is_empty()) {
+                config.primary_cloud = Some(id);
+            }
+            changed = true;
+        }
+    }
     changed
 }
