@@ -6,7 +6,7 @@ import {
   waitForAppReady,
 } from '../helpers/core-rpc';
 import {
-  inFlightThreadKeys,
+  inFlightThreadKey,
   persistedThreadMessages,
   selectedThreadTranscript,
 } from '../helpers/chat-transcript';
@@ -133,7 +133,7 @@ test.describe('Chat Harness - Send Stream', () => {
     // shape and the terminal `{ finish }` entry had nowhere to go.
     type StreamScriptEntry = { text: string; delayMs: number } | { finish: 'stop' | 'tool_calls' };
     const streamScript: StreamScriptEntry[] = [
-      ...REPLY_PIECES.map(text => ({ text, delayMs: 60 })),
+      ...REPLY_PIECES.map(text => ({ text, delayMs: 250 })),
       { finish: 'stop' },
     ];
 
@@ -142,6 +142,7 @@ test.describe('Chat Harness - Send Stream', () => {
     const threadId = await createNewThread(page);
 
     await sendMessage(page, PROMPT);
+    await expect.poll(() => inFlightThreadKey(threadId)).toBeTruthy();
 
     await expect(page.getByText(/here is the marker\s+canary-9f3c1a/i)).toBeVisible({
       timeout: 30_000,
@@ -169,10 +170,11 @@ test.describe('Chat Harness - Send Stream', () => {
       }, { timeout: 10_000 })
       .toContain(CANARY);
     const durable = await selectedThreadTranscript(page);
+    expect(durable.threadId).toBe(threadId);
     expect(durable.content).toContain(PROMPT);
     expect(durable.content).toContain(REPLY_PIECES.join(''));
     expect(durable.total).toBeGreaterThan(0);
-    await expect.poll(inFlightThreadKeys).not.toContain(`::${durable.threadId}`);
+    await expect.poll(() => inFlightThreadKey(durable.threadId)).toBeUndefined();
     await expect
       .poll(async () => {
         const messages = await persistedThreadMessages(threadId);

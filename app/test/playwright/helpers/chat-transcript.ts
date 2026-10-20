@@ -67,3 +67,9 @@ export async function inFlightThreadKeys(): Promise<string[]> {
   expect(Array.isArray(entries)).toBe(true);
   return (entries as Array<{ key: string }>).map(entry => entry.key);
 }
+
+export async function inFlightThreadKey(threadId: string): Promise<string | undefined> {
+  expect(threadId.length).toBeGreaterThan(0);
+  const keys = await inFlightThreadKeys();
+  return keys.find(key => key === threadId || key.endsWith(threadId));
+}
