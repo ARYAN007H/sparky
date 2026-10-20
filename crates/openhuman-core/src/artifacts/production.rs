@@ -101,6 +101,34 @@ impl Production {
         revise: Option<&str>,
         chat: Option<&ApprovalChatContext>,
     ) -> Result<Self, String> {
+        let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
+        Self::start_with_scoped_storage(
+            ctx,
+            workspace_dir,
+            files,
+            kind,
+            title,
+            extension,
+            tool_call_id,
+            revise,
+            chat,
+            scoped,
+        )
+        .await
+    }
+
+    async fn start_with_scoped_storage(
+        ctx: &crate::core::runtime::DispatchCtx,
+        workspace_dir: &Path,
+        files: FileRoots,
+        kind: ArtifactKind,
+        title: &str,
+        extension: &str,
+        tool_call_id: Option<&str>,
+        revise: Option<&str>,
+        chat: Option<&ApprovalChatContext>,
+        scoped: Option<crate::storage::ScopedStorage>,
+    ) -> Result<Self, String> {
         let legacy_kind = if kind == ArtifactKind::Image {
             LegacyArtifactKind::Image
         } else {
@@ -119,12 +147,13 @@ impl Production {
         )
         .await?;
 
-        let (artifacts, file_store) = super::tiny_store::artifacts_service_with_file_store(
+        let (artifacts, file_store) = super::tiny_store::build_artifacts_service_with_scope(
             workspace_dir,
             files.clone(),
             None,
             chat,
-            ctx,
+            scoped,
+            None,
         );
         let mut production = Self {
             artifacts,
