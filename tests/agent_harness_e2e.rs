@@ -48,6 +48,7 @@ use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
 use openhuman_rpc::server::build_core_http_router;
 
 const TEST_RPC_TOKEN: &str = "json-rpc-e2e-local-token";
+const MANAGED_CAPTURE_PROMPT_CLOCK: &str = "2024-01-15T12:00:00Z";
 
 // ─── Env serialization (same rationale as json_rpc_e2e.rs:61-79) ───────────
 
@@ -776,7 +777,7 @@ async fn boot_stack_with_config(extra_config: &str) -> Stack {
 }
 
 async fn boot_stack_with_capture_endpoint(api_origin: String, home: PathBuf) -> Stack {
-    boot_stack_with_options("", Some(api_origin), Some(home)).await
+    boot_stack_with_options("user_timezone = \"UTC\"\n", Some(api_origin), Some(home)).await
 }
 
 async fn boot_stack_with_options(
@@ -1043,7 +1044,9 @@ fn managed_capture_identity() -> Value {
         "message": "Compare the managed inference request shape.",
         "profile_path": "state/home",
         "workspace_path": "state/home/workspace",
-        "config": "default_model=e2e-mock-model; temperature=0.7",
+        "config": "default_model=e2e-mock-model; temperature=0.7; user_timezone=UTC",
+        "time_zone": "UTC",
+        "prompt_clock": MANAGED_CAPTURE_PROMPT_CLOCK,
         "session": "same synthetic e2e user and JWT",
     })
 }
@@ -1097,7 +1100,7 @@ fn managed_host_requests_repeat_with_the_same_capture_identity() {
 async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
     let _lock = env_lock();
     let _prompt_clock = openhuman_core::prompts::register_prompt_clock(|| {
-        chrono::DateTime::parse_from_rfc3339("2024-01-15T12:00:00Z")
+        chrono::DateTime::parse_from_rfc3339(MANAGED_CAPTURE_PROMPT_CLOCK)
             .expect("fixed capture instant")
             .with_timezone(&chrono::Utc)
     });
