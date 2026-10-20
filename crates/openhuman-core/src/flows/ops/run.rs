@@ -124,10 +124,8 @@ pub(super) async fn prepare_flow_run(
         )
         .await
         .map_err(|error| error.wire_message())?;
-    let flow: Flow =
-        store::roundtrip(workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?)
-            .map_err(|error| format!("decode workflow for run: {error}"))?;
-    let graph_json = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    let flow: Flow = workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?;
+    let graph_json = flow.graph.clone();
     let analysis = super::validation::validate_over_bus(ctx, config, graph_json).await?;
     let no_actionable_nodes = !analysis
         .has_actionable_nodes

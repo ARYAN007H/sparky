@@ -375,7 +375,8 @@ async fn strict_gate_rejects_an_incompatible_saved_child_reference() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     let error = strict_gate(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -403,7 +404,8 @@ async fn builder_proposal_rejects_an_incompatible_saved_child_reference() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let parent = structurally_valid_graph(referenced_child_graph(&child.id));
 
     let error = build_builder_proposal(
@@ -439,7 +441,8 @@ async fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let flow_b = store::create_flow(
         &config,
         "cycle b".to_string(),
@@ -447,7 +450,8 @@ async fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     store::update_flow_graph(
         &config,
         &flow_a.id,
@@ -486,7 +490,7 @@ async fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
 
 #[tokio::test]
 async fn draft_promote_creates_a_new_flow_and_removes_the_draft() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -513,7 +517,7 @@ async fn draft_promote_creates_a_new_flow_and_removes_the_draft() {
 
 #[tokio::test]
 async fn draft_promote_with_flow_id_updates_the_existing_flow() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -546,7 +550,7 @@ async fn draft_promote_with_flow_id_updates_the_existing_flow() {
 
 #[tokio::test]
 async fn draft_promote_of_invalid_graph_is_rejected_and_keeps_the_draft() {
-    use tinyflows_catalog::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 

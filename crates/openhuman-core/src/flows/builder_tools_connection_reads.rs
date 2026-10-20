@@ -36,7 +36,7 @@ impl crate::integrations::composio::builder_tools::FlowConnectionProvider
 }
 
 /// Render a non-secret connection summary for the agent-facing picker.
-pub(crate) fn flow_connection_to_json(c: &tinyflows_catalog::types::FlowConnection) -> Value {
+pub(crate) fn flow_connection_to_json(c: &crate::flows::ops::FlowConnection) -> Value {
     serde_json::json!({
         "connection_ref": c.connection_ref,
         "kind": c.kind,

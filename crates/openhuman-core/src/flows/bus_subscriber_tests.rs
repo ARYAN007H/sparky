@@ -1,5 +1,6 @@
 use super::*;
-use tinyflows_catalog::types::{FlowRun, FlowRunTrigger};
+use tinyflows_bus::catalog::{FlowRun, FlowRunStep};
+use tinyflows_bus::runs::FlowRunTrigger;
 
 #[test]
 fn name_and_domains_are_stable() {
@@ -183,7 +184,7 @@ async fn digest_ignores_cancelled_run() {
 
 #[tokio::test]
 async fn digest_rendering_scrubs_persisted_outputs() {
-    let step = tinyflows_catalog::FlowRunStep {
+    let step = FlowRunStep {
         node_id: "n1".to_string(),
         output: json!({
             "sent": 3,
@@ -197,7 +198,7 @@ async fn digest_rendering_scrubs_persisted_outputs() {
     // Generated synthetic fixture data exercises text-token scrubbing; it is
     // deterministic test input and never a real credential.
     let token_output = format!("sk-ant-api03-{}", "0123456789abcdef".repeat(3));
-    let string_step = tinyflows_catalog::FlowRunStep {
+    let string_step = FlowRunStep {
         node_id: "n2".to_string(),
         output: json!(token_output.clone()),
         port: None,
@@ -337,7 +338,7 @@ fn render_run_digest_is_bounded_and_includes_key_fields() {
         status: "completed".to_string(),
         started_at: "2026-01-01T00:00:00Z".to_string(),
         finished_at: Some("2026-01-01T00:05:00Z".to_string()),
-        steps: vec![tinyflows_catalog::FlowRunStep {
+        steps: vec![FlowRunStep {
             node_id: "n1".to_string(),
             output: json!({ "ok": true }),
             port: None,

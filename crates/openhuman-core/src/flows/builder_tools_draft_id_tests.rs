@@ -22,7 +22,7 @@ async fn cancel_flow_run_cancels_when_flow_id_matches_the_owner() {
         &flow.id,
         json!({}),
         serde_json::Map::new(),
-        tinyflows_catalog::FlowRunTrigger::Rpc,
+        tinyflows_bus::runs::FlowRunTrigger::Rpc,
     )
     .await
     .unwrap();
@@ -158,7 +158,7 @@ async fn validate_workflow_by_draft_id_checks_the_draft_graph() {
         None,
         "Draft".to_string(),
         valid_graph(),
-        tinyflows_catalog::DraftOrigin::Chat,
+        tinyflows_bus::catalog::DraftOrigin::Chat,
     )
     .unwrap()
     .value;
@@ -182,7 +182,7 @@ async fn save_workflow_by_draft_id_persists_the_draft_graph_onto_the_flow() {
         Some(flow_id.clone()),
         "Draft".to_string(),
         valid_graph(),
-        tinyflows_catalog::DraftOrigin::Chat,
+        tinyflows_bus::catalog::DraftOrigin::Chat,
     )
     .unwrap()
     .value;
@@ -200,7 +200,7 @@ async fn save_workflow_by_draft_id_persists_the_draft_graph_onto_the_flow() {
 
     // The draft's graph really landed on the flow.
     let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
-    assert_eq!(saved.graph.nodes.len(), 2);
+    assert_eq!(saved.graph["nodes"].as_array().unwrap().len(), 2);
 }
 
 #[tokio::test]

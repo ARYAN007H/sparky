@@ -341,7 +341,7 @@ async fn published_module_public_import_uses_authoring_bus_in_a_cold_process() {
     )
     .await
     .expect("public import must call the published Authoring.ImportGraph member");
-    assert_eq!(imported.value.graph.name, "published import");
+    assert_eq!(imported.value.graph["name"], "published import");
     assert_eq!(
         openhuman_core::modules::state_of("tinyflows"),
         openhuman_core::modules::ModuleState::Ready,

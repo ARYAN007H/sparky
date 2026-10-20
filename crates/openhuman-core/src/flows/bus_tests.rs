@@ -1,7 +1,7 @@
 use super::*;
 use serde_json::json;
-use tinyflows::model::{Node, NodeKind, WorkflowGraph};
-use tinyflows_catalog::Flow;
+use tinyflows::model::{Node, NodeKind};
+use tinyflows_bus::catalog::Workflow as Flow;
 
 /// Binds a fresh in-memory reference engine to `config`'s workspace and
 /// returns it, so the digest tests write and read back through one store.
@@ -56,10 +56,10 @@ fn flow_with_trigger_config(id: &str, enabled: bool, trigger_config: Value) -> F
         id: id.to_string(),
         name: id.to_string(),
         enabled,
-        graph: WorkflowGraph {
-            nodes: vec![trigger_node(trigger_config)],
-            ..Default::default()
-        },
+        graph: json!({
+            "nodes": [serde_json::to_value(trigger_node(trigger_config)).unwrap()],
+            "edges": []
+        }),
         created_at: "2026-01-01T00:00:00Z".to_string(),
         updated_at: "2026-01-01T00:00:00Z".to_string(),
         last_run_at: None,

@@ -1,7 +1,7 @@
+use super::graph_json::nodes;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use serde_json::Value;
-use tinyflows::model::{NodeKind, WorkflowGraph};
 
 // Agent-ref resolvability gate: an `agent` node's `agent_ref` must name a
 // real agent, not the runtime's `RegistryFallback` "unknown agent_ref" case
@@ -65,7 +65,7 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 pub(crate) async fn validate_agent_refs(
     ctx: &DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Vec<String> {
     use crate::agent_registry::host_definition::AgentDefinitionRegistry;
     use crate::agent_registry::AgentRegistryEntry;
@@ -75,8 +75,8 @@ pub(crate) async fn validate_agent_refs(
     let mut harness_registry_init_attempted = false;
     let mut custom_registry: Option<Result<Vec<AgentRegistryEntry>, String>> = None;
 
-    for node in &graph.nodes {
-        if node.kind != NodeKind::Agent {
+    for node in nodes(graph) {
+        if node.kind != "agent" {
             continue;
         }
         let Some(agent_ref) = node.config.get("agent_ref").and_then(Value::as_str) else {

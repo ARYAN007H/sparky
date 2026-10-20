@@ -8,7 +8,7 @@
 //!
 //! # Gate shape — leaf, not facade
 //!
-//! The whole family (this module plus [`tinyflows`]) is gated at
+//! This domain is gated at
 //! `pub mod flows;` in `crates/openhuman-core/src/lib.rs` on `#[cfg(feature = "flows")]`,
 //! and the submodules below inherit that gate. There is **no `stub.rs`**:
 //! every symbol reached from outside is a *registration site* (`core::all`,
@@ -44,11 +44,6 @@ mod schemas;
 mod store;
 #[cfg(test)]
 pub(crate) mod test_support;
-/// Generic graph model and legacy migration re-exports retained for host APIs.
-pub mod tinyflows;
-
-// Portable catalog vocabulary is imported directly from `tinyflows-catalog`.
-
 pub use schemas::{
     all_controller_schemas as all_flows_controller_schemas,
     all_registered_controllers as all_flows_registered_controllers,

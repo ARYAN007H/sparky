@@ -60,7 +60,7 @@ async fn private_agent_progress_advances_cursor_without_leaking_text_or_replayin
         id: format!("projection:{}", uuid::Uuid::new_v4()),
         name: "Projection test".into(),
         enabled: true,
-        graph: tinyflows::model::WorkflowGraph::default(),
+        graph: serde_json::json!({"nodes": [], "edges": []}),
         created_at: "2026-01-01T00:00:00Z".into(),
         updated_at: "2026-01-01T00:00:00Z".into(),
         last_run_at: None,

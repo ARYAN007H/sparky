@@ -4,8 +4,8 @@
 
 use serde_json::json;
 use tinyagents_graph::GraphObservation;
+use tinyflows_bus::catalog::Workflow as Flow;
 use tinyflows_bus::runs::FlowRunTrigger;
-use tinyflows_catalog::Flow;
 
 use crate::config::Config;
 

@@ -159,7 +159,7 @@ async fn list_flow_connections_is_read_only() {
 
 #[test]
 fn list_flow_connections_json_surfaces_platform_user_id() {
-    use tinyflows_catalog::types::FlowConnection;
+    use crate::flows::ops::FlowConnection;
 
     let with_identity = FlowConnection {
         connection_ref: "composio:slack:ca_slack1".to_string(),

@@ -18,7 +18,7 @@ pub(in crate::flows::schemas) fn handle_run(
                 id.trim(),
                 input,
                 inputs,
-                tinyflows_catalog::FlowRunTrigger::Rpc,
+                tinyflows_bus::runs::FlowRunTrigger::Rpc,
             )
             .await?,
         )
@@ -41,7 +41,7 @@ pub(in crate::flows::schemas) fn handle_run_detached(
                 id.trim(),
                 input,
                 inputs,
-                tinyflows_catalog::FlowRunTrigger::Rpc,
+                tinyflows_bus::runs::FlowRunTrigger::Rpc,
             )
             .await?,
         )

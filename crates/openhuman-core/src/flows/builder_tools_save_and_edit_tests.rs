@@ -248,7 +248,7 @@ async fn save_workflow_persists_graph_and_name_onto_existing_flow() {
     // The graph + name really persisted.
     let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
     assert_eq!(saved.name, "AI News Digest");
-    assert_eq!(saved.graph.nodes.len(), 2);
+    assert_eq!(saved.graph["nodes"].as_array().unwrap().len(), 2);
 }
 
 #[tokio::test]
@@ -271,7 +271,7 @@ async fn save_workflow_rejects_invalid_graph_and_leaves_flow_intact() {
     let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
     assert_eq!(saved.name, "Blank flow");
     assert_eq!(
-        saved.graph.nodes.len(),
+        saved.graph["nodes"].as_array().unwrap().len(),
         1,
         "original graph must be untouched"
     );
@@ -356,7 +356,7 @@ async fn save_workflow_rejects_agent_binding_missing_declared_field() {
     let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
     assert_eq!(saved.name, "Blank flow");
     assert_eq!(
-        saved.graph.nodes.len(),
+        saved.graph["nodes"].as_array().unwrap().len(),
         1,
         "original graph must be untouched"
     );
@@ -399,7 +399,7 @@ async fn save_workflow_accepts_correctly_schemad_graph() {
 
     let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
     assert_eq!(saved.name, "Summarize and notify");
-    assert_eq!(saved.graph.nodes.len(), 3);
+    assert_eq!(saved.graph["nodes"].as_array().unwrap().len(), 3);
 }
 
 #[tokio::test]

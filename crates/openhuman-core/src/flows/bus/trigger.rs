@@ -16,7 +16,8 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use tinybus::EventHandler;
-use tinyflows_catalog::Flow;
+use tinyflows_bus::catalog::Workflow as Flow;
+use tinyflows_bus::runs::FlowRunTrigger;
 use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
 fn portability_call<T, A>(config: &Config, member: &'static str, request: A) -> Result<T, String>
@@ -42,7 +43,7 @@ pub(crate) fn describe_trigger(
     config: &Config,
     flow: &Flow,
 ) -> Result<tinyflows_bus::portability::TriggerDetails, String> {
-    let graph = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    let graph = flow.graph.clone();
     portability_call(
         config,
         tinyflows_bus::portability::methods::DESCRIBE_TRIGGER,
@@ -55,7 +56,7 @@ pub(super) fn pinned_trigger_inputs(
     config: &Config,
     flow: &Flow,
 ) -> Result<serde_json::Map<String, Value>, String> {
-    let graph = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    let graph = flow.graph.clone();
     let value: Value = portability_call(
         config,
         tinyflows_bus::portability::methods::PINNED_INPUTS,
@@ -76,7 +77,7 @@ pub(super) fn matches_app_event(
     toolkit: &str,
     trigger_slug: &str,
 ) -> Result<bool, String> {
-    let graph = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    let graph = flow.graph.clone();
     portability_call(
         config,
         tinyflows_bus::portability::methods::APP_EVENT_BINDING,
@@ -147,7 +148,7 @@ pub(crate) struct TriggerRunRequest {
     pub(crate) flow_id: String,
     pub(crate) input: Value,
     pub(crate) inputs: serde_json::Map<String, Value>,
-    pub(crate) trigger: tinyflows_catalog::FlowRunTrigger,
+    pub(crate) trigger: FlowRunTrigger,
 }
 
 type RunFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
@@ -263,7 +264,7 @@ impl FlowTriggerSubscriber {
                 flow_id,
                 input: payload,
                 inputs,
-                trigger: tinyflows_catalog::FlowRunTrigger::AppEvent,
+                trigger: FlowRunTrigger::AppEvent,
             },
         };
         self.enqueue_app_event(key, ctx, queued).await;
@@ -408,7 +409,7 @@ impl FlowTriggerSubscriber {
                 flow_id: flow_id.clone(),
                 input: Value::Null,
                 inputs,
-                trigger: tinyflows_catalog::FlowRunTrigger::Schedule,
+                trigger: FlowRunTrigger::Schedule,
             },
         };
         self.enqueue_schedule_request(key, ctx, queued).await;

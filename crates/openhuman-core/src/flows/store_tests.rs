@@ -9,19 +9,20 @@ fn config(tmp: &TempDir) -> Config {
     }
 }
 
-fn graph() -> tinyflows::model::WorkflowGraph {
-    tinyflows::migrate::deserialize_graph(json!({
+fn graph() -> serde_json::Value {
+    json!({
         "nodes": [{"id":"trigger","name":"Trigger","kind":"trigger","config":{"trigger_kind":"manual"}}],
         "edges": []
-    }))
-    .unwrap()
+    })
 }
 
 #[test]
 fn catalog_clients_preserve_definition_revisions_and_suggestion_semantics() {
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
-    let flow = create_flow(&config, "before".into(), graph(), false, true).unwrap();
+    let flow = create_flow(&config, "before".into(), graph(), false, true)
+        .unwrap()
+        .workflow;
     assert_eq!(get_flow(&config, &flow.id).unwrap().unwrap().name, "before");
     let (listed, skipped) = list_flows(&config).unwrap();
     assert_eq!(skipped, 0);
@@ -38,7 +39,8 @@ fn catalog_clients_preserve_definition_revisions_and_suggestion_semantics() {
         false,
         Some(&flow.updated_at),
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     assert_eq!(updated.name, "after");
     assert_eq!(list_revisions(&config, &flow.id, 10).unwrap().len(), 1);
     assert!(matches!(

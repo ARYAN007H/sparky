@@ -11,8 +11,9 @@ mod session;
 use std::sync::Arc;
 
 use serde_json::{json, Value};
+use tinyflows_bus::catalog::Workflow as Flow;
+use tinyflows_bus::runs::FlowRunTrigger;
 use tinyflows_bus::runs::{self, ResumeRun, StartRun};
-use tinyflows_catalog::{types::FlowRunTrigger, Flow};
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
@@ -134,8 +135,7 @@ pub(crate) async fn start_run(
         0,
     );
     let receiver = session.subscribe();
-    let graph = serde_json::to_value(&flow.graph)
-        .map_err(|error| format!("encode workflow graph: {error}"))?;
+    let graph = flow.graph.clone();
     let proxy = match module::runs_proxy(config).await {
         Ok(proxy) => proxy,
         Err(error) => return Err(error),
@@ -263,10 +263,7 @@ pub(crate) async fn register_resume_bindings(
         )
         .await
         .map_err(|error| error.wire_message())?;
-    let flow: Flow = crate::flows::store::roundtrip(
-        workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?,
-    )
-    .map_err(|error| format!("decode workflow for resume: {error}"))?;
+    let flow: Flow = workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?;
     if flow.require_approval != require_approval {
         return Err("workflow approval policy changed during resume".to_string());
     }

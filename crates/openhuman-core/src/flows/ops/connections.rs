@@ -1,4 +1,27 @@
 use super::*;
+use serde::{Deserialize, Serialize};
+
+/// Secret-free OpenHuman picker projection for Composio accounts and named
+/// HTTP credentials. This is the product RPC shape; secrets remain in their
+/// domain stores and are injected only by CapsHost during execution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowConnection {
+    /// Value placed on a workflow node's `connection_ref`.
+    pub connection_ref: String,
+    /// Source kind: `composio` or `http`.
+    pub kind: String,
+    /// Human-readable label.
+    pub display: String,
+    /// Composio toolkit slug, when applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub toolkit: Option<String>,
+    /// HTTP credential scheme, when applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<String>,
+    /// Non-secret platform identity associated with a Composio connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform_user_id: Option<String>,
+}
 
 /// Lists the connection sources a flow node's `connection_ref` can attach to:
 /// Composio connected accounts (`kind = "composio"`) and stored HTTP
@@ -225,7 +248,7 @@ pub(crate) async fn connected_toolkits(
 pub async fn compute_required_connections(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Vec<Value> {
     use crate::integrations::composio::contract::toolkit_from_slug;
 
@@ -239,8 +262,8 @@ pub async fn compute_required_connections(
         }
     };
 
-    for node in &graph.nodes {
-        if node.kind == NodeKind::ToolCall {
+    for node in crate::flows::host_gates::nodes(graph) {
+        if node.kind == "tool_call" {
             if let Some(slug) = node.config.get("slug").and_then(Value::as_str) {
                 // Native OpenHuman tools (`oh:<name>`) need no connection.
                 if slug.starts_with("oh:") {
@@ -253,7 +276,9 @@ pub async fn compute_required_connections(
         }
     }
     // An app_event trigger names its toolkit directly.
-    if let Some(trigger) = graph.trigger() {
+    if let Some(trigger) =
+        crate::flows::host_gates::nodes(graph).find(|node| node.kind == "trigger")
+    {
         if let Some(tk) = trigger.config.get("toolkit").and_then(Value::as_str) {
             push(tk.to_string());
         }
@@ -284,10 +309,7 @@ pub async fn flows_required_connections(
     config: &Config,
     graph_json: Value,
 ) -> Result<Outcome<Value>, String> {
-    let graph: tinyflows::model::WorkflowGraph =
-        super::validation::migrate_over_bus(ctx, config, graph_json)
-            .await
-            .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))?;
+    let graph = super::validation::migrate_over_bus(ctx, config, graph_json).await?;
     let required = compute_required_connections(ctx, config, &graph).await;
     Ok(Outcome::single_log(
         json!({ "required_connections": required }),

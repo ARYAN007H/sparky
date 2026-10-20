@@ -1,7 +1,7 @@
+use super::graph_json::nodes;
 use crate::config::Config;
-use crate::flows::ops::build_flow_connections;
-use tinyflows::model::{NodeKind, WorkflowGraph};
-use tinyflows_catalog::FlowConnection;
+use crate::flows::ops::{build_flow_connections, FlowConnection};
+use serde_json::Value;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Connection-ref gate (WS3): a Composio tool_call's `connection_ref` must name
@@ -33,7 +33,7 @@ use tinyflows_catalog::FlowConnection;
 pub(crate) async fn validate_connection_refs(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Vec<String> {
     let connections: Option<Vec<FlowConnection>> =
         match crate::integrations::composio::ops::composio_list_connections(ctx, config).await {
@@ -64,20 +64,18 @@ pub(crate) async fn validate_connection_refs(
 /// connections" state), or `None` when it was unavailable (fail-open: the
 /// id-existence check is skipped, only the toolkit-mismatch check runs).
 pub(crate) fn validate_connection_refs_against(
-    graph: &WorkflowGraph,
+    graph: &Value,
     connections: Option<&[FlowConnection]>,
 ) -> Vec<String> {
     use crate::integrations::composio::contract::validation::{
         validate_connection_refs as validate, ConnectedAccountRef, ConnectionRefNode,
     };
 
-    let nodes: Vec<_> = graph
-        .nodes
-        .iter()
-        .filter(|node| node.kind == NodeKind::ToolCall)
+    let nodes: Vec<_> = nodes(graph)
+        .filter(|node| node.kind == "tool_call")
         .filter_map(|node| {
             Some(ConnectionRefNode {
-                id: node.id.clone(),
+                id: node.id.to_owned(),
                 slug: node.config.get("slug")?.as_str()?.to_string(),
                 connection_ref: node.config.get("connection_ref")?.as_str()?.to_string(),
             })

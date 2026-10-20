@@ -104,7 +104,8 @@ async fn flows_resume_marks_a_checkpoint_with_an_incompatible_saved_child_failed
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let legacy_graph = structurally_valid_graph(referenced_child_graph(&child.id));
     store::update_flow_graph(
         &config,

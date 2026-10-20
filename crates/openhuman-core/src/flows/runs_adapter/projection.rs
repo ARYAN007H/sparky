@@ -4,8 +4,8 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::{LazyLock, Mutex};
 
 use serde_json::Value;
+use tinyflows_bus::runs::FlowRunTrigger;
 use tinyflows_bus::runs::{self, RunEvent};
-use tinyflows_catalog::types::FlowRunTrigger;
 
 use crate::core::events::DomainEvent;
 use crate::flows::runs_adapter::session::RunSession;
