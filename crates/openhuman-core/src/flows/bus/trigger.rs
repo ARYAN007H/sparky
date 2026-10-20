@@ -6,7 +6,9 @@
 use crate::config::Config;
 use crate::core::events::DomainEvent;
 use crate::flows::store;
+use crate::modules::tinyflows as module;
 use async_trait::async_trait;
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::future::Future;
@@ -14,65 +16,76 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use tinybus::EventHandler;
-use tinyflows::model::TriggerKind;
 use tinyflows_catalog::Flow;
 use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
-/// Reads `trigger_kind` from a flow's trigger node config, deserializing into
-/// `tinyflows::model::TriggerKind`. Returns `None` when the flow doesn't have
-/// exactly one trigger node ([`tinyflows::model::WorkflowGraph::trigger`]) or
-/// the `trigger_kind` discriminator is missing/invalid — callers treat that
-/// as "no automatic binding", not an error (a `manual`-only or legacy graph
-/// authored before B2 simply never fires itself).
-pub(crate) fn extract_trigger_kind(flow: &Flow) -> Option<TriggerKind> {
-    let trigger = flow.graph.trigger()?;
-    serde_json::from_value(trigger.config.get("trigger_kind")?.clone()).ok()
+fn portability_call<T, A>(config: &Config, member: &'static str, request: A) -> Result<T, String>
+where
+    T: DeserializeOwned + Send + 'static,
+    A: Serialize + Send + Sync + 'static,
+{
+    let config = config.clone();
+    crate::storage::block_on_anyhow(async move {
+        let proxy = module::portability_proxy(&config)
+            .await
+            .map_err(anyhow::Error::msg)?;
+        proxy
+            .call(member, &(request,))
+            .await
+            .map_err(anyhow::Error::msg)
+    })
+    .map_err(|error| error.to_string())
 }
 
-/// Returns the trigger node's full config value, for callers that need
-/// kind-specific fields (`schedule` for `schedule`, `toolkit`/`trigger_slug`
-/// for `app_event`, …).
-pub(crate) fn extract_trigger_config(flow: &Flow) -> Option<&Value> {
-    Some(&flow.graph.trigger()?.config)
+/// Ask TinyFlows for normalized trigger metadata used by host bindings.
+pub(crate) fn describe_trigger(
+    config: &Config,
+    flow: &Flow,
+) -> Result<tinyflows_bus::portability::TriggerDetails, String> {
+    let graph = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    portability_call(
+        config,
+        tinyflows_bus::portability::methods::DESCRIBE_TRIGGER,
+        tinyflows_bus::portability::DescribeTrigger { graph },
+    )
 }
 
-/// Values an author pinned on the trigger node for *unattended* runs, read from
-/// the trigger's `config.inputs` object.
-///
-/// A schedule tick or an inbound app event has no operator to prompt, so a flow
-/// with declared inputs would otherwise be undispatchable. Pinning values in the
-/// trigger config is how such a flow states, at author time, what an automatic
-/// run should use. Values are passed through literally — this is configuration,
-/// not an expression scope, and there is no run in flight to resolve one
-/// against.
-///
-/// Returns an empty map when the trigger declares none, in which case a required
-/// input with no default fails in `prepare_flow_run` before any run row exists,
-/// and the reason is logged and visible in the run digest.
-pub(super) fn pinned_trigger_inputs(flow: &Flow) -> serde_json::Map<String, Value> {
-    extract_trigger_config(flow)
-        .and_then(|cfg| cfg.get("inputs"))
-        .and_then(Value::as_object)
+/// Return author-pinned literal inputs for an unattended trigger run.
+pub(super) fn pinned_trigger_inputs(
+    config: &Config,
+    flow: &Flow,
+) -> Result<serde_json::Map<String, Value>, String> {
+    let graph = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    let value: Value = portability_call(
+        config,
+        tinyflows_bus::portability::methods::PINNED_INPUTS,
+        tinyflows_bus::portability::PinnedInputs { graph },
+    )?;
+    value
+        .as_object()
         .cloned()
-        .unwrap_or_default()
+        .ok_or_else(|| "TinyFlows returned pinned inputs in an invalid shape".to_string())
 }
 
 /// True when `flow` is an enabled `app_event` flow bound to the given
 /// Composio `toolkit`/`trigger_slug` (case-insensitive — Composio slugs are
 /// conventionally upper-case but authoring surfaces may not normalize them).
-pub(super) fn matches_app_event(flow: &Flow, toolkit: &str, trigger_slug: &str) -> bool {
-    if !matches!(extract_trigger_kind(flow), Some(TriggerKind::AppEvent)) {
-        return false;
-    }
-    let Some(cfg) = extract_trigger_config(flow) else {
-        return false;
-    };
-    let cfg_toolkit = cfg.get("toolkit").and_then(Value::as_str).unwrap_or("");
-    let cfg_slug = cfg
-        .get("trigger_slug")
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    cfg_toolkit.eq_ignore_ascii_case(toolkit) && cfg_slug.eq_ignore_ascii_case(trigger_slug)
+pub(super) fn matches_app_event(
+    config: &Config,
+    flow: &Flow,
+    toolkit: &str,
+    trigger_slug: &str,
+) -> Result<bool, String> {
+    let graph = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    portability_call(
+        config,
+        tinyflows_bus::portability::methods::APP_EVENT_BINDING,
+        tinyflows_bus::portability::AppEventBinding {
+            graph,
+            toolkit: toolkit.to_string(),
+            trigger_slug: trigger_slug.to_string(),
+        },
+    )
 }
 
 /// Listens for normalized trigger events and starts runs for matching
@@ -503,11 +516,24 @@ impl FlowTriggerSubscriber {
             tracing::debug!(target: "flows", %flow_id, "[flows] schedule tick for disabled flow — ignoring");
             return;
         }
-        if !matches!(extract_trigger_kind(&flow), Some(TriggerKind::Schedule)) {
+        let details = match describe_trigger(&config, &flow) {
+            Ok(details) => details,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %error, "[flows] failed to describe trigger for schedule tick");
+                return;
+            }
+        };
+        if details.kind.as_deref() != Some("schedule") {
             tracing::debug!(target: "flows", %flow_id, "[flows] schedule tick for flow whose trigger is no longer `schedule` — ignoring");
             return;
         }
-        let inputs = pinned_trigger_inputs(&flow);
+        let inputs = match pinned_trigger_inputs(&config, &flow) {
+            Ok(inputs) => inputs,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %error, "[flows] failed to read pinned inputs for schedule trigger");
+                return;
+            }
+        };
         self.enqueue_schedule(&ctx, flow_id.to_string(), inputs)
             .await;
     }
@@ -539,9 +565,22 @@ impl FlowTriggerSubscriber {
 
         let mut matched = 0usize;
         for flow in flows {
-            if matches_app_event(&flow, toolkit, trigger_slug) {
+            let matches = match matches_app_event(&config, &flow, toolkit, trigger_slug) {
+                Ok(matches) => matches,
+                Err(error) => {
+                    tracing::warn!(target: "flows", flow_id = %flow.id, %toolkit, %trigger_slug, %error, "[flows] failed to match app_event trigger");
+                    continue;
+                }
+            };
+            if matches {
                 matched += 1;
-                let inputs = pinned_trigger_inputs(&flow);
+                let inputs = match pinned_trigger_inputs(&config, &flow) {
+                    Ok(inputs) => inputs,
+                    Err(error) => {
+                        tracing::warn!(target: "flows", flow_id = %flow.id, %error, "[flows] failed to read pinned inputs for app_event trigger");
+                        continue;
+                    }
+                };
                 self.dispatch_app_event(&ctx, flow.id.clone(), payload.clone(), inputs)
                     .await;
             }

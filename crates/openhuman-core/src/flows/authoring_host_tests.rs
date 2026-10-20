@@ -72,7 +72,7 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
             )
             .unwrap();
             flow.id = shared_id.into();
-            crate::flows::store::upsert_flow(&config, &flow).unwrap();
+            crate::flows::test_support::seed_flow(&config, &flow).unwrap();
         })
         .await;
     }

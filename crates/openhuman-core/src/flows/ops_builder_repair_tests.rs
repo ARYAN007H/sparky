@@ -3,7 +3,7 @@ use super::*;
 use crate::core::runtime::DispatchCtx;
 use crate::{
     config::Config,
-    flows::ops::{flows_build_with_extra_hidden_tools, FlowStreamTarget},
+    flows::ops::{flows_build, FlowStreamTarget},
 };
 
 #[tokio::test]
@@ -85,12 +85,11 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
             failing_node_ids: vec!["fetch".to_string()],
         };
 
-        let outcome = flows_build_with_extra_hidden_tools(
+        let outcome = flows_build(
             &DispatchCtx::process_default(),
             &Config::default(),
             req.clone(),
             None,
-            &[],
         )
         .await
         .expect("backend failure should short-circuit before the builder starts");
@@ -109,12 +108,11 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
         };
         let mut events = crate::web_chat::subscribe_web_channel_events();
 
-        flows_build_with_extra_hidden_tools(
+        flows_build(
             &DispatchCtx::process_default(),
             &Config::default(),
             req,
             Some(stream),
-            &[],
         )
         .await
         .expect("streamed backend failure should short-circuit before the builder starts");

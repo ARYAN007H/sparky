@@ -3,9 +3,8 @@
 //! `schemas.rs`'s `handle_*` RPC/CLI handlers, mirroring
 //! `crates/openhuman-core/src/cron/ops.rs`.
 //!
-//! The module is split by responsibility; every operation the rest of the
-//! crate reaches through `flows::ops::` is re-exported from here so the
-//! external paths are unchanged:
+//! The module is split by responsibility; host-owned operations used by RPC,
+//! tools, and sibling flow modules are re-exported from here:
 //!
 //! | Submodule | Responsibility |
 //! | --- | --- |
@@ -35,14 +34,12 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use serde_json::{json, Value};
-use tinyflows::model::{NodeKind, TriggerKind, WorkflowGraph};
+use tinyflows::model::{NodeKind, WorkflowGraph};
 // Generic graph analysis used for UI notes and authoring summaries comes from
 // the TinyFlows bus. OpenHuman-specific save and dispatch policy stays here.
 // The save/run safety predicates are `tinyflows-catalog`'s: whether a graph
-// fires unattended, whether it can act on the world, whether it has anything to
-// do at all are properties of the graph, not of this host. Re-exported at
-// `ops::` scope because the agent tools and this module's tests already name
-// them there.
+// fires unattended, whether it can act on the world, and whether it has work
+// are graph properties. Import them only at their host policy call sites.
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::flows::bus;
@@ -51,9 +48,6 @@ use crate::flows::store;
 use crate::security::approval::{ApprovalChatContext, ApprovalTurnContext};
 use crate::security::turn_origin::{with_origin, AgentTurnOrigin};
 use tinyflows_catalog::build_registry;
-pub(crate) use tinyflows_catalog::graph_policy::{
-    enforce_side_effect_approval, trigger_is_automatic,
-};
 use tinyflows_catalog::types::{FlowConnection, FlowRunTrigger, FlowSuggestion, SuggestionStatus};
 use tokio_util::sync::CancellationToken;
 use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
@@ -62,17 +56,6 @@ use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 /// capabilities have their own timeouts (HTTP, sandbox), but a hung LLM/tool
 /// call must never let the RPC block indefinitely — this caps the whole run.
 const FLOW_RUN_TIMEOUT_SECS: u64 = crate::flows::runs_adapter::RUN_TIMEOUT_SECS;
-
-/// How long a run may sit parked at a human-in-the-loop approval gate
-/// (`pending_approval`) before the TTL sweep expires it to a terminal
-/// `"cancelled"` (issue G4). Aligned with the agent tool-call `ApprovalGate`'s
-/// 10-minute fail-closed TTL (`crates/openhuman-core/src/security/approval/`), so a flow HITL gate a
-/// human never answers doesn't wedge a run — and its durable checkpoint —
-/// forever. The two are distinct mechanisms (flow runs execute as
-/// `TrustedAutomation { Workflow }`, which the tool-call gate lets through), so
-/// this is a dedicated flows-side TTL, not a reuse of the approval store's.
-#[cfg(test)]
-const FLOW_PARKED_TTL_SECS: i64 = tinyflows_catalog::run_management::PARKED_RUN_TTL_SECS;
 
 /// T-M1 fail-closed refusal: the graph hash pinned when this run parked no
 /// longer matches the flow's current graph (`save_workflow` rewrote it while

@@ -21,22 +21,6 @@ pub async fn flows_build(
     req: tinyflows_bus::copilot::BuilderPromptRequest,
     stream: Option<FlowStreamTarget>,
 ) -> Result<Outcome<Value>, String> {
-    flows_build_with_extra_hidden_tools(ctx, config, req, stream, &[]).await
-}
-
-/// [`flows_build`] with caller-specific tools removed in addition to the
-/// standard streaming/headless safety lists.
-///
-/// This is intentionally crate-private: product surfaces use [`flows_build`]'s
-/// normal builder belt. Host integrations that add their own persistence
-/// boundary can hide tools that would bypass that boundary.
-pub(crate) async fn flows_build_with_extra_hidden_tools(
-    ctx: &DispatchCtx,
-    config: &Config,
-    req: tinyflows_bus::copilot::BuilderPromptRequest,
-    stream: Option<FlowStreamTarget>,
-    extra_hidden_tools: &[&str],
-) -> Result<Outcome<Value>, String> {
     use crate::agent::OpenHumanSessionHost;
     let prompt = crate::flows::copilot_bus::call::<tinyflows_bus::copilot::TextResponse, _>(
         config,
@@ -120,15 +104,6 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
         }
         restrict_builder_toolset(&mut agent);
     }
-    if !extra_hidden_tools.is_empty() {
-        tracing::debug!(
-            target: "flows",
-            hidden = ?extra_hidden_tools,
-            "[flows] flows_build: applying caller-specific hidden tools"
-        );
-        agent.hide_tools(extra_hidden_tools);
-    }
-
     // When a chat thread is attached (the copilot pane), stream the builder turn
     // into it exactly like an interactive turn — text/tool deltas and the
     // `propose_workflow` tool result the frontend renders as a proposal card.
