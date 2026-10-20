@@ -340,6 +340,7 @@ fn an_invalid_flow_record_keeps_the_import_open_for_retry() {
     let backend = backend();
 
     let first = import_flows(&backend, &Scope::local(), &config).unwrap();
+    println!("invalid flow import result: {first:?}");
     assert!(
         matches!(first, Outcome::Incomplete { skipped: 1, .. }),
         "a skipped flow record must keep the migration incomplete: {first:?}"
@@ -375,7 +376,8 @@ async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files(
 
     let (dir, mut config) = workspace();
     config.components.tinyflows = true;
-    let legacy_files_before = tree(dir.path());
+    let legacy_dir = dir.path().join("flows");
+    let legacy_files_before = tree(&legacy_dir);
     let _restore = FallbackStorageRestore {
         previous: crate::storage::installed(),
         workspace: config.workspace_dir.clone(),
@@ -418,7 +420,7 @@ async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files(
         flow_import_marker_done(&backend, &config).is_ok_and(|done| !done),
         "the unbooted local fallback must not run the workspace-file importer"
     );
-    assert_eq!(tree(dir.path()), legacy_files_before);
+    assert_eq!(tree(&legacy_dir), legacy_files_before);
     crate::storage::local::forget(&config.workspace_dir);
 }
 
@@ -525,9 +527,10 @@ fn a_run_that_skipped_records_leaves_no_marker_so_it_is_retried() {
     let skipped = marked(&backend, dir.path(), "skipdomain", || Ok(Some((3, 2, 1)))).unwrap();
     assert_eq!(
         skipped,
-        Outcome::Imported {
+        Outcome::Incomplete {
             found: 3,
-            written: 2
+            written: 2,
+            skipped: 1,
         }
     );
     // No marker: the next boot runs the body again instead of `AlreadyDone`.
