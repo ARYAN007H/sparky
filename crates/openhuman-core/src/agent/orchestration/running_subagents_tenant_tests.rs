@@ -50,7 +50,6 @@ fn profile(name: &str, workspace: &std::path::Path) -> Arc<CoreContext> {
 struct Worker {
     task: String,
     session: String,
-    queue: Arc<RunQueue<QueuedTurn>>,
     abort: AbortHandle,
     _status: watch::Sender<DetachedSubagentStatus>,
 }
@@ -80,7 +79,6 @@ impl Worker {
         Self {
             task,
             session,
-            queue,
             abort,
             _status: tx,
         }
@@ -143,10 +141,7 @@ fn field(value: &serde_json::Value, key: &str) -> Option<bool> {
 }
 
 async fn dispatched_control(function: &str, task: &str) -> Result<serde_json::Value, String> {
-    let mut params = serde_json::json!({ "taskId": task });
-    if function == "steer" {
-        return Err("openhuman.subagent_steer must not be registered".to_string());
-    }
+    let params = serde_json::json!({ "taskId": task });
     crate::core::invoke::invoke_method(
         DispatchCtx::process_default(),
         crate::core::invoke::default_state(),
@@ -391,26 +386,11 @@ async fn missing_saas_scope_cannot_observe_or_control_workers() {
         resume_ref_for_task(&DispatchCtx::ambient(), &pair.a.task, PARENT),
         Err(WaitError::NotOwned)
     ));
-    assert_eq!(
-        steer(
-            &DispatchCtx::ambient(),
-            &pair.a.task,
-            PARENT,
-            "unscoped".into(),
-            QueueLane::Steer
-        )
-        .await,
-        Err(SteerError::NotOwned)
-    );
-    assert_eq!(
-        field(&control("steer", &pair.a.task).await, "steered"),
-        Some(false)
-    );
+    assert!(dispatched_control("steer", &pair.a.task).await.is_err());
     assert_eq!(
         field(&control("cancel", &pair.a.task).await, "cancelled"),
         Some(false)
     );
-    assert_eq!(pair.a.queue.status().await.steers, 0);
     CoreContext::sync_scope(pair.alice.clone(), || {
         assert!(resume_ref_for_task(&DispatchCtx::ambient(), &pair.a.task, PARENT).is_ok())
     });
@@ -421,10 +401,7 @@ async fn missing_saas_scope_cannot_observe_or_control_workers() {
             resume_ref_for_task(&DispatchCtx::ambient(), &pair.a.task, PARENT),
             Err(WaitError::NotOwned)
         ));
-        assert_eq!(
-            field(&control("steer", &pair.a.task).await, "steered"),
-            Some(false)
-        );
+        assert!(dispatched_control("steer", &pair.a.task).await.is_err());
         assert_eq!(
             field(&control("cancel", &pair.a.task).await, "cancelled"),
             Some(false)
@@ -447,11 +424,7 @@ async fn desktop_public_controls_remain_available_without_parent_scope() {
         snapshot_for_parent(&DispatchCtx::ambient(), PARENT).len(),
         1
     );
-    assert_eq!(
-        field(&control("steer", &worker.task).await, "steered"),
-        Some(true)
-    );
-    assert_eq!(worker.queue.status().await.steers, 1);
+    assert!(dispatched_control("steer", &worker.task).await.is_err());
     assert_eq!(
         field(&control("cancel", &worker.task).await, "cancelled"),
         Some(true)
@@ -482,11 +455,6 @@ async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
         Err(WaitError::NotOwned)
     ));
     assert!(cancel_by_task(&bob, &a_task).is_none());
-    assert_eq!(
-        steer_control(&bob, &a_task, "x".into(), QueueLane::Steer).await,
-        Err(SteerError::NotOwned)
-    );
-    assert_eq!(pair.a.queue.status().await.steers, 0);
     assert!(snapshot_for_parent(&bob, PARENT)
         .iter()
         .all(|worker| worker.task_id != a_task));
