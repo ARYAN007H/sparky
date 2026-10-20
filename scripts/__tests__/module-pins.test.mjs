@@ -369,6 +369,11 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
     assert.equal(validateTestOnlySourceParity({ ...input, actualHead: descendant }).ok, false, "descendant commits must not inherit an attestation");
     assert.equal(validateTestOnlySourceParity({ ...input, actualHead: descendant, proof: { ...fixture.parity, candidateCommit: descendant } }).ok, false, "a changed test blob cannot silently widen the pair");
     assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, assets: [] }).ok, false, "registry asset changes invalidate the proof");
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, version: "1.1.0", proof: { ...fixture.parity, tag: "v1.1.0" } }).ok, false, "registry version changes invalidate the proof");
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, unknown: true } }).ok, false, "unknown metadata must fail closed");
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, unchangedTreeSha256: "f".repeat(64) } }).ok, false, "the whole-tree parity hash is mandatory");
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, testFile: { ...fixture.parity.testFile, candidateMode: "100755" } } }).ok, false, "file-mode changes cannot be attested");
+    assert.equal(validateTestOnlySourceParity({ ...input, actualHead: fixture.candidateCommit, proof: { ...fixture.parity, binding: { ...fixture.parity.binding, moduleBlob: "f".repeat(40) } } }).ok, false, "the cfg(test) binding source blob is pinned");
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -393,6 +398,16 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
       f.git(["commit", "-qm", `${kind} change`]);
       const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
       assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: head, proof: f.parity }).ok, false, `${kind} changes must fail closed`);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  }
+
+  for (const tagChange of ["moved", "missing"]) {
+    const f = sourceParityFixture();
+    try {
+      f.git(tagChange === "moved" ? ["tag", "-f", "v1.0.0", f.candidateCommit] : ["tag", "-d", "v1.0.0"]);
+      assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: f.candidateCommit, proof: f.parity }).ok, false, `${tagChange} release tags must fail closed`);
     } finally {
       rmSync(f.root, { recursive: true, force: true });
     }
