@@ -192,6 +192,12 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
 
     let root = tempfile::tempdir().expect("workspace");
     let locator = crate::agent::session_store::splice_fixture::memory_locator();
+    let tool = || {
+        Box::new(tinyagents_harness::testkit::FakeTool::returning(
+            "legacy_history_probe",
+            "ok",
+        )) as Box<dyn tinytools::Tool>
+    };
     let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
         "reply after legacy adoption",
     ]));
@@ -199,6 +205,7 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     let mut host = SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(&locator))
         .chat_model(chat_model)
+        .tools(vec![tool()])
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
@@ -298,6 +305,7 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     let mut resumed = SessionHostBuilder::new()
         .with_session_history_locator(locator.clone())
         .chat_model(second_chat_model)
+        .tools(vec![tool()])
         .workspace_dir(second_root.path().join("workspace"))
         .action_dir(second_root.path().to_path_buf())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
