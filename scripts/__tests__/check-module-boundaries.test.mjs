@@ -213,6 +213,11 @@ test('host boundary audit ignores writer features unified only by unrelated work
     // own scoped normal tree containing only the read-only importer.
     const unified = metadata({
       openhuman: [['tinyflows-import']],
+      'openhuman-cli': [['openhuman-rpc']],
+      'openhuman-tui': [['openhuman-rpc']],
+      'openhuman-rpc': [['openhuman-tinyhumans']],
+      'openhuman-tinyhumans': [['openhuman-embed']],
+      'openhuman-embed': [['openhuman']],
       'tinyflows-import': [
         ['tinyflows'],
         ['tinyflows-catalog'],
@@ -224,7 +229,19 @@ test('host boundary audit ignores writer features unified only by unrelated work
       openhuman: [['tinyflows-import']],
       'tinyflows-import': [['tinyflows-bus']],
     });
-    const app = metadata({ 'openhuman-app': [['openhuman-rpc']] });
+    const app = metadata({
+      'openhuman-app': [['openhuman-rpc']],
+      'openhuman-rpc': [['openhuman-tinyhumans']],
+      'openhuman-tinyhumans': [['openhuman-embed']],
+      'openhuman-embed': [['openhuman']],
+      openhuman: [['tinyflows-import']],
+      'tinyflows-import': [
+        ['tinyflows'],
+        ['tinyflows-catalog'],
+        ['tinyflows-drivers'],
+        ['tinyflows-schedule'],
+      ],
+    });
     const defaults = metadata({
       'openhuman-cli': [['openhuman-rpc']],
       'openhuman-tui': [['openhuman-rpc']],
