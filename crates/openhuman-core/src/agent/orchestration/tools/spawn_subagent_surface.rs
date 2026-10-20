@@ -1,7 +1,6 @@
 //! The single asynchronous sub-agent spawn surface.
 
 use super::subagent_abort_report::AbortReport;
-use crate::agent::orchestration::fleet_tools::FleetToolSet;
 use crate::agent::orchestration::running_subagents;
 use crate::agent::orchestration::subagent_sessions::{
     self, DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore,
@@ -381,9 +380,7 @@ fn finish_spawn_registration(
 fn format_async_subagent_accepted(
     agent_id: &str,
     payload_json: &str,
-    fleet: &FleetToolSet,
 ) -> String {
-    let _ = fleet;
     format!(
         "Accepted async sub-agent `{agent_id}`. Its result is delivered automatically. To continue or answer a clarification, call `spawn_subagent` again with the same task_key.
 
@@ -400,19 +397,18 @@ fn format_async_subagent_accepted(
 fn async_subagent_ref_payload(
     task_id: &str,
     subagent_session_id: &str,
+    task_key: &str,
     agent_id: &str,
     worker_thread_id: Option<&str>,
     reused: bool,
     reuse_decision: &str,
     status: &str,
-    fleet: &FleetToolSet,
 ) -> serde_json::Value {
-    let _ = fleet;
     let instructions = json!({
         "answer_or_resume": {
             "tool": "spawn_subagent",
             "description": "Continue this task or answer a clarification while preserving its context.",
-            "arguments": { "agent_id": agent_id, "task_key": subagent_session_id, "prompt": "<follow-up or user answer>" }
+            "arguments": { "agent_id": agent_id, "task_key": task_key, "prompt": "<follow-up or user answer>" }
         }
     });
     let next_actions = [
@@ -425,6 +421,8 @@ fn async_subagent_ref_payload(
         "taskId": task_id,
         "subagent_session_id": subagent_session_id,
         "subagentSessionId": subagent_session_id,
+        "task_key": task_key,
+        "taskKey": task_key,
         "agent_id": agent_id,
         "agentId": agent_id,
         "mode": "async",
