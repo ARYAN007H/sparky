@@ -4,9 +4,11 @@
 //! thread it owned) or removing a source asks the engine to delete for good. When memory is off
 //! (signed out, no credential) the engine cannot be reached, and when it
 //! fails the deletion has not happened. Either way the deletion is recorded
-//! here, in the memory state KV value `pending_deletions`, and [`drain`] runs
-//! it again on the next sign-in ([`super::bus`], on `CredentialChanged`) and
-//! on every background tick, until it succeeds.
+//! here, in the workspace-owned memory state KV value `pending_deletions`,
+//! independent of the active profile/agent scope. The host migrates old
+//! scope-owned queue entries on first access. [`drain`] runs owed work again
+//! on the next sign-in ([`super::bus`], on `CredentialChanged`) and on every
+//! background tick, until it succeeds.
 //!
 //! Every deletion is hard: a forget by filter removes the matched events by
 //! `memory_ids` with an explicit `redact_events` cascade.

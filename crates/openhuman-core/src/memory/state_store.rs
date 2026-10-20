@@ -44,9 +44,7 @@ fn open_quarantining<T: DeserializeOwned>(workspace_dir: &Path, name: &str) -> R
 fn profile_layout_for_workspace(
     workspace_dir: &Path,
 ) -> Option<crate::config::schema::ProfileLayout> {
-    use crate::config::schema::profile_layout::{
-        PROFILE_CONFIG_FILE, PROFILE_WORKSPACE_DIR, USERS_DIR,
-    };
+    use crate::config::schema::profile_layout::{PROFILE_WORKSPACE_DIR, USERS_DIR};
 
     if let Some(profile) = crate::config::schema::ProfileLayout::of_workspace(workspace_dir) {
         return Some(profile);
