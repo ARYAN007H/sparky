@@ -989,8 +989,8 @@ pub fn is_session_expired_message(msg: &str) -> bool {
             && msg.contains("\"error\":\"Invalid token\""))
         // TAURI-RUST-N — same OpenHuman backend "Invalid token" envelope
         // wrapped by the tinyagents `ProviderError::Display` format
-        // (`TinyAgentsError::Provider(Box<ProviderError>)`). The crate-native
-        // path (`OpenHumanBackendModel`) delegates to tinyagents' `OpenAiModel`
+        // (`TinyAgentsError::Provider(Box<ProviderError>)`). The historical
+        // `OpenHumanBackendModel` delegated to `OpenAiModel`
         // which formats errors as `"{provider} returned HTTP {status}: {body}"`,
         // producing `"OpenHuman returned HTTP 401: ..."` — different from the
         // `"OpenHuman API error (401"` prefix the classic `api_error` path emits.

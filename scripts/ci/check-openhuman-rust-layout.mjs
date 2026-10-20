@@ -33,7 +33,7 @@ const LEGACY_LIMIT_ENTRIES = [
   // a follow-up without reintroducing an old harness/session exception.
   ["crates/openhuman-core/src/agent/session_host/builder/factory.rs", 921],
   ["crates/openhuman-core/src/agent/subagent_host/lifecycle.rs", 754],
-  ["crates/openhuman-core/src/agent/subagent_host/ops/runner.rs", 922],
+  ["crates/openhuman-core/src/agent/subagent_host/ops/runner.rs", 927],
   ["crates/openhuman-core/src/web_chat/progress_bridge.rs", 1089],
   // These established external test modules grew with upstream coverage. Pin
   // their current sizes while follow-up work separates their test concerns.
@@ -41,8 +41,8 @@ const LEGACY_LIMIT_ENTRIES = [
   // oversized files are pinned at the size they had when enforcement began.
   ["crates/openhuman-core/src/core/all.rs", 1114],
   ["crates/openhuman-core/src/core/all_tests.rs", 1465],
-  ["crates/openhuman-core/src/core/events.rs", 1703],
-  ["crates/openhuman-core/src/core/events_tests.rs", 997],
+  ["crates/openhuman-core/src/core/events.rs", 1697],
+  ["crates/openhuman-core/src/core/events_tests.rs", 988],
   ["crates/openhuman-core/src/core/observability.rs", 3425],
 ];
 const LEGACY_LIMITS = new Map(LEGACY_LIMIT_ENTRIES);

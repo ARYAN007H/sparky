@@ -33,6 +33,7 @@ pub mod model_context;
 pub mod ops;
 pub mod provider;
 pub mod provider_model;
+pub mod readiness;
 pub(crate) mod reasoning;
 pub mod registry;
 mod schemas;

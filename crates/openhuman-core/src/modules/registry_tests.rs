@@ -1,23 +1,8 @@
 use super::{find, ALL};
 use tinybus::module::platform::candidates_for;
 
-#[test]
-fn tinycomputer_registry_matches_bus_contract_and_published_release() {
-    let desktop = find("tinycomputer").expect("compiled computer module");
-    assert_eq!(desktop.bus_name, tinycomputer_bus::names::INTERFACE);
-    assert_eq!(desktop.object_path, tinycomputer_bus::names::OBJECT_PATH);
-    assert_eq!(desktop.version, "0.15.0");
-    assert_eq!(desktop.assets.len(), 17);
-    assert_eq!(tinycomputer_bus::CONTRACT_VERSION, (2, 20));
-    assert_eq!(
-        desktop.asset_for("ubuntu-24.04-x86_64").unwrap().sha256,
-        "c33256574bbffcff991d1da852c10f7ae5b5b838fe94ce70d801bdaa0975e190"
-    );
-    assert_eq!(
-        desktop.asset_for("macos-26-arm64").unwrap().sha256,
-        "9bacf2451dc9b1113bd5293f268743048bbe4e92db4f343b9e6a9dadea68249b"
-    );
-}
+#[path = "registry_computer_release_tests.rs"]
+mod computer_release_tests;
 
 #[test]
 #[cfg(feature = "web3")]

@@ -21,7 +21,7 @@ fn path(workspace_dir: &Path) -> PathBuf {
 }
 
 fn read_all(workspace_dir: &Path) -> BTreeMap<String, SourceState> {
-    match crate::memory::state_store::load(workspace_dir, STATE) {
+    match crate::memory::state_store::load_strict(workspace_dir, STATE) {
         Ok(Some(state)) => state,
         Ok(None) => BTreeMap::new(),
         Err(error) => {

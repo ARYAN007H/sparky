@@ -156,6 +156,9 @@ pub async fn remember_keyed(
     // Fail with MEMORY_OFF before touching anything.
     crate::memory::engine::resolve(config).engine()?;
     let key_tag = flow_key_tag(flow_id, key);
+    // Take a scoped snapshot before writing. If learning fails, this leaves
+    // the prior value intact; deleting by these ids after learning also keeps
+    // a concurrent write that was absent from the snapshot.
     let mut old_ids = Vec::new();
     let mut cursor = None;
     loop {

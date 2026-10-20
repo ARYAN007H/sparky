@@ -97,7 +97,7 @@ impl TurnModels {
 /// the Phase 3 P3-B cutover of [`build_turn_models`]: instead of wrapping one host
 /// `Provider` per tier in a [`native model adapter`], each tier is built as a crate-native
 /// [`ChatModel`] via [`factory::create_turn_chat_model`] (managed →
-/// `OpenHumanBackendModel`, local/cloud → crate `OpenAiModel`).
+/// `TinyHumansModel`, local/cloud → crate `OpenAiModel`).
 ///
 /// The `TurnModels` shape is identical to [`build_turn_models`] so
 /// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) is unchanged. The provider metadata

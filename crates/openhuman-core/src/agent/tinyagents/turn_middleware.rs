@@ -308,12 +308,7 @@ pub(super) fn install_turn_middleware(
                         "[stop_hooks] hook voted to stop the turn — pausing run: {}",
                         report.reason
                     );
-                    *summary
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
-                        "Stopping after {} model call(s): {}",
-                        report.iteration, report.reason
-                    ));
+                    record_stop_summary(&summary, report.iteration, &report.reason);
                 }),
         ));
     }
@@ -633,3 +628,15 @@ pub(super) fn install_turn_middleware(
         prompt_cache_guard,
     }
 }
+
+fn record_stop_summary(summary: &HaltSummarySlot, iteration: u32, reason: &str) {
+    *summary
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
+        "Stopping after {iteration} model call(s): {reason}"
+    ));
+}
+
+#[cfg(test)]
+#[path = "turn_middleware_tests.rs"]
+mod tests;

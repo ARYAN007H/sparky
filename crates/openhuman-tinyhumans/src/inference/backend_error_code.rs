@@ -106,6 +106,9 @@ pub fn is_managed_backend_envelope(err: &str) -> bool {
     let lower = err.to_ascii_lowercase();
     lower.starts_with(&format!("{label} api error"))
         || lower.starts_with(&format!("{label} streaming api error"))
+        // Existing diagnostics may still carry the former host-adapter label.
+        || lower.starts_with("openhuman api error")
+        || lower.starts_with("openhuman streaming api error")
 }
 
 /// Whether the managed backend explicitly flagged this `BAD_REQUEST` as a
@@ -136,7 +139,7 @@ pub fn body_flags_malformed(err: &str) -> bool {
 pub(crate) fn classify(provider: Option<&str>, err: &str) -> BackendErrorClassification {
     let provider_owned = provider.map_or_else(
         || is_managed_backend_envelope(err),
-        |provider| provider == PROVIDER_LABEL,
+        |provider| matches!(provider, PROVIDER_LABEL | "OpenHuman"),
     );
     let token = provider_owned
         .then(|| extract_backend_error_code_token(err))

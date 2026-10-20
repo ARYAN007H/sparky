@@ -153,6 +153,7 @@ async fn provider_admin_model_listing_covers_openrouter_validation_and_local_syn
 
 #[tokio::test]
 async fn factory_covers_legacy_api_key_scoping_and_abstract_model_errors() {
+    crate::tinyhumans_boot::boot();
     let _env = env_lock_async().await;
     let (base, state) = serve_mock().await;
     let tmp = tempdir().expect("tempdir");

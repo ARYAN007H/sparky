@@ -26,6 +26,7 @@ pub mod deletion;
 pub mod engine;
 pub mod engine_registry;
 pub mod error;
+pub use error::{MemoryError, MemoryResult};
 pub mod explore;
 #[cfg(test)]
 #[path = "guard_tests.rs"]
