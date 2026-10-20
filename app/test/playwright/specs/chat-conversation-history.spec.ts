@@ -7,6 +7,7 @@ import {
   waitForAppReady,
 } from '../helpers/core-rpc';
 import { selectedThreadTranscript } from '../helpers/chat-transcript';
+import { persistedThreadMessages } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-conversation-history';
@@ -132,7 +133,7 @@ test.describe('Chat Conversation History', () => {
     await setMockBehavior('llmStreamChunkDelayMs', '10');
 
     await openChat(page);
-    await createNewThread(page);
+    const threadId = await createNewThread(page);
 
     await sendMessage(page, FIRST_PROMPT);
     // The assistant bubble's Tailwind class carries an opacity modifier
@@ -221,5 +222,14 @@ test.describe('Chat Conversation History', () => {
     expect(transcript.content).toContain(FIRST_RESPONSE);
     expect(transcript.content).toContain(SECOND_PROMPT);
     expect(transcript.content).toContain(TURN_TWO_CANARY);
+    await expect
+      .poll(async () => {
+        const messages = await persistedThreadMessages(threadId);
+        const content = messages.map(message => message.content).join('\n');
+        return [FIRST_PROMPT, FIRST_RESPONSE, SECOND_PROMPT, TURN_TWO_CANARY].every(text =>
+          content.includes(text)
+        );
+      })
+      .toBe(true);
   });
 });

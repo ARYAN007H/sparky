@@ -7,6 +7,7 @@ import {
 } from '../helpers/core-rpc';
 import {
   inFlightThreadKeys,
+  persistedThreadMessages,
   selectedThreadTranscript,
 } from '../helpers/chat-transcript';
 
@@ -138,7 +139,7 @@ test.describe('Chat Harness - Send Stream', () => {
 
     await setMockBehavior('llmStreamScript', JSON.stringify(streamScript));
     await openChat(page);
-    await createNewThread(page);
+    const threadId = await createNewThread(page);
 
     await sendMessage(page, PROMPT);
 
@@ -172,5 +173,12 @@ test.describe('Chat Harness - Send Stream', () => {
     expect(durable.content).toContain(REPLY_PIECES.join(''));
     expect(durable.total).toBeGreaterThan(0);
     await expect.poll(inFlightThreadKeys).not.toContain(`::${durable.threadId}`);
+    await expect
+      .poll(async () => {
+        const messages = await persistedThreadMessages(threadId);
+        const content = messages.map(message => message.content).join('\n');
+        return content.includes(PROMPT) && content.includes(REPLY_PIECES.join(''));
+      })
+      .toBe(true);
   });
 });
