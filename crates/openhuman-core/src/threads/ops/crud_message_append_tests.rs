@@ -552,6 +552,7 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
 
 #[tokio::test]
 async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
+    use base64::Engine as _;
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use tinychannels_bus::{ContentPart, MediaReference};
 
@@ -618,4 +619,87 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
             .await
             .unwrap();
     assert_eq!(rows.iter().filter(|row| row.id == first.id).count(), 1);
+}
+
+#[tokio::test]
+async fn concurrent_queued_attachment_transfer_has_one_exact_owner() {
+    use base64::Engine as _;
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use tinychannels_bus::{ContentPart, MediaReference};
+
+    let (_temp, config) = setup().await;
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config.clone(),
+    ));
+    let image = || ContentPart::Image {
+        media: MediaReference {
+            url: Some(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                    "../../../../../tests/fixtures/images/handoff-hero.png"
+                ))
+            )),
+            ..Default::default()
+        },
+        caption: None,
+        alt_text: None,
+    };
+
+    let staged_conflict = crate::threads::attachments::stage_queued_parts(
+        &ctx,
+        "uploads",
+        &[image()],
+    )
+    .await
+    .unwrap();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+    let left_ctx = ctx.clone();
+    let left_refs = staged_conflict.clone();
+    let left_barrier = barrier.clone();
+    let left = tokio::spawn(async move {
+        left_barrier.wait().await;
+        persist_queued_user_message(&left_ctx, "uploads", "same", "left", &left_refs).await
+    });
+    let right_ctx = ctx.clone();
+    let right_refs = staged_conflict.clone();
+    let right = tokio::spawn(async move {
+        barrier.wait().await;
+        persist_queued_user_message(&right_ctx, "uploads", "same", "right", &right_refs).await
+    });
+    let results = [left.await.unwrap(), right.await.unwrap()];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
+    let rows = conversations::get_messages(
+        &ctx,
+        config.workspace_dir.clone(),
+        "uploads",
+    )
+    .unwrap();
+    assert_eq!(rows.iter().filter(|row| row.id == "user:same").count(), 1);
+
+    let staged_single_owner = crate::threads::attachments::stage_queued_parts(
+        &ctx,
+        "uploads",
+        &[image()],
+    )
+    .await
+    .unwrap();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+    let left_ctx = ctx.clone();
+    let left_refs = staged_single_owner.clone();
+    let left_barrier = barrier.clone();
+    let left = tokio::spawn(async move {
+        left_barrier.wait().await;
+        persist_queued_user_message(&left_ctx, "uploads", "owner-a", "", &left_refs).await
+    });
+    let right_ctx = ctx.clone();
+    let right_refs = staged_single_owner.clone();
+    let right = tokio::spawn(async move {
+        barrier.wait().await;
+        persist_queued_user_message(&right_ctx, "uploads", "owner-b", "", &right_refs).await
+    });
+    let results = [left.await.unwrap(), right.await.unwrap()];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
 }
