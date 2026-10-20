@@ -492,6 +492,7 @@ const threadSlice = createSlice({
       const event = action.payload;
       const rowId = event.openhuman_message_id;
       if (!rowId || !event.thread_id) return;
+      state.channelActivityByThreadId ??= {};
       const thread = (state.channelActivityByThreadId[event.thread_id] ??= {});
       if (!thread[rowId]) {
         const prior = state.messagesByThreadId[event.thread_id]?.find(
@@ -620,7 +621,7 @@ const threadSlice = createSlice({
       const threadId = action.payload;
       state.threads = state.threads.filter(thread => thread.id !== threadId);
       delete state.messagesByThreadId[threadId];
-      delete state.channelActivityByThreadId[threadId];
+      if (state.channelActivityByThreadId) delete state.channelActivityByThreadId[threadId];
       if (state.selectedThreadId === threadId) {
         state.selectionIntentVersion = (state.selectionIntentVersion ?? 0) + 1;
         state.selectedThreadId = null;
@@ -844,7 +845,9 @@ const threadSlice = createSlice({
       })
       .addCase(deleteThread.fulfilled, (state, action) => {
         delete state.messagesByThreadId[action.payload.threadId];
-        delete state.channelActivityByThreadId[action.payload.threadId];
+        if (state.channelActivityByThreadId) {
+          delete state.channelActivityByThreadId[action.payload.threadId];
+        }
       })
       .addCase(updateThreadTitle.fulfilled, (state, action) => {
         const idx = state.threads.findIndex(t => t.id === action.payload.id);
