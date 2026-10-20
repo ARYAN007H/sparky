@@ -2,8 +2,6 @@
 
 use crate::channels::context::CHANNEL_TYPING_REFRESH_INTERVAL_SECS;
 use crate::channels::Channel;
-use std::sync::Arc;
-use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus as traits;
 
 /// Maximum characters shown in the debug reply println.
