@@ -123,20 +123,30 @@ impl AgentTurnHost {
 
         // Keep the large agent future behind a pointer while the origin scope
         // is active. The origin is explicit and independent from RPC metadata.
-        let turn = match request.message_input {
-            Some(input) => session.run_single_with_approval_and_message(
-                &request.message,
-                input,
-                Some(request.origin.clone()),
-                request.approval,
-            ),
-            None => session.run_single_with_approval(
-                &request.message,
-                Some(request.origin.clone()),
-                request.approval,
-            ),
+        let origin = request.origin;
+        let message = request.message;
+        let input = request.message_input;
+        let approval = request.approval;
+        let turn = async move {
+            match input {
+                Some(input) => {
+                    session
+                        .run_single_with_approval_and_message(
+                            &message,
+                            input,
+                            Some(origin.clone()),
+                            approval,
+                        )
+                        .await
+                }
+                None => {
+                    session
+                        .run_single_with_approval(&message, Some(origin.clone()), approval)
+                        .await
+                }
+            }
         };
-        Box::pin(with_origin(request.origin, turn)).await
+        Box::pin(with_origin(origin, turn)).await
     }
 }
 
