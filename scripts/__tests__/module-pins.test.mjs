@@ -214,7 +214,7 @@ function sourceParityFixture() {
   writeFileSync(join(root, "Cargo.toml"), "[package]\nname = \"fixture\"\nversion = \"1.0.0\"\n");
   git(["add", "."]);
   git(["commit", "-qm", "release"]);
-  git(["tag", "v1.0.0"]);
+  git(["tag", "-a", "-m", "release", "v1.0.0"]);
   const releaseCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   writeFileSync(join(root, "src/tests.rs"), "#[test] fn works() { assert_eq!(1, 1); }\n");
   git(["add", "."]);
