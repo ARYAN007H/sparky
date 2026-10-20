@@ -56,7 +56,10 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use tinyflows_bus::schedule::types::CronJob;
-use tinyflows_bus::schedule::{members, Attempt, StartScheduler, StoreBackend, StoreConfig};
+use tinyflows_bus::schedule::{
+    members, Attempt, ManualDelivery, RunJobNow, RunJobReply, StartScheduler, StoreBackend,
+    StoreConfig,
+};
 use tokio::time::{self, Duration};
 
 const MIN_POLL_SECONDS: u64 = 5;
@@ -271,18 +274,20 @@ async fn execute_via_bus(
     let binding = Binding::new(ctx, config, security);
     let host = bus_host::register(binding).await.map_err(|e| anyhow!(e))?;
     let proxy = module::run_proxy(config).await.map_err(|e| anyhow!(e))?;
-    tracing::debug!(job_id = %job.id, %run_id, "[cron:scheduler] ExecuteJob");
-    let attempt: Attempt = proxy
-        .call(
-            members::EXECUTE_JOB,
-            (
-                CLAIM_SCOPE,
-                host.address(),
-                scheduler_config(config),
-                job,
-                run_id,
-            ),
-        )
+    let scope = crate::cron::documents_port::DocScope::current(config)?;
+    let request = RunJobNow {
+        scope: CLAIM_SCOPE.to_string(),
+        callback: host.address(),
+        config: scheduler_config(config),
+        storage: crate::cron::client::store_config(config, &scope).await?,
+        job: job.clone(),
+        run_id: run_id.to_string(),
+        delivery: ManualDelivery::NotRequested,
+        wait: true,
+    };
+    tracing::debug!(job_id = %job.id, %run_id, "[cron:scheduler] RunJobNow");
+    let reply: RunJobReply = proxy
+        .call(members::RUN_JOB_NOW, (request,))
         .await
         .map_err(|error| {
             let message = error.wire_message();
@@ -293,7 +298,21 @@ async fn execute_via_bus(
             }
         })?;
     drop(host);
-    Ok(attempt)
+    match reply {
+        RunJobReply::Completed { attempt, .. } => Ok(attempt),
+        RunJobReply::Refused { reason } => match reason {
+            tinyflows_bus::schedule::RunJobRefusal::AlreadyRunning => {
+                Err(anyhow!("cron job '{}' is already running", job.id))
+            }
+            tinyflows_bus::schedule::RunJobRefusal::DefinitionChanged => Err(anyhow!(
+                "cron job '{}' changed before it could run",
+                job.id
+            )),
+        },
+        RunJobReply::Accepted { .. } => Err(anyhow!(
+            "tinyflows accepted a blocking Run Now request without a terminal result"
+        )),
+    }
 }
 
 /// Single poll cycle of the scheduler loop, extracted so tests can drive
