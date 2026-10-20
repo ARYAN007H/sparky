@@ -14,7 +14,6 @@ fn all_tools_registers_the_memory_tool_while_memory_is_on() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
 
@@ -58,7 +57,6 @@ fn whatsapp_data_tools_are_gone_in_every_build() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -105,7 +103,6 @@ fn every_packed_tool_name_resolves_to_a_registered_tool() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let registered: std::collections::HashSet<&str> = tools.iter().map(|t| t.name()).collect();
@@ -220,7 +217,6 @@ fn document_tools_registered_when_feature_on() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -252,7 +248,6 @@ fn document_tools_absent_when_feature_off() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -280,7 +275,6 @@ fn all_tools_registers_gitbooks_when_enabled() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
@@ -369,7 +363,6 @@ fn all_tools_skips_gitbooks_when_disabled() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
@@ -401,7 +394,6 @@ fn all_tools_default_registry_contains_expected_baseline_surface() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -466,7 +458,6 @@ fn all_tools_default_registry_has_no_duplicate_tool_names() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -498,7 +489,6 @@ fn all_tools_excludes_browser_when_disabled() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
@@ -532,7 +522,6 @@ async fn document_tool_writes_into_the_configured_files_folder() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let tool = tools

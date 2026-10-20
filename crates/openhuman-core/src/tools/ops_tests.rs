@@ -70,7 +70,6 @@ fn integration_tools_for_config(tmp: &TempDir, cfg: &Config) -> Vec<Box<dyn Tool
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         cfg,
     )
 }
@@ -110,7 +109,6 @@ fn expansion_tools_for(tmp: &TempDir) -> Vec<Box<dyn Tool>> {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     )
 }

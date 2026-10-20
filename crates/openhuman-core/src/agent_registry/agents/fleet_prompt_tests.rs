@@ -115,7 +115,6 @@ fn registered_tools() -> Vec<Box<dyn tinytools::Tool>> {
         &crate::config::BrowserConfig::default(),
         &crate::config::HttpRequestConfig::default(),
         tmp.path(),
-        &std::collections::HashMap::new(),
         &config,
     );
     tools

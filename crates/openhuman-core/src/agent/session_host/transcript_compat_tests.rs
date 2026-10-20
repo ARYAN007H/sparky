@@ -570,7 +570,6 @@ fn assert_retired_tool_replay(identity_bound: bool) {
             &config.browser,
             &config.http_request,
             root.path(),
-            &std::collections::HashMap::new(),
             &config,
         );
         assert!(

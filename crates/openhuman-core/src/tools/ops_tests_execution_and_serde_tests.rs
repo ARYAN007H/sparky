@@ -22,7 +22,6 @@ fn all_tools_includes_browser_when_enabled() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
@@ -59,7 +58,6 @@ fn computer_component_off_unregisters_desktop_and_browser_tools() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
@@ -124,7 +122,6 @@ fn all_tools_registers_no_hosted_integration_families_without_a_tool_source() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -185,7 +182,6 @@ fn all_tools_registers_brave_engine_when_enabled() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -218,7 +214,6 @@ fn all_tools_registers_querit_as_the_search_role_when_enabled() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);
@@ -252,7 +247,6 @@ fn all_tools_omits_search_surface_when_search_is_disabled() {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     );
     let names = tool_names(&tools);

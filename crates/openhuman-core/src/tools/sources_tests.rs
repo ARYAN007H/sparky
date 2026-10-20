@@ -46,7 +46,6 @@ fn assemble(tmp: &TempDir) -> Vec<String> {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
         None,
     )
