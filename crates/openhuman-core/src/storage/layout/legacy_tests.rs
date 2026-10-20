@@ -24,14 +24,13 @@ async fn importing_twice_changes_nothing() {
     let fx = v1_profile();
     import(&fx.target, &fx.config).await.unwrap();
     migrate(&fx.target).await.unwrap();
-    dbg_docs(&v1_db(&fx.target));
     let first = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
     import(&fx.target, &fx.config).await.unwrap();
     migrate(&fx.target).await.unwrap();
-    dbg_docs(&v1_db(&fx.target));
-    let second = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
-    eprintln!("DBG first={first:?} second={second:?}");
-    assert_eq!(second, first);
+    assert_eq!(
+        super::super::db::table_counts(&v1_db(&fx.target)).unwrap(),
+        first
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -58,16 +57,4 @@ async fn no_workspace_means_nothing_to_import() {
     );
     migrate(&target).await.unwrap();
     assert!(!target.workspace().exists());
-}
-
-fn dbg_docs(p: &std::path::Path) {
-    let c = crate::storage::rusqlite::Connection::open(p).unwrap();
-    let cols: Vec<String> = c.prepare("PRAGMA table_info(docs)").unwrap().query_map([], |r| r.get::<_, String>(1)).unwrap().map(|x| x.unwrap()).collect();
-    eprintln!("DBGCOLS {cols:?}");
-    let col = if cols.iter().any(|x| x == "collection") { "collection" } else { &cols[0] };
-    let _ = col; let q = "SELECT scope||' '||coll, count(*) FROM docs GROUP BY 1 ORDER BY 1".to_string();
-    let rows: Vec<(String, i64)> = c.prepare(&q).unwrap().query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))).unwrap().map(|x| x.unwrap()).collect();
-    eprintln!("DBGDOCS {rows:?}");
-    let ids: Vec<String> = c.prepare("SELECT id||' '||body FROM docs WHERE coll='tsd.migrations' AND scope LIKE '%module:memory-workspace%' ORDER BY id").unwrap().query_map([], |r| r.get::<_, String>(0)).unwrap().map(|x| x.unwrap()).collect();
-    eprintln!("DBGIDS {}", ids.join(" || "));
 }
