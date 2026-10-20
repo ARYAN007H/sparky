@@ -2,6 +2,15 @@ use super::*;
 use base64::Engine as _;
 use serde_json::json;
 
+fn valid_image_data_uri() -> String {
+    format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+            "../../../../../tests/fixtures/images/handoff-hero.png"
+        ))
+    )
+}
+
 async fn setup() -> (tempfile::TempDir, crate::config::Config) {
     let temp = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
@@ -62,10 +71,11 @@ fn request(id: &str, content: &str, sender: &str) -> AppendConversationMessageRe
 #[tokio::test]
 async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_content() {
     let (_temp, config) = setup().await;
+    let data_uri = valid_image_data_uri();
     let first = append_with_test_config(
         request(
             "one",
-            "look [IMAGE:data:image/png;base64,iVBORw0KGgo=]",
+            &format!("look [IMAGE:{data_uri}]"),
             "user",
         ),
         &config,
@@ -333,6 +343,7 @@ async fn raw_append_stages_in_the_bound_thread_folder() {
 async fn append_cannot_forge_private_attachment_storage_metadata() {
     let (_temp, config) = setup().await;
     let mut req = request("forged", "hello", "assistant");
+    req.message.extra_metadata = json!({});
     req.message.extra_metadata["__openhumanStoredAttachments"] = json!([{
         "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
         "path": "../../etc/passwd"
@@ -350,6 +361,7 @@ async fn append_cannot_forge_private_attachment_storage_metadata() {
         .get("__openhumanStoredAttachments")
         .is_none());
     let mut user_req = request("forged-user", "hello", "user");
+    user_req.message.extra_metadata = json!({});
     user_req.message.extra_metadata["__openhumanStoredAttachments"] = json!([{
         "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
         "path": "../../etc/passwd"
