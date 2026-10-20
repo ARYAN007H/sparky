@@ -159,3 +159,35 @@ fn a_populated_requeue_keeps_its_own_trusted_execution() {
         &own_turn
     ));
 }
+
+#[test]
+fn requeue_adopts_context_but_never_predecessor_message_or_attachment_state() {
+    let running = QueuedPayload {
+        client_id: "client-a".into(),
+        trusted_turn: Some(trusted_turn("tenant-a:telegram:account-a:one")),
+        deferred_user_message: true,
+        pending_attachments: Some(PendingAttachmentInput {
+            parts: vec![tinychannels_bus::ContentPart::Image {
+                media: tinychannels_bus::MediaReference::default(),
+                caption: None,
+                alt_text: None,
+            }],
+        }),
+        stored_attachments: Some(StoredAttachmentInput {
+            persisted_message_id: "user:prior-image".into(),
+            parts: vec![],
+        }),
+        ..Default::default()
+    };
+    let mut next = QueuedPayload {
+        client_id: "client-b".into(),
+        ..Default::default()
+    };
+
+    RequeuePayload::adopt(&mut next, &running);
+
+    assert!(next.trusted_turn.is_some(), "trusted channel context is inherited");
+    assert!(!next.deferred_user_message);
+    assert!(next.pending_attachments.is_none());
+    assert!(next.stored_attachments.is_none());
+}

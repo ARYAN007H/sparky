@@ -88,15 +88,6 @@ impl RequeuePayload for QueuedPayload {
         if self.trusted_turn.is_none() {
             self.trusted_turn.clone_from(&running.trusted_turn);
         }
-        self.deferred_user_message |= running.deferred_user_message;
-        if self.pending_attachments.is_none() {
-            self.pending_attachments
-                .clone_from(&running.pending_attachments);
-        }
-        if self.stored_attachments.is_none() {
-            self.stored_attachments
-                .clone_from(&running.stored_attachments);
-        }
         if self.client_id.is_empty() {
             self.client_id.clone_from(&running.client_id);
             self.model_override.clone_from(&running.model_override);
