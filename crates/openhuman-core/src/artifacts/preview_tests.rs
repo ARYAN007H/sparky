@@ -38,7 +38,7 @@ async fn a_text_kind_shows_its_newest_version() {
         2,
     ));
     let dir = tempfile::tempdir().unwrap();
-    let body = body_of(&record, None, &DocumentConverter::none()).await;
+    let body = body_of(&record, None, None, &DocumentConverter::none()).await;
     assert_eq!(body.kind, "markdown");
     assert_eq!(body.version, 2);
     assert_eq!(body.body, "# v2");
@@ -54,6 +54,7 @@ async fn a_text_file_inside_the_roots_is_read() {
     let body = body_of(
         &record,
         Some(&files),
+        None,
         &DocumentConverter::none(),
     )
     .await;
@@ -71,6 +72,7 @@ async fn a_file_outside_the_roots_is_not_opened() {
     let record = file_record("artifacts/files/f-1/v1.txt", 11);
     let body = body_of(
         &record,
+        None,
         None,
         &DocumentConverter::none(),
     )
@@ -90,6 +92,7 @@ async fn a_file_over_the_preview_limit_is_not_read() {
     let body = body_of(
         &record,
         Some(&files),
+        None,
         &DocumentConverter::none(),
     )
     .await;
@@ -106,6 +109,7 @@ async fn a_binary_file_with_no_converter_shows_as_a_file() {
     let body = body_of(
         &record,
         Some(&files),
+        None,
         &DocumentConverter::none(),
     )
     .await;
