@@ -146,24 +146,32 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
             &context_b,
         );
         assert!(artifacts_b.get(&id).await.unwrap().is_none());
-        assert!(files_b
-            .as_ref()
-            .unwrap()
-            .metadata(&file.key)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            files_b
+                .as_ref()
+                .unwrap()
+                .metadata(&file.key)
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         let card_a = CoreContext::scope(core_a.clone(), async {
             super::super::store::get_artifact(&workspace, &id).await
         })
         .await;
-        assert!(card_a.is_ok(), "the explicit artifact profile owns its UI card");
+        assert!(
+            card_a.is_ok(),
+            "the explicit artifact profile owns its UI card"
+        );
         let card_b = CoreContext::scope(core_b.clone(), async {
             super::super::store::get_artifact(&workspace, &id).await
         })
         .await;
-        assert!(card_b.is_err(), "the ambient profile must not receive the UI card");
+        assert!(
+            card_b.is_err(),
+            "the ambient profile must not receive the UI card"
+        );
 
         // Seed a record in the ambient profile, then make a context with no
         // tenant act while that profile is ambient. The unbound call must not
@@ -183,7 +191,7 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
         let unbound_artifacts =
             artifacts_service(&workspace, FileRoots::new(&files), None, None, &unbound);
         assert!(
-            unbound_artifacts.list(0, 20).await.unwrap().0.is_empty(),
+            unbound_artifacts.list().await.unwrap().is_empty(),
             "a call with no tenant must not inherit the ambient profile's records"
         );
     })
@@ -325,16 +333,20 @@ async fn deleting_an_artifact_removes_its_card() {
         .await
         .unwrap();
     let id = saved.record.id;
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_ok());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_ok()
+    );
 
     let (removed, notice) = artifacts.delete(&id).await.unwrap();
     assert!(removed);
     assert!(notice.is_none(), "{notice:?}");
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_err());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_err()
+    );
 }
 
 struct NoopPublisher;
