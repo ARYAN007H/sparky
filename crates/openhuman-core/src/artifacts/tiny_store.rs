@@ -333,7 +333,9 @@ impl LegacyUiBridge {
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| anyhow::anyhow!("artifact presentation file has no valid name"))?;
-        let metadata = FsFileStore::new(root).put(name, bytes, media_type).await?;
+        let metadata = FsFileStore::new(root)
+            .overwrite_existing(name, bytes, media_type)
+            .await?;
         Ok(metadata.size_bytes)
     }
 
