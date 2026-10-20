@@ -135,6 +135,52 @@ fn managed_envelope_gate_rejects_byo_payload_carrying_error_code() {
 }
 
 #[test]
+fn hosted_classifier_drives_core_observability_without_core_token_ownership() {
+    use openhuman_embed::__host::inference_registry::register_backend_error_classifier;
+    use openhuman_embed::__host::observability::{expected_error_kind, ExpectedErrorKind};
+    use std::sync::Arc;
+
+    register_backend_error_classifier(Arc::new(super::classify));
+
+    let owned =
+        r#"OpenHuman API error (429): {"error":{"errorCode":"RATE_LIMITED","message":"x"}}"#;
+    assert_eq!(
+        expected_error_kind(owned),
+        Some(ExpectedErrorKind::BackendErrorCodeOwned)
+    );
+
+    let unknown =
+        r#"OpenHuman API error (500): {"error":{"errorCode":"FUTURE_CODE","message":"x"}}"#;
+    assert_eq!(
+        expected_error_kind(unknown),
+        Some(ExpectedErrorKind::BackendErrorCodeOwned)
+    );
+
+    let byo = r#"custom_openai API error (429): {"error":{"errorCode":"RATE_LIMITED"}}"#;
+    assert_ne!(
+        expected_error_kind(byo),
+        Some(ExpectedErrorKind::BackendErrorCodeOwned)
+    );
+
+    let malformed = r#"OpenHuman API error (400): {"error":{"errorCode":"BAD_REQUEST","malformed":true}}"#;
+    assert_ne!(
+        expected_error_kind(malformed),
+        Some(ExpectedErrorKind::BackendErrorCodeOwned)
+    );
+
+    for code in ["PAYLOAD_TOO_LARGE", "CONTEXT_LENGTH_EXCEEDED"] {
+        let guard_leak = format!(
+            "OpenHuman API error (413): {{\"error\":{{\"errorCode\":\"{code}\",\"message\":\"x\"}}}}"
+        );
+        assert_ne!(
+            expected_error_kind(&guard_leak),
+            Some(ExpectedErrorKind::BackendErrorCodeOwned),
+            "{code} must remain reportable as a client guard leak"
+        );
+    }
+}
+
+#[test]
 fn classification_keeps_provider_ownership_separate_from_raw_token_and_reportability() {
     let unknown = classify(
         Some(PROVIDER_LABEL),
