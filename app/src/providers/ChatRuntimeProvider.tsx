@@ -697,10 +697,25 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
       reportLostReply(event.thread_id);
     };
 
+    const reloadQueuedFollowup = async (threadId: string, requestId: string) => {
+      const pending = (store.getState().queue.pendingFollowupsByThread[threadId] ?? []).some(
+        item => item.requestId === requestId
+      );
+      if (!pending) return;
+      try {
+        await dispatch(loadThreadMessages(threadId)).unwrap();
+        dispatch(pendingFollowupCompleted({ threadId, requestId }));
+      } catch (error) {
+        rtLog('queued_followup_reload_failed', {
+          thread: threadId,
+          request: requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
     const finishChatDoneTurn = async (event: ChatDoneEvent, path: string) => {
       if (snapshotPolling.signal.aborted) return;
-      const completedFollowup = (store.getState().queue.pendingFollowupsByThread[event.thread_id] ?? [])
-        .some(item => item.requestId === event.request_id);
       // One store update: freeze the turn's trail, end the tail, reveal the
       // persisted reply in the tail's slot. See `turnSettled`.
       rtLog('turn_settled', { thread: event.thread_id, request: event.request_id, path });
@@ -721,23 +736,7 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
       // The core persists a queued user row under the runner lease before
       // emitting this matching terminal event. Reload that authoritative row
       // instead of appending a duplicate from the frontend.
-      if (completedFollowup) {
-        try {
-          await dispatch(loadThreadMessages(event.thread_id)).unwrap();
-          dispatch(
-            pendingFollowupCompleted({
-              threadId: event.thread_id,
-              requestId: event.request_id,
-            })
-          );
-        } catch (error) {
-          rtLog('queued_followup_reload_failed', {
-            thread: event.thread_id,
-            request: event.request_id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
+      await reloadQueuedFollowup(event.thread_id, event.request_id);
       if (snapshotPolling.signal.aborted) return;
       dispatch(endInferenceTurn({ threadId: event.thread_id }));
       dispatch(clearThreadInferenceActive(event.thread_id));
@@ -1985,6 +1984,11 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
             reason: 'chat_error',
           });
           requestUsageRefresh();
+
+          // The runner persists queued user rows before either successful or
+          // failed terminal events, so reconcile the exact queued request in
+          // both paths.
+          void reloadQueuedFollowup(event.thread_id, event.request_id);
 
           // The core can start a queued follow-up before delivering the prior
           // turn's error. Its error card still belongs in the thread, but the
