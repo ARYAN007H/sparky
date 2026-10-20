@@ -1,7 +1,7 @@
 /** TypeScript aliases generated from the persisted Rust session record schemas. */
 import type { ThreadWireTypes } from './threadWire.generated';
 
-export type PersistedTurnState = ThreadWireTypes['turnState'];
+export type PersistedTurnState = ThreadWireTypes['getTurnState']['state'];
 export type PersistedTurnLifecycle = PersistedTurnState['lifecycle'];
 export type PersistedTurnPhase = NonNullable<PersistedTurnState['phase']>;
 export type PersistedToolTimelineEntry = PersistedTurnState['toolTimeline'][number];
@@ -14,8 +14,8 @@ export type PersistedSubagentTranscriptItem = NonNullable<
   PersistedSubagentActivity['transcript']
 >[number];
 
-export type GetTurnStateResponse = Pick<ThreadWireTypes, 'turnState'>;
-export type ListTurnStatesResponse = ThreadWireTypes['turnStates'];
+export type GetTurnStateResponse = ThreadWireTypes['getTurnState'];
+export type ListTurnStatesResponse = ThreadWireTypes['listTurnStates'];
 export type ClearTurnStateResponse = ThreadWireTypes['clearTurnState'];
 
 export type AgentRun = ThreadWireTypes['agentRun'];
@@ -24,5 +24,5 @@ export type AgentRunStatus = AgentRun['status'];
 export type RunTelemetry = NonNullable<AgentRun['telemetry']>;
 export type RunEvent = ThreadWireTypes['runEvent'];
 export type AgentRunListResponse = ThreadWireTypes['agentRunList'];
-export type AgentRunGetResponse = Pick<ThreadWireTypes, 'agentRunGet'>;
+export type AgentRunGetResponse = ThreadWireTypes['agentRunGet'];
 export type RunEventListResponse = ThreadWireTypes['runEventList'];
