@@ -175,9 +175,28 @@ test('a legal direct bridge edge does not hide a second path through a wrapper',
     [['openhuman-cli', 'wrapper', 'openhuman-modules-linked']],
   );
   assert.deepEqual(
-    linkedHostAudit(m, 'openhuman-cli', linked).map(v => v.path),
+    linkedHostAudit(m, 'openhuman-cli', linked).violations.map(v => v.path),
     [['openhuman-cli', 'wrapper', 'openhuman-modules-linked']],
   );
+});
+
+test('linked bridge closure does not excuse an unrelated implementation edge or bus source mismatch', () => {
+  const linked = {
+    ...strict,
+    linkedHost: { package: 'openhuman-modules-linked', allowedParents: ['openhuman-cli'] },
+    contractManifests: { 'tinyflows-bus': '/canonical/tinyflows-bus/Cargo.toml' },
+  };
+  const m = metadata({
+    'openhuman-cli': [['openhuman-modules-linked'], ['openhuman'], ['tinyflows']],
+    'openhuman-modules-linked': [['tinyflows-import']],
+    openhuman: [['tinyflows-import']],
+    'tinyflows-import': [['tinyflows'], ['tinyflows-bus']],
+  });
+  const findings = linkedHostAudit(m, 'openhuman-cli', linked).violations;
+  assert.deepEqual(findings.map(v => [v.package, v.path]), [
+    ['tinyflows', ['openhuman-cli', 'tinyflows']],
+    ['tinyflows-bus', ['openhuman-cli', 'openhuman', 'tinyflows-import', 'tinyflows-bus']],
+  ]);
 });
 
 test('deliberate violation: the bridge reached from the app, the TUI, the core or through a wrapper fails', () => {
@@ -330,6 +349,7 @@ test('host boundary audit ignores writer features unified only by unrelated work
           cargoArgs[cargoArgs.indexOf('--features') + 1].split(',').includes('linked-modules');
         if (packageName === 'openhuman-cli' && !links && cargoArgs.includes('--features')) {
           const selected = cargoArgs[cargoArgs.indexOf('--features') + 1].split(',');
+          assert.ok(selected.includes('default'), 'CLI default-only feature edges remain covered');
           assert.ok(selected.includes('flow-write'), 'all non-bridge CLI features remain covered');
           assert.ok(!selected.includes('linked-modules'), 'linked-modules is isolated from the shipping graph');
         }
