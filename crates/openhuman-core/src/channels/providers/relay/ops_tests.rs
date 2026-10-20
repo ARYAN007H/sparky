@@ -298,7 +298,7 @@ async fn relay_preflight_failure_uses_trusted_channel_locale_without_running_age
     assert_eq!(agent_runs.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_eq!(
         replies,
-        vec!["Este chat no está disponible temporalmente. Inténtalo de nuevo más tarde."]
+        vec!["Algo salió mal. Inténtalo de nuevo."]
     );
     assert!(!replies[0].contains("COMPONENT_DISABLED"));
 }
