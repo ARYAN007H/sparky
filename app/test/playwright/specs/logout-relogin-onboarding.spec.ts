@@ -53,8 +53,10 @@ async function expectLandedInChat(page: Page): Promise<void> {
 }
 
 async function logoutViaSettings(page: Page): Promise<void> {
-  await callCoreRpc('openhuman.auth_clear_session', {});
-  await page.goto('/#/');
+  await page.goto('/#/settings/account');
+  await waitForAppReady(page);
+  await page.getByTestId('settings-nav-logout').click();
+  await expect(page.getByTestId('welcome-cta-tinyhumans')).toBeVisible({ timeout: 20_000 });
   // A core RPC response only confirms that persistence was updated. Wait for
   // the browser's CoreStateProvider to observe that signed-out snapshot before
   // asserting the public route, otherwise a preceding authenticated snapshot
@@ -77,6 +79,32 @@ test.describe('Logout -> re-login onboarding overlay', () => {
   test.beforeEach(async ({ page }) => {
     await resetMock();
     await bootRuntimeReadyGuestPage(page);
+  });
+
+  test('same-account completed onboarding survives UI logout and re-login', async ({ page }) => {
+    const userId = 'pw-logout-relogin-completed-user';
+    const tokenPayload = Buffer.from(
+      JSON.stringify({ sub: userId, userId, exp: Math.floor(Date.now() / 1000) + 3600 })
+    ).toString('base64url');
+    const token = `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.${tokenPayload}.sig`;
+
+    await callCoreRpc('openhuman.auth_store_session', { token });
+    await callCoreRpc('openhuman.config_set_onboarding_completed', { value: true });
+    await page.goto('/#/chat');
+    await waitForAppReady(page);
+    await expect.poll(readOnboardingCompleted).toBe(true);
+
+    await logoutViaSettings(page);
+    await expect(page.getByTestId('onboarding-layout')).toHaveCount(0);
+
+    await callCoreRpc('openhuman.auth_store_session', { token });
+    await page.goto('/#/onboarding/welcome');
+    await waitForAppReady(page);
+    await expect
+      .poll(async () => page.evaluate(() => window.location.hash), { timeout: 20_000 })
+      .toMatch(/^#\/chat/);
+    await expect.poll(readOnboardingCompleted).toBe(true);
+    await expect(page.getByTestId('onboarding-layout')).toHaveCount(0);
   });
 
   test('re-login after logout re-runs onboarding from clean state and lands in chat', async ({
