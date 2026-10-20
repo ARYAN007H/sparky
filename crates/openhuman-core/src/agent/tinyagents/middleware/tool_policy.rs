@@ -280,7 +280,7 @@ impl ToolPolicyHostState {
         let rendered = tinyagents_harness_tools::skills::render_pack_filtered(
             &crate::tools::toolpacks::CATALOG,
             skill,
-            handle,
+            &handle,
             // The same predicate the gate applies to `use_skill`'s inner tool.
             // Two sources of truth for "can this session call it" is the bug.
             &is_callable,

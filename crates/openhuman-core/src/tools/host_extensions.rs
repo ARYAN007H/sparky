@@ -10,10 +10,9 @@ use tinyagents_harness_tools::skills::PackRegistryHandle;
 use tinytools::{PermissionLevel, ToolCategory, ToolResult, ToolScope};
 use tinytools::{Tool, ToolRunContext};
 
-/// Reads a tool's pack-registry handle from its erased host extension.
-pub fn pack_registry_handle(tool: &dyn Tool) -> Option<&PackRegistryHandle> {
-    tool.host_extension()
-        .and_then(|any| any.downcast_ref::<PackRegistryHandle>())
+/// Reads the owner's shared pack-registry handle from a registered `use_skill` tool.
+pub fn pack_registry_handle(tool: &dyn Tool) -> Option<PackRegistryHandle> {
+    tinyagents_harness_tools::skills::pack_registry_handle(tool)
 }
 
 /// Reads the target agent a synthesized `delegate_*` tool routes to.
