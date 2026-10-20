@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { PersistedTurnState } from '../../types/turnState';
+import { toThreadMessageLike } from '../../providers/assistantUiMessages';
 import reducer, {
   beginInferenceTurn,
   bumpInferenceHeartbeatForThread,
@@ -1431,14 +1432,28 @@ describe('subagent event reducers (Phase 3)', () => {
       })
     );
 
-    expect(state.toolTimelineByThread.t1[0]).toMatchObject({ status: 'running' });
-    expect(state.toolTimelineByThread.t1[0].subagent).toMatchObject({
+    const activity = state.toolTimelineByThread.t1.find(entry => entry.id === rowId)!;
+    expect(activity).toMatchObject({ status: 'running' });
+    expect(activity.subagent).toMatchObject({
       status: 'running',
       parentCallId: 'spawn-resume',
     });
-    expect(state.toolTimelineByThread.t1[0].subagent?.awaitingQuestion).toBeUndefined();
-    expect(state.toolTimelineByThread.t1.find(entry => entry.id === 'spawn-resume')?.name).toBe(
-      'spawn_subagent'
+    expect(activity.subagent?.awaitingQuestion).toBeUndefined();
+    const rendered = toThreadMessageLike(
+      {
+        id: 'm1',
+        content: '',
+        extraMetadata: {},
+        sender: 'agent',
+        type: 'text',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      state.toolTimelineByThread.t1
+    );
+    expect(rendered.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'tool-call', toolCallId: 'spawn-resume', toolName: 'task' }),
+      ])
     );
   });
 
