@@ -85,6 +85,10 @@ fn normalizes_case_whitespace_and_prefixes() {
     assert_eq!(route_for_model("  FIXTURE-REASONING "), CostRoute::Managed);
     assert_eq!(route_for_model("fixture-reasoning"), CostRoute::Managed);
     assert_eq!(
+        route_for_model("hint:fixture-reasoning"),
+        CostRoute::Managed
+    );
+    assert_eq!(
         route_for_model("openhuman/fixture-reasoning"),
         CostRoute::Managed
     );
