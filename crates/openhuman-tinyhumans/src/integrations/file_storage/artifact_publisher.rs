@@ -18,13 +18,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::json;
 use tiny_artifacts::{
-    ArtifactKind, ArtifactPublisher, ArtifactRecord, ArtifactVersion, PublishOptions, PublishedLink,
+    ArtifactKind, ArtifactPublisher, ArtifactRecord, ArtifactVersion, FileStore, PublishOptions,
+    PublishedLink,
 };
 
 use super::tools::helpers::{file_path, mime_for_path, FILES_PATH};
 use super::types::{LinkResponse, UploadResponse};
 use crate::integrations::IntegrationClient;
 use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::artifact_publisher::ArtifactPublisherBinder;
 use openhuman_embed::__host::security::approval::ApprovalTurnContext;
 use openhuman_embed::__host::security::SecurityPolicy;
 
@@ -36,6 +38,7 @@ const DEFAULT_LINK_SECONDS: u64 = 604_800;
 pub struct StorageArtifactPublisher {
     client: Arc<IntegrationClient>,
     security: Arc<SecurityPolicy>,
+    files: Arc<dyn FileStore>,
     /// The turn the backend requests are reported to. A publisher is built
     /// once per tool set, not per call, so it reports outside any chat.
     approval: ApprovalTurnContext,
@@ -44,10 +47,15 @@ pub struct StorageArtifactPublisher {
 impl StorageArtifactPublisher {
     /// A publisher over `client`, refusing to share when `security` is
     /// read-only.
-    pub fn new(client: Arc<IntegrationClient>, security: Arc<SecurityPolicy>) -> Self {
+    pub fn new(
+        client: Arc<IntegrationClient>,
+        security: Arc<SecurityPolicy>,
+        files: Arc<dyn FileStore>,
+    ) -> Self {
         Self {
             client,
             security,
+            files,
             approval: ApprovalTurnContext::default(),
         }
     }
@@ -56,45 +64,54 @@ impl StorageArtifactPublisher {
 /// The publisher for `config`, or `None` when there is no integration client
 /// (no backend URL configured, or not signed in) — the same condition under
 /// which the `storage_*` tools are absent.
-pub fn artifact_publisher(config: &Config) -> Option<Arc<dyn ArtifactPublisher>> {
+pub fn artifact_publisher(config: &Config) -> Option<ArtifactPublisherBinder> {
     let client = crate::integrations::build_client(config)?;
     let security = Arc::new(SecurityPolicy::from_config(
         &config.autonomy,
         &config.workspace_dir,
         &config.action_dir,
     ));
-    Some(Arc::new(StorageArtifactPublisher::new(client, security)))
+    Some(Arc::new(move |files| {
+        Arc::new(StorageArtifactPublisher::new(
+            client.clone(),
+            security.clone(),
+            files,
+        ))
+    }))
 }
 
 /// The bytes, file name and media type a version uploads as.
 async fn upload_body(
+    files: &dyn FileStore,
     record: &ArtifactRecord,
     version: &ArtifactVersion,
 ) -> anyhow::Result<(Vec<u8>, String, &'static str)> {
     if record.holds_file() {
-        let path = version
+        let file = version
             .file
             .as_ref()
-            .map_or(version.body.as_str(), |f| f.path.as_str());
-        let path = Path::new(path);
-        // The record was checked when written; check again on what the path
-        // resolves to now, so nothing protected leaves the machine.
-        let resolved = tokio::fs::canonicalize(path)
-            .await
-            .map_err(|e| anyhow::anyhow!("cannot read the artifact's file: {e}"))?;
-        if let Some(reason) = openhuman_embed::__host::artifact_publisher::refused_path(&resolved) {
-            anyhow::bail!("[policy-blocked] cannot share this artifact: {reason}");
-        }
-        let bytes = tokio::fs::read(&resolved)
+            .ok_or_else(|| anyhow::anyhow!("file artifact version has no file reference"))?;
+        let bytes = files
+            .read(&file.key)
             .await
             .map_err(|e| anyhow::anyhow!("cannot read the artifact's file: {e}"))?;
         // Named after the artifact: the file read may be a kept version copy
         // (`v2.pptx`), whose name means nothing to whoever opens the link.
+        let path = Path::new(&file.key);
         let name = match path.extension().and_then(|e| e.to_str()) {
             Some(ext) => format!("{}.{ext}", file_stem(&record.title)),
             None => file_stem(&record.title),
         };
-        let mime = mime_for_path(path);
+        let mime = match file.media_type.as_deref() {
+            Some("image/png") => "image/png",
+            Some("image/jpeg") => "image/jpeg",
+            Some("image/gif") => "image/gif",
+            Some("image/webp") => "image/webp",
+            Some("application/pdf") => "application/pdf",
+            Some("text/plain") => "text/plain",
+            Some("text/csv") => "text/csv",
+            _ => mime_for_path(path),
+        };
         return Ok((bytes, name, mime));
     }
     let ext = match record.kind {
@@ -217,7 +234,7 @@ impl ArtifactPublisher for StorageArtifactPublisher {
         if !self.security.can_act() {
             anyhow::bail!("[policy-blocked] Action blocked: autonomy is read-only");
         }
-        let (bytes, filename, mime) = upload_body(record, version).await?;
+        let (bytes, filename, mime) = upload_body(self.files.as_ref(), record, version).await?;
         tracing::debug!(
             artifact_id = %record.id,
             version = version.version,

@@ -372,14 +372,6 @@ pub fn guarded_roots(roots: Vec<PathBuf>) -> tiny_artifacts::FileRoots {
     tiny_artifacts::FileRoots::new(roots).with_guard(refused_path)
 }
 
-pub(crate) fn file_store_for(
-    workspace_dir: &Path,
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> Option<Arc<dyn FileStore>> {
-    crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx)
-        .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)) as Arc<dyn FileStore>)
-}
-
 /// The artifact service for one workspace: OpenHuman's store and UI bridge,
 /// with file artifacts allowed from [`file_roots`]. Cards are announced to
 /// `chat`, the turn making the change (`None` outside a chat turn).
@@ -390,7 +382,7 @@ pub fn artifacts_service(
     chat: Option<&ApprovalChatContext>,
     ctx: &crate::core::runtime::DispatchCtx,
 ) -> Artifacts {
-    artifacts_service_with_publisher(workspace_dir, files, action_dir, chat, ctx, None)
+    build_artifacts_service(workspace_dir, files, action_dir, chat, ctx, None).0
 }
 
 /// Build an artifact service and bind an optional publisher to the exact
@@ -403,8 +395,30 @@ pub fn artifacts_service_with_publisher(
     ctx: &crate::core::runtime::DispatchCtx,
     publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
 ) -> Artifacts {
+    build_artifacts_service(workspace_dir, files, action_dir, chat, ctx, publisher).0
+}
+
+pub(crate) fn artifacts_service_with_file_store(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> (Artifacts, Option<Arc<dyn FileStore>>) {
+    build_artifacts_service(workspace_dir, files, action_dir, chat, ctx, None)
+}
+
+fn build_artifacts_service(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
+    publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
+) -> (Artifacts, Option<Arc<dyn FileStore>>) {
     let roots = file_roots(workspace_dir, &files, action_dir);
-    let file_store = file_store_for(workspace_dir, ctx);
+    let file_store = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx)
+        .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)) as Arc<dyn FileStore>);
     let mut records: Arc<dyn ArtifactStore> = Arc::new(versioned_store(workspace_dir));
     if let Some(store) = file_store.as_ref() {
         records = Arc::new(LegacyFileImportStore {
@@ -427,7 +441,7 @@ pub fn artifacts_service_with_publisher(
         }
         artifacts = artifacts.with_file_store(file_store);
     }
-    artifacts
+    (artifacts, file_store)
 }
 
 /// Legacy workspace folder that earlier builds used for per-version file
