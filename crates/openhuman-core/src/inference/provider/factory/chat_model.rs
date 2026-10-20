@@ -72,9 +72,13 @@ pub(super) fn create_chat_model_with_model_id_inner(
             false
         }
     };
+    let resolved_context = ctx.resolved();
+    let extensions = resolved_context
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
     if !test_override_active {
         if resolves_to_managed_backend(role, config) {
-            return make_openhuman_backend_model(role, config);
+            return make_openhuman_backend_model_in(extensions, role, config);
         }
         if let Some(result) =
             try_create_claude_agent_sdk_chat_model(role, config, &EgressLedger::none())
@@ -178,7 +182,12 @@ pub async fn probe_inference_readiness(
         "[flows][inference-probe] role={role} resolves to the managed OpenHuman backend — \
          probing readiness"
     );
-    let Some(entry) = crate::inference::registry::chat_model(PROVIDER_OPENHUMAN) else {
+    let resolved_context = ctx.resolved();
+    let extensions = resolved_context
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
+    let Some(entry) = crate::inference::registry::chat_model_for(extensions, PROVIDER_OPENHUMAN)
+    else {
         log::debug!("[flows][inference-probe] role={role} managed provider was unregistered");
         return Ok(());
     };

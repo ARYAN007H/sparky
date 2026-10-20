@@ -85,7 +85,7 @@ use local_runtime::{
 use managed_backend::managed_chat_model;
 pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread,
-    make_openhuman_backend_model_for_thread_in,
+    make_openhuman_backend_model_for_thread_in, make_openhuman_backend_model_in,
 };
 use subprocess_providers::{
     prepare_claude_agent_sdk_chat_model, try_create_claude_agent_sdk_chat_model,

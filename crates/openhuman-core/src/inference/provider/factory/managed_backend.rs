@@ -144,6 +144,24 @@ pub(crate) fn make_openhuman_backend_model(
     managed_chat_model(role, config, None, None, true, None, &EgressLedger::none())
 }
 
+/// One-shot managed construction selected by an explicit dispatch context.
+pub(crate) fn make_openhuman_backend_model_in(
+    extensions: Option<&crate::core::slots::Extensions>,
+    role: &str,
+    config: &Config,
+) -> anyhow::Result<ManagedChatModel> {
+    managed_chat_model_for(
+        extensions,
+        role,
+        config,
+        None,
+        None,
+        true,
+        None,
+        &EgressLedger::none(),
+    )
+}
+
 /// The managed model for a caller that holds runtime options rather than a
 /// [`Config`] (the configured `delegate` tool): `model` is used verbatim, with
 /// no tier translation and no egress emission, exactly as that tool always did.
