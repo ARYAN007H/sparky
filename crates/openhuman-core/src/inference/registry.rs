@@ -120,14 +120,47 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 
 /// The registered chat-model provider, if any.
 pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
-    let registered = CHAT_MODELS.get(provider_id);
-    // Unit tests model "a hosted provider is present" by default, as the old
-    // built-in managed backend was; a test that wants the bare core asks for it
-    // with `without_managed_provider`.
-    #[cfg(test)]
-    let registered =
-        registered.or_else(|| super::registry_test_support::default_managed_entry(provider_id));
-    registered
+    CHAT_MODELS.get(provider_id)
+}
+
+/// The registered provider's model hooks, if it has any.
+pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelHooks> {
+    chat_model(provider_id)?.models
+}
+
+/// The registered provider's default model, if it declares one.
+pub fn provider_default_model(provider_id: &str) -> Option<String> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.default_model)()
+}
+
+/// Registers a generic config normalizer, such as a provider-owned migration
+/// that must also run after the config schema reaches its current version.
+pub type ConfigNormalizer = Arc<dyn Fn(&mut Config) -> bool + Send + Sync>;
+
+static CONFIG_NORMALIZERS: HookSlot<ConfigNormalizer> = HookSlot::new("config::normalizers");
+
+/// Registers a config normalizer for the process.
+pub fn register_config_normalizer(id: impl Into<String>, normalizer: ConfigNormalizer) {
+    CONFIG_NORMALIZERS.register(id, normalizer);
+}
+
+/// Registers a config normalizer for a CoreContext's extensions.
+pub fn register_config_normalizer_in(
+    extensions: &Extensions,
+    id: impl Into<String>,
+    normalizer: ConfigNormalizer,
+) {
+    CONFIG_NORMALIZERS.register_in(extensions, id, normalizer);
+}
+
+/// Runs the currently registered config normalizers and reports whether any
+/// changed the config.
+pub(crate) fn normalize_config(config: &mut Config) -> bool {
+    CONFIG_NORMALIZERS
+        .entries()
+        .into_iter()
+        .fold(false, |changed, (_, normalize)| normalize(config) || changed)
 }
 
 // ---------------------------------------------------------------------------
