@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinystoragedrivers::{CollectionSpec, Precondition};
 
 use crate::storage::{self, documents::Repo};
@@ -30,10 +30,7 @@ struct ReplyVisemeTimeline {
     frames: Vec<Value>,
 }
 
-fn viseme_repo(
-    ctx: &crate::core::runtime::DispatchCtx,
-    workspace: &Path,
-) -> Result<Repo, String> {
+fn viseme_repo(ctx: &crate::core::runtime::DispatchCtx, workspace: &Path) -> Result<Repo, String> {
     let tenant = crate::core::runtime::tenant::tenant_in(
         crate::core::runtime::is_saas(),
         ctx.resolved().as_deref(),
@@ -225,7 +222,8 @@ pub(crate) fn persist_reply_visemes(
     let body = serde_json::to_value(ReplyVisemeTimeline { tenant, frames })
         .map_err(|error| format!("serialize voice-note timeline record: {error}"))?;
     repo.run(|docs| async move {
-        docs.put(VISEME_COLLECTION, &id, body, Precondition::None).await?;
+        docs.put(VISEME_COLLECTION, &id, body, Precondition::None)
+            .await?;
         Ok(())
     })
     .map_err(|error| format!("persist voice-note timeline: {error}"))

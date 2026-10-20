@@ -72,15 +72,16 @@ fn synthesized_reply_metadata_preserves_its_viseme_timeline() {
             tinyinference_voice::VisemeFrame {
                 viseme: "aa".into(),
                 start_ms: 0,
-                end_ms: 120
+                end_ms: 120,
             },
             tinyinference_voice::VisemeFrame {
                 viseme: "PP".into(),
                 start_ms: 120,
-                end_ms: 220
+                end_ms: 220,
             },
-        ]
-    ).unwrap();
+        ],
+    )
+    .unwrap();
 
     let meta = reply_note_metadata(&ctx, tmp.path(), "request-1").unwrap();
     assert_eq!(
@@ -130,12 +131,7 @@ fn typed_voice_media_must_match_its_durable_note_reference() {
 #[test]
 fn synthesized_reply_is_stored_only_with_decodable_audio() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(!store_synthesized_reply(
-        tmp.path(),
-        "r1",
-        "",
-        "audio/mpeg"
-    ));
+    assert!(!store_synthesized_reply(tmp.path(), "r1", "", "audio/mpeg"));
     assert!(!store_synthesized_reply(
         tmp.path(),
         "r1",
@@ -148,7 +144,8 @@ fn synthesized_reply_is_stored_only_with_decodable_audio() {
         "YWJj",
         "audio/mpeg"
     ));
-    assert!(reply_note_metadata(tmp.path(), "r1").is_some());
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    assert!(reply_note_metadata(&ctx, tmp.path(), "r1").is_some());
 }
 
 #[test]
