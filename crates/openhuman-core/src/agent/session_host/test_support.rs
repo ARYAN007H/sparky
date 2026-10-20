@@ -27,7 +27,7 @@ pub(crate) fn with_fixture_model_name(builder: SessionHostBuilder) -> SessionHos
 /// are thread-local, so each test opts in on the thread that builds its host.
 fn model_fixture_entry() -> ChatModelEntry {
     ChatModelEntry {
-        build: Arc::new(|request: ChatModelRequest<'_>| {
+        build: Arc::new(|request: &ChatModelRequest<'_>| {
             let model = request
                 .model_override
                 .or(request.default_model)
