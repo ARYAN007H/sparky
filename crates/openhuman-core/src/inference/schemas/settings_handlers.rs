@@ -86,9 +86,7 @@ pub(super) fn handle_inference_resolve_model(
         // tier; custom/BYOK models are covered by the user's per-model
         // `model_registry.vision` flag.
         let vision = crate::inference::model_context::model_supports_vision_in(
-            extensions,
-            &resolved,
-            &config,
+            extensions, &resolved, &config,
         );
         to_json(Outcome::new(
             serde_json::json!({ "model": resolved, "vision": vision }),

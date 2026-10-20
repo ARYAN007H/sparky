@@ -392,7 +392,11 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools_for
             );
         }
         AuthStyle::Anthropic | AuthStyle::None => {}
-        style if crate::config::schema::cloud_providers::is_hosted_auth_style_for(extensions, style) => {
+        style
+            if crate::config::schema::cloud_providers::is_hosted_auth_style_for(
+                extensions, style,
+            ) =>
+        {
             #[cfg(not(test))]
             if let Err(error) = verify_backend_session_active(config) {
                 return Some(Err(error));

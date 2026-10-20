@@ -67,6 +67,18 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         let (_, model) = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
             .expect("explicit model entry builds");
         assert_eq!(model, "context-a-one-shot");
+        let simple_chat =
+            crate::inference::host_runtime::ops::agent_chat_simple::agent_chat_simple(
+                &dispatch,
+                &config,
+                "fixture prompt",
+                None,
+                None,
+                None,
+            )
+            .await
+            .expect("simple chat uses its explicit model entry");
+        assert_eq!(simple_chat.value, "context-a-one-shot");
         let simple = crate::inference::host_runtime::ops::agent_chat_simple::agent_chat_simple(
             &dispatch,
             &config,
@@ -160,9 +172,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
     fn catalog(name: &'static str) -> CatalogEntry {
         CatalogEntry {
             list: Arc::new(|_, _| {
-                Box::pin(async {
-                    Err("model listing is not used by this test".to_string())
-                })
+                Box::pin(async { Err("model listing is not used by this test".to_string()) })
             }),
             limits: Some(Arc::new(move |model, _| {
                 Some(tinyinference_llm::model::discover::DiscoveryRequest {

@@ -83,6 +83,7 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
 
         assert_eq!(name_of(&models.primary).await, "context-a-model");
         assert_eq!(name_of(&models.summarizer).await, "context-a-model");
+        assert_eq!(name_of(&models.summarizer).await, "context-a-model");
         assert!(models
             .primary
             .profile()

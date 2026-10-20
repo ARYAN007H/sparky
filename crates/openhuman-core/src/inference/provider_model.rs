@@ -33,9 +33,9 @@ fn role_for_provider_model_with(
         .filter(|role| WORKLOAD_ROLES.contains(role))
         .map(str::to_string)
         .or_else(|| match extensions {
-            Some(extensions) => crate::inference::registry::provider_model_role_for(
-                extensions, provider_id, model,
-            ),
+            Some(extensions) => {
+                crate::inference::registry::provider_model_role_for(extensions, provider_id, model)
+            }
             None => crate::inference::registry::provider_model_role(provider_id, model),
         });
     role.as_deref()
@@ -63,11 +63,7 @@ pub(crate) fn is_abstract_model_for(
     model: &str,
 ) -> bool {
     model.trim().starts_with("hint:")
-        || crate::inference::registry::provider_model_is_alias_for(
-            extensions,
-            provider_id,
-            model,
-        )
+        || crate::inference::registry::provider_model_is_alias_for(extensions, provider_id, model)
 }
 
 /// Resolve a model hint according to the configured provider route and the
@@ -133,8 +129,7 @@ fn resolve_provider_model_hint_with(
                 Some(trimmed),
             ),
         };
-        return resolved
-        .unwrap_or_else(|| trimmed.to_string());
+        return resolved.unwrap_or_else(|| trimmed.to_string());
     }
     if let Some((_, model)) = route.split_once(':') {
         return tinyinference_providers::route::split_model_and_temperature(model).0;
