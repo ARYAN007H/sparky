@@ -140,6 +140,32 @@ test("strict and diagnostic selections partition discovered specs fail-closed", 
   );
 });
 
+test("selection discovery works in the CI image without ripgrep", () => {
+  const emptyPath = fs.mkdtempSync(path.join(fixtureRoot, "path-without-rg-"));
+  const selections = ["all", "required", "diagnostic"].map((selection) => {
+    const result = spawnSync(
+      process.execPath,
+      [selectionResolver, `--selection=${selection}`, "--json"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: { ...process.env, PATH: emptyPath },
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout);
+  });
+
+  assert.deepEqual(
+    selections.map((result) => [result.selection, result.files.length]),
+    [
+      ["all", 110],
+      ["required", 109],
+      ["diagnostic", 1],
+    ],
+  );
+});
+
 test("selection classifier rejects unknown diagnostics and protected-owner demotion", () => {
   const base = {
     protectedOwnerFiles: ["test/playwright/specs/owner.spec.ts"],

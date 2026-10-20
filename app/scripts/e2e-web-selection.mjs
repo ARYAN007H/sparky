@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -95,14 +94,20 @@ export function verifyDiagnosticBytes(contract, readFile = readFileSync) {
 }
 
 export function discoverSpecFiles() {
-  const result = execFileSync('rg', ['--files', '--glob', '*.spec.ts', 'test/playwright/specs'], {
-    cwd: appRoot,
-    encoding: 'utf8',
-  });
-  return result
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map(file => file.replaceAll(path.sep, '/'));
+  const specsRoot = path.join(appRoot, 'test/playwright/specs');
+  const files = [];
+  const visit = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolutePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolutePath);
+      else if (entry.isFile() && entry.name.endsWith('.spec.ts')) {
+        files.push(path.relative(appRoot, absolutePath).split(path.sep).join('/'));
+      }
+    }
+  };
+
+  visit(specsRoot);
+  return files.sort();
 }
 
 export function resolveSelection(selection, { contract, discovered = discoverSpecFiles() }) {
