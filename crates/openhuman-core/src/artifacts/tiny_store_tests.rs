@@ -384,9 +384,9 @@ fn share_artifact_is_offered_only_with_a_publisher() {
             &workspace,
             publisher_available,
         )
-            .iter()
-            .map(|t| t.name().to_string())
-            .collect::<Vec<_>>()
+        .iter()
+        .map(|t| t.name().to_string())
+        .collect::<Vec<_>>()
     };
     let without = names(false);
     assert!(

@@ -96,7 +96,11 @@ pub async fn ai_get_artifact(
     // OpenHuman is an error rather than a path that points at nothing.
     let roots = super::files::FileRoots::from_config(config);
     let resolved = ctx
-        .enter(super::files::resolve_file(&config.workspace_dir, &meta, &roots))
+        .enter(super::files::resolve_file(
+            &config.workspace_dir,
+            &meta,
+            &roots,
+        ))
         .await?;
     if matches!(meta.status, super::types::ArtifactStatus::Ready)
         && !tokio::fs::try_exists(&resolved).await.unwrap_or(false)
@@ -220,7 +224,10 @@ async fn regenerate_presentation(
     client_id: &str,
 ) -> Result<Outcome<Value>, String> {
     let args = ctx
-        .enter(store::read_artifact_args(&config.workspace_dir, artifact_id))
+        .enter(store::read_artifact_args(
+            &config.workspace_dir,
+            artifact_id,
+        ))
         .await?;
 
     // A fresh policy from the live config — cheap, sync, and mirrors how

@@ -19,8 +19,8 @@ pub use files::{resolve_ready_file, FileRoots};
 pub use migrate::{migrate_legacy_artifacts, MigrationReport};
 pub use publisher_slot::{
     artifact_publisher, artifact_publisher_in, register_artifact_publisher,
-    register_artifact_publisher_in,
-    unregister_artifact_publisher, ArtifactPublisherBinder, ArtifactPublisherFactory,
+    register_artifact_publisher_in, unregister_artifact_publisher, ArtifactPublisherBinder,
+    ArtifactPublisherFactory,
 };
 pub use schemas::{
     all_controller_schemas as all_artifacts_controller_schemas,

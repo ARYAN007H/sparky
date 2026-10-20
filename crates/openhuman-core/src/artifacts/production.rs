@@ -144,8 +144,8 @@ impl Production {
             scoped,
             None,
         );
-        let file_store = file_store
-            .ok_or_else(|| "artifact tenant storage is unavailable".to_string())?;
+        let file_store =
+            file_store.ok_or_else(|| "artifact tenant storage is unavailable".to_string())?;
         let (meta, path) = ctx
             .enter(super::store::create_artifact_regenerating(
                 workspace_dir,

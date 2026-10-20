@@ -63,16 +63,7 @@ pub async fn read_body(
         Some(record) => record,
         // An artifact made before versioning has only its legacy record: show
         // the file that record vouches for.
-        None => {
-            legacy_record(
-                &config.workspace_dir,
-                &files,
-                id,
-                file_store.as_ref(),
-                ctx,
-            )
-            .await?
-        }
+        None => legacy_record(&config.workspace_dir, &files, id, file_store.as_ref(), ctx).await?,
     };
     let converter = DocumentConverter::for_config(config);
     let display_path = ctx

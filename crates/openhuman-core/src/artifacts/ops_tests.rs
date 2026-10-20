@@ -125,8 +125,8 @@ async fn list_with_thread_filter_returns_only_matching_thread() {
         None,
         Some("thread-a"),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 2, "only two artifacts belong to thread-a");
     let ids: Vec<&str> = value["artifacts"]
@@ -182,8 +182,8 @@ async fn list_with_thread_filter_unknown_thread_returns_zero() {
         None,
         Some("thread-missing"),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 0);
     assert_eq!(value["artifacts"].as_array().unwrap().len(), 0);
@@ -454,11 +454,15 @@ async fn get_returns_the_files_folder_path() {
         .await
         .unwrap();
 
-    let value = ai_get_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, &meta.id)
-        .await
-        .unwrap()
-        .into_cli_compatible_json()
-        .unwrap();
+    let value = ai_get_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &meta.id,
+    )
+    .await
+    .unwrap()
+    .into_cli_compatible_json()
+    .unwrap();
 
     assert_eq!(
         value["absolute_path"],
@@ -489,9 +493,13 @@ async fn get_reports_a_ready_file_removed_outside_openhuman() {
         .unwrap();
     std::fs::remove_file(&path).unwrap();
 
-    let err = ai_get_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, &meta.id)
-        .await
-        .unwrap_err();
+    let err = ai_get_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &meta.id,
+    )
+    .await
+    .unwrap_err();
     assert!(err.contains("file missing"), "{err}");
 }
 

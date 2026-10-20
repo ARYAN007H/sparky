@@ -445,9 +445,7 @@ fn handle_get_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(
-            crate::artifacts::ops::ai_get_artifact(&ctx, &config, artifact_id.trim()).await?,
-        )
+        to_json(crate::artifacts::ops::ai_get_artifact(&ctx, &config, artifact_id.trim()).await?)
     })
 }
 
@@ -511,9 +509,7 @@ fn handle_delete_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(
-            crate::artifacts::ops::ai_delete_artifact(&ctx, &config, artifact_id.trim()).await?,
-        )
+        to_json(crate::artifacts::ops::ai_delete_artifact(&ctx, &config, artifact_id.trim()).await?)
     })
 }
 
