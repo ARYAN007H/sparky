@@ -287,11 +287,10 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
     };
     let mut web_events = crate::web_chat::subscribe_web_channel_events();
     let config = Config::default();
-    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(
-        ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
-            .session_agent("relay-agent")
-            .session_profile("relay-profile"),
-    ));
+    let mut overlay = ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
+        .session_agent("relay-agent");
+    overlay.profile = Some("relay-profile".into());
+    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay));
     let projection = Arc::new(
         crate::web_chat::Surface::new(
             &ctx,
@@ -379,9 +378,7 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
             }
             match event.event_name() {
                 "chat_done" => projected = Some(event),
-                crate::channels::providers::relay::CHANNEL_OUTBOUND_EVENT => {
-                    terminal = Some(event)
-                }
+                crate::channels::providers::relay::CHANNEL_OUTBOUND_EVENT => terminal = Some(event),
                 _ => panic!("unexpected relayed output event: {}", event.event_name()),
             }
         }
@@ -441,11 +438,10 @@ async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_te
         ..Default::default()
     };
     let config = Config::default();
-    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(
-        ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
-            .session_agent("relay-target-agent")
-            .session_profile("relay-target-profile"),
-    ));
+    let mut overlay = ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
+        .session_agent("relay-target-agent");
+    overlay.profile = Some("relay-target-profile".into());
+    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay));
     let target = crate::channels::runtime::dispatch::hosted_relay_target(
         &ctx,
         &config,
