@@ -130,6 +130,15 @@ async function sendMessage(page: Page, prompt: string): Promise<void> {
   await page.getByTestId('send-message-button').click();
 }
 
+async function openLatestActivityGroup(page: Page) {
+  const group = page.locator('[data-slot="tool-group-root"]').last();
+  await expect(group).toBeVisible({ timeout: 30_000 });
+  const trigger = group.locator('[data-slot="tool-group-trigger"]');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  return group;
+}
+
 test.describe('Chat Multi Tool Round', () => {
   test('runs file_read then grep before the final answer', async ({ page }) => {
     await resetMock();
@@ -141,14 +150,14 @@ test.describe('Chat Multi Tool Round', () => {
     await sendMessage(page, PROMPT);
 
     await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible({ timeout: 50_000 });
-    const cards = page.getByTestId('assistant-ui-tool-call');
-    await expect(cards.filter({ hasText: 'Fetching example.com' })).toHaveCount(1);
-    await expect(cards.filter({ hasText: /Search(?:ing|ed) the web/ })).toHaveCount(1);
-    const renderedCards = await cards.allTextContents();
-    const fetchIndex = renderedCards.findIndex(text => text.includes('Fetching example.com'));
-    const searchIndex = renderedCards.findIndex(text => /Search(?:ing|ed) the web/.test(text));
-    expect(fetchIndex).toBeGreaterThanOrEqual(0);
-    expect(searchIndex).toBeGreaterThan(fetchIndex);
+    const activityGroup = await openLatestActivityGroup(page);
+    const cards = activityGroup.getByTestId('assistant-ui-tool-call');
+    await expect(cards).toHaveCount(2);
+    await expect(cards.nth(0)).toHaveAttribute('data-tool-name', 'web_fetch');
+    await expect(cards.nth(1)).toHaveAttribute('data-tool-name', 'web_search_tool');
+    await expect(cards.nth(0)).toContainText('Read webpage');
+    await expect(cards.nth(0)).toContainText('example.com');
+    await expect(cards.nth(1)).toContainText(/Search(?:ing|ed) the web/);
     await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible();
   });
 });

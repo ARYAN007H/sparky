@@ -122,6 +122,15 @@ async function sendMessage(page: Page, prompt: string): Promise<void> {
   await page.getByTestId('send-message-button').click();
 }
 
+async function openLatestActivityGroup(page: Page) {
+  const group = page.locator('[data-slot="tool-group-root"]').last();
+  await expect(group).toBeVisible({ timeout: 30_000 });
+  const trigger = group.locator('[data-slot="tool-group-trigger"]');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  return group;
+}
+
 test.describe('Chat Tool Call Flow', () => {
   test('renders a terminal tool call, final answer, and clears in-flight state', async ({
     page,
@@ -148,10 +157,14 @@ test.describe('Chat Tool Call Flow', () => {
     // Tool activity belongs to assistant-ui and renders as a readable card,
     // never through the removed legacy Agentic task insights timeline.
     await expect(page.getByTestId('agent-task-insights')).toHaveCount(0);
-    await expect(page.getByTestId('assistant-ui-tool-call')).toHaveCount(1);
-    const toolCard = page.getByTestId('assistant-ui-tool-call');
+    const activityGroup = await openLatestActivityGroup(page);
+    const toolCard = activityGroup.locator(
+      '[data-testid="assistant-ui-tool-call"][data-tool-name="web_fetch"]'
+    );
+    await expect(toolCard).toHaveCount(1);
     await expect(toolCard).toBeVisible();
-    await expect(toolCard).toContainText('Fetching example.com');
+    await expect(toolCard).toContainText('Read webpage');
+    await expect(toolCard).toContainText('example.com');
     // Web-channel turns retain supervised access even if the stored config is
     // wider. The external fetch is therefore cancelled without an approval
     // surface, and must render its actual terminal state instead of a false

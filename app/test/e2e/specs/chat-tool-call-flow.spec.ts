@@ -17,7 +17,7 @@ import {
   typeIntoComposer,
   waitForSocketConnected,
 } from '../helpers/chat-harness';
-import { textExists } from '../helpers/element-helpers';
+import { clickToolGroupTrigger, textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import { clearRequestLog, setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
@@ -49,6 +49,15 @@ async function renderedToolCards(): Promise<string[]> {
       document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')
     ).map(card => card.innerText)
   )) as string[];
+}
+
+async function activityGroupExpanded(): Promise<boolean> {
+  return browser.execute(() => {
+    const trigger = document.querySelector<HTMLElement>(
+      '[data-slot="tool-group-root"] [data-slot="tool-group-trigger"]'
+    );
+    return trigger?.getAttribute('aria-expanded') === 'true';
+  });
 }
 
 describe('Chat tool-call lifecycle', () => {
@@ -108,9 +117,28 @@ describe('Chat tool-call lifecycle', () => {
 
   it('T1.2 — rendered assistant UI tool card identifies the web fetch', async () => {
     console.log(`${LOG_PREFIX} T1.2: checking rendered tool card`);
-    const cards = await renderedToolCards();
-    expect(cards.some(card => card.includes('Fetching example.com'))).toBe(true);
-    expect(await textExists('Fetching example.com')).toBe(true);
+    await browser.waitUntil(async () => await textExists(CANARY_FINAL), {
+      timeout: 40_000,
+      timeoutMsg: 'final answer did not render before inspecting the settled tool timeline',
+    });
+    if (!(await activityGroupExpanded())) {
+      await clickToolGroupTrigger(0, '1 tool call');
+    }
+    await browser.waitUntil(async () => await activityGroupExpanded(), {
+      timeout: 10_000,
+      timeoutMsg: 'assistant activity group did not expand to show the rendered tool card',
+    });
+    const cards = await browser.execute(() =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-slot="tool-group-root"] [data-testid="assistant-ui-tool-call"]'
+        )
+      ).map(card => ({ name: card.getAttribute('data-tool-name'), text: card.innerText }))
+    );
+    expect(cards).toHaveLength(1);
+    expect(cards[0].name).toBe('web_fetch');
+    expect(cards[0].text).toContain('Read webpage');
+    expect(cards[0].text).toContain('example.com');
   });
 
   it('T1.3 — final answer with canary text renders in the DOM', async () => {
