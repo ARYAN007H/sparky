@@ -118,6 +118,7 @@ async fn module_route_help_response(
             model: "gpt-5".into(),
         },
         history_len: 0,
+        session_scope: None,
         providers,
     };
     let response: ChannelControlResult = crate::channels::module_fixture::client()
@@ -402,7 +403,7 @@ async fn clear_history_command_uses_reset_callback_and_persists_route_override()
 
 #[cfg(feature = "modules")]
 #[tokio::test]
-async fn remote_clear_without_typed_scope_fails_closed() {
+async fn remote_clear_without_captured_scope_fails_closed() {
     let ctx = runtime_context(std::env::temp_dir().join("remote-clear-scope"));
     let dispatch = ctx.dispatch_ctx();
     let cancellation = tokio_util::sync::CancellationToken::new();
@@ -412,8 +413,21 @@ async fn remote_clear_without_typed_scope_fails_closed() {
         &ctx,
         &crate::core::runtime::Tenant::default(),
         &cancellation,
+        None,
         tinychannels_bus::module_remote::RemoteHostRequest::ClearHistory {
-            sender_key: "telegram_alice_chat".into(),
+            session_scope: tinychannels_bus::module_remote::RemoteSessionScope {
+                channel: tinychannels_bus::ChannelRef {
+                    id: "telegram".into(),
+                    account_id: Some("telegram:bot-a".into()),
+                },
+                conversation: tinychannels_bus::ConversationRef {
+                    kind: tinychannels_bus::ConversationKind::Group,
+                    id: "room-1".into(),
+                    topic_id: Some("topic-3".into()),
+                    ..Default::default()
+                },
+                session_key: "prepared-session".into(),
+            },
         },
     )
     .await;
