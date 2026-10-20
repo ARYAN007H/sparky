@@ -73,11 +73,7 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
     let (_temp, config) = setup().await;
     let data_uri = valid_image_data_uri();
     let first = append_with_test_config(
-        request(
-            "one",
-            &format!("look [IMAGE:{data_uri}]"),
-            "user",
-        ),
+        request("one", &format!("look [IMAGE:{data_uri}]"), "user"),
         &config,
         None,
     )

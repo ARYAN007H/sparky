@@ -539,7 +539,8 @@ pub(crate) async fn discard_staged_parts(
     .map_err(|error| format!("staged attachment workspace unavailable: {error}"))?;
     let tenant = tenant_for(ctx)?;
     for entry in entries {
-        let Some(id) = opaque_media(&entry.part).and_then(|media| media.opaque_id.as_deref()) else {
+        let Some(id) = opaque_media(&entry.part).and_then(|media| media.opaque_id.as_deref())
+        else {
             continue;
         };
         let manifest_path = staged_manifest_path(&config.workspace_dir, id)?;
