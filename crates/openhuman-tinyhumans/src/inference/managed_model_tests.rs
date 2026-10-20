@@ -33,6 +33,14 @@ fn backend() -> OpenHumanBackendModel {
 }
 
 #[test]
+fn managed_model_preserves_the_openhuman_response_cache_identity() {
+    assert_eq!(
+        backend().cache_identity().as_deref(),
+        Some("openhuman:https://api.example.test/openai/v1:reasoning-v1")
+    );
+}
+
+#[test]
 fn with_thread_id_injects_explicit_thread() {
     let request = ModelRequest::new(vec![Message::user("hi")]);
     let updated = with_thread_id(request, Some("thread-42"));
