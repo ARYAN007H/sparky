@@ -256,7 +256,7 @@ async fn persist_queued_user_message_with_config(
     let request = AppendConversationMessageRequest {
         thread_id: thread_id.to_string(),
         message: ConversationMessageRecord {
-            id: row_id,
+            id: row_id.clone(),
             content: text.to_string(),
             attachments: Vec::new(),
             message_type: "text".into(),

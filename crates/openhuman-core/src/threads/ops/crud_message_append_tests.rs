@@ -1,4 +1,5 @@
 use super::*;
+use base64::Engine as _;
 use serde_json::json;
 
 async fn setup() -> (tempfile::TempDir, crate::config::Config) {
