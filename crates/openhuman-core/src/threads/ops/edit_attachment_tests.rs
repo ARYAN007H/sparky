@@ -168,6 +168,7 @@ async fn editing_an_image_row_restages_only_its_exact_opaque_reference() {
 
 #[tokio::test]
 async fn edit_rpc_rejects_an_attachment_ref_owned_by_another_row_before_truncation() {
+    let _serial = crate::web_chat::RUN_CHAT_TASK_TEST_LOCK.lock().await;
     let temp = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
     config.workspace_dir = temp.path().join("workspace");
@@ -238,6 +239,35 @@ async fn edit_rpc_rejects_an_attachment_ref_owned_by_another_row_before_truncati
     let source = append_image_row("user-image-source", "source row").await;
     let other = append_image_row("user-image-other", "other row").await;
 
+    let block = crate::web_chat::TestRunChatTaskBlock {
+        started: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        dropped: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        release: std::sync::Arc::new(tokio::sync::Notify::new()),
+        max_park_for: std::time::Duration::from_secs(30),
+        succeed_in: None,
+    };
+    crate::web_chat::set_test_run_chat_task_block(Some(block.clone())).await;
+    crate::web_chat::start_chat(
+        &ctx,
+        "active-edit-client",
+        "edit-image-scope",
+        "keep this turn alive",
+        None,
+        None,
+        None,
+        None,
+        crate::web_chat::ChatRequestMetadata::default(),
+    )
+    .await
+    .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while !block.started.load(std::sync::atomic::Ordering::SeqCst) {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+
     let result = edit_message(
         &ctx,
         EditMessageRequest {
@@ -249,16 +279,38 @@ async fn edit_rpc_rejects_an_attachment_ref_owned_by_another_row_before_truncati
         },
     )
     .await;
-    assert!(result.is_err());
+    let rejected = result.is_err();
+    let active_turn_was_preserved = !block.dropped.load(std::sync::atomic::Ordering::SeqCst);
 
-    let rows = store::blocking::get_messages(ctx, config.workspace_dir, "edit-image-scope".into())
-        .await
-        .unwrap();
-    assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0].id, source.id);
-    assert_eq!(rows[0].content, "source row");
-    assert_eq!(rows[0].attachments, source.attachments);
-    assert_eq!(rows[1].id, other.id);
-    assert_eq!(rows[1].content, "other row");
-    assert_eq!(rows[1].attachments, other.attachments);
+    let _ =
+        crate::web_chat::cancel_chat_scoped(&ctx, "active-edit-client", "edit-image-scope", None)
+            .await;
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while !block.dropped.load(std::sync::atomic::Ordering::SeqCst) {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    crate::web_chat::set_test_run_chat_task_block(None).await;
+
+    assert!(rejected, "foreign opaque refs must be rejected");
+    assert!(
+        active_turn_was_preserved,
+        "foreign attachment rejection must leave the active turn alone"
+    );
+
+    let rows = store::blocking::get_messages(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+        "edit-image-scope".into(),
+    )
+    .await
+    .unwrap();
+    let source_after = rows.iter().find(|row| row.id == source.id).unwrap();
+    assert_eq!(source_after.content, "source row");
+    assert_eq!(source_after.attachments, source.attachments);
+    let other_after = rows.iter().find(|row| row.id == other.id).unwrap();
+    assert_eq!(other_after.content, "other row");
+    assert_eq!(other_after.attachments, other.attachments);
 }
