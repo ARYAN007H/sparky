@@ -17,7 +17,7 @@ async fn create_parked_run(config: &Config, name: &str) -> (Flow, String, Vec<St
     .unwrap()
     .value;
     let run_id = parked["thread_id"].as_str().unwrap().to_owned();
-    let pending = serde_json::from_value(parked["pending_approvals"].clone()).unwrap();
+    let pending: Vec<String> = serde_json::from_value(parked["pending_approvals"].clone()).unwrap();
     assert!(!pending.is_empty(), "the fixture must park for approval");
     (flow, run_id, pending)
 }

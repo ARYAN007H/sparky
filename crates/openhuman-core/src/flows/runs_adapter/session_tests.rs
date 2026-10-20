@@ -42,8 +42,9 @@ async fn private_agent_progress_advances_cursor_without_leaking_text_or_replayin
 
     crate::core::bus::init().await.expect("bus init");
     let collector = Arc::new(Collector::default());
+    let handler: Arc<dyn EventHandler<DomainEvent>> = collector.clone();
     let _subscription = crate::core::bus::BUS
-        .subscribe(Arc::clone(&collector))
+        .subscribe(handler)
         .expect("subscriber installed");
 
     let tmp = tempfile::TempDir::new().unwrap();
