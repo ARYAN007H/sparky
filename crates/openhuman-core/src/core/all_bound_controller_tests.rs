@@ -10,7 +10,7 @@ static TEST_LOCK: Mutex<()> = Mutex::new(());
 static EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
 fn staged_bound_methods() -> Vec<&'static str> {
-    let mut methods = vec!["composio.execute", "threads.upsert"];
+    let mut methods = vec!["composio.execute"];
     #[cfg(feature = "voice")]
     methods.extend([
         "voice.status",
@@ -29,6 +29,7 @@ fn staged_bound_methods() -> Vec<&'static str> {
         "voice.live_settings_set",
         "voice.live_test_provider",
     ]);
+    methods.push("threads.upsert");
     methods
 }
 
