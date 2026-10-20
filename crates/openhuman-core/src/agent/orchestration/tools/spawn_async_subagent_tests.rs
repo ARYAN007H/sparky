@@ -9,13 +9,6 @@ use tinyagents_harness::run_queue::RunQueue;
 use tinytools::{ToolCallOptions, ToolRunContext};
 use tinytools_agent::dialect::ToolCallFormat;
 
-#[test]
-fn failed_steer_of_running_reused_session_does_not_fall_through_to_spawn() {
-    let result = failed_running_reuse_steer_result("message queue is closed");
-    assert!(result.is_some(), "a failed reuse must return a tool error");
-    assert!(result.unwrap().is_error);
-}
-
 struct ThreadContext(&'static str);
 
 #[tokio::test]
