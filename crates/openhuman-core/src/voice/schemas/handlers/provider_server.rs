@@ -20,7 +20,7 @@ use crate::voice::schemas::params::{
 
 pub(crate) fn voice_set_providers_controller() -> BoundRegisteredController {
     BoundRegisteredController::typed(
-        super::registry::voice_schemas("voice_set_providers"),
+        super::super::registry::voice_schemas("voice_set_providers"),
         deserialize_params::<SetProvidersParams>,
         run_voice_set_providers,
     )
@@ -98,7 +98,7 @@ fn run_voice_set_providers(ctx: DispatchCtx, p: SetProvidersParams) -> Controlle
 
 pub(crate) fn voice_update_provider_settings_controller() -> BoundRegisteredController {
     BoundRegisteredController::typed(
-        super::registry::voice_schemas("voice_update_provider_settings"),
+        super::super::registry::voice_schemas("voice_update_provider_settings"),
         deserialize_params::<VoiceUpdateProviderSettingsParams>,
         run_voice_update_provider_settings,
     )
@@ -280,7 +280,7 @@ fn sync_legacy_stt_engine(config: &mut crate::config::Config, provider: &str) {
 
 pub(crate) fn voice_list_models_controller() -> BoundRegisteredController {
     BoundRegisteredController::typed(
-        super::registry::voice_schemas("voice_list_models"),
+        super::super::registry::voice_schemas("voice_list_models"),
         deserialize_params::<VoiceListModelsParams>,
         run_voice_list_models,
     )
@@ -359,7 +359,7 @@ fn run_voice_list_models(ctx: DispatchCtx, p: VoiceListModelsParams) -> Controll
 
 pub(crate) fn voice_test_provider_controller() -> BoundRegisteredController {
     BoundRegisteredController::typed(
-        super::registry::voice_schemas("voice_test_provider"),
+        super::super::registry::voice_schemas("voice_test_provider"),
         deserialize_params::<VoiceTestProviderParams>,
         run_voice_test_provider,
     )

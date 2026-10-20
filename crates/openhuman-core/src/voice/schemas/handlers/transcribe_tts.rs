@@ -23,7 +23,7 @@ fn ignored_params(_params: Map<String, Value>) -> Result<(), String> {
 
 pub(crate) fn voice_status_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
-        super::registry::voice_schemas("voice_status"),
+        super::super::registry::voice_schemas("voice_status"),
         load_voice_config,
         ignored_params,
         run_voice_status,
@@ -32,7 +32,7 @@ pub(crate) fn voice_status_controller() -> BoundRegisteredController {
 
 pub(crate) fn voice_transcribe_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
-        super::registry::voice_schemas("voice_transcribe"),
+        super::super::registry::voice_schemas("voice_transcribe"),
         load_voice_config,
         deserialize_params::<TranscribeParams>,
         run_voice_transcribe,
@@ -41,7 +41,7 @@ pub(crate) fn voice_transcribe_controller() -> BoundRegisteredController {
 
 pub(crate) fn voice_transcribe_bytes_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
-        super::registry::voice_schemas("voice_transcribe_bytes"),
+        super::super::registry::voice_schemas("voice_transcribe_bytes"),
         load_voice_config,
         deserialize_params::<TranscribeBytesParams>,
         run_voice_transcribe_bytes,
@@ -50,7 +50,7 @@ pub(crate) fn voice_transcribe_bytes_controller() -> BoundRegisteredController {
 
 pub(crate) fn voice_tts_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
-        super::registry::voice_schemas("voice_tts"),
+        super::super::registry::voice_schemas("voice_tts"),
         load_voice_config,
         deserialize_params::<TtsParams>,
         run_voice_tts,
@@ -59,7 +59,7 @@ pub(crate) fn voice_tts_controller() -> BoundRegisteredController {
 
 pub(crate) fn voice_reply_synthesize_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
-        super::registry::voice_schemas("voice_reply_synthesize"),
+        super::super::registry::voice_schemas("voice_reply_synthesize"),
         load_voice_config,
         deserialize_params::<ReplySynthesizeParams>,
         run_voice_reply_synthesize,
@@ -68,7 +68,7 @@ pub(crate) fn voice_reply_synthesize_controller() -> BoundRegisteredController {
 
 pub(crate) fn voice_stt_dispatch_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
-        super::registry::voice_schemas("voice_stt_dispatch"),
+        super::super::registry::voice_schemas("voice_stt_dispatch"),
         load_voice_config,
         deserialize_params::<SttDispatchParams>,
         run_voice_stt_dispatch,
@@ -77,7 +77,7 @@ pub(crate) fn voice_stt_dispatch_controller() -> BoundRegisteredController {
 
 pub(crate) fn voice_tts_dispatch_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
-        super::registry::voice_schemas("voice_tts_dispatch"),
+        super::super::registry::voice_schemas("voice_tts_dispatch"),
         load_voice_config,
         deserialize_params::<TtsDispatchParams>,
         run_voice_tts_dispatch,
