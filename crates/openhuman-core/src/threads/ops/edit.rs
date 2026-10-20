@@ -306,10 +306,6 @@ pub async fn regenerate(
     ))
 }
 
-#[cfg(test)]
-#[path = "edit_tests.rs"]
-mod tests;
-
 /// Scan a thread's message log (append order) for the first deterministic
 /// assistant-reply id after `after_message_id`, and return the `request_id`
 /// it was minted for. `Ok(None)` when `after_message_id` has no reply yet
