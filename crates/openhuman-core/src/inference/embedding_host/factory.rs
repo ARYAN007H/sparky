@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use crate::config::Config;
+use tinyinference_providers::route::custom_provider_string;
 use tinyinference_embeddings::factory::{
     create_configured_embedding_model, create_default_embedding_model, CredentialResolver,
     EmbeddingFactorySettings, ManagedModelFactory,
@@ -64,7 +65,7 @@ pub fn create_embedding_provider_with_credentials(
 ) -> anyhow::Result<Box<dyn EmbeddingModel>> {
     let provider = custom_endpoint
         .filter(|_| provider == "custom")
-        .map(|endpoint| format!("custom:{endpoint}"))
+        .map(|endpoint| custom_provider_string("custom", Some(endpoint)))
         .unwrap_or_else(|| provider.to_owned());
     let api_key = api_key.to_owned();
     let credentials: CredentialResolver = Arc::new(move |_| api_key.clone());
@@ -132,7 +133,7 @@ pub fn create_embedding_provider_for_chat(
 ) -> anyhow::Result<Box<dyn EmbeddingModel>> {
     let provider = custom_endpoint
         .filter(|_| provider == "custom")
-        .map(|endpoint| format!("custom:{endpoint}"))
+        .map(|endpoint| custom_provider_string("custom", Some(endpoint)))
         .unwrap_or_else(|| provider.to_owned());
     let selected = settings(
         &provider,
