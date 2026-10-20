@@ -24,25 +24,6 @@ pub(super) struct InferenceModelRouteUpdate {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct InferenceCloudProviderUpdate {
-    id: Option<String>,
-    slug: String,
-    #[serde(default)]
-    label: Option<String>,
-    endpoint: String,
-    #[serde(default)]
-    auth_style: Option<String>,
-    #[serde(default)]
-    ca_cert_pem: Option<String>,
-    // keep until v0.66 (review after 2027-01-11): incoming RPC discriminator
-    // remains accepted until shipped-client parameter coverage exists.
-    #[serde(rename = "type", default)]
-    legacy_type: Option<String>,
-    #[serde(default)]
-    default_model: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
 pub(super) struct InferenceUpdateModelSettingsParams {
     api_url: Option<String>,
     inference_url: Option<String>,
@@ -50,7 +31,7 @@ pub(super) struct InferenceUpdateModelSettingsParams {
     default_model: Option<String>,
     default_temperature: Option<f64>,
     model_routes: Option<Vec<InferenceModelRouteUpdate>>,
-    cloud_providers: Option<Vec<InferenceCloudProviderUpdate>>,
+    cloud_providers: Option<Vec<crate::config::ops::CloudProviderUpdate>>,
     #[serde(default)]
     model_registry: Option<Vec<crate::config::schema::ModelRegistryEntry>>,
     primary_cloud: Option<String>,
@@ -158,94 +139,7 @@ pub(super) fn handle_inference_update_model_settings(
             }),
             cloud_providers: update
                 .cloud_providers
-                .map(|entries| {
-                    use crate::config::schema::cloud_providers::{
-                        generate_provider_id, is_slug_reserved, builtin_cloud_provider, AuthStyle,
-                        CloudProviderCreds,
-                    };
-                    let reserved_count = entries
-                        .iter()
-                        .filter(|e| {
-                            let t = e.slug.trim();
-                            !t.is_empty() && is_slug_reserved(t)
-                        })
-                        .count();
-                    if reserved_count > 0 {
-                        log::debug!(
-                            "[inference] update_model_settings: dropping {} reserved cloud provider slug(s)",
-                            reserved_count
-                        );
-                    }
-                    entries
-                        .into_iter()
-                        // Silently drop entries whose (non-empty) slug is reserved —
-                        // typically the migration-seeded "openhuman" / "cloud" /
-                        // "pid" built-ins that the frontend echoes back on every
-                        // save (see `migrations::unify_ai_provider_settings`).
-                        // Empty slugs still fall through so the explicit
-                        // validation error below fires for actual frontend
-                        // bugs. `apply_model_settings` re-injects the existing
-                        // reserved entries from the stored config so they
-                        // aren't dropped on save.
-                        .filter(|entry| {
-                            let trimmed = entry.slug.trim();
-                            trimmed.is_empty() || !is_slug_reserved(trimmed)
-                        })
-                        .map(|entry| {
-                            let slug = entry.slug.trim().to_string();
-                            if slug.is_empty() {
-                                return Err("cloud provider slug must not be empty".to_string());
-                            }
-                            let legacy_provider = entry.legacy_type.as_deref()
-                                .map(str::trim)
-                                .and_then(builtin_cloud_provider);
-                            let legacy_auth = legacy_provider
-                                .map(|provider| provider.auth_style.as_str())
-                                .unwrap_or("bearer");
-                            let endpoint = if entry.endpoint.is_empty() {
-                                legacy_provider.map(|provider| provider.endpoint.to_string())
-                                    .unwrap_or(entry.endpoint)
-                            } else {
-                                entry.endpoint
-                            };
-                            let auth_style = match entry
-                                .auth_style
-                                .as_deref()
-                                .unwrap_or(legacy_auth)
-                                .to_ascii_lowercase()
-                                .as_str()
-                            {
-                                "bearer" => AuthStyle::Bearer,
-                                "anthropic" => AuthStyle::Anthropic,
-                                "openhuman_jwt" | "openhumanjwt" => AuthStyle::OpenhumanJwt,
-                                "none" => AuthStyle::None,
-                                other => {
-                                    return Err(format!(
-                                        "unknown auth_style '{}'; valid: bearer, anthropic, openhuman_jwt, none",
-                                        other
-                                    ))
-                                }
-                            };
-                            let id = entry
-                                .id
-                                .filter(|s| !s.trim().is_empty())
-                                .unwrap_or_else(|| generate_provider_id(&slug));
-                            let label = entry
-                                .label
-                                .filter(|s| !s.trim().is_empty())
-                                .unwrap_or_else(|| slug.clone());
-                            let provider = CloudProviderCreds {
-                                id,
-                                slug,
-                                label,
-                                endpoint,
-                                auth_style,
-                                default_model: entry.default_model,
-                            };
-                            Ok(provider)
-                        })
-                        .collect::<Result<Vec<_>, String>>()
-                })
+                .map(crate::config::ops::build_cloud_provider_creds)
                 .transpose()?,
             model_registry: update.model_registry,
             primary_cloud: update.primary_cloud,

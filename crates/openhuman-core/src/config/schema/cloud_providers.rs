@@ -202,6 +202,20 @@ pub enum AuthStyle {
 }
 
 impl AuthStyle {
+    /// Parse the RPC compatibility spellings for a provider authentication style.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.to_ascii_lowercase().as_str() {
+            "bearer" => Ok(Self::Bearer),
+            "anthropic" => Ok(Self::Anthropic),
+            "openhuman_jwt" | "openhumanjwt" => Ok(Self::OpenhumanJwt),
+            "none" => Ok(Self::None),
+            other => Err(format!(
+                "unknown auth_style '{}'; valid: bearer, anthropic, openhuman_jwt, none",
+                other
+            )),
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Bearer => "bearer",

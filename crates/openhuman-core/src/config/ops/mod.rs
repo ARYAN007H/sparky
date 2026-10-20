@@ -2,8 +2,10 @@
 
 mod agent;
 mod agent_paths;
+mod cloud_providers;
 mod loader;
 mod model;
+mod primary_cloud;
 mod privacy;
 mod sandbox;
 mod search;
@@ -112,6 +114,14 @@ pub use model::{
     load_and_apply_model_settings, load_and_apply_runtime_settings, load_and_resolve_api_url,
     ComposioTriggerSettingsPatch, LocalAiSettingsPatch, MemorySettingsPatch, ModelSettingsPatch,
     RuntimeSettingsPatch,
+};
+
+pub use cloud_providers::{build_cloud_provider_creds, CloudProviderUpdate};
+pub(crate) use primary_cloud::{
+    cloud_entry_provider_string, has_custom_inference_intent, is_openhuman_cloud_entry,
+    legacy_custom_inference_provider_string, legacy_inference_slug,
+    looks_like_openhuman_backend, normalize_endpoint_for_compare,
+    resolve_primary_cloud_provider_string,
 };
 
 pub use privacy::{
