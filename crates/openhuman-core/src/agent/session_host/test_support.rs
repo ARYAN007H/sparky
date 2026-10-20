@@ -26,10 +26,8 @@ impl ChatModel<()> for SessionFixtureModel {
 /// Installs an explicit generic model fixture for tests that construct a
 /// session through the managed-provider factory. HookSlot test registrations
 /// are thread-local, so each test opts in on the thread that builds its host.
-pub(crate) fn install_model_fixture() {
-    crate::inference::registry::register_chat_model(
-        PROVIDER_OPENHUMAN,
-        ChatModelEntry {
+fn model_fixture_entry() -> ChatModelEntry {
+    ChatModelEntry {
             build: Arc::new(|request: ChatModelRequest<'_>| {
                 let model = request
                     .model_override
@@ -69,8 +67,28 @@ pub(crate) fn install_model_fixture() {
                 default_pricing: Arc::new(|| None),
                 without_reasoning: Arc::new(|request| request),
             }),
-        },
+    }
+}
+
+pub(crate) fn install_model_fixture() {
+    crate::inference::registry::register_chat_model(PROVIDER_OPENHUMAN, model_fixture_entry());
+}
+
+pub(crate) fn install_model_fixture_in(extensions: &crate::core::slots::Extensions) {
+    crate::inference::registry::register_chat_model_in(
+        extensions,
+        PROVIDER_OPENHUMAN,
+        model_fixture_entry(),
     );
+}
+
+pub(crate) fn model_fixture_context() -> Arc<crate::core::runtime::CoreContext> {
+    let context = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
+    install_model_fixture_in(context.extensions());
+    context
 }
 
 pub(crate) fn config_with_model_fixture() -> Config {
