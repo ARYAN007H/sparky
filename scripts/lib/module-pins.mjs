@@ -49,14 +49,16 @@ export function parseAllList(src) {
     /pub const ALL: &\[ModuleRecord\] = &\[([\s\S]*?)\];/,
   );
   if (!block) throw new Error("registry.rs: could not find `pub const ALL`");
-  return block[1]
-    .replace(/\/\/[^\n]*/g, "")
-    // `#[cfg(feature = "…")]` on an element: the record is still in `ALL` for
-    // the builds that carry its optional contract crate, so it is still pinned.
-    .replace(/#\[[^\]]*\]/g, "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  return (
+    block[1]
+      .replace(/\/\/[^\n]*/g, "")
+      // `#[cfg(feature = "…")]` on an element: the record is still in `ALL` for
+      // the builds that carry its optional contract crate, so it is still pinned.
+      .replace(/#\[[^\]]*\]/g, "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+  );
 }
 
 /** Every `const NAME: ModuleRecord = ModuleRecord { … };`, keyed by NAME. */
@@ -257,9 +259,16 @@ export function validateTestOnlySourceParity({
       runGit(["rev-parse", `refs/tags/${proof.tag}^{commit}`]) !==
       proof.releaseCommit
     ) {
-      throw new Error("release tag does not resolve to the attested release commit");
+      throw new Error(
+        "release tag does not resolve to the attested release commit",
+      );
     }
-    runGit(["merge-base", "--is-ancestor", proof.releaseCommit, proof.candidateCommit]);
+    runGit([
+      "merge-base",
+      "--is-ancestor",
+      proof.releaseCommit,
+      proof.candidateCommit,
+    ]);
 
     const assetPayload = JSON.stringify({
       version,
@@ -285,12 +294,11 @@ export function validateTestOnlySourceParity({
     ) {
       throw new Error("test-file proof fields are missing or unknown");
     }
-    const validRepoPath =
-      (value) =>
-        typeof value === "string" &&
-        /^[A-Za-z0-9_./-]+$/.test(value) &&
-        !posix.isAbsolute(value) &&
-        !value.split("/").includes("..");
+    const validRepoPath = (value) =>
+      typeof value === "string" &&
+      /^[A-Za-z0-9_./-]+$/.test(value) &&
+      !posix.isAbsolute(value) &&
+      !value.split("/").includes("..");
     if (
       !proof.binding ||
       !validRepoPath(file.path) ||
@@ -299,10 +307,14 @@ export function validateTestOnlySourceParity({
       file.path !== proof.binding.testPath ||
       posix.dirname(file.path) !== posix.dirname(proof.binding.modulePath)
     ) {
-      throw new Error("test path is not a safe sibling of the attested module binding");
+      throw new Error(
+        "test path is not a safe sibling of the attested module binding",
+      );
     }
     if (file.releaseMode !== "100644" || file.candidateMode !== "100644") {
-      throw new Error("attested test file must remain a regular non-executable file");
+      throw new Error(
+        "attested test file must remain a regular non-executable file",
+      );
     }
     if (
       ![file.releaseBlob, file.candidateBlob].every((sha) =>
@@ -346,13 +358,17 @@ export function validateTestOnlySourceParity({
       releaseFile.oid !== file.releaseBlob ||
       candidateFile.oid !== file.candidateBlob
     ) {
-      throw new Error("attested test file path, mode, or blob does not match the Git trees");
+      throw new Error(
+        "attested test file path, mode, or blob does not match the Git trees",
+      );
     }
     const treeHash = (items) =>
       sha256(
         items
           .filter((item) => item.path !== file.path)
-          .map(({ mode, type, oid, path }) => `${mode} ${type} ${oid}\t${path}\n`)
+          .map(
+            ({ mode, type, oid, path }) => `${mode} ${type} ${oid}\t${path}\n`,
+          )
           .sort()
           .join(""),
       );
@@ -370,21 +386,29 @@ export function validateTestOnlySourceParity({
     const binding = proof.binding;
     if (
       !binding ||
-      Object.keys(binding).sort().join(",") !== "moduleBlob,modulePath,testPath" ||
+      Object.keys(binding).sort().join(",") !==
+        "moduleBlob,modulePath,testPath" ||
       !/^[0-9a-f]{40}$/.test(binding.moduleBlob)
     ) {
       throw new Error("module binding proof is malformed");
     }
-    const moduleEntry = candidateEntries.find((item) => item.path === binding.modulePath);
+    const moduleEntry = candidateEntries.find(
+      (item) => item.path === binding.modulePath,
+    );
     if (
       !moduleEntry ||
       moduleEntry.type !== "blob" ||
       moduleEntry.mode !== "100644" ||
       moduleEntry.oid !== binding.moduleBlob
     ) {
-      throw new Error("test module declaration source differs from the attested blob");
+      throw new Error(
+        "test module declaration source differs from the attested blob",
+      );
     }
-    const moduleSource = runGit(["show", `${proof.candidateCommit}:${binding.modulePath}`]);
+    const moduleSource = runGit([
+      "show",
+      `${proof.candidateCommit}:${binding.modulePath}`,
+    ]);
     const declaration = `#[cfg(test)]\n#[path = "${file.path.split("/").at(-1)}"]\nmod tests;`;
     if (!moduleSource.includes(declaration)) {
       throw new Error("the exact cfg(test) sibling module binding is absent");

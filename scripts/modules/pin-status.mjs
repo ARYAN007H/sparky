@@ -105,7 +105,9 @@ export function collectStatuses(root = DEFAULT_ROOT) {
 }
 
 export function main(argv, root = DEFAULT_ROOT) {
-  const flags = new Set(argv.filter((a) => a.startsWith("--") && a !== "--root"));
+  const flags = new Set(
+    argv.filter((a) => a.startsWith("--") && a !== "--root"),
+  );
   const rootIdx = argv.indexOf("--root");
   if (rootIdx >= 0) root = resolve(argv[rootIdx + 1]);
   const statuses = collectStatuses(root);

@@ -135,9 +135,16 @@ test("search source release matches the loaded search artifact", () => {
     (record) => record.id === "tinysearch",
   );
   assert.ok(record, "search adapter requires a registered module");
-  const source = readFileSync(join(REPO_ROOT, "vendor/tinysearch/Cargo.toml"), "utf8");
+  const source = readFileSync(
+    join(REPO_ROOT, "vendor/tinysearch/Cargo.toml"),
+    "utf8",
+  );
   const version = source.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-  assert.equal(version, record.version, "search source must match its loaded artifact");
+  assert.equal(
+    version,
+    record.version,
+    "search source must match its loaded artifact",
+  );
 });
 
 test("wallet source release matches the loaded wallet artifact", () => {
@@ -145,9 +152,16 @@ test("wallet source release matches the loaded wallet artifact", () => {
     (record) => record.id === "tinywallet",
   );
   assert.ok(record, "wallet adapter requires a registered module");
-  const source = readFileSync(join(REPO_ROOT, "vendor/tinywallet/Cargo.toml"), "utf8");
+  const source = readFileSync(
+    join(REPO_ROOT, "vendor/tinywallet/Cargo.toml"),
+    "utf8",
+  );
   const version = source.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-  assert.equal(version, record.version, "wallet source must match its loaded artifact");
+  assert.equal(
+    version,
+    record.version,
+    "wallet source must match its loaded artifact",
+  );
 });
 
 // ── Registry parsing ──────────────────────────────────────────────────────────
@@ -214,17 +228,32 @@ function sourceParityFixture() {
   git(["config", "commit.gpgsign", "false"]);
   git(["config", "tag.gpgsign", "false"]);
   mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "src/lib.rs"), '#[cfg(test)]\n#[path = "tests.rs"]\nmod tests;\npub fn value() -> u8 { 1 }\n');
+  writeFileSync(
+    join(root, "src/lib.rs"),
+    '#[cfg(test)]\n#[path = "tests.rs"]\nmod tests;\npub fn value() -> u8 { 1 }\n',
+  );
   writeFileSync(join(root, "src/tests.rs"), "#[test] fn works() {}\n");
-  writeFileSync(join(root, "Cargo.toml"), "[package]\nname = \"fixture\"\nversion = \"1.0.0\"\n");
+  writeFileSync(
+    join(root, "Cargo.toml"),
+    '[package]\nname = "fixture"\nversion = "1.0.0"\n',
+  );
   git(["add", "."]);
   git(["commit", "-qm", "release"]);
   git(["tag", "-a", "-m", "release", "v1.0.0"]);
-  const releaseCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  writeFileSync(join(root, "src/tests.rs"), "#[test] fn works() { assert_eq!(1, 1); }\n");
+  const releaseCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  writeFileSync(
+    join(root, "src/tests.rs"),
+    "#[test] fn works() { assert_eq!(1, 1); }\n",
+  );
   git(["add", "."]);
   git(["commit", "-qm", "owner tests"]);
-  const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
   const parity = {
     tag: "v1.0.0",
     releaseCommit,
@@ -233,25 +262,63 @@ function sourceParityFixture() {
     testFile: {
       path: "src/tests.rs",
       releaseMode: "100644",
-      releaseBlob: execFileSync("git", ["rev-parse", `${releaseCommit}:src/tests.rs`], { cwd: root, encoding: "utf8" }).trim(),
+      releaseBlob: execFileSync(
+        "git",
+        ["rev-parse", `${releaseCommit}:src/tests.rs`],
+        { cwd: root, encoding: "utf8" },
+      ).trim(),
       candidateMode: "100644",
-      candidateBlob: execFileSync("git", ["rev-parse", `${candidateCommit}:src/tests.rs`], { cwd: root, encoding: "utf8" }).trim(),
+      candidateBlob: execFileSync(
+        "git",
+        ["rev-parse", `${candidateCommit}:src/tests.rs`],
+        { cwd: root, encoding: "utf8" },
+      ).trim(),
     },
     unchangedTreeSha256: "",
     binding: {
       modulePath: "src/lib.rs",
-      moduleBlob: execFileSync("git", ["rev-parse", `${candidateCommit}:src/lib.rs`], { cwd: root, encoding: "utf8" }).trim(),
+      moduleBlob: execFileSync(
+        "git",
+        ["rev-parse", `${candidateCommit}:src/lib.rs`],
+        { cwd: root, encoding: "utf8" },
+      ).trim(),
       testPath: "src/tests.rs",
     },
   };
-  const canonicalTree = execFileSync("git", ["ls-tree", "-r", "--full-tree", "-z", releaseCommit], { cwd: root, encoding: "utf8" })
-    .split("\0").filter(Boolean).map((entry) => {
-      const match = entry.match(/^([0-7]{6}) (blob|commit) ([0-9a-f]{40})\t([\s\S]+)$/);
+  const canonicalTree = execFileSync(
+    "git",
+    ["ls-tree", "-r", "--full-tree", "-z", releaseCommit],
+    { cwd: root, encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(Boolean)
+    .map((entry) => {
+      const match = entry.match(
+        /^([0-7]{6}) (blob|commit) ([0-9a-f]{40})\t([\s\S]+)$/,
+      );
       if (match[4] === "src/tests.rs") return null;
       return `${match[1]} ${match[2]} ${match[3]}\t${match[4]}\n`;
-    }).filter(Boolean).sort().join("");
-  parity.unchangedTreeSha256 = createHash("sha256").update(canonicalTree).digest("hex");
-  parity.assetsSha256 = createHash("sha256").update(JSON.stringify({ version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }] })).digest("hex");
+    })
+    .filter(Boolean)
+    .sort()
+    .join("");
+  parity.unchangedTreeSha256 = createHash("sha256")
+    .update(canonicalTree)
+    .digest("hex");
+  parity.assetsSha256 = createHash("sha256")
+    .update(
+      JSON.stringify({
+        version: "1.0.0",
+        assets: [
+          {
+            hostKey: "linux",
+            archive: "fixture.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        ],
+      }),
+    )
+    .digest("hex");
   return { root, git, releaseCommit, candidateCommit, parity };
 }
 const provider = {
@@ -269,7 +336,9 @@ test("source parity proof accepts only its exact clean test-only Git pair", () =
     const result = validateTestOnlySourceParity({
       repoPath: fixture.root,
       version: "1.0.0",
-      assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+      assets: [
+        { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
+      ],
       actualHead: fixture.candidateCommit,
       proof: fixture.parity,
     });
@@ -282,24 +351,53 @@ test("source parity proof accepts only its exact clean test-only Git pair", () =
 test("the existing exact-drift exemption is proof-checked and keeps ahead visible", () => {
   const fixture = sourceParityFixture();
   try {
-    const actual = execFileSync("git", ["describe", "--tags", "--abbrev=8", "HEAD"], { cwd: fixture.root, encoding: "utf8" }).trim();
-    const exemption = { id: "tinyx", expect: actual, reason: "reviewed test-only owner commit", sourceParity: fixture.parity };
+    const actual = execFileSync(
+      "git",
+      ["describe", "--tags", "--abbrev=8", "HEAD"],
+      { cwd: fixture.root, encoding: "utf8" },
+    ).trim();
+    const exemption = {
+      id: "tinyx",
+      expect: actual,
+      reason: "reviewed test-only owner commit",
+      sourceParity: fixture.parity,
+    };
     const sourceParityContext = {
       repoPath: fixture.root,
-      assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+      assets: [
+        { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
+      ],
       actualHead: fixture.candidateCommit,
     };
-    const accepted = classifyPin({ ...base, version: "1.0.0", actual, exemption, sourceParityContext });
+    const accepted = classifyPin({
+      ...base,
+      version: "1.0.0",
+      actual,
+      exemption,
+      sourceParityContext,
+    });
     assert.equal(accepted.ok, true);
     assert.equal(accepted.kind, "exempt");
-    const status = classifyStatus({ ...base, version: "1.0.0", actual, exemption, sourceParityContext });
+    const status = classifyStatus({
+      ...base,
+      version: "1.0.0",
+      actual,
+      exemption,
+      sourceParityContext,
+    });
     assert.equal(status.kind, "exempt");
-    assert.ok(status.message.includes(actual), "the advisory status keeps the actual ahead description visible");
+    assert.ok(
+      status.message.includes(actual),
+      "the advisory status keeps the actual ahead description visible",
+    );
     const altered = classifyPin({
       ...base,
       version: "1.0.0",
       actual,
-      exemption: { ...exemption, sourceParity: { ...fixture.parity, candidateCommit: "f".repeat(40) } },
+      exemption: {
+        ...exemption,
+        sourceParity: { ...fixture.parity, candidateCommit: "f".repeat(40) },
+      },
       sourceParityContext,
     });
     assert.equal(altered.ok, false);
@@ -311,7 +409,11 @@ test("the existing exact-drift exemption is proof-checked and keeps ahead visibl
       exemption: { ...exemption, sourceParity: null },
       sourceParityContext,
     });
-    assert.equal(missing.ok, false, "a malformed present proof must not fall back to a reason-only exemption");
+    assert.equal(
+      missing.ok,
+      false,
+      "a malformed present proof must not fall back to a reason-only exemption",
+    );
     assert.equal(missing.kind, "invalid-source-parity");
     const invalidStatus = classifyStatus({
       ...base,
@@ -328,9 +430,15 @@ test("the existing exact-drift exemption is proof-checked and keeps ahead visibl
 });
 
 test("TinyJuice's canonical owner merge matches its recorded release-tree attestation", () => {
-  const exemption = JSON.parse(readFileSync(join(REPO_ROOT, "scripts/ci/module-pin-exemptions.json"), "utf8"))
-    .exemptions.find((entry) => entry.id === "tinyjuice");
-  const assets = [...parseRecords(readRegistry()).values()].find((record) => record.id === "tinyjuice").assets;
+  const exemption = JSON.parse(
+    readFileSync(
+      join(REPO_ROOT, "scripts/ci/module-pin-exemptions.json"),
+      "utf8",
+    ),
+  ).exemptions.find((entry) => entry.id === "tinyjuice");
+  const assets = [...parseRecords(readRegistry()).values()].find(
+    (record) => record.id === "tinyjuice",
+  ).assets;
   const candidateCommit = exemption.sourceParity.candidateCommit;
   const result = validateTestOnlySourceParity({
     repoPath: join(REPO_ROOT, "vendor/tinyjuice"),
@@ -341,23 +449,41 @@ test("TinyJuice's canonical owner merge matches its recorded release-tree attest
     runGit: (args) =>
       args[0] === "rev-parse" && args[1] === "HEAD"
         ? candidateCommit
-        : execFileSync("git", args, { cwd: join(REPO_ROOT, "vendor/tinyjuice"), encoding: "utf8" }).trim(),
+        : execFileSync("git", args, {
+            cwd: join(REPO_ROOT, "vendor/tinyjuice"),
+            encoding: "utf8",
+          }).trim(),
   });
   assert.equal(result.ok, true, result.message);
 });
 
 test("source parity proof rejects production, manifest, build, lock, and unknown changes", () => {
-  for (const changedFile of ["src/lib.rs", "Cargo.toml", "build.rs", "Cargo.lock", "unknown.txt"]) {
+  for (const changedFile of [
+    "src/lib.rs",
+    "Cargo.toml",
+    "build.rs",
+    "Cargo.lock",
+    "unknown.txt",
+  ]) {
     const fixture = sourceParityFixture();
     try {
       writeFileSync(join(fixture.root, changedFile), "changed\n");
       fixture.git(["add", changedFile]);
       fixture.git(["commit", "-qm", `change ${changedFile}`]);
-      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: fixture.root, encoding: "utf8" }).trim();
+      const head = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: fixture.root,
+        encoding: "utf8",
+      }).trim();
       const result = validateTestOnlySourceParity({
         repoPath: fixture.root,
         version: "1.0.0",
-        assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+        assets: [
+          {
+            hostKey: "linux",
+            archive: "fixture.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        ],
         actualHead: head,
         proof: fixture.parity,
       });
@@ -365,11 +491,21 @@ test("source parity proof rejects production, manifest, build, lock, and unknown
       const widenedCandidate = validateTestOnlySourceParity({
         repoPath: fixture.root,
         version: "1.0.0",
-        assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+        assets: [
+          {
+            hostKey: "linux",
+            archive: "fixture.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        ],
         actualHead: head,
         proof: { ...fixture.parity, candidateCommit: head },
       });
-      assert.equal(widenedCandidate.ok, false, `${changedFile} was accepted after widening the attested full head`);
+      assert.equal(
+        widenedCandidate.ok,
+        false,
+        `${changedFile} was accepted after widening the attested full head`,
+      );
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
@@ -377,7 +513,9 @@ test("source parity proof rejects production, manifest, build, lock, and unknown
 });
 
 test("source parity proof rejects descendants, dirty files, asset drift, renames, symlinks, and gitlinks", () => {
-  const assets = [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }];
+  const assets = [
+    { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
+  ];
   const validate = (fixture, overrides = {}) =>
     validateTestOnlySourceParity({
       repoPath: fixture.root,
@@ -396,9 +534,21 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
       writeFileSync(join(f.root, "src/tests.rs"), "#[test] fn later() {}\n");
       f.git(["add", "."]);
       f.git(["commit", "-qm", "later test change"]);
-      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
-      assert.match(validate(f, { actualHead: head }).message, /HEAD is not the exact attested candidate/);
-      assert.match(validate(f, { actualHead: head, proof: { ...f.parity, candidateCommit: head } }).message, /test file path, mode, or blob/);
+      const head = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: f.root,
+        encoding: "utf8",
+      }).trim();
+      assert.match(
+        validate(f, { actualHead: head }).message,
+        /HEAD is not the exact attested candidate/,
+      );
+      assert.match(
+        validate(f, {
+          actualHead: head,
+          proof: { ...f.parity, candidateCommit: head },
+        }).message,
+        /test file path, mode, or blob/,
+      );
     } finally {
       rmSync(f.root, { recursive: true, force: true });
     }
@@ -407,12 +557,32 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
   // Metadata mutants stay at the exact candidate HEAD, so each reaches and
   // proves its own invariant rather than failing the earlier HEAD check.
   for (const [name, overrides, diagnostic] of [
-    ["asset map", { assets: [] }, /registry version or artifact asset map changed/],
+    [
+      "asset map",
+      { assets: [] },
+      /registry version or artifact asset map changed/,
+    ],
     ["registry version", { version: "1.1.0" }, /release tag does not match/],
-    ["unknown field", { proof: { unknown: true } }, /proof fields are missing or unknown/],
-    ["whole-tree digest", { proof: { unchangedTreeSha256: "f".repeat(64) } }, /other source, manifest, lock, build input, or gitlink differs/],
-    ["mode", { proof: { testFile: { candidateMode: "100755" } } }, /regular non-executable/],
-    ["binding blob", { proof: { binding: { moduleBlob: "f".repeat(40) } } }, /module declaration source differs/],
+    [
+      "unknown field",
+      { proof: { unknown: true } },
+      /proof fields are missing or unknown/,
+    ],
+    [
+      "whole-tree digest",
+      { proof: { unchangedTreeSha256: "f".repeat(64) } },
+      /other source, manifest, lock, build input, or gitlink differs/,
+    ],
+    [
+      "mode",
+      { proof: { testFile: { candidateMode: "100755" } } },
+      /regular non-executable/,
+    ],
+    [
+      "binding blob",
+      { proof: { binding: { moduleBlob: "f".repeat(40) } } },
+      /module declaration source differs/,
+    ],
   ]) {
     const f = sourceParityFixture();
     try {
@@ -423,20 +593,34 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
         binding: { ...f.parity.binding, ...overrides.proof?.binding },
       };
       const result = validate(f, { ...overrides, proof });
-      assert.match(result.message, diagnostic, `${name} mutant failed for the wrong reason: ${result.message}`);
+      assert.match(
+        result.message,
+        diagnostic,
+        `${name} mutant failed for the wrong reason: ${result.message}`,
+      );
     } finally {
       rmSync(f.root, { recursive: true, force: true });
     }
   }
 
-  for (const kind of ["dirty-untracked", "dirty-tracked", "symlink", "rename", "gitlink"]) {
+  for (const kind of [
+    "dirty-untracked",
+    "dirty-tracked",
+    "symlink",
+    "rename",
+    "gitlink",
+  ]) {
     const f = sourceParityFixture();
     let nestedRoot;
     try {
       if (kind === "dirty-untracked" || kind === "dirty-tracked") {
         const path = kind === "dirty-tracked" ? "src/lib.rs" : "production.rs";
         writeFileSync(join(f.root, path), "uncommitted production input\n");
-        assert.match(validate(f).message, /module worktree is dirty/, `${kind} must fail at the cleanliness check`);
+        assert.match(
+          validate(f).message,
+          /module worktree is dirty/,
+          `${kind} must fail at the cleanliness check`,
+        );
         continue;
       }
       if (kind === "symlink") {
@@ -446,22 +630,55 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
       } else if (kind === "rename") {
         f.git(["mv", "src/tests.rs", "src/renamed.rs"]);
       } else {
-        nestedRoot = mkdtempSync(join(tmpdir(), "module-source-parity-nested-"));
-        execFileSync("git", ["init", "-q"], { cwd: nestedRoot, stdio: "ignore" });
-        execFileSync("git", ["config", "user.email", "pin-check@example.test"], { cwd: nestedRoot, stdio: "ignore" });
-        execFileSync("git", ["config", "user.name", "Pin Check"], { cwd: nestedRoot, stdio: "ignore" });
+        nestedRoot = mkdtempSync(
+          join(tmpdir(), "module-source-parity-nested-"),
+        );
+        execFileSync("git", ["init", "-q"], {
+          cwd: nestedRoot,
+          stdio: "ignore",
+        });
+        execFileSync(
+          "git",
+          ["config", "user.email", "pin-check@example.test"],
+          { cwd: nestedRoot, stdio: "ignore" },
+        );
+        execFileSync("git", ["config", "user.name", "Pin Check"], {
+          cwd: nestedRoot,
+          stdio: "ignore",
+        });
         writeFileSync(join(nestedRoot, "module.rs"), "pub fn nested() {}\n");
         execFileSync("git", ["add", "."], { cwd: nestedRoot, stdio: "ignore" });
-        execFileSync("git", ["commit", "-qm", "nested module"], { cwd: nestedRoot, stdio: "ignore" });
-        f.git(["-c", "protocol.file.allow=always", "submodule", "add", nestedRoot, "nested-module"]);
+        execFileSync("git", ["commit", "-qm", "nested module"], {
+          cwd: nestedRoot,
+          stdio: "ignore",
+        });
+        f.git([
+          "-c",
+          "protocol.file.allow=always",
+          "submodule",
+          "add",
+          nestedRoot,
+          "nested-module",
+        ]);
       }
       f.git(["commit", "-qm", `${kind} change`]);
-      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
+      const head = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: f.root,
+        encoding: "utf8",
+      }).trim();
       // Bind the actual new head but deliberately keep the original path/blob,
       // mode and whole-tree claims so the structural mutation is what rejects.
-      const result = validate(f, { actualHead: head, proof: { ...f.parity, candidateCommit: head } });
-      assert.match(result.message, kind === "gitlink" ? /other source, manifest, lock, build input, or gitlink differs/ : /test file path, mode, or blob/,
-        `${kind} failed for the wrong reason: ${result.message}`);
+      const result = validate(f, {
+        actualHead: head,
+        proof: { ...f.parity, candidateCommit: head },
+      });
+      assert.match(
+        result.message,
+        kind === "gitlink"
+          ? /other source, manifest, lock, build input, or gitlink differs/
+          : /test file path, mode, or blob/,
+        `${kind} failed for the wrong reason: ${result.message}`,
+      );
     } finally {
       rmSync(f.root, { recursive: true, force: true });
       if (nestedRoot) rmSync(nestedRoot, { recursive: true, force: true });
@@ -471,7 +688,11 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
   for (const tagChange of ["moved", "missing"]) {
     const f = sourceParityFixture();
     try {
-      f.git(tagChange === "moved" ? ["tag", "-f", "-a", "-m", "moved", "v1.0.0", f.candidateCommit] : ["tag", "-d", "v1.0.0"]);
+      f.git(
+        tagChange === "moved"
+          ? ["tag", "-f", "-a", "-m", "moved", "v1.0.0", f.candidateCommit]
+          : ["tag", "-d", "v1.0.0"],
+      );
       assert.match(
         validate(f).message,
         tagChange === "moved"
