@@ -16,7 +16,7 @@ use tinytools_agent::dialect::ToolCallFormat;
 const SPAWN_SUBAGENT_CANARY: &str = "tool-e2e-spawn-subagent-canary";
 
 #[tokio::test]
-async fn spawn_subagent_tool_runs_child_agent_e2e() {
+async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
     let workspace = tempfile::TempDir::new().expect("workspace");
     let provider = Arc::new(ScriptedModel::new(vec![(
         SPAWN_SUBAGENT_CANARY,
