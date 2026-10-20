@@ -120,7 +120,6 @@ fn make_discord_ctx(
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

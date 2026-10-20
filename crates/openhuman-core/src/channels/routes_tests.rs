@@ -79,7 +79,6 @@ fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(workspace_dir),
         message_timeout_secs: 60,
         multimodal: crate::config::MultimodalConfig::default(),
