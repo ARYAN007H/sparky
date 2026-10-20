@@ -86,6 +86,11 @@ pub(crate) async fn process_channel_runtime_message(
     let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
+    let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
+        channel: envelope.channel.clone(),
+        conversation: envelope.conversation.clone(),
+        session_key: canonical_session_key.clone(),
+    };
     crate::channels::host::voice::record_inbound_envelope(&envelope);
     let native_target = if let Some(target) = progressive_target {
         Some(target)
@@ -122,7 +127,7 @@ pub(crate) async fn process_channel_runtime_message(
         reply_target: msg.reply_target.clone(),
         content: msg.content.clone(),
         thread_ts: msg.thread_ts.clone(),
-        inbound_envelope: Some(envelope),
+        inbound_envelope: Some(envelope.clone()),
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 
@@ -136,6 +141,8 @@ pub(crate) async fn process_channel_runtime_message(
         &msg,
         target_channel.as_ref(),
         &history_key,
+        Some(remote_reset_scope),
+        &msg,
         || async move {
             reset_durable_channel_session(
                 &reset_context,
