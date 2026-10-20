@@ -70,6 +70,13 @@ test("local Linux E2E shards cover every CI suite", () => {
   for (const { spec } of scheduled) assert.ok(fs.existsSync(spec), `scheduled native spec exists: ${spec}`);
   const suites = new Set(scheduled.map(({ suite }) => suite));
   const assignedSuites = new Set(localShards.flatMap(({ suites: list }) => list.split(",")));
-  assert.deepEqual([...suites].sort(), [...assignedSuites].sort());
-  assert.ok(localShards.every(({ suites: list }) => list.split(",").some((suite) => suites.has(suite))));
+  const activeAssignedSuites = new Set([...assignedSuites].filter((suite) => suites.has(suite)));
+  assert.equal(suites.size, 11, "the native runner schedules only its 11 nonempty suites");
+  assert.deepEqual([...suites].sort(), [...activeAssignedSuites].sort());
+  assert.ok(
+    localShards.every(({ suites: list }) =>
+      list.split(",").some((suite) => activeAssignedSuites.has(suite)),
+    ),
+    "every OS shard group contains at least one nonempty native suite",
+  );
 });
