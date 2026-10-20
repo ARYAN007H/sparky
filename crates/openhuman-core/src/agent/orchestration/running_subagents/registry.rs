@@ -188,18 +188,25 @@ pub(crate) fn register(
     abort: AbortHandle,
     status: watch::Receiver<DetachedSubagentStatus>,
 ) -> Result<(), RegistrationError> {
+    if let Err(error) = admit_spawn(ctx, &workspace_dir) {
+        abort.abort();
+        return Err(error);
+    }
     let parent_epoch = match parent_thread_id.as_deref() {
-        Some(thread_id) => Some(
-            crate::agent::orchestration::background_completions::CompletionTarget::new(
+        Some(thread_id) => {
+            match crate::agent::orchestration::background_completions::CompletionTarget::new(
                 ctx.clone(),
                 workspace_dir.clone(),
                 parent_session.clone(),
                 Some(thread_id.to_owned()),
-            )
-            .map_err(RegistrationError::ParentLifecycle)?
-            .parent_epoch()
-            .expect("threaded spawn captures a parent generation"),
-        ),
+            ) {
+                Ok(target) => target.parent_epoch(),
+                Err(error) => {
+                    abort.abort();
+                    return Err(RegistrationError::ParentLifecycle(error));
+                }
+            }
+        }
         None => None,
     };
     register_with_parent_epoch(
