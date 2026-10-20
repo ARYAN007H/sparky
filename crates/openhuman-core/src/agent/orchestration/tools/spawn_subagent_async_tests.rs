@@ -5,6 +5,7 @@ use crate::config::AgentConfig;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
+use tinytools_agent::dialect::ToolCallFormat;
 
 #[test]
 fn parameters_schema_advertises_fire_and_forget_fields() {
