@@ -9,7 +9,7 @@ use serde_json::json;
 fn legacy_voice_catalog_keeps_its_handler_and_example_contracts() {
     crate::core::all::verify_parameter_contracts(
         &all_voice_registered_controllers(),
-        &super::parameter_contracts(),
+        &crate::voice::parameter_contracts(),
     )
     .unwrap();
 }

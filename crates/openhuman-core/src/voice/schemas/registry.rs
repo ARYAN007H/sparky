@@ -121,7 +121,12 @@ pub fn voice_schemas(function: &str) -> ControllerSchema {
             description:
                 "Transcribe audio from a file path through the configured STT engine, with optional LLM cleanup.",
             inputs: vec![
-                required_string("audio_path", "Path to the audio file."),
+                FieldSchema {
+                    name: "audio_path",
+                    ty: TypeSchema::String,
+                    comment: "Path to the audio file.",
+                    required: false,
+                },
                 optional_string("context", "Conversation context for LLM post-processing."),
                 optional_bool(
                     "skip_cleanup",
