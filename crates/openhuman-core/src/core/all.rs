@@ -4,52 +4,18 @@
 //! controllers (e.g., memory, skills, config) and providing a unified
 //! interface for both the CLI and RPC layers to invoke them.
 
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, OnceLock, RwLock},
-};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use serde_json::{Map, Value};
 
-use crate::core::runtime::DispatchCtx;
+#[path = "all_entry.rs"]
+mod all_entry;
+pub use all_entry::{
+    BoundRegisteredController, CliHandler, ControllerEntry, ControllerFuture, ControllerHandler,
+    ControllerTask, RegisteredCliAdapter, RegisteredController,
+};
+
 use crate::core::ControllerSchema;
-
-/// A pinned, boxed future returned by a controller handler.
-pub type ControllerFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'static>>;
-
-/// A function pointer type for controller handlers.
-///
-/// Handlers take the call's explicit [`DispatchCtx`] and a map of parameters,
-/// and return a [`ControllerFuture`]. The transport that accepted the call
-/// builds the context; the registry passes it through untouched.
-pub type ControllerHandler = fn(DispatchCtx, Map<String, Value>) -> ControllerFuture;
-
-/// A function pointer type for domain-specific CLI handlers.
-pub type CliHandler = fn(&[String]) -> anyhow::Result<()>;
-
-/// A registered standalone CLI adapter for a domain.
-#[derive(Clone)]
-pub struct RegisteredCliAdapter {
-    pub namespace: &'static str,
-    pub handler: CliHandler,
-}
-
-/// A registered controller combining its schema and handler function.
-#[derive(Clone)]
-pub struct RegisteredController {
-    /// The schema defining the controller's identity and parameters.
-    pub schema: ControllerSchema,
-    /// The actual function that executes the controller's logic.
-    pub handler: ControllerHandler,
-}
-
-impl RegisteredController {
-    /// Returns the canonical RPC method name for this controller (e.g., `openhuman.memory_doc_put`).
-    pub fn rpc_method_name(&self) -> String {
-        rpc_method_name(&self.schema)
-    }
-}
 
 pub use super::domain_group::DomainGroup;
 mod components_gate;
@@ -66,13 +32,20 @@ use validate::validate_registry;
 #[derive(Clone)]
 struct GroupedController {
     group: DomainGroup,
-    controller: RegisteredController,
+    controller: ControllerEntry,
 }
 
 /// Append `items` to `dst`, tagging each with `group`.
 /// This is the single seam that attaches a [`DomainGroup`] to every domain's
 /// controllers without the domain modules knowing about groups.
 fn push(dst: &mut Vec<GroupedController>, group: DomainGroup, items: Vec<RegisteredController>) {
+    dst.extend(items.into_iter().map(|controller| GroupedController {
+        group,
+        controller: ControllerEntry::legacy(controller),
+    }));
+}
+
+fn push_entries(dst: &mut Vec<GroupedController>, group: DomainGroup, items: Vec<ControllerEntry>) {
     dst.extend(
         items
             .into_iter()
@@ -212,7 +185,7 @@ pub fn register_controller_extension(ext: ControllerExtension) -> Result<(), Str
     for controller in ext.controllers {
         merged.push(GroupedController {
             group: ext.group,
-            controller,
+            controller: ControllerEntry::legacy(controller),
         });
     }
     // Validate the union so an extension cannot shadow a built-in or internal
@@ -639,10 +612,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::platform::update::all_update_registered_controllers(),
     );
     // Conversation thread and message management
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Threads,
-        crate::threads::all_threads_registered_controllers(),
+        crate::threads::schemas::all_controller_entries(),
     );
     // TokenJuice content-router debug controllers (detect / compress / cache_stats / retrieve).
     // Classified Inference: TokenJuice is the token-compression content router,
@@ -729,12 +702,12 @@ fn build_internal_only_controllers() -> Vec<GroupedController> {
 }
 
 /// Returns registered controllers filtered by the ambient [`crate::core::runtime::DomainSet`].
-pub fn all_registered_controllers() -> Vec<RegisteredController> {
+pub fn all_registered_controllers() -> Vec<ControllerEntry> {
     let view = registry_view();
     registered_controllers(&view)
 }
 
-fn registered_controllers(view: &RegistryView) -> Vec<RegisteredController> {
+fn registered_controllers(view: &RegistryView) -> Vec<ControllerEntry> {
     let found = view
         .iter()
         .filter(|g| visible(g))
@@ -1189,6 +1162,10 @@ pub fn all_http_method_schemas() -> Vec<HttpMethodSchemaDefinition> {
 mod schema_test_support;
 #[cfg(test)]
 pub(crate) use schema_test_support::*;
+
+#[cfg(test)]
+#[path = "all_bound_controller_tests.rs"]
+mod bound_controller_tests;
 
 #[cfg(test)]
 #[path = "all_schema_contract_tests.rs"]

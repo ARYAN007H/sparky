@@ -147,7 +147,7 @@ fn registered_wallet_schema_contract_rejects_missing_encrypted_mnemonic() {
 
 /// Built-in/internal snapshots avoid ambient DomainSet filtering and global
 /// hosted-extension mutation. Hosted/RPC contracts belong to their own crates.
-fn builtin_controller_snapshot() -> Vec<RegisteredController> {
+fn builtin_controller_snapshot() -> Vec<ControllerEntry> {
     registry()
         .iter()
         .chain(internal_registry())
@@ -165,6 +165,7 @@ fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<Contr
                     && controller.schema.method_name() == "mcp_clients.registry_get")
                 || controller.schema.method_name() == "modules.computer_status"
         })
+        .filter_map(|controller| controller.legacy_controller())
         .collect();
     let contracts = vec![crate::modules::schemas::computer_status_parameter_contract()];
     #[cfg(feature = "mcp")]

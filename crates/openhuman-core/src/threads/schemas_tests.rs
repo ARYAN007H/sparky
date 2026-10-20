@@ -51,6 +51,63 @@ fn schema_and_handler_catalogs_preserve_threads_wire_methods() {
     }
 }
 
+#[test]
+fn upsert_bound_parser_accepts_owned_examples_and_requires_declared_fields() {
+    let entry = all_controller_entries()
+        .into_iter()
+        .find(|controller| controller.schema.method_name() == "threads.upsert")
+        .expect("threads.upsert is registered");
+    let required = ["id", "title", "created_at"];
+    let required_in_schema: Vec<_> = entry
+        .schema
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_eq!(required_in_schema, required);
+
+    let examples = [
+        json!({"id":"t1", "title":"Hello", "created_at":"2026-04-22T00:00:00Z"}),
+        json!({"id":"t2", "title":"Thread", "created_at":"2026-04-22T00:00:00Z", "labels":["work"]}),
+    ];
+    for example in examples {
+        let params = obj(example);
+        crate::core::all::validate_params(&entry.schema, &params)
+            .expect("registered schema accepts the independent example");
+        entry
+            .decode_params(params)
+            .expect("the runtime-bound parser accepts the same example");
+    }
+
+    let mut missing_schema_field = entry.schema.clone();
+    missing_schema_field
+        .inputs
+        .retain(|field| field.name != "created_at");
+    let missing_required: Vec<_> = missing_schema_field
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_ne!(missing_required, required);
+
+    let mut optional_schema_field = entry.schema.clone();
+    optional_schema_field
+        .inputs
+        .iter_mut()
+        .find(|field| field.name == "created_at")
+        .expect("the contract field is declared")
+        .required = false;
+    let optional_required: Vec<_> = optional_schema_field
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_ne!(optional_required, required);
+}
+
 // ── parse::<T>(params) contract ─────────────────────────────────────
 
 fn obj(value: Value) -> Map<String, Value> {
