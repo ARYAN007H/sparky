@@ -128,14 +128,27 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
         "state",
     )
     .unwrap();
+    let local_old = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &crate::storage::Scope::local(),
+        "memory",
+        "state",
+    )
+    .unwrap();
     let alice_item = PendingDeletion::Thread {
         thread_id: "alice-owed".into(),
+    };
+    let local_item = PendingDeletion::Thread {
+        thread_id: "local-owed".into(),
     };
     let bob_item = PendingDeletion::Thread {
         thread_id: "bob-owed".into(),
     };
     alice_old
         .put("pending_deletions", &vec![alice_item.clone()])
+        .unwrap();
+    local_old
+        .put("pending_deletions", &vec![local_item.clone()])
         .unwrap();
     bob_old
         .put("pending_deletions", &vec![bob_item.clone()])
@@ -153,7 +166,15 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
             .unwrap(),
-        Some(vec![alice_item.clone()])
+        Some(vec![alice_item.clone(), local_item.clone()])
+    );
+    assert!(
+        local_old
+            .get::<Vec<PendingDeletion>>("pending_deletions")
+            .unwrap()
+            .unwrap_or_default()
+            .is_empty(),
+        "the previous local-scope queue moves to the workspace scope"
     );
     assert!(
         bob_old
