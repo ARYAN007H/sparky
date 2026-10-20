@@ -3,7 +3,9 @@
 
 mod common;
 
-use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend, PointedInference};
+use common::{
+    chat_completion, chat_requests, offline_config, runtime, stub_backend, PointedInference,
+};
 use openhuman_embed::{Access, AgentSpec, Runtime, Workspace};
 use serde_json::Value;
 use wiremock::matchers::{method, path_regex};
