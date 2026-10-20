@@ -7,7 +7,6 @@
 
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
-use std::ops::Deref;
 use tinyflows_bus::catalog::{
     self, DeleteWorkflowResult, FlowUpdateError as BusUpdateError, GetRevisionRequest,
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
@@ -17,23 +16,6 @@ use tinyflows_bus::catalog::{FlowSuggestion, SuggestionStatus};
 
 use crate::config::Config;
 use crate::modules::tinyflows as module;
-
-/// Host projection of a Catalog write, retaining owner policy flags while
-/// dereferencing to the persisted workflow for existing internal callers.
-#[derive(Clone, Debug)]
-pub(crate) struct FlowWriteResult {
-    pub(crate) workflow: Flow,
-    pub(crate) born_disabled: bool,
-    pub(crate) approval_forced: bool,
-}
-
-impl Deref for FlowWriteResult {
-    type Target = Flow;
-
-    fn deref(&self) -> &Self::Target {
-        &self.workflow
-    }
-}
 
 pub(crate) fn call_catalog<T, A>(config: &Config, member: &'static str, args: A) -> Result<T>
 where
@@ -60,13 +42,9 @@ where
     serde_json::from_value(serde_json::to_value(value)?).map_err(Into::into)
 }
 
-fn put_result(response: PutWorkflowResponse) -> Result<FlowWriteResult> {
+fn put_result(response: PutWorkflowResponse) -> Result<PutWorkflowResult> {
     match response {
-        PutWorkflowResponse::Ok(result) => Ok(FlowWriteResult {
-            workflow: result.workflow,
-            born_disabled: result.born_disabled,
-            approval_forced: result.approval_forced,
-        }),
+        PutWorkflowResponse::Ok(result) => Ok(result),
         PutWorkflowResponse::Error(error) => Err(anyhow!(match error {
             BusUpdateError::NotFound { message }
             | BusUpdateError::VersionConflict { message, .. }
@@ -95,7 +73,7 @@ pub fn create_flow(
     graph: Value,
     require_approval: bool,
     enabled: bool,
-) -> Result<FlowWriteResult> {
+) -> Result<PutWorkflowResult> {
     let storage = super::catalog_storage::register_blocking(config)?;
     let request = PutWorkflowRequest::Create {
         storage,
@@ -189,7 +167,7 @@ pub fn update_flow_graph(
     _enabled_override: Option<bool>,
     force_disarm_if_automatic: bool,
     expected_updated_at: Option<&str>,
-) -> std::result::Result<FlowWriteResult, BusUpdateError> {
+) -> std::result::Result<PutWorkflowResult, BusUpdateError> {
     let storage = super::catalog_storage::register_blocking(config).map_err(|error| {
         BusUpdateError::Store {
             message: error.to_string(),
@@ -211,11 +189,7 @@ pub fn update_flow_graph(
             }
         })?;
     match response {
-        PutWorkflowResponse::Ok(result) => Ok(FlowWriteResult {
-            workflow: result.workflow,
-            born_disabled: result.born_disabled,
-            approval_forced: result.approval_forced,
-        }),
+        PutWorkflowResponse::Ok(result) => Ok(result),
         PutWorkflowResponse::Error(error) => Err(error),
     }
 }
