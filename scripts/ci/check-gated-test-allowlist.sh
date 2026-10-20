@@ -87,6 +87,8 @@ channels/mod.rs
 mcp/host.rs
 modules/registry_contract_tests.rs
 modules/registry.rs
+memory/ops.rs
+memory/ops_tests.rs
 EOF
 )
 
