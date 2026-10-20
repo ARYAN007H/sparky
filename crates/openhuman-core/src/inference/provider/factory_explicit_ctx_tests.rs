@@ -67,6 +67,17 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         let (_, model) = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
             .expect("explicit model entry builds");
         assert_eq!(model, "context-a-one-shot");
+        let simple = crate::inference::host_runtime::ops::agent_chat_simple::agent_chat_simple(
+            &dispatch,
+            &config,
+            "fixture prompt",
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("simple chat uses its explicit context model");
+        assert_eq!(simple.value, "context-a-one-shot");
         for (chat, _, _) in [
             create_turn_chat_model_with_native_tools_and_route(
                 &dispatch,

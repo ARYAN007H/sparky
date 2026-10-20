@@ -30,8 +30,13 @@ pub async fn agent_chat_simple(
         std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
         String,
     ) = if providers::factory::resolves_to_managed_backend("chat", &effective) {
+        let resolved_context = ctx.resolved();
+        let extensions = resolved_context
+            .as_deref()
+            .map(crate::core::runtime::CoreContext::extensions);
         let (backend, resolved_model) =
-            providers::factory::make_openhuman_backend_model_for_thread(
+            providers::factory::make_openhuman_backend_model_for_thread_in(
+                extensions,
                 "chat",
                 &effective,
                 effective.default_model.as_deref(),
