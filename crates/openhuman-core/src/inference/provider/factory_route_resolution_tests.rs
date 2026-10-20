@@ -1,6 +1,5 @@
 use super::*;
 
-use "openrouter/deepseek/deepseek-v4-flash";
 
 use crate::inference::provider::factory::access_gates::local_only_violation;
 /// When the provider string includes a model id the factory should build
