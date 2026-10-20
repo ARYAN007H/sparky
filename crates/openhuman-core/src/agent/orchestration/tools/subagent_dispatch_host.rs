@@ -335,9 +335,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         prompt.chars().count()
     );
 
-    let worktree_action_dir = parent_workspace_descriptor
-        .as_ref()
-        .map(|descriptor| descriptor.root.clone());
     if let Some(descriptor) = parent_workspace_descriptor.as_ref() {
         tracing::debug!(
             agent_id,
@@ -360,7 +357,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         worker_thread_id: None,
         initial_history: None,
         checkpoint_dir: None,
-        worktree_action_dir,
         workspace_descriptor: parent_workspace_descriptor,
         run_queue: None,
         message_run_queue: None,
@@ -450,15 +446,12 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     iterations: outcome.iterations as u32,
                                     output_chars: outcome.output.chars().count(),
                                     output: outcome.output.clone(),
-                                    // Synchronous delegate dispatch has no worktree
-                                    // isolation (that is a `spawn_subagent` concept).
+                                    // Synchronous delegate dispatch inherits the
+                                    // parent's workspace context.
                                     // Not audited for whether this child's spend reached the
                                     // parent turn's ledger, so it stays silent: omission adds
                                     // nothing, which is the status quo. See the field's docs.
                                     usage: None,
-                                    worktree_path: None,
-                                    changed_files: Vec::new(),
-                                    dirty_status: None,
                                     stop: None,
                                 })
                                 .await;
@@ -525,9 +518,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     // parent turn's ledger, so it stays silent: omission adds
                                     // nothing, which is the status quo. See the field's docs.
                                     usage: None,
-                                    worktree_path: None,
-                                    changed_files: Vec::new(),
-                                    dirty_status: None,
                                     stop: incomplete_stop(reason, outcome.failure_cause.clone()),
                                 })
                                 .await;

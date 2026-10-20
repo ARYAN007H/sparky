@@ -492,7 +492,7 @@ Capability {
             system prompt — OpenHuman's analog of Claude Code's CLAUDE.md / Codex's AGENTS.md. Two \
             layers are read once at session start: a global layer from the OpenHuman workspace \
             (<workspace_dir>/AGENTS.md) and a project layer from the folder the agent is operating \
-            in (<action_dir>/AGENTS.md, or a sub-agent's isolated worktree). The global layer is \
+            in <action_dir>/AGENTS.md). The global layer is \
             injected first, the project layer second (project instructions take precedence). \
             Missing or empty files are silently skipped, and each layer is capped so a large file \
             can't crowd out the rest of the prompt. On by default; disable via \
@@ -595,16 +595,6 @@ Capability {
         how_to: "Intelligence > Agent Tasks > Agents Library",
         status: CapabilityStatus::Beta,
         privacy: DERIVED_TO_BACKEND,
-    },
-Capability {
-        id: "intelligence.worktree_manager",
-        name: "Agent Worktrees",
-        domain: "intelligence",
-        category: CapabilityCategory::Intelligence,
-        description: "Inspect and clean up the isolated git worktrees that parallel sub-agents check out under <repo>/.claude/worktrees. Each row shows the worktree's branch, dirty state, and changed files, plus a cross-worktree overlap warning when two workers touched the same file. Open, diff, or remove a worktree (a dirty worktree requires an explicit discard confirmation; the worker branch is preserved).",
-        how_to: "Intelligence > Worktrees",
-        status: CapabilityStatus::Beta,
-        privacy: None,
     },
 Capability {
         id: "intelligence.notifications_dismiss",

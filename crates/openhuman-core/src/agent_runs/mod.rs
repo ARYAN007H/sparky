@@ -6,7 +6,6 @@ pub(crate) mod replay;
 mod schemas;
 pub(crate) mod subagent_control;
 mod subagent_finalize;
-pub(crate) mod worktree_schemas;
 
 pub(crate) use command_center::{
     all_command_center_controller_schemas, all_command_center_registered_controllers,
@@ -15,10 +14,6 @@ pub(crate) use schemas::all_registered_controllers as all_agent_registered_contr
 pub(crate) use subagent_control::{
     all_controller_schemas as all_subagent_control_controller_schemas,
     all_registered_controllers as all_subagent_control_registered_controllers,
-};
-pub(crate) use worktree_schemas::{
-    all_controller_schemas as all_worktree_controller_schemas,
-    all_registered_controllers as all_worktree_registered_controllers,
 };
 
 /// Registers the agent-run lifecycle projection for detached sub-agent events.
@@ -31,7 +26,6 @@ pub(crate) fn all_orchestration_registered_controllers(
 ) -> Vec<crate::core::all::RegisteredController> {
     let mut controllers = Vec::new();
     controllers.extend(all_command_center_registered_controllers());
-    controllers.extend(all_worktree_registered_controllers());
     controllers.extend(all_subagent_control_registered_controllers());
     controllers
 }
@@ -40,7 +34,6 @@ pub(crate) fn all_orchestration_registered_controllers(
 pub(crate) fn all_orchestration_controller_schemas() -> Vec<crate::core::ControllerSchema> {
     let mut schemas = Vec::new();
     schemas.extend(all_command_center_controller_schemas());
-    schemas.extend(all_worktree_controller_schemas());
     schemas.extend(all_subagent_control_controller_schemas());
     schemas
 }

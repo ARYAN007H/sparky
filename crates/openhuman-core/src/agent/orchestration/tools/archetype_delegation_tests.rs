@@ -26,7 +26,7 @@ fn delegation_opts_out_of_the_global_tool_timeout() {
     // TAURI-RUST-K29 / TAURI-RUST-8HB). The child bounds its own lifetime
     // via its max_iterations, the run cancellation token, and each inner
     // tool's own timeout — so this primitive must be Unbounded, like
-    // spawn_parallel_agents and the long-running scripting tools.
+    // long-running scripting tools.
     assert_eq!(
         sample_tool().timeout_policy(&json!({})),
         ToolTimeout::Unbounded,

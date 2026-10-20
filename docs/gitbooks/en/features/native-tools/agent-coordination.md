@@ -17,12 +17,11 @@ Besides doing the work, the agent has tools for organizing it: planning multi-st
 | `steer_subagent`, `wait_subagent`   | Message or collect a running worker by durable `subagent_session_id` or transient `task_id`.                           |
 | `list_subagents`, `close_subagent`  | Inspect the reusable workers for the parent thread, or retire one.                                                     |
 | `delegate`                          | Hands a task to a specialist, such as an archetype with different prompts, tools or permissions.                       |
-| `spawn_parallel_agents`             | Fans one task out to several specialists at once and merges what they return.                                          |
 | `use_skill`                         | Loads an inline skill's playbook and tools (coding, web3, system, scheduling, docs, mcp) so the agent can call them.   |
 | `ask_user_clarification`            | Pauses and asks you a precise question instead of guessing.                                                            |
 | `plan_exit`                         | Leaves the planning phase and starts executing.                                                                        |
 
-`spawn_subagent` and archetype delegation calls accept an optional `model` field to pin an exact model for one call. If you leave it out, the harness uses per-agent pins from config when present, and otherwise falls back to normal model-routing hints. Model, sandbox mode, parent thread, action root and task key all affect whether a sub-agent can be reused, so materially different work gets its own worker.
+`spawn_subagent` and archetype delegation calls accept an optional `model` field to pin an exact model for one call. If you leave it out, the harness uses per-agent pins from config when present, and otherwise falls back to normal model-routing hints. Model, sandbox mode, parent thread and task key all affect whether a sub-agent can be reused, so materially different work gets its own worker. For concurrent work, start several async sub-agent tasks and collect their results with `wait_subagent`.
 
 Reusable delegation returns a transient `task_id` and a durable `subagent_session_id`. Use the durable id for follow-ups in later turns. Pass `fresh: true` only when you or the task needs a clean worker. Pass `blocking: true` only when the parent must wait for the child's result.
 

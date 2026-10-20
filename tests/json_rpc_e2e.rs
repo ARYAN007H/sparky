@@ -1751,6 +1751,38 @@ async fn json_rpc_removed_harness_provisioning_is_unavailable() {
 }
 
 #[tokio::test]
+async fn json_rpc_worktree_methods_are_unavailable() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{rpc_addr}");
+
+    for (id, method, params) in [
+        (44_721, "openhuman.worktree_list", json!({})),
+        (
+            44_722,
+            "openhuman.worktree_status",
+            json!({ "path": "/repo/.claude/worktrees/worker" }),
+        ),
+        (
+            44_723,
+            "openhuman.worktree_diff",
+            json!({ "path": "/repo/.claude/worktrees/worker" }),
+        ),
+        (
+            44_724,
+            "openhuman.worktree_remove",
+            json!({ "path": "/repo/.claude/worktrees/worker" }),
+        ),
+    ] {
+        let response = post_json_rpc(&rpc_base, id, method, params).await;
+        assert_unknown_method(&response, method);
+        assert!(response.get("result").is_none(), "{response}");
+    }
+
+    rpc_join.abort();
+}
+
+#[tokio::test]
 async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");

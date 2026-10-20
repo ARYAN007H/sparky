@@ -151,6 +151,60 @@ async fn typed_mode_system_prompt_includes_subagent_role_contract() {
 }
 
 #[tokio::test]
+async fn typed_mode_uses_inherited_workspace_for_project_instructions() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+    use tinytools::WorkspaceDescriptor;
+
+    let scratch = tempfile::tempdir().expect("isolated prompt roots");
+    let action_dir = scratch.path().join("configured-action-root");
+    let workspace_dir = scratch.path().join("workspace");
+    let inherited_root = scratch.path().join("inherited-project");
+    for directory in [&action_dir, &workspace_dir, &inherited_root] {
+        std::fs::create_dir_all(directory).expect("create prompt root");
+    }
+    std::fs::write(
+        action_dir.join("AGENTS.md"),
+        "CONFIG_ACTION_ROOT_INSTRUCTIONS",
+    )
+    .expect("write configured action instructions");
+    std::fs::write(
+        inherited_root.join("AGENTS.md"),
+        "INHERITED_WORKSPACE_INSTRUCTIONS",
+    )
+    .expect("write inherited workspace instructions");
+
+    let mut config = crate::config::Config::default();
+    config.action_dir = action_dir;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config);
+    let provider = ScriptedProvider::new(vec![text_response("ok")]);
+    let mut parent = make_parent(provider.clone(), vec![stub("file_read")]);
+    parent.workspace_dir = workspace_dir;
+    parent.workspace_descriptor = Some(WorkspaceDescriptor::new(inherited_root));
+    parent.agent_config.agents_md_enabled = true;
+    let options = with_parent(
+        parent,
+        SubagentRunOptions {
+            run_context: crate::agent::tinyagents::host::OpenHumanRunContext::new()
+                .with_core(Some(core)),
+            ..SubagentRunOptions::default()
+        },
+    );
+
+    run_subagent(&make_def_named_tools(&[]), "the requested task", options)
+        .await
+        .expect("subagent run should complete");
+
+    let captured = provider.captured.lock();
+    let system = captured[0]
+        .messages
+        .iter()
+        .find(|message| message.role == "system")
+        .expect("system prompt should be sent");
+    assert!(system.content.contains("INHERITED_WORKSPACE_INSTRUCTIONS"));
+    assert!(!system.content.contains("CONFIG_ACTION_ROOT_INSTRUCTIONS"));
+}
+
+#[tokio::test]
 async fn typed_mode_returns_text_through_runner() {
     let provider = ScriptedProvider::new(vec![text_response("X is Y")]);
     let parent = make_parent(provider.clone(), vec![stub("file_read")]);
@@ -173,7 +227,6 @@ async fn typed_mode_returns_text_through_runner() {
                     worker_thread_id: None,
                     initial_history: None,
                     checkpoint_dir: None,
-                    worktree_action_dir: None,
                     run_queue: None,
                     message_run_queue: None,
                 },
@@ -404,7 +457,6 @@ async fn typed_mode_filters_tools_by_skill_filter() {
                     worker_thread_id: None,
                     initial_history: None,
                     checkpoint_dir: None,
-                    worktree_action_dir: None,
                     run_queue: None,
                     message_run_queue: None,
                 },

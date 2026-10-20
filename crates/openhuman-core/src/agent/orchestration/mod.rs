@@ -24,11 +24,9 @@ pub(crate) mod fleet_tools;
 #[path = "parent_context/builder.rs"]
 pub(crate) mod parent_context;
 pub(crate) mod running_subagents;
-pub(crate) mod spawn_parallel;
 pub(crate) mod subagent_events;
 pub(crate) mod subagent_sessions;
 pub mod tools;
-pub mod worktree;
 
 #[cfg(test)]
 #[path = "background_completions_tenant_tests.rs"]
@@ -43,4 +41,3 @@ mod background_delivery_tenant_tests;
 pub async fn release_background_completion_stores() -> usize {
     background_completions::release_all().await
 }
-pub use worktree::OpenHumanWorktreeIsolation;

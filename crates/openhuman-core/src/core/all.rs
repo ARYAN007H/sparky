@@ -689,7 +689,7 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         DomainGroup::Agent,
         crate::storage::import::all_session_import_registered_controllers(),
     );
-    // Background agent command center, workflow runs, teams, worktrees, and subagent controls.
+    // Background agent command center, workflow runs, teams, and subagent controls.
     push(
         &mut controllers,
         DomainGroup::Agent,

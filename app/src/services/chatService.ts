@@ -667,16 +667,6 @@ export interface SubagentProgressDetail {
   /** Human-readable display name from the agent registry. */
   display_name?: string;
   /**
-   * Absolute path to the worker's isolated `git worktree` checkout (on
-   * `subagent_completed`, when the worker ran with `isolation = "worktree"`).
-   * Drives the inline worktree row's open/diff/remove actions (#3376).
-   */
-  worktree_path?: string;
-  /** Files (relative to the worktree root) the worker changed (on `subagent_completed`). */
-  changed_files?: string[];
-  /** Whether the worker's worktree had uncommitted changes (on `subagent_completed`). */
-  dirty_status?: boolean;
-  /**
    * This child's own spend (on `subagent_completed`) — present **only when it
    * is not already inside the parent turn's totals**.
    *

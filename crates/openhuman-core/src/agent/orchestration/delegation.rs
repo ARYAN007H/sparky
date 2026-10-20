@@ -323,9 +323,6 @@ fn delegation_subagent_options(
     workspace_descriptor: Option<WorkspaceDescriptor>,
     run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
 ) -> SubagentRunOptions {
-    let worktree_action_dir = workspace_descriptor
-        .as_ref()
-        .map(|descriptor| descriptor.root.clone());
     SubagentRunOptions {
         skill_filter_override: None,
         context: None,
@@ -336,7 +333,6 @@ fn delegation_subagent_options(
         worker_thread_id: None,
         initial_history: None,
         checkpoint_dir: None,
-        worktree_action_dir,
         workspace_descriptor,
         run_queue: None,
         message_run_queue: None,

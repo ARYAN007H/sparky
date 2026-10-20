@@ -59,17 +59,6 @@ pub struct SubagentRunOptions {
     /// `{workspace_dir}/.openhuman/subagent_checkpoints/`.
     pub checkpoint_dir: Option<PathBuf>,
 
-    /// Per-worker isolated checkout for git-worktree isolation.
-    ///
-    /// When `Some`, the runner derives a [`WorkspaceDescriptor`] rooted at this
-    /// path (see `workspace_descriptor_for_subagent`) and threads it onto the
-    /// tinyagents run context, so acting tools (shell, git) resolve their CWD to
-    /// the worker's isolated worktree checkout via
-    /// `ToolExecutionContext.workspace` instead of the shared `Config.action_dir`.
-    /// When `None` (the default), behaviour is unchanged — tools fall through to
-    /// `security.action_dir`.
-    pub worktree_action_dir: Option<PathBuf>,
-
     /// SDK workspace descriptor threaded into the TinyAgents tool-execution
     /// context. When present it is attached to the run's `RunContext`
     /// (`RunContext::with_workspace`) and surfaced per tool call via

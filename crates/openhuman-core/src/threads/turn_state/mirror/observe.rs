@@ -150,7 +150,7 @@ impl ObserveProgress for TurnStateMirror {
                 self.state.phase = Some(TurnPhase::Subagent);
                 self.state.active_subagent = Some(agent_id.clone());
                 // Derive the real invoking tool's name from the parent row
-                // (`spawn_parallel_agents`, `spawn_async_subagent`,
+                // (`spawn_async_subagent`,
                 // `continue_subagent`, a synthesized `delegate_*`, …) instead
                 // of hardcoding `spawn_subagent`, which was wrong for every
                 // other delegation path. Falls back to the historical

@@ -95,9 +95,9 @@ runtime-wide".
 
 Every agent turn runs through the published [`tinyagents`](https://crates.io/crates/tinyagents) harness. There are three entry points: `Agent::turn`, the channel and CLI bus path, and `run_subagent`. All of them go through the adapter seam in [`crates/openhuman-core/src/agent/tinyagents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/tinyagents) (`TurnSpec::run`). Context trimming is `MessageTrimMiddleware`, and cancellation is the tinyagents steering channel. Policy stop hooks (budget, thread-goal and iteration caps) use the upstream `tinyagents-hooks` `StopHookMiddleware` and pause the run on the first stop vote. The channel route forwards live `AgentProgress` like the chat route. The shared `TurnProgress` seam lives in `agent/session_host/tool_progress.rs`.
 
-Multi-agent execution uses TinyAgents' `parallel` module and the host
-`spawn_parallel_agents` adapter. Detached sub-agent tasks retain host policy,
-progress, and product projections; TinyAgents owns the generic task lifecycle.
+Concurrent work uses separate async sub-agent requests. Detached sub-agent
+tasks retain host policy, progress, and product projections; TinyAgents owns
+the generic task lifecycle.
 
 ## TinyAgents crate: features and compatibility
 
@@ -201,7 +201,7 @@ Measure this rather than reasoning about it. `CAPTURE_ALL=1 node scripts/debug/c
 Alongside identity/soul/profile/memory, the system prompt pulls in AGENTS.md instruction files, OpenHuman's analog of Claude Code's `CLAUDE.md` / Codex's `AGENTS.md`. Two layers are loaded once, at system-prompt build time (never re-read per turn, so the frozen-prefix / KV-cache contract holds):
 
 - Global, `<workspace_dir>/AGENTS.md`, the user's OpenHuman workspace (where `SOUL.md` / `USER.md` live). Applies to every run.
-- Project, `<action_dir>/AGENTS.md`, the folder the agent is operating in. For sub-agent runs with a git-worktree override (`SubagentRunOptions.worktree_action_dir`), that override dir is the project layer instead.
+- Project, `<action_dir>/AGENTS.md`, the folder the agent is operating in.
 
 The global layer renders first, the project layer second (project instructions layered after, taking precedence on conflict), under a `## Project instructions (AGENTS.md)` heading. When the two dirs resolve to the same path the file is loaded once (deduped). Missing / unreadable / empty files are silently skipped, and each layer is capped at `BOOTSTRAP_MAX_CHARS` (~20 000 chars) with a `[... truncated]` marker so a large file can't crowd the prompt.
 
@@ -559,7 +559,7 @@ New/extended socket events (bridged from `DomainEvent` onto `WebChannelEvent` by
 - `approval_decided` / `plan_review_decided`: bridged from `DomainEvent::ApprovalDecided` / `PlanReviewDecided`, which gained `thread_id`, `client_id`, `tool_call_id`, and `resolution` (`"expired"` on TTL/sweep, `"cancelled"` on a dropped decision channel, `None` for an ordinary user decision, carried on the wire as the existing `cancel_reason` field). Only surfaced when the original park had both `thread_id` and `client_id` (chat-routed).
 - `run_mode_changed`: `{ thread_id, client_id: "", message: "plan" | "build" }`, bridged from `DomainEvent::ThreadRunModeChanged`, published by `threads::run_mode::set_mode`.
 - `thread_todos_changed`, `queue_item_queued` / `queue_item_delivered` / `queue_item_removed`, `queue_item` carries `{ id, lane, text_preview }`.
-- Sub-agent correlation: `subagent_spawned`/`subagent_completed`/`subagent_failed`/`subagent_awaiting_user` carry `subagent.parent_call_id` (the spawning tool call's id: every worker of one `spawn_parallel_agents` call shares it); `subagent_completed` also carries `subagent.output` (capped final text). `tool_call.args`/`tool_result.args`+`elapsed_ms` now carry real arguments and timing instead of `null` (from tinyagents' `AgentEvent::ToolStarted.input`).
+- Sub-agent correlation: `subagent_spawned`/`subagent_completed`/`subagent_failed`/`subagent_awaiting_user` carry `subagent.parent_call_id` (the spawning tool call's id); `subagent_completed` also carries `subagent.output` (capped final text). `tool_call.args`/`tool_result.args`+`elapsed_ms` now carry real arguments and timing instead of `null` (from tinyagents' `AgentEvent::ToolStarted.input`).
 - Artifact events (`ArtifactPending`/`ArtifactReady`/`ArtifactFailed`) carry `tool_call_id` and `turn_request_id`, the latter filled from the originating turn's `ApprovalChatContext::request_id` so the frontend can bind an artifact card to the exact turn that produced it (`None` for CLI/cron/sub-agent producers with no chat context).
 
 New RPCs:
@@ -647,8 +647,7 @@ direct `tinyagents-orchestration::subagent` lifecycle. There is no
 | `delegation.rs`                                   | The durable `plan → execute ⇄ review → finalize` delegation graph (production worker wired in `orchestration::delegation`), checkpointed via TinyAgents' own `SqliteCheckpointer`.    |
 
 Orchestration in `crates/openhuman-core/src/agent/orchestration/` adapts
-detached sub-agent execution, worktree isolation, progress, and product
-projections. TinyAgents owns generic task lifecycle and parallel fanout.
+detached sub-agent execution, progress, and product projections. TinyAgents owns generic task lifecycle and parallel fanout.
 
 Deliberately kept off the crate's primitives (these are design decisions, not gaps):
 

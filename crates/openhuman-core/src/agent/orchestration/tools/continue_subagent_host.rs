@@ -417,9 +417,6 @@ impl ContinueSubagentTool {
         let workspace_descriptor = tool_context
             .and_then(|ctx| ctx.workspace().cloned())
             .or_else(|| run_context.workspace.clone());
-        let worktree_action_dir = workspace_descriptor
-            .as_ref()
-            .map(|descriptor| descriptor.root.clone());
         if let Some(descriptor) = workspace_descriptor.as_ref() {
             tracing::debug!(
                 task_id = %task_id,
@@ -442,7 +439,6 @@ impl ContinueSubagentTool {
             worker_thread_id: checkpoint.worker_thread_id.clone(),
             initial_history: None,
             checkpoint_dir: Some(checkpoint_dir.clone()),
-            worktree_action_dir,
             workspace_descriptor,
             run_queue: None,
             message_run_queue: None,
@@ -539,9 +535,6 @@ impl ContinueSubagentTool {
                                         // parent turn's ledger, so it stays silent: omission adds
                                         // nothing, which is the status quo. See the field's docs.
                                         usage: None,
-                                        worktree_path: None,
-                                        changed_files: Vec::new(),
-                                        dirty_status: None,
                                         stop: None,
                                     })
                                     .await;
@@ -584,9 +577,6 @@ impl ContinueSubagentTool {
                                         // parent turn's ledger, so it stays silent: omission adds
                                         // nothing, which is the status quo. See the field's docs.
                                         usage: None,
-                                        worktree_path: None,
-                                        changed_files: Vec::new(),
-                                        dirty_status: None,
                                         stop: incomplete_stop(
                                             reason,
                                             outcome.failure_cause.clone(),

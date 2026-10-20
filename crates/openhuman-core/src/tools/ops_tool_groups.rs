@@ -148,7 +148,6 @@ pub(crate) fn tool_group(name: &str) -> crate::core::all::DomainGroup {
                 | "wait_loop"
                 | "request_plan_review"
                 | "plan_exit"
-                | "spawn_parallel_agents"
         )
     {
         return DomainGroup::Agent;

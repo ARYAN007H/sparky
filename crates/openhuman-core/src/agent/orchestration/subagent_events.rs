@@ -4,8 +4,7 @@
 //! `SubagentFailed` / `SubagentAwaitingUser`) used to be hand-constructed and
 //! `publish_global`-ed inline across every turn/orchestration path
 //! (`tools/dispatch.rs`, `tools/spawn_subagent.rs`,
-//! `tools/spawn_async_subagent.rs`, `tools/continue_subagent.rs`,
-//! `spawn_parallel.rs`). That scattered
+//! `tools/spawn_async_subagent.rs`, and `tools/continue_subagent.rs`). That scattered
 //! the ordering/rate-limiting decision across many call sites.
 //!
 //! This module centralizes construction + publish so there is exactly one place

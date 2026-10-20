@@ -11,11 +11,9 @@ impl Tool for SpawnSubagentTool {
          immediately — pass `blocking: true` to run it inline and get the \
          sub-agent's final output back in this turn. To run several independent \
          workers at once (e.g. \"a separate worker for each X\", a council \
-         of opinions, or \"fan out over N items\"), use `spawn_parallel_agents` \
-         with one task per worker — a SINGLE call that launches them \
-         concurrently. Do NOT call this tool in a loop to fan out: repeated \
-         `spawn_subagent` calls each delegate a single task and never launch \
-         workers concurrently, which serializes the whole request. See the Delegation \
+         of opinions, or \"fan out over N items\"), issue separate async \
+         sub-agent requests and collect their results. \
+         See the Delegation \
          Guide in the system prompt for available agent_ids and when to \
          use each."
     }
@@ -285,9 +283,6 @@ impl SpawnSubagentTool {
         }
 
         let workspace_descriptor = tool_context.and_then(|ctx| ctx.workspace().cloned());
-        let worktree_action_dir = workspace_descriptor
-            .as_ref()
-            .map(|descriptor| descriptor.root.clone());
         if let Some(descriptor) = workspace_descriptor.as_ref() {
             tracing::debug!(
                 task_id = %task_id,
@@ -312,7 +307,6 @@ impl SpawnSubagentTool {
             worker_thread_id: worker_thread_id.clone(),
             initial_history: None,
             checkpoint_dir: None,
-            worktree_action_dir,
             workspace_descriptor,
             run_queue: None,
             message_run_queue: None,
@@ -391,9 +385,6 @@ impl SpawnSubagentTool {
                                         // ledger, so `chat_done` already carries its tokens AND its
                                         // cost. Populating here would double both. See the field's docs.
                                         usage: None,
-                                        worktree_path: None,
-                                        changed_files: Vec::new(),
-                                        dirty_status: None,
                                         stop: None,
                                     })
                                     .await;
@@ -471,9 +462,6 @@ impl SpawnSubagentTool {
                                         // ledger, so `chat_done` already carries its tokens AND its
                                         // cost. Populating here would double both. See the field's docs.
                                         usage: None,
-                                        worktree_path: None,
-                                        changed_files: Vec::new(),
-                                        dirty_status: None,
                                         stop: incomplete_stop(
                                             reason,
                                             outcome.failure_cause.clone(),

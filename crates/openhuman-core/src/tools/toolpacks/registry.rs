@@ -387,7 +387,7 @@ pub const PACKS: &[ToolPack] = &[
 /// because they look like an obvious 1.6k-token candidate.
 ///
 /// `steer_subagent`, `wait_subagent`, `close_subagent`, `list_subagents`,
-/// `continue_subagent`, `wait`, `wait_loop` and `spawn_parallel_agents` are
+/// `continue_subagent`, `wait`, and `wait_loop` are
 /// needed *reactively*, mid-turn — exactly when an async worker returns or
 /// pauses on `ask_user_clarification`. A load round-trip at that moment is the
 /// worst possible time to add one, and a `continue_subagent` the model cannot
@@ -403,7 +403,6 @@ pub(crate) const DELIBERATELY_UNPACKED_FLEET_TOOLS: &[&str] = &[
     "continue_subagent",
     "wait",
     "wait_loop",
-    "spawn_parallel_agents",
 ];
 
 /// The lookup surface over [`PACKS`] handed to the generic `use_skill` tool

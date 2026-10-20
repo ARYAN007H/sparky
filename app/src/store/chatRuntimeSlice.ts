@@ -69,23 +69,6 @@ export function isActiveTimelineStatus(status: string | undefined): boolean {
   return status === 'running' || status === 'awaiting_user';
 }
 
-/**
- * Every `subagent:*` timeline row spawned by one `spawn_parallel_agents` tool
- * call — the workers sharing `subagent.parentCallId === parentCallId` (see
- * {@link SubagentActivity.parentCallId}) — in the order they were issued
- * (`seq`). Used by `ParallelAgentsCard` (`features/conversations/aui/
- * ParallelAgentsCard.tsx`) to render the vendored `SubagentList` above the
- * per-child `TaskCard` rows for a `spawn_parallel_agents` call.
- */
-export function selectSubagentChildrenByParentCallId(
-  timeline: ToolTimelineEntry[],
-  parentCallId: string
-): ToolTimelineEntry[] {
-  return timeline
-    .filter(entry => entry.subagent?.parentCallId === parentCallId)
-    .sort((a, b) => a.seq - b.seq);
-}
-
 /** Live progress of the running turn, as the socket handlers maintain it. */
 export interface InferenceStatus {
   phase: 'thinking' | 'tool_use' | 'subagent';
@@ -203,25 +186,6 @@ export interface SubagentActivity {
    * tool sequence. Absent on legacy/test rows that predate streaming.
    */
   transcript?: SubagentTranscriptItem[];
-  /**
-   * Absolute path to this worker's isolated `git worktree` checkout, when it
-   * ran with `isolation = "worktree"` (#3376). `undefined` for non-isolated
-   * (read-only or shared-workspace) workers. Scaffold-only: the open/diff/
-   * remove action buttons that consume this land in a follow-up PR.
-   */
-  worktreePath?: string;
-  /**
-   * Files (relative to the worktree root) this worker changed, collected from
-   * `git status` after the run. Drives the future diff/overlap UI. Absent or
-   * empty for non-isolated workers and clean worktrees.
-   */
-  changedFiles?: string[];
-  /**
-   * `true` when the worker's worktree had uncommitted changes after the run.
-   * A dirty worktree must not be auto-removed — the cleanup UI will require an
-   * explicit user choice. `undefined` for non-isolated workers.
-   */
-  isDirty?: boolean;
 }
 
 /**
@@ -2171,9 +2135,6 @@ const chatRuntimeSlice = createSlice({
         outputChars?: number;
         /** The sub-agent's final assistant text; see {@link SubagentActivity.output}. */
         output?: string;
-        worktreePath?: string;
-        changedFiles?: string[];
-        isDirty?: boolean;
       }>
     ) => {
       const {
@@ -2185,9 +2146,6 @@ const chatRuntimeSlice = createSlice({
         elapsedMs,
         outputChars,
         output,
-        worktreePath,
-        changedFiles,
-        isDirty,
       } = action.payload;
       // Settle a still-in-flight row: `running`, or `awaiting_user` (a subagent
       // paused for input that then completes must not stay stuck at
@@ -2228,9 +2186,6 @@ const chatRuntimeSlice = createSlice({
         if (elapsedMs !== undefined) s.elapsedMs = elapsedMs;
         if (outputChars !== undefined) s.outputChars = outputChars;
         if (output !== undefined) s.output = output;
-        if (worktreePath !== undefined) s.worktreePath = worktreePath;
-        if (changedFiles !== undefined) s.changedFiles = changedFiles;
-        if (isDirty !== undefined) s.isDirty = isDirty;
       }
     },
     /**

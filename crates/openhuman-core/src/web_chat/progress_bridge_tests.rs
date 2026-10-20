@@ -156,36 +156,6 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
     assert_eq!(event.tool_call_id.as_deref(), Some("call-1"));
 }
 
-#[test]
-fn worktree_detail_collapses_empty_changed_files_to_none() {
-    // Non-isolated / clean worker: empty list → `None` so the renderer
-    // omits the "changed files" section instead of showing an empty one.
-    let d = subagent_worktree_detail(None, vec![], None);
-    assert_eq!(d.worktree_path, None);
-    assert_eq!(d.changed_files, None);
-    assert_eq!(d.dirty_status, None);
-}
-
-#[test]
-fn worktree_detail_forwards_isolated_worker_fields() {
-    // Isolated worker with uncommitted changes: fields pass through and a
-    // non-empty list is wrapped in `Some`.
-    let d = subagent_worktree_detail(
-        Some("/repo/.claude/worktrees/run-1".to_string()),
-        vec!["src/lib.rs".to_string(), "README.md".to_string()],
-        Some(true),
-    );
-    assert_eq!(
-        d.worktree_path.as_deref(),
-        Some("/repo/.claude/worktrees/run-1")
-    );
-    assert_eq!(
-        d.changed_files,
-        Some(vec!["src/lib.rs".to_string(), "README.md".to_string()])
-    );
-    assert_eq!(d.dirty_status, Some(true));
-}
-
 // ── #4270 inference heartbeat ────────────────────────────────────────────
 
 use crate::config::Config;

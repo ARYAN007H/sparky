@@ -418,7 +418,6 @@ fn all_tools_default_registry_contains_expected_baseline_surface() {
         "csv_export",
         "spawn_subagent",
         "spawn_async_subagent",
-        "spawn_parallel_agents",
         "ask_user_clarification",
         "read_workspace_state",
         "wait",
