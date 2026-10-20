@@ -9,6 +9,12 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
     for property in [
         "thread",
         "message",
+        "threadsList",
+        "threadMessages",
+        "threadDelete",
+        "purgeResult",
+        "threadSearchHit",
+        "threadSearch",
         "turnState",
         "agentRun",
         "runEvent",
