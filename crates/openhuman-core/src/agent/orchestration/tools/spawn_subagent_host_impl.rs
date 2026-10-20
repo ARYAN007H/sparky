@@ -106,6 +106,22 @@ impl SpawnSubagentTool {
                 prompt
             );
         }
+        prompt = match crate::attachments::delegation_prompt(
+            &dispatch,
+            &prompt,
+            &args,
+            workspace_descriptor.as_ref(),
+            run_context.origin.as_ref(),
+        )
+        .await
+        {
+            Ok(prompt) => prompt,
+            Err(error) => {
+                return Ok(ToolResult::error(format!(
+                    "image forwarding failed: {error}"
+                )));
+            }
+        };
         if definition.id == "vision_agent" {
             match crate::attachments::has_resolvable_image(
                 &dispatch,
