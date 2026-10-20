@@ -64,6 +64,28 @@ fn legacy_configuration_with_retired_sections_still_parses() {
 }
 
 #[test]
+fn stale_configured_agents_are_dropped_before_typed_decode() {
+    let legacy = config_from_toml_str(
+        r#"
+default_model = "preserved-model"
+
+[agents.research]
+model = "old/configured-model"
+system_prompt = "retired"
+"#,
+    )
+    .expect("legacy config with configured agents still loads");
+
+    assert_eq!(legacy.default_model.as_deref(), Some("preserved-model"));
+    let saved = toml::to_string(&legacy).expect("config serializes");
+    assert!(!saved.contains("[agents"), "stale table survived: {saved}");
+
+    let reloaded = config_from_toml_str(&saved).expect("migrated config reloads");
+    assert_eq!(reloaded.default_model.as_deref(), Some("preserved-model"));
+    assert_eq!(toml::to_string(&reloaded).unwrap(), saved);
+}
+
+#[test]
 fn a_syntax_error_reports_the_toml_location() {
     let err = config_from_toml_str("default_model = \n[broken").unwrap_err();
     assert!(err.to_string().contains("line"), "{err}");

@@ -4048,6 +4048,22 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
     rpc_join.abort();
 }
 
+#[tokio::test]
+async fn retired_agent_work_methods_are_unknown_over_http() {
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{rpc_addr}");
+
+    for (id, method) in [
+        (20_001, "openhuman.agent_work_list"),
+        (20_002, "openhuman.agent_work_control"),
+    ] {
+        let response = post_json_rpc(&rpc_base, id, method, json!({})).await;
+        assert_unknown_method(&response, method);
+    }
+
+    rpc_join.abort();
+}
+
 #[test]
 fn json_rpc_web_chat_routing_cases_use_expected_backend_models() {
     run_json_rpc_e2e_on_agent_stack(
