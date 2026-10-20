@@ -83,6 +83,106 @@ export type TranscriptItem =
       round: number;
       seq: number;
     };
+/**
+ * Provider-neutral ordered inbound content.
+ */
+export type ContentPart =
+  | {
+      kind: 'text';
+      /**
+       * Formatting dialect; formatting remains text, never HTML authority.
+       */
+      markdownDialect?: string | null;
+      text: string;
+    }
+  | {
+      altText: string | null;
+      caption: string | null;
+      kind: 'image';
+      media: MediaReference;
+    }
+  | {
+      caption: string | null;
+      durationMs: number | null;
+      kind: 'video';
+      media: MediaReference;
+      thumbnail: MediaReference | null;
+    }
+  | {
+      codec: string | null;
+      durationMs: number | null;
+      kind: 'audio';
+      media: MediaReference;
+      title: string | null;
+      transcript: string | null;
+    }
+  | {
+      caption: string | null;
+      fileName: string | null;
+      kind: 'file';
+      media: MediaReference;
+    }
+  | {
+      kind: 'voice_note';
+      voiceNote: VoiceNote;
+    }
+  | {
+      altText: string | null;
+      emoji: string | null;
+      kind: 'sticker';
+      media: MediaReference;
+      packId: string | null;
+      stickerId: string | null;
+    }
+  | {
+      accuracyMeters: number | null;
+      address: string | null;
+      kind: 'location';
+      label: string | null;
+      latitude: number;
+      liveUntilUnixMs: number | null;
+      longitude: number;
+    }
+  | {
+      displayName: string;
+      emails: ContactMethod[];
+      kind: 'contact';
+      organization: string | null;
+      phoneNumbers: ContactMethod[];
+    }
+  | {
+      kind: 'buttons';
+      rows: ButtonAction[][];
+    }
+  | {
+      closesAtUnixMs: number | null;
+      kind: 'poll';
+      multipleChoice: boolean;
+      options: string[];
+      providerPollId: string | null;
+      question: string;
+    }
+  | {
+      blocks: any;
+      kind: 'presentation';
+    }
+  | {
+      data: any;
+      kind: 'native';
+      provider: string;
+    };
+/**
+ * Origin of voice transcript enrichment.
+ */
+export type VoiceTranscriptSource = 'provider' | 'host_stt';
+/**
+ * Whether a voice transcript is still being produced or is final.
+ */
+export type VoiceTranscriptState = 'pending' | 'complete' | 'unavailable';
+/**
+ * Visual button emphasis; it does not change action authority.
+ */
+export type ButtonStyle = 'primary' | 'secondary' | 'danger';
 
 /**
  * Root schema whose properties provide the UI-facing thread record aliases.
@@ -96,6 +196,7 @@ export interface ThreadWireTypes {
   listTurnStates: ListTurnStatesResponse;
   message: ConversationMessageRecord;
   purgeResult: PurgeConversationThreadsResponse;
+  queuedChatAck: QueuedChatAck;
   runEvent: RunEvent;
   runEventList: RunEventListResponse;
   runTelemetry: RunTelemetry;
@@ -462,6 +563,12 @@ export interface ListTurnStatesResponse {
  * A single persisted conversation message.
  */
 export interface ConversationMessageRecord {
+  /**
+   * Opaque, persisted media references attached to this message.
+   * Only OpenHuman returns these. Callers submit refs in the chat request,
+   * and the trusted runner revalidates them against this exact user row.
+   */
+  attachments?: ContentPart[];
   content: string;
   createdAt: string;
   extraMetadata: {
@@ -472,12 +579,113 @@ export interface ConversationMessageRecord {
   type: string;
 }
 /**
+ * One inbound media reference, preserving provider attachment order.
+ */
+export interface MediaReference {
+  codec: string | null;
+  contentType: string | null;
+  durationMs: number | null;
+  fileName: string | null;
+  height: number | null;
+  /**
+   * Provider-neutral media kind.
+   */
+  kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
+  localCachePath: string | null;
+  /**
+   * Stable host-owned identifier for media stored outside the channel
+   * provider. It is safe to persist and does not imply a shared filesystem.
+   */
+  opaqueId?: string | null;
+  path: string | null;
+  platformMessageId: string | null;
+  sizeBytes: number | null;
+  transcribed: boolean;
+  url: string | null;
+  width: number | null;
+}
+/**
+ * Audio message metadata and optional transcript enrichment.
+ */
+export interface VoiceNote {
+  codec: string | null;
+  durationMs: number | null;
+  media: MediaReference1;
+  pushToTalk: boolean;
+  transcript: VoiceTranscript | null;
+  waveform: number[] | null;
+}
+/**
+ * One inbound media reference, preserving provider attachment order.
+ */
+export interface MediaReference1 {
+  codec: string | null;
+  contentType: string | null;
+  durationMs: number | null;
+  fileName: string | null;
+  height: number | null;
+  /**
+   * Provider-neutral media kind.
+   */
+  kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
+  localCachePath: string | null;
+  /**
+   * Stable host-owned identifier for media stored outside the channel
+   * provider. It is safe to persist and does not imply a shared filesystem.
+   */
+  opaqueId?: string | null;
+  path: string | null;
+  platformMessageId: string | null;
+  sizeBytes: number | null;
+  transcribed: boolean;
+  url: string | null;
+  width: number | null;
+}
+/**
+ * Transcript enrichment attached to a voice note without replacing its audio.
+ */
+export interface VoiceTranscript {
+  language: string | null;
+  source: VoiceTranscriptSource;
+  state: VoiceTranscriptState;
+  text: string;
+}
+/**
+ * One typed phone number or email address on a contact card.
+ */
+export interface ContactMethod {
+  label: string | null;
+  value: string;
+}
+/**
+ * One provider-neutral action button in an ordered content row.
+ */
+export interface ButtonAction {
+  disabled: boolean;
+  id: string;
+  label: string;
+  style: ButtonStyle | null;
+}
+/**
  * Response payload for purging all workspace-backed conversations.
  */
 export interface PurgeConversationThreadsResponse {
   agentMessagesDeleted: number;
   agentThreadsDeleted: number;
   messagesDeleted: number;
+}
+/**
+ * Typed acknowledgement returned when a web chat message enters the run queue.
+ * Attachment values are sanitized opaque references minted by the core.
+ */
+export interface QueuedChatAck {
+  client_id: string;
+  queue_depth: number;
+  queue_mode: string;
+  queued: boolean;
+  queued_attachments: ContentPart[];
+  request_id: string;
+  thread_id: string;
 }
 /**
  * One entry in a run's append-only event log.
