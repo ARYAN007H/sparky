@@ -375,6 +375,7 @@ async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files(
 
     let (dir, mut config) = workspace();
     config.components.tinyflows = true;
+    let legacy_files_before = tree(dir.path());
     let _restore = FallbackStorageRestore {
         previous: crate::storage::installed(),
         workspace: config.workspace_dir.clone(),
@@ -417,7 +418,7 @@ async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files(
         flow_import_marker_done(&backend, &config).is_ok_and(|done| !done),
         "the unbooted local fallback must not run the workspace-file importer"
     );
-    assert!(dir.path().join("flows/flows.db").is_file());
+    assert_eq!(tree(dir.path()), legacy_files_before);
     crate::storage::local::forget(&config.workspace_dir);
 }
 

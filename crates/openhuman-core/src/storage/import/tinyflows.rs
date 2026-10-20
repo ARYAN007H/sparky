@@ -20,7 +20,6 @@
 //! - an embedded agent's `agents/<id>/cron/jobs.db` goes to that agent's scope
 //!   ([`crate::storage::scope_for_agent`]), the one its cron calls resolve to.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 #[cfg(feature = "flows")]
