@@ -38,6 +38,7 @@ pub struct Production {
     files: FileRoots,
     chat: Option<ApprovalChatContext>,
     ctx: crate::core::runtime::DispatchCtx,
+    file_store: Option<std::sync::Arc<dyn tiny_artifacts::FileStore>>,
     id: String,
     path: PathBuf,
     /// Whether this adds a version to an artifact that already has one: its
@@ -119,13 +120,21 @@ impl Production {
         )
         .await?;
 
-        let artifacts = artifacts_service(workspace_dir, files.clone(), None, chat, ctx);
+        let (artifacts, file_store) =
+            super::tiny_store::artifacts_service_with_file_store(
+                workspace_dir,
+                files.clone(),
+                None,
+                chat,
+                ctx,
+            );
         let mut production = Self {
             artifacts,
             workspace_dir: workspace_dir.to_path_buf(),
             files,
             chat: chat.cloned(),
             ctx: ctx.clone(),
+            file_store,
             id: meta.id.clone(),
             path,
             revision: false,
@@ -267,7 +276,7 @@ impl Production {
         let bridge = super::tiny_store::LegacyUiBridge::new(
             &self.workspace_dir,
             self.files.clone(),
-            super::tiny_store::file_store_for(&self.workspace_dir, &self.ctx),
+            self.file_store.clone(),
             self.chat.as_ref(),
         );
         if let Err(err) = bridge.show_newest(&record).await {
