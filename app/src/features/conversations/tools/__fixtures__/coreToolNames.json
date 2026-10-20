@@ -148,7 +148,6 @@
   "skill_runtime_resolve_runtimes",
   "skill_search",
   "spawn_async_subagent",
-  "spawn_parallel_agents",
   "spawn_subagent",
   "steer_subagent",
   "suggest_workflows",

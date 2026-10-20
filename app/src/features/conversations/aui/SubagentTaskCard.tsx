@@ -14,7 +14,7 @@
  * Not the vendored `elements/task-card.aui.tsx`'s own `TaskCard` wrapper:
  * that one derives its `actions` purely from `part.approval`/`part.interrupt`,
  * which has no slot for the two OpenHuman-specific actions a delegation
- * needs — the awaiting-user reply box and the worktree open/diff/remove row
+ * needs — the awaiting-user reply box
  * — so this adapter is built directly from the raw `TaskCard`
  * (`elements/task-card.tsx`) + `utils/task.ts` pieces instead, with those
  * actions supplied explicitly.

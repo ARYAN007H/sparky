@@ -108,7 +108,6 @@ export const TOOL_PHRASES = {
 
   // ── Agents and delegation ──────────────────────────────────────────────
   delegateTask: { active: 'Delegating task', done: 'Delegated task' },
-  runAgentsInParallel: { active: 'Running agents in parallel', done: 'Ran agents in parallel' },
   messageAgent: { active: 'Messaging agent', done: 'Messaged agent' },
   waitForAgent: { active: 'Waiting for agent', done: 'Waited for agent' },
   wait: { active: 'Waiting', done: 'Waited' },

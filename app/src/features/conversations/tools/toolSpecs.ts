@@ -90,7 +90,6 @@ import {
   TextSearchIcon,
   TrendingUpIcon,
   UserRoundIcon,
-  UsersIcon,
   VideoIcon,
   WalletIcon,
   WorkflowIcon,
