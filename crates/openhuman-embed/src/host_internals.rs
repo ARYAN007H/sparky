@@ -135,8 +135,9 @@ pub mod config {
             pub use openhuman_core::config::schema::cloud_providers::{
                 builtin_cloud_provider, endpoint_host, generate_provider_id,
                 host_is_builtin_cloud_provider, register_hosted_cloud_provider_policy,
-                register_hosted_cloud_preset, AuthStyle, BuiltinCloudProvider, CloudProviderCreds,
-                HostedCloudProviderClassifier,
+                register_hosted_cloud_provider_policy_in, register_hosted_cloud_preset,
+                register_hosted_cloud_preset_in, AuthStyle, BuiltinCloudProvider,
+                CloudProviderCreds, HostedCloudProviderClassifier,
             };
         }
     }
