@@ -578,14 +578,14 @@ fn agent_cron_dirs(workspace: &Path) -> Vec<(String, PathBuf)> {
 pub fn run_with(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report> {
     let backend_for_migration = Arc::clone(backend);
     let config_for_migration = config.clone();
-    let (mut reports, local_catalog_ready) = match crate::storage::block_on_anyhow(async move {
+    let (mut reports, _local_catalog_ready) = match crate::storage::block_on_anyhow(async move {
         Ok(migrate_owner_stores(backend_for_migration, config_for_migration).await)
     }) {
         Ok(result) => result,
         Err(error) => (vec![finish(FLOWS_DOMAIN, Err(error))], false),
     };
     #[cfg(feature = "flows")]
-    if local_catalog_ready {
+    if _local_catalog_ready {
         reports.push(finish(
             FLOWS_DOMAIN,
             import_flows_after_migration(backend, &crate::storage::tenant_scope(None), config),
