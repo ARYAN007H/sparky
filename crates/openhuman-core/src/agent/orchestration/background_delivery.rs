@@ -161,7 +161,7 @@ fn schedule_delivery_inner(
                    // delayed task must run under the profile that scheduled it.
     ctx.clone().spawn(async move {
         let outcome = try_deliver(ctx.clone(), thread_id.clone(), fence.clone(), wait_idle).await;
-        if outcome == DeliveryOutcome::Busy {
+        if outcome == DeliveryOutcome::ParentBusy {
             // Still running past the ceiling: leave the record pending and
             // wait again rather than overlap the user's turn.
             log::debug!(
@@ -299,10 +299,15 @@ async fn try_deliver(
     let turn_thread_id = thread_id.clone();
     let give_up_thread_id = thread_id.clone();
     let give_up_log_thread_id = thread_id.clone();
-    let scoped_thread = crate::core::runtime::tenant::profile_key_in(
-        &super::busy_guard::caller(&busy_ctx),
-        &thread_id,
-    );
+    let owner = match busy_ctx.tenant() {
+        Ok(tenant) => tenant.profile_only(),
+        Err(error) => {
+            log::debug!("[background_delivery] no tenant for completion delivery: {error}");
+            return DeliveryOutcome::Fenced;
+        }
+    };
+    let tenant_key = crate::core::runtime::tenant::profile_key_in(&owner, "");
+    let scoped_thread = crate::core::runtime::tenant::profile_key_in(&owner, &thread_id);
     let deliver = move |records: &[CompletionRecord]| {
         let notice = format_router.formatter().format_batch(records);
         let ctx = ctx.clone();
@@ -342,6 +347,7 @@ async fn try_deliver(
     let target = DeliveryTarget {
         router: &router,
         parent_key: &thread_id,
+        tenant_key: &tenant_key,
         thread_key: &scoped_thread,
     };
     let outcome = if recovering {
@@ -476,8 +482,15 @@ where
     // A busy thread defers *before* the claim: the claim counts a delivery
     // attempt, and a user who keeps typing must not burn a record's budget.
     if let Some(batch) = claim_ready(ctx, &router, &thread_id) {
-        let task_ids: Vec<String> = batch.iter().map(|c| c.task_id.clone()).collect();
-        slot.hold(&task_ids);
+        let receipts: Vec<_> = batch.iter().filter_map(CompletionRecord::receipt).collect();
+        if receipts.len() != batch.len() {
+            log::error!(
+                "[background_delivery] claimed completion batch contains a record without a receipt; refusing delivery thread_id={thread_id}"
+            );
+            router.release(&receipts);
+            return None;
+        }
+        slot.hold(&receipts);
         // A user turn can start between the idle check inside `claim_ready` and
         // the awaited turn below; re-check so a system turn is never streamed
         // concurrently with it. Dropping the slot releases the lease (the claim
@@ -496,14 +509,14 @@ where
         );
         match deliver(thread_id.clone(), notice).await {
             Ok(_) => {
-                if let Err(error) = router.mark_delivered(&task_ids) {
+                if let Err(error) = router.mark_delivered(&receipts) {
                     // The reply is already in the thread; the record stays
                     // pending, so a later drain or a restart delivers it again
                     // (at-least-once).
                     log::error!(
                         "[background_delivery] delivered but could not settle records \
                          thread_id={thread_id} tasks=[{}] error={error}",
-                        task_ids.join(",")
+                        receipts.iter().map(|receipt| receipt.task_id.as_str()).collect::<Vec<_>>().join(",")
                     );
                 }
             }
@@ -516,7 +529,7 @@ where
                 // into the thread rather than discarded. A checkout failure
                 // publishes no `AgentError`, so it cannot drive the self-retrigger
                 // loop on its own; it only ever spends the budget.
-                match router.mark_failed(&task_ids) {
+                match router.mark_failed(&receipts) {
                     Ok(gave_up) if !gave_up.is_empty() => {
                         // Stop retrying, but do NOT drop: the results exist and
                         // the user is owed them. Hand them to the give-up sink,
@@ -543,7 +556,7 @@ where
                         log::warn!(
                             "[background_delivery] delivery turn failed thread_id={thread_id} \
                              tasks=[{}] max_attempts={} error={e}",
-                            task_ids.join(","),
+                            receipts.iter().map(|receipt| receipt.task_id.as_str()).collect::<Vec<_>>().join(","),
                             router.max_attempts()
                         );
                         let attempts = router
@@ -559,7 +572,7 @@ where
                             "[background_delivery] could not record the failed delivery \
                              thread_id={thread_id} error={error}"
                         );
-                        router.release(&task_ids);
+                        router.release(&receipts);
                     }
                 }
                 // A batch can mix records at different attempt counts: some gave

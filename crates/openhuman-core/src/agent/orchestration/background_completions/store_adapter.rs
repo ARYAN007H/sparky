@@ -32,13 +32,16 @@ pub(in crate::agent::orchestration) fn open_driver_store(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
 ) -> anyhow::Result<Arc<dyn CompletionStore>> {
-    with_storage_context(ctx, || {
-        let opened = crate::storage::local::open("background_completions", workspace_dir)?;
-        let scoped = opened.scoped()?;
-        let store = DriverCompletionStore::new(Arc::clone(scoped.documents()))
-            .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
-        Ok(Arc::new(store) as Arc<dyn CompletionStore>)
-    })
+    let tenant = ctx
+        .tenant()
+        .map_err(|error| anyhow::anyhow!("resolve the completion-store tenant: {error}"))?;
+    let backend = crate::storage::local::backend_for(workspace_dir)?;
+    let store = DriverCompletionStore::new(
+        backend,
+        crate::storage::sessions::session_scope(&crate::core::runtime::session_key(&tenant)),
+    )
+    .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
+    Ok(Arc::new(store) as Arc<dyn CompletionStore>)
 }
 
 /// Scope storage access to the explicit context when one exists. A genuinely

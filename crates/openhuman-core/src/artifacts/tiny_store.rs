@@ -29,8 +29,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tiny_artifacts::{
-    ArtifactEvent, ArtifactEventKind, ArtifactKind, ArtifactObserver, ArtifactRecord, Artifacts,
-    Author, Content, FileStore,
+    ArtifactEvent, ArtifactEventKind, ArtifactKind, ArtifactObserver, ArtifactRecord, ArtifactStore,
+    Artifacts, Author, Content, FileRef, FileStore,
 };
 
 use super::files::FileRoots;
@@ -89,6 +89,74 @@ pub(crate) fn legacy_kind_for_extension(ext: &str) -> LegacyArtifactKind {
 /// [`legacy_versioned_dir`] are imported once).
 pub fn versioned_store(workspace_dir: &Path) -> super::version_documents::DocumentArtifactStore {
     super::version_documents::DocumentArtifactStore::new(workspace_dir)
+}
+
+/// Imports version records written by earlier OpenHuman builds, whose file
+/// references held host paths, through the owner's guarded legacy importer.
+struct LegacyFileImportStore {
+    records: Arc<dyn ArtifactStore>,
+    files: Arc<dyn FileStore>,
+    roots: tiny_artifacts::FileRoots,
+}
+
+impl LegacyFileImportStore {
+    async fn import_record(&self, mut record: ArtifactRecord) -> anyhow::Result<ArtifactRecord> {
+        let mut changed = false;
+        for version in &mut record.versions {
+            let Some(legacy) = version.file.clone() else {
+                continue;
+            };
+            if !Path::new(&legacy.key).is_absolute() {
+                continue;
+            }
+            let ext = Path::new(&legacy.key)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("bin");
+            let key = format!("artifacts/files/{}/v{}.{}", record.id, version.version, ext);
+            let imported = tiny_artifacts::import_legacy_file(
+                self.files.as_ref(),
+                &self.roots,
+                &legacy,
+                &key,
+            )
+            .await?;
+            version.body = imported.key.clone();
+            version.file = Some(imported);
+            changed = true;
+        }
+        if changed {
+            self.records.upsert(&record).await?;
+        }
+        Ok(record)
+    }
+}
+
+#[async_trait]
+impl ArtifactStore for LegacyFileImportStore {
+    async fn list(&self) -> anyhow::Result<Vec<ArtifactRecord>> {
+        let mut imported = Vec::new();
+        for record in self.records.list().await? {
+            imported.push(self.import_record(record).await?);
+        }
+        Ok(imported)
+    }
+
+    async fn get(&self, id: &str) -> anyhow::Result<Option<ArtifactRecord>> {
+        self.records
+            .get(id)
+            .await?
+            .map(|record| self.import_record(record))
+            .transpose()
+    }
+
+    async fn upsert(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
+        self.records.upsert(record).await
+    }
+
+    async fn delete(&self, id: &str) -> anyhow::Result<bool> {
+        self.records.delete(id).await
+    }
 }
 
 /// Where an earlier build kept versioned records, one `<id>.json` each.
@@ -320,7 +388,15 @@ pub fn artifacts_service(
 ) -> Artifacts {
     let roots = file_roots(workspace_dir, &files, action_dir);
     let file_store = file_store_for(workspace_dir, ctx);
-    let mut artifacts = Artifacts::new(Arc::new(versioned_store(workspace_dir)))
+    let mut records: Arc<dyn ArtifactStore> = Arc::new(versioned_store(workspace_dir));
+    if let Some(store) = file_store.as_ref() {
+        records = Arc::new(LegacyFileImportStore {
+            records,
+            files: store.clone(),
+            roots: guarded_roots(roots.clone()),
+        });
+    }
+    let mut artifacts = Artifacts::new(records)
         .with_observer(Arc::new(LegacyUiBridge::new(
             workspace_dir,
             files,
