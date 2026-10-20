@@ -68,7 +68,7 @@ describe('queueSlice — core run-queue items', () => {
     expect(state.itemsByThread.t1).toBeUndefined();
   });
 
-  it('keeps pending follow-ups when an item is delivered (they persist on turn end)', () => {
+  it('keeps pending follow-ups after the core delivers their queue item', () => {
     let state = reducer(
       undefined,
       pendingFollowupAdded({ threadId: 't1', message: message('m1', 'hi'), text: 'hi' })
