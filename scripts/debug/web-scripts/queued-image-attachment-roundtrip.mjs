@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const FIRST_REPLY = "The first turn is complete.";
+const UI_QUEUED_PROMPT = "Queue this follow-up through the composer.";
 const QUEUED_PROMPT = "Describe this queued image.";
 const QUEUED_REPLY = "The queued image is attached.";
 const FILE_NAME = "queued-roundtrip.png";
@@ -170,12 +171,60 @@ export default async function queuedImageAttachmentRoundtrip({
   );
 
   // The queued turn will use this fast script; the already-running request has
-  // retained its delayed script. The normal composer disables a second send
-  // while a turn runs, so exercise the same public RPC directly here.
+  // retained its delayed script. Exercise the actual assistant-ui queue send
+  // control and ACK-to-Redux consumer first. The image follow-up below uses the
+  // same public RPC directly because attachment picking is disabled mid-turn.
   mock.set("llmStreamScript", [
     { text: QUEUED_REPLY },
     { finish: "stop" },
   ]);
+  await composer.fill(UI_QUEUED_PROMPT);
+  await page.getByTestId("queue-message-button").click();
+  const uiQueuedCall = await waitUntil(
+    () =>
+      rpcResponses.find(
+        (call) =>
+          call.method === "openhuman.channel_web_chat" &&
+          call.params?.message === UI_QUEUED_PROMPT,
+      ),
+    "composer follow-up response",
+  );
+  const uiQueueAck = uiQueuedCall.result;
+  if (
+    uiQueueAck?.queued !== true ||
+    typeof uiQueueAck.request_id !== "string" ||
+    uiQueueAck.queued_attachments?.length !== 0
+  ) {
+    throw new Error(
+      `composer follow-up did not produce a valid queued ACK: ${JSON.stringify(uiQueuedCall)}`,
+    );
+  }
+  const uiPending = await page.waitForFunction(
+    ({ id, requestId }) =>
+      window.__OPENHUMAN_STORE__?.getState?.().queue?.pendingFollowupsByThread?.[
+        id
+      ]?.find((entry) => entry.requestId === requestId),
+    { id: threadId, requestId: uiQueueAck.request_id },
+    { timeout: 10_000 },
+  );
+  const uiPendingValue = await uiPending.jsonValue();
+  if (
+    uiPendingValue?.message?.content !== UI_QUEUED_PROMPT ||
+    uiPendingValue?.attachments?.length !== 0
+  ) {
+    throw new Error(
+      `composer ACK was not consumed into its matching pending UI entry: ${JSON.stringify(uiPendingValue)}`,
+    );
+  }
+  const uiQueuedRequest = rpcCalls.find(
+    (call) =>
+      call.method === "openhuman.channel_web_chat" &&
+      call.params?.message === UI_QUEUED_PROMPT,
+  );
+  if (uiQueuedRequest?.params?.queue_mode !== "followup") {
+    throw new Error("composer queue control did not send queue_mode=followup");
+  }
+
   const firstRequest = rpcCalls.find(
     (call) =>
       call.method === "openhuman.channel_web_chat" &&
@@ -285,7 +334,12 @@ export default async function queuedImageAttachmentRoundtrip({
     },
     { url: rpcUrl, token: authorization, id: threadId },
   );
-  if (earlyRows.some((row) => row.content === QUEUED_PROMPT)) {
+  if (
+    earlyRows.some(
+      (row) =>
+        row.content === QUEUED_PROMPT || row.content === UI_QUEUED_PROMPT,
+    )
+  ) {
     throw new Error("queued image row was persisted before the active assistant turn finished");
   }
   const earlyUiRows =
@@ -296,7 +350,12 @@ export default async function queuedImageAttachmentRoundtrip({
         ] ?? [],
       threadId,
     )) ?? [];
-  if (earlyUiRows.some((row) => row.content === QUEUED_PROMPT)) {
+  if (
+    earlyUiRows.some(
+      (row) =>
+        row.content === QUEUED_PROMPT || row.content === UI_QUEUED_PROMPT,
+    )
+  ) {
     throw new Error("queued image appeared as a persisted transcript row before flush");
   }
   const stillActive = await page.evaluate(
@@ -311,7 +370,7 @@ export default async function queuedImageAttachmentRoundtrip({
   if (await page.getByText(FIRST_REPLY, { exact: false }).isVisible().catch(() => false)) {
     throw new Error("held active turn completed before the queued-row timing assertion");
   }
-  log("queued image ACK retained only an opaque ref; no transcript row existed before the active turn completed");
+  log("composer ACK reached the matching pending UI entry; queued RPC image ACK retained an opaque ref; neither had a transcript row before the active turn completed");
 
   await page.getByText(FIRST_REPLY, { exact: false }).waitFor({ timeout: 60_000 });
   await page.getByText(QUEUED_REPLY, { exact: false }).waitFor({ timeout: 90_000 });
