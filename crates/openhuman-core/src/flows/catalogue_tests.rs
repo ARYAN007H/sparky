@@ -1,7 +1,7 @@
 //! Tests for the flow → catalogue-entry mapping.
 
 use super::*;
-use tinyflows::model::{Node, NodeKind, WorkflowGraph};
+use tinyflows::model::{Node, NodeKind};
 use tinyflows_bus::catalog::Workflow as Flow;
 
 fn node(id: &str, kind: NodeKind, config: serde_json::Value) -> Node {
