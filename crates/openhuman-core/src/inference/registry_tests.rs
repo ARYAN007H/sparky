@@ -225,6 +225,10 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
     use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
     let seen = Arc::new(Mutex::new(String::new()));
+    crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == EPHEMERAL_ROUTE_SLUG),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
     let sink = Arc::clone(&seen);
     register_catalog(
         PROVIDER_OPENHUMAN,

@@ -11,6 +11,24 @@ fn response(status: StatusCode, body: &str) -> reqwest::Response {
     )
 }
 
+const FIXTURE_BACKEND: &str = "fixture-managed-provider";
+
+fn install_fixture_backend_classifier() {
+    use crate::inference::registry::{
+        register_backend_error_classifier, BackendErrorClassification,
+    };
+    register_backend_error_classifier(std::sync::Arc::new(|provider, _message| {
+        BackendErrorClassification {
+            provider_owned: provider == Some(FIXTURE_BACKEND),
+            backend_owned: false,
+            reportable: false,
+            token: None,
+            kind: None,
+            malformed_bad_request: false,
+        }
+    }));
+}
+
 /// Drain the shared bus until `pick` matches an event or the queue is empty.
 fn drain_until<T>(
     rx: &mut tinybus::EventReceiver<DomainEvent>,
@@ -82,10 +100,11 @@ async fn api_error_keeps_raw_message_for_unclassified_status() {
 
 #[tokio::test]
 async fn backend_401_publishes_session_expired_through_reporter() {
+    install_fixture_backend_classifier();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
     let marker = "REPORTER_MARKER_SESSION";
-    let _ = api_error("OpenHuman", response(StatusCode::UNAUTHORIZED, marker)).await;
+    let _ = api_error(FIXTURE_BACKEND, response(StatusCode::UNAUTHORIZED, marker)).await;
     let seen = drain_until(&mut rx, |e| match e {
         DomainEvent::SessionExpired { reason, .. } if reason.contains(marker) => Some(()),
         _ => None,
@@ -121,10 +140,11 @@ async fn byo_401_publishes_api_key_rejected_not_session_expired() {
 
 #[tokio::test]
 async fn backend_provider_does_not_get_byo_key_rejection() {
+    install_fixture_backend_classifier();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
     let _ = api_error(
-        "OpenHuman",
+        FIXTURE_BACKEND,
         response(
             StatusCode::UNAUTHORIZED,
             r#"{"error":{"type":"authentication_error"}}"#,
@@ -132,7 +152,7 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
     )
     .await;
     let rejected = drain_until(&mut rx, |e| match e {
-        DomainEvent::ProviderApiKeyRejected { provider, .. } if provider == "OpenHuman" => Some(()),
+        DomainEvent::ProviderApiKeyRejected { provider, .. } if provider == FIXTURE_BACKEND => Some(()),
         _ => None,
     });
     assert!(
@@ -146,7 +166,8 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
 #[test]
 fn is_backend_auth_failure_only_matches_openhuman_backend_401_403() {
     use reqwest::StatusCode;
-    let backend = "OpenHuman";
+    install_fixture_backend_classifier();
+    let backend = FIXTURE_BACKEND;
 
     assert!(is_backend_auth_failure(backend, StatusCode::UNAUTHORIZED));
     assert!(is_backend_auth_failure(backend, StatusCode::FORBIDDEN));

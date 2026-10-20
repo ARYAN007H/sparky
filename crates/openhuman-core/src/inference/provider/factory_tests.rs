@@ -4,6 +4,86 @@ use crate::config::Config;
 use crate::security::credentials::AuthService;
 use tempfile::TempDir;
 
+#[cfg(test)]
+struct ManagedRouteFixtureModel;
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl ChatModel<()> for ManagedRouteFixtureModel {
+    async fn invoke(
+        &self,
+        _state: &(),
+        _request: tinyinference_llm::model::ModelRequest,
+    ) -> tinyinference_llm::Result<tinyinference_llm::model::ModelResponse> {
+        Ok(tinyinference_llm::model::ModelResponse::assistant("fixture"))
+    }
+}
+
+#[cfg(test)]
+fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
+    use crate::config::schema::cloud_providers::AuthStyle;
+    use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
+    use std::sync::Mutex;
+
+    let native_modes = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&native_modes);
+    crate::inference::registry::register_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        ChatModelEntry {
+            build: Arc::new(move |request| {
+                seen.lock().unwrap().push(request.native_tool_calling);
+                Ok((
+                    Arc::new(ManagedRouteFixtureModel),
+                    request
+                        .model_override
+                        .or(request.default_model)
+                        .unwrap_or("fixture/managed-default")
+                        .to_string(),
+                ))
+            }),
+            probe: None,
+            models: Some(ProviderModelHooks {
+                default_model: Arc::new(|| Some("fixture/managed-default".into())),
+                role_for_model: Arc::new(|model| {
+                    (model == "hint:reasoning").then(|| "reasoning".into())
+                }),
+                is_alias: Arc::new(|model| model == "hint:reasoning"),
+                is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+                supports_vision: Arc::new(|_| false),
+                resolve_model: Arc::new(|_, config, model| match model {
+                    Some("hint:reasoning") => Some("fixture/managed-default".into()),
+                    Some(model) if !model.starts_with("hint:") => Some(model.into()),
+                    Some(_) => None,
+                    None => config
+                        .default_model
+                        .clone()
+                        .or_else(|| Some("fixture/managed-default".into())),
+                }),
+                context_window: Arc::new(|_| None),
+                default_pricing: Arc::new(|| None),
+                without_reasoning: Arc::new(|request| request),
+            }),
+        },
+    );
+    crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == "fixture-managed"),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
+    native_modes
+}
+
+#[cfg(test)]
+fn fixture_managed_entry(id: &str) -> CloudProviderCreds {
+    CloudProviderCreds {
+        id: id.to_string(),
+        slug: "fixture-managed".to_string(),
+        label: "Managed fixture".to_string(),
+        endpoint: "https://fixture.managed.test/v1".to_string(),
+        auth_style: AuthStyle::OpenhumanJwt,
+        default_model: Some("fixture/managed-default".into()),
+    }
+}
+
 use crate::inference::provider::factory::access_gates::host_requires_session;
 fn create_test_chat_model_from_string(
     role: &str,

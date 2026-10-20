@@ -108,22 +108,26 @@ async fn unsupported_scheme_endpoint_still_surfaces_an_error() {
     assert!(result.is_err(), "ftp:// must not read as an empty catalog");
 }
 
-/// With no catalog provider registered, the managed provider (by id, and by an
-/// `OpenhumanJwt` entry) lists an empty catalog rather than failing.
+/// A host-owned provider with no catalog may return an empty catalog. Passive
+/// legacy auth classification is installed explicitly to exercise that path.
 #[tokio::test]
 async fn unregistered_managed_catalog_lists_no_models() {
     use crate::config::schema::cloud_providers::AuthStyle;
+    use std::sync::Arc;
+
+    crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == "fixture-managed"),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = workspace_with_provider(
         &tmp,
-        "custom-managed",
+        "fixture-managed",
         "https://managed.example/v1",
         AuthStyle::OpenhumanJwt,
     );
-    for provider in ["openhuman", "custom-managed"] {
-        let outcome = super::catalog_listing::list_configured_models_from_config(provider, &config)
-            .await
-            .expect("an unregistered managed catalog is empty, not an error");
-        assert_eq!(outcome.value["models"], serde_json::json!([]), "{provider}");
-    }
+    let outcome = super::catalog_listing::list_configured_models_from_config("fixture-managed", &config)
+        .await
+        .expect("an unregistered host-owned catalog is empty, not an error");
+    assert_eq!(outcome.value["models"], serde_json::json!([]));
 }
