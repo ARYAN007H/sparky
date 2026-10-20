@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tinyinference_llm::providers::tinyhumans::TinyHumansModel;
+use tinyinference_llm::providers::tinyhumans::{TinyHumansFailurePoint, TinyHumansModel};
 
 use super::managed_session::{publish_managed_auth_failure, resolve_session_bearer};
 use crate::backend::url::effective_api_url;
@@ -90,7 +90,8 @@ pub(super) fn build_chat_model(
     .with_cache_namespace("openhuman")
     .with_native_tool_calling(native_tool_calling)
     .with_thread_id(thread_id)
-    .with_http_client(managed_inference_http_client());
+    .with_http_client(managed_inference_http_client())
+    .with_error_observer(log_managed_error);
 
     if observe_auth_failures {
         managed = managed.with_managed_auth_failure_handler(|error, context| {
@@ -98,6 +99,31 @@ pub(super) fn build_chat_model(
         });
     }
     Ok(managed)
+}
+
+fn log_managed_error(error: &tinyinference_llm::Error, point: TinyHumansFailurePoint) {
+    let operation = match point {
+        TinyHumansFailurePoint::Invoke => "invoke",
+        TinyHumansFailurePoint::StreamOpen => "stream",
+        TinyHumansFailurePoint::StreamItem => "stream (in-band)",
+        TinyHumansFailurePoint::Readiness => return,
+    };
+    match error {
+        tinyinference_llm::Error::Provider(provider) => {
+            log::warn!(
+                "[providers][openhuman-backend] managed {operation} failed: status={:?} code={:?} provider={} retryable={} detail={}",
+                provider.status,
+                provider.code,
+                provider.provider,
+                provider.retryable,
+                tinyinference_core::sanitize::sanitize_api_error(&provider.message),
+            );
+        }
+        other => log::warn!(
+            "[providers][openhuman-backend] managed {operation} failed (non-provider error): {}",
+            tinyinference_core::sanitize::sanitize_api_error(&other.to_string()),
+        ),
+    }
 }
 
 #[cfg(test)]
