@@ -216,7 +216,7 @@ test('Cargo tree parsing preserves package versions, path identity, and dedup ed
   assert.equal(bus.source, null);
   assert.equal(bus.manifest_path, `${localBus}/Cargo.toml`);
   assert.equal(m.packages.filter(pkg => pkg.name === 'tinyjuice').length, 2);
-  assert.equal(m.resolve.nodes.find(node => node.id.startsWith('tree:2:wrapper v1.0.0')).deps.length, 1);
+  assert.equal(m.resolve.nodes.find(node => node.id.startsWith('tree:2:wrapper v1.0.0')).deps.length, 3);
   const pinned = {
     ...strict,
     contractManifests: { 'tinyjuice-bus': `${localBus}/Cargo.toml` },
@@ -308,6 +308,7 @@ test('host boundary audit ignores writer features unified only by unrelated work
       if (cargoArgs[0] === 'tree') {
         const packageName = cargoArgs[cargoArgs.indexOf('-p') + 1];
         const links = packageName === 'openhuman-cli' && cargoArgs.includes('--all-features');
+        const tinyflowsBus = resolve(harnessRoot, 'vendor/tinyflows/crates/tinyflows-bus');
         return [
           `0${packageName} v0.0.0`,
           ...(links ? [
@@ -316,7 +317,7 @@ test('host boundary audit ignores writer features unified only by unrelated work
             '3tinydocs v0.0.0',
           ] : packageName === 'openhuman' ? [
             '1tinyflows-import v0.1.0',
-            '2tinyflows-bus v0.1.0',
+            `2tinyflows-bus v0.1.0 (${tinyflowsBus})`,
           ] : []),
         ].join('\n');
       }
