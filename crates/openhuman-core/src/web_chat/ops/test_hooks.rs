@@ -36,6 +36,20 @@ pub struct TestRunChatTaskBlock {
 pub(crate) static TEST_RUN_CHAT_TASK_BLOCK: Lazy<Mutex<Option<TestRunChatTaskBlock>>> =
     Lazy::new(|| Mutex::new(None));
 
+#[cfg(test)]
+pub(crate) static TEST_LAST_RUN_CHAT_TASK_ERROR: Lazy<Mutex<Option<String>>> =
+    Lazy::new(|| Mutex::new(None));
+
+#[cfg(test)]
+pub(crate) async fn set_last_run_chat_task_error_for_test(error: Option<&str>) {
+    *TEST_LAST_RUN_CHAT_TASK_ERROR.lock().await = error.map(str::to_owned);
+}
+
+#[cfg(test)]
+pub(crate) async fn last_run_chat_task_error_for_test() -> Option<String> {
+    TEST_LAST_RUN_CHAT_TASK_ERROR.lock().await.clone()
+}
+
 /// Process-wide lock serializing every test that drives the global
 /// `run_chat_task` test hooks (`set_test_run_chat_task_block`,
 /// `set_test_forced_run_chat_task_error`) or the `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`

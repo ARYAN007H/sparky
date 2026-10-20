@@ -86,6 +86,8 @@ pub(crate) use ops::lock_thread_sessions_for_test;
 #[cfg(any(test, debug_assertions))]
 pub use ops::parallel_in_flight_entries_for_test;
 #[cfg(test)]
+pub(crate) use ops::last_run_chat_task_error_for_test;
+#[cfg(test)]
 pub(crate) use ops::track_parallel_turn_for_test;
 pub use ops::{
     cancel_all_turns, cancel_chat_scoped, cancel_should_target, channel_web_cancel,

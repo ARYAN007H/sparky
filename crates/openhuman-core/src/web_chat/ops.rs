@@ -50,3 +50,7 @@ pub use test_hooks::RUN_CHAT_TASK_TEST_LOCK;
 pub(super) use test_hooks::{run_test_hooks, test_hooks_active, TEST_PARK_AFTER_RUN};
 #[cfg(any(test, debug_assertions))]
 pub use test_hooks::{set_test_park_after_run, set_test_run_chat_task_block, TestRunChatTaskBlock};
+#[cfg(test)]
+pub(crate) use test_hooks::{
+    last_run_chat_task_error_for_test, set_last_run_chat_task_error_for_test,
+};

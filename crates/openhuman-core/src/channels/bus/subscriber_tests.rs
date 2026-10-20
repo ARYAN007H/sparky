@@ -39,6 +39,7 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
         succeed_in: Some(workspace.path().to_path_buf()),
     };
     crate::web_chat::set_test_run_chat_task_block(Some(block.clone())).await;
+    crate::web_chat::ops::set_last_run_chat_task_error_for_test(None).await;
 
     let ctx = DispatchCtx::ambient();
     let client_id = "channel-timeout-client";
@@ -65,8 +66,11 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
             match event_rx.try_recv() {
                 Ok(event) if event.context().request_id == request_id => match event.wire_event() {
                     WebChannelEvent::ChatError { message, .. } => {
+                        let detail = crate::web_chat::last_run_chat_task_error_for_test()
+                            .await
+                            .unwrap_or_else(|| "runner did not expose an internal failure".into());
                         return Err(format!(
-                            "shared runner failed before entering controlled turn: {}",
+                            "shared runner failed before entering controlled turn: {detail}; classified message: {}",
                             message.as_deref().unwrap_or("no error message")
                         ));
                     }

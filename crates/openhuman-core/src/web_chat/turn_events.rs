@@ -279,6 +279,8 @@ impl WebEvents {
     }
 
     async fn failed(&self, request: &TurnRequest<QueuedPayload>, surface: &Surface, error: &str) {
+        #[cfg(test)]
+        super::ops::set_last_run_chat_task_error_for_test(Some(error)).await;
         let parallel =
             request.disposition == tinyagents_harness::turn_runner::QueueDisposition::Parallel;
         let raw = host_error(error, Some(request));
