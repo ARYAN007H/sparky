@@ -235,7 +235,8 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
             worker_thread_id: None,
             task_id: task_id.clone(),
             lifecycle_key: Some(lifecycle_key),
-        },
+                crate::agent::orchestration::subagent_sessions::    parent_epoch: None,
+},
         None,
     )
     .expect("seed durable row for the actual paused job");
