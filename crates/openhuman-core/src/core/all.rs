@@ -839,9 +839,6 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         "run_ledger" => Some(
             "Durable agent and workflow run state, child lineage, events, telemetry, and checkpoint references.",
         ),
-        "agent_work" => Some(
-            "Background agent command center — recent agent runs grouped by status (needs-input, working, completed, failed, stopped).",
-        ),
         "tool_registry" => Some(
             "Read-only discovery for MCP stdio tools and controller-backed tools, including routes, schemas, version, allowed agents, and health.",
         ),

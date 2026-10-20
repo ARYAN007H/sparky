@@ -78,22 +78,6 @@ fn deserialize_params_and_helpers_cover_success_and_failure_paths() {
     assert!(matches!(json_output("result", "x").ty, TypeSchema::Json));
 }
 
-#[test]
-fn host_graph_topology_projection_keeps_delegation_only() {
-    let names: Vec<_> = crate::agent::tinyagents::tool_registration::host_graph_topologies()
-        .into_iter()
-        .map(|report| report.name)
-        .collect();
-    assert!(names.contains(&"delegation"), "saw {names:?}");
-    assert!(
-        !names.iter().any(|name| name.starts_with("agent_teams:")),
-        "retired team graphs must not be projected: {names:?}"
-    );
-    assert!(
-        !names.iter().any(|name| name.starts_with("workflow_runs:")),
-        "retired workflow graphs must not be projected: {names:?}"
-    );
-}
 
 #[tokio::test]
 async fn registry_snapshot_omits_retired_graphs_and_keeps_delegation() {
