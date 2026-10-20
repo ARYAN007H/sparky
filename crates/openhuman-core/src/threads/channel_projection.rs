@@ -186,24 +186,15 @@ pub(crate) async fn persist_activity(
         let workspace = core
             .workspace_dir()
             .map_err(|error| anyhow!("resolve projection workspace: {error}"))?;
-        let messages = crate::threads::store::blocking::get_messages(
-            ctx.clone(),
-            workspace.clone(),
-            target.thread_id.clone(),
-        )
-        .await
-        .map_err(|error| anyhow!("read projected thread: {error}"))?;
-        let Some(message) = messages.iter().find(|message| message.id == target.row_id) else {
-            return Err(anyhow!("bound OpenHuman message row no longer exists"));
-        };
-        let metadata = channel_activity_metadata(&message.extra_metadata, event)?;
+        let merge = channel_activity_merge_patch(event)?;
         crate::threads::store::blocking::update_message(
             ctx.clone(),
             workspace,
             target.thread_id.clone(),
             target.row_id.clone(),
             crate::threads::store::ConversationMessagePatch {
-                extra_metadata: Some(metadata),
+                merge_extra_metadata: Some(merge),
+                ..Default::default()
             },
         )
         .await
@@ -214,72 +205,62 @@ pub(crate) async fn persist_activity(
     result.map_err(|error| format!("{LOG_PREFIX} persist activity: {error:#}"))
 }
 
-fn channel_activity_metadata(
-    existing: &Value,
-    event: &tinychannels_bus::ChannelEvent,
-) -> Result<Value> {
+fn channel_activity_merge_patch(event: &tinychannels_bus::ChannelEvent) -> Result<Value> {
     use tinychannels_bus::ChannelEventKind as Kind;
 
-    let mut metadata = existing.as_object().cloned().unwrap_or_default();
-    let activity = metadata
-        .entry("channelActivity")
-        .or_insert_with(|| json!({"reactions": [], "readReceipts": []}));
-    let activity = activity
-        .as_object_mut()
-        .ok_or_else(|| anyhow!("channelActivity metadata is not an object"))?;
     match &event.event {
         Kind::ReadReceipt {
             actor, timestamp, ..
         } => {
-            let actor_id = actor.as_ref().map(|actor| actor.id.as_str()).unwrap_or("");
-            let read_receipts = activity
-                .entry("readReceipts")
-                .or_insert_with(|| json!([]))
-                .as_array_mut()
-                .ok_or_else(|| anyhow!("channelActivity.readReceipts is not an array"))?;
-            if let Some(existing) = read_receipts.iter_mut().find(|receipt| {
-                receipt.get("actorId").and_then(Value::as_str).unwrap_or("") == actor_id
-            }) {
-                *existing = json!({"actorId": actor_id, "timestamp": timestamp});
-            } else {
-                read_receipts.push(json!({"actorId": actor_id, "timestamp": timestamp}));
-            }
+            let actor = actor
+                .as_ref()
+                .filter(|actor| !actor.id.is_empty())
+                .ok_or_else(|| anyhow!("read receipt has no actor identity"))?;
+            let receipt_key = keyed_digest(&[&actor.id])?;
+            Ok(json!({"channelActivity":{"readReceipts":{
+                (receipt_key): {"actorId":actor.id,"timestamp":timestamp}
+            }}}))
         }
         Kind::ReactionAdded {
             actor, reaction, ..
         } => {
-            let reactions = activity
-                .entry("reactions")
-                .or_insert_with(|| json!([]))
-                .as_array_mut()
-                .ok_or_else(|| anyhow!("channelActivity.reactions is not an array"))?;
-            let value = json!({
-                "actorId": actor.id,
-                "value": reaction.value,
-                "customEmojiId": reaction.custom_emoji_id,
-            });
-            if !reactions.contains(&value) {
-                reactions.push(value);
+            if actor.id.is_empty() {
+                return Err(anyhow!("reaction has no actor identity"));
             }
+            let reaction_key = reaction_digest(&actor.id, reaction)?;
+            Ok(json!({"channelActivity":{"reactions":{
+                (reaction_key): {"actorId":actor.id,"value":reaction.value,"customEmojiId":reaction.custom_emoji_id}
+            }}}))
         }
         Kind::ReactionRemoved {
             actor, reaction, ..
         } => {
-            let reactions = activity
-                .entry("reactions")
-                .or_insert_with(|| json!([]))
-                .as_array_mut()
-                .ok_or_else(|| anyhow!("channelActivity.reactions is not an array"))?;
-            reactions.retain(|existing| {
-                existing.get("actorId").and_then(Value::as_str) != Some(&actor.id)
-                    || existing.get("value").and_then(Value::as_str) != Some(&reaction.value)
-                    || existing.get("customEmojiId").and_then(Value::as_str)
-                        != reaction.custom_emoji_id.as_deref()
-            });
+            if actor.id.is_empty() {
+                return Err(anyhow!("reaction has no actor identity"));
+            }
+            let reaction_key = reaction_digest(&actor.id, reaction)?;
+            Ok(json!({"channelActivity":{"reactions":{(reaction_key):null}}}))
         }
-        _ => return Err(anyhow!("event does not target persisted channel activity")),
+        _ => Err(anyhow!("event does not target persisted channel activity")),
     }
-    Ok(Value::Object(metadata))
+}
+
+fn keyed_digest(parts: &[&str]) -> Result<String> {
+    let encoded = serde_json::to_vec(parts).context("encode channel activity key")?;
+    Ok(hex::encode(Sha256::digest(encoded)))
+}
+
+fn reaction_digest(
+    actor_id: &str,
+    reaction: &tinychannels_bus::ChannelReaction,
+) -> Result<String> {
+    let encoded = serde_json::to_vec(&(
+        actor_id,
+        &reaction.value,
+        reaction.custom_emoji_id.as_deref(),
+    ))
+    .context("encode channel reaction key")?;
+    Ok(hex::encode(Sha256::digest(encoded)))
 }
 
 fn bind_in(repo: &Repo, key: MessageBindingKey, thread_id: &str) -> Result<()> {

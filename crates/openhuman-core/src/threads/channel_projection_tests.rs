@@ -153,7 +153,7 @@ fn sender_scoped_threads_can_share_a_conversation_without_overwriting() {
 }
 
 #[test]
-fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
+fn channel_activity_emits_atomic_keyed_merge_patches() {
     use tinychannels_bus::{ChannelEvent, ChannelEventKind, ChannelReaction, ChannelRef};
 
     let event = |kind| ChannelEvent {
@@ -181,16 +181,41 @@ fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
         },
         reaction: reaction.clone(),
     });
-    let metadata = channel_activity_metadata(&json!({"existing": true}), &added).unwrap();
-    let metadata = channel_activity_metadata(&metadata, &added).unwrap();
-    assert_eq!(metadata["existing"], true);
-    assert_eq!(
-        metadata["channelActivity"]["reactions"]
-            .as_array()
-            .unwrap()
-            .len(),
-        1
-    );
+    let patch = channel_activity_merge_patch(&added).unwrap();
+    let reaction_entries = patch["channelActivity"]["reactions"].as_object().unwrap();
+    assert_eq!(reaction_entries.len(), 1);
+    let (reaction_key, reaction_value) = reaction_entries.iter().next().unwrap();
+    assert_eq!(reaction_value["actorId"], "alice");
+    assert_eq!(reaction_value["value"], "🔥");
+
+    // The key encodes tuple boundaries, so provider values containing a
+    // separator cannot alias another actor/reaction tuple.
+    let separator_collision = reaction_digest(
+        "a|b",
+        &ChannelReaction {
+            value: "c".into(),
+            custom_emoji_id: None,
+        },
+    )
+    .unwrap();
+    let distinct_tuple = reaction_digest(
+        "a",
+        &ChannelReaction {
+            value: "b|c".into(),
+            custom_emoji_id: None,
+        },
+    )
+    .unwrap();
+    assert_ne!(separator_collision, distinct_tuple);
+    let custom = reaction_digest(
+        "alice",
+        &ChannelReaction {
+            value: "🔥".into(),
+            custom_emoji_id: Some("provider-custom-1".into()),
+        },
+    )
+    .unwrap();
+    assert_ne!(*reaction_key, custom);
 
     let read = event(ChannelEventKind::ReadReceipt {
         message_id: "provider-target".into(),
@@ -200,11 +225,16 @@ fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
         }),
         timestamp: Some(42),
     });
-    let metadata = channel_activity_metadata(&metadata, &read).unwrap();
+    let read_patch = channel_activity_merge_patch(&read).unwrap();
+    let read_entries = read_patch["channelActivity"]["readReceipts"]
+        .as_object()
+        .unwrap();
+    assert_eq!(read_entries.len(), 1);
     assert_eq!(
-        metadata["channelActivity"]["readReceipts"][0]["actorId"],
+        read_entries.values().next().unwrap()["actorId"],
         "bob"
     );
+    assert_eq!(read_entries.values().next().unwrap()["timestamp"], 42);
 
     let removed = event(ChannelEventKind::ReactionRemoved {
         message_id: "provider-target".into(),
@@ -215,9 +245,9 @@ fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
         },
         reaction,
     });
-    let metadata = channel_activity_metadata(&metadata, &removed).unwrap();
-    assert!(metadata["channelActivity"]["reactions"]
-        .as_array()
-        .unwrap()
-        .is_empty());
+    let remove_patch = channel_activity_merge_patch(&removed).unwrap();
+    assert_eq!(
+        remove_patch["channelActivity"]["reactions"][reaction_key],
+        Value::Null
+    );
 }
