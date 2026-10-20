@@ -155,6 +155,7 @@ fn builtin_controller_snapshot() -> Vec<ControllerEntry> {
         .collect()
 }
 
+#[cfg(any(feature = "modules", feature = "mcp"))]
 fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<ControllerParamContract>)
 {
     let controllers = builtin_controller_snapshot()
@@ -220,15 +221,28 @@ fn every_covered_required_declaration_rejects_removal_and_optional_mutants() {
             }
         }
     }
-    // Voice has ten independently required fields and MCP has one. The
-    // computer-status adapter remains covered when both optional domains are
-    // disabled, but has no required field to mutate. Synthetic runner tests
-    // still exercise mutation rejection in that feature configuration.
+    // MCP has one independently required field. The computer-status adapter
+    // has no required field to mutate; synthetic runner tests cover that case.
     let expected_mutations = 2 * usize::from(cfg!(feature = "mcp"));
     assert_eq!(
         mutations, expected_mutations,
         "covered required-field mutations"
     );
+}
+
+#[test]
+#[cfg(not(any(feature = "modules", feature = "mcp")))]
+fn optional_domain_controller_methods_are_absent_when_features_are_disabled() {
+    let methods = builtin_controller_snapshot()
+        .into_iter()
+        .map(|controller| controller.schema.method_name())
+        .collect::<Vec<_>>();
+    assert!(!methods
+        .iter()
+        .any(|method| method == "mcp_clients.registry_get"));
+    assert!(!methods
+        .iter()
+        .any(|method| method == "modules.computer_status"));
 }
 
 #[test]
