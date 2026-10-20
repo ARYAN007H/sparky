@@ -98,7 +98,6 @@ pub use slack::SlackChannel;
 #[cfg(all(feature = "channels", test))]
 pub use telegram::TelegramChannel;
 #[cfg(all(feature = "channels", test))]
-#[cfg(all(feature = "channels", test))]
 pub use yuanbao::YuanbaoChannel;
 
 #[cfg(all(feature = "channels", any(test, debug_assertions)))]
