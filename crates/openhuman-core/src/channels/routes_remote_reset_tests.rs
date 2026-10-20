@@ -49,7 +49,7 @@ fn transcript_meta(thread_id: &str, agent_id: &str) -> TranscriptMeta {
     }
 }
 
-fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope {
+fn remote_session_scope(session_key: &str) -> tinychannels_bus::module_remote::RemoteSessionScope {
     tinychannels_bus::module_remote::RemoteSessionScope {
         channel: tinychannels_bus::ChannelRef {
             id: "telegram".into(),
@@ -61,7 +61,7 @@ fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope
             topic_id: Some("topic-3".into()),
             ..Default::default()
         },
-        session_key: "prepared-session".into(),
+        session_key: session_key.into(),
     }
 }
 
@@ -151,16 +151,36 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     let bob_tenant = bob_dispatch.tenant().unwrap();
     let alice_route = crate::channels::routes::get_route_selection(&alice_runtime, "remote-reset");
     let bob_route = crate::channels::routes::get_route_selection(&_bob_runtime, "remote-reset");
-    let alice_agent = crate::channels::runtime::dispatch::host_agent::configured_agent(
-        &alice_runtime,
-        &alice_route,
-    )
-    .await
-    .expect("Alice's configured channel agent resolves");
+    let alice_agent =
+        match crate::channels::runtime::dispatch::host_agent::route(&alice_runtime, "telegram") {
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Agent(host) => *host,
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Unbound => {
+                crate::channels::runtime::dispatch::host_agent::configured_agent(
+                    &alice_runtime,
+                    &alice_route,
+                )
+                .await
+                .expect("Alice's configured channel agent resolves")
+            }
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Missing(agent) => {
+                panic!("Alice's channel agent {agent} is unavailable")
+            }
+        };
     let bob_agent =
-        crate::channels::runtime::dispatch::host_agent::configured_agent(&_bob_runtime, &bob_route)
-            .await
-            .expect("Bob's configured channel agent resolves");
+        match crate::channels::runtime::dispatch::host_agent::route(&_bob_runtime, "telegram") {
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Agent(host) => *host,
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Unbound => {
+                crate::channels::runtime::dispatch::host_agent::configured_agent(
+                    &_bob_runtime,
+                    &bob_route,
+                )
+                .await
+                .expect("Bob's configured channel agent resolves")
+            }
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Missing(agent) => {
+                panic!("Bob's channel agent {agent} is unavailable")
+            }
+        };
     let canonical = "channel-session:telegram:bot-a:group:room-1";
     let alice_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, canonical);
     let bob_key = crate::core::runtime::tenant::tenant_key(&bob_tenant, canonical);
@@ -184,7 +204,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         "remote status history comes from the durable session",
     );
 
-    let scope = remote_session_scope();
+    let scope = remote_session_scope(canonical);
     let reset = crate::channels::host::remote_control::RemoteResetContext {
         scope: scope.clone(),
         durable_session_key: alice_key.clone(),
