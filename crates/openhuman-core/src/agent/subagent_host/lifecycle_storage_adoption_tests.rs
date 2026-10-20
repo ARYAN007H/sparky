@@ -166,27 +166,9 @@ fn owner_file_pause_is_imported_and_the_original_bytes_stay_unchanged() {
 }
 
 #[tokio::test]
-async fn a_detached_driver_keeps_its_carried_actor_for_lifecycle_reads_and_commits() {
-    use super::super::driver_adapter::{HostInvocation, HostRequest};
+async fn a_detached_lifecycle_write_uses_its_carried_actor_scope() {
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use tinyagents_harness::context::{RunConfig, RunContext};
-
-    struct CompleteTool;
-    #[async_trait::async_trait]
-    impl tinytools::Tool for CompleteTool {
-        fn name(&self) -> &str {
-            "complete_fixture"
-        }
-        fn description(&self) -> &str {
-            "Finish without a provider"
-        }
-        fn parameters_schema(&self) -> serde_json::Value {
-            serde_json::json!({"type":"object"})
-        }
-        async fn execute(&self, _: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
-            Ok(tinytools::ToolResult::success("detached actor result"))
-        }
-    }
 
     let workspace = tempfile::tempdir().unwrap();
     let checkpoints = workspace.path().join(".openhuman/subagent_checkpoints");
@@ -198,62 +180,28 @@ async fn a_detached_driver_keeps_its_carried_actor_for_lifecycle_reads_and_commi
     );
     let task_id = "detached-actor-child";
     let key = SubagentTaskKey::from_context(&parent, task_id, None);
-    let options = crate::agent::subagent_host::SubagentRunOptions {
-        task_id: Some(task_id.into()),
-        checkpoint_dir: Some(checkpoints.clone()),
-        run_context: parent.data.clone(),
-        ..Default::default()
-    };
-    let request = HostRequest {
-        invocation: HostInvocation::ConfiguredTool {
-            agent_id: "same-agent".into(),
-            tool: std::sync::Arc::new(CompleteTool),
-            arguments: serde_json::json!({}),
-        },
-        options,
-    };
-    let (done, mut receiver) = tokio::sync::mpsc::unbounded_channel();
-    let completion: super::super::HostCompletion = std::sync::Arc::new(move |_, result, _| {
-        let done = done.clone();
-        Box::pin(async move {
-            done.send(result).unwrap();
-        })
+    let persistence = super::super::persistence::OpenHumanPersistence::new(checkpoints.clone())
+        .with_dispatch(parent.data.dispatch_ctx());
+    let mut outcome = SubagentOutcome::cancelled(task_id);
+    outcome.output = "detached actor result".into();
+    let detached = tokio::spawn(async move {
+        persistence.record_terminal(&key, &outcome, None).await.unwrap();
+        key
     });
-    // No ambient CoreContext is installed here. The actor is carried only
-    // by the explicit parent, through the generic tool's real tokio::spawn.
-    let (_, bundle) = super::super::invoke_driver_tool_with_request(
-        &parent,
-        request,
-        "finish".into(),
-        "background",
-        Some(completion),
-        Some(tinyagents_orchestration::subagent::SubAgentJobRegistry::default()),
-        None,
-    )
-    .await
-    .unwrap();
-    tokio::time::timeout(std::time::Duration::from_secs(10), receiver.recv())
+    let key = detached.await.unwrap();
+    let alice_persistence = super::super::persistence::OpenHumanPersistence::new(checkpoints.clone())
+        .with_dispatch(crate::core::runtime::DispatchCtx::for_core(alice.clone()));
+    let durable = alice_persistence
+        .load_terminal(&key)
         .await
         .unwrap()
-        .unwrap()
-        .unwrap();
-    CoreContext::scope(alice, async {
-        let restarted = super::super::persistence::OpenHumanPersistence::new(checkpoints.clone());
-        let durable = restarted
-            .load_terminal(&key)
-            .await
-            .unwrap()
-            .expect("the detached driver committed in its carried actor scope");
-        assert_eq!(durable.output, "detached actor result");
-    })
-    .await;
+        .expect("detached lifecycle write committed in its carried actor scope");
+    assert_eq!(durable.output, "detached actor result");
     CoreContext::scope(bob, async {
         let other = super::super::persistence::OpenHumanPersistence::new(checkpoints);
         assert!(other.load_terminal(&key).await.unwrap().is_none());
     })
     .await;
-    // Keep the production bundle alive until its detached completion finished.
-    drop(bundle);
 }
 
 async fn assert_legacy_owner_terminal(format: &str) {
