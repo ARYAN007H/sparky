@@ -6,11 +6,9 @@ fn registered_controllers_match_schemas() {
     let schemas = all_controller_schemas();
     let registered = all_registered_controllers();
     assert_eq!(schemas.len(), registered.len());
-    assert_eq!(schemas.len(), 2);
+    assert_eq!(schemas.len(), 1);
     assert_eq!(schema_for("subagent_cancel").namespace, "subagent");
     assert_eq!(schema_for("subagent_cancel").function, "cancel");
-    assert_eq!(schema_for("subagent_steer").namespace, "subagent");
-    assert_eq!(schema_for("subagent_steer").function, "steer");
 }
 
 #[test]
@@ -233,16 +231,3 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     assert!(delivery[0].result.text.contains("user requested stop"));
 }
 
-#[tokio::test]
-async fn steer_unknown_task_is_a_noop_false() {
-    let _lock = crate::config::TEST_ENV_LOCK.lock().await;
-    let mut params = Map::new();
-    params.insert("taskId".into(), json!("sub-does-not-exist"));
-    params.insert("message".into(), json!("redirect"));
-    let out = handle_subagent_steer(DispatchCtx::process_default(), params)
-        .await
-        .expect("handler ok");
-    let data = out.get("data").unwrap_or(&out);
-    assert_eq!(data.get("steered").and_then(Value::as_bool), Some(false));
-    assert_eq!(data.get("reason").and_then(Value::as_str), Some("unknown"));
-}
