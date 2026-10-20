@@ -7,7 +7,13 @@ import {
   waitForAppReady,
 } from '../helpers/core-rpc';
 
-type TelegramStatus = { channel_id?: string; channel?: string; connected?: boolean };
+type TelegramStatus = {
+  channel_id?: string;
+  channel?: string;
+  auth_mode?: string;
+  authMode?: string;
+  connected?: boolean;
+};
 
 async function telegramConnected(): Promise<boolean> {
   const response = (await callCoreRpc<unknown>('openhuman.channels_status', {
@@ -24,7 +30,9 @@ async function telegramConnected(): Promise<boolean> {
       : unwrapped;
   expect(Array.isArray(entries), 'channels_status returns channel status entries').toBe(true);
   const telegram = (entries as TelegramStatus[]).find(
-    (entry) => (entry.channel_id ?? entry.channel) === 'telegram'
+    (entry) =>
+      (entry.channel_id ?? entry.channel) === 'telegram' &&
+      (entry.auth_mode ?? entry.authMode) === 'bot_token'
   );
   expect(telegram, 'channels_status includes Telegram').toBeDefined();
   return telegram?.connected === true;
@@ -52,6 +60,10 @@ test.describe('Channels Smoke', () => {
     await dismissWalkthroughIfPresent(page);
     const telegram = page.getByTestId('skill-row-channel-telegram');
 
+    await callCoreRpc('openhuman.channels_disconnect', {
+      channel: 'telegram',
+      authMode: 'bot_token',
+    });
     await expect.poll(telegramConnected).toBe(false);
     await expect(telegram).toContainText('Not configured');
     await callCoreRpc('openhuman.channels_connect', {
