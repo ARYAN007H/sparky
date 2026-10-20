@@ -16,7 +16,7 @@
 //! the async workers.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::ConversationPurgeStats;
 use tinyagents_session::threads::{
@@ -332,18 +332,32 @@ impl ConversationStore {
     /// Queue persistence keeps its existing IO and process-crash limitations.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
         let workspace_dir = self.workspace_dir.clone();
-        let stats = self.run("purge_threads", NONE, |s| async move {
+        let deleted_threads = Arc::new(Mutex::new(Vec::new()));
+        let callback_threads = Arc::clone(&deleted_threads);
+        let result = self.run("purge_threads", NONE, |s| async move {
             s.purge_threads_with(move |thread_id| {
-                crate::memory::deletion::enqueue(
-                    &workspace_dir,
-                    crate::memory::deletion::PendingDeletion::Thread {
-                        thread_id: thread_id.to_owned(),
-                    },
-                );
+                callback_threads
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push(thread_id.to_owned());
             })
             .await
             .map(ConversationPurgeStats::from)
-        })?;
+        });
+        // The callback runs inside storage::block_on. Defer StateKv writes
+        // until that bridge returns; re-entering it from the callback fails.
+        let deleted_threads = std::mem::take(
+            &mut *deleted_threads
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        for thread_id in deleted_threads {
+            crate::memory::deletion::enqueue(
+                &workspace_dir,
+                crate::memory::deletion::PendingDeletion::Thread { thread_id },
+            );
+        }
+        let stats = result?;
         self.forget_all_transcript_keys();
         Ok(stats)
     }

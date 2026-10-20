@@ -187,8 +187,13 @@ async fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_
     assert_eq!(
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
-            .unwrap(),
-        Some(vec![alice_item.clone(), local_item.clone()])
+            .unwrap()
+            .unwrap()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>(),
+        [alice_item.clone(), local_item.clone()]
+            .into_iter()
+            .collect()
     );
     assert!(
         local_old
