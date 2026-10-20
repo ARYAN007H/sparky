@@ -1,7 +1,5 @@
 //! Per-sender routing and runtime command handling.
 
-#[cfg(test)]
-use super::context::clear_sender_history;
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
@@ -205,7 +203,21 @@ where
                         model: current.model,
                     },
                     history_len,
-                    session_scope: reset_scope.map(Box::new),
+                    session_scope: reset_scope.clone().map(Box::new),
+                    configured_channel: reset_scope.as_ref().and_then(|scope| {
+                        let account = scope.channel.account_id.as_deref()?;
+                        let channel = ctx.channels_by_name.get(account)?;
+                        (channel.name() == account
+                            && tinychannels_bus::provider_id(channel.name()) == scope.channel.id)
+                            .then(|| {
+                                Box::new(
+                                    tinychannels_bus::module_control::ConfiguredControlChannel {
+                                        name: channel.name().to_owned(),
+                                        capabilities: channel.capabilities(),
+                                    },
+                                )
+                            })
+                    }),
                     providers: provider_descriptors(),
                 },),
             )
@@ -347,10 +359,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
         None,
         None,
         msg,
-        || async {
-            clear_sender_history(&ctx.conversation_histories, sender_key);
-            Ok(())
-        },
+        || async { Ok(()) },
     )
     .await
 }

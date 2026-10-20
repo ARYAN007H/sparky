@@ -83,6 +83,11 @@ pub(super) struct TurnSlot {
     /// Cross-surface lease survives TinyAgents' early `checkin` until the
     /// terminal projection has finished delivering this turn.
     pub(super) session_lease: Option<SessionLease>,
+    /// Profile-wide serialization is acquired after the session lease (the
+    /// same order used by native channel turns) and held through terminal
+    /// projection. Acquiring these in the opposite order can deadlock when
+    /// two Runner instances target one session.
+    pub(super) profile_turn: Option<crate::profiles::turn_gate::TurnGuard>,
     pub(super) fork: bool,
     pub(super) config: Option<Arc<crate::config::Config>>,
     pub(super) thread_dir: Option<std::path::PathBuf>,

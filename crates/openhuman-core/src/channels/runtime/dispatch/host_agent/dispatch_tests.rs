@@ -53,7 +53,6 @@ fn context(channel: Arc<Telegram>, config: Config) -> Arc<ChannelRuntimeContext>
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 5,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,

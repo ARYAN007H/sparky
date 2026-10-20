@@ -5,9 +5,9 @@
 //! new update for the same Telegram conversation. The second model request
 //! must contain the first user's message from the session transcript.
 //!
-//! Both Telegram and inference are loopback mocks. This target needs the
-//! linked TinyChannels module implementation so it exercises the native
-//! Telegram listener rather than a host-side REST adapter.
+//! Both Telegram and inference are loopback mocks. This target loads a locally
+//! compiled TinyChannels module so it exercises the native Telegram listener
+//! through the production TinyBus artifact path.
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -294,6 +294,7 @@ fn start_core(
     workspace: &Path,
     telegram: &str,
     inference: &str,
+    module_source_dir: &Path,
     log_path: &Path,
 ) -> (CoreProcess, String) {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
@@ -312,7 +313,7 @@ fn start_core(
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
         .env(
             "RUST_LOG",
-            "tinychannels=debug,tinychannels_module=debug,tinystoragedrivers=debug,openhuman::storage_host=info,openhuman_core::channels=debug",
+            "tinychannels=debug,tinychannels::remote=debug,tinychannels_module=debug,tinychannels_module::service=debug,tinystoragedrivers=debug,openhuman::storage_host=info,openhuman_core::channels=debug",
         )
         .env("OPENHUMAN_MODEL", "mock:session-model")
         .env("OPENHUMAN_BACKEND_API_KEY", MOCK_API_KEY)
@@ -321,7 +322,8 @@ fn start_core(
         .env("OPENHUMAN_AUTO_UPDATE_ENABLED", "false")
         .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
         .env("OPENHUMAN_COMPONENT_CHANNELS", "1")
-        .env("OPENHUMAN_MODULE_SOURCE", "linked")
+        .env("OPENHUMAN_MODULE_SOURCE", "source")
+        .env("OPENHUMAN_MODULE_SOURCE_DIR", module_source_dir)
         .env(
             "OPENHUMAN_STORAGE_URL",
             format!("sqlite:{}", workspace.join("sessions.db").display()),
@@ -329,7 +331,6 @@ fn start_core(
         .env("OPENHUMAN_KEYRING_MASTER_KEY", "44".repeat(32))
         .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
         .env_remove("OPENHUMAN_MODULE_PATH")
-        .env_remove("OPENHUMAN_MODULE_SOURCE_DIR")
         .env_remove("OPENHUMAN_MODE")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
         .envs(
@@ -365,6 +366,25 @@ async fn wait_until(label: &str, mut condition: impl FnMut() -> bool) {
     let deadline = Instant::now() + Duration::from_secs(45);
     while !condition() {
         assert!(Instant::now() < deadline, "timed out waiting for {label}");
+        sleep(Duration::from_millis(50)).await;
+    }
+}
+
+async fn wait_for_new_session_reply(state: &MockState) {
+    let deadline = Instant::now() + Duration::from_secs(45);
+    loop {
+        let sent = state.sent_messages.lock().expect("Telegram sent messages");
+        if sent.iter().any(|body| {
+            body["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("Started new session"))
+        }) {
+            return;
+        }
+        if Instant::now() >= deadline {
+            panic!("timed out waiting for Telegram /new reply; outbound bodies: {sent:#?}");
+        }
+        drop(sent);
         sleep(Duration::from_millis(50)).await;
     }
 }
@@ -466,6 +486,16 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     let workspace = home.join("workspace");
     let logs = home.join("logs");
     std::fs::create_dir_all(&logs).expect("create logs");
+    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
+        .map(std::path::PathBuf::from)
+        .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
+    assert!(
+        module_source_dir
+            .join("tinychannels/modules.toml")
+            .is_file(),
+        "compiled TinyChannels source descriptor is missing from {}",
+        module_source_dir.display()
+    );
 
     let mocks = start_mock_servers().await;
     write_config(&home, &workspace, &mocks.inference);
@@ -476,6 +506,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &workspace,
         &mocks.telegram,
         &mocks.inference,
+        &module_source_dir,
         &logs.join("first.log"),
     );
     wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
@@ -536,20 +567,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
 
     // The real module command must reset only chat 42's durable SessionRef.
     push_update(&mocks.state, 102, 12, "/new");
-    wait_until("Telegram /new reply", || {
-        mocks
-            .state
-            .sent_messages
-            .lock()
-            .expect("Telegram sent messages")
-            .iter()
-            .any(|body| {
-                body["text"]
-                    .as_str()
-                    .is_some_and(|text| text.contains("Started new session"))
-            })
-    })
-    .await;
+    wait_for_new_session_reply(&mocks.state).await;
     wait_for_update_ack(102).await;
 
     push_update(&mocks.state, 103, 13, AFTER_RESET_TEXT);
@@ -577,6 +595,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &workspace,
         &mocks.telegram,
         &mocks.inference,
+        &module_source_dir,
         &logs.join("second.log"),
     );
     assert_ne!(
@@ -607,21 +626,24 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         5,
         "each Telegram update must reach the model once"
     );
+    let reset_chat_request = requests
+        .iter()
+        .find(|request| model_saw_user_text(request, RESET_AFTER_RESTART_TEXT))
+        .expect("post-reset chat 42 update reached the model");
     assert!(
-        model_saw_user_text(&requests[3], AFTER_RESET_TEXT),
+        model_saw_user_text(reset_chat_request, AFTER_RESET_TEXT),
         "chat 42 must resume its post-reset transcript after process restart; got {}",
-        serde_json::to_string_pretty(&requests[3]).unwrap()
+        serde_json::to_string_pretty(reset_chat_request).unwrap()
     );
-    assert!(
-        model_saw_user_text(&requests[3], RESET_AFTER_RESTART_TEXT),
-        "the resumed chat 42 request must include its current message"
-    );
-    assert!(!model_saw_user_text(&requests[3], FIRST_TEXT));
-    assert!(!model_saw_user_text(&requests[3], OTHER_CHAT_TEXT));
-    assert!(model_saw_user_text(&requests[4], OTHER_CHAT_TEXT));
-    assert!(model_saw_user_text(&requests[4], OTHER_AFTER_RESTART_TEXT));
-    assert!(!model_saw_user_text(&requests[4], FIRST_TEXT));
-    assert!(!model_saw_user_text(&requests[4], AFTER_RESET_TEXT));
+    assert!(!model_saw_user_text(reset_chat_request, FIRST_TEXT));
+    assert!(!model_saw_user_text(reset_chat_request, OTHER_CHAT_TEXT));
+    let other_chat_request = requests
+        .iter()
+        .find(|request| model_saw_user_text(request, OTHER_AFTER_RESTART_TEXT))
+        .expect("post-restart chat 43 update reached the model");
+    assert!(model_saw_user_text(other_chat_request, OTHER_CHAT_TEXT));
+    assert!(!model_saw_user_text(other_chat_request, FIRST_TEXT));
+    assert!(!model_saw_user_text(other_chat_request, AFTER_RESET_TEXT));
     wait_for_completion(&mocks.state, 5).await;
     second.stop();
 }

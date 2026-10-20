@@ -6,7 +6,7 @@
 //! * [`try_route_approval_reply`] (in [`approval`]) — intercepts yes/no
 //!   approval replies before dispatching a fresh agent turn.
 //! * [`process_channel_message`] — full per-message pipeline: typing, ACK
-//!   reaction, history, agent turn, draft updates, reply.
+//!   reaction, durable session, agent turn, progressive events and reply.
 //! * [`bus_turn`] — the orchestrator path: an unbound channel's turn over
 //!   the native bus. A channel bound to a host agent runs through
 //!   [`super::host_agent`] instead.

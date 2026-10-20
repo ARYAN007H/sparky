@@ -5,7 +5,8 @@
 //! through the host agent resolver ([`crate::agent::host_agents`]) and run as
 //! that agent -- its definition, its host tools, its context -- instead of
 //! going over the bus to the orchestrator. Everything else about the channel
-//! stays: per-chat history, typing, drafts, the reply back to the chat.
+//! stays: durable session identity, typing, progressive events, and the reply
+//! back to the chat.
 //!
 //! A binding the resolver cannot satisfy (the embedder has not created the
 //! agent yet, or dropped it) is **refused**, with a short reply to the chat

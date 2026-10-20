@@ -25,7 +25,7 @@ pub(crate) struct HostChannelTurn {
     pub(crate) message: String,
     /// Who asked: the channel's `ExternalChannel` origin.
     pub(crate) origin: AgentTurnOrigin,
-    /// Live progress for the channel's draft updates.
+    /// Live progress projected through the compiled channel module.
     pub(crate) progress: Option<mpsc::Sender<AgentProgress>>,
     pub(crate) run_queue: Option<std::sync::Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
     /// Where this turn's parked approvals surface; default for a channel
