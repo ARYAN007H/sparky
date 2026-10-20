@@ -3642,13 +3642,12 @@ async fn assert_spawn_reaches_specialist(
         .unwrap_or_else(|| panic!("no model request for the `{specialist}` turn"));
     let belt = advertised_tool_names(orchestrator);
     assert!(
-        belt.iter().any(|name| name == "use_skill") && use_skill_offers_pack(orchestrator, pack),
-        "the orchestrator must offer the `{pack}` pack through use_skill so it can reach \
-         `{hand_off}`; it advertised {belt:?}"
+        belt.iter().any(|name| name == "spawn_subagent"),
+        "the orchestrator must offer spawn_subagent to reach `{specialist}`; it advertised {belt:?}"
     );
     assert!(
-        !belt.iter().any(|name| name == hand_off),
-        "`{hand_off}` is packed (#6787), not a direct tool on the orchestrator's wire: {belt:?}"
+        !belt.iter().any(|name| name == specialist),
+        "`{specialist}` is an agent id, not a model-facing tool name: {belt:?}"
     );
     let raw: Vec<&String> = belt
         .iter()
@@ -3659,8 +3658,8 @@ async fn assert_spawn_reaches_specialist(
         "the orchestrator must not advertise raw registry tools: {raw:?}"
     );
 
-    tool_result_text(&requests, hand_off)
-        .unwrap_or_else(|| panic!("no tool result for `{hand_off}`; requests: {}", dump()));
+    tool_result_text(&requests, "spawn_subagent")
+        .unwrap_or_else(|| panic!("no spawn_subagent result; requests: {}", dump()));
     assert!(
         requests
             .iter()
@@ -3668,27 +3667,25 @@ async fn assert_spawn_reaches_specialist(
             .any(|request| advertised_tool_names(request)
                 .iter()
                 .any(|name| specialist_only_tools.contains(&name.as_str()))),
-        "no model request came from the specialist behind `{hand_off}` (a belt with any of \
+        "no model request came from the specialist behind `{specialist}` (a belt with any of \
          {specialist_only_tools:?}); requests: {}",
         dump()
     );
 }
 
-/// Skill installs reach `skill_setup` through its `setup_skills` hand-off,
-/// which is a member of the `skills` tool pack (#6787) and so is called through
-/// `use_skill`; running an installed skill is the orchestrator's own
-/// `run_workflow`, not a hand-off to a retired `skill_executor` (`run_skill`).
+/// Skill installs reach `skill_setup` through the shared spawn tool; running an
+/// installed skill remains the orchestrator's own `run_workflow`.
 #[cfg(feature = "skills")]
 #[test]
-fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack() {
+fn orchestrator_spawns_skill_setup_with_agent_id() {
     run_on_agent_stack(
-        "orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack",
-        orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack_inner,
+        "orchestrator_spawns_skill_setup_with_agent_id",
+        orchestrator_spawns_skill_setup_with_agent_id_inner,
     );
 }
 
 #[cfg(feature = "skills")]
-async fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack_inner() {
+async fn orchestrator_spawns_skill_setup_with_agent_id_inner() {
     let _lock = env_lock();
     reset_script(Vec::new());
     let stack = boot_stack().await;
@@ -3697,13 +3694,12 @@ async fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pac
         stack.rpc_base
     ))
     .await;
-    assert_packed_hand_off_reaches_specialist(
+    assert_spawn_reaches_specialist(
         &stack,
         &mut events,
         910,
         "harness-skill-handoff",
-        "skills",
-        "setup_skills",
+        "skill_setup",
         &[
             "skill_registry_install",
             "skill_registry_uninstall",
