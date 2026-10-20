@@ -77,23 +77,14 @@ fn render_installed_skills_empty_is_omitted() {
 }
 
 #[test]
-fn prompt_routes_result_gating_tasks_to_synchronous_delegation() {
-    // Regression for #4681: a "critique it before you finalize" task was
-    // dispatched via fire-and-forget `spawn_subagent`, so the turn
-    // finalized before the critique ran. The orchestrator prompt must
-    // explicitly route result-gating work to a synchronous/awaited path.
-    assert!(
-        ARCHETYPE.contains("A result that gates this reply needs a delegate with `blocking: true`"),
-        "orchestrator prompt must carry the result-gating delegation rule"
-    );
-    // The only primitive that returns inside the turn is a blocking
-    // `delegate_*` specialist. `spawn_subagent` has no `blocking`
-    // parameter, and the prompt used to claim it did; make sure that claim
-    // never comes back.
-    for line in ARCHETYPE.lines() {
+fn prompt_documents_the_single_always_async_spawn_contract() {
+    assert!(ARCHETYPE.contains("Calls are asynchronous; completed results arrive automatically."));
+    assert!(ARCHETYPE.contains("Reuse the same `task_key` to continue a worker"));
+    assert!(ARCHETYPE.contains("including one paused on `ask_user_clarification`"));
+    for retired in ["blocking: true", "continue_subagent", "delegate_make_presentation"] {
         assert!(
-            !(line.contains("spawn_subagent") && line.contains("blocking: true")),
-            "spawn_subagent has no `blocking` argument: {line}"
+            !ARCHETYPE.contains(retired),
+            "retired dispatch contract leaked into prompt: {retired}"
         );
     }
 }
