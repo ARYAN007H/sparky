@@ -233,6 +233,7 @@ pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
     let model = model.trim();
     !model.is_empty()
         && !model.starts_with("hint:")
+        && !crate::config::WORKLOAD_ROLES.contains(&model)
         && provider_model_hooks(provider_id).map_or(true, |hooks| (hooks.is_raw_model)(model))
 }
 

@@ -18,6 +18,8 @@ fn abstract_hint_markers_do_not_become_raw_model_ids() {
     assert!(is_abstract_model("missing-provider", "hint:unknown"));
     assert!(!is_raw_model("missing-provider", "hint:unknown"));
     assert!(is_raw_model("missing-provider", "vendor/model-id"));
+    assert!(!is_raw_model("missing-provider", "chat"));
+    assert!(!is_raw_model("missing-provider", "coding"));
     assert_eq!(
         role_for_provider_model("missing-provider", "hint:coding"),
         "coding"
