@@ -33,12 +33,44 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     use tinyagents_harness::context::RunContext;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
-    crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas)
+    struct GatedModel {
+        started: tokio::sync::mpsc::Sender<()>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    #[async_trait]
+    impl ChatModel<()> for GatedModel {
+        fn profile(&self) -> Option<&ModelProfile> {
+            static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+            Some(PROFILE.get_or_init(|| {
+                let mut profile = ModelProfile::default();
+                profile.tool_calling = true;
+                profile
+            }))
+        }
+
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            let _ = self.started.send(()).await;
+            self.release.notified().await;
+            Ok(ModelResponse::assistant("cancelled child was released"))
+        }
+    }
+
+    crate::core::runtime::lock_mode(crate::core::runtime::Mode::Saas)
         .expect("the child process starts with an unlocked SaaS mode");
     let scratch = tempfile::tempdir().expect("profile cancellation workspace");
     let workspace = scratch.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create shared workspace");
-    let provider = Arc::new(ScriptedModel::new(vec![]));
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let release = Arc::new(tokio::sync::Notify::new());
+    let provider = Arc::new(GatedModel {
+        started: started_tx,
+        release: Arc::clone(&release),
+    });
     let mut parent = parent_context(workspace.as_path(), provider, vec![]);
     parent.workspace_dir = workspace.clone();
     parent.session_id = "shared-profile-parent-session".into();
@@ -103,6 +135,10 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .and_then(|value| value["task_id"].as_str().map(str::to_owned))
         .expect("accepted child includes public task ID");
+    tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
+        .await
+        .expect("child reached the scripted provider gate")
+        .expect("child start notification");
     let alice_ctx = live.data.dispatch_ctx();
     let alice_jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
@@ -183,6 +219,23 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .is_none(),
         "SaaS cancellation without a profile fails closed"
     );
+    let after_unbound = store
+        .load()
+        .expect("unbound attempt leaves durable child row readable")
+        .into_iter()
+        .find(|row| row.subagent_session_id == row_before.subagent_session_id)
+        .expect("unbound attempt keeps Alice's durable row");
+    assert_eq!(after_unbound.status, DurableSubagentStatus::Running);
+    assert_eq!(after_unbound.current_task_id, row_before.current_task_id);
+    assert!(
+        crate::agent::orchestration::background_completions::pending_for_ctx(
+            &alice_ctx,
+            &workspace,
+            thread_id,
+        )
+        .is_empty(),
+        "neither rejected control attempt emits an Alice completion"
+    );
 
     let owner_cancel = crate::agent::orchestration::running_subagents::cancel_by_task_with_workspace_reason(
         &alice_ctx,
@@ -207,6 +260,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     .expect("rightful cancellation settles the driver job")
     .expect("owner job remains registered");
     assert_eq!(terminal.status, SubAgentJobStatus::Cancelled);
+    release.notify_one();
 }
 
 #[tokio::test]
