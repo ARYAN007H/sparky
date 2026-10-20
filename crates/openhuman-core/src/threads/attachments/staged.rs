@@ -25,7 +25,7 @@ pub(super) struct StagedAttachmentClaim {
 }
 
 pub(super) const STAGED_DOMAIN: &str = "threads::attachments";
-pub(super) const STAGED_COLLECTION: &str = crate::threads::store::storage_schema::STAGED_ATTACHMENTS;
+pub(super) const STAGED_COLLECTION: &str = crate::threads::store::STAGED_ATTACHMENTS;
 pub(super) const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
 pub(super) fn staged_doc_id(opaque_id: &str) -> Result<String, String> {
