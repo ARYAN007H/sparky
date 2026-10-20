@@ -1,29 +1,14 @@
-//! Registry of in-flight async sub-agents that can be **steered** mid-run.
+//! Registry of in-flight asynchronous sub-agents and their cancellation lifecycle.
 //!
 //! `spawn_subagent` runs a child as a detached `tokio` task. On its own
 //! that task is opaque: the parent gets a `task_id` back but has no channel into
 //! the running loop and no way to collect the result inline. This registry
 //! closes both gaps.
 //!
-//! Each running async sub-agent registers in TinyAgents'
-//! [`DetachedTaskRegistry`](tinyagents_tasks::DetachedTaskRegistry),
-//! keyed by its `task_id`, with:
-//! - an `Arc<RunQueue>` — the same steering channel the steering forwarder in
-//!   `TurnSpec::run` drains mid-turn, so `steer_subagent` can
-//!   inject a message when no crate-native steering handle is registered;
-//! - a TinyAgents `SteeringHandle` in the process-local
-//!   `SteeringRegistry` while the child TinyAgents run is active, so
-//!   steer/collect controls can deliver directly to the crate queue;
-//! - a `watch::Receiver<DetachedSubagentStatus>` — so `wait_subagent` can block until the
-//!   child reaches a terminal status;
-//! - an `AbortHandle` — used by `subagent_cancel`/`close_subagent` paths to stop
-//!   detached work.
+//! The registry tracks task metadata, status and abort handles for cancellation.
 //!
 //! TinyAgents owns the process-local watch/cancel/abort/steering mechanics.
-//! OpenHuman retains product metadata, durable task-store projection, and the
-//! legacy `RunQueue` steering fallback. Ownership is enforced by captured profile
-//! and parent session; user controls retain the profile without requiring a parent ID.
-//! terminal entries are pruned on `wait` and swept at the registry soft cap.
+//! OpenHuman retains product metadata and durable task-store projection.
 //!
 //! ## Typed lifecycle ledger (issue #4249)
 //!
@@ -45,18 +30,13 @@
 //! - [`roster`] — read-only snapshots for prompt injection and control tools.
 //! - [`resolve`] — mapping a durable session id (or bare task id) to the live
 //!   registry entry or a durable fallback record.
-//! - [`steering`] — injecting messages and control directives into a running
-//!   sub-agent.
-//! - [`wait`] — blocking collection of a sub-agent's terminal result.
 //! - [`cancel`] — aborting sub-agents by task, session, thread, or all at once.
 
 mod cancel;
 mod registry;
 mod resolve;
 mod roster;
-mod steering;
 mod task_ledger;
-mod wait;
 
 #[cfg(test)]
 #[path = "running_subagents_tests.rs"]
@@ -79,12 +59,7 @@ pub(crate) use registry::{
 };
 pub(crate) use roster::active_subagents_context_block;
 #[cfg(test)]
-pub(crate) use steering::steer;
-pub(crate) use steering::steer_control;
-#[cfg(test)]
 pub(crate) use task_ledger::task_records;
 pub(crate) use task_ledger::{
     reconcile_orphaned_tasks_on_boot, task_record_for_task_in_workspace, task_store_for_workspace,
 };
-#[cfg(test)]
-pub(crate) use wait::wait_in_workspace;

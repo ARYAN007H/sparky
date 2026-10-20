@@ -1,5 +1,4 @@
 use super::*;
-use tinyagents_orchestration::steering::SteerError;
 
 /// The context these tests dispatch under: the calling task's own.
 fn cx() -> crate::core::runtime::DispatchCtx {
@@ -9,15 +8,12 @@ fn cx() -> crate::core::runtime::DispatchCtx {
 use crate::agent::orchestration::running_subagents::resolve::resume_ref_for_task;
 use crate::agent::orchestration::running_subagents::resolve::task_id_for_session;
 use crate::agent::orchestration::running_subagents::roster::snapshot_for_parent;
-use crate::agent::orchestration::running_subagents::wait::wait;
 use crate::agent::queued_turn::QueuedTurn;
-use crate::agent::tinyagents::host::steering::shared_steering_registry;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tinyagents_harness::ids::TaskId;
-use tinyagents_harness::run_queue::{QueueLane, RunQueue};
-use tinyagents_harness::steering::{SteeringCommand, SteeringHandle};
+use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_orchestration::subagent::FinishedOutcome;
 use tinyagents_orchestration::subagent::{
     DetachedSubagentStatus, WaitError, WaitOutcome, DETACHED_LEDGER_TIMEOUT_MS,
@@ -28,9 +24,6 @@ use tokio::task::AbortHandle;
 
 #[path = "running_subagents_cancel_tests.rs"]
 mod cancel_tests;
-
-#[path = "running_subagents_steering_tests.rs"]
-mod steering_tests;
 
 #[path = "running_subagents_wire_tests.rs"]
 mod wire_tests;
