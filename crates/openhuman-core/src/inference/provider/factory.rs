@@ -72,7 +72,7 @@ pub(crate) use turn_model::{
 // Factory-internal helpers shared across the submodules (and their tests)
 // through `use super::*`.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
-use chat_model::{unresolved_chat_model_error, with_default_temperature};
+use chat_model::{unresolved_chat_model_error, unresolved_chat_model_error_for, with_default_temperature};
 use cloud_slug::{
     resolve_cloud_slug, resolve_cloud_slug_for, try_create_cloud_slug_chat_model,
     try_create_cloud_slug_chat_model_from_string,
@@ -84,7 +84,7 @@ use local_runtime::{
     try_create_local_runtime_chat_model, try_create_local_runtime_chat_model_from_string,
     OptionalChatModelResult,
 };
-use managed_backend::managed_chat_model;
+use managed_backend::{managed_chat_model, managed_chat_model_for};
 pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread,
     make_openhuman_backend_model_for_thread_in, make_openhuman_backend_model_in,
