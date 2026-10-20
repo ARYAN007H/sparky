@@ -12,12 +12,11 @@ use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::Instant;
-use tinyagents_harness::progress::AgentProgress;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result, spawn_draft_updater, spawn_typing_task,
+    build_channel_context_block, log_worker_join_result, spawn_typing_task,
     REPLY_LOG_TRUNCATE_CHARS,
 };
 use super::super::host_agent::{self, HostRoute};
@@ -294,58 +293,6 @@ pub(crate) async fn process_channel_runtime_message(
     // unit fixtures only; a production channel turn without a host config is
     // refused rather than routed through a second execution graph.
 
-    // Determine if this channel supports streaming draft updates
-    let use_streaming = native_target.is_none()
-        && target_channel
-            .as_ref()
-            .is_some_and(|ch| ch.supports_draft_updates());
-
-    // Set up streaming channel if supported
-    let (_progress_tx, progress_rx) = if use_streaming {
-        let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(64);
-        (Some(tx), Some(rx))
-    } else {
-        (None, None)
-    };
-
-    // Send initial draft message if streaming
-    let draft_message_id = if use_streaming {
-        if let Some(channel) = target_channel.as_ref() {
-            match channel
-                .send_draft(
-                    &SendMessage::new("...", &msg.reply_target).in_thread(msg.thread_ts.clone()),
-                )
-                .await
-            {
-                Ok(id) => id,
-                Err(e) => {
-                    tracing::debug!("Failed to send draft on {}: {e}", channel.name());
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    // Spawn a task to forward streaming progress to draft updates
-    let draft_updater = if let (Some(rx), Some(draft_id_ref), Some(channel_ref)) = (
-        progress_rx,
-        draft_message_id.as_deref(),
-        target_channel.as_ref(),
-    ) {
-        Some(spawn_draft_updater(
-            rx,
-            Arc::clone(channel_ref),
-            msg.reply_target.clone(),
-            draft_id_ref.to_string(),
-        ))
-    } else {
-        None
-    };
-
     let typing_cancellation = target_channel.as_ref().map(|_| CancellationToken::new());
     let _typing_cancel_on_drop = typing_cancellation
         .as_ref()
@@ -502,11 +449,6 @@ pub(crate) async fn process_channel_runtime_message(
     let native_delivery_succeeded = execution.delivery_succeeded.unwrap_or(false);
     let llm_result = execution.result.map_err(anyhow::Error::msg);
 
-    // Wait for draft updater to finish
-    if let Some(handle) = draft_updater {
-        let _ = handle.await;
-    }
-
     if let Some(token) = typing_cancellation.as_ref() {
         token.cancel();
     }
@@ -537,25 +479,7 @@ pub(crate) async fn process_channel_runtime_message(
             };
             if native_target.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
-                    if let Some(ref draft_id) = draft_message_id {
-                        if let Err(e) = channel
-                            .finalize_draft(
-                                &msg.reply_target,
-                                draft_id,
-                                &response_text,
-                                msg.thread_ts.as_deref(),
-                            )
-                            .await
-                        {
-                            tracing::warn!("Failed to finalize draft: {e}; sending as new message");
-                            let _ = channel
-                                .send_with_outbound_intent(
-                                    &SendMessage::new(&response_text, &msg.reply_target)
-                                        .in_thread(msg.thread_ts.clone()),
-                                )
-                                .await;
-                        }
-                    } else if let Err(e) = channel
+                    if let Err(e) = channel
                         .send_with_outbound_intent(
                             &SendMessage::new(&response_text, &msg.reply_target)
                                 .in_thread(msg.thread_ts.clone()),
@@ -580,23 +504,12 @@ pub(crate) async fn process_channel_runtime_message(
                 );
                 if native_target.is_none() {
                     if let Some(channel) = target_channel.as_ref() {
-                        if let Some(ref draft_id) = draft_message_id {
-                            let _ = channel
-                                .finalize_draft(
-                                    &msg.reply_target,
-                                    draft_id,
-                                    error_text,
-                                    msg.thread_ts.as_deref(),
-                                )
-                                .await;
-                        } else {
-                            let _ = channel
-                                .send_with_outbound_intent(
-                                    &SendMessage::new(error_text, &msg.reply_target)
-                                        .in_thread(msg.thread_ts.clone()),
-                                )
-                                .await;
-                        }
+                        let _ = channel
+                            .send_with_outbound_intent(
+                                &SendMessage::new(error_text, &msg.reply_target)
+                                    .in_thread(msg.thread_ts.clone()),
+                            )
+                            .await;
                     }
                 }
 
@@ -672,23 +585,12 @@ pub(crate) async fn process_channel_runtime_message(
             }
             if native_target.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
-                    if let Some(ref draft_id) = draft_message_id {
-                        let _ = channel
-                            .finalize_draft(
-                                &msg.reply_target,
-                                draft_id,
-                                &error_response,
-                                msg.thread_ts.as_deref(),
-                            )
-                            .await;
-                    } else {
-                        let _ = channel
-                            .send_with_outbound_intent(
-                                &SendMessage::new(&error_response, &msg.reply_target)
-                                    .in_thread(msg.thread_ts.clone()),
-                            )
-                            .await;
-                    }
+                    let _ = channel
+                        .send_with_outbound_intent(
+                            &SendMessage::new(&error_response, &msg.reply_target)
+                                .in_thread(msg.thread_ts.clone()),
+                        )
+                        .await;
                 }
             }
             (
