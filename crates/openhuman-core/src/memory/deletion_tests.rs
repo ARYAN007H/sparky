@@ -190,7 +190,10 @@ fn an_unparsable_legacy_queue_is_quarantined_and_retry_queue_remains_usable() {
     assert!(pending(tmp.path()).is_empty());
     enqueue(tmp.path(), thread("t"));
     assert_eq!(pending(tmp.path()), vec![thread("t")]);
-    assert!(!file.exists(), "the corrupt legacy file is removed from the active path");
+    assert!(
+        !file.exists(),
+        "the corrupt legacy file is removed from the active path"
+    );
     assert_eq!(
         std::fs::read_to_string(file.with_extension("json.corrupt")).unwrap(),
         "not json",

@@ -51,26 +51,14 @@ fn workspace_scopes_keep_retry_queues_stable_and_isolated_on_shared_storage() {
     let second_scope = super::workspace_scope(second.path()).unwrap();
     let first_storage = backend.for_scope(&first_scope).unwrap();
     let second_storage = backend.for_scope(&second_scope).unwrap();
-    let first_state = crate::storage::state_kv::StateKv::over(
-        &first_storage,
-        "memory",
-        "state",
-    );
+    let first_state = crate::storage::state_kv::StateKv::over(&first_storage, "memory", "state");
 
     first_state
         .put("pending_deletions", &vec!["thread-a".to_string()])
         .unwrap();
 
-    let first_reopened = crate::storage::state_kv::StateKv::over(
-        &first_storage,
-        "memory",
-        "state",
-    );
-    let second_state = crate::storage::state_kv::StateKv::over(
-        &second_storage,
-        "memory",
-        "state",
-    );
+    let first_reopened = crate::storage::state_kv::StateKv::over(&first_storage, "memory", "state");
+    let second_state = crate::storage::state_kv::StateKv::over(&second_storage, "memory", "state");
     assert_eq!(
         first_reopened
             .get::<Vec<String>>("pending_deletions")

@@ -93,6 +93,13 @@ async fn save(config: &Config) -> Result<()> {
         .map_err(|error| Error::Engine(format!("saving config failed: {error:#}")))
 }
 
+fn engine_set_save_error(error: anyhow::Error) -> String {
+    if let Some(conflict) = crate::config::ops::config_save_conflict(&error, false) {
+        return conflict.encode();
+    }
+    StructuredRpcError::from(Error::Engine(format!("saving config failed: {error:#}"))).encode()
+}
+
 pub(super) fn engines_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<EmptyParams, _>(ctx, params, |_, config, _| async move {
         Ok(ops::engines_list(&config))
@@ -113,16 +120,27 @@ pub(super) fn engine_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             return finish(Err(error));
         }
         if let Err(error) = config.save().await {
-            if let Some(conflict) = crate::config::ops::config_save_conflict(&error, false) {
-                return Err(conflict.encode());
-            }
-            return finish(Err(Error::Engine(format!(
-                "saving config failed: {error:#}"
-            ))));
+            return Err(engine_set_save_error(error));
         }
         engine::invalidate();
         finish(Ok(ops::engine_get(&config).await))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::engine_set_save_error;
+
+    #[test]
+    fn nonconflict_save_failures_remain_engine_errors() {
+        let raw = engine_set_save_error(anyhow::anyhow!("disk unavailable"));
+        let error = crate::core::StructuredRpcError::decode(&raw).unwrap();
+        assert_eq!(error.data.as_ref().unwrap()["code"], "ENGINE");
+        assert_eq!(
+            error.message,
+            "engine error: saving config failed: disk unavailable"
+        );
+    }
 }
 
 pub(super) fn recall(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {

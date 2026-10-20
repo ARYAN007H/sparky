@@ -15,8 +15,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Digest;
 
-use crate::storage::StorageBackend;
 use crate::storage::state_kv::StateKv;
+use crate::storage::StorageBackend;
 
 const OWNER: &str = "memory";
 const NS: &str = "state";
@@ -140,7 +140,9 @@ pub(crate) fn import_all(
     // before the layout migrator archives the old files. Remove the source
     // only after the target write succeeds so an interrupted migration can
     // retry without losing owed deletions.
-    if let Some(previous) = local_kv.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")? {
+    if let Some(previous) =
+        local_kv.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
+    {
         let mut pending = queue_kv
             .get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
             .unwrap_or_default();
