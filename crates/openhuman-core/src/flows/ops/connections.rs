@@ -1,4 +1,27 @@
 use super::*;
+use serde::{Deserialize, Serialize};
+
+/// Secret-free OpenHuman picker projection for Composio accounts and named
+/// HTTP credentials. This is the product RPC shape; secrets remain in their
+/// domain stores and are injected only by CapsHost during execution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowConnection {
+    /// Value placed on a workflow node's `connection_ref`.
+    pub connection_ref: String,
+    /// Source kind: `composio` or `http`.
+    pub kind: String,
+    /// Human-readable label.
+    pub display: String,
+    /// Composio toolkit slug, when applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub toolkit: Option<String>,
+    /// HTTP credential scheme, when applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<String>,
+    /// Non-secret platform identity associated with a Composio connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform_user_id: Option<String>,
+}
 
 /// Lists the connection sources a flow node's `connection_ref` can attach to:
 /// Composio connected accounts (`kind = "composio"`) and stored HTTP
