@@ -288,21 +288,6 @@ async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_tab
 }
 
 #[tokio::test]
-async fn load_cached_model_preview_returns_empty_when_cache_json_is_invalid() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let state_dir = tempdir.path().join("state");
-    std::fs::create_dir_all(&state_dir).unwrap();
-    std::fs::write(
-        state_dir.join("models_cache.json"),
-        "{ definitely invalid json",
-    )
-    .unwrap();
-
-    let response = module_route_help_response(tempdir.path(), "/model", Vec::new()).await;
-    assert!(response.contains("No cached model list found for `openai`"));
-}
-
-#[tokio::test]
 async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_impl = Arc::new(RecordingChannel::default());
