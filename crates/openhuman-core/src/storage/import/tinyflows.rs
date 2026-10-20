@@ -374,7 +374,7 @@ async fn migrate_owner_stores(
         // second import change the database.
         if matches!(
             scope.parsed().map(|parsed| parsed.principal),
-            Ok(Some(tinystoragedrivers::scope::Principal::Module(_)))
+            Ok(Some(tinystoragedrivers::Principal::Module(_)))
         ) {
             continue;
         }
