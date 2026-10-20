@@ -310,9 +310,27 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
         let module_version = crate::modules::registry::find("tinyflows")
             .map(|record| record.version)
             .unwrap_or("missing");
+        let loaded_module = crate::modules::runtime::runtime()
+            .await
+            .ok()
+            .and_then(|runtime| {
+                runtime
+                    .host()
+                    .list()
+                    .into_iter()
+                    .find(|module| module.name == "tinyflows")
+            });
         eprintln!(
-            "ResumeRun nonparked-status diagnostic: error={err}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; registry_version={module_version}; artifact={:?}",
+            "ResumeRun nonparked-status diagnostic: error={err}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; registry_version={module_version}; loaded_version={}; loaded_file={}; artifact={:?}",
             config.workspace_dir.display(),
+            loaded_module
+                .as_ref()
+                .map(|module| module.version.as_str())
+                .unwrap_or("missing"),
+            loaded_module
+                .as_ref()
+                .map(|module| module.file.as_str())
+                .unwrap_or("missing"),
             crate::modules::local_artifact("tinyflows")
         );
     }
