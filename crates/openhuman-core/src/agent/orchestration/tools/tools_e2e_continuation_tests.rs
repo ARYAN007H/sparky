@@ -38,13 +38,13 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         "continue-paused-e2e",
         "continue-paused-e2e-thread",
     );
-    crate::core::runtime::CoreContext::scope(Arc::clone(&_core), async {
     assert!(
         live.data.dispatch_ctx().resolved().is_some(),
         "the parent carrier retains its core context"
     );
-    let paused = SpawnSubagentTool::new()
-        .execute_with_live_parent_context(
+    let paused = crate::core::runtime::CoreContext::scope(
+        Arc::clone(&_core),
+        SpawnSubagentTool::new().execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "Investigate the pause-resume fixture",
@@ -56,7 +56,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             live.data.child(),
             crate::agent::subagent_host::detached_subagent_parent(&live, "pause-resume-child")
                 .expect("detached parent"),
-        )
+        ),
+    )
         .await
         .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
@@ -124,8 +125,10 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
 
     let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
-    let before_session = sessions
-        .load()
+    let before_session = crate::core::runtime::CoreContext::sync_scope(
+        Arc::clone(&_core),
+        || sessions.load(),
+    )
         .expect("initial session persisted")
         .into_iter()
         .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
@@ -220,8 +223,9 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         reusable_session_id, before_session.subagent_session_id,
         "the production reuse selector sees the corrupted paused row"
     );
-    let refused_resume = SpawnSubagentTool::new()
-        .execute_with_live_parent_context(
+    let refused_resume = crate::core::runtime::CoreContext::scope(
+        Arc::clone(&_core),
+        SpawnSubagentTool::new().execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "This must not resume against a different lifecycle key.",
@@ -232,7 +236,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             live.data.child(),
             crate::agent::subagent_host::detached_subagent_parent(&live, "pause-resume-child")
                 .expect("detached parent"),
-        )
+        ),
+    )
         .await
         .expect("mismatched checkpoint refusal is returned as a tool error");
     assert!(refused_resume.is_error);
@@ -254,8 +259,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         "refusal invokes no child model"
     );
     assert_eq!(
-        sessions
-            .load()
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || sessions.load())
+            .expect("refused row remains persisted")
             .expect("refused row remains persisted")
             .into_iter()
             .find(|session| session.subagent_session_id == before_session.subagent_session_id)
@@ -264,18 +269,21 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         DurableSubagentStatus::AwaitingUser,
         "refusal leaves the paused row untouched"
     );
-    let mut restored_records = sessions.load().expect("mismatched sessions");
-    let row = restored_records
-        .iter_mut()
-        .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-        .expect("paused row to restore");
-    row.lifecycle_key = Some(original_lifecycle_key.clone());
-    sessions
-        .save(&restored_records)
-        .expect("restore the persisted lifecycle key for the valid continuation");
+    crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || {
+        let mut restored_records = sessions.load().expect("mismatched sessions");
+        let row = restored_records
+            .iter_mut()
+            .find(|session| session.subagent_session_id == before_session.subagent_session_id)
+            .expect("paused row to restore");
+        row.lifecycle_key = Some(original_lifecycle_key.clone());
+        sessions
+            .save(&restored_records)
+            .expect("restore the persisted lifecycle key for the valid continuation");
+    });
 
-    let resumed = SpawnSubagentTool::new()
-        .execute_with_live_parent_context(
+    let resumed = crate::core::runtime::CoreContext::scope(
+        Arc::clone(&_core),
+        SpawnSubagentTool::new().execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "Inspect the README and continue.",
@@ -286,7 +294,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             live.data.child(),
             crate::agent::subagent_host::detached_subagent_parent(&live, "pause-resume-child")
                 .expect("detached parent"),
-        )
+        ),
+    )
         .await
         .expect("continue");
     assert!(!resumed.is_error, "{}", resumed.output());
@@ -356,8 +365,10 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         completed_job.output.as_deref(),
         Some("paused-child-resumed-answer")
     );
-    let completed_session = sessions
-        .load()
+    let completed_session = crate::core::runtime::CoreContext::sync_scope(
+        Arc::clone(&_core),
+        || sessions.load(),
+    )
         .expect("completed session list")
         .into_iter()
         .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
@@ -367,8 +378,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         Some(&original_lifecycle_key),
         "resume preserves the original lifecycle identity"
     );
-    })
-    .await;
 }
 
 #[tokio::test]
