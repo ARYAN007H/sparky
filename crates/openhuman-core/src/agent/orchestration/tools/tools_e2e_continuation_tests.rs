@@ -58,8 +58,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
                 .expect("detached parent"),
         ),
     )
-        .await
-        .expect("initial spawn");
+    .await
+    .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
     let paused_ref = paused
         .output()
@@ -125,14 +125,12 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
 
     let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
-    let before_session = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&_core),
-        || sessions.load(),
-    )
-        .expect("initial session persisted")
-        .into_iter()
-        .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("initial durable session points at the paused child");
+    let before_session =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || sessions.load())
+            .expect("initial session persisted")
+            .into_iter()
+            .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
+            .expect("initial durable session points at the paused child");
     assert_eq!(before_session.status, DurableSubagentStatus::AwaitingUser);
     let original_lifecycle_key = before_session
         .lifecycle_key
@@ -238,8 +236,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
                 .expect("detached parent"),
         ),
     )
-        .await
-        .expect("mismatched checkpoint refusal is returned as a tool error");
+    .await
+    .expect("mismatched checkpoint refusal is returned as a tool error");
     assert!(refused_resume.is_error);
     assert!(
         refused_resume
@@ -260,7 +258,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
     assert_eq!(
         crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || sessions.load())
-            .expect("refused row remains persisted")
             .expect("refused row remains persisted")
             .into_iter()
             .find(|session| session.subagent_session_id == before_session.subagent_session_id)
@@ -296,8 +293,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
                 .expect("detached parent"),
         ),
     )
-        .await
-        .expect("continue");
+    .await
+    .expect("continue");
     assert!(!resumed.is_error, "{}", resumed.output());
     let resumed_ref = resumed
         .output()
@@ -365,14 +362,12 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         completed_job.output.as_deref(),
         Some("paused-child-resumed-answer")
     );
-    let completed_session = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&_core),
-        || sessions.load(),
-    )
-        .expect("completed session list")
-        .into_iter()
-        .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("completed row still owns the original task");
+    let completed_session =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || sessions.load())
+            .expect("completed session list")
+            .into_iter()
+            .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
+            .expect("completed row still owns the original task");
     assert_eq!(
         completed_session.lifecycle_key.as_ref(),
         Some(&original_lifecycle_key),
