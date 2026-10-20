@@ -99,14 +99,23 @@ describe('Settings - Data Management', function () {
 
     await waitForText('This will sign you out', 5_000);
     await clickSelector('[data-slot="alert-dialog-action"]');
+    await browser.waitUntil(async () => !fs.existsSync(sentinelPath), {
+      timeout: 60_000,
+      interval: 250,
+      timeoutMsg: 'reset_local_data did not delete the current user directory sentinel',
+    });
     await browser.waitUntil(async () => await textExists('Welcome to OpenHuman'), {
       timeout: 30_000,
       interval: 250,
       timeoutMsg: 'clear-data reset did not reload the signed-out Welcome screen',
     });
     await waitForTestId('welcome-cta-tinyhumans');
-    expect(fs.existsSync(sentinelPath)).toBe(false);
 
+    await browser.waitUntil(async () => (await callOpenhumanRpc('core.ping', {})).ok, {
+      timeout: 30_000,
+      interval: 250,
+      timeoutMsg: 'the core did not become healthy after the clear-data restart',
+    });
     const auth = await callOpenhumanRpc('openhuman.auth_get_state', {});
     expect(auth.ok).toBe(true);
     expect(auth.result?.result?.isAuthenticated).toBe(false);
