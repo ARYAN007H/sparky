@@ -90,8 +90,8 @@ fn managed_bearer_keeps_the_stored_key_transport_guard() {
 
 fn seed_app_session(dir: &std::path::Path, expires_at: Option<&str>) {
     use openhuman_embed::__host::security::credentials::{
-        AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
-        session_support::SESSION_EXPIRES_AT_META,
+        session_support::SESSION_EXPIRES_AT_META, AuthService, APP_SESSION_PROVIDER,
+        DEFAULT_AUTH_PROFILE_NAME,
     };
     let mut metadata = std::collections::HashMap::new();
     if let Some(expires_at) = expires_at {
@@ -148,14 +148,14 @@ fn managed_bearer_resolves_a_future_expiry_app_session() {
 }
 
 #[test]
-fn managed_bearer_keeps_exp_less_offline_app_sessions() {
+fn managed_bearer_resolves_exp_less_hosted_app_sessions() {
     let tmp = tempfile::TempDir::new().expect("temporary credentials");
     seed_app_session(tmp.path(), None);
 
     assert_eq!(
         managed_options_at(tmp.path())
             .resolve_bearer("http://127.0.0.1:9/openai/v1")
-            .expect("an exp-less offline session resolves by presence"),
+            .expect("an exp-less hosted session resolves by presence"),
         "test.session.jwt"
     );
 }
