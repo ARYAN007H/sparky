@@ -27,10 +27,9 @@ async fn importing_twice_changes_nothing() {
     let first = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
     import(&fx.target, &fx.config).await.unwrap();
     migrate(&fx.target).await.unwrap();
-    assert_eq!(
-        super::super::db::table_counts(&v1_db(&fx.target)).unwrap(),
-        first
-    );
+    let second = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
+    eprintln!("DBG first={first:?} second={second:?}");
+    assert_eq!(second, first);
 }
 
 #[tokio::test(flavor = "multi_thread")]
