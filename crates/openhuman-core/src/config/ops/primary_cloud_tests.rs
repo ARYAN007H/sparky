@@ -1,6 +1,14 @@
 use super::*;
 
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+use std::sync::Arc;
+
+fn register_test_hosted_policy() {
+    crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == "openhuman"),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
+}
 
 fn provider(id: &str, slug: &str, endpoint: &str, auth_style: AuthStyle) -> CloudProviderCreds {
     CloudProviderCreds {
@@ -15,6 +23,7 @@ fn provider(id: &str, slug: &str, endpoint: &str, auth_style: AuthStyle) -> Clou
 
 #[test]
 fn explicit_managed_primary_yields_matching_legacy_custom_provider() {
+    register_test_hosted_policy();
     let mut config = Config::default();
     config.cloud_providers = vec![
         provider(
@@ -41,6 +50,7 @@ fn explicit_managed_primary_yields_matching_legacy_custom_provider() {
 
 #[test]
 fn explicit_managed_primary_fails_closed_for_unmatched_custom_intent() {
+    register_test_hosted_policy();
     let mut config = Config::default();
     config.cloud_providers = vec![provider(
         "managed",
