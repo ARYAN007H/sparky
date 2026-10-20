@@ -177,8 +177,9 @@ async fn classified_failure_event_preserves_runner_copy_and_queued_prefix() {
 
     let error = events_for(&mut rx, &req.request_id, 1).await.remove(0);
     assert!(matches!(error.wire_event(), WebChannelEvent::ChatError {
-        message: Some(message), copy_key: Some(copy_key), copy_params: Some(params), ..
+        message: Some(message), error_type: Some(error_type), copy_key: Some(copy_key), copy_params: Some(params), ..
     } if message == "queued turn was not run: localized by the runner"
+        && error_type == "auth_error"
         && copy_key == "chat_error.auth_error"
         && params["detail"] == "sanitized detail"));
 }

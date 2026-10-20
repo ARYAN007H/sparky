@@ -420,7 +420,12 @@ fn chat_error_event(
                 .map(|failure| failure.message.clone())
                 .unwrap_or(classified.message),
         ),
-        error_type: Some(classified.error_type.to_owned()),
+        error_type: Some(
+            structured
+                .map(|failure| failure.class.as_str())
+                .unwrap_or(classified.error_type)
+                .to_owned(),
+        ),
         error_source: Some(classified.source.to_owned()),
         error_retryable: Some(classified.retryable),
         error_retry_after_ms: classified.retry_after_ms,
