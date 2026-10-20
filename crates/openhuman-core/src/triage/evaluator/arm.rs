@@ -248,25 +248,20 @@ pub(crate) fn classify_error(message: String) -> ArmError {
         None,
         None,
         &message,
-        crate::core::observability::is_session_expired_message,
+        |value| {
+            crate::core::observability::is_session_expired_message(value)
+                || tinyinference_llm::failure::is_context_window_exceeded_message(value)
+                || tinyinference_llm::failure::body_indicates_quota_exhausted(value)
+        },
     );
-    let reason = match failure {
-        tinyinference_llm::failure::ProviderFailureClass::RateLimited
-        | tinyinference_llm::failure::ProviderFailureClass::NonRetryableRateLimit => {
-            FailoverReason::RateLimit
-        }
-        tinyinference_llm::failure::ProviderFailureClass::UpstreamUnhealthy => {
-            FailoverReason::Overloaded
-        }
-        tinyinference_llm::failure::ProviderFailureClass::Retryable => {
-            FailoverReason::Unknown
-        }
-        tinyinference_llm::failure::ProviderFailureClass::NonRetryable => FailoverReason::Unknown,
-    };
+    // Keep the harness's detailed failover reason mapping while using the
+    // provider-neutral classifier to distinguish retryable and exhausted
+    // rate limits and preserve terminal account/context failures.
+    let reason = FailoverReason::classify_unstructured(&message);
     let decision = decide(
         reason,
         FailoverState {
-            retryable: failure.is_retryable(),
+            retryable: failure.is_retryable() && reason != FailoverReason::Unknown,
             attempts_remaining: true,
             larger_window_available: false,
         },

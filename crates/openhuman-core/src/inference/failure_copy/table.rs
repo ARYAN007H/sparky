@@ -6,24 +6,29 @@
 //! here. A literal fixture (`web_chat/web_tests_error_copy_fixture_tests.rs`)
 //! pins every row.
 
-/// One row: what the frontend branches on (`error_type`, `source`,
-/// `retryable`) and what the user reads (`copy`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct FailureCopy {
-    /// Stable i18n key (`chat_error.<class>`), one per row. Sent as
-    /// `copy_key` on the `chat_error` event so the frontend can render the
-    /// copy in the user's locale; `copy` stays the English fallback.
-    pub(crate) key: &'static str,
-    /// Stable `error_type` wire token of the `chat_error` event.
-    pub(crate) error_type: &'static str,
-    /// Where the limit originated (`provider`, `openhuman_budget`,
-    /// `agent_loop`, `openhuman_billing`, `transport`, `config`, `auth`).
-    pub(crate) source: &'static str,
-    /// Whether the same prompt can be retried in the same thread.
-    pub(crate) retryable: bool,
-    /// User copy. A few classes take a suffix at the call site (retry-after
-    /// hint, provider detail block); the base text is always this string.
-    pub(crate) copy: &'static str,
+use tinyinference_llm::failure::copy::{
+    FailureCopy, FailureCopyClass, FailureCopyProvider, failure_copy_with,
+};
+
+struct OpenHumanFailureCopy;
+
+impl FailureCopyProvider for OpenHumanFailureCopy {
+    fn copy(&self, class: FailureCopyClass) -> Option<FailureCopy> {
+        use FailureCopyClass::*;
+        let copy = match class {
+            ChatTemplateRejected => Some("This model's chat template rejected the request — it isn't the model, the temperature, or your API key. Local models without native tool calling are driven through their own chat template, and some templates refuse the message shape of a tool step. Start a new chat to reset the history, or pick a model with native tool support in Connections → API keys → LLM."),
+            RateLimitedBilling => Some("Your AI provider is rejecting requests for billing or plan reasons (out of credits, plan limit, or unavailable model). Retrying won't help — open Settings to top up, upgrade your plan, or pick a different model."),
+            Authentication => Some("There's an authentication issue with the AI provider. Please check your API key in settings."),
+            EmptyResponse => Some("The model returned an empty response. Please retry. If it keeps happening, try a different model or check its setup in Connections → API keys → LLM."),
+            ModelConfigRejected => Some("Your AI provider rejected the request's model or temperature setting. Check your model and routing in Settings → LLM."),
+            CapabilityUnsupported => Some("This model can't process images. Remove the attachment or switch to a vision-capable model in Connections → API keys → LLM."),
+            RequestRejected => Some("The AI provider rejected the request — this is usually a model or parameter incompatibility. Try a different model in Connections → API keys → LLM."),
+            _ => None,
+        }?;
+        let mut row = tinyinference_llm::failure::copy::default_failure_copy(class)?;
+        row.copy = copy;
+        Some(row)
+    }
 }
 
 /// A failure class the chat surface renders copy for. Several classifier arms
@@ -62,18 +67,38 @@ pub(crate) enum FailureClass {
 }
 
 /// The row for `class`.
-pub(crate) fn failure_copy(class: FailureClass) -> &'static FailureCopy {
+pub(crate) fn failure_copy(class: FailureClass) -> FailureCopy {
     use FailureClass::*;
+    let upstream = match class {
+        ChatTemplateRejected => Some(FailureCopyClass::ChatTemplateRejected),
+        EmptyResponse => Some(FailureCopyClass::EmptyResponse),
+        RateLimited => Some(FailureCopyClass::RateLimited),
+        RateLimitedBilling => Some(FailureCopyClass::RateLimitedBilling),
+        Timeout => Some(FailureCopyClass::Timeout),
+        AuthError => Some(FailureCopyClass::Authentication),
+        PayloadTooLarge => Some(FailureCopyClass::PayloadTooLarge),
+        ContextOverflow => Some(FailureCopyClass::ContextOverflow),
+        ModelConfigRejected => Some(FailureCopyClass::ModelConfigRejected),
+        ModelUnavailable => Some(FailureCopyClass::ModelUnavailable),
+        CapabilityUnsupported => Some(FailureCopyClass::CapabilityUnsupported),
+        ProviderUnavailable => Some(FailureCopyClass::ProviderUnavailable),
+        RequestRejected => Some(FailureCopyClass::RequestRejected),
+        Network => Some(FailureCopyClass::Network),
+        Inference => Some(FailureCopyClass::Inference),
+        _ => None,
+    };
+    if let Some(class) = upstream {
+        return failure_copy_with(&OpenHumanFailureCopy, class).expect("known failure copy");
+    }
     macro_rules! row {
         ($key:expr, $ty:expr, $src:expr, $retry:expr, $copy:expr) => {{
-            static ROW: FailureCopy = FailureCopy {
+            FailureCopy {
                 key: $key,
                 error_type: $ty,
                 source: $src,
                 retryable: $retry,
                 copy: $copy,
-            };
-            &ROW
+            }
         }};
     }
     match class {
