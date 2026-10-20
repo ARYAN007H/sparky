@@ -16,7 +16,7 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
         .collect::<Vec<_>>();
     for name in &spawn_names {
         assert!(
-            crate::agent::tinyagents::is_subagent_spawn_or_delegate_tool(name),
+            crate::agent::tinyagents::is_subagent_spawn_tool(name),
             "shared spawn predicate missed {name}"
         );
     }

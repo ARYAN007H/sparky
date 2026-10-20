@@ -21,7 +21,7 @@ use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 use crate::agent::orchestration::tools::SpawnSubagentDispatch;
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
+use crate::agent::tinyagents::turn_policy::is_subagent_spawn_tool;
 use crate::agent::tools::TodoToolDispatch;
 use crate::core::runtime::CoreContext;
 
@@ -121,13 +121,13 @@ fn live_dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
     dispatch_selector(tool_sets)
 }
 
-/// Names among the candidate tools that spawn or delegate to a sub-agent.
+/// Names among the candidate tools that spawn a sub-agent.
 fn candidate_spawn_tools(tool_sets: &[SharedToolSet]) -> HashSet<String> {
     tool_sets
         .iter()
         .flat_map(|set| set.iter())
         .map(|tool| tool.name().to_string())
-        .filter(|name| is_subagent_spawn_or_delegate_tool(name))
+        .filter(|name| is_subagent_spawn_tool(name))
         .collect()
 }
 

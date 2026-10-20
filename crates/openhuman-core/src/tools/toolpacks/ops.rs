@@ -143,43 +143,24 @@ pub fn is_withheld_from(agent_id: &str, tool: &str) -> bool {
 /// guessed at tool names, and never handed off. Closing the raw tools leaves the
 /// hand-off as the route, and the pack listing then names it (`route_sentence`).
 ///
-/// A pack closes only when all of this holds:
-/// * it is withheld from `agent_id` (a pack's owner keeps its own belt),
-/// * one of the pack's owners is the [`delegation_target`] of a hand-off this
-///   agent carries **unpacked** — a delegate no pack withholds, and therefore
-///   one it advertises by construction.
-///
-/// [`delegation_target`]: crate::tools::host_extensions::delegation_target
-///
-/// Inside a closed pack, a tool that is itself a hand-off (e.g. `create_skill`)
-/// stays reachable: it is a route, not a raw tool. A tool whose group an embedder
-/// advertised is on the wire, not withheld, and is left alone too.
-///
-/// **Deliberately not keyed on the visible set.** It used to be, and that made
-/// the rule true in tests and false in production. An agent with
-/// `ToolScope::Named` is built with `visible` = its named list, which cannot
-/// contain a *synthesised* delegate like `setup_skills`; those names arrive
-/// later, when `refresh_delegation_tools` inserts them. So at build time no
-/// hand-off looked reachable and nothing closed, while a harness agent — whose
-/// empty visible set is seeded from every tool, synthesised ones included —
-/// closed correctly. The live orchestrator kept its raw `skill_registry_*` /
-/// `mcp_registry_*` route the whole time (#6302). Pack membership is knowable
-/// the moment the tools exist, so the answer no longer depends on when the
-/// visible set is filled in.
+/// Close tools owned by specialists that this agent can reach through its
+/// `spawn_subagent` schema. The schema's agent-id enum is the same allowlist
+/// enforced during execution, so this keeps a single route to each capability.
 pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'static str> {
     let reachable_owners: HashSet<&str> = tools
         .iter()
-        .filter(|tool| registry::pack_for_tool(tool.name()).is_none())
-        .filter_map(|tool| crate::tools::host_extensions::delegation_target(*tool))
+        .filter(|tool| tool.name() == "spawn_subagent")
+        .filter_map(|tool| {
+            tool.parameters_schema()
+                .pointer("/properties/agent_id/enum")
+                .and_then(serde_json::Value::as_array)
+        })
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
         .collect();
     if reachable_owners.is_empty() {
         return Vec::new();
     }
-    let handoffs: HashSet<&str> = tools
-        .iter()
-        .filter(|tool| crate::tools::host_extensions::delegation_target(**tool).is_some())
-        .map(|tool| tool.name())
-        .collect();
     let groups = super::groups::current();
     registry::PACKS
         .iter()
@@ -190,7 +171,6 @@ pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'st
                 .any(|owner| reachable_owners.contains(owner))
         })
         .flat_map(|pack| pack.tools.iter().copied())
-        .filter(|name| !handoffs.contains(name))
         .filter(|name| groups.mode_for_tool(name) == super::groups::GroupMode::Withheld)
         .collect()
 }

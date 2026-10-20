@@ -156,7 +156,7 @@ pub(crate) fn tool_call_limit(max_iterations: usize, cap: Option<usize>) -> usiz
 /// defense-in-depth so a misconfigured allowlist cannot reintroduce sub-agent
 /// spawning into a nested run. It shares TinyAgents' canonical spawn names and
 /// the host's single spawn surface.
-pub(crate) fn is_subagent_spawn_or_delegate_tool(name: &str) -> bool {
+pub(crate) fn is_subagent_spawn_tool(name: &str) -> bool {
     name == "spawn_subagent" || tinyagents_definition::SPAWN_TOOL_NAMES.contains(&name)
 }
 
