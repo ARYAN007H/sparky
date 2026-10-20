@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { bootAuthenticatedPage, waitForAppReady } from '../helpers/core-rpc';
+import { bootAuthenticatedPage, callCoreRpc, waitForAppReady } from '../helpers/core-rpc';
 
 async function setDeviceOffline(page: import('@playwright/test').Page, offline: boolean) {
   await page.evaluate(isOffline => {
@@ -24,11 +24,15 @@ test.describe('Connectivity state differentiation', () => {
   // transient reconnect label cannot be asserted deterministically here;
   // selector behavior has focused store coverage.
 
-  test('shows device-offline copy (not backend-only) when window fires offline', async ({
+  test('keeps device-offline state distinct while the local core remains reachable', async ({
     page,
   }) => {
     await setDeviceOffline(page, true);
-    await expect(page.getByText('Your device is offline right now')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
+    await expect(page.getByRole('navigation', { name: 'Home' })).toBeVisible();
+
+    const ping = await callCoreRpc<{ ok?: boolean }>('core.ping', {});
+    expect(ping.ok).toBe(true);
   });
 
   // The core is a separate process in this lane, but the runner has no
