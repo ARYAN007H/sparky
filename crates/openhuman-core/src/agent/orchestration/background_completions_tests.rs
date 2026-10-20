@@ -34,6 +34,17 @@ fn record(ws: &Path, session: &str, task: &str, summary: &str, thread: Option<&s
     ));
 }
 
+fn record_admitted(ws: &Path, session: &str, task: &str, summary: &str, thread: &str) {
+    let target = CompletionTarget::new(
+        cx(),
+        ws.to_path_buf(),
+        session.to_owned(),
+        Some(thread.to_owned()),
+    )
+    .expect("the parent thread admits a new child");
+    futures::executor::block_on(target.completed(task, "researcher", summary.to_owned()));
+}
+
 fn pending_ids(ws: &Path, thread: &str) -> Vec<String> {
     pending_for(ws, thread)
         .into_iter()
@@ -375,12 +386,12 @@ fn discard_pending_for_thread_blocks_late_results_until_the_next_turn() {
         pending_ids(w, "thread-stop-live").is_empty(),
         "the stopped generation's task ids stay tombstoned after the thread reopens"
     );
-    record(
+    record_admitted(
         w,
         "sess-stop",
         "sub-stop-new-turn",
         "next turn",
-        Some("thread-stop-live"),
+        "thread-stop-live",
     );
     assert_eq!(pending_ids(w, "thread-stop-live"), ["sub-stop-new-turn"]);
 }
@@ -402,12 +413,12 @@ fn a_stop_before_a_restart_is_lifted_by_the_first_new_spawn() {
         "thread-restart-stop",
         "sub-new"
     ));
-    record(
+    record_admitted(
         w,
         "sess-rs",
         "sub-new",
         "after restart",
-        Some("thread-restart-stop"),
+        "thread-restart-stop",
     );
     assert_eq!(
         pending_ids(w, "thread-restart-stop"),
