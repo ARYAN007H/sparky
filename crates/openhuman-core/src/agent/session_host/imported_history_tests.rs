@@ -185,3 +185,105 @@ async fn run_imported_history_prefix_regression() {
     assert!(resumed_history.contains("new relay question"));
     assert!(resumed_history.contains("first reply"));
 }
+
+#[tokio::test]
+async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
+    use tinyagents_session::transcript::{SessionRef, TranscriptMeta, TranscriptMessage};
+
+    let root = tempfile::tempdir().expect("workspace");
+    let locator = crate::agent::session_store::splice_fixture::memory_locator();
+    let model: Arc<dyn ChatModel<()>> = Arc::new(
+        tinyagents_harness::testkit::ScriptedModel::replies(vec!["unused"]),
+    );
+    let mut host = SessionHostBuilder::new()
+        .with_session_history_locator(Arc::clone(&locator))
+        .chat_model(model)
+        .workspace_dir(root.path().join("workspace"))
+        .action_dir(root.path().to_path_buf())
+        .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
+        .build()
+        .expect("session host");
+
+    host.set_thread_id(Some("legacy-history-lazy"));
+    let session = host.bound_session_ref().expect("bound session").clone();
+    assert!(!host.bound_history_is_authoritative().unwrap());
+
+    // Merely opening the exact transcript handle does not count as a durable
+    // turn and must not suppress the one-time legacy import.
+    let now = chrono::Utc::now().to_rfc3339();
+    locator
+        .open_stem(
+            &tinyagents_session::transcript::session_stem(&session),
+            TranscriptMeta {
+                agent_name: "orchestrator".into(),
+                agent_id: session.agent_id.clone(),
+                agent_type: Some("root".into()),
+                dispatcher: "native".into(),
+                provider: None,
+                model: None,
+                created: now.clone(),
+                updated: now,
+                turn_count: 0,
+                prefix_message_count: None,
+                prefix_reset: false,
+                input_tokens: 0,
+                output_tokens: 0,
+                cached_input_tokens: 0,
+                charged_amount_usd: 0.0,
+                thread_id: Some(session.session_key.clone()),
+                task_id: None,
+                session_id: Some(session.session_id()),
+                parent_session_id: None,
+            },
+        )
+        .unwrap();
+    assert!(!host.bound_history_is_authoritative().unwrap());
+    let missing = host
+        .adopt_legacy_history_if_needed(|| async {
+            Err(anyhow::anyhow!("legacy store unavailable"))
+        })
+        .await;
+    assert!(missing.is_err(), "failed legacy reads stop before a turn starts");
+    assert!(
+        !locator.session_exists(&session),
+        "a failed import must not create an empty durable transcript"
+    );
+
+    let imported = vec![TranscriptMessage::user("legacy question")];
+    assert!(host
+        .adopt_legacy_history_if_needed(|| async { Ok(imported.clone()) })
+        .await
+        .unwrap());
+    assert!(host.bound_history_is_authoritative().unwrap());
+    assert!(!host
+        .adopt_legacy_history_if_needed(|| async {
+            Err(anyhow::anyhow!("legacy store became unavailable"))
+        })
+        .await
+        .unwrap());
+
+    // A separate host bound to a session with committed durable rows never
+    // consults the legacy source, even when that source is unavailable.
+    let second_root = tempfile::tempdir().expect("second workspace");
+    let second_model: Arc<dyn ChatModel<()>> = Arc::new(
+        tinyagents_harness::testkit::ScriptedModel::replies(vec!["unused"]),
+    );
+    let mut resumed = SessionHostBuilder::new()
+        .with_session_history_locator(locator.clone())
+        .chat_model(second_model)
+        .workspace_dir(second_root.path().join("workspace"))
+        .action_dir(second_root.path().to_path_buf())
+        .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
+        .build()
+        .expect("resumed session host");
+    resumed.set_thread_id(Some("legacy-history-lazy"));
+    assert!(resumed.bound_history_is_authoritative().unwrap());
+    assert!(!resumed
+        .adopt_legacy_history_if_needed(|| async {
+            Err(anyhow::anyhow!("legacy store unavailable"))
+        })
+        .await
+        .unwrap());
+
+    let _ = SessionRef::root("unused");
+}

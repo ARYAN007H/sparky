@@ -43,6 +43,16 @@ impl OpenHumanSessionHost {
             || transcript.tools.is_some())
     }
 
+    /// Exact durable identity used by the method above. Exposed only to the
+    /// adjacent session-host tests and callers that need to seed that same
+    /// recorded session store.
+    #[cfg(test)]
+    pub(crate) fn bound_session_ref(
+        &self,
+    ) -> Option<&tinyagents_session::transcript::SessionRef> {
+        self.session.as_ref()
+    }
+
     /// Load legacy history only when the exact bound session has no durable
     /// turn or explicit empty/reset boundary. A failed load returns before the
     /// caller can start a turn and create a misleading empty session.
