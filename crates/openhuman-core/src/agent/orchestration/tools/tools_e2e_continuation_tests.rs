@@ -157,16 +157,28 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     sessions
         .save(&mismatched_records)
         .expect("corrupt only the persisted lifecycle owner key");
-    let definition = AgentDefinitionRegistry::builtins_only()
+    let definitions = AgentDefinitionRegistry::builtins_only();
+    let definition = definitions
         .get("task_manager_agent")
         .expect("task manager definition");
+    let effective_action_root = live
+        .data
+        .workspace
+        .as_ref()
+        .map(|workspace| workspace.root.clone())
+        .or_else(|| {
+            crate::security::live_policy::effective_in(&live.data.dispatch_ctx())
+                .map(|policy| policy.action_dir.clone())
+        });
     let selector = crate::agent::orchestration::subagent_sessions::SubagentSessionSelector {
         parent_session: "continue-paused-e2e".into(),
         parent_thread_id: Some("continue-paused-e2e-thread".into()),
         agent_id: "task_manager_agent".into(),
         model: Some("test-model".into()),
         sandbox_mode: format!("{:?}", definition.sandbox_mode),
-        action_root: None,
+        action_root: crate::agent::orchestration::subagent_sessions::action_root_key(
+            effective_action_root.as_deref(),
+        ),
         task_key: "pause-resume-fixture".into(),
     };
     let (saved_key, reusable_session_id) =
