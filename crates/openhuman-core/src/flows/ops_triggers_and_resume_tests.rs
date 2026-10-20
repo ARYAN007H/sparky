@@ -241,34 +241,26 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
     let job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
         .unwrap()
         .expect("cron job bound on enable");
-    let run_at = chrono::DateTime::parse_from_rfc3339("2026-10-20T09:00:00Z")
-        .unwrap()
-        .with_timezone(&chrono::Utc);
-    crate::cron::record_run(
+    crate::cron::update_job(
         &config,
         &job.id,
-        run_at,
-        run_at,
-        "ok",
-        Some("prior schedule result"),
-        17,
+        crate::cron::CronJobPatch {
+            enabled: Some(false),
+            ..Default::default()
+        },
     )
     .unwrap();
     let original_job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
         .unwrap()
-        .expect("seeded schedule job remains registered");
-    assert_eq!(original_job.last_run, Some(run_at));
-    assert_eq!(original_job.last_status.as_deref(), Some("ok"));
-    assert_eq!(
-        original_job.last_output.as_deref(),
-        Some("prior schedule result")
-    );
+        .expect("paused schedule job remains registered");
+    assert!(!original_job.enabled, "precondition: schedule job is paused");
 
     let mut graph = schedule_trigger_graph("0 9 * * *");
     graph["nodes"][0]["config"]["inputs"] = json!({"team": "platform"});
     let updated = flows_update(&config, &created.value.id, None, Some(graph), None, None)
         .await
         .unwrap();
+    assert!(updated.value.enabled, "the flow remains enabled during the edit");
     assert_eq!(
         updated.value.graph.trigger().unwrap().config["inputs"]["team"],
         "platform",
@@ -279,9 +271,7 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
         .unwrap()
         .expect("schedule job remains bound after input-only edit");
     assert_eq!(job.id, original_job.id, "input edits must preserve the binding");
-    assert_eq!(job.last_run, original_job.last_run);
-    assert_eq!(job.last_status, original_job.last_status);
-    assert_eq!(job.last_output, original_job.last_output);
+    assert!(!job.enabled, "input-only edits must preserve a paused schedule job");
     assert_eq!(job.expression, original_job.expression);
 }
 
