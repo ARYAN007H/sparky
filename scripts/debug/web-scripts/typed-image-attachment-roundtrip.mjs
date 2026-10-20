@@ -308,32 +308,7 @@ export default async function typedImageAttachmentRoundtrip({
       }),
     threadId,
   );
-  await page.getByText(REPLY, { exact: false }).waitFor({ timeout: 30_000 });
-  const restoredMessage = await page.evaluate(
-    ({ id, rowId }) => {
-      const messages =
-        window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId?.[
-          id
-        ] ?? [];
-      return messages.find(
-        (message) => message.sender === "user" && message.id === rowId,
-      );
-    },
-    { id: threadId, rowId: persisted.id },
-  );
-  if (restoredMessage?.content !== persisted.content)
-    throw new Error(
-      "reloaded conversation did not restore the marker-free user text",
-    );
-  if (["[ATTACHMENT:", "[IMAGE:", "[FILE:"].some((marker) =>
-    restoredMessage.content.includes(marker),
-  ))
-    throw new Error("reloaded user text contains a staging marker");
-  if (
-    JSON.stringify(restoredMessage?.attachments) !==
-    JSON.stringify(persisted.attachments)
-  )
-    throw new Error("reloaded conversation did not restore the opaque image ref");
+  await page.getByText(EDITED_REPLY, { exact: false }).waitFor({ timeout: 30_000 });
   const restoredEdit = await page.evaluate(
     ({ id, content }) => {
       const messages =
@@ -348,9 +323,11 @@ export default async function typedImageAttachmentRoundtrip({
   );
   if (
     restoredEdit?.id !== editedUserRow.id ||
+    restoredEdit?.content !== EDITED_TEXT ||
+    /\[(?:ATTACHMENT|IMAGE|FILE):/i.test(restoredEdit?.content ?? "") ||
     restoredEdit?.attachments?.[0]?.media?.opaqueId !== editedRef.media.opaqueId
   )
-    throw new Error("edited image row did not reload with its fresh opaque reference");
+    throw new Error("edited image row did not reload with clean text and fresh opaque reference");
   log(
     "typed image attachment survived core staging, chat submission and reload",
   );
