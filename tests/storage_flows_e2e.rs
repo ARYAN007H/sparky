@@ -52,7 +52,7 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     });
-    let flow = flows::ops::flows_create(&config, "Digest".to_string(), graph, false)
+    let flow = flows::ops::flows_create(&config, "Digest".to_string(), graph.clone(), false)
         .await
         .unwrap()
         .value;
@@ -133,7 +133,7 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     let fallback_flow = flows::ops::flows_create(
         &config,
         "Fallback".to_string(),
-        structurally_valid_graph_for_storage_test(),
+        graph,
         false,
     )
     .await
