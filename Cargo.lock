@@ -5450,7 +5450,6 @@ dependencies = [
  "tinyflows",
  "tinyflows-bus",
  "tinyflows-catalog",
- "tinyflows-copilot",
  "tinyflows-drivers",
  "tinyflows-import",
  "tinyflows-module",
