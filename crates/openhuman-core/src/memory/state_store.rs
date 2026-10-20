@@ -105,10 +105,19 @@ fn open_workspace_quarantining<T: DeserializeOwned>(
 ) -> Result<StateKv> {
     let scope = workspace_scope(workspace_dir)?;
     let backend = crate::storage::local::backend_for(workspace_dir)?;
-    let kv = StateKv::on_backend(&backend, &scope, OWNER, NS)?;
+    open_workspace_quarantining_on::<T>(workspace_dir, &backend, &scope, name)
+}
+
+fn open_workspace_quarantining_on<T: DeserializeOwned>(
+    workspace_dir: &Path,
+    backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
+    scope: &crate::storage::Scope,
+    name: &str,
+) -> Result<StateKv> {
+    let kv = StateKv::on_backend(backend, scope, OWNER, NS)?;
     kv.import_file_quarantining::<T>(name, &legacy_path(workspace_dir, name))?;
     if name == "pending_deletions" {
-        migrate_existing_queue_scopes(workspace_dir, &backend, &scope, &kv)?;
+        migrate_existing_queue_scopes(workspace_dir, backend, scope, &kv)?;
     }
     Ok(kv)
 }
