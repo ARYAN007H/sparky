@@ -67,12 +67,27 @@ fn approval_gated_http_graph() -> Value {
         "nodes": [
             { "id": "trigger", "kind": "trigger", "name": "Manual" },
             { "id": "request", "kind": "http_request", "name": "Blocked request",
-              "config": { "method": "GET", "url": "http://127.0.0.1:1/must-not-connect" } },
+              "config": { "method": "POST", "url": "http://127.0.0.1:1/must-not-connect" } },
             { "id": "after", "kind": "output_parser", "name": "After request" }
         ],
         "edges": [
             { "from_node": "trigger", "to_node": "request" },
             { "from_node": "request", "to_node": "after" }
+        ]
+    })
+}
+
+fn approval_gated_parser_graph() -> Value {
+    json!({
+        "name": "Published approval lifecycle",
+        "nodes": [
+            { "id": "trigger", "kind": "trigger", "name": "Manual" },
+            { "id": "gate", "kind": "output_parser", "name": "Approval", "config": { "requires_approval": true } },
+            { "id": "after", "kind": "output_parser", "name": "After approval" }
+        ],
+        "edges": [
+            { "from_node": "trigger", "to_node": "gate" },
+            { "from_node": "gate", "to_node": "after" }
         ]
     })
 }
@@ -124,6 +139,44 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     )
     .await;
     let flow_id = created["id"].as_str().expect("saved flow id").to_owned();
+    let approval_flow = ok(
+        addr,
+        TEST_TOKEN,
+        8,
+        "openhuman.flows_create",
+        json!({ "name": "Published approval flow", "graph": approval_gated_parser_graph() }),
+    )
+    .await;
+    let approval_flow_id = approval_flow["id"].as_str().expect("approval flow id").to_owned();
+    let approval_parked = ok(
+        addr,
+        TEST_TOKEN,
+        9,
+        "openhuman.flows_run",
+        json!({ "id": approval_flow_id, "input": { "item": "approved" } }),
+    )
+    .await;
+    let approval_run_id = approval_parked["thread_id"].as_str().expect("approval run id");
+    assert!(approval_parked["pending_approvals"].as_array().unwrap().iter().any(|v| v == "gate"));
+    let approved = ok(
+        addr,
+        TEST_TOKEN,
+        10,
+        "openhuman.flows_resume",
+        json!({ "id": approval_flow_id, "thread_id": approval_run_id, "approvals": ["gate"] }),
+    )
+    .await;
+    assert!(approved["pending_approvals"].as_array().unwrap().is_empty());
+    let approved_row = ok(
+        addr,
+        TEST_TOKEN,
+        11,
+        "openhuman.flows_get_run",
+        json!({ "run_id": approval_run_id }),
+    )
+    .await;
+    assert_eq!(approved_row["status"], "completed");
+
     let parked = ok(
         addr,
         TEST_TOKEN,
@@ -175,7 +228,7 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         TEST_TOKEN,
         5,
         "openhuman.flows_run",
-        json!({ "id": flow_id, "input": { "item": "cancel" } }),
+        json!({ "id": approval_flow_id, "input": { "item": "cancel" } }),
     )
     .await;
     let cancelled_id = parked_again["thread_id"]
