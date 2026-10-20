@@ -226,9 +226,13 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             provider_server.hold_until(CONCURRENT_TURNS);
             let started = std::time::Instant::now();
             let mut turns = tokio::task::JoinSet::new();
+            // RED-ONLY: serialize every turn behind one lock.
+            let serialize = std::sync::Arc::new(tokio::sync::Mutex::new(()));
             for index in 0..CONCURRENT_TURNS {
                 let harness = std::sync::Arc::clone(&harness);
+                let serialize = std::sync::Arc::clone(&serialize);
                 turns.spawn(async move {
+                    let _serialized = serialize.lock().await;
                     harness
                         .turn(format!("Concurrent agent {index}"))
                         .session(format!("concurrent-agent-{index}"))
