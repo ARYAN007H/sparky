@@ -6,8 +6,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         DurableSubagentStatus, SubagentSessionStore,
     };
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
-    use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
@@ -22,7 +20,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         Box::new(tinyagents_harness_tools::AskClarificationTool::new());
     let ask_spec = Arc::new(ask_tool.spec());
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
-    parent.workspace_dir = workspace.path().to_path_buf();
     parent.session_id = "continue-paused-e2e".into();
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);
     parent.on_progress = Some(progress_tx);
@@ -35,27 +32,11 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     parent
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
-    let mut definition = AgentDefinitionRegistry::builtins_only()
-        .get("task_manager_agent")
-        .expect("task manager definition")
-        .clone();
-    definition.model = tinyagents_definition::ModelSpec::Inherit;
-    let definitions =
-        Arc::new(AgentDefinitionRegistry::builtins_only().with_definitions([definition]));
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = workspace.path().to_path_buf();
-    config.components.juice = false;
-    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
-    );
-    let mut host_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
-        .with_core(Some(Arc::clone(&core)))
-        .with_parent(parent);
-    host_context.thread_id = Some("continue-paused-e2e-thread".into());
-    let live = tinyagents_harness::context::RunContext::new(
-        tinyagents_harness::context::RunConfig::new("continue-paused-e2e")
-            .with_thread("continue-paused-e2e-thread"),
-        host_context,
+    let live = core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "continue-paused-e2e",
+        "continue-paused-e2e-thread",
     );
     let paused = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
@@ -92,31 +73,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .to_owned();
 
     let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx());
-    let running_job = jobs
-        .list()
-        .into_iter()
-        .find(|job| {
-            job.extensions
-                .get("task_id")
-                .and_then(serde_json::Value::as_str)
-                == Some(task_id.as_str())
-        })
-        .expect("initial child is registered in shared Jobs");
-    let paused_job = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        jobs.wait_owned(
-            running_job.id.as_str(),
-            crate::agent::tinyagents::tool_registration::subagent_owner_key(
-                workspace.path(),
-                "continue-paused-e2e",
-                Some("continue-paused-e2e-thread"),
-            ),
-        ),
-    )
-    .await
-    .expect("child reaches its clarification checkpoint")
-    .expect("registered child remains available");
-    assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             match progress_rx.recv().await {
@@ -131,6 +87,31 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     })
     .await
     .expect("host pause projection follows durable checkpoint persistence");
+    let paused_job = jobs
+        .list()
+        .into_iter()
+        .find(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str())
+        })
+        .expect("initial child is registered in shared Jobs");
+    let paused_job = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        jobs.wait_owned(
+            paused_job.id.as_str(),
+            crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                workspace.path(),
+                "continue-paused-e2e",
+                Some("continue-paused-e2e-thread"),
+            ),
+        ),
+    )
+    .await
+    .expect("child reaches its clarification checkpoint")
+    .expect("registered child remains available");
+    assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
     assert_eq!(
         provider.calls.load(std::sync::atomic::Ordering::SeqCst),
         1,
@@ -190,6 +171,20 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         Some(before_session.subagent_session_id.as_str()),
         "resume must keep the durable session identity"
     );
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    task_id: event_task_id,
+                    ..
+                }) if event_task_id == task_id => break,
+                Some(_) => {}
+                None => panic!("parent progress stream closed before child completion"),
+            }
+        }
+    })
+    .await
+    .expect("resume completion projection follows durable settlement");
     assert!(provider.saw("Inspect the README and continue."));
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
     let requests = provider.seen.lock();
@@ -217,8 +212,44 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
 }
 
+fn core_backed_live_parent(
+    workspace: &std::path::Path,
+    parent: crate::agent::harness::ParentExecutionContext,
+    session_id: &str,
+    thread_id: &str,
+) -> tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>
+{
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let mut definition = AgentDefinitionRegistry::builtins_only()
+        .get("task_manager_agent")
+        .expect("task manager definition")
+        .clone();
+    definition.model = tinyagents_definition::ModelSpec::Inherit;
+    let definitions =
+        Arc::new(AgentDefinitionRegistry::builtins_only().with_definitions([definition]));
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.to_path_buf();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
+    );
+    let mut parent = parent;
+    parent.workspace_dir = workspace.to_path_buf();
+    parent.session_id = session_id.to_owned();
+    let mut host_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    host_context.thread_id = Some(thread_id.to_owned());
+    tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new(session_id).with_thread(thread_id),
+        host_context,
+    )
+}
+
 #[tokio::test]
-async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
+async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
     use crate::agent::orchestration::background_completions::{
         forget_workspace_for_test, pending_for,
     };
@@ -226,8 +257,7 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
         DurableSubagentStatus, SubagentSessionStore,
     };
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-    use crate::tools::toolpacks::ToolGroups;
+    use crate::core::runtime::DispatchCtx;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
     use tinyagents_tasks::CompletionStatus;
@@ -243,8 +273,9 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
         Box::new(tinyagents_harness_tools::AskClarificationTool::new());
     let ask_spec = Arc::new(ask_tool.spec());
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
-    parent.workspace_dir = workspace.path().to_path_buf();
     parent.session_id = "paused-cancel-rpc-parent".into();
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);
+    parent.on_progress = Some(progress_tx);
     parent.all_tools = Arc::new(vec![ask_tool]);
     parent.all_tool_specs = Arc::new(vec![ask_spec.clone()]);
     parent.visible_tool_specs = Arc::new(vec![ask_spec]);
@@ -255,27 +286,11 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
 
-    let mut definition = AgentDefinitionRegistry::builtins_only()
-        .get("task_manager_agent")
-        .expect("task manager definition")
-        .clone();
-    definition.model = tinyagents_definition::ModelSpec::Inherit;
-    let definitions =
-        Arc::new(AgentDefinitionRegistry::builtins_only().with_definitions([definition]));
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = workspace.path().to_path_buf();
-    config.components.juice = false;
-    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
-    );
-    let mut host_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
-        .with_core(Some(Arc::clone(&core)))
-        .with_parent(parent);
-    host_context.thread_id = Some("paused-cancel-rpc-thread".into());
-    let live = tinyagents_harness::context::RunContext::new(
-        tinyagents_harness::context::RunConfig::new("paused-cancel-rpc-parent")
-            .with_thread("paused-cancel-rpc-thread"),
-        host_context,
+    let live = core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "paused-cancel-rpc-parent",
+        "paused-cancel-rpc-thread",
     );
     let parent_cancellation = live.data.child().cancellation;
     let jobs =
@@ -296,13 +311,32 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
         .await
         .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
-    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
-    let task_id = paused
+    let paused_ref = paused
         .output()
-        .lines()
-        .find_map(|line| line.strip_prefix("task_id: "))
-        .unwrap_or_else(|| panic!("pause envelope carries task id: {}", paused.output()))
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .unwrap_or_else(|| panic!("accepted envelope carries task reference: {}", paused.output()));
+    let task_id = paused_ref["task_id"]
+        .as_str()
+        .expect("accepted task id")
         .to_owned();
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentAwaitingUser {
+                    task_id: event_task_id,
+                    ..
+                }) if event_task_id == task_id => break,
+                Some(_) => {}
+                None => panic!("parent progress stream closed before the pause was projected"),
+            }
+        }
+    })
+    .await
+    .expect("host pause projection follows durable checkpoint persistence");
+    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     let paused_job = jobs
         .list()
         .into_iter()
@@ -323,54 +357,12 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
         .expect("live parent execution context")
         .session_id
         .clone();
-    let lifecycle_key = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
-        &live,
-        task_id.clone(),
-        Some("paused-cancel-rpc-thread".into()),
-    );
-    // Blocking spawn has no product session row in the legacy contract. Seed
-    // the row that a host-owned session surface would expose, using the real
-    // paused job's public id, full lifecycle key, and authenticated owner.
-    let session = crate::agent::orchestration::subagent_sessions::upsert_running(
-        &sessions,
-        crate::agent::orchestration::subagent_sessions::SubagentSessionUpsert {
-            selector: crate::agent::orchestration::subagent_sessions::SubagentSessionSelector {
-                parent_session: parent_session.clone(),
-                parent_thread_id: Some("paused-cancel-rpc-thread".into()),
-                agent_id: "task_manager_agent".into(),
-                model: Some("test-model".into()),
-                sandbox_mode: "workspace".into(),
-                action_root: None,
-                task_key: "paused-cancel-rpc-task".into(),
-            },
-            display_name: Some("Task Manager".into()),
-            task_title: "Pause cancellation fixture".into(),
-            worker_thread_id: None,
-            task_id: task_id.clone(),
-            lifecycle_key: Some(lifecycle_key),
-            parent_epoch: None,
-        },
-        None,
-    )
-    .expect("seed durable row for the actual paused job");
-    crate::agent::orchestration::subagent_sessions::mark_finished(
-        &sessions,
-        &session.subagent_session_id,
-        &task_id,
-        &crate::agent::subagent_host::SubagentRunStatus::AwaitingUser {
-            question: "which file should I inspect?".into(),
-            options: None,
-            checkpoint: None,
-        },
-        Vec::new(),
-    )
-    .expect("mark the seeded product row paused");
     let before_row = sessions
         .load()
         .expect("paused durable session list")
         .into_iter()
-        .find(|row| row.subagent_session_id == session.subagent_session_id)
-        .expect("seeded durable row remains available");
+        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+        .expect("actual paused durable session remains available");
     assert_eq!(before_row.status, DurableSubagentStatus::AwaitingUser);
     assert_eq!(before_row.parent_session, parent_session);
     assert_eq!(
@@ -434,7 +426,9 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
 
     let mut repeated_params = serde_json::Map::new();
     repeated_params.insert("taskId".into(), json!(task_id));
-    let repeated = (controller.handler)(DispatchCtx::new(Arc::clone(&core)), repeated_params)
+    let repeated = (controller.handler)(DispatchCtx::new(Arc::clone(
+        live.data.dispatch_ctx().resolved().expect("RPC uses the spawned parent's core"),
+    )), repeated_params)
         .await
         .expect("repeated cancel RPC result");
     assert_eq!(response_field(&repeated, "cancelled"), Some(json!(false)));
