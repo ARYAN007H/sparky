@@ -5,8 +5,52 @@ use tinyagents_tasks::InMemoryCompletionStore;
 struct FullDisk(InMemoryCompletionStore);
 
 impl CompletionStore for FullDisk {
+    fn is_process_local(&self) -> bool {
+        self.0.is_process_local()
+    }
+    fn coordination_identity(&self) -> Option<String> {
+        self.0.coordination_identity()
+    }
+    fn parent_lifecycle(&self) -> Option<Arc<tinyagents_tasks::ParentLifecycle>> {
+        self.0.parent_lifecycle()
+    }
+    fn bind_parent_lifecycle(
+        &self,
+        lifecycle: Arc<tinyagents_tasks::ParentLifecycle>,
+    ) -> tinyagents_harness::error::Result<()> {
+        self.0.bind_parent_lifecycle(lifecycle)
+    }
+    fn acquire_parent_gate(
+        &self,
+        parent_key: &str,
+        holder: &str,
+        ttl: std::time::Duration,
+    ) -> tinyagents_harness::error::Result<Option<tinyagents_tasks::ParentGateClaim>> {
+        self.0.acquire_parent_gate(parent_key, holder, ttl)
+    }
+    fn renew_parent_gate(
+        &self,
+        parent_key: &str,
+        claim: &tinyagents_tasks::ParentGateClaim,
+        ttl: std::time::Duration,
+    ) -> tinyagents_harness::error::Result<bool> {
+        self.0.renew_parent_gate(parent_key, claim, ttl)
+    }
+    fn release_parent_gate(
+        &self,
+        parent_key: &str,
+        claim: &tinyagents_tasks::ParentGateClaim,
+    ) -> tinyagents_harness::error::Result<bool> {
+        self.0.release_parent_gate(parent_key, claim)
+    }
     fn get(&self, task_id: &str) -> Option<CompletionRecord> {
         self.0.get(task_id)
+    }
+    fn try_get(
+        &self,
+        task_id: &str,
+    ) -> tinyagents_harness::error::Result<Option<CompletionRecord>> {
+        self.0.try_get(task_id)
     }
     fn put(&self, _record: &CompletionRecord) -> tinyagents_harness::error::Result<()> {
         Err(tinyagents_harness::error::TinyAgentsError::Graph(
@@ -15,6 +59,55 @@ impl CompletionStore for FullDisk {
     }
     fn list(&self, parent_key: Option<&str>) -> Vec<CompletionRecord> {
         self.0.list(parent_key)
+    }
+    fn put_fenced(
+        &self,
+        _record: &CompletionRecord,
+        _parent_key: &str,
+        _gate: &tinyagents_tasks::ParentGateClaim,
+    ) -> tinyagents_harness::error::Result<()> {
+        Err(tinyagents_harness::error::TinyAgentsError::Graph(
+            "disk full".into(),
+        ))
+    }
+    fn insert_if_absent(
+        &self,
+        _record: &CompletionRecord,
+        _gate: &tinyagents_tasks::ParentGateClaim,
+    ) -> tinyagents_harness::error::Result<bool> {
+        Err(tinyagents_harness::error::TinyAgentsError::Graph(
+            "disk full".into(),
+        ))
+    }
+    fn claim_pending(
+        &self,
+        request: tinyagents_tasks::PendingClaimRequest,
+    ) -> tinyagents_harness::error::Result<Vec<CompletionRecord>> {
+        self.0.claim_pending(request)
+    }
+    fn claim_task(
+        &self,
+        request: tinyagents_tasks::TaskClaimRequest,
+    ) -> tinyagents_harness::error::Result<Option<CompletionRecord>> {
+        self.0.claim_task(request)
+    }
+    fn resolve_claim(
+        &self,
+        request: tinyagents_tasks::ResolveClaimRequest,
+    ) -> tinyagents_harness::error::Result<Option<CompletionRecord>> {
+        self.0.resolve_claim(request)
+    }
+    fn try_list(
+        &self,
+        parent_key: Option<&str>,
+    ) -> tinyagents_harness::error::Result<Vec<CompletionRecord>> {
+        self.0.try_list(parent_key)
+    }
+    fn compact(
+        &self,
+        retain: std::time::Duration,
+    ) -> tinyagents_harness::error::Result<usize> {
+        self.0.compact(retain)
     }
 }
 
@@ -25,8 +118,52 @@ struct ToggleStore {
 }
 
 impl CompletionStore for ToggleStore {
+    fn is_process_local(&self) -> bool {
+        self.inner.is_process_local()
+    }
+    fn coordination_identity(&self) -> Option<String> {
+        self.inner.coordination_identity()
+    }
+    fn parent_lifecycle(&self) -> Option<Arc<tinyagents_tasks::ParentLifecycle>> {
+        self.inner.parent_lifecycle()
+    }
+    fn bind_parent_lifecycle(
+        &self,
+        lifecycle: Arc<tinyagents_tasks::ParentLifecycle>,
+    ) -> tinyagents_harness::error::Result<()> {
+        self.inner.bind_parent_lifecycle(lifecycle)
+    }
+    fn acquire_parent_gate(
+        &self,
+        parent_key: &str,
+        holder: &str,
+        ttl: std::time::Duration,
+    ) -> tinyagents_harness::error::Result<Option<tinyagents_tasks::ParentGateClaim>> {
+        self.inner.acquire_parent_gate(parent_key, holder, ttl)
+    }
+    fn renew_parent_gate(
+        &self,
+        parent_key: &str,
+        claim: &tinyagents_tasks::ParentGateClaim,
+        ttl: std::time::Duration,
+    ) -> tinyagents_harness::error::Result<bool> {
+        self.inner.renew_parent_gate(parent_key, claim, ttl)
+    }
+    fn release_parent_gate(
+        &self,
+        parent_key: &str,
+        claim: &tinyagents_tasks::ParentGateClaim,
+    ) -> tinyagents_harness::error::Result<bool> {
+        self.inner.release_parent_gate(parent_key, claim)
+    }
     fn get(&self, task_id: &str) -> Option<CompletionRecord> {
         self.inner.get(task_id)
+    }
+    fn try_get(
+        &self,
+        task_id: &str,
+    ) -> tinyagents_harness::error::Result<Option<CompletionRecord>> {
+        self.inner.try_get(task_id)
     }
 
     fn put(&self, record: &CompletionRecord) -> tinyagents_harness::error::Result<()> {
@@ -38,8 +175,70 @@ impl CompletionStore for ToggleStore {
         self.inner.put(record)
     }
 
+    fn put_fenced(
+        &self,
+        record: &CompletionRecord,
+        parent_key: &str,
+        gate: &tinyagents_tasks::ParentGateClaim,
+    ) -> tinyagents_harness::error::Result<()> {
+        if self.fail_writes.load(Ordering::SeqCst) {
+            return Err(tinyagents_harness::error::TinyAgentsError::Graph(
+                "disk full".into(),
+            ));
+        }
+        self.inner.put_fenced(record, parent_key, gate)
+    }
+
+    fn insert_if_absent(
+        &self,
+        record: &CompletionRecord,
+        gate: &tinyagents_tasks::ParentGateClaim,
+    ) -> tinyagents_harness::error::Result<bool> {
+        if self.fail_writes.load(Ordering::SeqCst) {
+            return Err(tinyagents_harness::error::TinyAgentsError::Graph(
+                "disk full".into(),
+            ));
+        }
+        self.inner.insert_if_absent(record, gate)
+    }
+
+    fn claim_pending(
+        &self,
+        request: tinyagents_tasks::PendingClaimRequest,
+    ) -> tinyagents_harness::error::Result<Vec<CompletionRecord>> {
+        self.inner.claim_pending(request)
+    }
+
+    fn claim_task(
+        &self,
+        request: tinyagents_tasks::TaskClaimRequest,
+    ) -> tinyagents_harness::error::Result<Option<CompletionRecord>> {
+        self.inner.claim_task(request)
+    }
+
+    fn resolve_claim(
+        &self,
+        request: tinyagents_tasks::ResolveClaimRequest,
+    ) -> tinyagents_harness::error::Result<Option<CompletionRecord>> {
+        self.inner.resolve_claim(request)
+    }
+
     fn list(&self, parent_key: Option<&str>) -> Vec<CompletionRecord> {
         self.inner.list(parent_key)
+    }
+
+    fn try_list(
+        &self,
+        parent_key: Option<&str>,
+    ) -> tinyagents_harness::error::Result<Vec<CompletionRecord>> {
+        self.inner.try_list(parent_key)
+    }
+
+    fn compact(
+        &self,
+        retain: std::time::Duration,
+    ) -> tinyagents_harness::error::Result<usize> {
+        self.inner.compact(retain)
     }
 }
 
