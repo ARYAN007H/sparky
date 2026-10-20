@@ -155,6 +155,31 @@ fn opaque_media(part: &ContentPart) -> Option<&MediaReference> {
     }
 }
 
+pub(crate) fn validate_opaque_parts(parts: &[ContentPart]) -> Result<(), String> {
+    let mut ids = std::collections::HashSet::with_capacity(parts.len());
+    for part in parts {
+        let media = opaque_media(part)
+            .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;
+        let opaque_id = media
+            .opaque_id
+            .as_deref()
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| "stored attachment must include an opaque reference".to_string())?;
+        if media.path.is_some() || media.url.is_some() || media.local_cache_path.is_some() {
+            return Err("stored attachment must not include a path or URL".into());
+        }
+        if !ids.insert(opaque_id) {
+            return Err("stored attachment refs must be unique".into());
+        }
+        if let ContentPart::Video { thumbnail: Some(thumb), .. } = part
+            && (thumb.path.is_some() || thumb.url.is_some() || thumb.local_cache_path.is_some())
+        {
+            return Err("stored attachment thumbnail must not include a path or URL".into());
+        }
+    }
+    Ok(())
+}
+
 /// Resolve request refs against one persisted user row. The request may carry
 /// opaque IDs and descriptive metadata only; storage paths come exclusively
 /// from the exact row's private metadata.
@@ -167,17 +192,7 @@ pub(crate) async fn resolve_persisted_parts(
     if thread_id.is_empty() || persisted_message_id.is_empty() || requested.is_empty() {
         return Err("stored attachment scope and refs must be non-empty".into());
     }
-    for part in requested {
-        let media = opaque_media(part)
-            .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;
-        if media.opaque_id.as_deref().is_none_or(str::is_empty)
-            || media.path.is_some()
-            || media.url.is_some()
-            || media.local_cache_path.is_some()
-        {
-            return Err("stored attachment must use an opaque reference only".into());
-        }
-    }
+    validate_opaque_parts(requested)?;
 
     let config = ctx
         .load_config()
@@ -237,3 +252,7 @@ fn opaque_media_mut(part: &mut ContentPart) -> Option<&mut MediaReference> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+#[path = "attachments_tests.rs"]
+mod tests;
