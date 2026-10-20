@@ -364,14 +364,13 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
 #[cfg(feature = "voice")]
 #[test]
 fn production_registry_binds_every_core_voice_controller_to_its_parser() {
-    use crate::core::schema_test_support::required_input_contract;
     use serde_json::json;
 
     struct Contract {
         method: &'static str,
         required: &'static [&'static str],
         optional: &'static [&'static str],
-        examples: &'static [Value],
+        examples: Vec<Value>,
     }
 
     let contracts = [
@@ -379,13 +378,13 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.status",
             required: &[],
             optional: &[],
-            examples: &[json!({})],
+            examples: vec![json!({})],
         },
         Contract {
             method: "voice.transcribe",
             required: &["audio_path"],
             optional: &["context", "skip_cleanup"],
-            examples: &[
+            examples: vec![
                 json!({"audio_path":"fixture.wav"}),
                 json!({"audio_path":"fixture.wav","context":"example","skip_cleanup":true}),
             ],
@@ -394,7 +393,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.transcribe_bytes",
             required: &["audio_bytes"],
             optional: &["extension", "context", "skip_cleanup"],
-            examples: &[
+            examples: vec![
                 json!({"audio_bytes":[0,1]}),
                 json!({"audio_bytes":[0,1],"extension":"wav","context":"example","skip_cleanup":true}),
             ],
@@ -403,7 +402,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.tts",
             required: &["text"],
             optional: &["output_path"],
-            examples: &[
+            examples: vec![
                 json!({"text":"Hello"}),
                 json!({"text":"Hello","output_path":"fixture.wav"}),
             ],
@@ -412,7 +411,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.reply_synthesize",
             required: &["text"],
             optional: &["voice_id", "model_id", "output_format"],
-            examples: &[
+            examples: vec![
                 json!({"text":"Hello"}),
                 json!({"text":"Hello","voice_id":"fixture","model_id":"fixture","output_format":"mp3_44100"}),
             ],
@@ -421,7 +420,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.stt_dispatch",
             required: &["audio_base64"],
             optional: &["provider", "model", "mime_type", "file_name", "language"],
-            examples: &[
+            examples: vec![
                 json!({"audio_base64":"AA=="}),
                 json!({"audio_base64":"AA==","provider":"cloud","model":"fixture","mime_type":"audio/wav","file_name":"fixture.wav","language":"en"}),
             ],
@@ -430,7 +429,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.tts_dispatch",
             required: &["text"],
             optional: &["provider", "voice"],
-            examples: &[
+            examples: vec![
                 json!({"text":"Hello"}),
                 json!({"text":"Hello","provider":"cloud","voice":"fixture"}),
             ],
@@ -439,7 +438,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.set_providers",
             required: &[],
             optional: &["stt_provider", "tts_provider", "stt_model", "tts_voice"],
-            examples: &[
+            examples: vec![
                 json!({}),
                 json!({"stt_provider":"cloud","tts_provider":"cloud","stt_model":"fixture","tts_voice":"fixture"}),
             ],
@@ -448,7 +447,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.update_provider_settings",
             required: &[],
             optional: &["voice_providers", "stt_provider", "tts_provider"],
-            examples: &[
+            examples: vec![
                 json!({}),
                 json!({"voice_providers":[{"slug":"fixture-provider"}],"stt_provider":"cloud","tts_provider":"cloud"}),
             ],
@@ -457,7 +456,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.list_models",
             required: &["provider_id"],
             optional: &["capability"],
-            examples: &[
+            examples: vec![
                 json!({"provider_id":"fixture"}),
                 json!({"provider_id":"fixture","capability":"stt"}),
             ],
@@ -475,19 +474,19 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.live_providers",
             required: &[],
             optional: &[],
-            examples: &[json!({})],
+            examples: vec![json!({})],
         },
         Contract {
             method: "voice.live_settings_get",
             required: &[],
             optional: &[],
-            examples: &[json!({})],
+            examples: vec![json!({})],
         },
         Contract {
             method: "voice.live_settings_set",
             required: &[],
             optional: &["default_provider", "gemini", "sarvam", "elevenlabs"],
-            examples: &[
+            examples: vec![
                 json!({}),
                 json!({"default_provider":"gemini","gemini":{"model":"fixture","voice":null},"sarvam":{"language":"en"},"elevenlabs":{"voice_id":"fixture"}}),
             ],
@@ -496,7 +495,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             method: "voice.live_test_provider",
             required: &["provider"],
             optional: &[],
-            examples: &[json!({"provider":"gemini"})],
+            examples: vec![json!({"provider":"gemini"})],
         },
     ];
 
@@ -562,7 +561,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             contract.method
         );
 
-        for example in contract.examples {
+        for example in &contract.examples {
             let params = example
                 .as_object()
                 .expect("voice example is an object")
