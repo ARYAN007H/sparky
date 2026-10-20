@@ -236,21 +236,23 @@ impl LegacyUiBridge {
         // ready. Re-reserving would flash the card back to "generating".
         if let Some(file) = latest.file.as_ref() {
             if let Ok(meta) = super::store::get_artifact(&self.workspace_dir, &record.id).await {
-                let owned = meta.file.as_deref().map(Path::new).filter(|owned| {
-                    owned
+                let owned_has_extension = meta.file.as_deref().is_some_and(|owned| {
+                    Path::new(owned)
                         .extension()
                         .and_then(|e| e.to_str())
                         .map(str::to_ascii_lowercase)
                         == Some(ext.clone())
                 });
-                if let Some(owned) = owned {
+                if owned_has_extension {
+                    let destination = self.resolve_visible_destination(&meta).await?;
                     let file_store = self
                         .file_store
                         .as_ref()
                         .ok_or_else(|| anyhow::anyhow!("artifact file storage is unavailable"))?;
                     let bytes = file_store.read(&file.key).await?;
-                    tokio::fs::write(owned, &bytes).await?;
-                    let size = bytes.len() as u64;
+                    let size = self
+                        .write_visible_file(&destination, &bytes, file.media_type.as_deref())
+                        .await?;
                     super::store::finalize_artifact(
                         &self.workspace_dir,
                         &record.id,
@@ -275,6 +277,7 @@ impl LegacyUiBridge {
         )
         .await
         .map_err(anyhow::Error::msg)?;
+        let destination = self.resolve_visible_destination(&meta).await?;
         let size = if record.holds_file() {
             if let Some(file) = latest.file.as_ref() {
                 let file_store = self
@@ -282,14 +285,16 @@ impl LegacyUiBridge {
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("artifact file storage is unavailable"))?;
                 let bytes = file_store.read(&file.key).await?;
-                tokio::fs::write(&dest, &bytes).await?;
-                bytes.len() as u64
+                self.write_visible_file(&destination, &bytes, file.media_type.as_deref())
+                    .await?
             } else {
-                let source = PathBuf::from(&latest.body);
-                if same_file(&source, &dest) {
-                    tokio::fs::metadata(&dest).await?.len()
+                let source = self.source_roots.resolve(&latest.body).await?;
+                if same_file(&source.path, &destination) {
+                    tokio::fs::metadata(&destination).await?.len()
                 } else {
-                    tokio::fs::copy(&source, &dest).await?
+                    let bytes = tokio::fs::read(&source.path).await?;
+                    self.write_visible_file(&destination, &bytes, source.media_type.as_deref())
+                        .await?
                 }
             }
         } else {
@@ -300,6 +305,36 @@ impl LegacyUiBridge {
             .await
             .map_err(anyhow::Error::msg)?;
         Ok(())
+    }
+
+    async fn resolve_visible_destination(&self, meta: &ArtifactMeta) -> anyhow::Result<PathBuf> {
+        let path = super::files::resolve_file(&self.workspace_dir, meta, &self.files)
+            .await
+            .map_err(anyhow::Error::msg)?;
+        let raw = path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("artifact presentation path is not valid UTF-8"))?;
+        let resolved = super::tiny_store::guarded_roots(self.files.trusted().to_vec())
+            .resolve(raw)
+            .await?;
+        Ok(resolved.path)
+    }
+
+    async fn write_visible_file(
+        &self,
+        destination: &Path,
+        bytes: &[u8],
+        media_type: Option<&str>,
+    ) -> anyhow::Result<u64> {
+        let root = destination
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("artifact presentation file has no parent"))?;
+        let name = destination
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| anyhow::anyhow!("artifact presentation file has no valid name"))?;
+        let metadata = FsFileStore::new(root).put(name, bytes, media_type).await?;
+        Ok(metadata.size_bytes)
     }
 
     async fn on_event_in_scope(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
