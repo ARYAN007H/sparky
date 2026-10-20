@@ -5,6 +5,7 @@ import {
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
+import { inFlightThreadKeys, selectedThreadTranscript } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-cancel';
@@ -128,6 +129,7 @@ test.describe('Chat Harness - Cancel', () => {
     // Mid-stream, the composer's Send button morphs into a Stop button (the
     // cancel control now lives in the composer for the text composer).
     await expect(page.getByTestId('stop-generation-button')).toBeVisible({ timeout: 10_000 });
+    await expect.poll(async () => page.locator('#root').innerText()).toContain('one two');
 
     await page.getByTestId('stop-generation-button').click();
 
@@ -135,6 +137,12 @@ test.describe('Chat Harness - Cancel', () => {
     for (const piece of LATE_PIECES) {
       await expect(page.getByText(piece, { exact: false })).toHaveCount(0, { timeout: 5_000 });
     }
+    await expect.poll(inFlightThreadKeys).toEqual([]);
+    await expect.poll(async () => page.locator('#root').innerText()).toContain('one two');
+    const transcript = await selectedThreadTranscript(page);
+    expect(transcript.content).toContain(PROMPT);
+    expect(transcript.content).toContain('one two');
+    for (const piece of LATE_PIECES) expect(transcript.content).not.toContain(piece);
 
     const composer = page.getByTestId('chat-message-input');
     await expect(composer).toBeEnabled();

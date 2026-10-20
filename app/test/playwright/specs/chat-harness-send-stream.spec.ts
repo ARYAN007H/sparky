@@ -5,6 +5,11 @@ import {
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
+import {
+  inFlightThreadKeys,
+  listedThreadTranscripts,
+  selectedThreadTranscript,
+} from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-send-stream';
@@ -153,5 +158,23 @@ test.describe('Chat Harness - Send Stream', () => {
         );
       })
       .toBe(true);
+
+    await expect
+      .poll(async () => {
+        try {
+          return (await selectedThreadTranscript(page)).content;
+        } catch {
+          return '';
+        }
+      }, { timeout: 10_000 })
+      .toContain(CANARY);
+    const durable = await selectedThreadTranscript(page);
+    expect(durable.content).toContain(PROMPT);
+    expect(durable.content).toContain(REPLY_PIECES.join(''));
+    const files = await listedThreadTranscripts();
+    const durableFile = files.find(file => file.rel_path === durable.path);
+    expect(durableFile).toBeDefined();
+    expect(durableFile?.size).toBeGreaterThan(0);
+    await expect.poll(inFlightThreadKeys).not.toContain(`::${durable.threadId}`);
   });
 });

@@ -52,3 +52,13 @@ export async function listedThreadTranscripts(): Promise<
   expect(Array.isArray(entries), 'workspace file list contains entries').toBe(true);
   return entries as Array<{ rel_path: string; size: number; is_dir: boolean }>;
 }
+
+export async function inFlightThreadKeys(): Promise<string[]> {
+  const status = unwrapResult(
+    await callCoreRpc<unknown>('openhuman.test_support_in_flight_chats', {})
+  );
+  expect(status && typeof status === 'object' && 'entries' in status, 'in-flight test support returns entries').toBe(true);
+  const entries = (status as { entries: unknown }).entries;
+  expect(Array.isArray(entries), 'in-flight entries are a list').toBe(true);
+  return (entries as Array<{ key: string }>).map(entry => entry.key);
+}
