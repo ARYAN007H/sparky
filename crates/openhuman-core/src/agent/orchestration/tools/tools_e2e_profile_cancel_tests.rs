@@ -12,7 +12,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             std::env::current_exe().expect("unit test executable path"),
         )
         .arg("--exact")
-        .arg(test_name)
+        .arg(&test_name)
         .arg("--nocapture")
         .env(CHILD, "1")
         .output()
