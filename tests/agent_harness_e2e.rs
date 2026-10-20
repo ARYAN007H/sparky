@@ -2013,30 +2013,14 @@ async fn provider_error_retry_inner() {
     stack.shutdown();
 }
 
-// ─── Task 9: Parallel fan-out + multi-hop chain ───────────────────────────────
-//
-// parallel_subagent_fanout:
-//   spawn_parallel_agents is in the orchestrator's named tools (agent.toml:165)
-//   and is registered via ops.rs:163. Requires ≥2 tasks, each { agent_id, prompt }.
-//   The orchestrator's subagents.allowlist includes "vision_agent",
-//   so agent_id:"vision_agent" is valid. children run via join_all (spawn_parallel_agents.rs
-//   ~line 322 — "let futures = prepared.into_iter().map(…)"). Both children
-//   consume from the same global FIFO scripted-response queue. Because
-//   join_all spawns futures concurrently but the queue pop is under a Mutex,
-//   one child gets the first completion and the other gets the second. Both
-//   carry distinct canaries; the synthesis quotes both.
-//   LLM request ordering (4 upstream calls):
-//     request[0]  = orchestrator → spawn_parallel_agents tool call
-//     request[1,2] = vision_agent child 1 & child 2 (order nondeterministic,
-//                    both return distinct canaries)
-//     request[3]  = orchestrator synthesis with both canaries
+// ─── Task 9: Concurrent async delegation + multi-hop chain ──────────────────
 //
 // multi_hop_delegation_chain:
 //   Depth-1 subagents (vision_agent, task_manager_agent, etc.) do NOT have
 //   spawn tools in their named lists. Verified: vision_agent's agent.toml
 //   (agent_registry/agents/vision_agent/agent.toml) names only `file_read` and
 //   `image_info`. It contains no
-//   spawn_subagent or spawn_parallel_agents. The only
+//   spawn_subagent. The only
 //   agents with spawn tools are orchestrator and trigger_reactor (loader.rs:383,
 //   527). trigger_reactor is not in the orchestrator's subagents.allowlist.
 //   MAX_SPAWN_DEPTH=3 (spawn_depth_context.rs:16) is structurally unreachable
@@ -2061,14 +2045,8 @@ async fn provider_error_retry_inner() {
 /// Two `spawn_async_subagent` calls issued together really do put two workers
 /// in flight: both are dispatched and both run, concurrently.
 ///
-/// This is the surviving half of what `spawn_parallel_agents` used to prove.
-/// #5757 (`02d81f6cf`) retired that tool on the grounds that "several spawns
-/// are already several workers in flight" (`orchestrator/agent.toml`), and
-/// `prompt.md` now teaches exactly that: "N independent subtasks means N
-/// spawns, issued together. They run concurrently." That claim is the thing
-/// worth pinning — it is the whole justification for dropping the dedicated
-/// fan-out tool, and #4754 measured what happens when fan-out silently
-/// serializes (145-200s gaps between workers).
+/// Concurrent async delegation calls keep independent workers in flight at
+/// the same time.
 ///
 /// The *other* half — both results reaching the user — is deliberately not
 /// asserted here, and not because it stopped mattering. `spawn_async_subagent`
@@ -2087,11 +2065,11 @@ async fn provider_error_retry_inner() {
 /// the global FIFO and any assertion keyed on script order would be a coin
 /// flip. What each worker was asked is deterministic; when it asked is not.
 #[test]
-fn parallel_subagent_fanout() {
-    run_on_agent_stack("parallel_subagent_fanout", parallel_subagent_fanout_inner);
+fn concurrent_async_subagents_overlap() {
+    run_on_agent_stack("concurrent_async_subagents_overlap", concurrent_async_subagents_overlap_inner);
 }
 
-async fn parallel_subagent_fanout_inner() {
+async fn concurrent_async_subagents_overlap_inner() {
     let _lock = env_lock();
     // Arm the overlap barrier before the stack boots: each worker's response is
     // withheld until a second worker has also arrived, so a serial
@@ -2185,7 +2163,7 @@ async fn parallel_subagent_fanout_inner() {
     // makes the test about concurrency rather than eventual dispatch: the
     // barrier only releases when a second worker joins the first, so strictly
     // serial execution cannot reach here — it parks, times out, and leaves the
-    // flag clear. It is the claim that justified retiring `spawn_parallel_agents`.
+    // flag clear.
     assert!(
         canary_overlap_observed(),
         "the two workers never overlapped — fan-out ran serially, which is the \
