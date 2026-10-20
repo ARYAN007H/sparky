@@ -1,52 +1,26 @@
-//! Declares OpenHuman's product orchestration surfaces over TinyAgents.
-//!
-//! Tools, by role:
-//! - **Spawn**: `spawn_subagent` and `spawn_subagent`.
-//! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
-//!   `wait_subagent`, `list_subagents`.
-//! - **Delegation**: `ArchetypeDelegationTool`.
-//!
-//! TinyAgents owns generic control operations; the host control module keeps
-//! the product declarations and projections. Worker-thread persistence lives
-//! in `threads`.
-//!
-//! `agent::registration` assembles the delegation tools for the catalogue.
-//! Execution crosses the shared TinyAgents Jobs/Message and subagent driver
-//! ports while this module retains product-specific policies and envelopes.
+//! OpenHuman's single asynchronous sub-agent spawn surface.
 
-#[path = "tools/archetype_delegation_host.rs"]
-mod archetype_delegation;
 #[path = "tools/awaiting_user.rs"]
 pub(crate) mod awaiting_user;
-#[path = "tools/continue_subagent_host.rs"]
-mod continue_subagent;
-#[path = "tools/subagent_dispatch_host.rs"]
-mod dispatch;
-#[path = "tools/spawn_subagent_surface.rs"]
-mod spawn_subagent;
 #[path = "tools/spawn_subagent_surface.rs"]
 mod spawn_subagent;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
-#[path = "tools/subagent_control_surfaces.rs"]
-mod subagent_control_surfaces;
 #[cfg(test)]
 #[path = "tools/tools_e2e_tests.rs"]
 mod tools_e2e_tests;
-
-pub(crate) use dispatch::DelegationDispatch;
-pub(crate) use subagent_control_surfaces::overlay_task_store_status;
-pub(crate) use subagent_control_surfaces::{
-    format_running_wait_message, requested_timeout_secs, wait_status_payload,
-};
-pub(crate) use subagent_control_surfaces::{
-    CloseSubagentTool, ListSubagentsTool, SteerSubagentTool, WaitSubagentTool,
-};
+#[cfg(test)]
+#[path = "tools/tools_e2e_continuation_tests.rs"]
+mod tools_e2e_continuation_tests;
+#[cfg(test)]
+#[path = "tools/tools_e2e_driver_tests.rs"]
+mod tools_e2e_driver_tests;
+#[cfg(test)]
+#[path = "tools/tools_e2e_workspace_owner_tests.rs"]
+mod tools_e2e_workspace_owner_tests;
 
 /// A minimal live TinyAgents carrier over `parent`, for tests that drive a
-/// concrete tool directly (outside an agent turn) under an explicit parent
-/// execution context. Normal agent turns always arrive through the typed
-/// dispatchers with their original carrier.
+/// concrete tool directly under an explicit parent execution context.
 #[cfg(test)]
 pub(crate) fn live_parent_run_context(
     kind: &str,
@@ -58,10 +32,5 @@ pub(crate) fn live_parent_run_context(
         .into_tinyagents(tinyagents_harness::context::RunConfig::new(kind))
 }
 
-pub use archetype_delegation::{ArchetypeDelegationTool, DelegationTarget};
-pub(crate) use continue_subagent::ContinueSubagentDispatch;
-pub use continue_subagent::ContinueSubagentTool;
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;
 pub use spawn_subagent::{scope_spawn_subagent_spec, SpawnSubagentTool};
-pub(crate) use spawn_subagent::SpawnSubagentDispatch;
-pub use spawn_subagent::SpawnSubagentTool;
