@@ -6,7 +6,7 @@
 use serde_json::json;
 
 use crate::threads::turn_state::mirror::ObserveProgress;
-use crate::web_chat::{SubagentProgressDetail, WebChannelEvent};
+use crate::web_chat::WebChannelEvent;
 use tinyagents_session::{port::TurnStates, turn_state::TurnStateMirror};
 
 use super::event_bus::publish_web_channel_event_in;
