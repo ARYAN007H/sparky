@@ -64,21 +64,22 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
             .with_thread(thread_id),
         host,
     );
-    let detached = crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
-        .expect("detached parent");
     let accepted = crate::core::runtime::CoreContext::scope(
         Arc::clone(&core),
-        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "wait for the thread stop",
-                "model": "test-model",
-                "task_key": "stop detached child"
-            }),
-            None,
-            live.data.child(),
-            detached.clone(),
-        )),
+        Box::pin(
+            SpawnSubagentTool::new().execute_with_live_parent_context(
+                json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": "wait for the thread stop",
+                    "model": "test-model",
+                    "task_key": "stop detached child"
+                }),
+                None,
+                live.data.child(),
+                crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
+                    .expect("detached parent"),
+            ),
+        ),
     )
     .await
     .expect("spawn child");
@@ -91,11 +92,6 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .and_then(|value| value["task_id"].as_str().map(str::to_owned))
         .expect("accepted child includes its task ID");
-    let lifecycle_key = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
-        &detached,
-        task_id.clone(),
-        None,
-    );
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
         .expect("driver child reached provider gate")
@@ -108,6 +104,21 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&dispatch);
+    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+    );
+    let before_scoped =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
+            .expect("load live durable row");
+    let row_before = before_scoped
+        .iter()
+        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+        .expect("driver persistence includes the live child");
+    assert_eq!(row_before.parent_thread_id.as_deref(), Some(thread_id));
+    let lifecycle_key = row_before
+        .lifecycle_key
+        .clone()
+        .expect("persisted child row carries its lifecycle key");
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         workspace.path(),
         "stop-detached-subagent-session",
@@ -123,12 +134,6 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         job.status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Running
     );
-    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
-        workspace.path().to_path_buf(),
-    );
-    let before_scoped =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
-            .expect("load live durable row");
     assert!(
         before_scoped.iter().any(|row| {
             row.current_task_id.as_deref() == Some(task_id.as_str())

@@ -125,7 +125,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
                 }),
                 None,
                 live.data.child(),
-                detached.clone(),
+                detached,
             ),
     )
     .await
@@ -139,11 +139,6 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .and_then(|value| value["task_id"].as_str().map(str::to_owned))
         .expect("accepted child includes public task ID");
-    let lifecycle_key = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
-        &detached,
-        task_id.clone(),
-        None,
-    );
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
         .expect("child reached the scripted provider gate")
@@ -152,6 +147,19 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     let alice_jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&alice_ctx);
+    let store = SubagentSessionStore::new(workspace.clone());
+    let row_before = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
+        .expect("durable child row readable")
+        .into_iter()
+        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+        .expect("durable row belongs to the live child");
+    assert_eq!(row_before.status, DurableSubagentStatus::Running);
+    assert_eq!(row_before.parent_session, "shared-profile-parent-session");
+    assert_eq!(row_before.parent_thread_id.as_deref(), Some(thread_id));
+    let lifecycle_key = row_before
+        .lifecycle_key
+        .clone()
+        .expect("persisted child row carries its lifecycle key");
     let alice_owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         &workspace,
         "shared-profile-parent-session",
@@ -164,16 +172,6 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .get(alice_job_id.as_str())
         .expect("real child is registered in Alice's scoped driver registry");
     assert_eq!(alice_job.status, SubAgentJobStatus::Running);
-
-    let store = SubagentSessionStore::new(workspace.clone());
-    let row_before = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
-        .expect("durable child row readable")
-        .into_iter()
-        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("durable row belongs to the live child");
-    assert_eq!(row_before.status, DurableSubagentStatus::Running);
-    assert_eq!(row_before.parent_session, "shared-profile-parent-session");
-    assert_eq!(row_before.parent_thread_id.as_deref(), Some(thread_id));
 
     let bob_ctx = DispatchCtx::new(Arc::clone(&bob));
     let bob_job_registry = crate::core::runtime::slot_for::<

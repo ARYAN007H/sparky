@@ -38,6 +38,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         "continue-paused-e2e",
         "continue-paused-e2e-thread",
     );
+    crate::core::runtime::CoreContext::scope(Arc::clone(&_core), async {
     assert!(
         live.data.dispatch_ctx().resolved().is_some(),
         "the parent carrier retains its core context"
@@ -366,6 +367,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         Some(&original_lifecycle_key),
         "resume preserves the original lifecycle identity"
     );
+    })
+    .await;
 }
 
 #[tokio::test]
