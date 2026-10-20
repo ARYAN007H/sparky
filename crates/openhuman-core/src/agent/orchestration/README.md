@@ -8,8 +8,8 @@ and UI-facing projections.
 
 ## Responsibilities
 
-- Host adapters that dispatch work through `agent::subagent_host::run_subagent`.
-- Background sub-agent task tracking, cancellation, steering, completion
+- Host adapters for detached spawns and durable session reuse.
+- Background sub-agent task tracking, cancellation, completion
   delivery, and run-ledger projection.
 - Manual cancellation for detached `spawn_subagent` runs.
 - The shared root `ParentExecutionContext` builder used by background tasks.
@@ -21,7 +21,7 @@ and UI-facing projections.
 - `background_completions.rs`, `completion_notice.rs`, and
   `background_delivery.rs`: host delivery policy over TinyAgents completion
   routing.
-- `subagent_control.rs`: manual cancel RPC.
+- `subagent_control.rs`: manual cancel RPC over the driver-owned job registry.
 - `subagent_sessions/`: durable session reuse and deduplication.
 - `parent_context/builder.rs`: construction for tasks without a parent turn.
 - `tools.rs`: callable sub-agent tools.
@@ -52,4 +52,4 @@ sandbox context, spawn depth, and progress derive from the parent
 - `agent/registration.rs` registers the callable tools; `tools::ops` composes that family.
 - `threads` cancels detached work when a thread closes.
 - `crate::core::all` registers the remaining controller pairs.
-- The frontend uses the background run and sub-agent controls.
+- The frontend uses the background run and sub-agent cancellation controls.
