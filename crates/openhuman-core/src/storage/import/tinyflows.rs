@@ -34,8 +34,9 @@ use crate::storage::{Scope, StorageBackend};
 
 type CatalogMigrationKey = (PathBuf, String);
 
-static CATALOG_MIGRATIONS: LazyLock<Mutex<HashMap<CatalogMigrationKey, Result<(), String>>>> =
-    LazyLock::new(Default::default);
+static CATALOG_MIGRATIONS: LazyLock<
+    Mutex<HashMap<CatalogMigrationKey, std::result::Result<(), String>>>,
+> = LazyLock::new(Default::default);
 
 /// The marker name of the flow catalog (flows, revisions, runs, state,
 /// suggestions, drafts) and checkpoints.
@@ -197,7 +198,11 @@ async fn migrate_catalog_storage(
         .context("migrate the TinyFlows catalog storage")
 }
 
-fn record_catalog_migration(config: &Config, scope: &Scope, outcome: Result<(), String>) {
+fn record_catalog_migration(
+    config: &Config,
+    scope: &Scope,
+    outcome: std::result::Result<(), String>,
+) {
     let key = (config.workspace_dir.clone(), scope.as_str().to_owned());
     CATALOG_MIGRATIONS
         .lock()
@@ -216,10 +221,7 @@ fn catalog_migration_ready(config: &Config, scope: &Scope) -> bool {
     )
 }
 
-fn flow_import_marker_done(
-    backend: &Arc<dyn StorageBackend>,
-    config: &Config,
-) -> Result<bool> {
+fn flow_import_marker_done(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<bool> {
     let markers = Repo::on(
         backend,
         &crate::storage::tenant_scope(None),
@@ -228,6 +230,18 @@ fn flow_import_marker_done(
     )?;
     let step = marker_step(FLOWS_DOMAIN, &config.workspace_dir);
     import_state::is_done(&markers, MARKER_OWNER, &step)
+}
+
+#[cfg(feature = "flows")]
+pub(crate) fn legacy_flow_import_pending(
+    backend: &Arc<dyn StorageBackend>,
+    config: &Config,
+    scope: &Scope,
+) -> Result<bool> {
+    if scope != &Scope::local() || !flow_sources_present(&config.workspace_dir.join("flows")) {
+        return Ok(false);
+    }
+    Ok(!flow_import_marker_done(backend, config)?)
 }
 
 /// Make the acting scope safe for workflow calls, retrying a failed Catalog
@@ -246,15 +260,13 @@ pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Res
         record_catalog_migration(config, &scope, result.clone());
         result?;
     }
-    if scope == Scope::local() && flow_sources_present(&config.workspace_dir.join("flows")) {
-        let done = flow_import_marker_done(&backend, config)
-            .map_err(|error| format!("check the legacy flow import marker: {error:#}"))?;
-        if !done {
-            return Err(
-                "legacy flow import is incomplete for this workspace; workflow access is paused until it succeeds"
-                    .to_owned(),
-            );
-        }
+    if legacy_flow_import_pending(&backend, config, &scope)
+        .map_err(|error| format!("check the legacy flow import marker: {error:#}"))?
+    {
+        return Err(
+            "legacy flow import is incomplete for this workspace; workflow access is paused until it succeeds"
+                .to_owned(),
+        );
     }
     Ok(())
 }
@@ -284,6 +296,7 @@ async fn migrate_owner_stores(
     config: Config,
 ) -> (Vec<Report>, bool) {
     let scopes = crate::storage::boot::scopes_to_migrate(&backend).await;
+    #[cfg(feature = "flows")]
     let local = Scope::local();
     #[cfg(feature = "flows")]
     let mut local_catalog_ready = false;
@@ -306,10 +319,7 @@ async fn migrate_owner_stores(
             if let Err(error) = catalog {
                 reports.push(finish(
                     FLOWS_DOMAIN,
-                    Err(error.context(format!(
-                        "migrate the catalog for scope {}",
-                        scope.as_str()
-                    ))),
+                    Err(error.context(format!("migrate the catalog for scope {}", scope.as_str()))),
                 ));
             }
         }
@@ -317,10 +327,7 @@ async fn migrate_owner_stores(
         if let Err(error) = migrate_schedule_storage(&backend, &config, &scope).await {
             reports.push(finish(
                 CRON_DOMAIN,
-                Err(error.context(format!(
-                    "migrate the schedule for scope {}",
-                    scope.as_str()
-                ))),
+                Err(error.context(format!("migrate the schedule for scope {}", scope.as_str()))),
             ));
         }
     }
@@ -348,13 +355,10 @@ fn import_flows_after_migration(
         let config = config.clone();
         let totals = Arc::new(Mutex::new(ImportTotals::default()));
         crate::storage::block_on_anyhow(async move {
-            let registration = crate::flows::catalog_storage::register_backend_scope(
-                &config,
-                backend,
-                scope,
-            )
-            .await
-            .map_err(anyhow::Error::msg)?;
+            let registration =
+                crate::flows::catalog_storage::register_backend_scope(&config, backend, scope)
+                    .await
+                    .map_err(anyhow::Error::msg)?;
             let storage = registration.storage();
             let proxy = crate::modules::tinyflows::catalog_proxy_for_migration(&config)
                 .await
@@ -515,16 +519,12 @@ fn agent_cron_dirs(workspace: &Path) -> Vec<(String, PathBuf)> {
 pub fn run_with(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report> {
     let backend_for_migration = Arc::clone(backend);
     let config_for_migration = config.clone();
-    let (mut reports, local_catalog_ready) =
-        match crate::storage::block_on_anyhow(async move {
-            Ok(migrate_owner_stores(backend_for_migration, config_for_migration).await)
-        }) {
-            Ok(result) => result,
-            Err(error) => (
-                vec![finish(FLOWS_DOMAIN, Err(error))],
-                false,
-            ),
-        };
+    let (mut reports, local_catalog_ready) = match crate::storage::block_on_anyhow(async move {
+        Ok(migrate_owner_stores(backend_for_migration, config_for_migration).await)
+    }) {
+        Ok(result) => result,
+        Err(error) => (vec![finish(FLOWS_DOMAIN, Err(error))], false),
+    };
     #[cfg(feature = "flows")]
     if local_catalog_ready {
         reports.push(finish(

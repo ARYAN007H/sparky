@@ -156,12 +156,12 @@ pub(crate) async fn register_backend_scope(
             }))
         })
         .await
-        .map_err(|error| format!("CatalogStorage migration registration task did not finish: {error}"))?
+        .map_err(|error| {
+            format!("CatalogStorage migration registration task did not finish: {error}")
+        })?
 }
 
-async fn register_scope(
-    documents: DocScope,
-) -> Result<Arc<CatalogStorageRegistration>, String> {
+async fn register_scope(documents: DocScope) -> Result<Arc<CatalogStorageRegistration>, String> {
     let key = documents.key();
     let path = path_for(&key);
     let runtime = crate::modules::runtime::runtime()

@@ -160,9 +160,7 @@ mod imp {
     }
 
     /// Catalog proxy used only while migrations or bounded legacy imports run.
-    pub(crate) async fn catalog_proxy_for_migration(
-        config: &Config,
-    ) -> Result<Proxy, String> {
+    pub(crate) async fn catalog_proxy_for_migration(config: &Config) -> Result<Proxy, String> {
         ensure(config).await?;
         let runtime = runtime::runtime()
             .await

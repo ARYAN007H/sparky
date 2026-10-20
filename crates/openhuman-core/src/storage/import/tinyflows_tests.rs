@@ -346,6 +346,13 @@ fn an_invalid_flow_record_keeps_the_import_open_for_retry() {
     );
     let retry = import_flows(&backend, &Scope::local(), &config).unwrap();
     assert!(matches!(retry, Outcome::Incomplete { skipped: 1, .. }));
+    assert!(legacy_flow_import_pending(&backend, &config, &Scope::local()).unwrap());
+    assert!(!legacy_flow_import_pending(
+        &backend,
+        &config,
+        &crate::storage::scope_for_profile("another-profile"),
+    )
+    .unwrap());
     assert_eq!(tree(dir.path()), before, "the legacy files were modified");
 }
 
@@ -373,6 +380,41 @@ fn a_workspace_without_legacy_files_imports_nothing_and_leaves_no_marker() {
     };
     copy_tree(&fixtures().join("workspace"), dir.path());
     assert!(written(import_flows(&backend, &Scope::local(), &with_files).unwrap()) > 0);
+}
+
+#[tokio::test]
+async fn catalog_and_schedule_owner_migrations_cover_existing_scopes() {
+    let (_dir, config) = workspace();
+    let backend = backend();
+    let profile = crate::storage::scope_for_profile("migration-profile");
+    let profile_scope = backend.for_scope(&profile).unwrap();
+    profile_scope
+        .documents()
+        .ensure_collection(&tinystoragedrivers::CollectionSpec::new(
+            "profile.migration-sentinel",
+        ))
+        .await
+        .unwrap();
+
+    let (reports, local_catalog_ready) = migrate_owner_stores(Arc::clone(&backend), config).await;
+    assert!(local_catalog_ready);
+    assert!(reports.is_empty(), "{reports:?}");
+
+    for scope in [Scope::local(), profile] {
+        let scoped = backend.for_scope(&scope).unwrap();
+        assert!(scoped
+            .documents()
+            .get("flows.definitions", "missing")
+            .await
+            .unwrap()
+            .is_none());
+        assert!(scoped
+            .documents()
+            .get("cron.jobs", "missing")
+            .await
+            .unwrap()
+            .is_none());
+    }
 }
 
 #[test]
