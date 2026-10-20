@@ -91,15 +91,19 @@ fn observed_mutation_rejects_a_stale_parent_thread_task_lifecycle_or_status() {
         change_current(&mut current);
         store.save(std::slice::from_ref(&current)).unwrap();
 
-        let mut closure_called = false;
-        let updated = mutate_observed_session(&store, &observed, |session, _now| {
-            closure_called = true;
+        let closure_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let closure_marker = std::sync::Arc::clone(&closure_called);
+        let updated = mutate_observed_session(&store, &observed, move |session, _now| {
+            closure_marker.store(true, std::sync::atomic::Ordering::SeqCst);
             session.latest_error = Some("stale mutation".into());
         })
         .unwrap();
 
         assert!(!updated, "stale {field} must not update the current row");
-        assert!(!closure_called, "stale {field} must reject before mutation");
+        assert!(
+            !closure_called.load(std::sync::atomic::Ordering::SeqCst),
+            "stale {field} must reject before mutation"
+        );
         let persisted = store.load().unwrap().pop().unwrap();
         assert_eq!(
             serde_json::to_value(&persisted).unwrap(),
