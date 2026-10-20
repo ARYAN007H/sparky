@@ -377,11 +377,12 @@ async fn append_cannot_forge_private_attachment_storage_metadata() {
             "path": "../../etc/passwd"
         }]})),
     };
+    let update_error = message_update(&crate::core::runtime::DispatchCtx::ambient(), update)
+        .await
+        .expect_err("metadata updates must not create resolver authority");
     assert!(
-        message_update(&crate::core::runtime::DispatchCtx::ambient(), update)
-            .await
-            .is_err(),
-        "metadata updates must not create resolver authority"
+        update_error.contains("reserved"),
+        "expected reserved-key rejection, got: {update_error}"
     );
 }
 
