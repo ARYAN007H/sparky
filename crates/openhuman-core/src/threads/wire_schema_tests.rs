@@ -1,5 +1,44 @@
 use super::*;
 
+fn resolve_schema<'a>(
+    root: &'a serde_json::Value,
+    mut schema: &'a serde_json::Value,
+) -> &'a serde_json::Value {
+    while let Some(reference) = schema.get("$ref").and_then(serde_json::Value::as_str) {
+        let pointer = reference.strip_prefix('#').expect("local schema reference");
+        schema = root.pointer(pointer).expect("schema reference resolves");
+    }
+    schema
+}
+
+fn schema_string_values(root: &serde_json::Value, schema: &serde_json::Value) -> Vec<String> {
+    let schema = resolve_schema(root, schema);
+    let mut values: Vec<String> = if let Some(values) = schema
+        .get("enum")
+        .and_then(serde_json::Value::as_array)
+    {
+        values
+            .iter()
+            .map(|value| value.as_str().expect("string enum value").to_owned())
+            .collect()
+    } else {
+        schema
+            .get("oneOf")
+            .and_then(serde_json::Value::as_array)
+            .expect("string enum or oneOf schema")
+            .iter()
+            .map(|variant| {
+                variant["const"]
+                    .as_str()
+                    .expect("string oneOf const")
+                    .to_owned()
+            })
+            .collect()
+    };
+    values.sort();
+    values
+}
+
 #[test]
 fn thread_wire_schema_exports_the_core_and_session_records() {
     let schema: serde_json::Value =
@@ -23,10 +62,29 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         "agentRun",
         "runEvent",
         "runTelemetry",
+        "turnCitation",
+        "queueMode",
     ] {
         assert!(
             properties.contains_key(property),
             "schema is missing {property}"
+        );
+    }
+    assert_eq!(
+        schema_string_values(&schema, &properties["queueMode"]),
+        vec![
+            "collect".to_owned(),
+            "followup".to_owned(),
+            "interrupt".to_owned(),
+            "parallel".to_owned(),
+            "steer".to_owned(),
+        ]
+    );
+    let citation_schema = resolve_schema(&schema, &properties["turnCitation"]);
+    for field in ["id", "key", "namespace", "score", "timestamp", "snippet"] {
+        assert!(
+            citation_schema["properties"].get(field).is_some(),
+            "citation schema is missing {field}: {citation_schema}"
         );
     }
     let ack = &schema["$defs"]["QueuedChatAck"];
