@@ -8,7 +8,7 @@
 #[path = "http_error_tests.rs"]
 mod tests;
 
-use crate::inference::provider::openhuman_backend_model;
+use crate::inference::registry::classify_backend_error;
 use tinyinference_core::sanitize::sanitize_api_error;
 use tinyinference_llm::failure::http::{
     classify_and_report_http_failure, ErrorReporter, ProviderHttpFailure, ProviderHttpFailureFacts,
@@ -25,14 +25,15 @@ pub fn should_report_provider_http_failure(status: reqwest::StatusCode) -> bool 
 
 /// Whether this is the OpenHuman backend rejecting the app session JWT.
 pub fn is_backend_auth_failure(provider: &str, status: reqwest::StatusCode) -> bool {
-    matches!(status.as_u16(), 401 | 403) && provider == openhuman_backend_model::PROVIDER_LABEL
+    matches!(status.as_u16(), 401 | 403)
+        && classify_backend_error(Some(provider), "").is_some_and(|result| result.provider_owned)
 }
 
 /// Whether the response carries a managed-backend `errorCode` the backend
 /// already owns. Only trustworthy on the managed backend provider.
 pub fn is_backend_error_code_owned(provider: &str, body: &str) -> bool {
-    provider == openhuman_backend_model::PROVIDER_LABEL
-        && crate::inference::provider::backend_error_code_skips_sentry(body)
+    classify_backend_error(Some(provider), body)
+        .is_some_and(|result| result.backend_owned && !result.reportable)
 }
 
 /// Config-rejection demotion policy: the managed backend's unknown-model body
@@ -40,7 +41,9 @@ pub fn is_backend_error_code_owned(provider: &str, body: &str) -> bool {
 /// third-party scoped so a backend regression still reaches Sentry.
 pub(crate) fn config_rejection_demoted(facts: &ProviderHttpFailureFacts, provider: &str) -> bool {
     facts.configuration_rejected
-        && (facts.unknown_model || provider != openhuman_backend_model::PROVIDER_LABEL)
+        && (facts.unknown_model
+            || !classify_backend_error(Some(provider), "")
+                .is_some_and(|result| result.provider_owned))
 }
 
 fn log_user_state(
@@ -145,7 +148,8 @@ impl ErrorReporter for HostErrorReporter<'_> {
             status,
             facts,
         } = failure;
-        let is_backend = provider == openhuman_backend_model::PROVIDER_LABEL;
+        let is_backend = classify_backend_error(Some(provider), "")
+            .is_some_and(|result| result.provider_owned);
         let status_code =
             reqwest::StatusCode::from_u16(status).unwrap_or(reqwest::StatusCode::BAD_GATEWAY);
         let demote = |kind: &str, reason: &str, warn: bool| {
