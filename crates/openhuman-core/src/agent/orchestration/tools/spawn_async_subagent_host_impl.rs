@@ -329,6 +329,7 @@ impl SpawnAsyncSubagentTool {
                         parent_thread_id.clone(),
                     ),
                 ),
+                parent_epoch: completion_target.parent_epoch(),
             },
             reusable.as_ref(),
         ) {
@@ -502,4 +503,5 @@ impl SpawnAsyncSubagentTool {
             &fleet,
         ))
     }
-}
+    parent_epoch: None,
+            }

@@ -1,7 +1,17 @@
 use super::*;
 use crate::agent::orchestration::subagent_sessions::types::SubagentSessionUpsert;
 use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
-use tinyagents_orchestration::subagent::{FinishedOutcome, SubagentTaskKey};
+use tinyagents_orchestration::subagent::{FinishedOutcome, SubagentTaskKey    parent_epoch: None,
+            parent_epoch: None,
+    let first = upsert_r    parent_epoch: None,
+    let store = SubagentSessionStore::new(dir.p    parent_epoch: None,
+        parent_run_id: "turn-run"    parent_epoch: None,
+        task_id: "    parent_epoch: None,
+    let d    parent_epoch: None,
+fn cancellation_reason_is_written_only_fo    parent_epoch: None,
+            task_tit    parent_epoch: None,
+#[te    parent_epoch: None,
+        normalize};
 
 fn selector(task_key: &str) -> SubagentSessionSelector {
     SubagentSessionSelector {
@@ -12,7 +22,13 @@ fn selector(task_key: &str) -> SubagentSessionSelector {
         sandbox_mode: "read_only".into(),
         action_root: Some("/tmp/work".into()),
         task_key: task_key.into(),
-    }
+        parent_epoch: None,
+    assert    parent_epoch: None,
+    assert_eq!(current.lifecycle_key, Some(secon    parent_epoch: None,
+     parent_epoch: None,
+            life    parent_epoch: None,
+        &se    parent_epoch: None,
+    .}
 }
 
 #[test]

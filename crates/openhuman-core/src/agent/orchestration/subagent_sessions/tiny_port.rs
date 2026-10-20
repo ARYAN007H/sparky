@@ -224,6 +224,7 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
                 worker_thread_id: upsert.worker_thread_id,
                 task_id: upsert.task_id,
                 lifecycle_key: Some(upsert.lifecycle_key),
+                parent_epoch: upsert.parent_epoch,
             },
             reuse.as_ref(),
         )

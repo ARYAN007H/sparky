@@ -121,28 +121,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         task_id,
         reason,
     )?;
-    let parent_epoch = match selected.as_ref().and_then(|selected| {
-        selected.was_paused.then_some((
-            selected.parent_thread_id.as_deref(),
-            selected.task_id.as_str(),
-        ))
-    }) {
-        Some((Some(thread_id), selected_task_id)) => {
-            match crate::agent::orchestration::background_completions::paused_task_parent_epoch(
-                ctx,
-                &workspace_dir,
-                thread_id,
-                selected_task_id,
-            ) {
-                Ok(epoch) => epoch,
-                Err(error) => {
-                    log::warn!("[running_subagents] could not recover paused task parent epoch task_id={selected_task_id}: {error}");
-                    None
-                }
-            }
-        }
-        _ => None,
-    };
+    let parent_epoch = selected.as_ref().and_then(|selected| selected.parent_epoch);
     let driver_pause = selected
         .as_ref()
         .filter(|selected| selected.was_paused)

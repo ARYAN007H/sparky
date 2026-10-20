@@ -11,7 +11,8 @@ fn registered_controllers_match_schemas() {
     assert_eq!(schema_for("subagent_cancel").function, "cancel");
     assert_eq!(schema_for("subagent_steer").namespace, "subagent");
     assert_eq!(schema_for("subagent_steer").function, "steer");
-}
+    parent_epoch: None,
+        }
 
 #[test]
 fn require_str_rejects_blank_and_missing() {
@@ -184,6 +185,7 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
             worker_thread_id: None,
             task_id: task_id.into(),
             lifecycle_key: Some(key.clone()),
+            parent_epoch: Some(1),
         },
         None,
     )
@@ -207,6 +209,7 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         subagent_session_id: session.subagent_session_id.clone(),
         workspace_dir: workspace_dir.clone(),
         parent_thread_id: parent_thread.clone(),
+        parent_epoch: Some(1),
         already_finished: None,
         was_paused: true,
         lifecycle_key: Some(key),
@@ -216,6 +219,7 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     assert!(settle_paused_driver_cancel(
         &DispatchCtx::process_default(),
         &observed,
+        observed.parent_epoch,
         Some("user requested stop")
     )
     .await

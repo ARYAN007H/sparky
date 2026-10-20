@@ -36,6 +36,7 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
             "context": "parent supplied context",
             "model": "test-model",
             "blocking": true
+            parent_epoch: None,
         }),
         None,
         live.data.child(),

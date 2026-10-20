@@ -62,6 +62,8 @@ fn collections() -> Vec<CollectionSpec> {
 struct StoredSession {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     lifecycle_key: Option<tinyagents_orchestration::subagent::SubagentTaskKey>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    parent_epoch: Option<u64>,
     subagent_session_id: String,
     parent_session: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -101,6 +103,7 @@ impl From<&DurableSubagentSession> for StoredSession {
         let updated_ms = rfc3339_ms(&s.updated_at).unwrap_or(created_ms);
         Self {
             lifecycle_key: s.lifecycle_key.clone(),
+            parent_epoch: s.parent_epoch,
             subagent_session_id: s.subagent_session_id.clone(),
             parent_session: s.parent_session.clone(),
             parent_thread_id: s.parent_thread_id.clone(),
@@ -128,6 +131,7 @@ impl From<StoredSession> for DurableSubagentSession {
     fn from(s: StoredSession) -> Self {
         Self {
             lifecycle_key: s.lifecycle_key,
+            parent_epoch: s.parent_epoch,
             subagent_session_id: s.subagent_session_id,
             parent_session: s.parent_session,
             parent_thread_id: s.parent_thread_id,

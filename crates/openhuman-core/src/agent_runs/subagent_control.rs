@@ -231,9 +231,6 @@ async fn settle_paused_driver_cancel(
     parent_epoch: Option<u64>,
     reason: Option<&str>,
 ) -> Result<bool, String> {
-    let Some(parent_epoch) = parent_epoch else {
-        return Err("subagent_cancel: paused task has no captured parent generation".into());
-    };
     let store = subagent_sessions::SubagentSessionStore::new(paused.workspace_dir.clone());
     let transitioned = subagent_sessions::mark_driver_pause_cancelled(&store, paused)
         .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
@@ -242,15 +239,18 @@ async fn settle_paused_driver_cancel(
             Some(reason) => format!("cancelled by user. Reason: {reason}"),
             None => "cancelled by user".to_string(),
         };
+        let parent_epoch = paused.parent_thread_id.as_ref().map(|_| parent_epoch.unwrap_or(0));
         background_completions::record_outcome_with_parent_epoch(
             ctx,
             &paused.workspace_dir,
             &paused.parent_session,
             &paused.task_id,
             &paused.agent_id,
-            &error,
+            format!(
+                "[SUBAGENT_FAILED] the async sub-agent errored before producing a result: {error}"
+            ),
             paused.parent_thread_id.clone(),
-            Some(parent_epoch),
+            parent_epoch,
             background_completions::BackgroundAgentOutcome::Failed,
         )
         .await;

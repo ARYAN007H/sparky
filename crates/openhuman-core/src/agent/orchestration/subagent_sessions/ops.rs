@@ -139,6 +139,7 @@ pub fn upsert_running(
             task_title: upsert.task_title.clone(),
             current_task_id: None,
             lifecycle_key: None,
+            parent_epoch: None,
             status: DurableSubagentStatus::Running,
             reusable: true,
             latest_history: None,
@@ -155,6 +156,8 @@ pub fn upsert_running(
     session.display_name = upsert.display_name.or(session.display_name);
     session.current_task_id = Some(upsert.task_id);
     session.lifecycle_key = upsert.lifecycle_key.or(session.lifecycle_key);
+    // This belongs to the new task, not the reusable session's previous run.
+    session.parent_epoch = upsert.parent_epoch;
     session.status = DurableSubagentStatus::Running;
     session.reusable = true;
     session.latest_error = None;
