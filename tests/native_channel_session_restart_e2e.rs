@@ -642,9 +642,8 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         .find(|request| model_saw_user_text(request, OTHER_AFTER_RESTART_TEXT))
         .expect("post-restart chat 43 update reached the model");
     assert!(model_saw_user_text(other_chat_request, OTHER_CHAT_TEXT));
-    assert!(model_saw_user_text(&requests[4], OTHER_AFTER_RESTART_TEXT));
-    assert!(!model_saw_user_text(&requests[4], FIRST_TEXT));
-    assert!(!model_saw_user_text(&requests[4], AFTER_RESET_TEXT));
+    assert!(!model_saw_user_text(other_chat_request, FIRST_TEXT));
+    assert!(!model_saw_user_text(other_chat_request, AFTER_RESET_TEXT));
     wait_for_completion(&mocks.state, 5).await;
     second.stop();
 }
