@@ -144,19 +144,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     // A durable host row and the checkpoint must agree on the full owner key.
     // Corrupt only its root run identity and drive the real spawn path: resume
     // must refuse before mutating the paused row or admitting another child.
-    let mut mismatched_records = sessions.load().expect("paused sessions");
-    let row = mismatched_records
-        .iter_mut()
-        .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-        .expect("paused row to corrupt");
-    row.lifecycle_key
-        .as_mut()
-        .expect("paused session retains lifecycle key")
-        .root_run_id
-        .push_str("-mismatch");
-    sessions
-        .save(&mismatched_records)
-        .expect("corrupt only the persisted lifecycle owner key");
     let definitions = AgentDefinitionRegistry::builtins_only();
     let definition = definitions
         .get("task_manager_agent")
@@ -183,6 +170,21 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     };
     let (saved_key, reusable_session_id) =
         crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || {
+            let mut records = sessions.load().expect("load paused row before corruption");
+            let row = records
+                .iter_mut()
+                .find(|session| {
+                    session.subagent_session_id == before_session.subagent_session_id
+                })
+                .expect("paused row to corrupt");
+            row.lifecycle_key
+                .as_mut()
+                .expect("paused session retains lifecycle key")
+                .root_run_id
+                .push_str("-mismatch");
+            sessions
+                .save(&records)
+                .expect("corrupt only the persisted lifecycle owner key");
             let reread = sessions.load().expect("reread corrupted paused row");
             let persisted = reread
                 .iter()
