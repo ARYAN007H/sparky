@@ -1080,6 +1080,7 @@ async fn run_managed_capture_turn(
         "The managed gateway request is stable.",
     )]);
     with_captured_proxy_requests(|requests| requests.clear());
+    let workspace_dir = home.join("workspace");
     let stack = boot_stack_with_capture_endpoint(api_origin, home).await;
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=managed-capture-client",
@@ -1122,6 +1123,9 @@ async fn run_managed_capture_turn(
         "managed-capture-thread",
     )
     .await;
+    // Session transcript stores and their SQLite backend are also cached by
+    // workspace path; release them before the next repetition removes it.
+    openhuman_core::storage::sessions::release_workspace(&workspace_dir);
 
     with_captured_proxy_requests(|requests| requests.clone())
 }
