@@ -290,6 +290,17 @@ pub fn resolve_provider_model(
     (hooks.resolve_model)(role, config, model_override)
 }
 
+pub(crate) fn resolve_provider_model_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    role: &str,
+    config: &Config,
+    model_override: Option<&str>,
+) -> Option<String> {
+    let hooks = chat_model_for(extensions, provider_id)?.models?;
+    (hooks.resolve_model)(role, config, model_override)
+}
+
 /// The provider's model-specific context window, if known.
 pub fn provider_model_context_window(provider_id: &str, model: &str) -> Option<u64> {
     let hooks = provider_model_hooks(provider_id)?;

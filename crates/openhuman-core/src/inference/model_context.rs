@@ -139,6 +139,18 @@ pub fn model_supports_vision(model: &str, config: &crate::config::Config) -> boo
     ) || model_vision_enabled(model, config)
 }
 
+pub(crate) fn model_supports_vision_in(
+    extensions: Option<&crate::core::slots::Extensions>,
+    model: &str,
+    config: &crate::config::Config,
+) -> bool {
+    crate::inference::registry::provider_model_supports_vision_for(
+        extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        model,
+    ) || model_vision_enabled(model, config)
+}
+
 #[cfg(test)]
 #[path = "model_context_tests.rs"]
 mod tests;
