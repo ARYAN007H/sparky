@@ -65,6 +65,25 @@ async fn legacy_path_refs_are_guarded_and_imported_as_opaque_file_keys() {
     assert_eq!(file.key, "artifacts/files/a-legacy/v1.txt");
     assert_ne!(file.key, source.display().to_string());
     assert_eq!(blobs.read(&file.key).await.unwrap(), b"legacy bytes");
+
+    let outside = dir.path().join("outside.txt");
+    std::fs::write(&outside, "must stay outside").unwrap();
+    let mut blocked_version = ArtifactVersion::new(
+        1,
+        outside.display().to_string(),
+        ArtifactAuthor::Agent,
+        "agent",
+        1,
+    );
+    blocked_version.file = Some(FileRef {
+        key: outside.display().to_string(),
+        size_bytes: 17,
+        media_type: None,
+    });
+    let mut blocked = ArtifactRecord::pending("a-outside", "Outside", ArtifactKind::File, 1);
+    blocked.versions.push(blocked_version);
+    records.upsert(&blocked).await.unwrap();
+    assert!(importing.get("a-outside").await.is_err());
 }
 
 #[tokio::test]
