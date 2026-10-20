@@ -476,6 +476,7 @@ fn availability_notes_are_status_not_instructions() {
 /// thread would write into the same file.
 #[test]
 fn a_subagent_thread_binding_claims_no_session_identity() {
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
