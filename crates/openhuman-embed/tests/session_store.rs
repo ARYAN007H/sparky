@@ -182,7 +182,6 @@ fn a_stateless_runtime_keeps_every_conversation_in_its_session_store() {
                 .into_iter()
                 .filter(|path| !baseline.contains(path))
                 .collect();
-            eprintln!("DBGWRITTEN {written:?}");
             assert!(
                 written.is_empty(),
                 "a stateless workspace must remain empty, found: {written:?}"
