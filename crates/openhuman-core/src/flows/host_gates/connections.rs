@@ -1,8 +1,7 @@
 use super::graph_json::nodes;
 use crate::config::Config;
-use crate::flows::ops::build_flow_connections;
+use crate::flows::ops::{build_flow_connections, FlowConnection};
 use serde_json::Value;
-use tinyflows_catalog::FlowConnection;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Connection-ref gate (WS3): a Composio tool_call's `connection_ref` must name

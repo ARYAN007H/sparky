@@ -263,8 +263,8 @@ Top level:
 | [`catalogue.rs`](./catalogue.rs) | `flow_entries` lists saved flows as `Workflow` entries with `WorkflowScope::Flow`, so the skill catalogue and `skill_search` show one list. |
 | [`node_contracts.rs`](./node_contracts.rs) | Host overlay on `Catalog.NodeKinds` returned over TinyBus (which `tool_call` slugs resolve to Composio or native `oh:` tools, which trigger kinds dispatch here). |
 | [`host_gates/`](./host_gates/) | OpenHuman stages served through the scoped TinyFlows `AuthoringHost` callback. |
+| [`host_gates/graph_json.rs`](./host_gates/graph_json.rs) | Read-only traversal of TinyFlows' normalized graph JSON for host-owned policy checks. |
 | `../skills/bundled/flow_authoring.rs` | Adapts Copilot `ListResources` to TinySkills materialization and scoped skill discovery. |
-| `tinyflows/` | Generic graph vocabulary and migration re-exports. See [tinyflows/README.md](tinyflows/README.md). |
 
 `ops/`, grouped by role:
 
@@ -293,11 +293,10 @@ Top level:
   approval parking. Resume uses a fresh CapsHost registration and the exact
   same stable storage address.
 - `bus::FlowTriggerSubscriber` ([`bus/trigger.rs`](./bus/trigger.rs)): the trigger-to-run bridge.
-- Model types, re-exported from `tinyflows_catalog` and not owned here: `Flow`,
-  `FlowConnection`, `FlowDraft`, `FlowImport`, `FlowRevision`, `FlowRun`,
-  `FlowRunStep`, `FlowRunTrigger`, `FlowSuggestion`, `FlowValidation`,
-  `FlowValidationError`, `SuggestionStatus`, `DraftOrigin`, plus the `types`,
-  `run_registry`, `build_registry` and `n8n_import` modules.
+- Workflow, run, draft, and validation records cross the host boundary through
+  `tinyflows_bus` Catalog, Runs, and Authoring contracts. `FlowConnection` is
+  OpenHuman's secret-free picker projection in `ops/connections.rs`; graph
+  payloads stay normalized JSON at the host boundary.
 
 ## RPC / CLI surface
 
@@ -358,10 +357,9 @@ Agent tools: `core`'s [`tools/ops.rs`](../tools/ops.rs) adds 27 flows tools to t
 ## Tests
 
 Tests sit beside their modules as `*_tests.rs` files ([`ops_tests.rs`](./ops_tests.rs),
-[`bus_tests.rs`](./bus_tests.rs), [`schemas_tests.rs`](./schemas_tests.rs), the builder tool and agent prompt tests,
-and the seam's own suite under `tinyflows/`). `store.rs`'s tests cover the
-storage resolution and the import of the legacy files; the catalog's behavior is
-covered in `tinyflows-drivers`.
+[`bus_tests.rs`](./bus_tests.rs), [`schemas_tests.rs`](./schemas_tests.rs), and the builder tool and agent prompt suites).
+`storage::import::tinyflows_tests` covers owner migrations and read-only legacy
+file replay; Catalog behavior belongs to the TinyFlows module's own suite.
 
 ```bash
 cargo test -p openhuman flows::
