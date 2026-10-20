@@ -5,9 +5,9 @@ import { threadApi } from '../../services/api/threadApi';
 import { CoreRpcError } from '../../services/coreRpcClient';
 import type { Thread, ThreadMessage } from '../../types/thread';
 import threadReducer, {
-  applyChannelEvent,
   addInferenceResponse,
   addMessageLocal,
+  applyChannelEvent,
   clearAllThreads,
   clearSelectedThread,
   clearStaleThread,
@@ -115,12 +115,10 @@ describe('threadSlice synchronous reducers', () => {
     expect(
       store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]
         ?.extraMetadata?.channelActivity
-    ).toEqual({
-      reactions: [{ actorId: 'alice', value: '🔥' }],
-      readReceipts: [],
-    });
-    expect(store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]?.id)
-      .toBe('user:row-42');
+    ).toEqual({ reactions: [{ actorId: 'alice', value: '🔥' }], readReceipts: [] });
+    expect(
+      store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]?.id
+    ).toBe('user:row-42');
   });
 
   // [#1123] setWelcomeThreadId is now a true no-op — kept for TS compat but

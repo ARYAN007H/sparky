@@ -494,7 +494,9 @@ const threadSlice = createSlice({
       if (!rowId || !event.thread_id) return;
       const thread = (state.channelActivityByThreadId[event.thread_id] ??= {});
       if (!thread[rowId]) {
-        const prior = state.messagesByThreadId[event.thread_id]?.find(message => message.id === rowId);
+        const prior = state.messagesByThreadId[event.thread_id]?.find(
+          message => message.id === rowId
+        );
         const persisted = prior?.extraMetadata?.channelActivity;
         const saved = persisted && typeof persisted === 'object' ? persisted : undefined;
         thread[rowId] = {
@@ -546,10 +548,7 @@ const threadSlice = createSlice({
         if (message.id !== rowId) return;
         message.extraMetadata = {
           ...(message.extraMetadata ?? {}),
-          channelActivity: {
-            reactions: activity.reactions,
-            readReceipts: activity.readReceipts,
-          },
+          channelActivity: { reactions: activity.reactions, readReceipts: activity.readReceipts },
         };
       };
       state.messagesByThreadId[event.thread_id]?.forEach(updateMessage);
