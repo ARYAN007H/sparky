@@ -54,9 +54,6 @@ pub(super) fn local_only_violation(
     if tinyinference_local::profile::is_local_provider_string(p) {
         return None;
     }
-    if ProviderRoute::parse(p).is_some_and(|route| !route.is_external()) {
-        return None;
-    }
     Some(external_provider_label(p))
 }
 
