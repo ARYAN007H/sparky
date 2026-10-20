@@ -267,3 +267,86 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
         );
     }
 }
+
+#[test]
+fn production_registry_binds_composio_execute_to_its_declared_parser() {
+    use serde_json::json;
+
+    // Inspect the unfiltered registry so a legacy row cannot hide behind the
+    // domain schema catalog or live surface filters.
+    let entries: Vec<_> = registry()
+        .iter()
+        .chain(internal_registry())
+        .map(|grouped| &grouped.controller)
+        .filter(|entry| entry.schema.method_name() == "composio.execute")
+        .collect();
+    assert_eq!(
+        entries.len(),
+        1,
+        "composio.execute has one raw registry entry"
+    );
+    let entry = entries[0];
+    let bound_methods: Vec<_> = registry()
+        .iter()
+        .chain(internal_registry())
+        .filter(|grouped| grouped.controller.is_bound())
+        .map(|grouped| grouped.controller.schema.method_name())
+        .collect();
+    assert_eq!(
+        bound_methods,
+        ["composio.execute", "threads.upsert"],
+        "staged bound inventory"
+    );
+    assert!(
+        entry.is_bound(),
+        "composio.execute must be bound at registration"
+    );
+    assert_eq!(entry.rpc_method_name(), "openhuman.composio_execute");
+
+    let declared_required: Vec<_> = entry
+        .schema
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_eq!(
+        declared_required,
+        ["tool"],
+        "required fields are independent contract"
+    );
+    for name in ["arguments", "connection_id"] {
+        assert!(
+            entry
+                .schema
+                .inputs
+                .iter()
+                .any(|field| field.name == name && !field.required),
+            "{name} must remain optional"
+        );
+    }
+
+    for example in [
+        json!({"tool":"GMAIL_SEND_EMAIL"}),
+        json!({"tool":" GMAIL_SEND_EMAIL ","arguments":{"to":"test@example.invalid"},"connection_id":"conn-1"}),
+        json!({"tool":"GMAIL_SEND_EMAIL","arguments":null,"connection_id":null}),
+        json!({"tool":"GMAIL_SEND_EMAIL","arguments":42,"connection_id":""}),
+    ] {
+        let params = example.as_object().expect("example is an object").clone();
+        validate_params(&entry.schema, &params)
+            .expect("actual registered schema accepts the example");
+        entry
+            .decode_params(params)
+            .expect("actual raw registry entry uses the runtime parser");
+    }
+
+    let mut missing_tool: Map<String, Value> = serde_json::from_value(json!({
+        "arguments":{"to":"test@example.invalid"}
+    }))
+    .expect("object params");
+    assert!(validate_params(&entry.schema, &missing_tool).is_err());
+    assert!(entry.decode_params(missing_tool.clone()).is_err());
+    missing_tool.insert("tool".into(), json!("GMAIL_SEND_EMAIL"));
+    assert!(validate_params(&entry.schema, &missing_tool).is_ok());
+    assert!(entry.decode_params(missing_tool).is_ok());
+}
