@@ -144,6 +144,216 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
     );
 }
 
+/// A child the harness stops early (failure breaker / iteration cap) is not a
+/// successful result: asynchronous completion preserves the incomplete marker
+/// for delivery and reports the child's stop through parent progress.
+#[tokio::test(start_paused = true)]
+async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(512);
+    let mut parent = parent_context(workspace.path(), Arc::new(LoopingToolModel), vec![]);
+    parent.session_id = "stopped-child-test".into();
+    parent.on_progress = Some(progress_tx);
+    let thread_id = "stopped-child-test-thread";
+    let (live, _core) = continuation_tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "stopped-child-test",
+        thread_id,
+    );
+    assert!(live.data.dispatch_ctx().resolved().is_some());
+    let run_context = live.data.child();
+    // Boxed: the inline spawn future is too large for a test thread's
+    // stack (the trait `execute` path boxes it the same way).
+    let tool = SpawnSubagentTool::new();
+    let result = Box::pin(
+        tool.execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "List the task sources",
+                "model": "test-model"
+            }),
+            None,
+            run_context,
+            crate::agent::subagent_host::detached_subagent_parent(&live, "stopped-child")
+                .expect("detached parent"),
+        ),
+    )
+    .await
+    .expect("tool execution");
+
+    assert!(
+        !result.is_error,
+        "the asynchronous spawn is accepted before the child settles: {}",
+        result.output()
+    );
+    let task_id = result
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|payload| payload.get("task_id")?.as_str().map(str::to_owned))
+        .expect("accepted result carries the child task id");
+
+    let (_output, stop) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    agent_id,
+                    task_id: event_task_id,
+                    output,
+                    stop,
+                    ..
+                }) if agent_id == "task_manager_agent" && event_task_id == task_id => {
+                    break (output, stop)
+                }
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    agent_id,
+                    task_id: event_task_id,
+                    error,
+                }) if agent_id == "task_manager_agent" && event_task_id == task_id => {
+                    panic!("stopped child was reported as a provider failure: {error}")
+                }
+                Some(_) => {}
+                None => panic!("parent progress stream closed before child stop"),
+            }
+        }
+    })
+    .await
+    .expect("the async completion reaches the parent");
+    let stop = stop.expect("SubagentCompleted carries the child's stop");
+    assert!(matches!(
+        stop.kind,
+        tinyagents_harness::turn_stop::TurnStopKind::Breaker
+            | tinyagents_harness::turn_stop::TurnStopKind::IterationCap
+    ));
+    let incomplete_completion =
+        crate::agent::orchestration::background_completions::pending_for_ctx(
+            &live.data.dispatch_ctx(),
+            workspace.path(),
+            thread_id,
+        )
+        .into_iter()
+        .find(|record| record.task_id == task_id)
+        .expect("the asynchronous incomplete result is retained for delivery");
+    assert!(
+        incomplete_completion
+            .result
+            .text
+            .contains("[SUBAGENT_INCOMPLETE]"),
+        "the delivered result remains explicitly incomplete: {}",
+        incomplete_completion.result.text
+    );
+}
+
+#[tokio::test]
+async fn failed_async_child_is_reported_to_the_parent_without_a_success_result() {
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
+    let mut parent = parent_context(workspace.path(), Arc::new(FailingModel), vec![]);
+    parent.on_progress = Some(progress_tx);
+    let live = super::live_parent_run_context("failed-async-child", parent);
+    let accepted = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "exercise provider failure",
+                "model": "test-model"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "failed-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("the asynchronous spawn request is accepted");
+    assert!(
+        !accepted.is_error,
+        "child failure is delivered asynchronously"
+    );
+
+    let failure = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    agent_id, error, ..
+                }) if agent_id == "task_manager_agent" => break error,
+                Some(_) => {}
+                None => panic!("parent progress stream closed before child failure"),
+            }
+        }
+    })
+    .await
+    .expect("asynchronous child failure reaches the parent");
+    assert!(
+        failure.starts_with("spawn_subagent failed and did not complete."),
+        "failure copy remains recognizable to the parent: {failure}"
+    );
+    assert!(failure.contains("scripted provider outage"), "{failure}");
+    assert!(!failure.contains("completed successfully"), "{failure}");
+}
+
+#[tokio::test]
+async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
+    const STUB_CANARY: &str = "unexecuted-tool-call-stub-canary";
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let provider = Arc::new(ScriptedModel::new(vec![(
+        STUB_CANARY,
+        r#"{"tool_calls":[{"type":"function","function":{"name":"missing","arguments":"{}"}}]}"#,
+    )]));
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
+    let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    parent.on_progress = Some(progress_tx);
+    let live = super::live_parent_run_context("stub-async-child", parent);
+    let accepted = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": format!("return {STUB_CANARY}"),
+                "model": "test-model"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "stub-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("the asynchronous spawn request is accepted");
+    assert!(!accepted.is_error, "completion is asynchronous");
+
+    let completed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    agent_id,
+                    output,
+                    stop,
+                    ..
+                }) if agent_id == "task_manager_agent" => break (output, stop),
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    agent_id, error, ..
+                }) if agent_id == "task_manager_agent" => {
+                    panic!("stub should be incomplete, not an inference failure: {error}")
+                }
+                Some(_) => {}
+                None => panic!("parent progress stream closed before stub settlement"),
+            }
+        }
+    })
+    .await
+    .expect("the completion guard projects the stub to the parent");
+    assert!(provider.saw(STUB_CANARY));
+    assert!(completed.0.contains("tool_calls"), "{}", completed.0);
+    assert!(
+        completed.1.is_some(),
+        "a stub is incomplete, not successful"
+    );
+}
+
 struct FailingModel;
 
 #[async_trait]
