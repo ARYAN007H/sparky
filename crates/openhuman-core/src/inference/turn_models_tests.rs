@@ -10,6 +10,102 @@ use super::TurnModels;
 use crate::agent::tinyagents::TurnModelSource;
 use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
 
+fn scoped_model_entry(
+    name: &'static str,
+    supports_vision: bool,
+) -> crate::inference::registry::ChatModelEntry {
+    use crate::inference::registry::ProviderModelHooks;
+
+    crate::inference::registry::ChatModelEntry {
+        build: Arc::new(move |_| Ok((Arc::new(NamedModel(name)), name.to_string()))),
+        probe: None,
+        models: Some(ProviderModelHooks {
+            default_model: Arc::new(move || Some(name.to_string())),
+            role_for_model: Arc::new(|model| model.strip_prefix("hint:").map(str::to_string)),
+            is_alias: Arc::new(|model| model.starts_with("hint:")),
+            is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+            supports_vision: Arc::new(move |_| supports_vision),
+            resolve_model: Arc::new(move |_, _, model| match model {
+                Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
+                Some(_) | None => Some(name.to_string()),
+            }),
+            context_window: Arc::new(move |_| Some(if supports_vision { 131_072 } else { 32_768 })),
+            default_pricing: Arc::new(|| None),
+            without_reasoning: Arc::new(|request| request),
+        }),
+    }
+}
+
+#[tokio::test]
+async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_context() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use crate::core::slots::Extensions;
+
+    let provider = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
+    let context_a_extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &context_a_extensions,
+        provider,
+        scoped_model_entry("context-a-model", true),
+    );
+    let context_a =
+        CoreContext::for_test_with_extensions(DomainSet::full(), None, context_a_extensions);
+
+    let context_b_extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &context_b_extensions,
+        provider,
+        scoped_model_entry("context-b-model", false),
+    );
+    let context_b =
+        CoreContext::for_test_with_extensions(DomainSet::full(), None, context_b_extensions);
+
+    let dispatch = DispatchCtx::new(Arc::clone(&context_a));
+    let config = Arc::new(crate::config::Config::default());
+    CoreContext::scope(context_b, async {
+        let source = TurnModelSource::new_crate_native(&dispatch, "chat", config);
+        let models = source
+            .build("hint:chat", 0.0, None, None)
+            .expect("explicit context A has a registered managed model");
+
+        assert_eq!(name_of(&models.primary).await, "context-a-model");
+        assert!(models
+            .primary
+            .profile()
+            .is_some_and(|profile| profile.modalities.image_in));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn explicit_turn_context_without_provider_does_not_borrow_ambient_provider() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use crate::core::slots::Extensions;
+
+    let context_a =
+        CoreContext::for_test_with_extensions(DomainSet::full(), None, Extensions::new());
+    let context_b_extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &context_b_extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        scoped_model_entry("context-b-model", false),
+    );
+    let context_b =
+        CoreContext::for_test_with_extensions(DomainSet::full(), None, context_b_extensions);
+
+    let dispatch = DispatchCtx::new(context_a);
+    let config = Arc::new(crate::config::Config::default());
+    CoreContext::scope(context_b, async {
+        let source = TurnModelSource::new_crate_native(&dispatch, "chat", config);
+        let error = source
+            .build("hint:chat", 0.0, None, None)
+            .err()
+            .expect("an explicit context without a provider must fail closed");
+        assert!(error.to_string().contains("BACKEND_UNAVAILABLE"));
+    })
+    .await;
+}
+
 #[tokio::test]
 async fn role_pins_apply_when_the_primary_uses_config_routing() {
     use crate::agent::host_overrides::HostOverrides;
