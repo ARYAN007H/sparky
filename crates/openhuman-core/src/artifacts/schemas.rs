@@ -429,8 +429,14 @@ fn handle_list_artifacts(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             .transpose()?;
         let thread_id = read_optional_string(&params, "thread_id")?;
         to_json(
-            crate::artifacts::ops::ai_list_artifacts(&config, offset, limit, thread_id.as_deref())
-                .await?,
+            crate::artifacts::ops::ai_list_artifacts(
+                &ctx,
+                &config,
+                offset,
+                limit,
+                thread_id.as_deref(),
+            )
+            .await?,
         )
     })
 }
@@ -439,7 +445,9 @@ fn handle_get_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(crate::artifacts::ops::ai_get_artifact(&config, artifact_id.trim()).await?)
+        to_json(
+            crate::artifacts::ops::ai_get_artifact(&ctx, &config, artifact_id.trim()).await?,
+        )
     })
 }
 
@@ -503,7 +511,9 @@ fn handle_delete_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(crate::artifacts::ops::ai_delete_artifact(&config, artifact_id.trim()).await?)
+        to_json(
+            crate::artifacts::ops::ai_delete_artifact(&ctx, &config, artifact_id.trim()).await?,
+        )
     })
 }
 
