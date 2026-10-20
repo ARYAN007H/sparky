@@ -1,8 +1,4 @@
-//! Tool: `spawn_subagent` - fire-and-forget sub-agent delegation.
-//!
-//! Unlike `spawn_subagent`, this tool returns as soon as the child run is
-//! accepted. Completion/failure is reported through normal sub-agent lifecycle
-//! events and, when possible, persisted in the child worker thread.
+//! The single asynchronous sub-agent spawn surface.
 
 use super::subagent_abort_report::AbortReport;
 use crate::agent::orchestration::fleet_tools::FleetToolSet;
@@ -216,9 +212,8 @@ impl Tool for SpawnSubagentTool {
     }
 
     fn description(&self) -> &str {
-        "Fire-and-forget a sub-agent for background work this reply does not depend on \
-         (archiving, cleanup, background investigation). Returns immediately; never for \
-         user-visible answers, writes, financial actions, or anything that gates your reply."
+        "Run a focused sub-agent task asynchronously. Returns immediately while the worker runs; \
+         its result is delivered automatically. Reuse the same task_key to continue an existing task."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -682,5 +677,5 @@ fn reusable_follow_up_message(prompt: &str, context: Option<&str>) -> String {
 }
 
 #[cfg(test)]
-#[path = "spawn_subagent_tests.rs"]
+#[path = "spawn_subagent_async_tests.rs"]
 mod tests;
