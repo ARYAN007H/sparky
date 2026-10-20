@@ -76,23 +76,19 @@ fn turn_facts(scope: &HostVoiceScope, tenant: &crate::core::runtime::Tenant) -> 
         .unwrap_or_default()
 }
 
-/// Record an inbound envelope's voice facts. The inbound message id is the
-/// turn id the module echoes back in its voice scope.
+/// Record an inbound envelope's voice facts under the runner request id that
+/// the module echoes back as `HostVoiceScope.turn_id`.
 pub(crate) fn record_inbound_envelope(
     envelope: &ChannelInboundEnvelope,
     tenant: &crate::core::runtime::Tenant,
+    turn_id: &str,
 ) {
     let inbound_has_voice = envelope
         .parts
         .iter()
         .any(|part| matches!(part, ContentPart::VoiceNote { .. }));
     record_turn(
-        turn_key(
-            tenant,
-            &envelope.channel,
-            &envelope.conversation,
-            &envelope.message_id,
-        ),
+        turn_key(tenant, &envelope.channel, &envelope.conversation, turn_id),
         VoiceTurnFacts {
             inbound_has_voice,
             explicitly_requested: false,

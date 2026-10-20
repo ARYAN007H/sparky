@@ -46,8 +46,8 @@ fn envelope(conversation: &str, message: &str, voice: bool) -> ChannelInboundEnv
 #[test]
 fn mirror_policy_reports_inbound_voice_from_recorded_envelope() {
     let tenant = crate::core::runtime::Tenant::default();
-    record_inbound_envelope(&envelope("c-voice", "m1", true), &tenant);
-    record_inbound_envelope(&envelope("c-text", "m2", false), &tenant);
+    record_inbound_envelope(&envelope("c-voice", "m1", true), &tenant, "m1");
+    record_inbound_envelope(&envelope("c-text", "m2", false), &tenant, "m2");
     let cfg = ChannelVoiceConfig::default();
     let voice = resolve_policy(&cfg, &scope("telegram", "c-voice", "m1"), &tenant);
     assert_eq!(voice.mode, HostVoiceReplyMode::Mirror);
@@ -60,17 +60,47 @@ fn mirror_policy_reports_inbound_voice_from_recorded_envelope() {
 fn voice_facts_are_correlated_with_the_runner_request_id() {
     let tenant = crate::core::runtime::Tenant::default();
     let inbound = envelope("voice-conversation", "provider-message-id", true);
-    record_inbound_envelope(&inbound, &tenant);
+    record_inbound_envelope(
+        &inbound,
+        &tenant,
+        "telegram:provider-message-id:runner-uuid",
+    );
 
     let policy = resolve_policy(
         &ChannelVoiceConfig::default(),
-        &scope("telegram", "voice-conversation", "telegram:provider-message-id:runner-uuid"),
+        &scope(
+            "telegram",
+            "voice-conversation",
+            "telegram:provider-message-id:runner-uuid",
+        ),
         &tenant,
     );
 
     assert!(
         policy.inbound_has_voice,
         "reply policy is queried with the runner request ID, not the provider message ID"
+    );
+    assert!(
+        !resolve_policy(
+            &ChannelVoiceConfig::default(),
+            &scope("telegram", "voice-conversation", "provider-message-id"),
+            &tenant,
+        )
+        .inbound_has_voice,
+        "a provider message ID is not an alias for the runner request ID"
+    );
+    assert!(
+        !resolve_policy(
+            &ChannelVoiceConfig::default(),
+            &scope(
+                "telegram",
+                "other-conversation",
+                "telegram:provider-message-id:runner-uuid"
+            ),
+            &tenant,
+        )
+        .inbound_has_voice,
+        "voice facts remain bound to the full conversation scope"
     );
 }
 
@@ -88,8 +118,8 @@ fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
     };
 
     let tenant = crate::core::runtime::Tenant::default();
-    record_inbound_envelope(&voice, &tenant);
-    record_inbound_envelope(&text, &tenant);
+    record_inbound_envelope(&voice, &tenant, "shared-turn");
+    record_inbound_envelope(&text, &tenant, "shared-turn");
 
     let alice = resolve_policy(
         &ChannelVoiceConfig::default(),
@@ -117,7 +147,7 @@ fn voice_facts_require_matching_configured_account_and_full_conversation() {
     let mut voice = envelope("shared", "same-turn", true);
     voice.conversation.thread_id = Some("thread-a".into());
     voice.conversation.topic_id = Some("topic-a".into());
-    record_inbound_envelope(&voice, &tenant);
+    record_inbound_envelope(&voice, &tenant, "same-turn");
 
     let config = ChannelVoiceConfig::default();
     let matching = HostVoiceScope {
@@ -156,8 +186,8 @@ fn same_channel_account_and_turn_ids_do_not_cross_voice_facts_between_tenants() 
     let envelope_voice = envelope("same-conversation", "same-turn", true);
     let envelope_text = envelope("same-conversation", "same-turn", false);
 
-    record_inbound_envelope(&envelope_voice, &alice);
-    record_inbound_envelope(&envelope_text, &bob);
+    record_inbound_envelope(&envelope_voice, &alice, "same-turn");
+    record_inbound_envelope(&envelope_text, &bob, "same-turn");
 
     assert!(
         resolve_policy(

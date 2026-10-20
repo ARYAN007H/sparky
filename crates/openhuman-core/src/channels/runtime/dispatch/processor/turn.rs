@@ -100,7 +100,6 @@ pub(crate) async fn process_channel_runtime_message(
             return;
         }
     };
-    crate::channels::host::voice::record_inbound_envelope(&envelope, &tenant);
     let session_key = crate::core::runtime::tenant::tenant_key(&tenant, &canonical_session_key);
 
     println!(
@@ -388,6 +387,7 @@ pub(crate) async fn process_channel_runtime_message(
     let execution = match selected_host {
         Some(host) => {
             let request_id = format!("{}:{}:{}", msg.channel, msg.id, uuid::Uuid::new_v4());
+            crate::channels::host::voice::record_inbound_envelope(&envelope, &tenant, &request_id);
             let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
                 host_agent: host,
                 channel: msg.channel.clone(),
