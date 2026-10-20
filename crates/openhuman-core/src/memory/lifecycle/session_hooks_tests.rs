@@ -6,8 +6,8 @@ use tinyinference_llm::ToolCall;
 fn external_channel_origin(
     channel: &str,
     message_id: &str,
-) -> crate::agent::turn_origin::AgentTurnOrigin {
-    crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+) -> crate::security::turn_origin::AgentTurnOrigin {
+    crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
         channel: channel.into(),
         sender: None,
         sender_name: None,
@@ -31,7 +31,7 @@ fn logged_channel_keeps_normalized_custom_external_provider_ids() {
 
 #[test]
 fn logged_channel_is_none_for_non_channel_origins_none_and_cron_replays() {
-    use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
+    use crate::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 
     assert_eq!(logged_channel(None), None);
     assert_eq!(logged_channel(Some(&AgentTurnOrigin::Cli)), None);
@@ -65,7 +65,7 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
         prelude: &mut OpenHumanTurnPrelude,
         engine: &tinymemory_api::conformance::ReferenceEngine,
         thread_id: &str,
-        origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+        origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
         expected_channel: Option<&str>,
     ) {
         prelude.thread_id = Some(thread_id.into());
@@ -174,7 +174,7 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
     )
     .await;
 
-    use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
+    use crate::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
     log_turn(
         &mut prelude,
         &engine,
