@@ -4,7 +4,7 @@
 //! Every operation takes the [`Config`] it runs against, so the RPC handlers
 //! (which load config per call) and the agent tool (which carries its
 //! session's config) share one implementation. Every write is
-//! scrubbed of secrets and PII by the bound engine itself ([`super::guard`]).
+//! scrubbed of secrets and PII by TinyMemory's native engine binder.
 
 #[cfg(feature = "channels")]
 use std::collections::{BTreeMap, BTreeSet};
@@ -167,12 +167,12 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
             TINYHUMANS_ENGINE => {
                 return Err(Error::InvalidRequest(
                     ("the tinyhumans engine uses your sign-in, not an API key").into(),
-                ))
+                ));
             }
             _ => {
                 return Err(Error::InvalidRequest(
                     ("this engine takes no API key").into(),
-                ))
+                ));
             }
         }
     }
@@ -498,16 +498,15 @@ fn channel_key(channel: &str) -> String {
     channel.trim().to_ascii_lowercase()
 }
 
-/// Reads only the legacy map written by prior releases. Corrupt JSON is
-/// skipped and left untouched; current code never creates or updates it.
+/// Reads only the legacy map written by prior releases. Corrupt JSON keeps the
+/// existing quarantine behavior; current code never creates or updates it.
 #[cfg(feature = "channels")]
 fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
-    // Prefer the state-store value: layout migration may already have
-    // removed the legacy file after importing it. The direct file fallback
-    // below preserves the legacy lookup when storage cannot be opened. As
-    // with StateKv's best-effort import, malformed JSON is skipped without
-    // moving or rewriting the source file.
-    if let Ok(Some(all)) = crate::memory::state_store::load::<BTreeMap<String, BTreeSet<String>>>(
+    // Prefer the workspace state value, which may have imported and removed
+    // the old file. If no value is available (including a failed import),
+    // retain the legacy read path. Malformed JSON is skipped without moving
+    // or rewriting its source.
+    if let Ok(Some(all)) = super::state_store::load::<BTreeMap<String, BTreeSet<String>>>(
         workspace,
         "channel_threads",
     ) {

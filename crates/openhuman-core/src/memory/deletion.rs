@@ -4,9 +4,11 @@
 //! thread it owned) or removing a source asks the engine to delete for good. When memory is off
 //! (signed out, no credential) the engine cannot be reached, and when it
 //! fails the deletion has not happened. Either way the deletion is recorded
-//! here, in the workspace's `pending_deletions` state value, and [`drain`] runs
-//! it again on the next sign-in ([`super::bus`], on `CredentialChanged`) and
-//! on every background tick, until it succeeds.
+//! here, in the workspace-owned memory state KV value `pending_deletions`,
+//! independent of the active profile/agent scope. The host migrates old
+//! scope-owned queue entries on first access. [`drain`] runs owed work again
+//! on the next sign-in ([`super::bus`], on `CredentialChanged`) and on every
+//! background tick, until it succeeds.
 //!
 //! Every deletion is hard: a forget by filter removes the matched events by
 //! `memory_ids` with an explicit `redact_events` cascade.
@@ -30,29 +32,34 @@ use tinymemory_api::Error;
 const STATE: &str = "pending_deletions";
 
 /// The workspace's `pending_deletions` state value: a stop mid-write never
-/// loses the queue (the storage write is atomic). A read error is returned to
-/// the queue rather than treated as an empty list; an empty queue removes the
-/// value.
+/// loses the queue (the storage write is atomic). An unparsable value is
+/// dropped and logged; an empty queue removes the value.
 struct FileStore {
     workspace_dir: PathBuf,
 }
 
 impl ListStore<PendingDeletion> for FileStore {
     fn load(&self) -> std::result::Result<Vec<PendingDeletion>, StoreError> {
-        super::state_store::load(&self.workspace_dir, STATE)
-            .map(Option::unwrap_or_default)
-            .map_err(|error| {
-                tracing::warn!(%error, "[memory:deletion] pending deletions unreadable");
-                StoreError(error.to_string())
-            })
+        match super::state_store::load_workspace(&self.workspace_dir, STATE) {
+            Ok(Some(pending)) => Ok(pending),
+            Ok(None) => Ok(Vec::new()),
+            Err(error) => {
+                tracing::warn!(%error, "[memory:deletion] reading pending deletions failed");
+                Err(StoreError("pending deletions unreadable".into()))
+            }
+        }
     }
 
     fn save(&self, all: &[PendingDeletion]) -> std::result::Result<(), StoreError> {
         if all.is_empty() {
-            return super::state_store::remove(&self.workspace_dir, STATE)
-                .map_err(|error| StoreError(error.to_string()));
+            return super::state_store::remove_workspace::<Vec<PendingDeletion>>(
+                &self.workspace_dir,
+                STATE,
+            )
+            .map_err(|error| StoreError(error.to_string()));
         }
-        super::state_store::save(&self.workspace_dir, STATE, &all)
+        let all = all.to_vec();
+        super::state_store::save_workspace(&self.workspace_dir, STATE, &all)
             .map_err(|error| StoreError(error.to_string()))
     }
 }

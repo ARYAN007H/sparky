@@ -192,3 +192,18 @@ fn typed_insufficient_credits_maps_without_parsing_engine_text() {
     assert_eq!(error.message, "insufficient credits: HTTP 402");
     assert!(error.expected_user_state);
 }
+
+
+#[test]
+fn upstream_unavailable_is_transient_not_account_wide() {
+    use tinymemory_api::Error as E;
+
+    assert!(E::Off("disabled".into()).is_account_wide());
+    assert!(E::Unauthorized("bad key".into()).is_account_wide());
+    assert!(E::InsufficientCredits("top up".into()).is_account_wide());
+    assert!(!E::Unavailable("timeout".into()).is_account_wide());
+    assert!(E::Unavailable("timeout".into()).is_transient());
+    assert!(!E::InvalidRequest("bad filter".into()).is_account_wide());
+    assert!(!E::Conflict("duplicate".into()).is_account_wide());
+    assert!(!E::Engine("corrupt index".into()).is_account_wide());
+}

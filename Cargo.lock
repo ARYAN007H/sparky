@@ -3567,7 +3567,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -5447,8 +5447,12 @@ dependencies = [
  "tinycomputer-bus",
  "tinyconnectors-bus",
  "tinydocs-bus",
+ "tinyeventqueues",
+ "tinyeventqueues-bus",
  "tinyflows",
  "tinyflows-bus",
+ "tinyflows-catalog",
+ "tinyflows-copilot",
  "tinyflows-drivers",
  "tinyflows-import",
  "tinyflows-module",
@@ -5541,6 +5545,7 @@ dependencies = [
  "tinychannels",
  "tinycomputer-bus",
  "tinydocs-bus",
+ "tinyeventqueues-bus",
  "tinyinference-core 0.4.1",
  "tinyinference-llm 0.4.1",
  "tinyinference-local",
@@ -5548,7 +5553,6 @@ dependencies = [
  "tinymcp-bus",
  "tinymemory-tools",
  "tinysearch-bus",
- "tinystoragedrivers",
  "tinystoragedrivers-core",
  "tinytools",
  "tinytools-agent",
@@ -5622,6 +5626,7 @@ dependencies = [
  "tinycomputer",
  "tinyconnectors",
  "tinydocs-module",
+ "tinyeventqueues",
  "tinyflows-module",
  "tinyhosts",
  "tinyjuice-module",
@@ -8217,7 +8222,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.61.2",
@@ -8767,7 +8772,7 @@ dependencies = [
  "toml 1.1.6+spec-1.1.0",
  "tracing",
  "ureq",
- "zip 9.0.5",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -9093,11 +9098,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinyflows"
-version = "0.8.28"
+name = "tinyeventqueues"
+version = "0.1.2"
 dependencies = [
  "async-trait",
- "base64 0.23.1",
+ "log",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "thiserror 2.0.20",
+ "tinybus",
+ "tinybus-module",
+ "tinyeventqueues-bus",
+ "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-core",
+ "tokio",
+]
+
+[[package]]
+name = "tinyeventqueues-bus"
+version = "0.1.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-core",
+]
+
+[[package]]
+name = "tinyflows"
+version = "0.8.23"
+dependencies = [
+ "async-trait",
  "futures-timer",
  "futures-util",
  "getrandom 0.4.3",
@@ -9107,6 +9138,7 @@ dependencies = [
  "jaq-std",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -9204,13 +9236,9 @@ dependencies = [
  "tinybus-module",
  "tinyflows",
  "tinyflows-bus",
- "tinyflows-catalog",
- "tinyflows-copilot",
  "tinyflows-drivers",
- "tinyflows-import",
  "tinyflows-schedule",
  "tinystoragedrivers-core",
- "tinytools",
  "tokio",
  "tracing",
  "uuid",
@@ -9604,7 +9632,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-api"
-version = "1.29.0"
+version = "2.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9618,7 +9646,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-integrations"
-version = "1.29.0"
+version = "2.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9643,24 +9671,27 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-tools"
-version = "1.29.0"
+version = "2.0.0"
 dependencies = [
  "async-lock",
  "async-trait",
  "chrono",
  "futures",
  "log",
+ "schemars",
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "tempfile",
  "thiserror 2.0.20",
  "tinymemory-api",
+ "url",
  "uuid",
 ]
 
 [[package]]
 name = "tinyredact"
-version = "1.29.0"
+version = "2.0.0"
 dependencies = [
  "log",
  "regex",
@@ -9817,6 +9848,9 @@ dependencies = [
  "futures-util",
  "http",
  "object_store",
+ "quick-xml 0.41.0",
+ "reqwest 0.13.5",
+ "serde",
  "tinystoragedrivers-core",
  "tokio",
  "tokio-util",
@@ -12201,20 +12235,6 @@ dependencies = [
  "memchr",
  "typed-path",
  "zopfli",
-]
-
-[[package]]
-name = "zip"
-version = "9.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
-dependencies = [
- "crc32fast",
- "flate2",
- "indexmap",
- "memchr",
- "nix 0.31.3",
- "typed-path",
 ]
 
 [[package]]

@@ -18,11 +18,12 @@ fn upstream_engine_status_maps_health_reason_and_capabilities() {
     ];
 
     for (health, reason, expected_health) in cases {
+        let input_contract_version = "memory-contract-fixture-2.0";
         let status = tinymemory_api::EngineStatus {
             health,
             reason: reason.clone(),
             capabilities: vec!["recall", "store"],
-            contract_version: "2.0",
+            contract_version: input_contract_version,
         };
         let row = subsystem_status_for_engine("cortexdb".into(), status);
         assert_eq!(row.slot, "memory");
@@ -30,7 +31,7 @@ fn upstream_engine_status_maps_health_reason_and_capabilities() {
         assert_eq!(row.class, "external");
         assert_eq!(row.health, expected_health);
         assert_eq!(row.health_reason, reason);
-        assert_eq!(row.contract_version, tinymemory_api::CONTRACT_VERSION);
+        assert_eq!(row.contract_version, input_contract_version);
         assert_eq!(row.capabilities, vec!["recall", "store"]);
         assert!(row.fell_back_from.is_none());
         assert!(row.last_error.is_none());

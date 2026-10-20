@@ -2,14 +2,13 @@
 //!
 //! The queue itself (dedupe, retry, history) is `tinymemory_tools::queue`;
 //! this module is the host adapter: one queue per workspace over the
-//! `memory`/`state`/`jobs` storage value, the engine and
-//! `[memory.recall] build_delay_secs` it runs against, and the
-//! `memory_background` cron hook.
+//! `memory`/`state`/`jobs` storage value, the engine and `[memory.recall]
+//! build_delay_secs` it runs against, and the `memory_background` cron hook.
 //!
 //! `post_turn` and brain ingests return `BackgroundJob` values (belief builds,
 //! deferred ingests) instead of running them. They are queued here, persisted
-//! in the `memory`/`state`/`jobs` storage value so a restart loses none,
-//! de-duplicated (two builds of one scope are one build), and run by the
+//! in the `memory`/`state`/`jobs` storage value so a restart loses none, de-duplicated
+//! (two builds of one scope are one build), and run by the
 //! `memory_background` cron job ([`run_due`]) once they are at least
 //! `[memory.recall] build_delay_secs` old — a belief build reads the facts the
 //! engine extracts from the writes, and that extraction lags behind them.
@@ -43,6 +42,11 @@ pub type JobQueue = QueueState;
 
 const STATE: &str = "jobs";
 
+/// The queue file of a workspace.
+fn path(workspace_dir: &Path) -> PathBuf {
+    super::super::state_store::legacy_path(workspace_dir, STATE)
+}
+
 /// A [`QueueStore`] over the workspace's `jobs` state value.
 struct FileQueueStore {
     workspace_dir: PathBuf,
@@ -50,16 +54,18 @@ struct FileQueueStore {
 
 impl QueueStore for FileQueueStore {
     fn load(&self) -> QueueState {
-        crate::memory::state_store::load(&self.workspace_dir, STATE)
-            .unwrap_or_else(|error| {
+        match super::super::state_store::load_workspace_strict(&self.workspace_dir, STATE) {
+            Ok(Some(queue)) => queue,
+            Ok(None) => QueueState::default(),
+            Err(error) => {
                 tracing::warn!(%error, "[memory:jobs] reading the queue failed");
-                None
-            })
-            .unwrap_or_default()
+                QueueState::default()
+            }
+        }
     }
 
     fn save(&self, state: &QueueState) -> std::result::Result<(), String> {
-        crate::memory::state_store::save(&self.workspace_dir, STATE, state)
+        super::super::state_store::save(&self.workspace_dir, STATE, state)
             .map_err(|error| error.to_string())
     }
 }

@@ -6,7 +6,7 @@
 //! a run the previous process never finished, and reads as `idle`.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
 use tinymemory_integrations::sources::{SourceState, SourceStatus};
@@ -16,18 +16,24 @@ static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 const STATE: &str = "sources_state";
 
+fn path(workspace_dir: &Path) -> PathBuf {
+    crate::memory::state_store::legacy_path(workspace_dir, STATE)
+}
+
 fn read_all(workspace_dir: &Path) -> BTreeMap<String, SourceState> {
-    crate::memory::state_store::load(workspace_dir, STATE)
-        .unwrap_or_else(|error| {
-            tracing::warn!(error = %error, "[memory:sources] reading sync state failed");
-            None
-        })
-        .unwrap_or_default()
+    match crate::memory::state_store::load_strict(workspace_dir, STATE) {
+        Ok(Some(state)) => state,
+        Ok(None) => BTreeMap::new(),
+        Err(error) => {
+            tracing::warn!(%error, "[memory:sources] reading sync state failed");
+            BTreeMap::new()
+        }
+    }
 }
 
 fn write_all(workspace_dir: &Path, all: &BTreeMap<String, SourceState>) {
     if let Err(error) = crate::memory::state_store::save(workspace_dir, STATE, all) {
-        tracing::warn!(error = %error, "[memory:sources] writing sync state failed");
+        tracing::warn!(%error, "[memory:sources] writing sync state failed");
     }
 }
 

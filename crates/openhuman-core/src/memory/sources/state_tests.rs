@@ -6,20 +6,18 @@ fn corrupt_legacy_source_state_is_skipped_and_left_in_place() {
     let tmp = tempfile::tempdir().unwrap();
     let file = crate::memory::state_store::legacy_path(tmp.path(), "sources_state");
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-    std::fs::write(&file, b"{\"source-1\":").unwrap();
+    let corrupt = b"{\"source-1\":";
+    std::fs::write(&file, corrupt).unwrap();
 
     assert!(load(tmp.path()).is_empty());
-    assert!(
-        file.exists(),
-        "state import leaves the legacy file in place"
-    );
-    assert_eq!(std::fs::read(file).unwrap(), b"{\"source-1\":");
+    assert!(file.exists(), "the read-only legacy load must not move the file");
+    assert_eq!(std::fs::read(file).unwrap(), corrupt);
 }
 
 #[test]
 fn native_source_state_keeps_the_persisted_host_shape() {
     let tmp = tempfile::tempdir().unwrap();
-    let file = crate::memory::state_store::legacy_path(tmp.path(), "sources_state");
+    let file = path(tmp.path());
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     let saved = serde_json::json!({
         "src-1": {

@@ -470,6 +470,11 @@ pub struct Config {
     #[serde(default)]
     pub memes: MemesConfig,
 
+    /// Inbound event queues (`[inbound]`); the switch is
+    /// `[components] eventqueues`.
+    #[serde(default)]
+    pub inbound: InboundConfig,
+
     /// Per-dependency switches (`[components]`). Narrow-only; applied at the
     /// next core start.
     #[serde(default)]

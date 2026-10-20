@@ -48,7 +48,7 @@ fn corrupt_legacy_job_queue_is_skipped_without_replacing_the_file() {
     assert_eq!(store.load(), QueueState::default());
     assert!(
         file.exists(),
-        "the one-time state import must leave the legacy file untouched"
+        "the read-only legacy import must leave corrupt bytes in place"
     );
     assert_eq!(std::fs::read(file).unwrap(), b"{\"pending\":[");
 }
@@ -137,20 +137,20 @@ async fn a_run_needs_an_engine() {
 }
 
 #[tokio::test]
-async fn the_build_delay_comes_from_the_recall_config_and_the_file_store_is_the_workspaces() {
+async fn the_build_delay_comes_from_recall_config_and_the_queue_uses_the_state_store() {
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config_in(&tmp);
     bind_reference(&config);
     config.memory.recall.build_delay_secs = 3600;
     enqueue(&config, &Namespace::ROOT, vec![build("a")]).await;
     assert!(has_pending(&config.workspace_dir));
-    let stored: JobQueue = crate::memory::state_store::load(&config.workspace_dir, "jobs")
+    let stored: QueueState = crate::memory::state_store::load(&config.workspace_dir, "jobs")
         .unwrap()
         .unwrap();
     assert_eq!(
         stored.pending.len(),
         1,
-        "persisted in the memory state store"
+        "persisted through the state KV port"
     );
     assert!(run(&config, Selection::Due).await.unwrap().is_empty());
 }

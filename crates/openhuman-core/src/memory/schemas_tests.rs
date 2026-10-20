@@ -210,6 +210,27 @@ fn required_inputs_match_the_spec() {
     }
 }
 
+#[test]
+fn sources_add_schema_lists_only_supported_kinds_and_target_formats() {
+    let schema = schema("sources_add");
+    let field = |name: &str| {
+        schema
+            .inputs
+            .iter()
+            .find(|input| input.name == name)
+            .unwrap_or_else(|| panic!("missing sources_add input {name}"))
+    };
+
+    assert_eq!(
+        field("kind").comment,
+        "folder | file | link | github | rss."
+    );
+    assert_eq!(
+        field("target").comment,
+        "Path, URL, owner/repo or feed URL."
+    );
+}
+
 #[tokio::test]
 async fn invalid_params_are_rejected_as_invalid_request() {
     let tmp = tempfile::tempdir().unwrap();
