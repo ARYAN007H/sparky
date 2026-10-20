@@ -146,7 +146,7 @@ fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> S
 
 fn is_openhuman_cloud_entry(config: &Config, entry: &CloudProviderCreds) -> bool {
     entry.slug == PROVIDER_OPENHUMAN
-        || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
+        || crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style)
         || looks_like_openhuman_backend(config, &entry.endpoint)
 }
 

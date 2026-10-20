@@ -15,7 +15,9 @@ fn provider_descriptors(config: &crate::config::Config) -> Vec<ProviderDescripto
         .map(|provider| ProviderDescriptor {
             name: provider.slug.clone(),
             aliases: if provider.slug == crate::inference::provider::factory::PROVIDER_OPENHUMAN
-                || provider.auth_style == crate::config::schema::AuthStyle::OpenhumanJwt
+                || crate::config::schema::cloud_providers::is_hosted_auth_style(
+                    provider.auth_style,
+                )
             {
                 vec!["backend".to_string(), "openhuman-backend".to_string()]
             } else {
