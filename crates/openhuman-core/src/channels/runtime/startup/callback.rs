@@ -247,6 +247,7 @@ impl ChannelHostCallbacks {
         &self,
         request: tinychannels_bus::HostStoreVoiceMediaRequest,
     ) -> Result<tinychannels_bus::HostStoreVoiceMediaResult> {
+        tracing::info!("scoped channel voice media callback entered");
         if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_VOICE_MEDIA_BYTES) {
             return Err(Error::failed("voice media callback exceeds its limit"));
         }

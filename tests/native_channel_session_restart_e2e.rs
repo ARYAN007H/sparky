@@ -43,6 +43,7 @@ struct MockState {
     sent_messages: Mutex<Vec<Value>>,
     transcription_uploads: Mutex<Vec<Vec<u8>>>,
     voice_file_requests: Mutex<Vec<String>>,
+    voice_download_requests: Mutex<usize>,
     speech_requests: Mutex<Vec<String>>,
     sent_voice_uploads: Mutex<Vec<Vec<u8>>>,
 }
@@ -174,7 +175,11 @@ async fn get_voice_file(
     Json(json!({ "ok": true, "result": { "file_path": "voice/input.oga", "file_size": 2575 } }))
 }
 
-async fn download_voice_file() -> impl IntoResponse {
+async fn download_voice_file(State(state): State<Arc<MockState>>) -> impl IntoResponse {
+    *state
+        .voice_download_requests
+        .lock()
+        .expect("voice download requests") += 1;
     (
         [(axum::http::header::CONTENT_TYPE, "audio/ogg")],
         include_bytes!("../vendor/tinychannels/src/providers/telegram/fixtures/sine-ogg-opus.ogg")
@@ -805,8 +810,9 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
     );
     assert!(
         model_saw_user_text(&requests[0], "the dictated voice request"),
-        "the model receives the transcript produced by the scoped cloud STT callback; file requests={:?}, transcription uploads={}",
+        "the model receives the transcript produced by the scoped cloud STT callback; file requests={:?}, downloads={}, transcription uploads={}",
         mocks.state.voice_file_requests.lock().expect("voice file requests"),
+        mocks.state.voice_download_requests.lock().expect("voice download requests"),
         mocks.state.transcription_uploads.lock().expect("STT uploads").len()
     );
     assert_eq!(
