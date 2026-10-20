@@ -14,9 +14,9 @@ use crate::core::TypeSchema;
 use crate::inference::registry::{
     register_backend_error_classifier, BackendErrorClassification, BackendErrorKind,
 };
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::collections::HashMap;
 use tinyagents_harness::run_queue::QueueLane;
 use tokio::time::{timeout, Duration};
 
@@ -82,8 +82,7 @@ fn classify_with_backend_metadata(
                 reportable: malformed_bad_request
                     || matches!(
                         kind,
-                        BackendErrorKind::PayloadTooLarge
-                            | BackendErrorKind::ContextLengthExceeded
+                        BackendErrorKind::PayloadTooLarge | BackendErrorKind::ContextLengthExceeded
                     ),
                 token: None,
                 kind: Some(kind),
@@ -101,9 +100,7 @@ fn classify_failure_fixture(case: &str, message: &str) -> ClassifiedError {
         "be_model_unavailable" => Some((BackendErrorKind::ModelUnavailable, false)),
         "be_payload" => Some((BackendErrorKind::PayloadTooLarge, false)),
         "be_context" => Some((BackendErrorKind::ContextLengthExceeded, false)),
-        "be_bad_request" | "be_bad_request_history" => {
-            Some((BackendErrorKind::BadRequest, false))
-        }
+        "be_bad_request" | "be_bad_request_history" => Some((BackendErrorKind::BadRequest, false)),
         "be_bad_request_malformed" => Some((BackendErrorKind::BadRequest, true)),
         "be_internal" => Some((BackendErrorKind::Internal, false)),
         _ => None,
