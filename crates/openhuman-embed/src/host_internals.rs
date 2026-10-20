@@ -132,8 +132,8 @@ pub mod config {
     pub mod schema {
         // tinyhumans integrations: the Composio routing-mode strings.
         pub use openhuman_core::config::schema::{
-            COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED,
-            DelegateAgentConfig, ModelRouteConfig, TeamModelConfig,
+            DelegateAgentConfig, ModelRouteConfig, TeamModelConfig, COMPOSIO_MODE_BACKEND,
+            COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED,
         };
         pub mod cloud_providers {
             pub use openhuman_core::config::schema::cloud_providers::{

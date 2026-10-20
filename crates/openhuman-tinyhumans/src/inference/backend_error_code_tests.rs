@@ -190,8 +190,8 @@ fn managed_envelope_gate_rejects_byo_payload_carrying_error_code() {
 
 #[test]
 fn hosted_classifier_drives_core_observability_without_core_token_ownership() {
-    use openhuman_embed::__host::inference_registry::register_backend_error_classifier;
     use openhuman_embed::__host::core::observability::{expected_error_kind, ExpectedErrorKind};
+    use openhuman_embed::__host::inference_registry::register_backend_error_classifier;
     use std::sync::Arc;
 
     register_backend_error_classifier(Arc::new(super::classify));
