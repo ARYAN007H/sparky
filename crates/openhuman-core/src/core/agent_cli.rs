@@ -706,7 +706,7 @@ fn print_dump_prompt_help() {
     println!("  # Orchestrator prompt, JSON for scripting.");
     println!("  openhuman agent dump-prompt --agent orchestrator --json");
     println!();
-    println!("  # Planner prompt with its tool list.");
+    println!("  # Orchestrator prompt with its tool list.");
     println!("  openhuman agent dump-prompt --agent orchestrator --with-tools");
 }
 
