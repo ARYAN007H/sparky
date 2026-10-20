@@ -3815,6 +3815,7 @@ dependencies = [
  "tinycomputer-bus",
  "tinyconnectors-bus",
  "tinydocs-bus",
+ "tinyeventqueues-bus",
  "tinyflows",
  "tinyflows-bus",
  "tinyflows-catalog",
@@ -6732,7 +6733,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "serde",
  "serde_json",
@@ -6798,7 +6799,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-bus"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -6807,7 +6808,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-bus"
-version = "0.19.3"
+version = "0.21.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -6820,6 +6821,15 @@ version = "0.2.4"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "tinyeventqueues-bus"
+version = "0.1.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]
@@ -7149,7 +7159,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.19.2"
+version = "0.19.5"
 dependencies = [
  "base64 0.23.1",
  "schemars 1.2.2",
@@ -7323,7 +7333,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 2.0.20",
+ "tinystoragedrivers-schema",
  "tokio",
  "ulid",
  "zstd",
@@ -7339,6 +7349,15 @@ dependencies = [
  "serde_json",
  "tinystoragedrivers-core",
  "tokio",
+]
+
+[[package]]
+name = "tinystoragedrivers-schema"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

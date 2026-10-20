@@ -96,7 +96,9 @@ pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events";
 /// subscriber rebuilds its dispatch context from it instead of reading an
 /// ambient one.
 /// `2.0.0` retires the obsolete desktop push-to-talk transcript event.
-pub const EVENTS_VERSION: Version = Version::new(2, 0, 0);
+/// `2.1.0` adds the inbound event queue variants `InboundEventDropped`,
+/// `InboundDeferred` and `InboundDeadLettered` (additive).
+pub const EVENTS_VERSION: Version = Version::new(2, 1, 0);
 
 /// The bus. Initialised once by [`init`]; safe to touch before that.
 pub static BUS: OnceBus<DomainEvent> = OnceBus::new();

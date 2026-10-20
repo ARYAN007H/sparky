@@ -135,7 +135,7 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/core/observability/progress_tracing/export.rs",
-    "line": 33,
+    "line": 87,
     "text": "let opened = std::fs::OpenOptions::new()",
     "occurrence": 1
   },
@@ -261,21 +261,21 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/security/credentials/http_creds.rs",
-    "line": 424,
+    "line": 429,
     "text": "fs::write(&tmp_path, &json)",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/security/credentials/profiles.rs",
-    "line": 288,
+    "line": 289,
     "text": "let mut file = OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/security/credentials/profiles.rs",
-    "line": 301,
+    "line": 302,
     "text": "fs::write(path, bytes)",
     "occurrence": 1
   },
