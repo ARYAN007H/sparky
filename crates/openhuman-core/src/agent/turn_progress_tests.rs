@@ -54,6 +54,45 @@ fn native_progress_mapping_leaves_subagent_lifecycle_to_its_surface() {
 }
 
 #[test]
+fn shared_subagent_mapping_uses_the_callers_correlation_context() {
+    let event = subagent_event(
+        AgentProgress::SubagentSpawned {
+            agent_id: "researcher".into(),
+            task_id: "task-web".into(),
+            mode: "typed".into(),
+            dedicated_thread: false,
+            prompt_chars: 4,
+            prompt: "help".into(),
+            worker_thread_id: None,
+            display_name: Some("Researcher".into()),
+            parent_call_id: Some("event-parent-is-not-authoritative".into()),
+        },
+        3,
+        Some("ledger-parent".into()),
+    )
+    .expect("subagent event has a canonical output");
+
+    let out = expect_subagent(event);
+    assert_eq!(out.state, "spawned");
+    assert_eq!(out.agent_id, "researcher");
+    assert_eq!(out.iteration, Some(3));
+    assert_eq!(out.parent_call_id.as_deref(), Some("ledger-parent"));
+}
+
+#[test]
+fn shared_subagent_mapping_ignores_unrelated_progress() {
+    assert!(subagent_event(
+        AgentProgress::TextDelta {
+            delta: "hello".into(),
+            iteration: 1,
+        },
+        1,
+        None,
+    )
+    .is_none());
+}
+
+#[test]
 fn a_started_tool_call_keeps_small_arguments_and_nulls_empty_ones() {
     let ChannelOutputEvent::ToolCallStarted { arguments, .. } = tool_started(
         "c".into(),
