@@ -2318,7 +2318,7 @@ fn report_expected_message(kind: ExpectedErrorKind, message: &str, domain: &str,
             // The FE surfaces actionable copy via `classify_inference_error`;
             // Sentry must not double-report (F2/F4). Demote at `warn!` so the
             // breadcrumb retains the code for triage without spawning an event.
-            let code = crate::inference::registry::classify_backend_error(message)
+            let code = crate::inference::registry::classify_backend_error(None, message)
                 .as_ref()
                 .and_then(|classification| classification.token.as_deref())
                 .unwrap_or_default();

@@ -45,3 +45,37 @@ fn managed_tier_vocabulary_maps_aliases_and_leaves_concrete_ids_raw() {
     assert!(is_raw_model("vendor/concrete-model"));
     assert!(!is_raw_model("hint:unknown"));
 }
+
+#[test]
+fn hosted_vision_capabilities_cover_managed_aliases_and_media_models() {
+    for model in [
+        MODEL_MANAGED_DEFAULT,
+        "reasoning-v1",
+        "hint:reasoning",
+        "vision-v1",
+        "hint:vision",
+        MODEL_MEDIA_UNDERSTANDING,
+        MODEL_IMAGE_GENERATION_AGENT,
+        MODEL_VIDEO_GENERATION_AGENT,
+    ] {
+        assert!(supports_vision(model), "{model} should accept images");
+    }
+
+    for model in [
+        "chat-v1",
+        "hint:chat",
+        "reasoning-quick-v1",
+        "agentic-v1",
+        "hint:agentic",
+        "burst-v1",
+        "hint:burst",
+        "coding-v1",
+        "hint:coding",
+        "summarization-v1",
+        "hint:summarization",
+        "vendor/custom-text-model",
+        "",
+    ] {
+        assert!(!supports_vision(model), "{model} should remain text-only");
+    }
+}
