@@ -3,12 +3,13 @@
 //! port. [`SdkBackendTransport`](crate::SdkBackendTransport) implements it.
 
 use async_trait::async_trait;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::memory_engines::BearerSource;
 use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 use reqwest::header::HeaderMap;
 use reqwest::Method;
 use serde_json::Value;
 use std::sync::Arc;
-use tinymemory_integrations::BearerSource;
 
 /// One `(name, value)` query pair; a `None` value omits the pair.
 pub type QueryParam = (&'static str, Option<String>);
@@ -100,7 +101,7 @@ pub trait BackendTransport: Send + Sync + 'static {
     /// this returns `None`.
     fn memory_bearer_source(
         &self,
-        _config: Arc<crate::config::Config>,
+        _config: Arc<Config>,
     ) -> Option<Arc<dyn BearerSource>> {
         None
     }

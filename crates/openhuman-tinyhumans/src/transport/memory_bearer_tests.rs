@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use openhuman_embed::__host::config::Config;
-use openhuman_embed::BackendTransport;
 use tempfile::TempDir;
 
-use super::SdkBackendTransport;
+use super::{BackendTransport, SdkBackendTransport};
 
 fn config(tmp: &TempDir) -> Config {
     Config {

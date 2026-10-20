@@ -6,13 +6,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use openhuman_embed::__host::config::Config;
-use openhuman_embed::__host::memory::{BearerSource, CallbackBearerSource, MemoryError};
+use openhuman_embed::__host::memory::{CallbackBearerSource, MemoryError};
+use openhuman_embed::__host::memory_engines::BearerSource;
 use openhuman_embed::__host::security::credentials::session_support::{
     resolve_backend_credential, BackendCredential,
-};
-use openhuman_embed::{
-    BackendRequest, BackendTransport, BackendTransportError, BaseUrlPurpose, TransportProfile,
 };
 use reqwest::Method;
 use serde_json::Value;
