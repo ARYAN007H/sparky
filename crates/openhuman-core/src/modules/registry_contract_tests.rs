@@ -81,6 +81,12 @@ fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
         tinymemes_bus::STATE_INTERFACE,
         tinymemes_bus::STATE_PATH,
     ));
+    #[cfg(feature = "inbound-queues")]
+    names.push((
+        "tinyeventqueues",
+        tinyeventqueues_bus::INTERFACE,
+        tinyeventqueues_bus::OBJECT_PATH,
+    ));
     names
 }
 
@@ -115,11 +121,12 @@ fn a_drifted_contract_constant_is_reported_as_a_mismatch() {
     feature = "web3",
     feature = "voice",
     feature = "hosting",
-    feature = "tinymemes"
+    feature = "tinymemes",
+    feature = "inbound-queues"
 ))]
 #[test]
-fn a_product_feature_build_carries_all_thirteen_records() {
-    assert_eq!(ALL.len(), 13);
+fn a_product_feature_build_carries_all_fourteen_records() {
+    assert_eq!(ALL.len(), 14);
     for id in [
         "tinycomputer",
         "tinysearch",
@@ -134,6 +141,7 @@ fn a_product_feature_build_carries_all_thirteen_records() {
         "tinyflows",
         "tinyhosts",
         "tinymemes",
+        "tinyeventqueues",
     ] {
         assert!(find(id).is_some(), "{id} missing from the registry");
     }
@@ -155,7 +163,12 @@ fn every_record_maps_to_a_real_component() {
                 || !cfg!(feature = "modules")
                 || matches!(
                     *id,
-                    "tinydocs" | "tinywallet" | "tinyvoice" | "tinyhosts" | "tinymemes"
+                    "tinydocs"
+                        | "tinywallet"
+                        | "tinyvoice"
+                        | "tinyhosts"
+                        | "tinymemes"
+                        | "tinyeventqueues"
                 ),
             "mapping for unknown module '{id}'"
         );

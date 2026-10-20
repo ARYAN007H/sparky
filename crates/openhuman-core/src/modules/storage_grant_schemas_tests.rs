@@ -16,7 +16,7 @@ fn allowed(
 
 #[test]
 fn every_row_has_a_valid_generated_grant() {
-    for row in &ROWS {
+    for row in ROWS {
         let grant =
             declared(row.module).unwrap_or_else(|| panic!("{} declares storage", row.module));
         grant
@@ -36,7 +36,7 @@ fn every_row_has_a_valid_generated_grant() {
 
 #[test]
 fn the_registry_ids_exist() {
-    for row in &ROWS {
+    for row in ROWS {
         assert!(
             crate::modules::registry::ALL
                 .iter()

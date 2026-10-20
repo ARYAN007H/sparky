@@ -148,20 +148,6 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 9,
-    "text": "use crate::security::turn_origin::with_origin;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 198,
-    "text": "if let Err(e) = with_origin(origin, apply_decision(&ctx, run, &envelope)).await",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/integrations/task_sources/route.rs",
     "line": 21,
     "text": "use crate::security::turn_origin::with_origin;",
@@ -218,16 +204,23 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/skills/webhooks/bus.rs",
-    "line": 321,
+    "path": "crates/openhuman-core/src/skills/webhooks/ops.rs",
+    "line": 172,
     "text": "crate::security::turn_origin::with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/skills/webhooks/ops.rs",
-    "line": 172,
-    "text": "crate::security::turn_origin::with_origin(",
+    "path": "crates/openhuman-core/src/triage/runner.rs",
+    "line": 25,
+    "text": "use crate::security::turn_origin::with_origin;",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/triage/runner.rs",
+    "line": 78,
+    "text": "with_origin(origin, apply_decision(ctx, run, envelope)).await",
     "occurrence": 1
   },
   {

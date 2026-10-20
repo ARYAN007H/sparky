@@ -100,6 +100,12 @@ hosting
 # build-time OPENHUMAN_TINYMEMES_DEFAULT) enables it.
 tinymemes
 
+# Inbound event queues: Composio triggers and agent webhooks are ingested into
+# the tinyeventqueues module, which persists, deduplicates, filters and paces
+# them and calls the host back to run triage. Runtime switches:
+# [components] eventqueues and [inbound] enabled.
+inbound-queues
+
 # Storage driver for the default backend, `sqlite:<workspace>/storage`: every
 # store, the session store included, lives in it, and older installs' per-domain
 # databases and transcript files are imported into it once. Also serves

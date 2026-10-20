@@ -5447,6 +5447,8 @@ dependencies = [
  "tinycomputer-bus",
  "tinyconnectors-bus",
  "tinydocs-bus",
+ "tinyeventqueues",
+ "tinyeventqueues-bus",
  "tinyflows",
  "tinyflows-bus",
  "tinyflows-catalog",
@@ -5543,6 +5545,7 @@ dependencies = [
  "tinychannels",
  "tinycomputer-bus",
  "tinydocs-bus",
+ "tinyeventqueues-bus",
  "tinyinference-core 0.4.1",
  "tinyinference-llm 0.4.1",
  "tinyinference-local",
@@ -5622,6 +5625,7 @@ dependencies = [
  "tinycomputer",
  "tinyconnectors",
  "tinydocs-module",
+ "tinyeventqueues",
  "tinyflows-module",
  "tinyhosts",
  "tinyjuice-module",
@@ -9092,6 +9096,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyeventqueues"
+version = "0.1.2"
+dependencies = [
+ "async-trait",
+ "log",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "thiserror 2.0.20",
+ "tinybus",
+ "tinybus-module",
+ "tinyeventqueues-bus",
+ "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-core",
+ "tokio",
+]
+
+[[package]]
+name = "tinyeventqueues-bus"
+version = "0.1.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-core",
+]
+
+[[package]]
 name = "tinyflows"
 version = "0.8.23"
 dependencies = [
@@ -9809,6 +9840,9 @@ dependencies = [
  "futures-util",
  "http",
  "object_store",
+ "quick-xml 0.41.0",
+ "reqwest 0.13.5",
+ "serde",
  "tinystoragedrivers-core",
  "tokio",
  "tokio-util",

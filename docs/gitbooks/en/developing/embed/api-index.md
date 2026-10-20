@@ -197,6 +197,7 @@ The compiled capability report describes this build:
     "flows": true,
     "hosting": false,
     "http-server": true,
+    "inbound-queues": true,
     "inference": false,
     "mcp": true,
     "media": true,
