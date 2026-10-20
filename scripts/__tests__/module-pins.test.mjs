@@ -298,6 +298,15 @@ test("the existing exact-drift exemption is proof-checked and keeps ahead visibl
     });
     assert.equal(altered.ok, false);
     assert.equal(altered.kind, "invalid-source-parity");
+    const missing = classifyPin({
+      ...base,
+      version: "1.0.0",
+      actual,
+      exemption: { ...exemption, sourceParity: null },
+      sourceParityContext,
+    });
+    assert.equal(missing.ok, false, "a malformed present proof must not fall back to a reason-only exemption");
+    assert.equal(missing.kind, "invalid-source-parity");
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }

@@ -95,9 +95,8 @@ export function parseRecords(src) {
  * `actual` is `git describe --tags` output for the submodule; `exemption` is the
  * matching entry from module-pin-exemptions.json, or undefined.
  *
- * Four outcomes, and three of them are failures — including "exempt but the
- * pins now agree". A stale exemption is not harmless: it is a standing licence
- * for the next real drift on that record to pass unnoticed.
+ * A declared exemption accepts one exact drift only. A stale exemption is not
+ * harmless: it is a standing licence for the next real drift to pass unnoticed.
  */
 export function classifyPin({ id, version, submodulePath, actual, exemption, sourceParityContext }) {
   const wanted = `v${version}`;
@@ -145,7 +144,8 @@ export function classifyPin({ id, version, submodulePath, actual, exemption, sou
           `    intended, update \`expect\` and the reason in module-pin-exemptions.json.`,
       };
     }
-    if (exemption.sourceParity) {
+    const hasSourceParity = Object.hasOwn(exemption, "sourceParity");
+    if (hasSourceParity) {
       const proof = validateTestOnlySourceParity({
         ...sourceParityContext,
         version,
@@ -163,7 +163,7 @@ export function classifyPin({ id, version, submodulePath, actual, exemption, sou
       ok: true,
       kind: "exempt",
       reason: exemption.reason,
-      sourceParity: Boolean(exemption.sourceParity),
+      sourceParity: hasSourceParity,
     };
   }
   return {
@@ -194,6 +194,9 @@ export function validateTestOnlySourceParity({
   runGit = (args) => execFileSync("git", args, { cwd: repoPath, encoding: "utf8" }).trim(),
 }) {
   try {
+    if (typeof repoPath !== "string" || repoPath.length === 0) {
+      throw new Error("submodule repository path is missing");
+    }
     const required = [
       "tag",
       "releaseCommit",
@@ -245,6 +248,7 @@ export function validateTestOnlySourceParity({
       .map((entry) => {
         const match = entry.match(/^([0-7]{6}) (blob|commit) ([0-9a-f]{40})\t([\s\S]+)$/);
         if (!match) throw new Error(`unsupported tree entry in ${ref}`);
+        if (!/^[\x20-\x7e]+$/.test(match[4])) throw new Error(`unsupported non-printable Git path in ${ref}`);
         return { mode: match[1], type: match[2], oid: match[3], path: match[4] };
       });
     const releaseEntries = entries(proof.releaseCommit);
