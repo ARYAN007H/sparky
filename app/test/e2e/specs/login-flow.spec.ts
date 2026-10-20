@@ -1,28 +1,19 @@
 // @ts-nocheck
 /**
- * E2E test: Complete login → onboarding → home flow via deep link (Linux / tauri-driver).
+ * E2E test: Desktop deep-link login and token error paths (Linux / tauri-driver).
  *
- * Verifies the full auth + onboarding journey using mock data:
- *   Phase 1 — Deep link authentication:
+ * Verifies desktop auth entry using mock data:
+ *   Deep link authentication:
  *     1. `openhuman://auth?token=...` deep link is triggered via __simulateDeepLink
  *     2. App calls POST /auth/login-token/consume            (mock server)
  *     3. App receives JWT, dispatches to Redux authSlice
  *     4. UserProvider calls GET /auth/me  (mock server)
  *
- *   Phase 2 — Onboarding steps (driven via data-testid="onboarding-next-button"):
- *     Step 0: WelcomeStep            — "Get Started"
- *     Step 1: SkillsStep             — "Continue" or "Skip for Now"
- *     Step 2: ContextGatheringStep   — user-driven gate (skipped if no sources connected)
- *
- *   Phase 3 — Completion verification:
- *     - App calls POST /settings/onboarding-complete (from SkillsStep)
- *     - App navigates to #/home — greeting with mock user's name shown
- *
- *   Phase 4 — Error paths:
+ *   Error paths:
  *     - Expired token returns 401 and app does not navigate to home
  *     - Invalid token returns 401 and app does not navigate to home
  *
- *   Phase 5 — Bypass auth path:
+ *   Bypass auth path:
  *     - `openhuman://auth?token=...&key=auth` sets token directly (no consume call)
  *
  * The mock server runs on http://127.0.0.1:18473 and the .app bundle must
@@ -31,7 +22,6 @@
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
 import { buildBypassJwt, triggerAuthDeepLink, triggerDeepLink } from '../helpers/deep-link-helpers';
 import {
-  dumpAccessibilityTree,
   hasAppChrome,
   waitForWebView,
   waitForWindowVisible,
@@ -61,16 +51,13 @@ async function waitForRequest(method, urlFragment, timeout = 15_000) {
   return undefined;
 }
 
-describe('Login flow — complete with mock data (Linux)', () => {
+describe('Desktop deep-link login (Linux)', () => {
   before(async () => {
     await startMockServer();
     resetMockBehavior();
     setMockBehavior('composioConnections', '[]');
     await waitForApp();
-    // Wipe any state from prior specs in this single-session run, but
-    // stop BEFORE the auth deep-link / onboarding walk — this spec
-    // exercises that login flow itself, so it has to start from the
-    // Welcome screen.
+    // Start from Welcome so this spec exercises native deep-link entry.
     await resetApp('e2e-login-flow', { skipAuth: true });
     clearRequestLog();
   });
