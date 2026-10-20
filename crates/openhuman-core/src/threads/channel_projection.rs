@@ -213,6 +213,7 @@ fn bind_row_in(repo: &Repo, key: MessageBindingKey, thread_id: &str, row_id: &st
                 "provider message has no trusted thread binding",
             ));
         };
+        let precondition = stored.unchanged();
         let mut binding: MessageBinding = serde_json::from_value(stored.doc)
             .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
         if binding.key != key || binding.thread_id != thread_id {
@@ -232,7 +233,7 @@ fn bind_row_in(repo: &Repo, key: MessageBindingKey, thread_id: &str, row_id: &st
         binding.row_id = Some(row_id);
         let body: Value = serde_json::to_value(binding)
             .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
-        docs.put(COLLECTION, &id, json!(body), stored.unchanged())
+        docs.put(COLLECTION, &id, json!(body), precondition)
             .await?;
         Ok(())
     })?;
