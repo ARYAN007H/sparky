@@ -16,6 +16,59 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use super::OpenHumanSessionHost;
 
 impl OpenHumanSessionHost {
+    /// Whether this exact bound session already carries authoritative durable
+    /// state. A freshly opened header alone is not enough: hosts may still need
+    /// to adopt legacy history once. Explicit reset boundaries and recorded
+    /// prompt/tool snapshots are authoritative even when the current head is
+    /// intentionally empty.
+    pub(crate) fn bound_history_is_authoritative(&self) -> anyhow::Result<bool> {
+        let Some(session) = self.session.as_ref() else {
+            return Ok(false);
+        };
+        let locator = self.session_locator();
+        let head = locator.head_generation(session);
+        let Some(read) = locator.read_session_transcript(&head) else {
+            return Ok(false);
+        };
+        let Some(transcript) = read
+            .read_session()
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        else {
+            return Ok(false);
+        };
+        Ok(!transcript.messages.is_empty()
+            || transcript.meta.turn_count > 0
+            || transcript.meta.prefix_reset
+            || transcript.meta.prefix_message_count.is_some()
+            || transcript.tools.is_some())
+    }
+
+    /// Exact durable identity used by the method above. Exposed only to the
+    /// adjacent session-host tests and callers that need to seed that same
+    /// recorded session store.
+    #[cfg(test)]
+    pub(crate) fn bound_session_ref(&self) -> Option<&tinyagents_session::transcript::SessionRef> {
+        self.session.as_ref()
+    }
+
+    /// Load legacy history only when the exact bound session has no durable
+    /// turn or explicit empty/reset boundary. A failed load returns before the
+    /// caller can start a turn and create a misleading empty session.
+    pub(crate) async fn adopt_legacy_history_if_needed<F, Fut>(
+        &self,
+        load: F,
+    ) -> anyhow::Result<bool>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = anyhow::Result<Vec<TranscriptMessage>>>,
+    {
+        if self.bound_history_is_authoritative()? {
+            return Ok(false);
+        }
+        let messages = load().await?;
+        self.adopt_imported_history(&messages)
+    }
+
     /// Reset the bound durable transcript without deleting its sealed
     /// generations. The runtime owns the session identity and reset
     /// serialization; this host method only ensures the bound session is

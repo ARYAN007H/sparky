@@ -33,6 +33,7 @@ pub(crate) async fn process_channel_runtime_message(
         authenticated_relay,
         prepared_inbound,
         imported_history,
+        legacy_history,
         progressive_target,
     } = runtime_msg;
     let prepared = match prepared_inbound {
@@ -396,6 +397,7 @@ pub(crate) async fn process_channel_runtime_message(
                 approval: approval.clone(),
                 relay_thread: ctx.relay_thread.clone(),
                 imported_history,
+                legacy_history,
                 native_target: native_target.clone(),
             });
             super::super::native_runner::run(

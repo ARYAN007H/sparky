@@ -397,6 +397,50 @@ async fn clear_history_command_uses_reset_callback_and_persists_route_override()
 }
 
 #[tokio::test]
+async fn failed_history_reset_does_not_apply_requested_route() {
+    let ctx = runtime_context(PathBuf::from("/tmp"));
+    let key = "telegram_alice_room";
+    let before = ChannelRouteSelection {
+        provider: "openai".into(),
+        model: "reasoning-v1".into(),
+    };
+    set_route_selection(&ctx, key, before.clone());
+    let channel_impl = Arc::new(RecordingChannel::default());
+    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
+        id: "reset-fails".into(),
+        sender: "alice".into(),
+        reply_target: "room".into(),
+        content: "/model gpt-5-mini".into(),
+        channel: "telegram".into(),
+        timestamp: 0,
+        thread_ts: None,
+        sender_name: None,
+    };
+
+    let handled = handle_runtime_command_with_reset(
+        &ctx,
+        &msg,
+        Some(&channel),
+        key,
+        None,
+        None,
+        &msg,
+        || async { Err("durable reset failed".to_owned()) },
+    )
+    .await;
+
+    assert!(handled);
+    assert_eq!(get_route_selection(&ctx, key), before);
+    let sent = channel_impl.sent.lock().unwrap();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].content, "Something went wrong. Please try again.");
+    assert!(!sent[0].content.contains("durable reset failed"));
+}
+
+#[tokio::test]
 async fn handle_runtime_command_telegram_status_replies_without_agent() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_impl = Arc::new(RecordingChannel::default());

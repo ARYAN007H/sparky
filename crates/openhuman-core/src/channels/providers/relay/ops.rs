@@ -1,6 +1,7 @@
 //! `channel_relay_inbound`: record a relayed message and run its turn.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde_json::{json, Value};
@@ -16,6 +17,57 @@ use crate::channels::runtime::{
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::security::SecurityPolicy;
+
+/// Deferred one-time import of the relay's older conversation-row history.
+/// The durable TinyAgents session is checked first by the session host, so a
+/// failure in this legacy store cannot block an already-established session.
+#[derive(Clone, Debug)]
+pub(crate) struct LegacyHistoryImport {
+    workspace_dir: PathBuf,
+    thread_id: String,
+    message_id: String,
+    limit: usize,
+}
+
+impl LegacyHistoryImport {
+    pub(crate) fn new(
+        workspace_dir: PathBuf,
+        thread_id: String,
+        message_id: String,
+        limit: usize,
+    ) -> Self {
+        Self {
+            workspace_dir,
+            thread_id,
+            message_id,
+            limit,
+        }
+    }
+
+    pub(crate) async fn load(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+    ) -> Result<Vec<tinyagents_session::transcript::TranscriptMessage>, String> {
+        let rows = store::prior_turns(
+            ctx,
+            &self.workspace_dir,
+            &self.thread_id,
+            &self.message_id,
+            self.limit,
+        )
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| match row.role.as_str() {
+                "user" => tinyagents_session::transcript::TranscriptMessage::user(row.content),
+                "assistant" => {
+                    tinyagents_session::transcript::TranscriptMessage::assistant(row.content)
+                }
+                _ => unreachable!("prior_turns only returns user and assistant rows"),
+            })
+            .collect())
+    }
+}
 
 /// Accept one relayed message: validate it, record it on its thread under the
 /// caller's workspace, and start its turn in the background. Answers at once,
@@ -132,11 +184,10 @@ pub(crate) async fn run_relay_turn(
             Ok(limits) => limits,
             Err(error) => {
                 tracing::warn!("relayed channel runtime limits unavailable: {error}");
-                let reply =
-                    "⚠️ This chat's assistant is not available right now. Please try again later.";
+                let reply = crate::channels::failure_copy::generic_failure(Some(&config));
                 let _ = tinychannels_runtime::Channel::send(
                     channel.as_ref(),
-                    &crate::channels::SendMessage::new(reply, &params.chat_id),
+                    &crate::channels::SendMessage::new(&reply, &params.chat_id),
                 )
                 .await;
                 record(
@@ -169,11 +220,10 @@ pub(crate) async fn run_relay_turn(
                 %error,
                 "[channels::relay] could not build the turn"
             );
-            let reply =
-                "⚠️ This chat's assistant is not available right now. Please try again later.";
+            let reply = crate::channels::failure_copy::generic_failure(Some(&config));
             let _ = tinychannels_runtime::Channel::send(
                 channel.as_ref(),
-                &crate::channels::SendMessage::new(reply, &params.chat_id),
+                &crate::channels::SendMessage::new(&reply, &params.chat_id),
             )
             .await;
             record(
@@ -221,39 +271,10 @@ pub(crate) async fn run_relay_turn(
         Ok(prepared) => prepared,
         Err(error) => {
             tracing::warn!("relayed channel preparation failed: {error}");
-            return channel.sent();
-        }
-    };
-    let imported_history = match store::prior_turns(
-        &dispatch_ctx,
-        &workspace_dir,
-        &thread_id,
-        &params.message_id,
-        MAX_CHANNEL_HISTORY,
-    )
-    .await
-    {
-        Ok(prior) => prior
-            .into_iter()
-            .map(|row| match row.role.as_str() {
-                "user" => tinyagents_session::transcript::TranscriptMessage::user(row.content),
-                "assistant" => {
-                    tinyagents_session::transcript::TranscriptMessage::assistant(row.content)
-                }
-                _ => unreachable!("prior_turns only returns user and assistant rows"),
-            })
-            .collect(),
-        Err(error) => {
-            tracing::warn!(
-                thread_id = %thread_id,
-                %error,
-                "[channels::relay] could not read the thread's history; refusing to start a session without it"
-            );
-            let reply =
-                "⚠️ This chat's history could not be loaded. Please send your message again.";
+            let reply = crate::channels::failure_copy::generic_failure(Some(&config));
             let _ = tinychannels_runtime::Channel::send(
                 channel.as_ref(),
-                &crate::channels::SendMessage::new(reply, &params.chat_id),
+                &crate::channels::SendMessage::new(&reply, &params.chat_id),
             )
             .await;
             record(
@@ -267,7 +288,6 @@ pub(crate) async fn run_relay_turn(
             return channel.sent();
         }
     };
-
     let tenant = match dispatch_ctx.tenant() {
         Ok(tenant) => tenant,
         Err(error) => {
@@ -299,7 +319,12 @@ pub(crate) async fn run_relay_turn(
     );
     let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
-    runtime_message.imported_history = imported_history;
+    runtime_message.legacy_history = Some(LegacyHistoryImport::new(
+        workspace_dir.clone(),
+        thread_id.clone(),
+        params.message_id.clone(),
+        MAX_CHANNEL_HISTORY,
+    ));
     runtime_message.progressive_target = Some(progressive_target);
     let turn = process_channel_runtime_message(ctx, runtime_message);
     if let Some(context) = dispatch_ctx.core() {

@@ -240,9 +240,10 @@ where
         }
         Err(_) => {
             if let Some(channel) = target_channel {
+                let reply = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
                 let _ = channel
                     .send_with_outbound_intent(
-                        &SendMessage::new("Channel module unavailable.", &msg.reply_target)
+                        &SendMessage::new(&reply, &msg.reply_target)
                             .in_thread(msg.thread_ts.clone()),
                     )
                     .await;
@@ -250,6 +251,20 @@ where
             return true;
         }
     };
+    if clear_history && reset_history().await.is_err() {
+        tracing::warn!("channel durable history reset failed");
+        if let Some(channel) = target_channel {
+            let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
+            let _ = channel
+                .send_with_outbound_intent(
+                    &SendMessage::new(&copy, &msg.reply_target).in_thread(msg.thread_ts.clone()),
+                )
+                .await;
+        }
+        return true;
+    }
+    // Apply a route change only after its requested durable reset has
+    // succeeded, so a failed reset cannot partially alter command state.
     if let Some(route) = next_route {
         set_route_selection(
             ctx,
@@ -259,21 +274,6 @@ where
                 model: route.model,
             },
         );
-    }
-    if clear_history && reset_history().await.is_err() {
-        tracing::warn!("channel durable history reset failed");
-        if let Some(channel) = target_channel {
-            let copy = crate::web_chat::classify_inference_error(
-                "OpenHuman session persistence failed while resetting this conversation",
-            );
-            let _ = channel
-                .send_with_outbound_intent(
-                    &SendMessage::new(copy.message, &msg.reply_target)
-                        .in_thread(msg.thread_ts.clone()),
-                )
-                .await;
-        }
-        return true;
     }
     let Some(reply) = reply else {
         return false;
