@@ -45,6 +45,39 @@ async fn goal_store_is_reused_within_a_context_and_isolated_between_agents() {
 }
 
 #[tokio::test]
+async fn goal_store_isolated_between_profiles_with_the_same_agent_and_thread() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let context_for = |profile: &'static str| {
+        let overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile(profile)
+        .session_agent("same-agent");
+        CoreContext::for_test(DomainSet::full(), Some(workspace.path().to_path_buf()))
+            .derive_with(overlay)
+    };
+    let profile_a = DispatchCtx::new(context_for("profile-a"));
+    let profile_b = DispatchCtx::new(context_for("profile-b"));
+    let store_a = goal_store(workspace.path(), &profile_a);
+    let store_b = goal_store(workspace.path(), &profile_b);
+
+    assert!(!Arc::ptr_eq(&store_a, &store_b));
+    store_a
+        .set("shared-thread-id", "profile A objective", None)
+        .await
+        .expect("write profile A goal");
+    assert!(store_b
+        .get("shared-thread-id")
+        .await
+        .expect("read profile B goal")
+        .is_none());
+}
+
+#[tokio::test]
 async fn goal_tool_with_context_uses_the_business_goal_store() {
     struct ThreadContext(&'static str);
     impl tinytools::ToolRunContext for ThreadContext {
