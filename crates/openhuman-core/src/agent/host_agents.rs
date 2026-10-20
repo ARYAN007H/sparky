@@ -133,6 +133,21 @@ impl HostAgent {
         .await
     }
 
+    /// Reset the durable session used by an external channel command. The
+    /// caller serializes this operation with turns for the same trusted
+    /// tenant, agent, and canonical session identity.
+    pub(crate) async fn reset_external_channel_history(
+        &self,
+        session_key: &str,
+        event_session_id: &str,
+        channel: &str,
+    ) -> anyhow::Result<bool> {
+        let mut session = self.session_host(&self.config, Some(session_key))?;
+        session.set_thread_id(Some(session_key));
+        session.set_event_context(event_session_id, channel);
+        self.scope(session.reset_bound_history()).await
+    }
+
     /// Build a session for this agent from `config` -- normally a clone of
     /// [`HostAgent::config`] carrying a driver's overrides.
     ///
