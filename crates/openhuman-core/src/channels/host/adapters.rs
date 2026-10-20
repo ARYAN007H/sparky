@@ -317,7 +317,9 @@ impl AllowlistStore for ConfigAllowlistStore {
 /// Routes provider events by `domain`:
 /// - `"web"`     → the web channel's `WebChannelEvent` broadcast bus (payload
 ///   must deserialize into a `WebChannelEvent`; presentation builds that shape).
-/// - `"channel"` → the global `DomainEvent` bus (telegram reaction fan-out).
+/// - `"channel"` → the global `DomainEvent` bus for legacy provider callbacks.
+///   Typed `channel_event` payloads use `publish_host_in` so trusted scope can
+///   resolve and persist their exact OpenHuman message target first.
 ///
 /// One capability, two backends — providers don't know which bus they hit.
 pub struct OpenHumanEventSink;
