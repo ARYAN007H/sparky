@@ -90,7 +90,7 @@ fn builder_applies_defaults_and_exposes_public_accessors() {
 
     assert_eq!(agent.tools().len(), 2);
     assert_eq!(agent.tool_specs().len(), 2);
-    assert_eq!(agent.model_name(), openhuman_core::config::DEFAULT_MODEL);
+    assert_eq!(agent.model_name(), "openrouter/deepseek/deepseek-v4-flash");
     assert_eq!(agent.temperature(), 0.7);
     assert_eq!(agent.workspace_dir(), std::path::Path::new("."));
     assert!(agent.workflows().is_empty());
