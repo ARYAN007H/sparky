@@ -518,7 +518,7 @@ async fn an_interrupted_retry_resumes_its_real_legacy_row() {
     let done = wait_for_host_import(&config).await;
     assert_eq!(done.failed, 0);
     assert_eq!(done.imported, 1);
-    let file = FileCheckpointStore::new(&config.workspace_dir).load();
+    let file = StateKvCheckpointStore::new(&config.workspace_dir).load();
     assert!(file.failed.is_empty());
     assert!(!file.retrying);
     assert_reference_contains(&engine, "resumed retry body").await;
