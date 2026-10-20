@@ -903,7 +903,7 @@ async fn send_web_chat(
 
 struct CaptureProxy {
     child: Child,
-    _stdout: BufReader<ChildStdout>,
+    stdout_drain: Option<std::thread::JoinHandle<()>>,
     port: u16,
 }
 
@@ -911,6 +911,9 @@ impl Drop for CaptureProxy {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        if let Some(stdout_drain) = self.stdout_drain.take() {
+            let _ = stdout_drain.join();
+        }
     }
 }
 
@@ -938,16 +941,36 @@ fn start_capture_proxy(
         .spawn()
         .expect("start capture-first-inference.mjs");
     let stdout = child.stdout.take().expect("capture proxy stdout");
+    let (startup_tx, startup_rx) = std::sync::mpsc::sync_channel(1);
+    let stdout_drain = std::thread::spawn(move || {
+        let mut stdout = BufReader::new(stdout);
+        let mut startup = String::new();
+        let startup_result = match stdout.read_line(&mut startup) {
+            Ok(0) => Err("stdout closed before the proxy announced its port".to_owned()),
+            Ok(_) => Ok(startup),
+            Err(error) => Err(format!("reading proxy startup line failed: {error}")),
+        };
+        if startup_tx.send(startup_result).is_err() {
+            return;
+        }
+        let mut discarded = String::new();
+        while stdout.read_line(&mut discarded).is_ok_and(|count| count > 0) {
+            discarded.clear();
+        }
+    });
     let mut proxy = CaptureProxy {
         child,
-        _stdout: BufReader::new(stdout),
+        stdout_drain: Some(stdout_drain),
         port: 0,
     };
-    let mut startup = String::new();
-    proxy
-        ._stdout
-        .read_line(&mut startup)
-        .expect("read capture proxy startup");
+    let startup = match startup_rx.recv_timeout(Duration::from_secs(10)) {
+        Ok(Ok(startup)) => startup,
+        Ok(Err(error)) => panic!("capture proxy failed during startup: {error}"),
+        Err(error) => {
+            let status = proxy.child.try_wait().ok().flatten();
+            panic!("capture proxy did not report startup within 10s ({error}; exit={status:?})")
+        }
+    };
     let address = startup
         .split_whitespace()
         .find_map(|word| word.strip_prefix("http://127.0.0.1:"))
@@ -1195,8 +1218,16 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
             &capture_root.join("captures/before/requests"),
         ));
         assert!(
-            before == batches[0],
-            "managed request bytes changed from before to after migration"
+        before.len() == batches[0].len() * 2
+            && before.chunks_exact(batches[0].len()).all(|batch| batch == batches[0]),
+            "before baseline batches were not two identical captures"
+        );
+        let after = capture_request_bodies(&capture_request_files(&request_dir));
+        assert!(
+            after.len() == batches[1].len() * 2
+                && after.chunks_exact(batches[1].len()).all(|batch| batch == batches[1])
+                && before == after,
+            "managed request bytes changed between before and after migration"
         );
     }
     drop(proxy);
