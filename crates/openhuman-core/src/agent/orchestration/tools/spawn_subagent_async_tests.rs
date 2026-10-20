@@ -373,85 +373,66 @@ async fn missing_prompt_returns_error() {
     assert!(result.output().contains("prompt"));
 }
 
-/// B40 / Gap 4: a delegating agent (e.g. the orchestrator) calling
-/// `spawn_subagent` directly from a thread-less context (flow
-/// `agent` node, CLI, cron) must get a clear, actionable error instead of
-/// silently accepting the spawn and later dropping its result in
-/// `background_delivery`'s "headless batch" path. Sets up a real parent
-/// turn context (so the call gets past the parent-context /
-/// allowlist / registry checks) but deliberately gives the call
-/// no explicit parent thread, so the child has no thread — the exact
-/// condition that used to sail through to `tokio::spawn` and lose the
-/// result.
+/// Headless callers have no thread for follow-up chat delivery. They still
+/// start an asynchronous child and retain its result in the run log.
 #[tokio::test]
-async fn errors_clearly_when_no_parent_thread_for_delivery() {
+async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);
+    let mut parent = parent_context(workspace.path());
+    parent.session_id = "headless-spawn-session".into();
+    parent.on_progress = Some(progress_tx);
+    let live = super::super::live_parent_run_context("headless-spawn", parent);
 
     let result = SpawnSubagentTool::new()
-        .execute_under_parent(
+        .execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "investigate x",
             }),
-            ToolCallOptions::default(),
             None,
-            parent_context(workspace.path()),
+            live.data.child(),
+            Some(&live),
         )
         .await
         .unwrap();
-
-    assert!(result.is_error);
-    let out = result.output();
-    assert!(out.contains("no parent chat thread"), "{out}");
-    // The recommended escape hatch must name a route that does NOT loop back
-    // into this guard: a synchronous one, with the argument that makes it
-    // synchronous.
-    //
-    // The literal `spawn_subagent` is deliberately no longer asserted. The
-    // guidance used to name it; it now recommends `delegate_*` instead, which
-    // is the better advice for the reason this comment already gave — plain
-    // `spawn_subagent` defaults to async and would steer the model straight
-    // back here. Verified callable under the product feature profile:
-    // `delegate_<agent_id>` tools are generated in
-    // `tools/orchestrator_tools.rs:116`, and they accept `blocking`
-    // (`archetype_delegation_host.rs:115` declares it, `:245` reads it) — so the
-    // guidance names a real tool family with a real argument, not a route the
-    // model cannot take.
-    assert!(out.contains("blocking: true"), "{out}");
-    assert!(out.contains("delegate_"), "{out}");
-}
-
-/// The positive half of the branch above: with a chat thread bound, the
-/// guard must NOT fire. This asserts only that the call gets *past* the
-/// `parent_thread_id.is_none()` check — driving the full spawn/session
-/// machinery to a successful "Accepted" is out of scope for a unit test,
-/// so a later failure is acceptable; a "no parent chat thread" failure is
-/// not. Pins that the guard keys on thread presence and nothing else.
-#[tokio::test]
-async fn guard_does_not_fire_when_parent_thread_is_bound() {
-    let _ = AgentDefinitionRegistry::init_global_builtins();
-    let workspace = tempfile::TempDir::new().expect("workspace");
-
-    let thread = ThreadContext("t-parent");
-    let result = SpawnSubagentTool::new()
-        .execute_under_parent(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "investigate x",
-            }),
-            ToolCallOptions::default(),
-            Some(&thread),
-            parent_context(workspace.path()),
-        )
-        .await
-        .unwrap();
-
-    assert!(
-        !result.output().contains("no parent chat thread"),
-        "guard fired despite a bound parent thread: {}",
-        result.output()
+    assert!(!result.is_error, "{}", result.output());
+    assert!(result.output().contains("Accepted async sub-agent"));
+    let reference = result
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .expect("async response contains task reference");
+    let task_id = reference["task_id"].as_str().expect("task id");
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(&live.data.dispatch_ctx());
+    let job = jobs
+        .list()
+        .into_iter()
+        .find(|job| job.id.as_str() == task_id)
+        .expect("headless child is registered");
+    let finished = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        jobs.wait_owned(job.id.as_str(), job.owner.clone()),
+    )
+    .await
+    .expect("headless child completes")
+    .expect("headless child remains registered");
+    assert_eq!(
+        finished.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
     );
+    let mut logged_result = None;
+    while let Ok(event) = progress_rx.try_recv() {
+        if let crate::progress::AgentProgress::SubagentCompleted { output, .. } = event {
+            logged_result = Some(output);
+        }
+    }
+    assert_eq!(logged_result.as_deref(), Some("done"));
 }
 
 fn parent_context(workspace_dir: &Path) -> ParentExecutionContext {
