@@ -317,11 +317,8 @@ async fn durable_channel_history_len(
     let Some(core) = dispatch.resolved() else {
         return 0;
     };
-    let locator = crate::agent::session_store::transcripts_or_files_in(
-        &core,
-        &agent_id,
-        &ctx.workspace_dir,
-    );
+    let locator =
+        crate::agent::session_store::transcripts_or_files_in(&core, &agent_id, &ctx.workspace_dir);
     let session = tinyagents_session::transcript::SessionRef::scoped(session_key, &agent_id);
     let head = locator.head_generation(&session);
     let Some(read) = locator.read_session_transcript(&head) else {

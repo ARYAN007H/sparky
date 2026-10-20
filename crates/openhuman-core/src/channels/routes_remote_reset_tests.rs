@@ -142,6 +142,19 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     assert_ne!(alice_key, bob_key);
     let alice_session = seed_session(&alice_core, workspace, &alice_key);
     let bob_session = seed_session(&bob_core, workspace, &bob_key);
+    let route = crate::channels::routes::get_route_selection(&alice_runtime, "remote-reset");
+    assert_eq!(
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &route,
+            "telegram",
+            "legacy-key-is-not-authority",
+            Some(&alice_key),
+        )
+        .await,
+        2,
+        "remote status history comes from the durable session",
+    );
 
     let scope = remote_session_scope();
     let reset = crate::channels::host::remote_control::RemoteResetContext {
@@ -194,6 +207,18 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     .expect("captured tenant reset succeeds");
     assert!(matches!(cleared, RemoteHostResult::Completed));
     assert!(session_messages(&alice_core, workspace, &alice_session).is_empty());
+    assert_eq!(
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &route,
+            "telegram",
+            "legacy-key-is-not-authority",
+            Some(&alice_key),
+        )
+        .await,
+        0,
+        "a reset clears the durable status count",
+    );
     assert_eq!(
         session_messages(&bob_core, workspace, &bob_session),
         ["prior tenant turn", "prior tenant reply"]
