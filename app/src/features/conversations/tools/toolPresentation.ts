@@ -275,7 +275,7 @@ export function describeToolCall(input: DescribeToolCallInput): ToolCallPresenta
       baseName,
       // Delegate aliases are no longer registered but remain in older
       // transcripts, so give them a stable agent icon without a live spec.
-      icon: BotIcon,
+      icon: EXACT_TOOL_SPECS.spawn_subagent.icon,
       category: 'agent',
       body: 'generic',
       tense,
