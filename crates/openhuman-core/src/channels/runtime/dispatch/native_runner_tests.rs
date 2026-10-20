@@ -34,63 +34,120 @@ async fn active_terminal_delivery_is_returned_to_its_waiting_caller() {
 
 #[tokio::test]
 async fn terminal_delivery_releases_session_profile_and_busy_guards() {
-    let dispatch = crate::core::runtime::DispatchCtx::unbound();
-    let profile = format!("native-runner-test-{}", uuid::Uuid::new_v4());
-    let session = format!("native-session-{}", uuid::Uuid::new_v4());
-    let lease_key =
-        crate::agent::session_lease::SessionLeaseKey::new("native-test-tenant", "agent", &session);
-    let lease = crate::agent::session_lease::SessionLease::acquire(lease_key.clone(), None)
-        .await
-        .expect("session lease");
-    let profile_turn = crate::profiles::turn_gate::acquire_profile(&profile).await;
-    let busy =
-        crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(&dispatch, &session);
-    let shared = NativeShared::default();
-    shared.begin_delivery_wait("guarded-request");
-    shared.with("guarded-request", |slot| {
-        slot.lease = Some(lease);
-        slot.profile_turn = Some(profile_turn);
-        slot.busy = Some(busy);
-    });
+    use crate::agent::host_agents::HostAgent;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
-    assert!(crate::agent::orchestration::busy_guard::is_busy(
-        &dispatch, &session
-    ));
-    let waiting = tokio::spawn({
-        let profile = profile.clone();
-        async move { crate::profiles::turn_gate::acquire_profile(&profile).await }
-    });
-    let waiting_session = tokio::spawn({
-        let lease_key = lease_key.clone();
-        async move {
-            crate::agent::session_lease::SessionLease::acquire(lease_key, None)
-                .await
-                .expect("next session lease")
+    fn request(
+        dispatch: &DispatchCtx,
+        session: &str,
+        profile: &str,
+        request_id: &str,
+    ) -> TurnRequest<QueuedPayload> {
+        let core = dispatch.core().expect("profile context").clone();
+        let definition = crate::agent::harness::host_definition::AgentDefinitionRegistry::
+            builtins_only()
+            .get("orchestrator")
+            .cloned()
+            .expect("built-in orchestrator definition");
+        let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
+            host_agent: HostAgent {
+                definition,
+                config: crate::config::Config::default(),
+                host_tools: None,
+                context: core,
+                hooks: Default::default(),
+            },
+            channel: "telegram".into(),
+            session_key: session.into(),
+            event_session_id: format!("event-{session}"),
+            origin: crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+                sender_name: Some("Ada".into()),
+                channel: "telegram".into(),
+                sender: Some("sender".into()),
+                reply_target: "chat".into(),
+                message_id: request_id.into(),
+                history_key: None,
+                channel_session: None,
+            },
+            approval: Default::default(),
+            relay_thread: None,
+            imported_history: Vec::new(),
+            native_target: None,
+        });
+        TurnRequest {
+            scope: ScopeKey {
+                agent_id: "orchestrator".into(),
+                profile_id: Some(profile.into()),
+            },
+            thread_id: session.into(),
+            request_id: request_id.into(),
+            text: "hello".into(),
+            payload: QueuedPayload {
+                ctx: Some(dispatch.clone()),
+                trusted_turn: Some(trusted),
+                ..Default::default()
+            },
+            host_authored: false,
+            disposition: QueueDisposition::Interrupt,
+            deadline: None,
+            idle_timeout: None,
         }
-    });
+    }
+
+    let profile = format!("native-runner-profile-{}", uuid::Uuid::new_v4());
+    let session = format!("native-runner-session-{}", uuid::Uuid::new_v4());
+    let core = CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            Default::default(),
+        )
+        .profile(profile.clone()),
+    );
+    let dispatch = DispatchCtx::new(core);
+    let first_shared = Arc::new(NativeShared::default());
+    let first = NativeHost {
+        shared: Arc::clone(&first_shared),
+    };
+    let first_request = request(&dispatch, &session, &profile, "native-first");
+    let first_session = first
+        .checkout(&first_request)
+        .await
+        .expect("first native checkout");
+    assert_eq!(first_session.session_id, session);
+
+    let second_shared = Arc::new(NativeShared::default());
+    let second = NativeHost {
+        shared: Arc::clone(&second_shared),
+    };
+    let second_request = request(&dispatch, &session, &profile, "native-cancelled");
+    let waiting = tokio::spawn(async move { second.checkout(&second_request).await });
     tokio::task::yield_now().await;
     assert!(
         !waiting.is_finished(),
-        "profile gate stays held through delivery"
+        "a second runner instance waits on the checked-out durable session"
     );
+    waiting.abort();
     assert!(
-        !waiting_session.is_finished(),
-        "session lease stays held through delivery"
+        tokio::time::timeout(std::time::Duration::from_secs(1), waiting)
+            .await
+            .expect("cancelled checkout completes")
+            .expect_err("checkout task was cancelled")
+            .is_cancelled()
     );
 
-    shared.record_delivery("guarded-request", true);
-
-    assert!(!crate::agent::orchestration::busy_guard::is_busy(
-        &dispatch, &session
-    ));
-    let next = tokio::time::timeout(std::time::Duration::from_secs(1), waiting)
-        .await
-        .expect("profile gate is released after delivery")
-        .expect("profile waiter does not panic");
-    drop(next);
-    let next_session = tokio::time::timeout(std::time::Duration::from_secs(1), waiting_session)
-        .await
-        .expect("session lease is released after delivery")
-        .expect("session waiter does not panic");
-    drop(next_session);
+    first_shared.record_delivery("native-first", true);
+    let third_request = request(&dispatch, &session, &profile, "native-third");
+    let third = NativeHost {
+        shared: Arc::clone(&second_shared),
+    };
+    let third_session = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        third.checkout(&third_request),
+    )
+    .await
+    .expect("terminal delivery releases the session/profile guards")
+    .expect("a later runner can check out the session");
+    assert_eq!(third_session.session_id, session);
+    second_shared.record_delivery("native-third", true);
 }
