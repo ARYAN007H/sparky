@@ -458,12 +458,27 @@ export default async function queuedImageAttachmentRoundtrip({
         if (message.role !== "user") return false;
         if (typeof message.content === "string") return message.content === QUEUED_PROMPT;
         return Array.isArray(message.content) && message.content.some(
-          (part) => part.type === "text" && part.text === QUEUED_PROMPT,
+          (part) => part.type === "text" && part.text.includes(QUEUED_PROMPT),
         );
       }),
     );
   if (!imageCandidates.length) {
-    throw new Error("queued turn did not reach the mock model with an exact user prompt");
+    const observed = mock
+      .requests()
+      .filter((request) => /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url))
+      .map((request) => {
+        const messages = JSON.parse(request.body).messages ?? [];
+        return messages.filter((message) => message.role === "user").map((message) => ({
+          content: Array.isArray(message.content)
+            ? message.content.map((part) => part.type === "text"
+                ? { type: "text", text: part.text }
+                : { type: part.type, image_url: part.image_url
+                    ? { urlPrefix: String(part.image_url.url ?? "").slice(0, 48) }
+                    : undefined })
+            : message.content,
+        }));
+      });
+    throw new Error(`queued prompt was not found in a model user message: ${JSON.stringify(observed)}`);
   }
   const candidateShapes = imageCandidates.map(({ body }) =>
     body.messages.filter((message) => message.role === "user").map((message) => ({
