@@ -53,7 +53,7 @@ function hasSourceAuthority(value) {
 async function waitUntil(predicate, label, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const value = predicate();
+    const value = await predicate();
     if (value) return value;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -373,7 +373,12 @@ export default async function queuedImageAttachmentRoundtrip({
   log("composer ACK reached the matching pending UI entry; queued RPC image ACK retained an opaque ref; neither had a transcript row before the active turn completed");
 
   await page.getByText(FIRST_REPLY, { exact: false }).waitFor({ timeout: 60_000 });
-  await page.getByText(QUEUED_REPLY, { exact: false }).waitFor({ timeout: 90_000 });
+  await waitUntil(
+    async () =>
+      (await page.getByText(QUEUED_REPLY, { exact: false }).count()) >= 2,
+    "both queued assistant replies",
+    90_000,
+  );
 
   const rows = await page.evaluate(
     async ({ url, token, id }) => {
@@ -407,6 +412,14 @@ export default async function queuedImageAttachmentRoundtrip({
   );
   if (userRows.length !== 1) {
     throw new Error(`queued image produced ${userRows.length} persisted user rows, expected one`);
+  }
+  const uiUserRows = rows.filter(
+    (row) => row.sender === "user" && row.content === UI_QUEUED_PROMPT,
+  );
+  if (uiUserRows.length !== 1) {
+    throw new Error(
+      `composer follow-up produced ${uiUserRows.length} persisted user rows, expected one`,
+    );
   }
   const persisted = userRows[0];
   if (persisted.id !== `user:${ack.request_id}`) {
@@ -456,7 +469,12 @@ export default async function queuedImageAttachmentRoundtrip({
       }),
     threadId,
   );
-  await page.getByText(QUEUED_REPLY, { exact: false }).waitFor({ timeout: 30_000 });
+  await waitUntil(
+    async () =>
+      (await page.getByText(QUEUED_REPLY, { exact: false }).count()) >= 2,
+    "both queued assistant replies after reload",
+    30_000,
+  );
   const reloaded = await page.evaluate(
     ({ id, rowId }) => {
       const messages =
