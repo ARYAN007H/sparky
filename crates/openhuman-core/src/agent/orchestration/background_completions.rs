@@ -191,7 +191,7 @@ pub(crate) async fn record_outcome(
     .await;
 }
 
-pub(super) async fn record_outcome_with_parent_epoch(
+pub(crate) async fn record_outcome_with_parent_epoch(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
     parent_session: &str,
@@ -302,6 +302,26 @@ pub(super) async fn record_outcome_with_parent_epoch(
             );
         }
     }
+}
+
+/// Recover the admission epoch from a task's persisted pause notice. Paused
+/// driver jobs have already returned from their completion callback, so their
+/// host-side cancellation must reuse this epoch rather than admitting a new
+/// child generation.
+pub(crate) fn paused_task_parent_epoch(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    thread_id: &str,
+    task_id: &str,
+) -> anyhow::Result<Option<u64>> {
+    let prefix = awaiting_input_record_prefix(task_id);
+    Ok(entry_for_ctx(ctx, workspace_dir)
+        .store
+        .try_list(Some(thread_id))?
+        .into_iter()
+        .find(|record| record.task_id.starts_with(&prefix))
+        .map(|record| record.parent_epoch)
+        .filter(|epoch| *epoch != 0))
 }
 
 async fn record_completion_record(

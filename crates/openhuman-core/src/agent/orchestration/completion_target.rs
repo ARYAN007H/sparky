@@ -79,6 +79,10 @@ impl CompletionTarget {
         })
     }
 
+    pub(crate) fn parent_epoch(&self) -> Option<u64> {
+        self.parent_epoch
+    }
+
     /// Queue a finished result. See [`record_completion`].
     pub(crate) async fn completed(&self, task_id: &str, agent_id: &str, summary: String) {
         record_outcome_with_parent_epoch(

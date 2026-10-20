@@ -52,6 +52,9 @@ pub(crate) struct RunningSubagentMetadata {
     /// `None` for a headless spawn with no originating thread. Used to abort the
     /// sub-agent when its parent thread is deleted (see [`super::cancel::cancel_for_thread`]).
     pub(crate) parent_thread_id: Option<String>,
+    /// Parent lifecycle generation admitted when this child was registered.
+    /// Its eventual cancellation record must not be attached to a later turn.
+    pub(crate) parent_epoch: Option<u64>,
     pub(crate) run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
 }
 
@@ -71,6 +74,8 @@ pub(crate) enum RegistrationError {
     Scope,
     #[error("detached task registration failed: {0}")]
     Registry(#[source] tinyagents_harness::error::TinyAgentsError),
+    #[error("parent lifecycle admission failed: {0}")]
+    ParentLifecycle(#[source] anyhow::Error),
 }
 
 /// Check the actual caller before any reusable-session or worker-thread write.
@@ -218,11 +223,30 @@ pub(crate) fn register(
                 task_id,
                 thread_id
             );
+            return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+                "parent thread is stopped or deleted"
+            )));
         }
         // First spawn in a workspace this process has not scanned: redeliver any
         // completions a previous process finished there but never delivered.
         crate::agent::orchestration::background_delivery::recover_on_boot(ctx, &workspace_dir);
     }
+
+    let parent_epoch = match parent_thread_id.as_deref() {
+        Some(thread_id) => match crate::agent::orchestration::background_completions::CompletionTarget::new(
+            ctx.clone(),
+            workspace_dir.clone(),
+            parent_session.clone(),
+            Some(thread_id.to_owned()),
+        ) {
+            Ok(target) => target.parent_epoch(),
+            Err(error) => {
+                abort.abort();
+                return Err(RegistrationError::ParentLifecycle(error));
+            }
+        },
+        None => None,
+    };
 
     let metadata = RunningSubagentMetadata {
         profile,
@@ -231,6 +255,7 @@ pub(crate) fn register(
         subagent_session_id: subagent_session_id.clone(),
         workspace_dir: workspace_dir.clone(),
         parent_thread_id: parent_thread_id.clone(),
+        parent_epoch,
         run_queue,
     };
     registry()
