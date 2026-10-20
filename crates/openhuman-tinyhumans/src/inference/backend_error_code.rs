@@ -99,12 +99,8 @@ pub fn extract_backend_error_code_token(err: &str) -> Option<String> {
 /// managed backend, `"OpenHuman API error (...)"` /
 /// `"OpenHuman streaming API error (...)"`).
 ///
-/// Load-bearing for the managed-vs-BYO distinction: a BYO / direct-provider
-/// body that merely happens to carry an `errorCode`-shaped field must NOT be
-/// treated as backend-owned (CodeRabbit). The provider HTTP emit sites gate on
-/// the known `provider` value instead; this helper is for the string-only
-/// downstream sites (`expected_error_kind`, `before_send`) that no longer carry
-/// the typed provider.
+/// Used when callers have only a flattened string and no provider identity to
+/// supply to the classifier.
 pub fn is_managed_backend_envelope(err: &str) -> bool {
     let label = PROVIDER_LABEL.to_ascii_lowercase();
     let lower = err.to_ascii_lowercase();
