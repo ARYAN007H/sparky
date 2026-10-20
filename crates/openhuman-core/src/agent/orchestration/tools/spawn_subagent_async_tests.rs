@@ -284,7 +284,7 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
     let mut parent = parent_context(workspace.path());
     parent.session_id = "headless-spawn-session".into();
     parent.on_progress = Some(progress_tx);
-    let live = super::super::live_parent_run_context("headless-spawn", parent);
+    let live = headless_core_backed_parent(workspace.path(), parent);
 
     let result = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
@@ -309,13 +309,34 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .expect("async response contains task reference");
     let task_id = reference["task_id"].as_str().expect("task id");
+    let output = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    task_id: event_task_id,
+                    output,
+                    ..
+                }) if event_task_id == task_id => break output,
+                Some(_) => {}
+                None => panic!("headless completion progress stream closed"),
+            }
+        }
+    })
+    .await
+    .expect("headless result is projected to the run log");
+    assert_eq!(output, "done");
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
     let job = jobs
         .list()
         .into_iter()
-        .find(|job| job.id.as_str() == task_id)
+        .find(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id)
+        })
         .expect("headless child is registered");
     let finished = tokio::time::timeout(
         std::time::Duration::from_secs(5),
@@ -335,13 +356,38 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
         finished.status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
     );
-    let mut logged_result = None;
-    while let Ok(event) = progress_rx.try_recv() {
-        if let crate::progress::AgentProgress::SubagentCompleted { output, .. } = event {
-            logged_result = Some(output);
-        }
-    }
-    assert_eq!(logged_result.as_deref(), Some("done"));
+    assert_eq!(finished.output.as_deref(), Some("done"));
+}
+
+fn headless_core_backed_parent(
+    workspace: &Path,
+    mut parent: ParentExecutionContext,
+) -> tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext> {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let mut definition = AgentDefinitionRegistry::builtins_only()
+        .get("task_manager_agent")
+        .expect("task manager definition")
+        .clone();
+    definition.model = tinyagents_definition::ModelSpec::Inherit;
+    let definitions = Arc::new(
+        AgentDefinitionRegistry::builtins_only().with_definitions([definition]),
+    );
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.to_path_buf();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
+    );
+    parent.workspace_dir = workspace.to_path_buf();
+    let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent.clone());
+    tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new(parent.session_id),
+        host,
+    )
 }
 
 fn parent_context(workspace_dir: &Path) -> ParentExecutionContext {
