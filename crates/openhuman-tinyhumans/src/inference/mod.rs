@@ -60,8 +60,7 @@ pub(crate) fn build_chat_model(
         .filter(|model| !model.is_empty())
         .map(str::to_string)
         .or_else(tiers::default_model)
-        .expect("TinyHumans registers its managed default")
-        ;
+        .ok_or_else(|| anyhow::anyhow!("TinyHumans managed inference has no configured model"))?;
     let default_model = request
         .default_model
         .map(str::trim)
