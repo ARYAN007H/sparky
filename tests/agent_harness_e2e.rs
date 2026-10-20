@@ -171,7 +171,7 @@ fn captured_requests_reject_tool_as_unknown(requests: &[Value], tool: &str) -> b
 
 // ─── Fan-out overlap barrier ────────────────────────────────────────────────
 //
-// Only `parallel_subagent_fanout` arms this; every other test leaves it empty
+// Only `concurrent_async_subagents_overlap` arms this; every other test leaves it empty
 // and the handler's fast path is a single `is_empty()` check.
 //
 // The problem it solves: "both workers eventually issued a request" is
@@ -2187,8 +2187,7 @@ async fn concurrent_async_subagents_overlap_inner() {
 /// dispatch_subagent forwards the result; orchestrator synthesizes.
 ///
 /// Depth behavior discovered: vision_agent's agent.toml names only `file_read`
-/// and `image_info` (no spawn_subagent,
-/// spawn_parallel_agents). MAX_SPAWN_DEPTH=3
+/// and `image_info` (no spawn tools). MAX_SPAWN_DEPTH=3
 /// (spawn_depth_context.rs:16) is unreachable with built-in agents; it guards
 /// runtime/workspace agents. The three-level synthesis (user-turn root →
 /// vision_agent subagent → orchestrator synthesis) is the deepest path
