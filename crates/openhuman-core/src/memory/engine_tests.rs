@@ -227,6 +227,17 @@ fn cortexdb_is_off_until_a_key_is_stored_and_rebuilds_on_a_new_key() {
 }
 
 #[test]
+fn cortexdb_key_does_not_report_a_tinyhumans_credential() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.memory.engine = CORTEXDB_ENGINE.to_string();
+    store_cortexdb_key(&config, "cdb-key-only").unwrap();
+
+    assert!(has_key(&config, CORTEXDB_ENGINE));
+    assert!(!has_key(&config, TINYHUMANS_ENGINE));
+}
+
+#[test]
 fn switching_observed_actor_rebuilds_the_cortexdb_engine() {
     let _stable = CACHE_STABLE
         .write()

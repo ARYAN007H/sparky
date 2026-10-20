@@ -523,3 +523,84 @@ async fn an_interrupted_retry_resumes_its_real_legacy_row() {
     assert!(!file.retrying);
     assert_reference_contains(&engine, "resumed retry body").await;
 }
+
+#[tokio::test]
+async fn peer_slot_contention_preserves_interrupted_import_for_later_resume() {
+    #[derive(Clone, Copy)]
+    enum Peer {
+        Migration,
+        Backfill,
+    }
+
+    for peer in [Peer::Migration, Peer::Backfill] {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = config_in(&tmp);
+        let engine = bind_reference(&config);
+        legacy_document(
+            &config,
+            "resume-after-peer-slot",
+            "Resume after peer slot",
+            "legacy body resumed after peer slot",
+        );
+        let workspace = config.workspace_dir.clone();
+        let peer_guard = match peer {
+            Peer::Migration => crate::memory::run_slots::reserve(
+                &crate::memory::run_slots::MIGRATION,
+                &workspace,
+                &[
+                    &crate::memory::run_slots::IMPORT,
+                    &crate::memory::run_slots::BACKFILL,
+                ],
+            ),
+            Peer::Backfill => crate::memory::run_slots::reserve(
+                &crate::memory::run_slots::BACKFILL,
+                &workspace,
+                &[
+                    &crate::memory::run_slots::IMPORT,
+                    &crate::memory::run_slots::MIGRATION,
+                ],
+            ),
+        }
+        .expect("peer owns its real driver slot");
+        let mut interrupted = ImportFile::default();
+        interrupted.state.phase = ImportPhase::Running;
+        interrupted.state.total = 1;
+        let store = StateKvCheckpointStore::new(&workspace);
+        store.save(&interrupted).unwrap();
+
+        assert!(
+            !resume_interrupted_with(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                &config,
+                Arc::new(|| false),
+                Arc::new(|_: &Config| true),
+            )
+            .await,
+            "peer contention must defer this resume"
+        );
+        assert_eq!(
+            store.load(),
+            interrupted,
+            "peer contention must leave the resumable checkpoint unchanged"
+        );
+
+        drop(peer_guard);
+        assert!(
+            resume_interrupted_with(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                &config,
+                Arc::new(|| false),
+                Arc::new(|_: &Config| true),
+            )
+            .await,
+            "the import resumes once the peer slot is released"
+        );
+        let done = wait_for_host_import(&config).await;
+        assert_eq!(done.imported, 1);
+        assert_eq!(done.failed, 0);
+        let final_file = store.load();
+        assert_eq!(final_file.state.phase, ImportPhase::Done);
+        assert_eq!(final_file.checkpoint.documents.as_deref(), Some("resume-after-peer-slot"));
+        assert_reference_contains(&engine, "legacy body resumed after peer slot").await;
+    }
+}
