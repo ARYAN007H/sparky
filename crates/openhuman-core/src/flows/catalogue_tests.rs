@@ -16,15 +16,19 @@ fn node(id: &str, kind: NodeKind, config: serde_json::Value) -> Node {
     }
 }
 
+fn graph(nodes: Vec<Node>) -> serde_json::Value {
+    serde_json::json!({
+        "nodes": serde_json::to_value(nodes).unwrap(),
+        "edges": []
+    })
+}
+
 fn flow(name: &str, enabled: bool, nodes: Vec<Node>) -> Flow {
     Flow {
         id: "flow-abc-123".to_string(),
         name: name.to_string(),
         enabled,
-        graph: serde_json::json!({
-            "nodes": serde_json::to_value(nodes).unwrap(),
-            "edges": []
-        }),
+        graph: graph(nodes),
         created_at: String::new(),
         updated_at: String::new(),
         last_run_at: None,
@@ -179,20 +183,22 @@ fn a_saved_flow_reaches_the_catalogue_with_its_real_id() {
     let tmp = TempDir::new().unwrap();
     let config = store_config(&tmp);
 
-    let graph = WorkflowGraph {
-        nodes: vec![
+    let graph = graph(vec![
             node(
                 "t",
                 NodeKind::Trigger,
                 serde_json::json!({ "trigger_kind": "manual" }),
             ),
             node("a", NodeKind::Agent, serde_json::json!({})),
-        ],
-        ..Default::default()
-    };
-    let saved =
-        super::super::store::create_flow(&config, "Weekly Report".to_string(), graph, false, true)
-            .expect("flow saves");
+        ]);
+    let saved = super::super::store::create_flow(
+        &config,
+        "Weekly Report".to_string(),
+        graph,
+        false,
+    )
+    .expect("flow saves")
+    .workflow;
 
     let entries = flow_entries(&config);
     assert_eq!(entries.len(), 1, "the saved flow must appear: {entries:?}");
@@ -214,16 +220,13 @@ fn entries_are_sorted_by_name_so_the_prompt_prefix_is_stable() {
     // unrelated to the conversation.
     let tmp = TempDir::new().unwrap();
     let config = store_config(&tmp);
-    let graph = WorkflowGraph {
-        nodes: vec![node(
+    let graph = graph(vec![node(
             "trigger",
             NodeKind::Trigger,
             serde_json::json!({ "trigger_kind": "manual" }),
-        )],
-        ..Default::default()
-    };
+        )]);
     for name in ["Zebra", "Alpha", "Mango"] {
-        super::super::store::create_flow(&config, name.to_string(), graph.clone(), false, true)
+        super::super::store::create_flow(&config, name.to_string(), graph.clone(), false)
             .expect("flow saves");
     }
     let names: Vec<String> = flow_entries(&config).into_iter().map(|e| e.name).collect();

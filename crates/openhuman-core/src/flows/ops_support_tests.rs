@@ -1,12 +1,11 @@
 use super::*;
 
 // compute_approval_manifest (save-time pre-authorization card)
-pub(super) fn manifest_graph() -> WorkflowGraph {
-    structurally_valid_graph(manifest_graph_json())
+pub(super) fn manifest_graph() -> Value {
+    manifest_graph_json()
 }
 
-/// The same fixture in its wire form, for the RPCs that take a candidate
-/// `graph` payload rather than a deserialized [`WorkflowGraph`].
+/// The fixture as TinyFlows' normalized graph JSON, as required by the bus.
 pub(super) fn manifest_graph_json() -> Value {
     json!({
         "name": "manifest-fixture",
