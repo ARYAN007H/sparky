@@ -53,14 +53,8 @@ pub(super) fn spawn_typing_task(
     })
 }
 
-/// Forward agent progress to a provider draft while keeping the updater
-/// attached to the current dispatch worker's cancellation lifecycle.
-pub(super) fn spawn_draft_updater(
-    mut progress: tokio::sync::mpsc::Receiver<AgentProgress>,
-    channel: Arc<dyn Channel>,
-    reply_target: String,
-    draft_id: String,
-) -> tokio_util::task::AbortOnDropHandle<()> {
+/// Build the `[Channel context]` block for a channel turn.
+pub(super) fn build_channel_context_block(msg: &traits::ChannelMessage) -> String {
     tokio_util::task::AbortOnDropHandle::new(tokio::spawn(async move {
         let mut accumulated = String::new();
         let mut last_thinking_update = None;
