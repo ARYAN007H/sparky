@@ -475,8 +475,8 @@ pub(crate) async fn process_channel_runtime_message(
             let error = configured_agent_error.expect("checked configured-agent failure");
             super::native_runner::NativeTurnExecution {
                 result: Err(error),
-                lease: None,
-                progress_failed: false,
+                delivery_succeeded: None,
+                queued: false,
             }
         }
         #[cfg(test)]
@@ -500,21 +500,23 @@ pub(crate) async fn process_channel_runtime_message(
             .map_err(|error| error.to_string());
             super::native_runner::NativeTurnExecution {
                 result,
-                lease: None,
-                progress_failed: false,
+                delivery_succeeded: None,
+                queued: false,
             }
         }
         #[cfg(not(test))]
         None => {
             super::native_runner::NativeTurnExecution {
                 result: Err("channel turn has no configured host agent".to_owned()),
-                lease: None,
-                progress_failed: false,
+                delivery_succeeded: None,
+                queued: false,
             }
         }
     };
-    let _session_lease = execution.lease;
-    let progress_failed = execution.progress_failed;
+    if execution.queued {
+        return;
+    }
+    let native_delivery_succeeded = execution.delivery_succeeded.unwrap_or(false);
     let llm_result = execution.result.map_err(anyhow::Error::msg);
 
     // Wait for draft updater to finish
@@ -545,11 +547,10 @@ pub(crate) async fn process_channel_runtime_message(
                 started_at.elapsed().as_millis(),
                 truncate_with_ellipsis(&response_text, REPLY_LOG_TRUNCATE_CHARS)
             );
-            let delivered = if progress_failed {
-                super::progressive::close_native_reply(&native_reply).await;
-                false
+            let delivered = if native_reply.is_some() {
+                native_delivery_succeeded
             } else {
-                super::progressive::finish_native_reply(&native_reply, &response_text).await
+                false
             };
             if native_reply.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
@@ -594,9 +595,7 @@ pub(crate) async fn process_channel_runtime_message(
                     "  ⚠️ Context window exceeded after {}ms",
                     started_at.elapsed().as_millis()
                 );
-                if progress_failed {
-                    super::progressive::close_native_reply(&native_reply).await;
-                } else {
+                if native_reply.is_none() {
                     let _ = super::progressive::finish_native_reply(&native_reply, error_text).await;
                 }
                 if native_reply.is_none() {
@@ -691,9 +690,7 @@ pub(crate) async fn process_channel_runtime_message(
                     ],
                 );
             }
-            if progress_failed {
-                super::progressive::close_native_reply(&native_reply).await;
-            } else {
+            if native_reply.is_none() {
                 let _ = super::progressive::finish_native_reply(&native_reply, &error_response).await;
             }
             if native_reply.is_none() {

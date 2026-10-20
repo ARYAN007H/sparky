@@ -44,14 +44,6 @@ impl NativeShared {
         f(slots.entry(request_id.to_owned()).or_default())
     }
 
-    fn take_lease(&self, request_id: &str) -> Option<SessionLease> {
-        self.slots
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .get_mut(request_id)
-            .and_then(|slot| slot.lease.take())
-    }
-
     fn record_delivery(&self, request_id: &str, delivered: bool) {
         self.delivery_status
             .lock()
@@ -347,8 +339,6 @@ impl Default for NativeRuntime {
 
 pub(crate) struct NativeTurnExecution {
     pub(crate) result: Result<crate::agent::bus::AgentTurnResponse, String>,
-    pub(crate) lease: Option<SessionLease>,
-    pub(crate) progress_failed: bool,
     pub(crate) delivery_succeeded: Option<bool>,
     pub(crate) queued: bool,
 }
@@ -366,8 +356,6 @@ pub(crate) async fn run(
         Err(error) => {
             return NativeTurnExecution {
                 result: Err(error.to_string()),
-                lease: None,
-                progress_failed: false,
                 delivery_succeeded: None,
                 queued: false,
             };
@@ -394,13 +382,12 @@ pub(crate) async fn run(
     let runner_result = runtime.runner.run(request).await;
     let queued = matches!(runner_result, Err(tinyagents_harness::turn_runner::TurnRunnerError::Queued));
     let result = runner_result.map_err(|error| error.to_string());
-    let slot = runtime
+    runtime
         .shared
         .slots
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&request_id)
-        .unwrap_or_default();
+        .remove(&request_id);
     let result = result.map(|result| {
         let provider = result.data["provider"].as_str().map(str::to_owned);
         let model = result.data["model"].as_str().map(str::to_owned);
@@ -412,8 +399,6 @@ pub(crate) async fn run(
     });
     NativeTurnExecution {
         result,
-        lease: slot.lease,
-        progress_failed: slot.progress_failed,
         delivery_succeeded: runtime.shared.take_delivery(&request_id),
         queued,
     }
