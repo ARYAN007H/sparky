@@ -1,5 +1,5 @@
-use super::*;
 use super::resume_checkpoint_tests::update_parked_run_document_for_test;
+use super::*;
 
 #[tokio::test]
 async fn flows_resume_marks_an_incompatible_legacy_checkpoint_failed() {
@@ -167,4 +167,3 @@ async fn flows_resume_missing_flow_errors() {
     .expect_err("must error");
     assert!(err.contains("not found"));
 }
-

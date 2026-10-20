@@ -323,4 +323,3 @@ async fn flows_resume_allows_a_legacy_row_with_null_graph_hash() {
     .expect("a legacy row with no graph_hash must still resume (unknown treated as allow)");
     assert_eq!(resumed.value["pending_approvals"], json!([]));
 }
-
