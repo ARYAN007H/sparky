@@ -19,6 +19,7 @@ pub(super) async fn open_native_reply(
 /// Captured configured module target for a single inbound conversation.
 /// Opening the progressive handle is deferred until TurnRunner checkout, so a
 /// queued follow-up gets a fresh module handle after it wins admission.
+#[derive(Clone)]
 pub(crate) struct NativeProgressiveTarget {
     object: tinybus::module::ModuleObjectClient,
     channel: tinychannels_bus::channel::ChannelRef,
