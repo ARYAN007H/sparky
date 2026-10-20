@@ -90,6 +90,22 @@ fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     }
 }
 
+fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope {
+    tinychannels_bus::module_remote::RemoteSessionScope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram:bot-a".into()),
+        },
+        conversation: tinychannels_bus::ConversationRef {
+            kind: tinychannels_bus::ConversationKind::Group,
+            id: "room-1".into(),
+            topic_id: Some("topic-3".into()),
+            ..Default::default()
+        },
+        session_key: "prepared-session".into(),
+    }
+}
+
 #[cfg(feature = "modules")]
 async fn module_route_help_response(
     workspace_dir: &Path,
@@ -415,24 +431,45 @@ async fn remote_clear_without_captured_scope_fails_closed() {
         &cancellation,
         None,
         tinychannels_bus::module_remote::RemoteHostRequest::ClearHistory {
-            session_scope: tinychannels_bus::module_remote::RemoteSessionScope {
-                channel: tinychannels_bus::ChannelRef {
-                    id: "telegram".into(),
-                    account_id: Some("telegram:bot-a".into()),
-                },
-                conversation: tinychannels_bus::ConversationRef {
-                    kind: tinychannels_bus::ConversationKind::Group,
-                    id: "room-1".into(),
-                    topic_id: Some("topic-3".into()),
-                    ..Default::default()
-                },
-                session_key: "prepared-session".into(),
-            },
+            session_scope: remote_session_scope(),
         },
     )
     .await;
 
     assert!(result.is_err(), "an unscoped reset must never report success");
+}
+
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn remote_clear_rejects_an_unconfigured_captured_account() {
+    let ctx = runtime_context(std::env::temp_dir().join("remote-clear-account"));
+    let dispatch = ctx.dispatch_ctx();
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let scope = remote_session_scope();
+    let reset_context = crate::channels::host::remote_control::RemoteResetContext {
+        scope: scope.clone(),
+        message: ChannelMessage {
+            channel: "telegram:bot-a".into(),
+            reply_target: "room-1".into(),
+            content: "/new".into(),
+            ..Default::default()
+        },
+        history_key: "legacy-history-key-is-not-used-as-identity".into(),
+    };
+
+    let result = crate::channels::host::remote_control::dispatch_callback(
+        &dispatch,
+        &ctx,
+        &crate::core::runtime::Tenant::default(),
+        &cancellation,
+        Some(&reset_context),
+        tinychannels_bus::module_remote::RemoteHostRequest::ClearHistory {
+            session_scope: scope,
+        },
+    )
+    .await;
+
+    assert!(result.is_err(), "unknown provider account must fail closed");
 }
 
 #[tokio::test]
