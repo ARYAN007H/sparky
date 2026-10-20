@@ -37,26 +37,16 @@ fn build_worker_thread_title_falls_back_when_empty() {
 }
 
 #[test]
-fn parameters_schema_advertises_dedicated_thread_flag() {
+fn parameters_schema_hides_legacy_mode_flags_and_keeps_required_agent_id() {
     let tool = SpawnSubagentTool;
     let schema = tool.parameters_schema();
     let props = schema.get("properties").expect("schema has properties");
-    // The per-toolkit spawn argument went with the integrations specialist.
-    assert!(
-        props.get("toolkit").is_none(),
-        "spawn_subagent must not advertise the removed `toolkit` argument"
-    );
-    let flag = props
-        .get("dedicated_thread")
-        .expect("dedicated_thread advertised");
-    assert_eq!(flag.get("type").and_then(|v| v.as_str()), Some("boolean"));
-    // Must be off by default — workers are an opt-in escape hatch, not
-    // a free upgrade for every spawn.
-    assert!(schema
-        .get("required")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().all(|s| s.as_str() != Some("dedicated_thread")))
-        .unwrap_or(true));
+    for legacy in ["blocking", "dedicated_thread", "archetype", "toolkit"] {
+        assert!(props.get(legacy).is_none(), "legacy `{legacy}` is not advertised");
+    }
+    assert!(schema["required"].as_array().is_some_and(|required| {
+        required.iter().any(|key| key.as_str() == Some("agent_id"))
+    }));
 }
 
 #[test]
@@ -206,22 +196,6 @@ fn classify_subagent_failure_reframes_upstream_provider_outages() {
 }
 
 #[tokio::test]
-async fn dedicated_thread_flag_no_longer_returns_disabled_error() {
-    let _ = AgentDefinitionRegistry::init_global_builtins();
-    let tool = SpawnSubagentTool;
-    let result = tool
-        .execute(json!({
-            "agent_id": "task_manager_agent",
-            "prompt": "find x",
-            "dedicated_thread": true,
-        }))
-        .await
-        .unwrap();
-    assert!(result.is_error);
-    assert!(!result.output().contains("temporarily disabled"));
-}
-
-#[tokio::test]
 async fn legacy_archetype_alias_is_accepted_for_lookup() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let tool = SpawnSubagentTool;
@@ -266,34 +240,16 @@ async fn legacy_archetype_alias_is_normalized_to_agent_id() {
     );
 }
 
-/// B40: with no chat thread bound, async-by-default delegation has nowhere
-/// to deliver a result, so `spawn_subagent` must self-heal to blocking
-/// dispatch rather than forwarding into `spawn_subagent`'s
-/// thread-less guard — otherwise the guard's own advice ("use
-/// `spawn_subagent`") would loop straight back into the guard. Asserted
-/// via which tool owns the downstream error.
-#[tokio::test]
-async fn async_default_self_heals_to_blocking_without_delivery_thread() {
-    let _ = AgentDefinitionRegistry::init_global_builtins();
-    let result = SpawnSubagentTool
-        .execute(json!({
-            "agent_id": "task_manager_agent",
-            "prompt": "work with no delivery thread",
-        }))
-        .await
-        .unwrap();
-
-    let out = result.output();
-    assert!(
-        !out.contains("spawn_subagent"),
-        "thread-less spawn_subagent must not route into the async tool: {out}"
-    );
-    assert!(
-        !out.contains("no parent chat thread"),
-        "thread-less spawn_subagent must not hit the async delivery guard: {out}"
-    );
-    assert!(
-        out.contains("requires a live harness run context"),
-        "a raw tool call must reject missing typed authority: {out}"
-    );
+#[test]
+fn frozen_legacy_mode_arguments_are_accepted_but_ignored() {
+    let args = json!({
+        "agent_id": "task_manager_agent",
+        "prompt": "inspect the frozen-session compatibility route",
+        "blocking": true,
+        "dedicated_thread": true,
+    });
+    let decoded = decode_async_spawn_args(&args);
+    assert_eq!(decoded.agent_id, "task_manager_agent");
+    assert_eq!(decoded.prompt, "inspect the frozen-session compatibility route");
+    assert_eq!(decoded.task_key, durable_task_key_source(&args, &decoded.prompt, None));
 }
