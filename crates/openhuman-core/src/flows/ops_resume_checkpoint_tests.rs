@@ -47,6 +47,50 @@ pub(super) fn update_parked_run_document_for_test(
     assert!(matches!(reply, CatalogStorageReply::Value { .. }));
 }
 
+/// Corrupt a stored flow graph through the host's owner-scoped document port.
+/// The malformed record is used to verify that one broken definition does not
+/// block reconciliation of its valid siblings.
+pub(super) fn corrupt_saved_flow_graph_for_test(config: &Config, flow_id: &str, graph: &str) {
+    use tinyflows_bus::catalog::{
+        self as catalog, CatalogDocumentPrecondition, CatalogStorageReply,
+        CatalogVersionedDocument, DocGetRequest, DocPutRequest,
+    };
+
+    let reply = crate::flows::catalog_storage::call_test_storage::<CatalogStorageReply, _>(
+        config,
+        catalog::storage::GET,
+        (DocGetRequest {
+            collection: "flows.definitions".into(),
+            id: flow_id.to_owned(),
+        },),
+    )
+    .expect("read the module-created flow document");
+    let value = match reply {
+        CatalogStorageReply::Value { value } => value,
+        CatalogStorageReply::Error { error } => panic!("flow fixture read failed: {error:?}"),
+    };
+    let stored: Option<CatalogVersionedDocument> =
+        serde_json::from_value(value).expect("decode the module-created flow document");
+    let mut stored = stored.expect("the flow document must exist");
+    stored.doc["graph"] = Value::String(graph.to_owned());
+
+    let reply = crate::flows::catalog_storage::call_test_storage::<CatalogStorageReply, _>(
+        config,
+        catalog::storage::PUT,
+        (DocPutRequest {
+            collection: "flows.definitions".into(),
+            id: flow_id.to_owned(),
+            doc: stored.doc,
+            precondition: CatalogDocumentPrecondition::Version(stored.version),
+            schema: stored.meta.schema,
+            expires_ms: stored.meta.expires_ms,
+            created_ms: Some(stored.meta.created_ms),
+        },),
+    )
+    .expect("write the corrupt flow fixture through its owner-scoped port");
+    assert!(matches!(reply, CatalogStorageReply::Value { .. }));
+}
+
 /// The success-path mirror of the refusal test above: when nothing rewrites
 /// the flow between park and resume, the recomputed hash matches the pinned
 /// one and the resume proceeds exactly as it did before this guard existed.

@@ -169,7 +169,7 @@ pub(crate) fn call_test_storage<T, A>(
 ) -> anyhow::Result<T>
 where
     T: serde::de::DeserializeOwned + Send + 'static,
-    A: Serialize + Send + 'static,
+    A: Serialize + Send + Sync + 'static,
 {
     let storage = register_blocking(config)?;
     crate::storage::block_on_anyhow(async move {

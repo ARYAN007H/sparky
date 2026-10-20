@@ -140,7 +140,11 @@ async fn reconcile_schedule_triggers_on_boot_survives_a_corrupt_row() {
     flows_set_enabled(&config, &bad.value.id, true)
         .await
         .unwrap();
-    store::force_corrupt_graph_json_for_test(&config, &bad.value.id, "{ not valid json").unwrap();
+    super::resume_checkpoint_tests::corrupt_saved_flow_graph_for_test(
+        &config,
+        &bad.value.id,
+        "{ not valid json",
+    );
 
     // Remove the cron job `flows_set_enabled` already bound for the good flow
     // above, so the post-reconcile assertion proves
