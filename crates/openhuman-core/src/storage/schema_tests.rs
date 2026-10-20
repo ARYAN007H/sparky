@@ -35,3 +35,27 @@ fn module_items_are_the_owners_module_scoped_declarations() {
     assert!(mcp.streams.iter().any(|name| name == "mcp.audit"));
     assert!(module_items("no-such-owner").collections.is_empty());
 }
+
+#[test]
+fn tiny_artifacts_blob_namespace_is_in_the_composed_owner_schema() {
+    let registry = registry().expect("the owners compose");
+    assert!(registry.owners().any(|owner| owner == "artifacts"));
+
+    let schema = owner_schemas()
+        .into_iter()
+        .find(|schema| schema.owner.as_str() == "artifacts" && schema.items.iter().any(|item| {
+            matches!(
+                item,
+                Item::Blobs {
+                    prefix,
+                    scope: ScopeClass::Tenant,
+                } if prefix == "artifacts/files/"
+            )
+        }))
+        .expect("TinyArtifacts declares its tenant blob prefix alongside host artifact data");
+    assert!(schema.items.iter().any(|item| matches!(
+        item,
+        Item::Blobs { prefix, scope: ScopeClass::Tenant }
+            if prefix == "artifacts/files/"
+    )));
+}

@@ -34,6 +34,7 @@ pub fn owner_schemas() -> Vec<Schema> {
         crate::desktop::notifications::storage_schema(),
         crate::integrations::task_sources::storage_schema(),
         crate::artifacts::storage_schema(),
+        tiny_artifacts::storage_schema(),
         crate::platform::cost::storage_schema(),
         crate::config::schema::config_storage_schema(),
         crate::profiles::storage_schema(),
