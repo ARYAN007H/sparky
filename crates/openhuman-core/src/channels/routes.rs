@@ -1,6 +1,5 @@
 //! Per-sender routing and runtime command handling.
 
-#[cfg(test)]
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
