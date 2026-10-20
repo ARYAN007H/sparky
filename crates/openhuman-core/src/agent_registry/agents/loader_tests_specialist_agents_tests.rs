@@ -270,6 +270,23 @@ fn orchestrator_routes_every_registered_specialist_through_spawn_subagent() {
             let SubagentEntry::AgentId(agent_id) = entry else {
                 continue;
             };
+            if agent_id == "presentation_agent" && !cfg!(feature = "documents") {
+                assert!(
+                    registry.get(agent_id).is_none(),
+                    "presentation_agent is intentionally absent without documents"
+                );
+                assert!(
+                    !allowed
+                        .iter()
+                        .any(|candidate| candidate.as_str() == Some(agent_id)),
+                    "spawn_subagent must not advertise presentation_agent without documents"
+                );
+                continue;
+            }
+            assert!(
+                registry.get(agent_id).is_some(),
+                "orchestrator specialist `{agent_id}` must be registered"
+            );
             assert!(
                 allowed
                     .iter()
