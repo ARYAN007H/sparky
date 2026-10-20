@@ -14,7 +14,7 @@ fn all_builtins_parse() {
 /// Pins the `presentation_agent` compile-time gate, both directions: it is
 /// registered under the `documents` feature (its `generate_presentation`
 /// deck tool lives there) and filtered out of the registry without it, so
-/// slim builds never advertise `make_presentation` with no tool to fulfil it.
+/// slim builds never advertise a presentation specialist with no deck tool.
 #[cfg(feature = "documents")]
 #[test]
 fn presentation_agent_registered_when_documents_on() {
