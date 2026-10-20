@@ -1,8 +1,8 @@
 use super::*;
 
 #[tokio::test]
-async fn continue_subagent_resumes_paused_job_through_shared_driver() {
-    use crate::agent::orchestration::tools::{ContinueSubagentTool, SpawnSubagentTool};
+async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_driver() {
+    use crate::agent::orchestration::tools::SpawnSubagentTool;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
@@ -33,6 +33,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
                 "agent_id": "task_manager_agent",
                 "prompt": "Investigate the pause-resume fixture",
                 "model": "test-model",
+                "task_key": "pause-resume-fixture",
                 "blocking": true
             }),
             None,
@@ -64,12 +65,13 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .expect("initial pause is registered in shared Jobs");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
 
-    let resumed = ContinueSubagentTool::new()
+    let resumed = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
-                "task_id": task_id,
                 "agent_id": "task_manager_agent",
-                "message": "Inspect the README and continue."
+                "prompt": "Inspect the README and continue.",
+                "model": "test-model",
+                "task_key": "pause-resume-fixture"
             }),
             None,
             live.data.child(),
