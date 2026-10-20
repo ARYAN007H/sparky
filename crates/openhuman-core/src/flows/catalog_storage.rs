@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use serde::Serialize;
@@ -44,10 +45,6 @@ impl DocScope {
         RegistrationKey {
             workspace_dir: self.workspace_dir.clone(),
             scope: self.scope.as_str().to_owned(),
-            backend: self
-                .backend
-                .as_ref()
-                .map(|backend| Arc::as_ptr(backend) as *const () as usize),
         }
     }
 
@@ -66,7 +63,6 @@ impl DocScope {
 struct RegistrationKey {
     workspace_dir: PathBuf,
     scope: String,
-    backend: Option<usize>,
 }
 
 /// One scope's process-lifetime callback registration. TinyFlows uses this
@@ -135,12 +131,32 @@ pub(crate) async fn register_backend_scope(
     backend: Arc<dyn StorageBackend>,
     scope: Scope,
 ) -> Result<Arc<CatalogStorageRegistration>, String> {
-    register_scope(DocScope {
+    static NEXT_MIGRATION_REGISTRATION: AtomicU64 = AtomicU64::new(1);
+    let documents = DocScope {
         workspace_dir: config.workspace_dir.clone(),
         scope,
         backend: Some(backend),
-    })
-    .await
+    };
+    let nonce = NEXT_MIGRATION_REGISTRATION.fetch_add(1, Ordering::Relaxed);
+    let path = format!("{}m{nonce}", path_for(&documents.key()));
+    let runtime = crate::modules::runtime::runtime()
+        .await
+        .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+    runtime
+        .spawn(async move {
+            let served =
+                module::serve_registered(path.clone(), CatalogStoragePort { scope: documents })
+                    .await?;
+            Ok(Arc::new(CatalogStorageRegistration {
+                address: CallbackAddress {
+                    destination: module::HOST_BUS_NAME.to_owned(),
+                    object_path: path,
+                },
+                _served: served,
+            }))
+        })
+        .await
+        .map_err(|error| format!("CatalogStorage migration registration task did not finish: {error}"))?
 }
 
 async fn register_scope(
