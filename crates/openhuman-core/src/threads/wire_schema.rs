@@ -8,6 +8,12 @@ use crate::threads::rpc_models::{
     PurgeConversationThreadsResponse,
 };
 
+#[derive(JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RunLedgerGetWireResponse {
+    pub run: Option<tinyagents_session::run_ledger::types::AgentRun>,
+}
+
 /// Root schema whose properties provide the UI-facing thread record aliases.
 #[derive(JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -20,10 +26,15 @@ pub struct ThreadWireTypes {
     pub purge_result: PurgeConversationThreadsResponse,
     pub thread_search_hit: super::ops::ThreadSearchHit,
     pub thread_search: super::ops::ThreadSearchResponse,
-    pub turn_state: tinyagents_session::turn_state::types::TurnState,
+    pub get_turn_state: super::turn_state::rpc_types::GetTurnStateResponse,
+    pub list_turn_states: super::turn_state::rpc_types::ListTurnStatesResponse,
+    pub clear_turn_state: super::turn_state::rpc_types::ClearTurnStateResponse,
     pub agent_run: tinyagents_session::run_ledger::types::AgentRun,
     pub run_event: tinyagents_session::run_ledger::types::RunEvent,
     pub run_telemetry: tinyagents_session::run_ledger::types::RunTelemetry,
+    pub agent_run_list: tinyagents_session::run_ledger::types::AgentRunListResponse,
+    pub agent_run_get: RunLedgerGetWireResponse,
+    pub run_event_list: tinyagents_session::run_ledger::types::RunEventListResponse,
 }
 
 /// Serialize the authoritative core/session record schemas for TypeScript codegen.
