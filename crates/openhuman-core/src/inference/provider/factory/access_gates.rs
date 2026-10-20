@@ -28,11 +28,12 @@ pub(super) fn external_provider_label(provider: &str) -> String {
     }
     // A concrete external route exposes just its provider slug.
     if let Some(route) = ProviderRoute::parse(p) {
-        if route.is_external()
-            && let RouteKind::Cloud { slug } = route.kind()
-            && !slug.trim().is_empty()
-        {
-            return slug.trim().to_string();
+        if route.is_external() {
+            if let RouteKind::Cloud { slug } = route.kind() {
+                if !slug.trim().is_empty() {
+                    return slug.trim().to_string();
+                }
+            }
         }
     }
     p.to_string()

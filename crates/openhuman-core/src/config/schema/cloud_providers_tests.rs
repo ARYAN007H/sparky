@@ -1,8 +1,6 @@
 //! Tests for the surrounding module.
 
-use super::{
-    builtin_cloud_providers, builtin_presets, is_slug_reserved, AuthStyle,
-};
+use super::{builtin_cloud_providers, builtin_presets, is_slug_reserved, AuthStyle};
 use tinyinference_providers::builtin::endpoint_host;
 
 #[test]
@@ -104,7 +102,10 @@ fn builtin_cloud_provider_slugs_are_unique() {
 #[test]
 fn is_builtin_cloud_slug_matches_presets_only() {
     for slug in ["openai", "deepseek", "groq", "mistral"] {
-        assert!(builtin_presets().is_builtin_cloud_slug(slug), "{slug} is a built-in preset");
+        assert!(
+            builtin_presets().is_builtin_cloud_slug(slug),
+            "{slug} is a built-in preset"
+        );
     }
     for slug in ["my-proxy", "custom-openai", "totally-unknown", ""] {
         assert!(
@@ -172,16 +173,21 @@ fn hosted_presets_and_classification_are_context_scoped() {
         assert_eq!(presets[0].label, "Tenant Hosted");
         assert_eq!(presets[0].endpoint, "https://tenant.example/v1");
         assert!(presets.iter().any(|preset| preset.slug == "openai"));
-        assert_eq!(presets.iter().filter(|preset| preset.slug == "openai").count(), 1);
+        assert_eq!(
+            presets
+                .iter()
+                .filter(|preset| preset.slug == "openai")
+                .count(),
+            1
+        );
         assert_eq!(
             super::builtin_cloud_provider("openai").unwrap().endpoint,
             "https://api.openai.com/v1",
             "host additions must not replace a generic provider"
         );
         assert!(super::builtin_presets().host_is_builtin_cloud_provider("tenant.example"));
-        assert!(super::builtin_presets().endpoint_host_is_chat_completions_only(
-            "https://tenant.example/v1"
-        ));
+        assert!(super::builtin_presets()
+            .endpoint_host_is_chat_completions_only("https://tenant.example/v1"));
         assert!(super::builtin_cloud_provider("tenant-hosted").is_some());
         assert!(super::is_hosted_cloud_identity("tenant-hosted"));
         assert!(!super::is_hosted_auth_style(AuthStyle::Bearer));
@@ -277,9 +283,8 @@ fn host_is_builtin_cloud_provider_recognises_inference_hosts() {
 /// the slug is not builtin.
 #[test]
 fn nvidia_host_is_chat_completions_only_regardless_of_slug() {
-    assert!(builtin_presets().endpoint_host_is_chat_completions_only(
-        "https://integrate.api.nvidia.com/v1"
-    ));
+    assert!(builtin_presets()
+        .endpoint_host_is_chat_completions_only("https://integrate.api.nvidia.com/v1"));
     // Other chat-only built-in hosts too.
     for endpoint in [
         "https://api.deepseek.com/v1",
@@ -297,9 +302,7 @@ fn nvidia_host_is_chat_completions_only_regardless_of_slug() {
 fn openai_host_and_unknown_proxies_keep_the_responses_fallback() {
     // OpenAI's first-party host serves /responses — must NOT be gated off,
     // even via a custom proxy slug pointed at it.
-    assert!(!builtin_presets().endpoint_host_is_chat_completions_only(
-        "https://api.openai.com/v1"
-    ));
+    assert!(!builtin_presets().endpoint_host_is_chat_completions_only("https://api.openai.com/v1"));
     // Genuinely unknown proxy hosts keep the permissive default (they may be
     // real OpenAI proxies that implement /responses).
     for endpoint in [
@@ -326,7 +329,8 @@ fn host_gate_agrees_with_slug_capability_for_every_builtin() {
         if provider.auth_style != AuthStyle::Bearer {
             continue;
         }
-        let host_chat_only = builtin_presets().endpoint_host_is_chat_completions_only(provider.endpoint);
+        let host_chat_only =
+            builtin_presets().endpoint_host_is_chat_completions_only(provider.endpoint);
         let slug_supports = builtin_presets().builtin_cloud_supports_responses_api(provider.slug);
         assert_eq!(
             host_chat_only, !slug_supports,
