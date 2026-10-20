@@ -1,5 +1,6 @@
 use anyhow::Result;
 use tinyagents_runtime::{ResumeMode, SessionTurnRequest, TurnOptions};
+use tinyinference_llm::message::Message;
 
 use crate::agent::{
     message_convert::user_message_from_text, session_host::types::OpenHumanSessionHost,
@@ -31,6 +32,30 @@ impl OpenHumanSessionHost {
         origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
         approval: crate::security::approval::ApprovalTurnContext,
     ) -> Result<String> {
+        self.turn_with_approval_input(user_message, None, origin, approval)
+            .await
+    }
+
+    /// Dispatch a turn whose media parts were resolved by the trusted host
+    /// against the exact persisted row immediately before execution.
+    pub(crate) async fn turn_with_approval_and_message(
+        &mut self,
+        user_message: &str,
+        input: Message,
+        origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
+        approval: crate::security::approval::ApprovalTurnContext,
+    ) -> Result<String> {
+        self.turn_with_approval_input(user_message, Some(input), origin, approval)
+            .await
+    }
+
+    async fn turn_with_approval_input(
+        &mut self,
+        user_message: &str,
+        input: Option<Message>,
+        origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
+        approval: crate::security::approval::ApprovalTurnContext,
+    ) -> Result<String> {
         // The turn's context is bound once, here, before the runtime session
         // snapshots the host environment: the one ambient read at the turn
         // boundary, for a host that did not hand a context over.
@@ -38,7 +63,12 @@ impl OpenHumanSessionHost {
             self.host_env.core = crate::core::runtime::DispatchCtx::ambient().downgrade();
         }
         self.ensure_runtime_session()?;
-        let staged = super::attachment_input::stage_turn(self, user_message, origin).await?;
+        let input = match input {
+            Some(input) => input,
+            None => user_message_from_text(
+                super::attachment_input::stage_turn(self, user_message, origin).await?.as_str(),
+            ),
+        };
         let mut context = OpenHumanRunContext::new().with_host_env(&self.host_env);
         context.untrusted_input_turn = self.untrusted_input;
         context.origin = origin.cloned();
@@ -135,7 +165,7 @@ impl OpenHumanSessionHost {
             .as_mut()
             .expect("runtime session initialized")
             .turn(
-                SessionTurnRequest::new(user_message_from_text(staged.as_str())),
+                SessionTurnRequest::new(input),
                 options,
             );
         let outcome = Box::pin(turn)
