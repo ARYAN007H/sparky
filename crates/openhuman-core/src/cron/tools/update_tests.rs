@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-use crate::agent::turn_origin::AgentTurnOrigin;
+use crate::security::turn_origin::AgentTurnOrigin;
 use crate::config::Config;
 use tempfile::TempDir;
 use tinyagents_harness::{context::RunConfig, ids::CallId, tool::ToolExecutionContext};

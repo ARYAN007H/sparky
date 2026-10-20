@@ -3,7 +3,7 @@ use super::*;
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn cold_flow_prompt_uses_the_module_and_warm_resume_does_not_refetch() {
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let temp = tempfile::tempdir().expect("workspace");
     let config = crate::config::Config {
@@ -67,7 +67,7 @@ async fn explicit_flow_session_prompt_override_does_not_require_tinyflows_or_con
         ..Default::default()
     };
     let mut definition =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
             .get("workflow_builder")
             .expect("workflow_builder builtin")
             .clone();
