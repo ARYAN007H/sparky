@@ -1168,6 +1168,10 @@ pub(crate) use schema_test_support::*;
 mod bound_controller_tests;
 
 #[cfg(test)]
+#[path = "all_profiles_controller_tests.rs"]
+mod profiles_controller_tests;
+
+#[cfg(test)]
 #[path = "all_schema_contract_tests.rs"]
 mod schema_contract_tests;
 
