@@ -44,11 +44,10 @@ pub(super) fn to_module(error: MemoryError) -> lm::Error {
         MemoryError::Unsupported(message) => EngineError::Unsupported(message).into(),
         MemoryError::Unauthorized(message) => EngineError::Unauthorized(message).into(),
         MemoryError::Unavailable(message) => EngineError::Unavailable(message).into(),
-        // The backend's `[CODE] ` prefix stays on the message, which is how
-        // the module tells an exhausted balance.
-        MemoryError::InsufficientCredits(message) | MemoryError::Engine(message) => {
-            EngineError::Engine(message).into()
+        MemoryError::InsufficientCredits(message) => {
+            EngineError::InsufficientCredits(message).into()
         }
+        MemoryError::Engine(message) => EngineError::Engine(message).into(),
         MemoryError::ConfigConflict(error) => EngineError::Engine(error.message).into(),
     }
 }
