@@ -176,7 +176,10 @@ pub(crate) async fn build_builder_proposal(
     tracing::info!(
         target: "flows",
         %name,
-        node_count = graph.get("nodes").and_then(Value::as_array).map_or(0, Vec::len),
+        node_count = graph
+            .get("nodes")
+            .and_then(serde_json::Value::as_array)
+            .map_or(0, Vec::len),
         require_approval,
         warning_count = warnings.len(),
         revision,

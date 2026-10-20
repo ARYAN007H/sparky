@@ -5,7 +5,7 @@
 
 use crate::config::Config;
 use crate::core::events::DomainEvent;
-use crate::flows::{catalog_storage, store};
+use crate::flows::catalog_storage;
 use crate::memory::types::{ForgetParams, ItemsListParams, MAX_LIMIT};
 use async_trait::async_trait;
 use std::sync::Arc;
