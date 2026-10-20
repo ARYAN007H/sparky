@@ -16,6 +16,7 @@ use sha2::Digest;
 use tinymemory_tools::layout_migration::{LegacyClaim, Result as ModuleResult};
 
 use super::app_host::to_module;
+use crate::memory::error::MemoryError;
 use tinymemory_api::{Error, Result};
 
 /// Where a legacy tree's marker lives and who would own it.
@@ -129,11 +130,13 @@ pub fn take(key: &ClaimKey) -> Result<bool> {
 
 impl LegacyClaim for ClaimKey {
     fn held_by_other(&self) -> ModuleResult<bool> {
-        held_by_other(self).map_err(to_module)
+        held_by_other(self)
+            .map_err(MemoryError::from)
+            .map_err(to_module)
     }
 
     fn take(&self) -> ModuleResult<bool> {
-        take(self).map_err(to_module)
+        take(self).map_err(MemoryError::from).map_err(to_module)
     }
 }
 

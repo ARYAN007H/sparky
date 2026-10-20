@@ -23,7 +23,7 @@ use tinymemory_tools::layout_migration as lm;
 use super::app_host::{from_module, AppHost};
 use super::{LayoutHost, MigrationState, MigrationStatus, ScanView, Trigger};
 use crate::config::Config;
-use tinymemory_api::Result;
+use crate::memory::error::MemoryResult;
 
 /// Workspaces with a migration running now.
 static RUNNING: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
@@ -42,7 +42,7 @@ pub struct StartParams {
 ///
 /// When the state cannot be read, the engines cannot be bound, or the legacy
 /// tree cannot be read.
-pub async fn scan(host: &dyn LayoutHost) -> Result<ScanView> {
+pub async fn scan(host: &dyn LayoutHost) -> MemoryResult<ScanView> {
     lm::scan(host).await.map_err(from_module)
 }
 
@@ -51,7 +51,7 @@ pub async fn scan(host: &dyn LayoutHost) -> Result<ScanView> {
 /// # Errors
 ///
 /// When the state file cannot be read.
-pub fn status(config: &Config) -> Result<MigrationStatus> {
+pub fn status(config: &Config) -> MemoryResult<MigrationStatus> {
     lm::status(&AppHost::new(config.clone()), is_running(config)).map_err(from_module)
 }
 
@@ -126,7 +126,7 @@ pub fn start(
 /// # Errors
 ///
 /// When the state cannot be read or saved, or a run is going now.
-pub fn retry(config: &Config) -> Result<MigrationState> {
+pub fn retry(config: &Config) -> MemoryResult<MigrationState> {
     lm::retry(&AppHost::new(config.clone()), is_running(config)).map_err(from_module)
 }
 

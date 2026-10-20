@@ -56,8 +56,8 @@ fn memory_error_string_encodes_the_structured_error() {
 #[test]
 fn typed_credit_errors_are_account_wide_but_other_engine_errors_are_not() {
     use tinymemory_api::Error as E;
-    let credits = MemoryError::from(E::Engine(
-        "[USER_INSUFFICIENT_CREDITS] memory API recall on h: the account has insufficient credits (HTTP 402)".into(),
+    let credits = MemoryError::from(E::InsufficientCredits(
+        "memory API recall on h: the account has insufficient credits (HTTP 402)".into(),
     ));
     assert_eq!(credits.code(), INSUFFICIENT_CREDITS);
     assert!(credits.is_account_wide());
@@ -79,6 +79,10 @@ fn recall_skip_reasons_recover_only_account_wide_refusals() {
         |reason: &str| MemoryError::refusal_from_skip_reason(reason).map(|error| error.code());
     assert_eq!(
         code("engine error: [USER_INSUFFICIENT_CREDITS] memory API fetch (HTTP 402)"),
+        Some(INSUFFICIENT_CREDITS)
+    );
+    assert_eq!(
+        code("insufficient credits: memory API fetch (HTTP 402)"),
         Some(INSUFFICIENT_CREDITS)
     );
     assert_eq!(code("unavailable: connection refused"), Some(UNAVAILABLE));

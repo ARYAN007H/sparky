@@ -120,7 +120,9 @@ pub async fn recall(
         params.filter,
         &allowed_reach(config, identity),
     )?);
-    ops::recall(config, params).await
+    ops::recall(config, params)
+        .await
+        .map_err(MemoryError::from)
 }
 
 /// `memory_fetch`, confined.
@@ -137,7 +139,9 @@ pub async fn fetch(
         params.filter,
         &allowed_reach(config, identity),
     )?);
-    ops::fetch(config, params).await
+    ops::fetch(config, params)
+        .await
+        .map_err(MemoryError::from)
 }
 
 /// `memory_learn`, confined: the learning lands inside the caller's layout.
@@ -151,7 +155,9 @@ pub async fn learn(
     mut params: LearnParams,
 ) -> MemoryResult<LearnView> {
     params.meta = Some(confine_learn_meta(config, identity, params.meta)?);
-    ops::learn(config, params, None).await
+    ops::learn(config, params, None)
+        .await
+        .map_err(MemoryError::from)
 }
 
 /// `memory_forget`, confined: an id outside the caller's root is not
@@ -169,7 +175,9 @@ pub async fn forget(
         params.reach,
         &allowed_reach(config, identity),
     )?);
-    ops::forget(config, params).await
+    ops::forget(config, params)
+        .await
+        .map_err(MemoryError::from)
 }
 
 /// `memory_items_list`, confined. The explorer path narrows first (a
@@ -190,7 +198,9 @@ pub async fn items_list(
         &allowed_reach(config, identity),
     )?);
     params.path = Vec::new();
-    ops::items_list(config, params).await
+    ops::items_list(config, params)
+        .await
+        .map_err(MemoryError::from)
 }
 
 /// `memory_explore`, confined like [`items_list`].
@@ -210,7 +220,9 @@ pub async fn explore(
         &allowed_reach(config, identity),
     )?);
     params.path = Vec::new();
-    explore::explore(config, params).await
+    explore::explore(config, params)
+        .await
+        .map_err(MemoryError::from)
 }
 
 /// `memory_items_get`, confined: an id outside the caller's root reads as
@@ -229,9 +241,11 @@ pub async fn items_get(
         params.reach,
         &allowed_reach(config, identity),
     )?);
-    explore::items_get(config, params).await
+    explore::items_get(config, params)
+        .await
+        .map_err(MemoryError::from)
 }
 
 #[cfg(test)]
-#[path = "confine_tests.rs"]
+#[path = "confinement_tests.rs"]
 mod tests;

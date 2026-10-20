@@ -103,7 +103,10 @@ impl lm::LayoutHost for AppHost {
     async fn switch(&self) -> lm::Result<()> {
         // This person's own config file, loaded fresh: never the active
         // account's (someone else's after an account switch mid-move).
-        scope::switch_to_v3(&self.config).await.map_err(to_module)
+        scope::switch_to_v3(&self.config)
+            .await
+            .map_err(MemoryError::from)
+            .map_err(to_module)
     }
 
     async fn free_now(&self) -> bool {
