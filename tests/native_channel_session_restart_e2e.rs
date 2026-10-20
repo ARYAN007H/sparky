@@ -626,18 +626,22 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         5,
         "each Telegram update must reach the model once"
     );
+    let reset_chat_request = requests
+        .iter()
+        .find(|request| model_saw_user_text(request, RESET_AFTER_RESTART_TEXT))
+        .expect("post-reset chat 42 update reached the model");
     assert!(
-        model_saw_user_text(&requests[3], AFTER_RESET_TEXT),
+        model_saw_user_text(reset_chat_request, AFTER_RESET_TEXT),
         "chat 42 must resume its post-reset transcript after process restart; got {}",
-        serde_json::to_string_pretty(&requests[3]).unwrap()
+        serde_json::to_string_pretty(reset_chat_request).unwrap()
     );
-    assert!(
-        model_saw_user_text(&requests[3], RESET_AFTER_RESTART_TEXT),
-        "the resumed chat 42 request must include its current message"
-    );
-    assert!(!model_saw_user_text(&requests[3], FIRST_TEXT));
-    assert!(!model_saw_user_text(&requests[3], OTHER_CHAT_TEXT));
-    assert!(model_saw_user_text(&requests[4], OTHER_CHAT_TEXT));
+    assert!(!model_saw_user_text(reset_chat_request, FIRST_TEXT));
+    assert!(!model_saw_user_text(reset_chat_request, OTHER_CHAT_TEXT));
+    let other_chat_request = requests
+        .iter()
+        .find(|request| model_saw_user_text(request, OTHER_AFTER_RESTART_TEXT))
+        .expect("post-restart chat 43 update reached the model");
+    assert!(model_saw_user_text(other_chat_request, OTHER_CHAT_TEXT));
     assert!(model_saw_user_text(&requests[4], OTHER_AFTER_RESTART_TEXT));
     assert!(!model_saw_user_text(&requests[4], FIRST_TEXT));
     assert!(!model_saw_user_text(&requests[4], AFTER_RESET_TEXT));
