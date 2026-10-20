@@ -39,8 +39,8 @@ const LEGACY_LIMIT_ENTRIES = [
   // oversized files are pinned at the size they had when enforcement began.
   ["crates/openhuman-core/src/core/all.rs", 1114],
   ["crates/openhuman-core/src/core/all_tests.rs", 1465],
-  ["crates/openhuman-core/src/core/events.rs", 1703],
-  ["crates/openhuman-core/src/core/events_tests.rs", 997],
+  ["crates/openhuman-core/src/core/events.rs", 1697],
+  ["crates/openhuman-core/src/core/events_tests.rs", 988],
   ["crates/openhuman-core/src/core/observability.rs", 3429],
 ];
 const LEGACY_LIMITS = new Map(LEGACY_LIMIT_ENTRIES);
