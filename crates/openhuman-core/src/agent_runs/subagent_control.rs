@@ -239,7 +239,10 @@ async fn settle_paused_driver_cancel(
             Some(reason) => format!("cancelled by user. Reason: {reason}"),
             None => "cancelled by user".to_string(),
         };
-        let parent_epoch = paused.parent_thread_id.as_ref().map(|_| parent_epoch.unwrap_or(0));
+        let parent_epoch = paused
+            .parent_thread_id
+            .as_ref()
+            .map(|_| parent_epoch.unwrap_or(0));
         background_completions::record_outcome_with_parent_epoch(
             ctx,
             &paused.workspace_dir,

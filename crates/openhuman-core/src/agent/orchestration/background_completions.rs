@@ -304,7 +304,6 @@ pub(crate) async fn record_outcome_with_parent_epoch(
     }
 }
 
-
 async fn record_completion_record(
     ctx: &DispatchCtx,
     workspace_dir: &Path,

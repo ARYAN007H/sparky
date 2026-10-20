@@ -387,7 +387,13 @@ async fn transient_parent_admission_failure_does_not_permanently_delete_thread()
         "retryable-parent",
         "accepted-child",
     ));
-    record_admitted(w, "retryable-session", "accepted-child", "recovered", "retryable-parent");
+    record_admitted(
+        w,
+        "retryable-session",
+        "accepted-child",
+        "recovered",
+        "retryable-parent",
+    );
     assert_eq!(pending_ids(w, "retryable-parent"), ["accepted-child"]);
 }
 
