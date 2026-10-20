@@ -67,10 +67,9 @@ fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope
 
 fn seed_session(core: &CoreContext, workspace: &Path, key: &str, agent_id: &str) -> SessionRef {
     let session = SessionRef::scoped(key, agent_id);
-    let history =
-        crate::agent::session_store::transcripts_or_files_in(core, agent_id, workspace)
-            .open_session(&session, transcript_meta(key, agent_id))
-            .unwrap();
+    let history = crate::agent::session_store::transcripts_or_files_in(core, agent_id, workspace)
+        .open_session(&session, transcript_meta(key, agent_id))
+        .unwrap();
     history
         .append(TranscriptMessage::user("prior tenant turn"))
         .unwrap();
@@ -83,7 +82,10 @@ fn seed_session(core: &CoreContext, workspace: &Path, key: &str, agent_id: &str)
 fn session_messages(core: &CoreContext, workspace: &Path, session: &SessionRef) -> Vec<String> {
     let locator = crate::agent::session_store::transcripts_or_files_in(
         core,
-        &session.agent_id,
+        session
+            .agent_id
+            .as_deref()
+            .expect("test session is scoped to an agent"),
         workspace,
     );
     let head = locator.head_generation(session);
@@ -155,17 +157,20 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     )
     .await
     .expect("Alice's configured channel agent resolves");
-    let bob_agent = crate::channels::runtime::dispatch::host_agent::configured_agent(
-        &_bob_runtime,
-        &bob_route,
-    )
-    .await
-    .expect("Bob's configured channel agent resolves");
+    let bob_agent =
+        crate::channels::runtime::dispatch::host_agent::configured_agent(&_bob_runtime, &bob_route)
+            .await
+            .expect("Bob's configured channel agent resolves");
     let canonical = "channel-session:telegram:bot-a:group:room-1";
     let alice_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, canonical);
     let bob_key = crate::core::runtime::tenant::tenant_key(&bob_tenant, canonical);
     assert_ne!(alice_key, bob_key);
-    let alice_session = seed_session(&alice_core, workspace, &alice_key, &alice_agent.definition.id);
+    let alice_session = seed_session(
+        &alice_core,
+        workspace,
+        &alice_key,
+        &alice_agent.definition.id,
+    );
     let bob_session = seed_session(&bob_core, workspace, &bob_key, &bob_agent.definition.id);
     assert_eq!(
         super::durable_channel_history_len(
