@@ -17,6 +17,7 @@
 mod approval;
 mod bus_turn;
 mod progressive;
+mod reset;
 mod turn;
 
 use crate::channels::context::ChannelRuntimeContext;
@@ -78,6 +79,7 @@ impl From<ChannelMessage> for RuntimeChannelMessage {
 
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
+pub(crate) use reset::reset_durable_channel_session;
 pub(crate) use turn::{process_channel_message, process_channel_runtime_message};
 
 /// Run every inbound message through the agent pipeline, at most
