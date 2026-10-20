@@ -1159,16 +1159,15 @@ async fn credential_email_connect_refusal_does_not_store_credentials_over_json_r
         response.get("error").is_some(),
         "Email connect should surface the local IMAP verifier refusal: {response}"
     );
-    if tokio::time::timeout(Duration::from_secs(5), &mut accept_task)
-        .await
-        .is_err()
-    {
-        accept_task.abort();
-        panic!("email verifier should reach the test-owned IMAP endpoint");
+    match tokio::time::timeout(Duration::from_secs(5), &mut accept_task).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => panic!("IMAP fixture task failed: {error}"),
+        Err(_) => {
+            accept_task.abort();
+            let _ = accept_task.await;
+            panic!("email verifier should reach the test-owned IMAP endpoint");
+        }
     }
-    accept_task
-        .await
-        .expect("IMAP fixture task should not panic");
 
     let error_text = response.get("error").expect("RPC error").to_string();
     for secret in ["e2e-email-password", "e2e@example.invalid"] {
