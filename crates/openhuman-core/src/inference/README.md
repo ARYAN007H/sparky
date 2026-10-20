@@ -67,10 +67,9 @@ most BYOK slugs do not serve. [`provider/fallback_diagnostics.rs`](./provider/fa
 lands on a provider with no credentials, the error says it was a background role that fell back,
 instead of naming a slug the user never configured.
 
-Hints and retired tier slugs never reach the managed backend verbatim. `tiers.rs` maps them to a
-role (`role_for_model_tier`) or to the concrete managed default (`resolve_model_for_hint`), while
-raw catalog ids a user pins on an agent (for example `openrouter/deepseek/deepseek-v4-pro`) pass
-through unchanged (`is_raw_passthrough_model`). The TinyAgents workload router that consumes this
+Provider model aliases, defaults, and capabilities come from the registered provider-model hooks
+in `registry.rs`. The generic `provider_model.rs` adapter maps workload-role hints and preserves
+concrete ids without carrying a hosted catalog. The TinyAgents workload router that consumes this
 for agent turns is in [`agent/tinyagents/routes.rs`](../agent/tinyagents/routes.rs).
 
 There are two families of entry points. `create_chat_model*` in `factory/chat_model.rs` is for
@@ -198,8 +197,8 @@ picks the provider the same way a provider string does.
 | `auth_error_registry.rs` | Process singleton and user-facing copy over `tinyinference_providers::auth_registry::ProviderAuthErrorRegistry` (the once-per-episode latch). |
 | `failure_copy/` | `table.rs` maps a failure class to the wire `error_type`, source, retry verdict and user copy. `halt.rs` has loop-guard halt summaries. |
 | `provider/` | Model construction and provider policy. See [`provider/README.md`](provider/README.md). |
-| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `tiers`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
-| `provider/openhuman_backend_model.rs` | Provider-neutral managed pieces kept in the core (`PROVIDER_LABEL`, `without_reasoning`). The managed `ChatModel`, catalog and embeddings live in `openhuman-tinyhumans` and register through `registry.rs`. |
+| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
+| `provider_model.rs`, `registry.rs` | Provider-neutral model hooks and caller adapters; hosted aliases, model defaults, pricing, and request metadata are registered by `openhuman-tinyhumans`. |
 | `provider/openai_codex.rs` | Codex routing metadata for the `openai` slug when Codex OAuth is connected. |
 | [`provider/error_code.rs`](./provider/error_code.rs), [`provider/error_classify.rs`](./provider/error_classify.rs) | Managed `errorCode` extraction and Sentry ownership; OpenHuman policy over TinyInference's classifier. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |
