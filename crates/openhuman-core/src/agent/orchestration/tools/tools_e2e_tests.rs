@@ -290,6 +290,106 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
     );
 }
 
+#[tokio::test]
+async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_its_session() {
+    use crate::agent::orchestration::subagent_sessions::SubagentSessionStore;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let provider = Arc::new(ScriptedModel::new(vec![(
+        "completed-cancel-canary",
+        "child completed before late cancel",
+    )]));
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(16);
+    let mut parent = parent_context(workspace.path(), provider, vec![]);
+    parent.session_id = "completed-cancel-parent-session".into();
+    parent.on_progress = Some(progress_tx);
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.components.juice = false;
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), crate::tools::toolpacks::ToolGroups::none())
+            .definitions(definitions),
+    );
+    let thread_id = "completed-cancel-parent-thread";
+    let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    let live = tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new("completed-cancel-parent-session")
+            .with_thread(thread_id),
+        host,
+    );
+    let result = CoreContext::scope(
+        Arc::clone(&core),
+        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "Investigate completed-cancel-canary",
+                "model": "test-model",
+                "task_key": "completed child late cancel"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "completed-cancel-child")
+                .expect("detached parent"),
+        )),
+    )
+    .await
+    .expect("spawn tool execution");
+    assert!(!result.is_error, "{}", result.output());
+    let task_id = result
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|value| value["task_id"].as_str().map(str::to_owned))
+        .expect("accepted child task reference");
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    task_id: event_task_id,
+                    ..
+                }) if event_task_id == task_id => break,
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    task_id: event_task_id,
+                    error,
+                    ..
+                }) if event_task_id == task_id => panic!("child failed: {error}"),
+                Some(_) => {}
+                None => panic!("child progress stream closed"),
+            }
+        }
+    })
+    .await
+    .expect("child completed before the late cancel");
+
+    let store = SubagentSessionStore::new(workspace.path().to_path_buf());
+    let before = CoreContext::sync_scope(Arc::clone(&core), || store.load())
+        .expect("load completed durable row");
+    assert!(before.iter().any(|row| {
+        row.current_task_id.as_deref() == Some(task_id.as_str())
+            && row.parent_session == "completed-cancel-parent-session"
+    }));
+    let controller = crate::agent_runs::all_subagent_control_registered_controllers()
+        .into_iter()
+        .find(|controller| controller.schema.function == "cancel")
+        .expect("subagent cancel RPC registered");
+    let mut params = serde_json::Map::new();
+    params.insert("taskId".into(), json!(task_id));
+    let output = (controller.handler)(DispatchCtx::new(Arc::clone(&core)), params)
+        .await
+        .expect("late cancel handler");
+    assert_eq!(output["cancelled"], serde_json::json!(false));
+    assert_eq!(output["outcome"], serde_json::json!("completed"));
+    let after = CoreContext::sync_scope(Arc::clone(&core), || store.load())
+        .expect("load row after cancel");
+    assert_eq!(after, before, "late cancel must not rewrite completed state");
+}
+
 /// A child the harness stops early (failure breaker / iteration cap) is not a
 /// successful result: asynchronous completion preserves the incomplete marker
 /// for delivery and reports the child's stop through parent progress.

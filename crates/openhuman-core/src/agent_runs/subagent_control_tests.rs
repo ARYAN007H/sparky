@@ -54,9 +54,7 @@ fn field(out: &Value, name: &str) -> Option<Value> {
 /// durable session alone, instead of rewriting it as "cancelled by user".
 #[tokio::test]
 async fn cancel_of_a_legacy_failed_run_reports_its_outcome_and_rewrites_nothing() {
-    use crate::agent::orchestration::subagent_sessions::{
-        mark_failed, mark_finished, SubagentSessionStore,
-    };
+    use crate::agent::orchestration::subagent_sessions::{mark_failed, SubagentSessionStore};
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use std::sync::Arc;
 
@@ -67,7 +65,7 @@ async fn cancel_of_a_legacy_failed_run_reports_its_outcome_and_rewrites_nothing(
     let store = SubagentSessionStore::new(workspace.path().to_path_buf());
     let seeded: Vec<crate::agent::orchestration::subagent_sessions::DurableSubagentSession> =
         serde_json::from_value(json!([{
-            "subagentSessionId": "subsess-sub-rpc-done",
+            "subagentSessionId": "subsess-sub-rpc-failed",
             "parentSession": "session-rpc",
             "parentThreadId": "thread-rpc",
             "workerThreadId": null,
@@ -78,7 +76,7 @@ async fn cancel_of_a_legacy_failed_run_reports_its_outcome_and_rewrites_nothing(
             "actionRoot": null,
             "taskKey": "task",
             "taskTitle": "Task",
-            "currentTaskId": "sub-rpc-done",
+            "currentTaskId": "sub-rpc-failed",
             "status": "running",
             "reusable": true,
             "latestHistory": null,
