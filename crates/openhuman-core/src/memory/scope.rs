@@ -4,7 +4,9 @@
 use std::collections::HashMap;
 
 use tinymemory_api::{Error, Result};
-use tinymemory_tools::layout::identity::{self, AgentPin, IdentityPins};
+use tinymemory_tools::layout::identity::{
+    self, AgentPin, Identity as TinyMemoryIdentity, IdentityPins, ResolvedIdentity,
+};
 
 use crate::config::{Config, MemoryLayoutMode};
 
@@ -32,6 +34,51 @@ pub fn identity_pins(config: &Config) -> IdentityPins {
         recall: memory.recall.enabled,
         v3: memory.layout == MemoryLayoutMode::V3,
     }
+}
+
+/// OpenHuman's identity bound to the memory settings of a config.
+///
+/// TinyMemory owns identity precedence and layout resolution; this adapter
+/// supplies the current config's host pins to that public contract.
+#[derive(Debug, Clone, Default)]
+pub struct MemoryIdentity(TinyMemoryIdentity);
+
+impl MemoryIdentity {
+    /// The host-owned memory identity used by RPC and MCP surfaces.
+    #[must_use]
+    pub fn root() -> Self {
+        Self(TinyMemoryIdentity::root())
+    }
+
+    /// An agent definition's memory identity.
+    #[must_use]
+    pub fn agent(agent_id: &str) -> Self {
+        Self(TinyMemoryIdentity::agent(agent_id))
+    }
+
+    /// A team member's memory identity.
+    #[must_use]
+    pub fn team_member(team: &str, agent_id: &str) -> Self {
+        Self(TinyMemoryIdentity::team_member(team, agent_id))
+    }
+
+    /// Resolve this identity with OpenHuman's current host pins.
+    #[must_use]
+    pub fn resolve(&self, config: &Config) -> ResolvedIdentity {
+        self.0.resolve(&identity_pins(config))
+    }
+}
+
+/// The pooled conversation node for a resolved TinyMemory layout.
+#[must_use]
+pub fn chat_node(layout: &tinymemory_tools::MemoryLayout) -> tinymemory_api::Namespace {
+    tinymemory_tools::chat_node(layout)
+}
+
+/// Whether OpenHuman's memory configuration selects layout v3.
+#[must_use]
+pub fn layout_is_v3(config: &Config) -> bool {
+    identity_pins(config).v3
 }
 
 /// The engine scope root of the person `config` belongs to: `org:<id>` for a

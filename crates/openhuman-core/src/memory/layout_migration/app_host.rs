@@ -127,7 +127,7 @@ impl lm::LayoutHost for AppHost {
 
 /// The claim on the legacy tree `config`'s account would move, if it is
 /// shared by every account on the machine.
-pub(super) fn claim_key(config: &Config) -> Result<Option<ClaimKey>> {
+pub(super) fn claim_key(config: &Config) -> MemoryResult<Option<ClaimKey>> {
     // A self-hosted key is the operator's: every local account using it
     // shares one legacy tree. The hosted engine is one tenant per person.
     if config.memory.engine.trim() != CORTEXDB_ENGINE {
@@ -147,12 +147,12 @@ pub(super) fn claim_key(config: &Config) -> Result<Option<ClaimKey>> {
     Ok(Some(ClaimKey::new(app_dir, &endpoint, &owner)))
 }
 
-fn signed_in_root(config: &Config) -> Result<String> {
+fn signed_in_root(config: &Config) -> MemoryResult<String> {
     scope::user_root(config).ok_or_else(signed_out)
 }
 
-fn signed_out() -> Error {
-    Error::Off("sign in to move memory into its own layout".to_string())
+fn signed_out() -> MemoryError {
+    MemoryError::Off("sign in to move memory into its own layout".to_string())
 }
 
 #[cfg(test)]

@@ -33,7 +33,7 @@ async fn module_prompt_teaches_the_read_only_emit_invariant() {
         workspace_dir: workspace.path().to_path_buf(),
         ..crate::config::Config::default()
     };
-    let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
+    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
     let definition = registry
         .get("flow_discovery")
         .expect("flow_discovery builtin");

@@ -114,7 +114,7 @@ impl From<tinymemory_api::Error> for MemoryError {
     fn from(error: tinymemory_api::Error) -> Self {
         use tinymemory_api::Error as E;
         // A 402 arrives as `Engine` with the backend's code on its message.
-        let credits = tinymemory_integrations::cortex::is_insufficient_credits(&error);
+        let credits = tinymemory_integrations::import::is_insufficient_credits(&error);
         match error {
             E::Unsupported(message) => Self::Unsupported(message),
             E::InvalidRequest(message) | E::NotFound(message) => Self::InvalidRequest(message),

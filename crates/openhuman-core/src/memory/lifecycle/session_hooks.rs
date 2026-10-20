@@ -42,8 +42,8 @@ pub(super) struct PendingMemoryTurn {
 /// The provider channel that owns a logged conversation, if this turn came
 /// from an external channel. Event-context labels such as `cron`, `voice`, and
 /// `mcp_server` are not channel owners.
-fn logged_channel(origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>) -> Option<String> {
-    let Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+fn logged_channel(origin: Option<&crate::security::turn_origin::AgentTurnOrigin>) -> Option<String> {
+    let Some(crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
         channel,
         message_id,
         ..
