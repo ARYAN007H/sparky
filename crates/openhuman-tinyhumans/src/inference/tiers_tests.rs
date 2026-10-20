@@ -7,7 +7,7 @@ fn hosted_normalizer_rewrites_legacy_tiers_and_preserves_concrete_pins() {
     config.orchestrator.model = Some("custom/orchestrator-model".to_string());
     config.agents.insert(
         "pinned".to_string(),
-        crate::agent::AgentConfig {
+        openhuman_embed::__host::config::schema::DelegateAgentConfig {
             model: "vendor/model-id".to_string(),
             ..Default::default()
         },
