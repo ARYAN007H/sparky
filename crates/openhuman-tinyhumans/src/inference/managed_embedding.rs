@@ -7,7 +7,7 @@ use std::sync::Arc;
 use openhuman_embed::__host::egress::{emit_external_transfer, enforce_egress, EgressDescriptor};
 use openhuman_embed::__host::inference_registry::EmbeddingRequest;
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
-use tinyinference_embeddings::{BearerResolver, CloudEmbeddingModel, EmbeddingModel};
+use tinyinference_embeddings::{BearerResolver, CloudEmbeddingModel, EmbeddingEgressGuard, EmbeddingModel};
 
 use super::managed_session::resolve_session_bearer;
 use crate::backend::url::effective_api_url;
@@ -21,8 +21,11 @@ use crate::client::endpoint::is_managed_endpoint_for_api_key;
 /// chat of the turn that made the call. One built without a chat (background
 /// sync, the embedding RPC) still discloses, unrouted.
 pub struct ManagedEmbeddingModel {
-    inner: Arc<CloudEmbeddingModel>,
+    inner: CloudEmbeddingModel,
+    base_url: String,
     model: String,
+    dimensions: usize,
+    bearer: BearerResolver,
     chat: Option<ApprovalChatContext>,
 }
 
@@ -82,14 +85,13 @@ impl ManagedEmbeddingModel {
             .map_err(|error| tinyinference_embeddings::Error::Embedding(error.to_string()))
         });
         let model = model.to_string();
+        let base_url = base_url;
         Self {
-            inner: Arc::new(CloudEmbeddingModel::new(
-                base_url,
-                model.clone(),
-                dimensions,
-                bearer,
-            )),
+            inner: cloud_model(&base_url, &model, dimensions, Arc::clone(&bearer), chat.as_ref()),
+            base_url,
             model,
+            dimensions,
+            bearer,
             chat,
         }
     }
@@ -101,19 +103,40 @@ impl ManagedEmbeddingModel {
     #[must_use]
     pub fn routed_to(&self, chat: Option<ApprovalChatContext>) -> Self {
         Self {
-            inner: Arc::clone(&self.inner),
+            inner: cloud_model(
+                &self.base_url,
+                &self.model,
+                self.dimensions,
+                Arc::clone(&self.bearer),
+                chat.as_ref(),
+            ),
+            base_url: self.base_url.clone(),
             model: self.model.clone(),
+            dimensions: self.dimensions,
+            bearer: Arc::clone(&self.bearer),
             chat,
         }
     }
+}
 
-    fn guard(&self) -> tinyinference_embeddings::Result<()> {
-        let egress = EgressDescriptor::embedding("cloud", &self.model);
+fn cloud_model(
+    base_url: &str,
+    model: &str,
+    dimensions: usize,
+    bearer: BearerResolver,
+    chat: Option<&ApprovalChatContext>,
+) -> CloudEmbeddingModel {
+    let guarded_model = model.to_owned();
+    let guarded_chat = chat.cloned();
+    let egress_guard: EmbeddingEgressGuard = Arc::new(move |_, _| {
+        let egress = EgressDescriptor::embedding("cloud", &guarded_model);
         enforce_egress(&egress)
             .map_err(|error| tinyinference_embeddings::Error::Embedding(error.to_string()))?;
-        emit_external_transfer(self.chat.as_ref(), egress);
+        emit_external_transfer(guarded_chat.as_ref(), egress);
         Ok(())
-    }
+    });
+    CloudEmbeddingModel::new(base_url.to_owned(), model.to_owned(), dimensions, bearer)
+        .with_egress_guard(egress_guard)
 }
 
 #[async_trait::async_trait]
@@ -135,11 +158,8 @@ impl EmbeddingModel for ManagedEmbeddingModel {
     }
 
     async fn embed(&self, texts: &[String]) -> tinyinference_embeddings::Result<Vec<Vec<f32>>> {
-        // Only a batch that will actually leave is guarded: an empty one answers
-        // locally, and a blank input is refused by the transport.
-        if !texts.is_empty() && texts.iter().all(|text| !text.trim().is_empty()) {
-            self.guard()?;
-        }
+        // The owning transport invokes the host guard after input validation
+        // and immediately before resolving credentials or sending a request.
         self.inner.embed(texts).await
     }
 }

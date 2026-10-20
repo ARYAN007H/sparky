@@ -73,7 +73,7 @@ pub(super) fn build_chat_model(
     let mut managed = TinyHumansModel::new(
         endpoint,
         model,
-        model,
+        super::tiers::MODEL_MANAGED_DEFAULT,
         move || {
             resolver_options
                 .resolve_bearer(&resolver_endpoint)
@@ -92,6 +92,10 @@ pub(super) fn build_chat_model(
     }
     Ok(managed)
 }
+
+#[cfg(test)]
+#[path = "managed_model_tests.rs"]
+mod tests;
 
 /// Connect timeout for managed inference; matches the previous host adapter.
 const MANAGED_INFERENCE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
