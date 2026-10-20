@@ -129,14 +129,10 @@ impl ShellTool {
 
     /// Resolve the working directory for this shell invocation.
     ///
-    /// Returns the per-worker git-worktree checkout when the tinyagents harness
-    /// threaded a [`WorkspaceDescriptor`] into this call's
-    /// [`ToolExecutionContext`](tinyagents_harness::tool::ToolExecutionContext) — an edit-capable worker running with
-    /// `isolation = "worktree"`, whose isolated worktree root is carried on the
-    /// run context (`RunContext::with_workspace`) and surfaced per tool call via
-    /// `ToolExecutionContext::from_run_context`. Otherwise falls back to the
-    /// shared `self.security.action_dir`, which preserves the non-isolated
-    /// behaviour exactly. See #3376, #4249 (08.5).
+    /// Returns the root from a [`WorkspaceDescriptor`] threaded into this
+    /// call's [`ToolExecutionContext`](tinyagents_harness::tool::ToolExecutionContext).
+    /// Otherwise falls back to the shared `self.security.action_dir`.
+    /// See #3376, #4249 (08.5).
     fn effective_action_dir_for_context(&self, context: Option<&dyn ToolRunContext>) -> PathBuf {
         if let Some(workspace) = context.and_then(|ctx| ctx.workspace()) {
             tracing::debug!(
