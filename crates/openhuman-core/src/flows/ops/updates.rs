@@ -1,5 +1,4 @@
 use super::*;
-use tinyflows_catalog::graph_policy::{enforce_side_effect_approval, trigger_is_automatic};
 
 /// Maps the Catalog bus [`FlowUpdateError`](tinyflows_bus::catalog::FlowUpdateError) to the RPC
 /// error string. A concurrency conflict is encoded as a JSON object the UI can
@@ -35,7 +34,7 @@ fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
 /// **B29 Rule 1 analogue for saves** (save/enable safety — same issue
 /// `flows_create` guards at creation time, see its doc): `flows_create`
 /// refuses to persist an automatic-trigger graph (`schedule` / `app_event` /
-/// `webhook`, see [`trigger_is_automatic`]) as `enabled`, but that guard only
+/// `webhook`) as `enabled`, but that guard only
 /// runs once, at creation. Without an equivalent here, a flow created
 /// `enabled: true` with a manual/no-op trigger could later have an
 /// automatic-trigger graph saved onto it — via the `save_workflow` agent
@@ -45,7 +44,7 @@ fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
 /// So: when the *new* graph's trigger is automatic and the *previous*
 /// graph's trigger was NOT automatic (a manual/none → automatic
 /// transition), this forces the persisted `enabled` back to `false` in the
-/// same store write — the user must explicitly re-arm via
+/// the same Catalog write — the user must explicitly re-arm via
 /// `flows_set_enabled` after reviewing the new trigger. An automatic →
 /// automatic re-edit (e.g. tweaking a cron expression) is left alone — the
 /// user already opted in once, and re-disarming on every edit would just be
@@ -54,7 +53,7 @@ fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
 /// The override is applied **unconditionally** on a manual/none → automatic
 /// transition — it does *not* gate on whether the flow *looked* enabled in
 /// the `existing` read above. That read is a snapshot taken before
-/// `store::update_flow_graph`'s own guarded UPDATE re-reads the row; a
+/// Catalog.PutWorkflow's guarded UPDATE re-reads the row; a
 /// concurrent `flows_set_enabled(id, true)` landing in the gap would leave
 /// this snapshot stale while the row is actually enabled by the time the
 /// guarded UPDATE runs — and since `set_enabled` bumps `updated_at` too,
@@ -136,75 +135,37 @@ async fn flows_update_inner(
         // Metadata-only updates preserve access to legacy graphs written by
         // older versions, even when the current engine no longer accepts them.
         None => {
-            validate_and_migrate_graph(
-                ctx,
-                config,
-                serde_json::to_value(&existing.graph).map_err(|error| error.to_string())?,
-            )
-            .await?;
+            validate_and_migrate_graph(ctx, config, existing.graph.clone()).await?;
             existing.graph.clone()
         }
     };
-    // B29 Rule 1 analogue: disarm every manual/none → automatic trigger
-    // transition, unconditionally. `now_auto` is safe to compute here (it
-    // only depends on `graph`, THIS call's own incoming graph — never
-    // stale). The "was it automatic before" half of the transition,
-    // however, is NOT decided here: R-m2 found that gating on the
-    // ops-level `existing.graph` read let a concurrent write race this
-    // call and slip an automatic-trigger graph through with `enabled: true`
-    // — `existing` can be arbitrarily stale by the time
-    // `store::update_flow_graph` actually performs its guarded write. That
-    // decision now lives inside `update_flow_graph`, computed against the
-    // row it just re-read there (see its doc comment).
-    let now_auto = trigger_is_automatic(&graph);
-    let forced_automatic_disarm = disarm_automatic && now_auto;
+    let forced_automatic_disarm = disarm_automatic;
+    // Catalog.PutWorkflow owns the automatic-trigger transition rule. It
+    // evaluates the new graph and fresh persisted row in the module before
+    // writing, and reports the result through `born_disabled`.
     tracing::debug!(
         target: "flows",
         flow_id = %id,
-        now_auto,
         currently_enabled = existing.enabled,
-        forced_automatic_disarm,
-        "[flows] flows_update: auto-trigger disarm decision inputs (transition itself decided \
-         store-side against a fresh read, see update_flow_graph)"
+        force_disarm_automatic = disarm_automatic,
+        "[flows] flows_update: delegating automatic-trigger transition policy to Catalog.PutWorkflow"
     );
-
-    // Rule 2 analogue (compound-bypass closure): re-apply the same outbound
-    // side-effect check `flows_create` applies on save — via the shared
-    // [`enforce_side_effect_approval`] helper — so an update that *adds* a
-    // tool_call/http_request/code node to a previously read-only graph can
-    // never persist `require_approval: false` just because the update path
-    // trusted the caller's toggle unconditionally.
-    let (effective_require_approval, side_effect_forced) =
-        enforce_side_effect_approval(&graph, new_require_approval);
-    if side_effect_forced {
-        tracing::info!(
-            target: "flows",
-            flow_id = %id,
-            "[flows] flows_update: forcing require_approval=true — graph contains outbound \
-             side-effect node(s) (tool_call / http_request / code)"
-        );
-    }
 
     tracing::debug!(
         target: "flows",
         flow_id = %id,
         has_expected = expected_version.is_some(),
-        require_approval = effective_require_approval,
-        side_effect_forced,
+        require_approval = new_require_approval,
         "[flows] flows_update: persisting changes"
     );
-    // The auto-disarm decision (both the unconditional manual→automatic
-    // transition and `disarm_automatic`'s forced-remote-authoring variant)
-    // is made INSIDE `update_flow_graph`, against the row it re-reads right
-    // before its guarded UPDATE — see R-m2 above and that function's doc
-    // comment. `enabled_override: None` here means "no explicit force from
-    // this caller"; the disarm, if any, still applies on top of that.
+    // The module computes automatic-trigger disarm against its freshly read
+    // row; the explicit request flag is reserved for remote-authoring flows.
     let updated = store::update_flow_graph(
         config,
         id,
         new_name,
         graph,
-        effective_require_approval,
+        new_require_approval,
         None,
         disarm_automatic,
         expected_version.as_deref(),
@@ -218,7 +179,11 @@ async fn flows_update_inner(
     // happened store-side against a fresh read, so this is purely for the
     // info log / result message wording below and can't desync from what
     // was actually persisted.
-    let should_disarm = now_auto && existing.enabled && !updated.enabled;
+    let tinyflows_bus::catalog::PutWorkflowResult {
+        workflow: updated,
+        born_disabled: should_disarm,
+        approval_forced,
+    } = updated;
     if should_disarm {
         tracing::info!(
             target: "flows",
@@ -267,7 +232,7 @@ async fn flows_update_inner(
         };
         logs.push(reason.to_string());
     }
-    if side_effect_forced {
+    if approval_forced {
         logs.push(
             "require_approval forced to true because the graph contains outbound side-effect \
              nodes (tool_call / http_request / code)."
@@ -283,7 +248,7 @@ pub fn flows_get_history(
     config: &Config,
     id: &str,
     limit: usize,
-) -> Result<Outcome<Vec<tinyflows_catalog::FlowRevision>>, String> {
+) -> Result<Outcome<Vec<tinyflows_bus::catalog::WorkflowRevision>>, String> {
     let revisions = store::list_revisions(config, id, limit).map_err(|e| e.to_string())?;
     let count = revisions.len();
     Ok(Outcome::single_log(

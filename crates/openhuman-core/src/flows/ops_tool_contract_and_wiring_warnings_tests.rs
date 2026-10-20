@@ -76,7 +76,8 @@ async fn wiring_warnings_omits_missing_required_arg_advisory_but_host_gate_rejec
             .await
             .expect("TinyFlows wiring warnings should succeed");
     assert!(warnings.is_empty(), "{warnings:?}");
-    let errors = crate::flows::host_gates::validate_tool_contracts(&config, &g).await;
+    let graph_json = serde_json::to_value(&g).unwrap();
+    let errors = crate::flows::host_gates::validate_tool_contracts(&config, &graph_json).await;
     assert!(
         errors
             .iter()

@@ -40,13 +40,6 @@ pub(crate) async fn expire_parked_runs(ctx: &DispatchCtx, config: &Config) -> us
 /// returns only rows it changed; the runs adapter handles event projection and
 /// releases retained callback state for those rows.
 pub(crate) async fn sweep_orphaned_runs_on_boot(ctx: &DispatchCtx, config: &Config) -> usize {
-    if tinyflows_catalog::run_management::boot_sweep_plan(crate::storage::installed_is_shared())
-        == tinyflows_catalog::run_management::BootSweepPlan::Nothing
-    {
-        tracing::info!(target: "flows", "[flows] boot sweep: skipped, the storage backend is shared");
-        return 0;
-    }
-
     crate::storage::agents::for_each_scope(ctx, "flows boot sweep", |scope_ctx| async move {
         sweep_one_scope(&scope_ctx, config).await
     })

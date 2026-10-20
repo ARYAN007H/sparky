@@ -22,7 +22,7 @@ use crate::core::runtime::DispatchCtx;
 pub(crate) async fn run_builder_gates(
     ctx: &DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Vec<String> {
     // The stack order, short-circuiting and mock-run preflight are
     // `tinyflows::gates::builder_failures`'; the host supplies the stages that
@@ -42,12 +42,11 @@ pub(crate) async fn run_builder_gates(
     };
     let result = async {
         let proxy = crate::modules::tinyflows::authoring_proxy(config).await?;
-        let graph = serde_json::to_value(graph).map_err(|error| error.to_string())?;
         proxy
             .call::<Vec<String>>(
                 tinyflows_bus::methods::BUILDER_FAILURES,
                 &(
-                    graph,
+                    graph.clone(),
                     host.authoring.clone(),
                     vec![crate::flows::caps_host::NATIVE_TOOL_PREFIX.to_string()],
                 ),
@@ -127,7 +126,7 @@ pub(crate) async fn build_builder_proposal(
     config: &Config,
     retry_tool: &str,
     name: &str,
-    graph: &WorkflowGraph,
+    graph: &Value,
     require_approval: bool,
     revision: bool,
     instruction: Option<String>,
@@ -144,13 +143,12 @@ pub(crate) async fn build_builder_proposal(
         ));
     }
 
-    let graph_json = serde_json::to_value(graph).map_err(|error| error.to_string())?;
-    let analysis = super::validation::validate_over_bus(ctx, config, graph_json).await?;
+    let analysis = super::validation::validate_over_bus(ctx, config, graph.clone()).await?;
     let summary = analysis
         .summary
         .ok_or_else(|| "TinyFlows validation returned no graph summary".to_string())?;
     let mut warnings = analysis.warnings;
-    match graph_wiring_warnings(ctx, config, graph).await {
+    match wiring_warnings_json(ctx, config, graph.clone()).await {
         Ok(wiring_warnings) => warnings.extend(wiring_warnings),
         Err(error) => {
             tracing::warn!(target: "flows", %error, "[flows] TinyFlows wiring warnings failed")
@@ -173,12 +171,15 @@ pub(crate) async fn build_builder_proposal(
     // in `run_flow_body`) consumes, so a run right after this proposal reads
     // the cached result instead of re-probing the network.
     let inference_readiness = evaluate_inference_readiness(ctx, config, graph).await;
-    let graph_value = serde_json::to_value(graph).map_err(|e| e.to_string())?;
+    let graph_value = graph.clone();
 
     tracing::info!(
         target: "flows",
         %name,
-        node_count = graph.nodes.len(),
+        node_count = graph
+            .get("nodes")
+            .and_then(serde_json::Value::as_array)
+            .map_or(0, Vec::len),
         require_approval,
         warning_count = warnings.len(),
         revision,

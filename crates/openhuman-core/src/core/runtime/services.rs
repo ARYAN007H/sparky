@@ -257,6 +257,7 @@ pub fn spawn_flows_boot_reconcile(ctx: std::sync::Arc<crate::core::runtime::Core
     log::debug!("[flows] flows feature disabled at compile time — no boot run reconciliation");
 }
 
+#[cfg(feature = "flows")]
 async fn reconcile_flows_on_boot(
     dispatch: &crate::core::runtime::DispatchCtx,
 ) -> Result<usize, String> {

@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use serde::Serialize;
@@ -20,7 +21,6 @@ use tinyflows_bus::catalog::{
     CatalogVersionedDocument, DocDeleteRequest, DocDeleteWhereRequest, DocEnsureRequest,
     DocGetRequest, DocPutRequest, DocQueryRequest,
 };
-#[cfg(test)]
 use tinystoragedrivers::StorageBackend;
 use tinystoragedrivers::{
     Capability, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, Scope,
@@ -37,6 +37,7 @@ use crate::modules::tinyflows as module;
 struct DocScope {
     workspace_dir: PathBuf,
     scope: Scope,
+    backend: Option<Arc<dyn StorageBackend>>,
 }
 
 impl DocScope {
@@ -48,8 +49,11 @@ impl DocScope {
     }
 
     fn documents(&self) -> Result<Arc<dyn DocumentStore>, StorageError> {
-        let backend = crate::storage::local::backend_for(&self.workspace_dir)
-            .map_err(|error| StorageError::unavailable(error.to_string()))?;
+        let backend = match &self.backend {
+            Some(backend) => Arc::clone(backend),
+            None => crate::storage::local::backend_for(&self.workspace_dir)
+                .map_err(|error| StorageError::unavailable(error.to_string()))?,
+        };
         let scoped = backend.for_scope(&self.scope)?;
         Ok(Arc::clone(scoped.documents()))
     }
@@ -115,7 +119,49 @@ pub(crate) async fn register(
     let documents = DocScope {
         workspace_dir: config.workspace_dir.clone(),
         scope,
+        backend: None,
     };
+    register_scope(documents).await
+}
+
+/// Register a callback for a specific backend and scope, for boot-time owner
+/// migrations that must not depend on whichever backend is globally installed.
+pub(crate) async fn register_backend_scope(
+    config: &Config,
+    backend: Arc<dyn StorageBackend>,
+    scope: Scope,
+) -> Result<Arc<CatalogStorageRegistration>, String> {
+    static NEXT_MIGRATION_REGISTRATION: AtomicU64 = AtomicU64::new(1);
+    let documents = DocScope {
+        workspace_dir: config.workspace_dir.clone(),
+        scope,
+        backend: Some(backend),
+    };
+    let nonce = NEXT_MIGRATION_REGISTRATION.fetch_add(1, Ordering::Relaxed);
+    let path = format!("{}m{nonce}", path_for(&documents.key()));
+    let runtime = crate::modules::runtime::runtime()
+        .await
+        .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+    runtime
+        .spawn(async move {
+            let served =
+                module::serve_registered(path.clone(), CatalogStoragePort { scope: documents })
+                    .await?;
+            Ok(Arc::new(CatalogStorageRegistration {
+                address: CallbackAddress {
+                    destination: module::HOST_BUS_NAME.to_owned(),
+                    object_path: path,
+                },
+                _served: served,
+            }))
+        })
+        .await
+        .map_err(|error| {
+            format!("CatalogStorage migration registration task did not finish: {error}")
+        })?
+}
+
+async fn register_scope(documents: DocScope) -> Result<Arc<CatalogStorageRegistration>, String> {
     let key = documents.key();
     let path = path_for(&key);
     let runtime = crate::modules::runtime::runtime()

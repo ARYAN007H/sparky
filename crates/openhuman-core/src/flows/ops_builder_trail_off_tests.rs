@@ -96,7 +96,7 @@ async fn compute_required_connections_flags_missing_composio_toolkits() {
         ],
         "edges": [ { "from_node": "t", "to_node": "send" } ]
     });
-    let graph = tinyflows::migrate::deserialize_graph(graph_json).unwrap();
+    let graph = structurally_valid_graph(graph_json);
     let required = compute_required_connections(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -125,7 +125,7 @@ async fn compute_required_connections_skips_native_and_http_nodes() {
             { "from_node": "search", "to_node": "http" }
         ]
     });
-    let graph = tinyflows::migrate::deserialize_graph(graph_json).unwrap();
+    let graph = structurally_valid_graph(graph_json);
     let required = compute_required_connections(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,

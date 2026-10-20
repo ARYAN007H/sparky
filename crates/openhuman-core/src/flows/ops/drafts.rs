@@ -10,8 +10,8 @@ pub fn flows_draft_create(
     flow_id: Option<String>,
     name: String,
     graph: Value,
-    origin: tinyflows_catalog::DraftOrigin,
-) -> Result<Outcome<tinyflows_catalog::FlowDraft>, String> {
+    origin: tinyflows_bus::catalog::DraftOrigin,
+) -> Result<Outcome<tinyflows_bus::catalog::FlowDraft>, String> {
     let draft = draft_store::create_draft(config, flow_id, name, graph, origin)
         .map_err(|e| e.to_string())?;
     Ok(Outcome::single_log(draft, "draft created"))
@@ -35,7 +35,7 @@ pub(crate) fn flows_draft_create_from_copilot(
 pub fn flows_draft_get(
     config: &Config,
     id: &str,
-) -> Result<Outcome<tinyflows_catalog::FlowDraft>, String> {
+) -> Result<Outcome<tinyflows_bus::catalog::FlowDraft>, String> {
     let draft = draft_store::get_draft(config, id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("draft '{id}' not found"))?;
@@ -50,7 +50,7 @@ pub fn flows_draft_update(
     name: Option<String>,
     graph: Option<Value>,
     flow_id: Option<Option<String>>,
-) -> Result<Outcome<tinyflows_catalog::FlowDraft>, String> {
+) -> Result<Outcome<tinyflows_bus::catalog::FlowDraft>, String> {
     let draft =
         draft_store::update_draft(config, id, name, graph, flow_id).map_err(|e| e.to_string())?;
     Ok(Outcome::single_log(draft, "draft updated"))
@@ -59,7 +59,7 @@ pub fn flows_draft_update(
 /// Lists all drafts, newest-updated first.
 pub fn flows_draft_list(
     config: &Config,
-) -> Result<Outcome<Vec<tinyflows_catalog::FlowDraft>>, String> {
+) -> Result<Outcome<Vec<tinyflows_bus::catalog::FlowDraft>>, String> {
     let drafts = draft_store::list_drafts(config).map_err(|e| e.to_string())?;
     Ok(Outcome::single_log(drafts, "drafts listed"))
 }
@@ -123,8 +123,7 @@ pub(crate) async fn flows_draft_promote_with_context(
         match response {
             tinyflows_bus::catalog::PromoteDraftResponse::Error(error) => Err(error.message),
             tinyflows_bus::catalog::PromoteDraftResponse::Ok(result) => {
-                let flow: Flow = crate::flows::store::roundtrip(result.workflow)
-                    .map_err(|error| error.to_string())?;
+                let flow: Flow = result.workflow;
                 let mut logs = result
                     .metadata
                     .get("logs")

@@ -92,6 +92,14 @@ mod imp {
         }
     }
 
+    async fn ensure_workflow_ready(config: &Config) -> Result<(), String> {
+        #[cfg(feature = "flows")]
+        crate::storage::import::tinyflows::ensure_flow_scope_ready(config).await?;
+        #[cfg(not(feature = "flows"))]
+        let _ = config;
+        Ok(())
+    }
+
     async fn schedule_proxy(
         config: &Config,
         timeout: std::time::Duration,
@@ -129,6 +137,7 @@ mod imp {
 
     /// Proxy to the module-owned Authoring contract.
     pub(crate) async fn authoring_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure_workflow_ready(config).await?;
         ensure(config).await?;
         let runtime = runtime::runtime()
             .await
@@ -146,6 +155,12 @@ mod imp {
 
     /// Proxy to the module-owned Catalog contract.
     pub(crate) async fn catalog_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure_workflow_ready(config).await?;
+        catalog_proxy_for_migration(config).await
+    }
+
+    /// Catalog proxy used only while migrations or bounded legacy imports run.
+    pub(crate) async fn catalog_proxy_for_migration(config: &Config) -> Result<Proxy, String> {
         ensure(config).await?;
         let runtime = runtime::runtime()
             .await
@@ -163,6 +178,7 @@ mod imp {
 
     /// Proxy to the module-owned portability helpers used by CapsHost.
     pub(crate) async fn portability_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure_workflow_ready(config).await?;
         ensure(config).await?;
         let runtime = runtime::runtime()
             .await
@@ -180,6 +196,7 @@ mod imp {
 
     /// Proxy to the module-owned run admission and control surface.
     pub(crate) async fn runs_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure_workflow_ready(config).await?;
         ensure(config).await?;
         let runtime = runtime::runtime()
             .await
@@ -224,11 +241,13 @@ mod imp {
 
     /// A proxy for the module's Copilot tool, prompt and fallback services.
     pub(crate) async fn copilot_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure_workflow_ready(config).await?;
         copilot_interface_proxy(config).await
     }
 
     /// A long-deadline Copilot proxy for module-owned tool execution.
     pub(crate) async fn copilot_invoke_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure_workflow_ready(config).await?;
         copilot_invoke_interface_proxy(config).await
     }
 
@@ -381,8 +400,9 @@ mod fixture;
 pub(crate) use imp::serve_pair_after_first;
 #[cfg(feature = "modules")]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, portability_proxy, proxy,
-    run_proxy, runs_proxy, serve, serve_pair, serve_registered, unserve,
+    authoring_proxy, catalog_proxy, catalog_proxy_for_migration, copilot_invoke_proxy,
+    copilot_proxy, portability_proxy, proxy, run_proxy, runs_proxy, serve, serve_pair,
+    serve_registered, unserve,
 };
 
 #[cfg(not(feature = "modules"))]
@@ -416,6 +436,12 @@ mod imp {
     }
 
     pub(crate) async fn catalog_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
+    pub(crate) async fn catalog_proxy_for_migration(
+        config: &Config,
+    ) -> Result<tinybus::Proxy, String> {
         Err(unavailable(config))
     }
 
@@ -458,8 +484,9 @@ mod imp {
 
 #[cfg(not(feature = "modules"))]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, portability_proxy, proxy,
-    run_proxy, runs_proxy, serve, serve_pair, serve_registered, unserve,
+    authoring_proxy, catalog_proxy, catalog_proxy_for_migration, copilot_invoke_proxy,
+    copilot_proxy, portability_proxy, proxy, run_proxy, runs_proxy, serve, serve_pair,
+    serve_registered, unserve,
 };
 
 /// Whether the module can serve in this build and configuration (the switch

@@ -5,7 +5,12 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tinybox_bus::CommandClass;
 
-use super::{ToolBackend, ToolCallCtx, NATIVE_TOOL_PREFIX};
+use super::{ToolBackend, ToolCallCtx};
+
+#[path = "native_backend.rs"]
+mod flow_backend;
+
+pub(crate) use flow_backend::NATIVE_TOOL_PREFIX;
 
 pub(crate) struct NativeToolBackend;
 
@@ -26,14 +31,9 @@ impl ToolBackend for NativeToolBackend {
         args: Value,
         _conn: Option<&str>,
     ) -> Result<Value> {
-        crate::tools::native_ops::flow_backend::invoke(
-            ctx.config,
-            slug,
-            args,
-            &NativeFlowPolicyHooks { ctx },
-        )
-        .await
-        .map_err(EngineError::Capability)
+        flow_backend::invoke(ctx.config, slug, args, &NativeFlowPolicyHooks { ctx })
+            .await
+            .map_err(EngineError::Capability)
     }
 }
 
@@ -42,7 +42,7 @@ struct NativeFlowPolicyHooks<'a, 'ctx> {
 }
 
 #[async_trait]
-impl crate::tools::native_ops::flow_backend::FlowPolicyHooks for NativeFlowPolicyHooks<'_, '_> {
+impl flow_backend::FlowPolicyHooks for NativeFlowPolicyHooks<'_, '_> {
     async fn resolve_policy(
         &self,
         config: &crate::config::Config,

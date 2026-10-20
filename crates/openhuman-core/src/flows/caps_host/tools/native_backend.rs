@@ -1,6 +1,7 @@
 //! Adapts native tool results to the value and failure contract expected by
-//! TinyFlows. Tool execution itself remains in [`super`], which owns the
-//! native registry and its policy snapshot.
+//! TinyFlows. Tool execution remains in `tools::native_ops`, which owns the
+//! native registry and its policy snapshot; this flow adapter stays with the
+//! CapsHost capability that calls it.
 
 use std::sync::Arc;
 
@@ -43,15 +44,22 @@ pub(crate) async fn invoke(
     }
 
     let policy = hooks.resolve_policy(config).await?;
-    let class = super::classify_tool_call_with_security(config, policy.clone(), tool_name, &args)?;
+    let class = crate::tools::native_ops::classify_tool_call_with_security(
+        config,
+        policy.clone(),
+        tool_name,
+        &args,
+    )?;
     let audit_id = hooks.authorize(&policy, class, tool_name, &args).await?;
     tracing::debug!(target: "flows", %tool_name, ?class, "[flows] dispatching NATIVE OpenHuman tool");
-    let result = super::execute_tool_with_security(config, policy, tool_name, args, false)
-        .await
-        .and_then(|outcome| {
-            reject_failed_native_tool_result(slug, &outcome.result)
-                .map(|()| native_tool_payload(&outcome.result))
-        });
+    let result = crate::tools::native_ops::execute_tool_with_security(
+        config, policy, tool_name, args, false,
+    )
+    .await
+    .and_then(|outcome| {
+        reject_failed_native_tool_result(slug, &outcome.result)
+            .map(|()| native_tool_payload(&outcome.result))
+    });
     hooks.record_execution(audit_id.as_deref(), &result);
     result
 }
@@ -90,5 +98,5 @@ pub(crate) fn native_tool_payload(result: &ToolResult) -> Value {
 }
 
 #[cfg(test)]
-#[path = "flow_backend_tests.rs"]
+#[path = "native_backend_tests.rs"]
 mod tests;

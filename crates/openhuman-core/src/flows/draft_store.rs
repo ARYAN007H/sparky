@@ -3,10 +3,8 @@
 use anyhow::Result;
 use serde_json::Value;
 use tinyflows_bus::catalog::{
-    self, CreateDraftRequest, DraftIdRequest, FlowDraft as WireDraft, UpdateDraftRequest,
+    self, CreateDraftRequest, DraftIdRequest, DraftOrigin, FlowDraft, UpdateDraftRequest,
 };
-use tinyflows_catalog::DraftOrigin;
-use tinyflows_catalog::FlowDraft;
 
 use crate::config::Config;
 use crate::flows::{catalog_storage, store};
@@ -25,13 +23,9 @@ pub fn create_draft(
         flow_id,
         name,
         graph,
-        origin: store::roundtrip(origin)?,
+        origin,
     };
-    store::roundtrip(store::call_catalog::<WireDraft, _>(
-        config,
-        catalog::members::CREATE_DRAFT,
-        (request,),
-    )?)
+    store::call_catalog::<FlowDraft, _>(config, catalog::members::CREATE_DRAFT, (request,))
 }
 
 /// Read one module-owned draft.
@@ -41,9 +35,9 @@ pub fn get_draft(config: &Config, id: &str) -> Result<Option<FlowDraft>> {
         storage,
         id: id.to_owned(),
     };
-    let draft: Option<WireDraft> =
+    let draft: Option<FlowDraft> =
         store::call_catalog(config, catalog::members::GET_DRAFT, (request,))?;
-    draft.map(store::roundtrip).transpose()
+    Ok(draft)
 }
 
 /// Patch a module-owned draft.
@@ -62,19 +56,15 @@ pub fn update_draft(
         graph,
         flow_id,
     };
-    let draft: WireDraft = store::call_catalog(config, catalog::members::UPDATE_DRAFT, (request,))?;
-    store::roundtrip(draft)
+    store::call_catalog(config, catalog::members::UPDATE_DRAFT, (request,))
 }
 
 /// List module-owned drafts.
 pub fn list_drafts(config: &Config) -> Result<Vec<FlowDraft>> {
     let storage = catalog_storage::register_blocking(config)?;
-    let drafts: Vec<WireDraft> =
+    let drafts: Vec<FlowDraft> =
         store::call_catalog(config, catalog::members::LIST_DRAFTS, (storage,))?;
-    drafts
-        .into_iter()
-        .map(store::roundtrip)
-        .collect::<Result<Vec<_>>>()
+    Ok(drafts)
 }
 
 /// Delete one draft, returning whether a record was removed.

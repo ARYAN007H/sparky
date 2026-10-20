@@ -661,9 +661,13 @@ async fn flows_cancel_run_of_an_already_completed_run_errors() {
     .await
     .unwrap();
     let thread_id = run.value["thread_id"].as_str().unwrap().to_string();
+    let before = flows_get_run(&config, &thread_id).await.unwrap().value;
+    assert_eq!(before.status, "completed");
 
     let err = flows_cancel_run(&config, &thread_id)
         .await
         .expect_err("cancelling an already-completed run must be a clear error");
-    assert!(err.contains("already terminal"), "got: {err}");
+    assert!(err.contains("cancellation was not accepted"), "got: {err}");
+    let after = flows_get_run(&config, &thread_id).await.unwrap().value;
+    assert_eq!(after.status, "completed", "owner terminal row is unchanged");
 }

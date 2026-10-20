@@ -78,7 +78,11 @@ pub(in crate::flows::schemas) fn handle_list_suggestions(
             .and_then(Value::as_str)
             .map(str::trim)
             .filter(|s| !s.is_empty())
-            .map(tinyflows_catalog::SuggestionStatus::from_str_lossy);
+            .map(|status| match status {
+                "dismissed" => tinyflows_bus::catalog::SuggestionStatus::Dismissed,
+                "built" => tinyflows_bus::catalog::SuggestionStatus::Built,
+                _ => tinyflows_bus::catalog::SuggestionStatus::New,
+            });
         to_json(ops::flows_list_suggestions(&config, status).await?)
     })
 }
