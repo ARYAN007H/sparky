@@ -109,8 +109,8 @@ pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
             || s.is_empty()
             || s == "cloud"
             || s == PROVIDER_OPENHUMAN
-            // The owner classifier also accepts bare provider-kind aliases
-            // such as `openai`; only a parsed local route is persisted here.
+            // Only an explicit local route is exempt; bare provider-kind
+            // aliases stay subject to this migration's unresolved-route check.
             || ProviderRoute::parse(s).is_some_and(|route| matches!(route.kind(), RouteKind::Local(_)))
         {
             continue;
