@@ -435,7 +435,6 @@ impl Channel for ModuleChannel {
     fn supports_reactions(&self) -> bool {
         self.interaction.supports_reactions
     }
-
 }
 
 impl ModuleChannel {

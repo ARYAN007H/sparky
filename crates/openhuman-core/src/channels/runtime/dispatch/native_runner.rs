@@ -251,16 +251,16 @@ impl NativeHost {
         // profile-wide chat/cron gate. Both acquisitions happen in checkout,
         // after TurnRunner admission, and cancellation drops either future.
         let profile_turn = crate::profiles::turn_gate::acquire(dispatch).await;
-        let busy = match trusted.relay_thread.as_deref() {
-            Some(thread_id) => Some(
-                crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(
-                    dispatch, thread_id,
-                ),
-            ),
-            None => Some(crate::agent::orchestration::busy_guard::TurnBusy::start(
+        // Relay keeps its thread busy through the small post-run durable
+        // reply-recording tail in `run_relay_turn`; other native turns can
+        // release their busy guard with progressive terminal delivery.
+        let busy = if trusted.relay_thread.is_none() {
+            Some(crate::agent::orchestration::busy_guard::TurnBusy::start(
                 dispatch,
                 &session_id,
-            )),
+            ))
+        } else {
+            None
         };
         let native_reply = match trusted.native_target.as_ref() {
             Some(target) => Some(

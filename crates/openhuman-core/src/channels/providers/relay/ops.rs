@@ -106,6 +106,13 @@ pub(crate) async fn run_relay_turn(
     request_id: String,
 ) -> Vec<String> {
     let workspace_dir = config.workspace_dir.clone();
+    // Keep background deliveries off this thread through the adapter's
+    // durable reply-recording tail. Execution, profile serialization,
+    // cancellation and progressive delivery are owned by the shared runner.
+    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(
+        &dispatch_ctx,
+        &thread_id,
+    );
     // The thread is busy for the whole turn, so a background result due on it
     // waits instead of landing mid-turn. The pipeline's session id does not
     // name the thread, so the guard is taken on the thread itself; this task
@@ -309,6 +316,7 @@ pub(crate) async fn run_relay_turn(
     record(&dispatch_ctx, &workspace_dir, &params, &thread_id, &replies).await;
     // Idle again: deliver anything that finished while the turn ran. No
     // `AgentTurnCompleted` maps to this thread, so nothing else would.
+    drop(busy);
     crate::agent::orchestration::background_delivery::kick_delivery(&dispatch_ctx, &thread_id);
     tracing::info!(
         channel = %params.channel,

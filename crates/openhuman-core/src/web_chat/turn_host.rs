@@ -122,11 +122,10 @@ impl WebHost {
         // then the profile-wide chat/cron gate. This keeps native, relay and
         // web runner instances from forming an inverse-lock cycle.
         let profile_turn = crate::profiles::turn_gate::acquire(&ctx).await;
-        self.shared
-            .with(id, |slot| {
-                slot.session_lease = Some(lease);
-                slot.profile_turn = profile_turn;
-            });
+        self.shared.with(id, |slot| {
+            slot.session_lease = Some(lease);
+            slot.profile_turn = profile_turn;
+        });
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.

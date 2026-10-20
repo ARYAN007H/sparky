@@ -178,8 +178,6 @@ impl Channel for HarnessChannel {
     fn supports_reactions(&self) -> bool {
         self.supports_reactions
     }
-
-
 }
 
 struct HarnessModel;
