@@ -23,6 +23,10 @@ pub(crate) use staged::{
     validate_opaque_parts,
 };
 
+pub(crate) fn has_opaque_ref(part: &ContentPart) -> bool {
+    opaque_media(part).is_some_and(|media| media.opaque_id.is_some())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredAttachment {

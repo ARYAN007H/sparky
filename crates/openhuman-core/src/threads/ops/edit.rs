@@ -117,8 +117,7 @@ pub async fn edit_message(
         .await
         .map_err(ThreadsError::Message)?;
     let has_existing_refs = request.attachments.iter().any(|part| {
-        crate::threads::attachments::opaque_media(part)
-            .is_some_and(|media| media.opaque_id.is_some())
+        crate::threads::attachments::has_opaque_ref(part)
     });
     let staged_parts = if request.attachments.is_empty() {
         Vec::new()
