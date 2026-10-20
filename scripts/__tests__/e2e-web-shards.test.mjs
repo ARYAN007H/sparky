@@ -102,6 +102,7 @@ test("strict and diagnostic selections partition discovered specs fail-closed", 
   assert.ok(required.files.includes("test/playwright/specs/agent-review.spec.ts"));
   assert.ok(required.files.includes("test/playwright/specs/command-palette-keyboard.spec.ts"));
   assert.ok(required.files.includes("test/playwright/specs/skills-search-install.spec.ts"));
+  assert.ok(required.files.includes("test/playwright/specs/connections-tab-deeplinks.spec.ts"));
   assert.ok(required.files.includes("test/playwright/specs/webhooks-tunnel-flow.spec.ts"));
   assert.deepEqual(
     [...required.files, ...diagnostic.files].sort(),
@@ -200,7 +201,6 @@ test("required selection forwards every healthy spec and never the diagnostic fi
     "auth-access-control.spec.ts",
     "command-palette-keyboard.spec.ts",
     "skills-search-install.spec.ts",
-    "connections-tab-deeplinks.spec.ts",
     "webhooks-tunnel-flow.spec.ts",
   ]) {
     assert.match(joined, new RegExp(required.replaceAll(".", "\\.")));
