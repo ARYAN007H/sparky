@@ -58,10 +58,14 @@ fn upsert_bound_parser_accepts_owned_examples_and_requires_declared_fields() {
         .find(|controller| controller.schema.method_name() == "threads.upsert")
         .expect("threads.upsert is registered");
     let required = ["id", "title", "created_at"];
-    assert_eq!(
-        crate::core::schema_test_support::required_input_contract(&entry.schema, &required),
-        Ok(())
-    );
+    let required_in_schema: Vec<_> = entry
+        .schema
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_eq!(required_in_schema, required);
 
     let examples = [
         json!({"id":"t1", "title":"Hello", "created_at":"2026-04-22T00:00:00Z"}),
@@ -69,7 +73,7 @@ fn upsert_bound_parser_accepts_owned_examples_and_requires_declared_fields() {
     ];
     for example in examples {
         let params = obj(example);
-        crate::core::validate_params(&entry.schema, &params)
+        crate::core::all::validate_params(&entry.schema, &params)
             .expect("registered schema accepts the independent example");
         entry
             .decode_params(params)
@@ -80,11 +84,13 @@ fn upsert_bound_parser_accepts_owned_examples_and_requires_declared_fields() {
     missing_schema_field
         .inputs
         .retain(|field| field.name != "created_at");
-    assert!(crate::core::schema_test_support::required_input_contract(
-        &missing_schema_field,
-        &required
-    )
-    .is_err());
+    let missing_required: Vec<_> = missing_schema_field
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_ne!(missing_required, required);
 
     let mut optional_schema_field = entry.schema.clone();
     optional_schema_field
@@ -93,11 +99,13 @@ fn upsert_bound_parser_accepts_owned_examples_and_requires_declared_fields() {
         .find(|field| field.name == "created_at")
         .expect("the contract field is declared")
         .required = false;
-    assert!(crate::core::schema_test_support::required_input_contract(
-        &optional_schema_field,
-        &required
-    )
-    .is_err());
+    let optional_required: Vec<_> = optional_schema_field
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_ne!(optional_required, required);
 }
 
 // ── parse::<T>(params) contract ─────────────────────────────────────
