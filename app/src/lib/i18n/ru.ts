@@ -1966,6 +1966,7 @@ const messages: TranslationMap = {
     'Повтор не удался. Скачай последнюю версию и попробуй снова.',
   'daemon.serviceBlockingGate.retrying': 'Повтор...',
   'daemon.serviceBlockingGate.title': 'Ядро OpenHuman недоступно',
+  'notifications.card.dismiss': 'Закрыть уведомление',
   'notifications.card.importanceTitle': 'Важность: {pct}%',
   'notifications.center.empty': 'Уведомлений пока нет',
   'notifications.center.emptyHint': 'Пусто',

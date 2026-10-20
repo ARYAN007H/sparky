@@ -1917,6 +1917,7 @@ const messages: TranslationMap = {
     'فشلت إعادة المحاولة. نزّل أحدث إصدار للتطبيق وحاول مرة أخرى.',
   'daemon.serviceBlockingGate.retrying': 'جارٍ إعادة المحاولة...',
   'daemon.serviceBlockingGate.title': 'نواة OpenHuman غير متاحة',
+  'notifications.card.dismiss': 'إغلاق الإشعار',
   'notifications.card.importanceTitle': 'الأهمية: {pct}%',
   'notifications.center.empty': 'لا توجد إشعارات بعد',
   'notifications.center.emptyHint': 'تلميح الفراغ',

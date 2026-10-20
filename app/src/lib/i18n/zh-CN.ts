@@ -1839,6 +1839,7 @@ const messages: TranslationMap = {
   'daemon.serviceBlockingGate.retryFailed': '重试失败。请下载最新应用版本后重试。',
   'daemon.serviceBlockingGate.retrying': '重试中...',
   'daemon.serviceBlockingGate.title': 'OpenHuman 核心不可用',
+  'notifications.card.dismiss': '忽略通知',
   'notifications.card.importanceTitle': '重要性',
   'notifications.center.empty': '暂无通知',
   'notifications.center.emptyHint': '新通知将出现在这里',

@@ -1977,6 +1977,7 @@ const messages: TranslationMap = {
     'Ponowna próba się nie powiodła. Pobierz najnowszą wersję aplikacji i spróbuj ponownie.',
   'daemon.serviceBlockingGate.retrying': 'Ponawianie...',
   'daemon.serviceBlockingGate.title': 'Rdzeń OpenHuman jest niedostępny',
+  'notifications.card.dismiss': 'Odrzuć powiadomienie',
   'notifications.card.importanceTitle': 'Ważność: {pct}%',
   'notifications.center.empty': 'Brak powiadomień',
   'notifications.center.emptyHint': 'Nowe powiadomienia pojawią się tutaj.',

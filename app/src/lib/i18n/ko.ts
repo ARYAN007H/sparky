@@ -1938,6 +1938,7 @@ const messages: TranslationMap = {
     '다시 시도에 실패했습니다. 최신 앱 빌드를 다운로드하고 다시 시도하세요.',
   'daemon.serviceBlockingGate.retrying': '다시 시도 중...',
   'daemon.serviceBlockingGate.title': 'OpenHuman 코어를 사용할 수 없습니다',
+  'notifications.card.dismiss': '알림 닫기',
   'notifications.card.importanceTitle': '중요도: {pct}%',
   'notifications.center.empty': '아직 알림이 없습니다',
   'notifications.center.emptyHint': '빈 상태 안내',

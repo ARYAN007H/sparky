@@ -5165,6 +5165,7 @@ const en: TranslationMap = {
   'conversations.tools.reviewLearnings.active': 'Reviewing what I learned',
   'conversations.tools.reviewLearnings.done': 'Reviewed what I learned',
   'conversations.tools.updateLearnings.active': 'Updating what I learned',
+  'orchestration.detail.stop': 'Stop',
   'conversations.tools.updateLearnings.done': 'Updated what I learned',
   'conversations.tools.delegateTask.active': 'Delegating task',
   'conversations.tools.delegateTask.done': 'Delegated task',

@@ -1969,6 +1969,7 @@ const messages: TranslationMap = {
     'Coba ulang gagal. Unduh build aplikasi terbaru dan coba lagi.',
   'daemon.serviceBlockingGate.retrying': 'Mencoba ulang...',
   'daemon.serviceBlockingGate.title': 'Core OpenHuman tidak tersedia',
+  'notifications.card.dismiss': 'Abaikan notifikasi',
   'notifications.card.importanceTitle': 'Tingkat penting: {pct}%',
   'notifications.center.empty': 'Belum ada notifikasi',
   'notifications.center.emptyHint': 'Petunjuk kosong',

@@ -1986,6 +1986,7 @@ const messages: TranslationMap = {
     'Reintento fallido. Descarga la última versión de la app e inténtalo de nuevo.',
   'daemon.serviceBlockingGate.retrying': 'Reintentando...',
   'daemon.serviceBlockingGate.title': 'El core de OpenHuman no está disponible',
+  'notifications.card.dismiss': 'Descartar notificación',
   'notifications.card.importanceTitle': 'Importancia: {pct}%',
   'notifications.center.empty': 'Sin notificaciones aún',
   'notifications.center.emptyHint': 'Sugerencia de vacío',

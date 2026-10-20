@@ -5241,6 +5241,7 @@ const messages: TranslationMap = {
   'conversations.tools.reviewLearnings.active': '学習内容をレビュー中',
   'conversations.tools.reviewLearnings.done': '学習内容をレビューしました',
   'conversations.tools.updateLearnings.active': '学習内容を更新中',
+  'orchestration.detail.stop': '停止',
   'conversations.tools.updateLearnings.done': '学習内容を更新しました',
   'conversations.tools.delegateTask.active': 'タスクを委任中',
   'conversations.tools.delegateTask.done': 'タスクを委任しました',

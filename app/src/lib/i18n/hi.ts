@@ -1956,6 +1956,7 @@ const messages: TranslationMap = {
     'फिर से कोशिश विफल। लेटेस्ट ऐप बिल्ड डाउनलोड करके दोबारा कोशिश करें।',
   'daemon.serviceBlockingGate.retrying': 'फिर से कोशिश हो रही है...',
   'daemon.serviceBlockingGate.title': 'OpenHuman कोर उपलब्ध नहीं है',
+  'notifications.card.dismiss': 'नोटिफिकेशन हटाएं',
   'notifications.card.importanceTitle': 'महत्व: {pct}%',
   'notifications.center.empty': 'अभी कोई नोटिफिकेशन नहीं',
   'notifications.center.emptyHint': 'खाली संकेत',

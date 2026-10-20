@@ -2008,6 +2008,7 @@ const messages: TranslationMap = {
     'Wiederholungsversuch fehlgeschlagen. Lade den neuesten App-Build herunter und versuche es erneut.',
   'daemon.serviceBlockingGate.retrying': 'Erneuter Versuch...',
   'daemon.serviceBlockingGate.title': 'OpenHuman Kern ist nicht verfügbar',
+  'notifications.card.dismiss': 'Benachrichtigung verwerfen',
   'notifications.card.importanceTitle': 'Wichtigkeit: {pct}%',
   'notifications.center.empty': 'Noch keine Benachrichtigungen',
   'notifications.center.emptyHint': 'Leerer Hinweis',

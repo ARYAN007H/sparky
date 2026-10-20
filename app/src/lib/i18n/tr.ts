@@ -4893,6 +4893,7 @@ const messages: TranslationMap = {
   'conversations.tools.reviewLearnings.active': 'Öğrenilenler inceleniyor',
   'conversations.tools.reviewLearnings.done': 'Öğrenilenler incelendi',
   'conversations.tools.updateLearnings.active': 'Öğrenilenler güncelleniyor',
+  'orchestration.detail.stop': 'Durdur',
   'conversations.tools.updateLearnings.done': 'Öğrenilenler güncellendi',
   'conversations.tools.delegateTask.active': 'Görev devrediliyor',
   'conversations.tools.delegateTask.done': 'Görev devredildi',

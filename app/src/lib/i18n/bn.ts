@@ -1951,6 +1951,7 @@ const messages: TranslationMap = {
     'আবার চেষ্টা ব্যর্থ। সর্বশেষ অ্যাপ বিল্ড ডাউনলোড করে আবার চেষ্টা করুন।',
   'daemon.serviceBlockingGate.retrying': 'আবার চেষ্টা হচ্ছে...',
   'daemon.serviceBlockingGate.title': 'OpenHuman কোর পাওয়া যাচ্ছে না',
+  'notifications.card.dismiss': 'বিজ্ঞপ্তি বাদ দিন',
   'notifications.card.importanceTitle': 'গুরুত্ব: {pct}%',
   'notifications.center.empty': 'এখনো কোনো বিজ্ঞপ্তি নেই',
   'notifications.center.emptyHint': 'খালি হিন্ট',
