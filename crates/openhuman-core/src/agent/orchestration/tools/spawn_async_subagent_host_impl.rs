@@ -329,7 +329,7 @@ impl SpawnAsyncSubagentTool {
                         parent_thread_id.clone(),
                     ),
                 ),
-            parent_epoch: None,
+            parent_epoch: completion_target.parent_epoch(),
             },
             reusable.as_ref(),
         ) {
