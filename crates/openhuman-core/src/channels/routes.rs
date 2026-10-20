@@ -1,8 +1,6 @@
 //! Per-sender routing and runtime command handling.
 
 #[cfg(test)]
-#[cfg(test)]
-use super::context::clear_sender_history;
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
@@ -348,10 +346,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
         None,
         None,
         msg,
-        || async {
-            clear_sender_history(&ctx.conversation_histories, sender_key);
-            Ok(())
-        },
+        || async { Ok(()) },
     )
     .await
 }

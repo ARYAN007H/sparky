@@ -87,40 +87,6 @@ fn timeout_and_history_keys_respect_channel_rules() {
     );
 }
 
-#[test]
-fn clear_and_compact_sender_history_update_cached_messages() {
-    let ctx = runtime_context();
-    let sender = "discord_alice_reply_thread:thread-1";
-    let mut history = Vec::new();
-    history.push(tinychannels_runtime::context::ChatMessage::user("short"));
-    history.extend(
-        (0..20).map(|idx| {
-            tinychannels_runtime::context::ChatMessage::assistant("x".repeat(700 + idx))
-        }),
-    );
-    ctx.conversation_histories
-        .lock()
-        .unwrap()
-        .insert(sender.into(), history);
-
-    assert!(compact_sender_history(&ctx.conversation_histories, sender));
-    {
-        let compacted = ctx.conversation_histories.lock().unwrap();
-        let compacted = compacted.get(sender).unwrap();
-        assert_eq!(compacted.len(), CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES);
-        assert!(compacted.iter().all(|msg| {
-            msg.content.chars().count() <= CHANNEL_HISTORY_COMPACT_CONTENT_CHARS + 3
-        }));
-    }
-
-    clear_sender_history(&ctx.conversation_histories, sender);
-    assert!(!ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .contains_key(sender));
-}
-
 #[tokio::test]
 async fn overflow_detection_covers_edge_cases() {
     let ctx = runtime_context();

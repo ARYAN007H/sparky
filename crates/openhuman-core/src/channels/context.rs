@@ -16,17 +16,6 @@ pub(crate) use tinychannels_runtime::context::{
 };
 
 #[cfg(test)]
-pub(crate) use tinychannels_runtime::context::{clear_sender_history, ConversationHistoryMap};
-
-#[cfg(test)]
-pub(crate) use tinychannels_runtime::context::compact_sender_history;
-
-#[cfg(test)]
-pub(crate) use tinychannels_runtime::context::{
-    CHANNEL_HISTORY_COMPACT_CONTENT_CHARS, CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES,
-};
-
-#[cfg(test)]
 pub(crate) use tinychannels::context::{
     effective_channel_message_timeout_secs, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
@@ -55,8 +44,6 @@ pub(crate) struct ChannelRuntimeContext {
     pub(crate) model: Arc<String>,
     pub(crate) temperature: f64,
     pub(crate) max_tool_iterations: usize,
-    #[cfg(test)]
-    pub(crate) conversation_histories: ConversationHistoryMap,
     pub(crate) turn_model_source_cache: TurnModelSourceCacheMap,
     pub(crate) route_overrides: RouteSelectionMap,
     pub(crate) api_url: Option<String>,
