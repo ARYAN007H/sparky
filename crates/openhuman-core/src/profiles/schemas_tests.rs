@@ -104,48 +104,34 @@ fn credential_schema_and_parser_keep_field_order_defaults_and_kinds() {
         ["profile_id", "kind", "token", "expires_at"]
     );
 
-    let absent = parse_credential(
-        json!({
+    for (kind, expires_at, expected_expiry) in [
+        (UserCredentialKind::ApiKey, None, None),
+        (UserCredentialKind::Session, Some(json!(null)), None),
+        (
+            UserCredentialKind::Session,
+            Some(json!("not-normalized")),
+            Some("not-normalized"),
+        ),
+    ] {
+        let kind_name = match kind {
+            UserCredentialKind::Session => "session",
+            UserCredentialKind::ApiKey => "api_key",
+        };
+        let mut params = json!({
             "profile_id":"p1",
-            "kind":"api_key",
+            "kind":kind_name,
             "token":"fixture-only-token"
         })
         .as_object()
         .expect("object params")
-        .clone(),
-    )
-    .expect("api key with absent expiry");
-    assert_eq!(absent.kind, UserCredentialKind::ApiKey);
-    assert_eq!(absent.expires_at, None);
-
-    let null = parse_credential(
-        json!({
-            "profile_id":"p1",
-            "kind":"session",
-            "token":"fixture-only-token",
-            "expires_at":null
-        })
-        .as_object()
-        .expect("object params")
-        .clone(),
-    )
-    .expect("session with null expiry");
-    assert_eq!(null.kind, UserCredentialKind::Session);
-    assert_eq!(null.expires_at, None);
-
-    let string = parse_credential(
-        json!({
-            "profile_id":"p1",
-            "kind":"session",
-            "token":"fixture-only-token",
-            "expires_at":"not-normalized"
-        })
-        .as_object()
-        .expect("object params")
-        .clone(),
-    )
-    .expect("string expiry remains unchanged by the parser");
-    assert_eq!(string.expires_at.as_deref(), Some("not-normalized"));
+        .clone();
+        if let Some(expires_at) = expires_at {
+            params.insert("expires_at".into(), expires_at);
+        }
+        let parsed = parse_credential(params).expect("valid credential params");
+        assert_eq!(parsed.kind, kind);
+        assert_eq!(parsed.expires_at.as_deref(), expected_expiry);
+    }
 
     for invalid in [json!("unknown"), json!(42), json!(null)] {
         let params = json!({

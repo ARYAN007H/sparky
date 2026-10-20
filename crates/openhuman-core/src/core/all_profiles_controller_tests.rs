@@ -59,36 +59,26 @@ fn bound_profile_decoders_keep_permissive_unknown_field_behavior() {
     use serde_json::json;
 
     let entries = raw_profiles_entries();
-    for (method, params) in [
-        ("profiles.provision", json!({"user_id":"u1", "extra":true})),
-        (
-            "profiles.deprovision",
-            json!({"profile_id":"p1", "extra":true}),
-        ),
-        ("profiles.list", json!({"entirely_ignored":{"extra":true}})),
-        ("profiles.status", json!({"profile_id":"p1", "extra":true})),
-        (
-            "profiles.set_credential",
-            json!({
-                "profile_id":"p1",
-                "kind":"api_key",
-                "token":"fixture-only-token",
-                "extra":true
-            }),
-        ),
-        (
-            "profiles.clear_credential",
-            json!({"profile_id":"p1", "extra":true}),
-        ),
-        ("profiles.release", json!({"profile_id":"p1", "extra":true})),
-    ] {
-        let params = params.as_object().expect("fixture object").clone();
+    for contract in crate::profiles::schemas::profile_parameter_contracts() {
+        let mut params = contract.examples[0]
+            .as_object()
+            .expect("owner fixture object")
+            .clone();
+        params.insert("extra_scalar".into(), json!(true));
+        params.insert("extra_nested".into(), json!({"ignored":true}));
         entries
             .iter()
-            .find(|entry| entry.schema.method_name() == method)
-            .unwrap_or_else(|| panic!("missing raw {method} entry"))
+            .find(|entry| entry.schema.method_name() == contract.method)
+            .unwrap_or_else(|| panic!("missing raw {} entry", contract.method))
+            // Deliberately skip schema validation: this pins the legacy
+            // DTO/list decoder behavior for keys the schemas do not declare.
             .decode_params(params)
-            .unwrap_or_else(|error| panic!("{method} decoder rejected permissive map: {error}"));
+            .unwrap_or_else(|error| {
+                panic!(
+                    "{} decoder rejected permissive map: {error}",
+                    contract.method
+                )
+            });
     }
 }
 
