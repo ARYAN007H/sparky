@@ -1,8 +1,8 @@
 //! Controller schema and registered-controller lists for the `threads`
 //! namespace.
 
-use crate::core::ControllerSchema;
 use crate::core::all::{BoundRegisteredController, ControllerEntry, RegisteredController};
+use crate::core::ControllerSchema;
 
 use super::handlers::{
     handle_create_new, handle_delete, handle_edit_message, handle_generate_title, handle_goal_get,

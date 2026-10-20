@@ -1,8 +1,8 @@
 use super::*;
 use crate::core::{FieldSchema, TypeSchema};
 use std::sync::{
-    Mutex,
     atomic::{AtomicUsize, Ordering},
+    Mutex,
 };
 
 static CALLS: AtomicUsize = AtomicUsize::new(0);
@@ -208,7 +208,11 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
         .map(|grouped| &grouped.controller)
         .filter(|entry| entry.schema.method_name() == "threads.upsert")
         .collect();
-    assert_eq!(entries.len(), 1, "threads.upsert has one raw registry entry");
+    assert_eq!(
+        entries.len(),
+        1,
+        "threads.upsert has one raw registry entry"
+    );
     let entry = entries[0];
     let bound_methods: Vec<_> = registry()
         .iter()
@@ -230,7 +234,10 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
         .filter(|field| field.required)
         .map(|field| field.name)
         .collect();
-    assert_eq!(declared, required, "required fields are independent contract");
+    assert_eq!(
+        declared, required,
+        "required fields are independent contract"
+    );
 
     for example in [
         json!({"id":"t1", "title":"Hello", "created_at":"2026-04-22T00:00:00Z"}),
