@@ -35,7 +35,6 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
                 "prompt": format!("Investigate {SPAWN_SUBAGENT_CANARY}"),
                 "context": "parent supplied context",
                 "model": "test-model",
-                "blocking": true
             }),
             None,
             live.data.child(),
@@ -47,20 +46,53 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
     .expect("tool execution");
 
     assert!(!result.is_error, "{}", result.output());
-    assert_eq!(result.output(), "spawn-subagent-child-answer");
+    assert!(
+        result.output().contains("[async_subagent_ref]"),
+        "spawn returns an async task reference before its child result: {}",
+        result.output()
+    );
+    let task_ref = result
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .expect("accepted async envelope contains the child task reference");
+    let task_id = task_ref["task_id"].as_str().expect("public task id");
     assert!(provider.saw(SPAWN_SUBAGENT_CANARY));
     assert!(provider.saw("parent supplied context"));
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
-    assert!(
-        jobs.list().iter().any(|job| {
-            job.agent == "task_manager_agent"
-                && job.output.as_deref() == Some("spawn-subagent-child-answer")
-                && job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
-        }),
-        "spawn_subagent must register its real target and terminal state in shared Jobs"
+    let job = jobs
+        .list()
+        .into_iter()
+        .find(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id)
+        })
+        .expect("spawn registers its accepted child in shared Jobs");
+    let terminal = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        jobs.wait_owned(
+            job.id.as_str(),
+            crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                workspace.path(),
+                "spawn-subagent-e2e",
+                None,
+            ),
+        ),
+    )
+    .await
+    .expect("accepted child completes asynchronously")
+    .expect("accepted job remains in the shared registry");
+    assert_eq!(
+        terminal.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
     );
+    assert_eq!(terminal.output.as_deref(), Some("spawn-subagent-child-answer"));
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
