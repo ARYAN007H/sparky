@@ -661,10 +661,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::agent_runs::all_orchestration_registered_controllers(),
     );
     // SaaS operator plane: provision and inspect user profiles.
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Operator,
-        crate::profiles::all_profiles_registered_controllers(),
+        crate::profiles::schemas::all_profiles_controller_entries(),
     );
     controllers
 }
