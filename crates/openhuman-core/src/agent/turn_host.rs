@@ -37,7 +37,7 @@ pub(crate) struct TrustedAgentTurn {
     /// Captured configured compiled-module target for native turns. The
     /// progressive handle itself is opened at runner checkout per admitted
     /// request, so queued follow-ups never reuse a finished handle.
-    pub(crate) native_target: Option<Arc<crate::channels::runtime::dispatch::processor::progressive::NativeProgressiveTarget>>,
+    pub(crate) native_target: Option<Arc<crate::channels::runtime::dispatch::NativeProgressiveTarget>>,
 }
 
 impl std::fmt::Debug for TrustedAgentTurn {

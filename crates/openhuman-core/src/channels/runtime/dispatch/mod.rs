@@ -16,6 +16,8 @@ mod native_runner;
 mod processor;
 mod routing;
 
+pub(crate) use processor::progressive::NativeProgressiveTarget;
+
 pub(crate) use processor::{
     process_channel_message, process_channel_runtime_message, run_message_dispatch_loop,
     RuntimeChannelMessage,
