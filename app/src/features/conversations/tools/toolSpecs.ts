@@ -298,7 +298,8 @@ export const EXACT_TOOL_SPECS: Record<string, ToolSpec> = {
 
   // ── Agents and delegation ──────────────────────────────────────────────
   spawn_subagent: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
-  list_subagents: spec('checkAgents', BotIcon, 'agent'),
+  // Kept for recorded transcripts from before the single-spawn contract.
+  spawn_async_subagent: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
   wait: spec('wait', HourglassIcon, 'agent'),
   wait_loop: spec('wait', HourglassIcon, 'agent'),
   ask_user_clarification: spec('askQuestion', MessageCircleQuestionIcon, 'agent', {

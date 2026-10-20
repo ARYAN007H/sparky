@@ -1379,6 +1379,45 @@ describe('subagent event reducers (Phase 3)', () => {
     expect(rows[0].subagent).toMatchObject({ taskId: 'task-1', agentId: 'researcher' });
   });
 
+  it('reattaches a resumed task to its newest parent spawn call', () => {
+    const rowId = 't1:subagent:task-1:researcher';
+    let state = reducer(
+      undefined,
+      subagentSpawned({
+        threadId: 't1',
+        requestId: 'request-1',
+        round: 0,
+        rowId,
+        taskId: 'task-1',
+        agentId: 'researcher',
+        spawnEventId: 'request-1:4',
+        parentCallId: 'spawn-original',
+      })
+    );
+    state = reducer(state, subagentAwaitingUser({ threadId: 't1', rowId, question: 'Continue?' }));
+
+    state = reducer(
+      state,
+      subagentSpawned({
+        threadId: 't1',
+        requestId: 'request-2',
+        round: 0,
+        rowId,
+        taskId: 'task-1',
+        agentId: 'researcher',
+        spawnEventId: 'request-2:2',
+        parentCallId: 'spawn-resume',
+      })
+    );
+
+    expect(state.toolTimelineByThread.t1[0]).toMatchObject({ status: 'running' });
+    expect(state.toolTimelineByThread.t1[0].subagent).toMatchObject({
+      status: 'running',
+      parentCallId: 'spawn-resume',
+    });
+    expect(state.toolTimelineByThread.t1[0].subagent?.awaitingQuestion).toBeUndefined();
+  });
+
   it('subagentToolCallReceived appends and de-dupes on callId; result settles it', () => {
     let state = spawn();
     const row = 't1:subagent:task-1:researcher';
