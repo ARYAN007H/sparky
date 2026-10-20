@@ -160,8 +160,6 @@ fn every_pack_declares_the_tools_it_is_named_for() {
         (
             "workflows",
             &[
-                "build_workflow",
-                "discover_workflows",
                 "run_workflow",
                 "await_workflow",
                 "describe_workflow",
@@ -246,12 +244,6 @@ fn every_pack_declares_the_tools_it_is_named_for() {
         (
             "skills",
             &[
-                // Ranked lookup over installed skills. Deliberately IN this
-                // pack rather than advertised: on its own it produced ids for
-                // skills whose `describe_workflow` / run route were still
-                // withheld — 748 B on every wildcard agent for a doorway to a
-                // locked room.
-                "setup_skills",
                 "skill_search",
                 "skill_registry_browse",
                 "skill_registry_search",
@@ -269,7 +261,6 @@ fn every_pack_declares_the_tools_it_is_named_for() {
             &[
                 "generate_document",
                 "generate_presentation",
-                "make_presentation",
             ],
         ),
         (
@@ -343,13 +334,11 @@ fn every_pack_declares_the_tools_it_is_named_for() {
             &[
                 "create_image",
                 "create_video",
-                "analyze_image",
                 "media_generate_image",
                 "media_generate_video",
                 "media_list_models",
             ],
         ),
-        ("tasks", &["manage_tasks"]),
         ("goals", &["goal_get", "goal_set"]),
         ("docs", &["gitbooks_search", "gitbooks_get_page"]),
     ];

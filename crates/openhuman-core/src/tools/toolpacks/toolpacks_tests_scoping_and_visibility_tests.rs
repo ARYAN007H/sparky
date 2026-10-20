@@ -307,16 +307,21 @@ fn the_workflows_pack_is_still_owned_by_the_flow_agents() {
 
 // ── #6302: the MCP and skill hand-offs, and the packs they close ───────────
 
-/// `setup_skills` is a packed hand-off like `build_workflow` and
-/// `manage_tasks`: it rides in the `skills` pack it hands off into, so the
-/// orchestrator reaches it through `use_skill` instead of paying its schema on
-/// every request.
+/// The former specialist aliases are no longer registered or packed; the
+/// orchestrator uses the shared spawn tool with an agent id.
 #[test]
-fn the_skill_install_hand_off_is_packed_in_the_skills_pack() {
-    assert_eq!(
-        registry::pack_for_tool("setup_skills").map(|pack| pack.id),
-        Some("skills")
-    );
+fn retired_specialist_aliases_are_not_packed() {
+    for alias in [
+        "setup_skills",
+        "manage_tasks",
+        "build_workflow",
+        "discover_workflows",
+        "make_presentation",
+        "analyze_image",
+    ] {
+        assert_eq!(registry::pack_for_tool(alias), None, "{alias}");
+        assert!(!registry::all_packed_tool_names().contains(&alias), "{alias}");
+    }
 }
 
 /// The spawn tool closes only packs owned by specialists in its allowed-id
