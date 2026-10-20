@@ -449,43 +449,36 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None => None,
     };
-    // Serialize this durable identity across surface runners through delivery;
-    // TinyAgents' own lock is local to one runner and checks in before egress.
-    let lease_agent_id = selected_host
-        .as_ref()
-        .map(|host| host.definition.id.clone())
-        .or_else(|| tenant.agent.clone())
-        .unwrap_or_else(|| "orchestrator".to_owned());
-    let _session_lease = crate::agent::session_lease::SessionLease::acquire_channel(
-        &tenant,
-        &lease_agent_id,
-        &session_key,
-    )
-    .await;
-    let cancellation = tinyagents_harness::CancellationToken::new();
-    let agent_call: std::pin::Pin<
-        Box<dyn std::future::Future<Output = anyhow::Result<AgentTurnResponse>> + Send + '_>,
-    > = match selected_host {
-        Some(host) => Box::pin(run_host_agent_turn(
-            host,
-            HostChannelTurn {
-                relay_thread: ctx.relay_thread.clone(),
+    let execution = match selected_host {
+        Some(host) => {
+            let request_id = format!("{}:{}:{}", msg.channel, msg.id, uuid::Uuid::new_v4());
+            let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
+                host_agent: host,
                 channel: msg.channel.clone(),
                 session_key: session_key.clone(),
                 event_session_id: history_key.clone(),
-                message: enriched_message.clone(),
-                origin: turn_origin,
-                progress: progress_tx,
-                run_queue: None,
-                approval,
-                cancellation: cancellation.clone(),
-                turn_deadline: crate::agent::session_host::turn_backstop::configured_backstop(),
+                origin: turn_origin.clone(),
+                approval: approval.clone(),
+                relay_thread: ctx.relay_thread.clone(),
                 imported_history,
-            },
-        )),
+                native_reply: native_reply.clone(),
+            });
+            super::native_runner::run(
+                &ctx.dispatch_ctx(),
+                session_key.clone(),
+                request_id,
+                enriched_message.clone(),
+                trusted,
+            )
+            .await
+        }
         None if configured_agent_error.is_some() => {
             let error = configured_agent_error.expect("checked configured-agent failure");
-            Box::pin(async move { Err(anyhow::anyhow!(error)) })
+            super::native_runner::NativeTurnExecution {
+                result: Err(error),
+                lease: None,
+                progress_failed: false,
+            }
         }
         #[cfg(test)]
         None => {
@@ -494,7 +487,7 @@ pub(crate) async fn process_channel_runtime_message(
                 tinyagents_session::transcript::TranscriptMessage::system(system_prompt.as_str()),
                 tinyagents_session::transcript::TranscriptMessage::user(&enriched_message),
             ];
-            Box::pin(dispatch_bus_turn(
+            let result = dispatch_bus_turn(
                 ctx.as_ref(),
                 &msg,
                 &route,
@@ -503,16 +496,27 @@ pub(crate) async fn process_channel_runtime_message(
                 progress_tx,
                 turn_origin,
                 approval,
-            ))
+            )
+            .await
+            .map_err(|error| error.to_string());
+            super::native_runner::NativeTurnExecution {
+                result,
+                lease: None,
+                progress_failed: false,
+            }
         }
         #[cfg(not(test))]
         None => {
-            Box::pin(async { Err(anyhow::anyhow!("channel turn has no configured host agent")) })
+            super::native_runner::NativeTurnExecution {
+                result: Err("channel turn has no configured host agent".to_owned()),
+                lease: None,
+                progress_failed: false,
+            }
         }
     };
-    let llm_result =
-        tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;
-    cancellation.cancel();
+    let _session_lease = execution.lease;
+    let progress_failed = execution.progress_failed;
+    let llm_result = execution.result.map_err(anyhow::Error::msg);
 
     // Wait for draft updater to finish
     if let Some(handle) = draft_updater {
@@ -527,7 +531,7 @@ pub(crate) async fn process_channel_runtime_message(
     }
 
     let (success, response_text, response_provider, response_model) = match llm_result {
-        Ok(Ok(response)) => {
+        Ok(response) => {
             let resolved_provider = response
                 .resolved_provider
                 .clone()
@@ -577,7 +581,7 @@ pub(crate) async fn process_channel_runtime_message(
             }
             (delivered, response_text, resolved_provider, resolved_model)
         }
-        Ok(Err(e)) => {
+        Err(e) => {
             if is_context_window_overflow_error(&ctx, &e)
                 .await
                 .unwrap_or(false)
@@ -627,7 +631,8 @@ pub(crate) async fn process_channel_runtime_message(
                 return;
             }
 
-            let error_response = format!("⚠️ Error: {e}");
+            let classified = crate::web_chat::classify_inference_error(&e.to_string());
+            let error_response = classified.message;
             eprintln!(
                 "  ❌ LLM error after {}ms: {e}",
                 started_at.elapsed().as_millis()
