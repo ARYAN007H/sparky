@@ -19,6 +19,13 @@ fn test_config(tmp: &TempDir) -> Config {
     config
 }
 
+fn structurally_valid_graph(value: Value) -> Value {
+    let graph = tinyflows::migrate::deserialize_graph(value).expect("graph should deserialize");
+    tinyflows::validate::validate(&graph).expect("fixture should be structurally valid");
+    tinyflows::compat::ensure_compatible(&graph).expect("fixture should be engine-compatible");
+    serde_json::to_value(graph).expect("graph serializes to portable JSON")
+}
+
 fn trigger_only_graph() -> Value {
     json!({
         "name": "trigger-only",

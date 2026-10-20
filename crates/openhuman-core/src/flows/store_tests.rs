@@ -20,7 +20,7 @@ fn graph() -> serde_json::Value {
 fn catalog_clients_preserve_definition_revisions_and_suggestion_semantics() {
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
-    let flow = create_flow(&config, "before".into(), graph(), false)
+    let flow = create_flow(&config, "before".into(), graph(), false, true)
         .unwrap()
         .workflow;
     assert_eq!(get_flow(&config, &flow.id).unwrap().unwrap().name, "before");
