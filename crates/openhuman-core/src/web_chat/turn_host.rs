@@ -123,7 +123,9 @@ impl WebHost {
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.
-        if self.shared.was_queued(id) && request.disposition == QueueDisposition::Followup {
+        let deferred_user_message = self.shared.was_queued(id)
+            && request.disposition == QueueDisposition::Followup;
+        if deferred_user_message {
             crate::core::bus::BUS.publish(DomainEvent::RunQueueFollowupDispatched {
                 thread_id: request.thread_id.clone(),
                 followup_count: 1,
@@ -131,6 +133,9 @@ impl WebHost {
                 text_preview: Some(crate::agent::queued_turn::text_preview(&request.text)),
             });
         }
+        self.shared.with(id, |slot| {
+            slot.deferred_user_message = deferred_user_message;
+        });
         self.shared.admit(id, Admission::Started);
         let session = TurnSession {
             session_id: request.thread_id.clone(),
@@ -231,13 +236,15 @@ impl WebHost {
             return outcome;
         }
 
-        let (config, thread_dir, checked, projection, activity) = self.shared.with(id, |slot| {
+        let (config, thread_dir, checked, projection, activity, deferred_user_message) =
+            self.shared.with(id, |slot| {
             (
                 slot.config.clone(),
                 slot.thread_dir.clone(),
                 slot.session.take(),
                 slot.projection.clone(),
                 slot.activity.clone(),
+                slot.deferred_user_message,
             )
         });
         let (Some(config), Some(mut checked), Some(projection)) = (config, checked, projection)
@@ -275,7 +282,36 @@ impl WebHost {
             },
         );
 
-        let message_input = if let Some(stored) = payload.stored_attachments.as_ref() {
+        let message_input = if deferred_user_message {
+            let staged_parts = payload
+                .pending_attachments
+                .as_ref()
+                .map(|pending| pending.parts.as_slice())
+                .unwrap_or_default();
+            let persisted = crate::threads::ops::persist_queued_user_message(
+                &ctx,
+                thread_id,
+                id,
+                &request.text,
+                staged_parts,
+            )
+            .await?;
+            if staged_parts.is_empty() {
+                None
+            } else {
+                let parts = crate::threads::attachments::resolve_persisted_parts(
+                    &ctx,
+                    thread_id,
+                    &persisted.id,
+                    staged_parts,
+                )
+                .await?;
+                Some(crate::agent::message_convert::user_message_from_parts(
+                    &request.text,
+                    &parts,
+                )?)
+            }
+        } else if let Some(stored) = payload.stored_attachments.as_ref() {
             let parts = crate::threads::attachments::resolve_persisted_parts(
                 &ctx,
                 thread_id,
