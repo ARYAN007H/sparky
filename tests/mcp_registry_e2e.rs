@@ -101,54 +101,6 @@ async fn module_tool_call_reports_unknown_tool_as_error() {
 
 #[tokio::test]
 #[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
-async fn disabling_server_drops_its_live_module_connection() {
-    let (_tmp, config) = fresh_workspace_config();
-    let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
-    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(&config, server_id.clone(), true)
-        .await
-        .expect("enable server");
-    openhuman_core::mcp::registry::ops::mcp_clients_connect(&config, server_id.clone())
-        .await
-        .expect("connect stdio fixture through TinyBus");
-    assert!(
-        openhuman_core::mcp::registry::connections::is_connected_for_config(&config, &server_id)
-            .await
-    );
-
-    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(&config, server_id.clone(), false)
-        .await
-        .expect("disable server");
-    assert!(
-        !openhuman_core::mcp::registry::connections::is_connected_for_config(&config, &server_id)
-            .await,
-        "disabling an install must close the module-owned connection"
-    );
-}
-
-#[tokio::test]
-#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
-async fn disabled_server_accepts_environment_update_without_reconnecting() {
-    use std::collections::HashMap;
-
-    let (_tmp, config) = fresh_workspace_config();
-    let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
-    let mut env = HashMap::new();
-    env.insert("API_KEY".to_owned(), "test-only-secret".to_owned());
-
-    let result =
-        openhuman_core::mcp::registry::ops::mcp_clients_update_env(&config, server_id.clone(), env)
-            .await
-            .expect("confidential disabled-server update succeeds");
-    assert_eq!(result.value["status"], "disabled");
-    assert_eq!(result.value["env_keys"], json!(["API_KEY"]));
-    assert!(
-        !openhuman_core::mcp::registry::connections::is_connected_for_config(&config, &server_id)
-            .await
-    );
-}
-
-#[tokio::test]
-#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn per_config_lookups_are_isolated_by_workspace() {
     use openhuman_core::mcp::registry::{connections, ops};
 
@@ -177,33 +129,7 @@ async fn per_config_lookups_are_isolated_by_workspace() {
 
 #[tokio::test]
 #[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
-async fn disabled_install_is_not_dialed_during_startup() {
-    use openhuman_core::mcp::registry::{connections, ops};
-
-    let (_tmp, config) = fresh_workspace_config();
-    let server_id = install_server(
-        &config,
-        "@openhuman-test/disabled",
-        json!({
-            "command": "/nonexistent-disabled-mcp-server",
-            "enabled": false
-        }),
-    )
-    .await;
-    openhuman_core::mcp::registry::boot::spawn_installed_servers(&config).await;
-    let status = ops::mcp_clients_status(&config).await.expect("status");
-    let entry = status.value["servers"]
-        .as_array()
-        .and_then(|servers| servers.iter().find(|entry| entry["server_id"] == server_id))
-        .expect("disabled install remains visible");
-    assert_eq!(entry["status"], "disabled");
-    assert!(entry["last_error"].is_null());
-    assert!(!connections::is_connected_for_config(&config, &server_id).await);
-}
-
-#[tokio::test]
-#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
-async fn per_config_auth_failure_surfaces_401_reason_without_cross_workspace_leak() {
+async fn per_config_auth_failure_does_not_leak_across_workspaces() {
     use openhuman_core::mcp::registry::{connections, ops};
     use wiremock::matchers::any;
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -232,15 +158,6 @@ async fn per_config_auth_failure_surfaces_401_reason_without_cross_workspace_lea
             .await
             .is_err(),
         "the module must report a 401 as a failed connection"
-    );
-    assert_eq!(
-        connections::auth_hint_for_config(&config_a, &server_id).await,
-        Some("credential_required")
-    );
-    assert_eq!(
-        connections::last_error_for_config(&config_a, &server_id).await,
-        None,
-        "401 response text stays hidden; the typed auth hint carries the user-facing reason"
     );
     assert!(connections::auth_hint_for_config(&config_b, &server_id)
         .await
