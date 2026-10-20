@@ -517,12 +517,11 @@ fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     let Ok(text) = std::fs::read_to_string(&file) else {
         return BTreeSet::new();
     };
-    let all: BTreeMap<String, BTreeSet<String>> = serde_json::from_str(&text).unwrap_or_else(
-        |error| {
+    let all: BTreeMap<String, BTreeSet<String>> =
+        serde_json::from_str(&text).unwrap_or_else(|error| {
             tracing::warn!(%error, "[memory:channels] legacy channel map unparsable; skipped");
             BTreeMap::new()
-        },
-    );
+        });
     all.get(&channel_key(channel)).cloned().unwrap_or_default()
 }
 
