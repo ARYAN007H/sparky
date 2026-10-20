@@ -171,7 +171,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 name: "load",
                 ty: TypeSchema::Option(Box::new(TypeSchema::Bool)),
                 comment: "Load the module and ask it (Describe) even when it is not serving yet.",
-                required: true,
+                required: false,
             }],
             outputs: vec![FieldSchema {
                 name: "status",

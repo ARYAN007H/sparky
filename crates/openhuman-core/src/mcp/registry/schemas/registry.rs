@@ -171,7 +171,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 name: "qualified_name",
                 ty: TypeSchema::String,
                 comment: "Registry qualified name, e.g. `@modelcontextprotocol/server-filesystem`.",
-                required: false,
+                required: true,
             }],
             outputs: vec![FieldSchema {
                 name: "server",
