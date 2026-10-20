@@ -13,6 +13,13 @@ fn staged_bound_methods() -> Vec<&'static str> {
     let mut methods = vec!["composio.execute"];
     #[cfg(feature = "mcp")]
     methods.push("mcp_clients.registry_get");
+    methods.extend([
+        "socket.connect",
+        "socket.disconnect",
+        "socket.state",
+        "socket.emit",
+        "socket.connect_with_session",
+    ]);
     #[cfg(feature = "voice")]
     methods.extend([
         "voice.status",
@@ -35,6 +42,100 @@ fn staged_bound_methods() -> Vec<&'static str> {
     #[cfg(feature = "modules")]
     methods.push("modules.computer_status");
     methods
+}
+
+#[test]
+fn production_registry_binds_every_socket_controller_to_its_declared_parser() {
+    let entries: Vec<_> = registry()
+        .iter()
+        .filter(|grouped| {
+            grouped
+                .controller
+                .schema
+                .method_name()
+                .starts_with("socket.")
+        })
+        .map(|grouped| grouped.controller.clone())
+        .collect();
+    assert!(
+        internal_registry().iter().all(|row| !row
+            .controller
+            .schema
+            .method_name()
+            .starts_with("socket.")),
+        "socket methods remain public registry entries"
+    );
+    let contracts = crate::platform::socket::socket_parameter_contracts();
+    assert_eq!(
+        entries.len(),
+        contracts.len(),
+        "complete raw socket inventory"
+    );
+    assert!(entries
+        .iter()
+        .all(|entry| entry.schema.namespace == "socket"));
+    assert_eq!(
+        entries
+            .iter()
+            .map(|entry| entry.schema.method_name())
+            .collect::<Vec<_>>(),
+        contracts
+            .iter()
+            .map(|contract| contract.method)
+            .collect::<Vec<_>>(),
+        "independent socket inventory and registration order"
+    );
+    let grouped: Vec<_> = registry()
+        .iter()
+        .chain(internal_registry())
+        .filter(|row| row.controller.schema.method_name().starts_with("socket."))
+        .collect();
+    assert!(grouped.iter().all(|row| row.group == DomainGroup::Platform));
+    let rpc_methods = [
+        "openhuman.socket_connect",
+        "openhuman.socket_disconnect",
+        "openhuman.socket_state",
+        "openhuman.socket_emit",
+        "openhuman.socket_connect_with_session",
+    ];
+    assert_eq!(
+        entries
+            .iter()
+            .map(|entry| entry.rpc_method_name())
+            .collect::<Vec<_>>(),
+        rpc_methods,
+        "socket RPC method names remain stable"
+    );
+    verify_parameter_contracts(&entries, &contracts)
+        .expect("raw socket entries use their declared schemas and runtime decoders");
+    for contract in &contracts {
+        let entry = entries
+            .iter()
+            .find(|entry| entry.schema.method_name() == contract.method)
+            .expect("independent fixture selects a raw socket entry");
+        crate::core::all::verify_parameter_schema(&entry.schema, contract)
+            .expect("positive socket contract matches the production schema");
+        for &required in contract.required {
+            for make_optional in [false, true] {
+                let mut broken = entry.schema.clone();
+                if make_optional {
+                    broken
+                        .inputs
+                        .iter_mut()
+                        .find(|field| field.name == required)
+                        .expect("required field exists in schema")
+                        .required = false;
+                } else {
+                    broken.inputs.retain(|field| field.name != required);
+                }
+                assert!(
+                    crate::core::all::verify_parameter_schema(&broken, contract).is_err(),
+                    "{} independent contract rejects removed/optional {required}",
+                    contract.method
+                );
+            }
+        }
+    }
 }
 
 fn record_event(event: &'static str) {
