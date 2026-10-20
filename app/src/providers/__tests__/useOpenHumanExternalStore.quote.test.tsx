@@ -14,6 +14,7 @@ import type { ReactNode } from 'react';
 import { Provider } from 'react-redux';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ContentPart } from '../../services/chatWire';
 import chatRuntimeReducer from '../../store/chatRuntimeSlice';
 import threadReducer from '../../store/threadSlice';
 import { editMessage } from '../../services/chatService';
@@ -119,9 +120,24 @@ describe('a quoted excerpt reaching the core', () => {
     const store = configureStore({
       reducer: { thread: threadReducer, chatRuntime: chatRuntimeReducer },
     });
-    const attachment = {
+    const attachment: ContentPart = {
       kind: 'image' as const,
-      media: { opaqueId: 'stored-image-1', contentType: 'image/png' },
+      media: {
+        opaqueId: 'stored-image-1',
+        contentType: 'image/png',
+        codec: null,
+        durationMs: null,
+        fileName: null,
+        height: null,
+        kind: 'image',
+        localCachePath: null,
+        path: null,
+        platformMessageId: null,
+        sizeBytes: null,
+        transcribed: false,
+        url: null,
+        width: null,
+      },
       caption: null,
       altText: null,
     };
