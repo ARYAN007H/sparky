@@ -2,8 +2,7 @@
 
 use super::orchestration::tools::{
     CloseSubagentTool, ContinueSubagentTool, DelegateGraphTool, ListSubagentsTool,
-    SpawnAsyncSubagentTool, SpawnSubagentTool, SteerSubagentTool,
-    WaitSubagentTool,
+    SpawnAsyncSubagentTool, SpawnSubagentTool, SteerSubagentTool, WaitSubagentTool,
 };
 use super::tools::{PlanExitTool, TodoTool};
 use crate::config::Config;
