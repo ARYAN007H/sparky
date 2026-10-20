@@ -61,6 +61,14 @@ fn failing_parse(_params: Map<String, Value>) -> Result<Parsed, String> {
     Err("parser rejected".to_owned())
 }
 
+fn unused_contract_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    panic!("schema contract verification must not invoke controller handlers")
+}
+
+fn accept_contract_example(_params: Map<String, Value>) -> Result<(), String> {
+    Ok(())
+}
+
 fn schema() -> ControllerSchema {
     ControllerSchema {
         namespace: "bound_test",
@@ -303,18 +311,6 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
     );
     assert_eq!(entry.rpc_method_name(), "openhuman.composio_execute");
 
-    let declared_required: Vec<_> = entry
-        .schema
-        .inputs
-        .iter()
-        .filter(|field| field.required)
-        .map(|field| field.name)
-        .collect();
-    assert_eq!(
-        declared_required,
-        ["tool"],
-        "required fields are independent contract"
-    );
     for name in ["arguments", "connection_id"] {
         assert!(
             entry
@@ -325,6 +321,35 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
             "{name} must remain optional"
         );
     }
+
+    let required_contract = ControllerParamContract {
+        method: "composio.execute",
+        required: &["tool"],
+        handler: unused_contract_handler,
+        examples: vec![json!({"tool":"GMAIL_SEND_EMAIL"})],
+        parse: accept_contract_example,
+    };
+    verify_parameter_schema(&entry.schema, &required_contract)
+        .expect("independent required-field contract matches production schema");
+    let mut missing_required = entry.schema.clone();
+    missing_required.inputs.retain(|field| field.name != "tool");
+    assert!(
+        verify_parameter_schema(&missing_required, &required_contract)
+            .unwrap_err()
+            .contains("required inputs mismatch")
+    );
+    let mut optional_required = entry.schema.clone();
+    optional_required
+        .inputs
+        .iter_mut()
+        .find(|field| field.name == "tool")
+        .expect("tool schema field")
+        .required = false;
+    assert!(
+        verify_parameter_schema(&optional_required, &required_contract)
+            .unwrap_err()
+            .contains("required inputs mismatch")
+    );
 
     for example in [
         json!({"tool":"GMAIL_SEND_EMAIL"}),
