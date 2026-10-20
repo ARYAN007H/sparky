@@ -373,6 +373,11 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
             }
             codex_route = Some(&codex);
         }
+        AuthStyle::OpenhumanJwt => {
+            return Some(Err(anyhow::anyhow!(
+                "hosted cloud authentication is unavailable without a registered host provider"
+            )));
+        }
     }
 
     // Egress spine (privacy epic S2, #4436): committed to a BYOK cloud slug here
