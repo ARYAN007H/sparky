@@ -371,8 +371,7 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
             [],
             |row| row.get::<_, String>(0),
         )
-        .unwrap()
-        .workflow;
+        .unwrap();
     conn.execute_batch(&format!(
         "CREATE TRIGGER refuse_draft_updates BEFORE UPDATE ON {docs_table}
          WHEN NEW.coll = 'flows.drafts'
