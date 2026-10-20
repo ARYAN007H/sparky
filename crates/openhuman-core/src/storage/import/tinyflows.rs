@@ -126,25 +126,6 @@ impl ImportTotals {
 }
 
 #[cfg(feature = "flows")]
-async fn send_legacy_batch(
-    proxy: &tinybus::Proxy,
-    storage: &tinyflows_bus::catalog::CatalogStorage,
-    records: Vec<tinyflows_bus::catalog::LegacyImportRecord>,
-) -> Result<()> {
-    use tinyflows_bus::catalog::{self, ImportLegacyBatchRequest, ImportLegacyBatchResponse};
-
-    let request = ImportLegacyBatchRequest {
-        storage: storage.clone(),
-        records,
-    };
-    let response: ImportLegacyBatchResponse = proxy
-        .call(catalog::members::IMPORT_LEGACY_BATCH, &(request,))
-        .await
-        .context("send a bounded legacy flow batch to TinyFlows")?;
-    Ok(())
-}
-
-#[cfg(feature = "flows")]
 fn flow_sources_present(dir: &Path) -> bool {
     ["flows.db", "checkpoints.db", "checkpoints", "drafts"]
         .iter()
@@ -195,6 +176,7 @@ fn import_flows_after_migration(
         if !flow_sources_present(&dir) {
             return Ok(None);
         }
+        let dir = dir.clone();
         let backend = Arc::clone(backend);
         let scope = scope.clone();
         let config = config.clone();
