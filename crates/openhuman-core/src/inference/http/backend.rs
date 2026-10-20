@@ -12,7 +12,9 @@
 //! - `"openhuman"` -> OpenHuman backend (session JWT)
 
 use async_trait::async_trait;
-use tinyinference_llm::providers::openai::server_http::{BackendFailure, ChatBackend, ListedModel, ResolvedChat};
+use tinyinference_llm::providers::openai::server_http::{
+    BackendFailure, ChatBackend, ListedModel, ResolvedChat,
+};
 use tinyinference_providers::route::{bare_model_route, route_owner};
 use tracing::{debug, warn};
 

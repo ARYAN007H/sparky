@@ -5,8 +5,8 @@ use crate::core::Outcome;
 
 use super::{resolve_api_key, LOG_PREFIX};
 use crate::inference::embedding_host::factory::create_embedding_provider_with_config;
-use tinyinference_providers::route::split_custom_provider;
 use tinyinference_embeddings::probe::probe_custom_embeddings;
+use tinyinference_providers::route::split_custom_provider;
 
 /// Generates embeddings for the given input texts using the currently
 /// configured provider.

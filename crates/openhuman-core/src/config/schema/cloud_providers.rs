@@ -149,7 +149,9 @@ fn provider_presets(hosted: &[BuiltinCloudProvider]) -> BuiltinPresets {
         // converted into runtime bearer authentication.
         auth_style: match preset.auth_style {
             AuthStyle::Anthropic => BuiltinAuthStyle::Anthropic,
-            AuthStyle::Bearer | AuthStyle::OpenhumanJwt | AuthStyle::None => BuiltinAuthStyle::Bearer,
+            AuthStyle::Bearer | AuthStyle::OpenhumanJwt | AuthStyle::None => {
+                BuiltinAuthStyle::Bearer
+            }
         },
     }))
 }

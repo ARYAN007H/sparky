@@ -23,7 +23,13 @@ fn generate_provider_id_with_prefix(prefix: &str, slug: &str) -> String {
     }
     let safe_slug: String = slug
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .take(20)
         .collect();
     format!("{prefix}_{safe_slug}_{suffix}")

@@ -77,11 +77,7 @@ fn build_embedder(
 
 pub(crate) fn resolve_api_key(config: &Config, provider_name: &str) -> String {
     let (slug, endpoint) = split_custom_provider(provider_name);
-    let slug = if endpoint.is_some() {
-        "custom"
-    } else {
-        &slug
-    };
+    let slug = if endpoint.is_some() { "custom" } else { &slug };
     let cred_provider = format!("embeddings:{slug}");
     let auth = AuthService::from_config(config);
     auth.get_provider_bearer_token(&cred_provider, None)

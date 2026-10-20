@@ -225,7 +225,9 @@ pub async fn update_settings(
     // Resolve the provider string exactly as it will be persisted so the
     // signature reported to callers describes the saved configuration.
     let effective_provider = match &custom_endpoint {
-        Some(ep) if new_provider == "custom" || new_provider.starts_with("custom:") => {
+        Some(ep)
+            if new_provider == "custom" || split_custom_provider(&new_provider).1.is_some() =>
+        {
             custom_provider_string("custom", Some(ep))
         }
         _ => new_provider.clone(),

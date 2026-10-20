@@ -31,7 +31,7 @@ fn configured_managed_default_keeps_colon_bearing_model_owner() {
         ..Config::default()
     };
     let listed = configured_models(&config);
-    assert!(listed.iter().any(|model| {
-        model.id == "qwen3:14b" && model.owned_by == "openhuman"
-    }));
+    assert!(listed
+        .iter()
+        .any(|model| { model.id == "qwen3:14b" && model.owned_by == "openhuman" }));
 }
