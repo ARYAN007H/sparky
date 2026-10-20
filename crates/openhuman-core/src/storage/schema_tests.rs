@@ -37,6 +37,32 @@ fn module_items_are_the_owners_module_scoped_declarations() {
 }
 
 #[test]
+fn tiny_artifacts_blob_namespace_composes_with_host_artifact_collections() {
+    let registry = registry().expect("the owners compose");
+    assert_eq!(registry.owners().filter(|owner| *owner == "artifacts").count(), 1);
+
+    let artifacts = owner_schemas()
+        .into_iter()
+        .find(|schema| schema.owner.as_str() == "artifacts")
+        .expect("the artifact owners are composed");
+    assert!(artifacts.items.iter().any(|item| matches!(
+        item,
+        Item::Collection { name, .. } if name == "artifacts.records"
+    )));
+    assert!(artifacts.items.iter().any(|item| matches!(
+        item,
+        Item::Blobs {
+            prefix,
+            scope: ScopeClass::Tenant,
+        } if prefix == "artifacts/files/"
+    )));
+    assert!(!module_items("artifacts")
+        .blobs
+        .iter()
+        .any(|prefix| prefix == "artifacts/files/"));
+}
+
+#[test]
 fn tiny_artifacts_blob_namespace_is_in_the_composed_owner_schema() {
     let registry = registry().expect("the owners compose");
     assert!(registry.owners().any(|owner| owner == "artifacts"));

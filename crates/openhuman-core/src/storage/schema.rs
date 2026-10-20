@@ -21,6 +21,16 @@ use tinystoragedrivers::schema::{Item, Registry, Schema, ScopeClass};
 
 /// Every owner's schema that this build links.
 pub fn owner_schemas() -> Vec<Schema> {
+    // The host owns the artifact records and migrations; TinyArtifacts owns
+    // the blob namespace its file store uses. They share one storage owner,
+    // so compose their declarations into a single schema before Registry's
+    // same-owner and duplicate-item checks run.
+    let mut artifacts = crate::artifacts::storage_schema();
+    let tiny_artifacts = tiny_artifacts::storage_schema();
+    debug_assert_eq!(artifacts.owner.as_str(), tiny_artifacts.owner.as_str());
+    artifacts.items.extend(tiny_artifacts.items);
+    artifacts.steps.extend(tiny_artifacts.steps);
+
     let mut schemas = vec![
         tinyagents_harness::storage_schema(),
         tinyagents_session::storage_schema(),
@@ -33,7 +43,7 @@ pub fn owner_schemas() -> Vec<Schema> {
         crate::security::devices::storage_schema(),
         crate::desktop::notifications::storage_schema(),
         crate::integrations::task_sources::storage_schema(),
-        crate::artifacts::storage_schema(),
+        artifacts,
         tiny_artifacts::storage_schema(),
         crate::platform::cost::storage_schema(),
         crate::config::schema::config_storage_schema(),
