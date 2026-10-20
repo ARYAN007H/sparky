@@ -10,6 +10,7 @@ mod live_state;
 mod purge;
 mod search;
 mod support;
+mod thread_delete;
 mod title_generation;
 mod transcript;
 mod turn_state_ops;
