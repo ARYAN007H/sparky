@@ -94,6 +94,9 @@ pub(crate) mod turn_host;
 pub mod turn_origin;
 /// Shared idle and backstop policy for top-level agent turns.
 pub(crate) mod turn_policy;
+/// Canonical mechanical projection from agent progress to channel output
+/// events, shared by web and native channel adapters.
+pub(crate) mod turn_progress;
 /// How a turn that reached the completion path was stopped early (breaker,
 /// deadline wind-down, iteration cap), carried to traces and parent tools.
 pub mod turn_projection;
