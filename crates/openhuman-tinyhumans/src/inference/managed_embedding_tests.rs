@@ -139,13 +139,20 @@ async fn find_embedding_disclosure(
 }
 
 fn unreachable_embedder(model: &str) -> CloudEmbeddingModel {
+    unreachable_embedder_with_chat(model, None)
+}
+
+fn unreachable_embedder_with_chat(
+    model: &str,
+    chat: Option<ApprovalChatContext>,
+) -> CloudEmbeddingModel {
     build_cloud_model(
         Some("http://127.0.0.1:0".into()),
         std::env::temp_dir().join("openhuman_embeddings_routing_state"),
         false,
         model,
         DEFAULT_CLOUD_DIMENSIONS,
-        None,
+        chat,
     )
 }
 
@@ -470,7 +477,7 @@ async fn offline_local_session_is_refused_before_embedding_request() {
             true,
         )
         .unwrap();
-    let provider = ManagedEmbeddingModel::new(
+    let provider = build_cloud_model(
         Some(format!("http://{addr}")),
         tmp.path().to_path_buf(),
         false,
@@ -540,7 +547,7 @@ async fn expired_session_publishes_session_expired_before_embedding_request() {
             true,
         )
         .unwrap();
-    let provider = ManagedEmbeddingModel::new(
+    let provider = build_cloud_model(
         Some(format!("http://{addr}")),
         tmp.path().to_path_buf(),
         false,
