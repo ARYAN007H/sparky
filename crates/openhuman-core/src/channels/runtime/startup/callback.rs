@@ -241,6 +241,46 @@ impl ChannelHostCallbacks {
             .map_err(|_| Error::failed("channel speech synthesis failed"))
     }
 
+    async fn store_voice_media(
+        &self,
+        request: tinychannels_bus::HostStoreVoiceMediaRequest,
+    ) -> Result<tinychannels_bus::HostStoreVoiceMediaResult> {
+        Self::validate_callback_size(&request)?;
+        let scope = &request.scope;
+        let Some(channel) = self
+            .context()?
+            .channels_by_name
+            .get(&scope.configured_instance)
+        else {
+            return Err(Error::failed("voice media account is not configured"));
+        };
+        if scope.configured_instance.trim().is_empty()
+            || scope.channel.id != tinychannels_bus::provider_id(&scope.configured_instance)
+            || scope.channel.account_id.as_deref() != Some(scope.configured_instance.as_str())
+            || tinychannels_bus::provider_id(channel.name()) != scope.channel.id
+            || scope.conversation.id.trim().is_empty()
+            || scope.turn_id.trim().is_empty()
+        {
+            return Err(Error::failed(
+                "voice media scope does not match configured account",
+            ));
+        }
+        let media = request
+            .media_reference
+            .filter(|media| {
+                media
+                    .opaque_id
+                    .as_deref()
+                    .is_some_and(|id| id.starts_with("tinychannels_media_v1_"))
+            })
+            .ok_or_else(|| Error::failed("voice media has no durable scoped reference"))?;
+        Ok(tinychannels_bus::HostStoreVoiceMediaResult {
+            media,
+            // A local durable reference does not grant public-link access.
+            accessible_url: None,
+        })
+    }
+
     async fn get_voice_reply_policy(
         &self,
         request: HostVoiceReplyPolicyRequest,
