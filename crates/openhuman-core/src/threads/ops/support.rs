@@ -168,22 +168,28 @@ pub(super) fn thread_to_summary(thread: ConversationThread) -> ConversationThrea
 }
 
 pub(super) fn message_to_record(message: ConversationMessage) -> ConversationMessageRecord {
+    let attachments = crate::threads::attachments::public_refs(&message.extra_metadata);
+    let mut extra_metadata = message.extra_metadata;
+    crate::threads::attachments::strip_private_metadata(&mut extra_metadata);
     ConversationMessageRecord {
         id: message.id,
         content: message.content,
+        attachments,
         message_type: message.message_type,
-        extra_metadata: message.extra_metadata,
+        extra_metadata,
         sender: message.sender,
         created_at: message.created_at,
     }
 }
 
 pub(super) fn record_to_message(record: ConversationMessageRecord) -> ConversationMessage {
+    let mut extra_metadata = record.extra_metadata;
+    crate::threads::attachments::strip_private_metadata(&mut extra_metadata);
     ConversationMessage {
         id: record.id,
         content: record.content,
         message_type: record.message_type,
-        extra_metadata: record.extra_metadata,
+        extra_metadata,
         sender: record.sender,
         created_at: record.created_at,
     }

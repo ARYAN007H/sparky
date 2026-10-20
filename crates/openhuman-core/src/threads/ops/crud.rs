@@ -203,12 +203,45 @@ async fn message_append_with_config(
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     persistence_dir: &std::path::Path,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
-    if request.message.sender == "user" && !request.attachments.is_empty() {
-        // Typed attachments become the staging markers here, once, so the
-        // rest of this function sees the same content a marker send would.
+    let typed_attachments = if request.message.sender == "user" {
+        std::mem::take(&mut request.attachments)
+    } else {
+        Vec::new()
+    };
+    let typed_media_count = typed_attachments
+        .iter()
+        .filter(|part| {
+            matches!(
+                part,
+                tinychannels_bus::ContentPart::Image { .. }
+                    | tinychannels_bus::ContentPart::Audio { .. }
+                    | tinychannels_bus::ContentPart::Video { .. }
+                    | tinychannels_bus::ContentPart::File { .. }
+            )
+        })
+        .count();
+    if typed_attachments
+        .iter()
+        .any(|part| matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. }))
+    {
+        return Err(ThreadsError::Message(
+            "voice notes must be sent through channel.web_chat".into(),
+        ));
+    }
+    let original_content = request.message.content.clone();
+    if !typed_attachments.is_empty()
+        && (original_content.contains("[IMAGE:")
+            || original_content.contains("[FILE:")
+            || !crate::agent::attachments::parse(&original_content).1.is_empty())
+    {
+        return Err(ThreadsError::Message(
+            "typed attachments cannot be combined with legacy attachment markers".into(),
+        ));
+    }
+    if !typed_attachments.is_empty() {
         request.message.content = crate::agent::attachments::parts::fold_into_message(
             &request.message.content,
-            &request.attachments,
+            &typed_attachments,
         )
         .map_err(|error| ThreadsError::Message(error.to_string()))?;
     }
@@ -307,7 +340,7 @@ async fn message_append_with_config(
                 "user upload bytes require attachment markers before persistence".into(),
             ));
         }
-        request.message.content = crate::agent::attachments::stage_turn(
+        let staged_content = crate::agent::attachments::stage_turn(
             &request.message.content,
             Some(config),
             Some(&tinytools::WorkspaceDescriptor::new(workspace)),
@@ -316,6 +349,27 @@ async fn message_append_with_config(
         )
         .await
         .map_err(|error| ThreadsError::Message(format!("stage user attachments: {error}")))?;
+        if typed_media_count > 0 {
+            let (clean_content, staged_files) =
+                crate::agent::attachments::parse(&staged_content);
+            if staged_files.len() != typed_media_count {
+                return Err(ThreadsError::Message(
+                    "typed attachment staging did not preserve media order".into(),
+                ));
+            }
+            let entries = crate::threads::attachments::from_staged_parts(
+                &typed_attachments,
+                &staged_files,
+            )
+            .map_err(ThreadsError::Message)?;
+            request.message.attachments = crate::threads::attachments::save(
+                &mut request.message.extra_metadata,
+                entries,
+            );
+            request.message.content = clean_content.trim().to_string();
+        } else {
+            request.message.content = staged_content;
+        }
         if raw_upload || durable_upload {
             if let Some(metadata) = request.message.extra_metadata.as_object_mut() {
                 for field in byte_fields {

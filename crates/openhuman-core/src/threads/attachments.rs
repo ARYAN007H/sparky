@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tinychannels_bus::{ContentPart, MediaReference};
 
+use crate::agent::attachments::Attachment;
+
 const STORAGE_KEY: &str = "__openhumanStoredAttachments";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +52,89 @@ pub(crate) fn strip_private_metadata(metadata: &mut Value) {
     if let Some(object) = metadata.as_object_mut() {
         object.remove(STORAGE_KEY);
     }
+}
+
+/// Pair typed media input with the staged files created from it, storing only
+/// opaque refs publicly and keeping each validated relative path privately.
+pub(crate) fn from_staged_parts(
+    parts: &[ContentPart],
+    files: &[Attachment],
+) -> Result<Vec<(ContentPart, String)>, String> {
+    let media_count = parts
+        .iter()
+        .filter(|part| matches!(part, ContentPart::Image { .. } | ContentPart::Audio { .. } | ContentPart::Video { .. } | ContentPart::File { .. }))
+        .count();
+    if media_count != files.len() {
+        return Err("typed attachment staging did not preserve media ordering".into());
+    }
+
+    let mut files = files.iter();
+    let mut output = Vec::with_capacity(media_count);
+    for part in parts {
+        match part {
+            ContentPart::Image { media, caption, alt_text } => {
+                let file = files.next().expect("media count was checked");
+                output.push((ContentPart::Image {
+                    media: stored_media(media, file),
+                    caption: caption.clone(),
+                    alt_text: alt_text.clone(),
+                }, file.path.clone()));
+            }
+            ContentPart::Audio { media, codec, duration_ms, title, transcript } => {
+                let file = files.next().expect("media count was checked");
+                output.push((ContentPart::Audio {
+                    media: stored_media(media, file),
+                    codec: codec.clone(),
+                    duration_ms: *duration_ms,
+                    title: title.clone(),
+                    transcript: transcript.clone(),
+                }, file.path.clone()));
+            }
+            ContentPart::Video { media, caption, duration_ms, thumbnail } => {
+                let file = files.next().expect("media count was checked");
+                output.push((ContentPart::Video {
+                    media: stored_media(media, file),
+                    caption: caption.clone(),
+                    duration_ms: *duration_ms,
+                    thumbnail: thumbnail.as_ref().map(|thumb| {
+                        let mut sanitized = thumb.clone();
+                        sanitized.path = None;
+                        sanitized.url = None;
+                        sanitized.local_cache_path = None;
+                        sanitized.opaque_id = None;
+                        sanitized
+                    }),
+                }, file.path.clone()));
+            }
+            ContentPart::File { media, file_name, caption } => {
+                let file = files.next().expect("media count was checked");
+                let mut stored = stored_media(media, file);
+                if let Some(name) = file_name {
+                    stored.file_name = Some(name.clone());
+                }
+                output.push((ContentPart::File {
+                    media: stored,
+                    file_name: file_name.clone(),
+                    caption: caption.clone(),
+                }, file.path.clone()));
+            }
+            ContentPart::Text { .. } | ContentPart::VoiceNote { .. } => {}
+            _ => return Err("typed attachment has an unsupported kind".into()),
+        }
+    }
+    Ok(output)
+}
+
+fn stored_media(input: &MediaReference, file: &Attachment) -> MediaReference {
+    let mut media = input.clone();
+    media.opaque_id = Some(uuid::Uuid::new_v4().simple().to_string());
+    media.path = None;
+    media.url = None;
+    media.local_cache_path = None;
+    media.content_type = Some(file.mime.clone());
+    media.file_name = Some(file.name.clone());
+    media.size_bytes = Some(file.size_bytes as u64);
+    media
 }
 
 fn stored(metadata: &Value) -> Result<Vec<StoredAttachment>, String> {
