@@ -500,15 +500,10 @@ test("private auxiliary coverage suites keep their failure and the lane report s
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("private runner runs cargo lanes one at a time and overlaps them with the light lanes", async () => {
+test("private runner serializes independent lanes after failures even when parallelism is requested", async () => {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "lanes-private-"));
   fs.mkdirSync(path.join(out, "logs"));
   const check = (name, run) => ({ name, run, when: true, needs: [] });
-  const cargo = (name, targetDir) => ({
-    name,
-    targetDir: path.join(out, targetDir),
-    checks: [check(`${name}-check`, "sleep 0.3")],
-  });
   const plan = {
     profile: "ex63",
     lanes: [
@@ -516,29 +511,21 @@ test("private runner runs cargo lanes one at a time and overlaps them with the l
         name: "first",
         checks: [
           check("fails", "exit 1"),
-          check("continues", "sleep 0.3"),
+          check("continues", "echo continued"),
         ],
       },
-      cargo("cov", "cov"),
       { name: "second", checks: [check("independent", "echo independent")] },
-      cargo("lint", "build"),
     ],
   };
   const runner = new Runner(plan, { out, maxParallel: 8 });
+  assert.equal(runner.maxParallel, 1);
   const lanes = await runner.run();
-  const span = (name) => {
-    const checks = lanes.find((l) => l.name === name).checks;
-    return [Date.parse(checks[0].start), Date.parse(checks.at(-1).end)];
-  };
-  const overlaps = (a, b) => span(a)[0] < span(b)[1] && span(b)[0] < span(a)[1];
   assert.equal(lanes[0].checks[0].status, "failure");
   assert.equal(lanes[0].checks[1].status, "success");
-  assert.equal(lanes[2].checks[0].status, "success");
-  // Each chain stays serial in plan order, also after a failure.
-  assert.ok(span("second")[0] >= span("first")[1]);
-  assert.ok(span("lint")[0] >= span("cov")[1], "two cargo lanes ran at once");
-  // The chains run side by side.
-  assert.ok(overlaps("first", "cov"), "light lane waited for the cargo lane");
+  assert.equal(lanes[1].checks[0].status, "success");
+  assert.ok(
+    Date.parse(lanes[1].checks[0].start) >= Date.parse(lanes[0].checks[1].end),
+  );
   assert.equal(
     new Runner({ ...plan, profile: "hosted" }, { out, maxParallel: 8 })
       .maxParallel,

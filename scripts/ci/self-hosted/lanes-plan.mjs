@@ -90,8 +90,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   const nodeCache = ex63 ? "${CI_CACHE_DIR:-/cache}/node-tools" : null;
   const core = areas.rustCore;
 
-  // Private lanes with a target dir run one after another (the cargo chain)
-  // and share compatible build products; the others overlap them.
+  // Private lanes run sequentially and share compatible build products.
   // Instrumented objects stay separate from ordinary build/link checks.
   const targetDir = (lane) =>
     ex63 ? `target/ci-private-${lane === "cov" ? "coverage" : "build"}` : null;

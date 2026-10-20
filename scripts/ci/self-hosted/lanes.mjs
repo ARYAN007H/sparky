@@ -325,9 +325,14 @@ export class Runner {
   constructor(plan, { out, maxParallel, maxHeavy = Infinity }) {
     this.plan = plan;
     this.out = out;
+    // ex63 runs lanes one at a time. Overlapping the frontend lanes with the
+    // cargo chain was measured in run 39434038570 on 4 vCPU / 24 GB: vitest
+    // took 2.6x as long and cache restores 5.6x, rust-cov peaked at 19.4 GB,
+    // and nothing finished sooner, since compiles and tests already use every
+    // core.
     this.maxParallel =
       plan.profile === "ex63"
-        ? 2
+        ? 1
         : maxParallel > 0
           ? maxParallel
           : plan.lanes.length;
@@ -551,39 +556,20 @@ export class Runner {
     }
   }
 
-  /**
-   * Lanes in one chain run one at a time, in plan order. On ex63 every lane
-   * with a target dir is in the cargo chain (two whole-core compiles at once
-   * would not fit the VM, and they share build products) and the rest in the
-   * light chain, so frontend and static work overlaps the Rust lanes.
-   * Elsewhere each lane is its own chain.
-   */
-  chainOf(lane) {
-    if (this.plan.profile !== "ex63") return lane.name;
-    return lane.targetDir ? "cargo" : "light";
-  }
-
   async runQueue() {
     const queue = [...this.plan.lanes];
-    const running = new Map(); // promise -> chain
+    const running = new Set();
     const finished = [];
     await new Promise((resolveAll) => {
       const pump = () => {
-        const busy = () => new Set(running.values());
-        let i = 0;
-        while (running.size < this.maxParallel && i < queue.length) {
-          const chain = this.chainOf(queue[i]);
-          if (busy().has(chain)) {
-            i++;
-            continue;
-          }
-          const [lane] = queue.splice(i, 1);
+        while (running.size < this.maxParallel && queue.length > 0) {
+          const lane = queue.shift();
           const p = this.runLane(lane).then((r) => {
             running.delete(p);
             finished.push(r);
             pump();
           });
-          running.set(p, chain);
+          running.add(p);
         }
         if (running.size === 0 && queue.length === 0) resolveAll();
       };
