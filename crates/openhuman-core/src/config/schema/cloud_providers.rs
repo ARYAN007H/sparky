@@ -2,7 +2,7 @@
 //!
 //! Each entry in `Config::cloud_providers` represents one configured LLM
 //! backend. Providers are keyed by a user-chosen `slug` (e.g. `"openai"`,
-//! `"my-deepseek"`). The factory in `inference::provider::factory`
+//! `"my-deepseek"`). Inference routing in `config::ops::primary_cloud`
 //! resolves workload-to-provider strings against this list at runtime using
 //! the grammar `"<slug>:<model>"`.
 //!

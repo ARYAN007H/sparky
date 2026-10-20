@@ -20,7 +20,7 @@ pub(crate) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
         // silently routing through the managed backend.
         if has_custom_inference_intent(config) {
             log::debug!(
-                "[providers][chat-factory] BYOK intent detected (host={}) \
+                "[providers][chat-factory] BYOK intent detected (endpoint={}) \
                  but no matching cloud_providers entry found; returning fail-closed sentinel",
                 tinyinference_core::sanitize::redact_url(
                     config.inference_url.as_deref().unwrap_or_default()
@@ -40,7 +40,7 @@ pub(crate) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
     legacy_custom_inference_provider_string(config).unwrap_or_else(|| {
         if has_custom_inference_intent(config) {
             log::debug!(
-                "[providers][chat-factory] BYOK intent detected (host={}) \
+                "[providers][chat-factory] BYOK intent detected (endpoint={}) \
                  with no primary_cloud and no matching provider entry; returning fail-closed sentinel",
                 tinyinference_core::sanitize::redact_url(
                     config.inference_url.as_deref().unwrap_or_default()
