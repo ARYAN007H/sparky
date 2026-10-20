@@ -49,20 +49,6 @@ crate-type = ["rlib"]
 # which hosts connect at boot and which plugs in through the core's generic
 # registries. `scripts/assert-shed.sh` / `cargo tree -i tinyhumans-sdk`
 # must stay empty for this package.
-# tinyflows — host-agnostic workflow engine (typed node graph → validate → compile →
-# run on tinyagents). Powers the "Workflows" feature via the seam in
-# `crates/openhuman-core/src/tinyflows/` + the `flows::` domain. Pulls tinyagents 2.1 transitively
-# (same version OpenHuman uses directly, preserving one trait identity). Published
-# on crates.io and patched below to the vendored submodule.
-#
-# `mock` feature: enables `tinyflows::caps::mock::mock_capabilities()` — the
-# deterministic in-memory capability bundle the flows `dry_run_workflow` agent
-# tool (Phase 5b) runs a *draft* graph against so the workflow-builder agent can
-# self-verify a proposal without any real side effects (no real LLM/tool/HTTP/code).
-#
-# Optional: exclusive to the default-ON `flows` feature (#4797). A slim build
-# without `flows` drops this crate and its `jaq-*` JSON-query stack entirely.
-tinyflows = { version = "0.8", features = ["mock"], optional = true }
 # The tinyflows module's bus contract (`tinyflows_bus::schedule`): the job,
 # run, schedule and delivery records of the `cron::` domain, the member names
 # and the callback vocabulary. Unconditional: the cron scheduler is not behind
@@ -71,14 +57,6 @@ tinyflows = { version = "0.8", features = ["mock"], optional = true }
 # `tinyflows-schedule` or `tinyflows-drivers`' `schedule` store). It depends on
 # serde/chrono alone, like every `*-bus` crate.
 tinyflows-bus = { path = "../../vendor/tinyflows/crates/tinyflows-bus" }
-# The TinyFlows Catalog wire and DTO contracts used by the host adapter. The
-# module owns catalog rules and storage; OpenHuman calls its bus surface.
-#
-# Not published, so a path dependency into the same vendored workspace
-# `tinyflows` itself comes from — one checkout, one `tinyflows` package, one
-# `WorkflowGraph` type. Optional and exclusive to `flows` for the same reason
-# the engine is.
-tinyflows-catalog = { path = "../../vendor/tinyflows/crates/tinyflows-catalog", optional = true }
 # Reads the stores tinyflows hosts used before storage moved onto the ports
 # (`flows.db`, `jobs.db`, `checkpoints.db`, drafts). Only its pure SQLite readers
 # are enabled here: flows and checkpoints use bus records owned by the module;
