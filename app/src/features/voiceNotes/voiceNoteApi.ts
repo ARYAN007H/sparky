@@ -63,7 +63,22 @@ export async function voiceNoteContentPart(
       durationMs,
       waveform,
       pushToTalk: false,
-      media: { opaqueId: noteId, kind: 'audio', contentType, durationMs, sizeBytes: blob.size },
+      media: {
+        opaqueId: noteId,
+        kind: 'audio',
+        contentType,
+        durationMs,
+        sizeBytes: blob.size,
+        codec: null,
+        fileName: null,
+        height: null,
+        localCachePath: null,
+        path: null,
+        platformMessageId: null,
+        transcribed: false,
+        url: null,
+        width: null,
+      },
     },
   };
 }

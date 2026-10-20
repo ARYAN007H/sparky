@@ -220,7 +220,23 @@ describe('clipQueuePreview', () => {
 describe('clipQueuePreview with typed attachments', () => {
   const file = (name?: string) => ({
     kind: 'file' as const,
-    media: { url: 'data:application/pdf;base64,AAA', fileName: name },
+    fileName: name ?? null,
+    caption: null,
+    media: {
+      kind: 'document' as const,
+      url: 'data:application/pdf;base64,AAA',
+      fileName: name ?? null,
+      contentType: null,
+      sizeBytes: null,
+      codec: null,
+      durationMs: null,
+      height: null,
+      localCachePath: null,
+      path: null,
+      platformMessageId: null,
+      transcribed: false,
+      width: null,
+    },
   });
 
   it('uses the caption when there is one', () => {
