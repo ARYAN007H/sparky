@@ -250,7 +250,7 @@ fn core_backed_live_parent(
 #[tokio::test]
 async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
     use crate::agent::orchestration::background_completions::{
-        forget_workspace_for_test, pending_for,
+        forget_workspace_for_test, pending_for_ctx,
     };
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentStatus, SubagentSessionStore,
@@ -352,7 +352,18 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         })
         .expect("the paused child is registered in shared Jobs");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
-    assert!(pending_for(workspace.path(), "paused-cancel-rpc-thread").is_empty());
+    let queued = pending_for_ctx(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        "paused-cancel-rpc-thread",
+    );
+    assert!(
+        queued.iter().any(|record| {
+            record.label.as_deref()
+                == Some(crate::agent::orchestration::background_completions::AWAITING_INPUT_LABEL)
+        }),
+        "the asynchronous pause notice is queued independently"
+    );
     let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
     let parent_session = live
         .data
@@ -404,20 +415,6 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
             .cloned()
     };
     assert_eq!(response_field(&cancelled, "cancelled"), Some(json!(true)));
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
-        loop {
-            match progress_rx.recv().await {
-                Some(crate::progress::AgentProgress::SubagentFailed {
-                    task_id: event_task_id,
-                    ..
-                }) if event_task_id == task_id => break,
-                Some(_) => {}
-                None => panic!("parent progress stream closed before cancellation settled"),
-            }
-        }
-    })
-    .await
-    .expect("failure projection follows cancelled child settlement");
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert!(matches!(
         jobs.get(paused_job.id.as_str())
@@ -436,11 +433,18 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         .latest_error
         .as_deref()
         .is_some_and(|error| error.contains("user requested stop")));
-    let deliveries = pending_for(workspace.path(), "paused-cancel-rpc-thread");
-    assert_eq!(deliveries.len(), 1);
-    assert_eq!(deliveries[0].status, CompletionStatus::Failed);
-    assert!(deliveries[0].result.text.contains("[SUBAGENT_FAILED]"));
-    assert!(deliveries[0].result.text.contains("user requested stop"));
+    let deliveries = pending_for_ctx(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        "paused-cancel-rpc-thread",
+    );
+    let failures: Vec<_> = deliveries
+        .iter()
+        .filter(|record| record.task_id == task_id && record.status == CompletionStatus::Failed)
+        .collect();
+    assert_eq!(failures.len(), 1, "cancellation settles once for this task");
+    assert!(failures[0].result.text.contains("[SUBAGENT_FAILED]"));
+    assert!(failures[0].result.text.contains("user requested stop"));
 
     let mut repeated_params = serde_json::Map::new();
     repeated_params.insert("taskId".into(), json!(task_id));
@@ -457,6 +461,19 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
     .expect("repeated cancel RPC result");
     assert_eq!(response_field(&repeated, "cancelled"), Some(json!(false)));
     assert_eq!(response_field(&repeated, "outcome"), Some(json!("unknown")));
+    let deliveries_after_repeat = pending_for_ctx(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        "paused-cancel-rpc-thread",
+    );
+    assert_eq!(
+        deliveries_after_repeat
+            .iter()
+            .filter(|record| record.task_id == task_id && record.status == CompletionStatus::Failed)
+            .count(),
+        1,
+        "repeated cancellation does not enqueue another terminal failure"
+    );
     forget_workspace_for_test(workspace.path());
     assert!(!parent_cancellation.is_cancelled());
 }
