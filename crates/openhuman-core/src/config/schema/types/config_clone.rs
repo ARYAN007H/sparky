@@ -28,6 +28,7 @@ impl Clone for Config {
             default_model: self.default_model.clone(),
             default_temperature: self.default_temperature,
             output_language: self.output_language.clone(),
+            channels_locale: self.channels_locale.clone(),
             user_timezone: self.user_timezone.clone(),
             temperature_unsupported_models: self.temperature_unsupported_models.clone(),
             dashboard: self.dashboard.clone(),
