@@ -75,7 +75,8 @@ fn change_status(session: &mut DurableSubagentSession) {
 
 #[test]
 fn observed_mutation_rejects_a_stale_parent_thread_task_lifecycle_or_status() {
-    let changes: [(&str, fn(&mut DurableSubagentSession)); 5] = [
+    type SessionChange = fn(&mut DurableSubagentSession);
+    let changes: [(&str, SessionChange); 5] = [
         ("parent", change_parent),
         ("thread", change_thread),
         ("task", change_task),

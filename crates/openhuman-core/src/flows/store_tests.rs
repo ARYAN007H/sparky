@@ -75,7 +75,7 @@ fn catalog_clients_preserve_definition_revisions_and_suggestion_semantics() {
         source_run_id: None,
     };
     assert_eq!(
-        upsert_suggestions(&config, &[suggestion.clone()]).unwrap(),
+        upsert_suggestions(&config, std::slice::from_ref(&suggestion)).unwrap(),
         1
     );
     assert_eq!(
