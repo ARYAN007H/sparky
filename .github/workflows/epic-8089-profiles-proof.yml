@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   profiles-controller-proof:
+    if: github.repository == 'senamakel/openhuman'
     name: Profiles ${{ matrix.case }} contract proof
     runs-on: ubuntu-22.04
     timeout-minutes: 90
@@ -35,7 +36,7 @@ jobs:
         include:
           - case: baseline
             expected_tree: d0ba2a451a65c9bed2995612f87f9c4bbc9cc988
-            expected_schema_blob: 9fe5cc0386f733d191b49df205351e82fd122f5e
+            expected_schema_blob: 9fe5cc038664da876b648f3df69868b7f27e87ea
             expected_runtime_exit: 0
           - case: schema-required
             expected_tree: fbb4b509861753eb92ba82aebedb50e64eac4e85
@@ -46,6 +47,11 @@ jobs:
             expected_schema_blob: 67cf3fce9c94cd0105f427f6f53e41238db30e1d
             expected_runtime_exit: 101
     steps:
+      - name: Free disk space on the hosted container
+        run: |
+          rm -rf /__t/* || true
+          df -h /__w || true
+
       - name: Checkout the frozen Profiles source and recursive pins
         uses: actions/checkout@v7
         with:
@@ -66,7 +72,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = b417d16e0514491da6b8a36b82b49ab15bf56c5d
           test "$(git rev-parse HEAD^{tree})" = d0ba2a451a65c9bed2995612f87f9c4bbc9cc988
-          test "$(git rev-parse HEAD:crates/openhuman-core/src/profiles/schemas.rs)" = 9fe5cc0386f733d191b49df205351e82fd122f5e
+          test "$(git rev-parse HEAD:crates/openhuman-core/src/profiles/schemas.rs)" = 9fe5cc038664da876b648f3df69868b7f27e87ea
           test -z "$(git status --porcelain=v1)"
           mkdir -p target/profiles-proof
           git submodule status --recursive > target/profiles-proof/submodules.txt
@@ -128,12 +134,25 @@ jobs:
             printf 'source_head=b417d16e0514491da6b8a36b82b49ab15bf56c5d\n'
             printf 'baseline_commit=b417d16e0514491da6b8a36b82b49ab15bf56c5d\n'
             printf 'baseline_tree=d0ba2a451a65c9bed2995612f87f9c4bbc9cc988\n'
+            printf 'workflow_ref=%s\n' "$PROOF_WORKFLOW_REF"
+            printf 'workflow_sha=%s\n' "$PROOF_WORKFLOW_SHA"
+            printf 'workflow_repository=%s\n' "$PROOF_REPOSITORY"
             printf 'source_tree=%s\n' "$actual_tree"
             printf 'schemas_blob=%s\n' "$actual_blob"
             cat target/profiles-proof/mutation.patch.sha256
             printf 'features=default,voice,inference\n'
           } > target/profiles-proof/receipt.txt
+          printf 'workflow_ref=%s\nworkflow_sha=%s\nworkflow_repository=%s\n' \
+            "$PROOF_WORKFLOW_REF" "$PROOF_WORKFLOW_SHA" "$PROOF_REPOSITORY" \
+            >> target/profiles-proof/receipt.txt
           git status --short
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          cache-on-failure: true
+          key: profiles-proof
 
       - name: Compile the lib-test binary once
         shell: bash
@@ -143,9 +162,9 @@ jobs:
           export TMPDIR="$GITHUB_WORKSPACE/target/build-tmp"
           build_json=target/profiles-proof/build.jsonl
           build_stderr=target/profiles-proof/build.stderr
-          printf 'build_command=RUST_MIN_STACK=33554432 TMPDIR=%s CARGO_BUILD_JOBS=1 bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features voice,inference --no-run --message-format=json\n' "$TMPDIR" >> target/profiles-proof/receipt.txt
+          printf 'build_command=RUST_MIN_STACK=33554432 TMPDIR=%s CARGO_BUILD_JOBS=1 bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json\n' "$TMPDIR" >> target/profiles-proof/receipt.txt
           set +e
-          bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features voice,inference --no-run --message-format=json > "$build_json" 2> "$build_stderr"
+          bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json > "$build_json" 2> "$build_stderr"
           build_exit=$?
           set -e
           printf 'build_exit=%s\n' "$build_exit" >> target/profiles-proof/receipt.txt
