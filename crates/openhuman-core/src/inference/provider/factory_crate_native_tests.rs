@@ -264,7 +264,7 @@ fn create_chat_model_routes_managed_backend_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
     let config = Config::default();
-    let (model, model_id) = create_chat_model_with_model_id_in(
+    let (_model, model_id) = create_chat_model_with_model_id_in(
         &crate::core::runtime::DispatchCtx::ambient(),
         "chat",
         &config,
@@ -307,7 +307,7 @@ fn create_chat_model_routes_local_runtime_to_crate_native() {
 fn explicit_local_provider_string_routes_to_crate_native_model() {
     let _guard = crate::inference::inference_test_guard();
     let config = Config::default();
-    let (_model, model_id) =
+    let (model, model_id) =
         create_chat_model_from_string_with_model_id("chat", "ollama:qwen2.5", &config, 0.7)
             .expect("explicit local model must build");
     assert_eq!(model_id, "qwen2.5");
