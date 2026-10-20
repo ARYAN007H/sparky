@@ -37,7 +37,15 @@ pub fn goal_store(
         return store;
     }
 
-    let kv = crate::storage::sessions::stores_or_ephemeral(workspace_dir).kv;
+    let stores = match context.tenant() {
+        Ok(tenant) => crate::storage::sessions::provider_for_workspace(workspace_dir)
+            .for_agent(&crate::core::runtime::session_key(&tenant)),
+        Err(no_tenant) => {
+            log::warn!("[thread_goals] {no_tenant}; using throwaway in-memory store");
+            tinyagents_session::port::InMemorySessionStores::new().for_agent("ephemeral")
+        }
+    };
+    let kv = stores.kv;
     let store = Arc::new(GoalStore::with_observer(
         kv,
         Arc::new(OpenHumanGoalObserver),
