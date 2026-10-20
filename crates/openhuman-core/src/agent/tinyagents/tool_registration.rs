@@ -117,8 +117,8 @@ pub(crate) fn typed_dispatch_for(
     Some(dispatch)
 }
 
-fn live_dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
-    dispatch_selector(tool_sets)
+fn live_dispatch_selector() -> DispatchSelector {
+    dispatch_selector()
 }
 
 /// Names among the candidate tools that spawn a sub-agent.
@@ -198,7 +198,7 @@ type DispatchSelector = Arc<
 /// (it is the proxy every packed archetype delegation is reached through and
 /// must resolve the SAME live parent a natively advertised delegate tool does,
 /// regression R3), everything else goes through [`typed_dispatch_for`].
-fn dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
+fn dispatch_selector() -> DispatchSelector {
     Arc::new(move |name, adapter| {
         if name != USE_SKILL {
             return typed_dispatch_for(name, adapter);
@@ -220,11 +220,8 @@ fn select_packed_tool_dispatch(selection: PackSelection) -> Option<RegisteredToo
     typed_dispatch_for(&name, Arc::new(adapter))
 }
 
-fn turn_dispatch_selector(
-    tool_sets: Vec<SharedToolSet>,
-    _run_context: &OpenHumanRunContext,
-) -> DispatchSelector {
-    dispatch_selector(tool_sets)
+fn turn_dispatch_selector(_run_context: &OpenHumanRunContext) -> DispatchSelector {
+    dispatch_selector()
 }
 
 /// The admission rules for one turn.
@@ -264,7 +261,7 @@ pub(crate) fn host_tool_set_builder(
         .sets(tool_sets.iter().cloned())
         .admission(turn_admission(tool_sets, allowed, has_thread))
         .deferred(session_deferred.iter().cloned())
-        .dispatch(live_dispatch_selector(tool_sets.to_vec()))
+        .dispatch(live_dispatch_selector())
         .exec_scope(Arc::new(TurnOriginScope))
 }
 
@@ -279,7 +276,7 @@ pub(crate) fn host_tool_set_builder_for_turn(
         .sets(tool_sets.iter().cloned())
         .admission(turn_admission(tool_sets, allowed, has_thread))
         .deferred(session_deferred.iter().cloned())
-        .dispatch(turn_dispatch_selector(tool_sets.to_vec(), run_context))
+        .dispatch(turn_dispatch_selector(run_context))
         .exec_scope(Arc::new(TurnOriginScope))
 }
 
