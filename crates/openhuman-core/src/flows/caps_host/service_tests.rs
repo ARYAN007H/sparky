@@ -116,7 +116,7 @@ async fn agent_run_rejects_an_identity_from_another_bound_run() {
         serde_json::json!([{
             "client_request_id":"request-1",
             "agent":{"id":"agent"},
-            "identity":{"run_id":"different-run"},
+            "identity":{"run_id":"different-run","node_id":"agent-node"},
             "config":{}
         }]),
     )
