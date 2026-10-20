@@ -197,7 +197,6 @@ fn meta() -> TranscriptMeta {
     TranscriptMeta {
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
         agent_name: "orchestrator".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: None,

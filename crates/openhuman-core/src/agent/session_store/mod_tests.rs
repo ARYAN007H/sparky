@@ -99,7 +99,6 @@ async fn without_a_store_transcripts_come_from_the_workspace_store_not_files() {
         task_id: None,
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
     };
     let history = locator
         .open_stem(

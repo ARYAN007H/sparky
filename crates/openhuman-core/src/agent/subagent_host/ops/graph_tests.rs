@@ -35,7 +35,6 @@ fn read_stem(
         task_id: None,
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
     };
     locator
         .open_stem(stem, seed)

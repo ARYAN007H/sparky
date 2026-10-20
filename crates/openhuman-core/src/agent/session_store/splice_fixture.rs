@@ -89,6 +89,5 @@ pub(crate) fn blank_meta() -> TranscriptMeta {
         task_id: None,
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
     }
 }
