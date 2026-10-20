@@ -157,6 +157,8 @@ pub fn builtin_presets() -> BuiltinPresets {
     }))
 }
 
+/// Looks up a provider preset, giving the generic catalog precedence over
+/// host additions with the same slug.
 pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
     if let Some(preset) = BuiltinPresets::default().builtin_cloud_provider(type_str) {
         return Some(BuiltinCloudProvider::from(preset));
@@ -172,36 +174,6 @@ pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
     None
 }
 
-/// Whether `host` is the authority host of any built-in cloud **inference**
-/// provider (e.g. `openrouter.ai`, `api.openai.com`, `api.groq.com`).
-///
-/// Derived entirely from [`BUILTIN_CLOUD_PROVIDERS`] so the set stays in sync
-/// with the provider registry. `host` is compared case-insensitively against
-/// each preset's [`endpoint_host`].
-///
-/// # Why this exists
-///
-/// `config.api_url` is overloaded: it is the chat/inference endpoint, but
-/// `api::config::effective_backend_api_url` also reuses it as the
-/// OpenHuman **backend** base for team/billing/auth calls. A BYO user who
-/// points `api_url` at a provider's canonical base (`https://openrouter.ai/api/v1`)
-/// would otherwise have every backend domain call routed to the inference host
-/// → 400/404 (TAURI-RUST-HW1: 4932 team-usage 400s from `openrouter.ai`).
-/// The backend-URL resolver uses this to treat such hosts as non-backend and
-/// fall back to the default backend chain — the cloud analogue of the local-AI
-/// guard that fixed the Ollama case (OPENHUMAN-TAURI-51/-80/-7Z).
-/// Whether an endpoint **host** is a known cloud host that does NOT serve the
-/// OpenAI Responses API (`/v1/responses`) — i.e. it is chat-completions-only,
-/// regardless of which user slug points at it.
-///
-/// Derived entirely from [`BUILTIN_CLOUD_PROVIDERS`]: a host is chat-only when
-/// some built-in preset uses it AND no preset at that host advertises the
-/// Responses API (only OpenAI's `api.openai.com` does). This closes the
-/// custom-slug gap behind the builtin-slug gate
-/// ([`builtin_cloud_supports_responses_api`]): a user slug pointed at, e.g.,
-/// `integrate.api.nvidia.com` must never attempt `/responses` (TAURI-RUST-5A1),
-/// while a genuinely unknown proxy host keeps the permissive fallback so a real
-/// OpenAI proxy still gets `/responses`.
 /// Authentication header style for a cloud provider.
 ///
 /// Wire format is lowercase (e.g. `"bearer"`). Determines which HTTP headers
