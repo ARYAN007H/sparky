@@ -19,12 +19,12 @@ fn seeds_the_attributed_model_from_config() {
     let mut config = Config::default();
     config.default_model = Some("pinned-model".into());
     let gate = OpenHumanBudgetGate::new(Arc::new(config));
-    assert_eq!(gate.attributed_model(), "pinned-model");
+    assert_eq!(gate.attributed_model(), Some("pinned-model".to_string()));
 
     let mut unpinned = Config::default();
     unpinned.default_model = None;
     let gate = OpenHumanBudgetGate::new(Arc::new(unpinned));
-    assert_eq!(gate.attributed_model(), DEFAULT_MODEL);
+    assert_eq!(gate.attributed_model(), None);
 }
 
 #[tokio::test]
@@ -35,7 +35,7 @@ async fn acquire_stamps_the_model_that_record_will_attribute() {
     gate.acquire(&CallEstimate::new("some/model", 10, 5))
         .await
         .expect("no tracker in tests, so nothing can refuse");
-    assert_eq!(gate.attributed_model(), "some/model");
+    assert_eq!(gate.attributed_model(), Some("some/model".to_string()));
 }
 
 #[tokio::test]
