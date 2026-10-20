@@ -23,6 +23,9 @@ pub(crate) struct CancelledSubagent {
     pub(crate) subagent_session_id: Option<String>,
     pub(crate) workspace_dir: PathBuf,
     pub(crate) parent_thread_id: Option<String>,
+    /// Admission generation captured for this child, if it originated in a
+    /// thread. Completion after a later stop/resume must retain this epoch.
+    pub(crate) parent_epoch: Option<u64>,
     /// How the run had already ended when the cancel arrived, if it had. A
     /// finished entry stays registered until `sweep_terminal`, so a late
     /// "Cancel" still finds it; the caller must not rewrite that outcome as a
@@ -90,6 +93,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
             subagent_session_id: metadata.subagent_session_id,
             workspace_dir: metadata.workspace_dir,
             parent_thread_id: metadata.parent_thread_id,
+            parent_epoch: metadata.parent_epoch,
             already_finished,
             driver_pause: None,
             driver_managed: false,
@@ -117,6 +121,27 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         task_id,
         reason,
     )?;
+    let parent_epoch = match selected.as_ref().and_then(|selected| {
+        selected
+            .was_paused
+            .then_some((selected.parent_thread_id.as_deref(), selected.task_id.as_str()))
+    }) {
+        Some((Some(thread_id), selected_task_id)) => {
+            match crate::agent::orchestration::background_completions::paused_task_parent_epoch(
+                ctx,
+                &workspace_dir,
+                thread_id,
+                selected_task_id,
+            ) {
+                Ok(epoch) => epoch,
+                Err(error) => {
+                    log::warn!("[running_subagents] could not recover paused task parent epoch task_id={selected_task_id}: {error}");
+                    None
+                }
+            }
+        }
+        _ => None,
+    };
     let driver_pause = selected
         .as_ref()
         .filter(|selected| selected.was_paused)
@@ -127,6 +152,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         subagent_session_id: Some(selected.subagent_session_id),
         workspace_dir: selected.workspace_dir,
         parent_thread_id: selected.parent_thread_id,
+        parent_epoch,
         already_finished: selected.already_finished,
         driver_pause,
         driver_managed: true,

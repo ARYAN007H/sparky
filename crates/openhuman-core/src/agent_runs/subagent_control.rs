@@ -160,7 +160,13 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // A paused job has already returned from that hook, so this
                     // handler settles and reports that one terminal transition.
                     if let Some(paused) = meta.driver_pause.as_ref() {
-                        settle_paused_driver_cancel(&ctx, paused, reason.as_deref()).await?;
+                        settle_paused_driver_cancel(
+                            &ctx,
+                            paused,
+                            meta.parent_epoch,
+                            reason.as_deref(),
+                        )
+                        .await?;
                     }
                     (true, None)
                 } else {
@@ -174,7 +180,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // The thread is still alive (unlike the delete path), so we
                     // record a completion that flows through the same idle-gated
                     // delivery and surfaces the cancellation in chat.
-                    background_completions::record_completion(
+                    background_completions::record_outcome_with_parent_epoch(
                         &ctx,
                         &meta.workspace_dir,
                         &meta.parent_session,
@@ -182,6 +188,8 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                         meta.agent_id.clone(),
                         summary,
                         meta.parent_thread_id.clone(),
+                        meta.parent_epoch,
+                        background_completions::BackgroundAgentOutcome::Completed,
                     )
                     .await;
                     if let Some(subagent_session_id) = meta.subagent_session_id.as_deref() {
@@ -220,8 +228,12 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 async fn settle_paused_driver_cancel(
     ctx: &DispatchCtx,
     paused: &subagent_sessions::DriverTaskCancellation,
+    parent_epoch: Option<u64>,
     reason: Option<&str>,
 ) -> Result<bool, String> {
+    let Some(parent_epoch) = parent_epoch else {
+        return Err("subagent_cancel: paused task has no captured parent generation".into());
+    };
     let store = subagent_sessions::SubagentSessionStore::new(paused.workspace_dir.clone());
     let transitioned = subagent_sessions::mark_driver_pause_cancelled(&store, paused)
         .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
@@ -230,7 +242,7 @@ async fn settle_paused_driver_cancel(
             Some(reason) => format!("cancelled by user. Reason: {reason}"),
             None => "cancelled by user".to_string(),
         };
-        background_completions::record_failure(
+        background_completions::record_outcome_with_parent_epoch(
             ctx,
             &paused.workspace_dir,
             &paused.parent_session,
@@ -238,6 +250,8 @@ async fn settle_paused_driver_cancel(
             &paused.agent_id,
             &error,
             paused.parent_thread_id.clone(),
+            Some(parent_epoch),
+            background_completions::BackgroundAgentOutcome::Failed,
         )
         .await;
     }
