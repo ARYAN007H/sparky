@@ -253,6 +253,10 @@ fn default_temperature_wrapper_preserves_physical_attempt_tracking() {
             true
         }
 
+        fn has_pre_invocation_admission_gate(&self) -> bool {
+            true
+        }
+
         async fn invoke(
             &self,
             _state: &(),
@@ -273,6 +277,7 @@ fn default_temperature_wrapper_preserves_physical_attempt_tracking() {
     .expect("test override model");
 
     assert!(wrapped.tracks_physical_attempts());
+    assert!(wrapped.has_pre_invocation_admission_gate());
 }
 
 // ── Motion B (#4727): managed-backend crate-native routing ──────────────────
