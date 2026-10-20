@@ -6,10 +6,15 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const script = path.join(repoRoot, "app/scripts/e2e-web-shards.sh");
 fs.mkdirSync(path.join(repoRoot, "target"), { recursive: true });
-const fixtureRoot = fs.mkdtempSync(path.join(repoRoot, "target", "e2e-web-shards-test-"));
+const fixtureRoot = fs.mkdtempSync(
+  path.join(repoRoot, "target", "e2e-web-shards-test-"),
+);
 
 function run(args, env = {}) {
   return spawnSync("bash", [script, ...args], {
@@ -22,7 +27,10 @@ function run(args, env = {}) {
 test("four lanes assign each of 64 shards and nine special units once", () => {
   const units = [];
   const schedulerSource = fs.readFileSync(script, "utf8");
-  assert.match(schedulerSource, /--grep-invert='Connections \(aliases\|deep links\)\|Skills explorer'/);
+  assert.match(
+    schedulerSource,
+    /--grep-invert='Connections \(aliases\|deep links\)\|Skills explorer'/,
+  );
   assert.doesNotMatch(schedulerSource, /Chat Harness - Subagent/);
   for (let lane = 1; lane <= 4; lane += 1) {
     const result = run([`--lane=${lane}`, "--lanes=4", "--list"]);
@@ -34,7 +42,9 @@ test("four lanes assign each of 64 shards and nine special units once", () => {
   const specials = units.filter((unit) => unit.kind !== "shard");
   assert.equal(shards.length, 64);
   assert.deepEqual(
-    shards.map((unit) => unit.shard).sort((a, b) => Number.parseInt(a) - Number.parseInt(b)),
+    shards
+      .map((unit) => unit.shard)
+      .sort((a, b) => Number.parseInt(a) - Number.parseInt(b)),
     Array.from({ length: 64 }, (_, index) => `${index + 1}/64`),
   );
   assert.equal(specials.length, 9);
@@ -42,7 +52,10 @@ test("four lanes assign each of 64 shards and nine special units once", () => {
     specials.map((unit) => unit.index).sort((a, b) => a - b),
     Array.from({ length: 9 }, (_, index) => index),
   );
-  assert.equal(new Set(units.map((unit) => `${unit.kind}:${unit.index}`)).size, 73);
+  assert.equal(
+    new Set(units.map((unit) => `${unit.kind}:${unit.index}`)).size,
+    73,
+  );
 });
 
 test("invalid lane is rejected", () => {
@@ -52,24 +65,51 @@ test("invalid lane is rejected", () => {
 });
 
 test("CI Full requires every Playwright lane and manual workflow shares the artifact scheduler", () => {
-  const full = fs.readFileSync(path.join(repoRoot, ".github/workflows/ci-full.yml"), "utf8");
-  const manual = fs.readFileSync(path.join(repoRoot, ".github/workflows/e2e-playwright.yml"), "utf8");
-  const job = full.slice(full.indexOf("  playwright-e2e:"), full.indexOf("  # Full desktop E2E", full.indexOf("  playwright-e2e:")));
+  const full = fs.readFileSync(
+    path.join(repoRoot, ".github/workflows/ci-full.yml"),
+    "utf8",
+  );
+  const manual = fs.readFileSync(
+    path.join(repoRoot, ".github/workflows/e2e-playwright.yml"),
+    "utf8",
+  );
+  const job = full.slice(
+    full.indexOf("  playwright-e2e:"),
+    full.indexOf("  # Full desktop E2E", full.indexOf("  playwright-e2e:")),
+  );
   assert.match(job, /fail-fast:\s*false/);
   assert.match(job, /lane:\s*\[1, 2, 3, 4\]/);
   assert.doesNotMatch(job, /continue-on-error:/);
   assert.match(full, /- playwright-e2e/);
-  assert.match(full, /\["Playwright E2E"\]="\$\{\{ needs\['playwright-e2e'\]\.result \}\}"/);
+  assert.match(
+    full,
+    /\["Playwright E2E"\]="\$\{\{ needs\['playwright-e2e'\]\.result \}\}"/,
+  );
   assert.match(manual, /name: Build Playwright E2E artifact/);
   assert.match(manual, /name: e2e-playwright-linux-\$\{\{ github\.run_id \}\}/);
   assert.match(manual, /lane:\s*\[1, 2, 3, 4\]/);
-  assert.match(manual, /e2e-web-shards\.sh --lane=\$\{\{ matrix\.lane \}\} --lanes=4/);
+  assert.match(
+    manual,
+    /e2e-web-shards\.sh --lane=\$\{\{ matrix\.lane \}\} --lanes=4/,
+  );
 });
 
 test("failure artifact names are unique across all four Playwright lanes", () => {
   const workflows = [
-    ["CI Full", fs.readFileSync(path.join(repoRoot, ".github/workflows/ci-full.yml"), "utf8")],
-    ["manual Playwright", fs.readFileSync(path.join(repoRoot, ".github/workflows/e2e-playwright.yml"), "utf8")],
+    [
+      "CI Full",
+      fs.readFileSync(
+        path.join(repoRoot, ".github/workflows/ci-full.yml"),
+        "utf8",
+      ),
+    ],
+    [
+      "manual Playwright",
+      fs.readFileSync(
+        path.join(repoRoot, ".github/workflows/e2e-playwright.yml"),
+        "utf8",
+      ),
+    ],
   ];
 
   for (const [workflow, source] of workflows) {
@@ -78,7 +118,11 @@ test("failure artifact names are unique across all four Playwright lanes", () =>
     const names = Array.from({ length: 4 }, (_, index) =>
       match[1].replace(/\$\{\{\s*matrix\.lane\s*\}\}/g, String(index + 1)),
     );
-    assert.equal(new Set(names).size, 4, `${workflow} artifact names must be unique per lane`);
+    assert.equal(
+      new Set(names).size,
+      4,
+      `${workflow} artifact names must be unique per lane`,
+    );
   }
 });
 
@@ -103,8 +147,24 @@ test("failed units retain failure while later units run in distinct workspaces",
   assert.ok(calls.some((call) => call.includes("--shard=64/64")));
   const paths = calls.map((call) => call.split("|")[0]);
   assert.equal(new Set(paths).size, paths.length);
-  assert.equal(fs.readFileSync(path.join(workspace, "lane-4/receipts/shard-4.exit"), "utf8").trim(), "1");
-  assert.equal(fs.readFileSync(path.join(workspace, "lane-4/receipts/shard-64.exit"), "utf8").trim(), "0");
+  assert.equal(
+    fs
+      .readFileSync(
+        path.join(workspace, "lane-4/receipts/shard-4.exit"),
+        "utf8",
+      )
+      .trim(),
+    "1",
+  );
+  assert.equal(
+    fs
+      .readFileSync(
+        path.join(workspace, "lane-4/receipts/shard-64.exit"),
+        "utf8",
+      )
+      .trim(),
+    "0",
+  );
 });
 
 test.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
