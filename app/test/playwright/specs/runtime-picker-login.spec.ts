@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 
 import {
   bootRuntimeReadyGuestPage,
+  callCoreRpc,
   dismissWalkthroughIfPresent,
   signInViaBypassUser,
+  signInViaBypassUserPreservingConfig,
   waitForAppReady,
 } from '../helpers/core-rpc';
 
@@ -42,6 +44,16 @@ async function waitForMockRequest(method: string, pathFragment: string, timeoutM
   return null;
 }
 
+async function readOnboardingCompleted(): Promise<boolean> {
+  const response = await callCoreRpc<boolean | { result?: boolean }>(
+    'openhuman.config_get_onboarding_completed',
+    {}
+  );
+  const value = typeof response === 'boolean' ? response : response?.result;
+  expect(typeof value).toBe('boolean');
+  return value as boolean;
+}
+
 test.describe('Runtime picker -> login -> logout', () => {
   test.beforeEach(async ({ page }) => {
     await resetMock();
@@ -64,21 +76,26 @@ test.describe('Runtime picker -> login -> logout', () => {
     await expect(page.getByTestId('onboarding-custom-vault-step')).toBeVisible();
     await page.getByTestId('onboarding-next-button').click();
     await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('#/chat');
+    await expect.poll(readOnboardingCompleted).toBe(true);
   });
 
   test('provider login reaches home and logout returns to welcome', async ({ page }) => {
-    await signInViaBypassUser(page, 'pw-runtime-picker-login');
+    await callCoreRpc('openhuman.config_set_onboarding_completed', { value: false });
+    await signInViaBypassUserPreservingConfig(page, 'pw-runtime-picker-login');
     await dismissWalkthroughIfPresent(page);
 
     await expect
       .poll(async () => page.evaluate(() => window.location.hash))
       .toMatch(/^#\/(home|chat)(\/|$)/);
     await expect(await waitForMockRequest('GET', '/auth/me')).toBeTruthy();
+    await expect.poll(readOnboardingCompleted).toBe(true);
 
     await page.goto('/#/settings/account');
     await waitForAppReady(page);
     await page.getByTestId('settings-nav-logout').click();
 
     await expect(page.getByText('Welcome to OpenHuman')).toBeVisible();
+    await expect(page.getByTestId('welcome-cta-self')).toBeVisible();
+    await expect(page.getByTestId('welcome-cta-tinyhumans')).toBeVisible();
   });
 });
