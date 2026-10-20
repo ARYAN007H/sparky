@@ -31,6 +31,7 @@ use tinystoragedrivers::{CollectionSpec, Precondition, Query, Sort};
 use super::storage_schema::{VERSIONS, version_body, version_record};
 use crate::storage::DocumentStoreExt;
 use crate::storage::documents::Repo;
+use crate::storage::ScopedStorage;
 use crate::storage::schema_support::key_of;
 
 const DOMAIN: &str = "artifacts::versions";
@@ -43,6 +44,7 @@ fn collections() -> Vec<CollectionSpec> {
 #[derive(Clone, Debug)]
 pub struct DocumentArtifactStore {
     workspace_dir: PathBuf,
+    scoped: Option<ScopedStorage>,
 }
 
 impl DocumentArtifactStore {
@@ -50,6 +52,16 @@ impl DocumentArtifactStore {
     pub fn new(workspace_dir: impl Into<PathBuf>) -> Self {
         Self {
             workspace_dir: workspace_dir.into(),
+            scoped: None,
+        }
+    }
+
+    /// The version records over the same explicit tenant scope as this
+    /// artifact service's file store.
+    pub fn over(workspace_dir: impl Into<PathBuf>, scoped: &ScopedStorage) -> Self {
+        Self {
+            workspace_dir: workspace_dir.into(),
+            scoped: Some(scoped.clone()),
         }
     }
 
@@ -61,7 +73,10 @@ impl DocumentArtifactStore {
     /// The repo for this call (resolved here, in the caller's context, for its
     /// scope), after the one-time legacy import.
     async fn repo(&self) -> Result<Repo> {
-        let repo = Repo::current_for(&self.workspace_dir, DOMAIN, collections)?;
+        let repo = match &self.scoped {
+            Some(scoped) => Repo::over(scoped, DOMAIN, collections),
+            None => Repo::current_for(&self.workspace_dir, DOMAIN, collections)?,
+        };
         let legacy = self.legacy_dir();
         on_blocking(repo.clone(), move |repo| {
             let key = legacy.display().to_string();

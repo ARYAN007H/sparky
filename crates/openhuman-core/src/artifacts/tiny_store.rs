@@ -417,9 +417,14 @@ fn build_artifacts_service(
     publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
 ) -> (Artifacts, Option<Arc<dyn FileStore>>) {
     let roots = file_roots(workspace_dir, &files, action_dir);
-    let file_store = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx)
-        .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)) as Arc<dyn FileStore>);
-    let mut records: Arc<dyn ArtifactStore> = Arc::new(versioned_store(workspace_dir));
+    let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
+    let file_store = scoped
+        .as_ref()
+        .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(scoped)) as Arc<dyn FileStore>);
+    let mut records: Arc<dyn ArtifactStore> = Arc::new(match scoped.as_ref() {
+        Some(scoped) => super::version_documents::DocumentArtifactStore::over(workspace_dir, scoped),
+        None => versioned_store(workspace_dir),
+    });
     if let Some(store) = file_store.as_ref() {
         records = Arc::new(LegacyFileImportStore {
             records,
