@@ -151,7 +151,7 @@ pub fn upsert_running(
     let now = chrono::Utc::now().to_rfc3339();
     let session_id = format!("subsess-{}", uuid::Uuid::new_v4());
 
-    let mut session = DurableSubagentSession {
+    let session = DurableSubagentSession {
         subagent_session_id: session_id.clone(),
         parent_session: upsert.selector.parent_session.clone(),
         parent_thread_id: upsert.selector.parent_thread_id.clone(),

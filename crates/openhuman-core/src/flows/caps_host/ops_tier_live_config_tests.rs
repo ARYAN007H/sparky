@@ -159,10 +159,7 @@ async fn malformed_live_config_is_denied_without_echoing_its_contents() {
         enforce_current_node_tier_gate(&ctx, &config, &baseline, CommandClass::Write, "code")
             .await
             .expect_err("malformed persisted policy must deny rather than reuse Full");
-    let message = match error {
-        EngineError::Capability(message) => message,
-        other => panic!("expected capability denial, got {other:?}"),
-    };
+    let EngineError::Capability(message) = error;
     assert!(message.contains(POLICY_BLOCKED_MARKER));
     assert!(!message.contains(canary), "config text leaked: {message}");
 }
@@ -443,10 +440,7 @@ async fn http_adapter_passes_its_live_upgrade_to_the_http_gate_without_egress() 
         .request(json!({ "method": "GET", "url": "not-a-url" }), None)
         .await
         .expect_err("invalid URL must fail before network access");
-    let message = match error {
-        EngineError::Capability(message) => message,
-        other => panic!("expected capability error, got {other:?}"),
-    };
+    let EngineError::Capability(message) = error;
     assert_eq!(
         message, "Only http:// and https:// URLs are allowed",
         "the refreshed policy must pass the inner NetGate and reach URL validation"

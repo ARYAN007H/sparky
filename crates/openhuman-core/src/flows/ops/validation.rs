@@ -153,7 +153,7 @@ pub async fn flows_validate(
             "flow validation failed",
         );
     }
-    let graph: WorkflowGraph = match report
+    let _graph: WorkflowGraph = match report
         .graph
         .ok_or_else(|| "TinyFlows validation returned no graph".to_string())
         .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))

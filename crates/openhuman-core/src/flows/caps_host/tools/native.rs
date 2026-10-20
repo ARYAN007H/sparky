@@ -50,10 +50,7 @@ impl crate::tools::native_ops::flow_backend::FlowPolicyHooks for NativeFlowPolic
         super::super::current_tier_policy(self.ctx.dispatch, config, self.ctx.security)
             .await
             .map(std::sync::Arc::new)
-            .map_err(|error| match error {
-                EngineError::Capability(body) => body,
-                other => other.to_string(),
-            })
+            .map_err(|EngineError::Capability(body)| body)
     }
 
     async fn authorize(
@@ -64,10 +61,7 @@ impl crate::tools::native_ops::flow_backend::FlowPolicyHooks for NativeFlowPolic
         args: &Value,
     ) -> std::result::Result<Option<String>, String> {
         let tier_decision = super::super::enforce_node_tier_gate(policy, class, "tool_call")
-            .map_err(|error| match error {
-                EngineError::Capability(body) => body,
-                other => other.to_string(),
-            })?;
+            .map_err(|EngineError::Capability(body)| body)?;
         let summary = crate::security::approval::summarize_action(tool_name, args);
         let redacted = crate::security::approval::redact_args(args);
         let (outcome, audit_id) = super::super::gate_call_for_tier(

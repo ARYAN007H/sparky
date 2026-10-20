@@ -21,14 +21,11 @@ fn http_request_node_tier_gate_blocks_readonly_allows_higher() {
         "http_request",
     )
     .expect_err("read-only must block a Network-class http_request node");
-    if let EngineError::Capability(msg) = err {
-        assert!(
-            msg.contains(POLICY_BLOCKED_MARKER),
-            "read-only block must carry the policy-blocked marker: {msg}"
-        );
-    } else {
-        panic!("expected EngineError::Capability for a blocked node");
-    }
+    let EngineError::Capability(msg) = err;
+    assert!(
+        msg.contains(POLICY_BLOCKED_MARKER),
+        "read-only block must carry the policy-blocked marker: {msg}"
+    );
 
     // Supervised/full do not hard-block — they fall through to the
     // ApprovalGate (which performs the Prompt round-trip).
@@ -96,14 +93,11 @@ async fn http_adapter_blocks_under_readonly_tier() {
         .request(request, None)
         .await
         .expect_err("read-only http_request node must be blocked");
-    if let EngineError::Capability(msg) = err {
-        assert!(
-            msg.contains(POLICY_BLOCKED_MARKER),
-            "expected a policy-blocked refusal, got: {msg}"
-        );
-    } else {
-        panic!("expected EngineError::Capability");
-    }
+    let EngineError::Capability(msg) = err;
+    assert!(
+        msg.contains(POLICY_BLOCKED_MARKER),
+        "expected a policy-blocked refusal, got: {msg}"
+    );
 }
 
 /// End-to-end at the adapter: a Composio `tool_call` node under a
@@ -130,14 +124,11 @@ async fn composio_tool_call_blocks_under_readonly_tier() {
         .invoke("SLACK_SEND_MESSAGE", json!({}), None)
         .await
         .expect_err("read-only tier must block a Composio tool_call node before dispatch");
-    if let EngineError::Capability(msg) = err {
-        assert!(
-            msg.contains(POLICY_BLOCKED_MARKER),
-            "expected a policy-blocked refusal, got: {msg}"
-        );
-    } else {
-        panic!("expected EngineError::Capability");
-    }
+    let EngineError::Capability(msg) = err;
+    assert!(
+        msg.contains(POLICY_BLOCKED_MARKER),
+        "expected a policy-blocked refusal, got: {msg}"
+    );
 }
 
 // ── Effect-aware Composio tier gating (fixes reads parking as pending
@@ -179,14 +170,11 @@ async fn composio_read_action_allowed_under_readonly_tier() {
         .invoke("TWITTER_RECENT_SEARCH", json!({}), None)
         .await
         .expect_err("no live Composio session is configured in this test");
-    if let EngineError::Capability(msg) = err {
-        assert!(
-            !msg.contains(POLICY_BLOCKED_MARKER),
-            "a curated read must never be refused by the autonomy-tier gate, got: {msg}"
-        );
-    } else {
-        panic!("expected EngineError::Capability");
-    }
+    let EngineError::Capability(msg) = err;
+    assert!(
+        !msg.contains(POLICY_BLOCKED_MARKER),
+        "a curated read must never be refused by the autonomy-tier gate, got: {msg}"
+    );
 }
 
 /// A curated read under Supervised classifies as `CommandClass::Read`,
@@ -220,14 +208,11 @@ async fn composio_read_action_does_not_prompt_under_supervised_tier() {
         .invoke("TWITTER_RECENT_SEARCH", json!({}), None)
         .await
         .expect_err("no live Composio session is configured in this test");
-    if let EngineError::Capability(msg) = err {
-        assert!(
-            !msg.contains(POLICY_BLOCKED_MARKER),
-            "a curated read must pass the tier gate under Supervised, got: {msg}"
-        );
-    } else {
-        panic!("expected EngineError::Capability");
-    }
+    let EngineError::Capability(msg) = err;
+    assert!(
+        !msg.contains(POLICY_BLOCKED_MARKER),
+        "a curated read must pass the tier gate under Supervised, got: {msg}"
+    );
 }
 
 /// Guard: a curated *write* action must still resolve to a

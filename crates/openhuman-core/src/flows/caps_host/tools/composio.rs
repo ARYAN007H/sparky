@@ -61,7 +61,6 @@ impl FlowCallPolicy for FlowPolicy {
 fn capability_payload(error: EngineError) -> String {
     match error {
         EngineError::Capability(message) => message,
-        other => other.to_string(),
     }
 }
 
