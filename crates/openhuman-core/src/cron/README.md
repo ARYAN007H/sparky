@@ -19,7 +19,7 @@ TinyFlows engine, catalog, copilot, drivers, and schedule implementation; the
 pure `tinyflows-import` readers remain for legacy data.
 
 Check this boundary with
-`scripts/assert-shed.sh default tinyflows tinyflows-catalog tinyflows-copilot tinyflows-drivers tinyflows-schedule`.
+`scripts/assert-shed.sh flows tinyflows tinyflows-catalog tinyflows-copilot tinyflows-drivers tinyflows-schedule`.
 
 ## How it works
 
