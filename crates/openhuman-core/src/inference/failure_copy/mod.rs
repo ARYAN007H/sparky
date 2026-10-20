@@ -10,8 +10,8 @@
 //! `tinyinference_providers::is_budget_message`) lives upstream in
 //! `tinyinference`; deciding *which class an error is* stays in the callers.
 
-mod halt;
 mod chat_error_catalog;
+mod halt;
 mod localized;
 mod table;
 

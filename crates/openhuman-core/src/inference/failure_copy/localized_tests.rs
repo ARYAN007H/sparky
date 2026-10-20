@@ -24,7 +24,7 @@ fn native_failure_copy_preserves_queued_prefix_and_sanitized_detail() {
     );
 
     assert!(rendered.starts_with("queued turn was not run: "));
-    assert!(rendered.contains("problème d’authentification"));
+    assert!(rendered.contains("problème d'authentification"));
     assert!(rendered.ends_with("> sanitized provider detail"));
     assert!(!rendered.contains("authentication failed"));
 }
@@ -41,7 +41,10 @@ fn unknown_locale_key_and_parameter_types_fall_back_safely() {
         Some("chat_error.rate_limited"),
         Some(&serde_json::json!({ "retry_after_secs": "not-a-number", "detail": 4 })),
     );
-    assert_eq!(english, chat_error_catalog::translation("en", "chat_error.rate_limited").unwrap());
+    assert_eq!(
+        english,
+        chat_error_catalog::translation("en", "chat_error.rate_limited").unwrap()
+    );
     assert!(!english.contains("not-a-number"));
     assert!(!english.contains('4'));
 
