@@ -94,6 +94,7 @@ pub(super) fn managed_chat_model_for(
 }
 
 /// Construct a managed turn model with the explicit OpenHuman thread attached.
+#[cfg(test)]
 pub(crate) fn make_openhuman_backend_model_for_thread(
     role: &str,
     config: &Config,
