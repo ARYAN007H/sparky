@@ -141,7 +141,6 @@ fn coding_agent_prompts_reference_action_sandbox_not_stale_workspace() {
         coding.contains("action sandbox") || coding.contains("action_dir"),
         "guides/coding.md must reference the action sandbox or action_dir (see #3236)"
     );
-
 }
 
 #[test]

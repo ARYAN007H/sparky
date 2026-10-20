@@ -17,13 +17,13 @@
 //! `--agent orchestrator` for the orchestrator prompt; otherwise pass
 //! any built-in or workspace-custom agent id (e.g. `orchestrator`, `researcher`).
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
-use crate::core::agent_cli::debug::prompt_size::{PromptSizeReport, render_text};
+use crate::core::agent_cli::debug::prompt_size::{render_text, PromptSizeReport};
 use crate::core::agent_cli::debug::{
-    DumpPromptOptions, DumpedPrompt, dump_agent_prompt, dump_all_agent_prompts, write_prompt_dumps,
+    dump_agent_prompt, dump_all_agent_prompts, write_prompt_dumps, DumpPromptOptions, DumpedPrompt,
 };
 
 pub(crate) mod debug;

@@ -159,10 +159,7 @@ fn orchestrator_is_chat_tier() {
 #[test]
 fn other_builtins_default_to_worker_tier() {
     for def in load_builtins().unwrap() {
-        if matches!(
-            def.id.as_str(),
-            "orchestrator" | "flow_discovery"
-        ) {
+        if matches!(def.id.as_str(), "orchestrator" | "flow_discovery") {
             continue;
         }
         assert_eq!(

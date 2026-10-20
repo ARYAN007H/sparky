@@ -30,7 +30,7 @@
 
 use anyhow::Result;
 
-use super::{DumpPromptOptions, DumpedPrompt, dump_agent_prompt};
+use super::{dump_agent_prompt, DumpPromptOptions, DumpedPrompt};
 
 /// Rough bytes-per-token for English prose and JSON on a BPE tokenizer.
 ///
