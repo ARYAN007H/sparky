@@ -79,7 +79,7 @@ fn approval_gated_http_graph() -> Value {
         "nodes": [
             { "id": "trigger", "kind": "trigger", "name": "Manual" },
             { "id": "request", "kind": "http_request", "name": "Blocked request",
-              "config": { "method": "POST", "url": "http://127.0.0.1:1/must-not-connect" } },
+              "config": { "method": "POST", "url": "http://127.0.0.1:1/must-not-connect", "requires_approval": true } },
             { "id": "after", "kind": "output_parser", "name": "After request" }
         ],
         "edges": [
@@ -302,7 +302,9 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         .unwrap_or_default()
         .to_lowercase();
     assert!(
-        failure.contains("read-only") || failure.contains("network"),
+        failure.contains("[policy-blocked]")
+            && failure.contains("flows http_request node is not permitted")
+            && failure.contains("readonly"),
         "{terminal}"
     );
     assert!(
