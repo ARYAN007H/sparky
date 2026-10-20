@@ -369,10 +369,9 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
         .query_row(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'docs'",
             [],
-            |row| row.get(0),
+            |row| row.get::<_, String>(0),
         )
-        .unwrap()
-        .workflow;
+        .unwrap();
     conn.execute_batch(&format!(
         "CREATE TRIGGER refuse_draft_updates BEFORE UPDATE ON {docs_table}
          WHEN NEW.coll = 'flows.drafts'

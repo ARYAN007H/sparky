@@ -117,7 +117,9 @@ fn agent_prompt_binding_unaffected() {
         ],
         "edges": [ { "from_node": "t", "to_node": "summarize" } ]
     }));
-    assert!(tinyflows::gates::failures(&g).is_empty());
+    let engine_graph: tinyflows::model::WorkflowGraph =
+        serde_json::from_value(g.clone()).expect("graph fixture converts to engine graph");
+    assert!(tinyflows::gates::failures(&engine_graph).is_empty());
 }
 
 /// Regression for issue #4593 (widened for #4881's `resume_flow_run`/

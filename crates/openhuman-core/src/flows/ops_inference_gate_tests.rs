@@ -217,9 +217,14 @@ async fn agent_node_role_prefers_custom_registry_entry_model_pin_over_default() 
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let node = g.nodes.iter().find(|n| n.id == "a").expect("node 'a'");
+    let node = g["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"] == "a")
+        .expect("node 'a'");
     assert_eq!(
-        agent_node_role(&config, node).await,
+        agent_node_role(&config, &node["config"]).await,
         "reasoning",
         "the custom registry entry's `hint:reasoning` pin must win over the default role"
     );
