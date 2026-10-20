@@ -230,12 +230,17 @@ and checkpoints are owned by TinyFlows' module services and the document port.
 OpenHuman registers a scope-bound CatalogStorage callback per acting storage
 scope and retains its stable address with each live or approval-parked run.
 There is one storage path: the installed host storage backend, which defaults
-to local SQLite for desktop use. The files TinyFlows used to write
-(`flows/flows.db`, `flows/drafts/`, `flows/checkpoints.db`) are imported
-read-only once, at boot for an installed backend (`storage::import::tinyflows`)
-and on first use otherwise, and are never written again. When the scope cannot
-be resolved (SaaS mode with no acting agent) flow state fails every call rather
-than falling back to a shared bucket.
+to local SQLite for desktop use. Startup migrates the module's catalog and
+schedule stores for every discovered storage scope before services start. The
+legacy files TinyFlows used to write (`flows/flows.db`, `flows/drafts/`,
+`flows/checkpoints.db`) are read through bounded readers and replayed through
+Catalog bus requests; they are never modified. A clean import marker is written
+only after all batches succeed. If the import is incomplete, the local flow
+scope stays paused and retries on the next boot; chat, login, cron and other
+storage scopes continue. The unbooted local-storage fallback migrates the
+Catalog schema on first use but deliberately does not import legacy files.
+When the acting scope cannot be resolved (SaaS mode with no acting agent), flow
+state fails every call rather than falling back to a shared bucket.
 
 ## Layout
 
@@ -314,12 +319,11 @@ Agent tools: `core`'s [`tools/ops.rs`](../tools/ops.rs) adds 27 flows tools to t
 
 ## Boundaries
 
-- `vendor/tinyflows` (tinyflows repo) owns the workflow model, migration,
-  validation, compilation, and the run engine with its in-crate state-graph
-  runtime. `tinyflows-catalog` owns the saved-flow types and registries,
-  `tinyflows-drivers` owns the document layout for flows, drafts, runs and
-  checkpoints, and `tinyflows-copilot` owns the authoring manual and pure text heuristics.
-  Fix engine and storage behavior there, not here.
+- The TinyFlows module owns graph migration and validation, Catalog and Runs
+  behavior, persistence schemas, execution, and Copilot prompts. OpenHuman calls
+  the `tinyflows-bus` contracts and supplies scoped CatalogStorage and CapsHost
+  callbacks. Keep engine, catalog and module behavior in the TinyFlows owner
+  repository; keep OpenHuman policy and host adapters here.
 - `cron/` owns scheduling. This domain only arms and removes `JobType::Flow`
   jobs; the scheduler fires them through the schedule runtime's `TriggerSink`.
 - [`integrations/composio/`](../integrations/composio/) owns the Composio catalog, connections and trigger
@@ -365,10 +369,8 @@ pnpm debug rust flows
 ```
 
 Related docs: [docs/gitbooks/en/features/workflows.md](../../../../docs/gitbooks/en/features/workflows.md)
-(user-facing feature), [docs/gitbooks/en/developing/architecture/flows-on-tinyagents.md](../../../../docs/gitbooks/en/developing/architecture/flows-on-tinyagents.md)
-(run pipeline and security model; it still describes lowering onto
-`tinyagents`, while the vendored crate now carries its own runtime under
-[`vendor/tinyflows/crates/tinyflows/src/graph/`](../../../../vendor/tinyflows/crates/tinyflows/src/graph/)), and
+(user-facing feature), [docs/gitbooks/en/developing/architecture/flows-on-tinyflows.md](../../../../docs/gitbooks/en/developing/architecture/flows-on-tinyflows.md)
+(module boundary, run lifecycle, storage migration, and host policy), and
 [../cron/README.md](../cron/README.md) (`JobType::Flow`).
 
 ## Further reading
