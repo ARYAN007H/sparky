@@ -17,8 +17,7 @@ fn turn_request_field_names_match_the_controller() {
     let schema = openhuman_core::core::all::all_registered_controllers()
         .into_iter()
         .find(|controller| {
-            controller.schema.namespace == "inference"
-                && controller.schema.function == "agent_chat"
+            controller.schema.namespace == "inference" && controller.schema.function == "agent_chat"
         })
         .expect("inference.agent_chat is a registered controller");
     let schema = schema.schema;
@@ -202,8 +201,7 @@ fn the_controller_declares_nowhere_for_a_seed_to_travel() {
     let schema = openhuman_core::core::all::all_registered_controllers()
         .into_iter()
         .find(|controller| {
-            controller.schema.namespace == "inference"
-                && controller.schema.function == "agent_chat"
+            controller.schema.namespace == "inference" && controller.schema.function == "agent_chat"
         })
         .expect("inference.agent_chat is a registered controller");
     let schema = schema.schema;
