@@ -3,7 +3,8 @@ use super::*;
 #[tokio::test]
 async fn continue_subagent_resumes_paused_job_through_shared_driver() {
     use crate::agent::orchestration::tools::{ContinueSubagentTool, SpawnSubagentTool};
-    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
+    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
@@ -115,7 +116,8 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     use crate::agent::orchestration::tools::SpawnSubagentTool;
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
-    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
+    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobStatus;
     use tinyagents_tasks::CompletionStatus;
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;

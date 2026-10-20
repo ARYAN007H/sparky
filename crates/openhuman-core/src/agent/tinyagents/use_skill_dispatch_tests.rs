@@ -253,7 +253,8 @@ async fn use_skill_dispatch_reaches_live_parent_for_packed_archetype_delegate() 
 async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
-    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
+    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     let workspace = tempfile::TempDir::new().expect("workspace");
     let (dispatch, _) = build_use_skill_dispatch_with_target(Some("scoped_only_packed_worker"));
