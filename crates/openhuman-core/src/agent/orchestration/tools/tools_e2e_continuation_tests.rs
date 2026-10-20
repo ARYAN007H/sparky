@@ -47,7 +47,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .await
         .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
-    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     let paused_ref = paused
         .output()
         .split("[async_subagent_ref]\n")
@@ -86,6 +85,11 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     .expect("child reaches its clarification checkpoint")
     .expect("registered child remains available");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
+    assert_eq!(
+        provider.calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the initial child must reach and persist its clarification before resume"
+    );
 
     let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
     let before_session = sessions
