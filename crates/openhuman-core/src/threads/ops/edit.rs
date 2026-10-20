@@ -517,5 +517,9 @@ async fn clear_dropped_turn_states(
 mod tests;
 
 #[cfg(test)]
+#[path = "edit_attachment_tests.rs"]
+mod attachment_tests;
+
+#[cfg(test)]
 #[path = "edit_turn_state_tests.rs"]
 mod turn_state_tests;
