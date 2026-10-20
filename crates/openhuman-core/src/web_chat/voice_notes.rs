@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, Precondition};
 
 use crate::storage::{self, documents::Repo};

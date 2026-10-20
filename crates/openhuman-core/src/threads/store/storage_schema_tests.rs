@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinystoragedrivers::schema::ScopeClass;
 use tinystoragedrivers::{Meta, Precondition, StorageBackend};
 
@@ -36,7 +36,7 @@ fn channel_attachment_and_viseme_records_are_declared_in_the_threads_owner() {
 
 #[tokio::test]
 async fn schema_prepares_the_scoped_projection_and_media_collections() {
-    use crate::storage::{MemoryStorage, scope_for_profile};
+    use crate::storage::{scope_for_profile, MemoryStorage};
 
     let registry = tinystoragedrivers::schema::Registry::compose([storage_schema()]).unwrap();
     let backend = MemoryStorage::new();

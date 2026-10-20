@@ -33,11 +33,7 @@ pub fn storage_schema() -> Schema {
         // These collections are new in owner schema v2, so each collection
         // starts at its own version 1; owner versioning does not imply that
         // a new collection has a v1→v2 migration step.
-        .collection_with(
-            1,
-            CollectionSpec::new(CHANNEL_MESSAGES),
-            ScopeClass::Tenant,
-        )
+        .collection_with(1, CollectionSpec::new(CHANNEL_MESSAGES), ScopeClass::Tenant)
         .collection_with(
             1,
             CollectionSpec::new(STAGED_ATTACHMENTS),

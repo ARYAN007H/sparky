@@ -48,12 +48,10 @@ fn public_projection_hides_paths_but_keeps_opaque_attachment_refs() {
         vec![(part.clone(), "uploads/thread/a.png".into())],
     );
     assert_eq!(public, vec![part]);
-    assert!(
-        metadata[STORAGE_KEY][0]["path"]
-            .as_str()
-            .unwrap()
-            .contains("uploads/")
-    );
+    assert!(metadata[STORAGE_KEY][0]["path"]
+        .as_str()
+        .unwrap()
+        .contains("uploads/"));
 
     let projected = public_refs(&metadata);
     assert_eq!(projected, public);
@@ -184,17 +182,15 @@ async fn multipart_claim_failure_keeps_prior_claim_owned_by_retry() {
     insert_record(&repo, &staged_record(first.clone(), "first.png"));
     insert_record(&repo, &staged_record(second.clone(), "second.png"));
     let second_claim = claim("", second.clone(), true);
-    assert!(
-        cancel_staged_record(
-            &repo,
-            &second_claim.tenant,
-            "thread",
-            &staged_doc_id(&second_id).unwrap(),
-            &second,
-            &second_claim,
-        )
-        .unwrap()
-    );
+    assert!(cancel_staged_record(
+        &repo,
+        &second_claim.tenant,
+        "thread",
+        &staged_doc_id(&second_id).unwrap(),
+        &second,
+        &second_claim,
+    )
+    .unwrap());
     let entries = vec![
         StoredAttachment {
             part: first.clone(),
@@ -205,41 +201,35 @@ async fn multipart_claim_failure_keeps_prior_claim_owned_by_retry() {
             path: "second.png".into(),
         },
     ];
-    assert!(
-        claim_staged_refs(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            "thread",
-            &config,
-            "user:req",
-            &entries,
-        )
-        .await
-        .is_err()
-    );
+    assert!(claim_staged_refs(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "thread",
+        &config,
+        "user:req",
+        &entries,
+    )
+    .await
+    .is_err());
     let first_claim = claim("user:req", first.clone(), false);
-    assert!(
-        !claim_staged_record(
-            &repo,
-            &first_claim.tenant,
-            "thread",
-            &staged_doc_id(&first_id).unwrap(),
-            &first,
-            &first_claim,
-        )
-        .unwrap()
-    );
+    assert!(!claim_staged_record(
+        &repo,
+        &first_claim.tenant,
+        "thread",
+        &staged_doc_id(&first_id).unwrap(),
+        &first,
+        &first_claim,
+    )
+    .unwrap());
     let other = claim("user:other", first.clone(), false);
-    assert!(
-        claim_staged_record(
-            &repo,
-            &other.tenant,
-            "thread",
-            &staged_doc_id(&first_id).unwrap(),
-            &first,
-            &other,
-        )
-        .is_err()
-    );
+    assert!(claim_staged_record(
+        &repo,
+        &other.tenant,
+        "thread",
+        &staged_doc_id(&first_id).unwrap(),
+        &first,
+        &other,
+    )
+    .is_err());
 }
 
 #[tokio::test]
@@ -257,17 +247,15 @@ async fn discarding_claimed_attachment_preserves_row_owned_file() {
     let repo = test_repo(&config.workspace_dir);
     insert_record(&repo, &staged_record(part.clone(), "committed.png"));
     let bound = claim("user:req", part.clone(), false);
-    assert!(
-        claim_staged_record(
-            &repo,
-            &bound.tenant,
-            "thread",
-            &staged_doc_id(&opaque_id).unwrap(),
-            &part,
-            &bound,
-        )
-        .unwrap()
-    );
+    assert!(claim_staged_record(
+        &repo,
+        &bound.tenant,
+        "thread",
+        &staged_doc_id(&opaque_id).unwrap(),
+        &part,
+        &bound,
+    )
+    .unwrap());
     let workspace = crate::agent::attachments::thread_action_dir(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
