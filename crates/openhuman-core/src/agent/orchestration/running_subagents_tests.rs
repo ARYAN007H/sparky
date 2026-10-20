@@ -11,12 +11,11 @@ use crate::agent::orchestration::running_subagents::roster::snapshot_for_parent;
 use crate::agent::queued_turn::QueuedTurn;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use tinyagents_harness::ids::TaskId;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_orchestration::subagent::FinishedOutcome;
 use tinyagents_orchestration::subagent::{
-    DetachedSubagentStatus, WaitError, WaitOutcome, DETACHED_LEDGER_TIMEOUT_MS,
+    DetachedSubagentStatus, WaitError, DETACHED_LEDGER_TIMEOUT_MS,
 };
 use tinyagents_tasks::OrchestrationTaskStatus;
 use tokio::sync::watch;

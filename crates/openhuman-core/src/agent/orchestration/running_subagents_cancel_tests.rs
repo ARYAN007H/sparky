@@ -1,7 +1,6 @@
 //! Cancelling and stopping registered sub-agents: by task, by thread, and all.
 
 use super::*;
-use tinyagents_orchestration::steering::SteerError;
 
 /// A finished run stays registered until the terminal sweep, so a late
 /// "Cancel" still finds it. It must come back flagged, so the RPC does not
@@ -60,28 +59,6 @@ async fn cancel_all_clears_everything() {
         "headless sub-agents must not contribute an id"
     );
 
-    assert_eq!(
-        steer(
-            &cx(),
-            "task-all-1",
-            "session-A",
-            "x".into(),
-            QueueLane::Steer
-        )
-        .await,
-        Err(SteerError::Unknown)
-    );
-    assert_eq!(
-        steer(
-            &cx(),
-            "task-all-2",
-            "session-B",
-            "x".into(),
-            QueueLane::Steer
-        )
-        .await,
-        Err(SteerError::Unknown)
-    );
     // Registry is empty now.
     assert!(cancel_all(&cx()).is_empty());
 }
@@ -121,29 +98,6 @@ async fn stop_for_thread_aborts_the_threads_running_children() {
     assert!(
         joined.expect_err("child was aborted").is_cancelled(),
         "stop must abort the detached child task"
-    );
-    assert_eq!(
-        steer(
-            &cx(),
-            "task-stop-1",
-            "session-stop",
-            "x".into(),
-            QueueLane::Steer
-        )
-        .await,
-        Err(SteerError::Unknown)
-    );
-    assert!(
-        steer(
-            &cx(),
-            "task-stop-other",
-            "session-stop",
-            "x".into(),
-            QueueLane::Steer
-        )
-        .await
-        .is_ok(),
-        "a different thread's sub-agent is untouched"
     );
     assert!(
         stop_for_thread(&cx(), "thread-stop").is_empty(),

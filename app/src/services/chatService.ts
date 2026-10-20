@@ -682,7 +682,7 @@ export interface SubagentProgressDetail {
   /** `null` when the child's cost is not known. */
   cost_usd?: number | null;
   /**
-   * Provider-assigned id of the `spawn_subagent`/`spawn_subagent`/
+   * Provider-assigned id of the `spawn_subagent`/
    * `delegate_*` tool call that started this delegation
    * (`AgentProgress::SubagentSpawned::parent_call_id`, threaded onto every
    * event in the `subagent_*` family — see `crates/openhuman-rpc/src/server/socketio.rs`).
