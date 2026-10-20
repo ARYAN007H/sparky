@@ -124,8 +124,17 @@ test("selection classifier rejects unknown diagnostics and protected-owner demot
   assert.throws(
     () =>
       classifySpecFiles(
-        ["test/playwright/specs/owner.spec.ts", "test/playwright/specs/legacy.spec.ts"],
-        { ...base, diagnostics: [{ path: "test/playwright/specs/owner.spec.ts" }] },
+        [
+          "test/playwright/specs/owner.spec.ts",
+          "test/playwright/specs/aui-tool-result-elements.spec.ts",
+        ],
+        {
+          protectedOwnerFiles: [
+            "test/playwright/specs/owner.spec.ts",
+            "test/playwright/specs/aui-tool-result-elements.spec.ts",
+          ],
+          diagnostics: [{ path: "test/playwright/specs/aui-tool-result-elements.spec.ts" }],
+        },
       ),
     /protected browser owners cannot be diagnostic/,
   );
