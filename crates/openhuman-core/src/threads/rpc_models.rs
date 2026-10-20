@@ -199,3 +199,7 @@ pub struct PurgeConversationThreadsResponse {
     pub agent_threads_deleted: usize,
     pub agent_messages_deleted: usize,
 }
+
+#[cfg(test)]
+#[path = "rpc_models_tests.rs"]
+mod tests;
