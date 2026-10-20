@@ -35,14 +35,20 @@ async fn check_gate_rejects_a_tool_node_without_its_id() {
     config.config_path = tmp.path().join("config.toml");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
 
-    let _registration = register(
+    let registration = register(
         Arc::new(config.clone()),
         crate::core::runtime::DispatchCtx::ambient(),
     )
     .await
     .unwrap();
-    let proxy = crate::modules::tinyflows::authoring_proxy(&config)
-        .await
+    let runtime = crate::modules::runtime::runtime().await.unwrap();
+    let proxy = runtime
+        .connection()
+        .proxy(
+            &registration.authoring.bus_name,
+            &registration.authoring.object_path,
+            "ai.tinyhumans.tinyflows.AuthoringHost",
+        )
         .unwrap();
 
     let result = proxy
