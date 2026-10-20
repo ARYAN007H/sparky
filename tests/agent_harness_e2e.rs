@@ -1221,11 +1221,8 @@ async fn delegated_clarification_flow_inner() {
     let requests = with_captured(|c| c.clone());
 
     // ── No unknown-tool result in any captured request ──
-    // Proves manage_tasks was recognised by the orchestrator. This is the guard
-    // that let the 3-completion version of this test pass vacuously: with the
-    // delegate unresolved, the engine's lowercase "unknown tool `manage_tasks`"
-    // result never matched the old `"Unknown tool:"` literal, and the
-    // orchestrator consumed the child's clarification completion itself.
+    // The shared spawn tool is registered, and the task-manager child is
+    // reached without an unknown-tool result.
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
         "found an unknown-tool result in captured requests — delegation was broken; \
@@ -1234,7 +1231,7 @@ async fn delegated_clarification_flow_inner() {
     );
 
     // ── Both turns traversed the expected four upstream requests ──
-    // request[0] = orchestrator (manage_tasks call),
+    // request[0] = orchestrator (spawn_subagent call),
     // request[1] = task_manager_agent (ask_user_clarification pause),
     // request[2] = orchestrator (relays the question; turn-1 end),
     // request[3] = orchestrator turn-2 synthesis (turn-2 end).
@@ -1247,20 +1244,20 @@ async fn delegated_clarification_flow_inner() {
     );
 
     // ── request[1] went to task_manager_agent, not the orchestrator ──
-    // Proves the blocking delegate really ran (the child's system prompt is
+    // Proves the async spawn really ran (the child's system prompt is
     // task-manager-specific; both agents share the project-context prefix, so
     // message 0 alone cannot tell them apart). Without this the flow degrades
     // to "orchestrator asks the user itself", which never exercises the pause.
     let child_request = requests.get(1).map(Value::to_string).unwrap_or_default();
     assert!(
         child_request.contains("You own the user's task-source feeds and artifacts"),
-        "request[1] did not carry the task_manager_agent prompt — manage_tasks did not \
+        "request[1] did not carry the task_manager_agent prompt — spawn_subagent did not \
          delegate; request: {child_request}"
     );
 
     // ── request[2] saw the child's pause as a `[SUBAGENT_AWAITING_USER]` envelope ──
     // Proves `dispatch_subagent` surfaced the pause the #4291 way (structured
-    // envelope carrying the question, as the manage_tasks tool result) rather
+    // envelope carrying the question, as the spawn_subagent result) rather
     // than as a plain success the model could read as "answered".
     let relay_request = requests.get(2).map(Value::to_string).unwrap_or_default();
     assert!(
@@ -3599,37 +3596,24 @@ fn use_skill_offers_pack(request: &Value, pack: &str) -> bool {
         .any(|tool| tool.to_string().contains(&quoted))
 }
 
-/// One scripted turn in which the orchestrator hands a request to a specialist
-/// by calling `hand_off` through the `use_skill` tool pack `pack`.
-///
-/// `setup_skills` is a member of the `skills` pack (#6787: it cost ~270 tokens
-/// on every orchestrator request for a family used a few times a week), so the
-/// orchestrator reaches it as `use_skill { skill: "skills", tool: "setup_skills" }`.
-///
-/// Three things must hold, all read from the captured model requests:
-/// * the orchestrator's own request offers the pack and does not advertise
-///   `hand_off` or any raw `skill_registry_*` tool on the wire;
-/// * the hand-off call returned a result (`tool_result_text` panics on
-///   `unknown tool`);
-/// * a later request came from the specialist, recognised by a tool only its
-///   belt carries.
+/// One scripted turn in which the orchestrator starts a specialist through
+/// the shared `spawn_subagent` tool.
 #[cfg(feature = "skills")]
-async fn assert_packed_hand_off_reaches_specialist(
+async fn assert_spawn_reaches_specialist(
     stack: &Stack,
     events: &mut tokio::sync::mpsc::UnboundedReceiver<Value>,
     rpc_id: i64,
     client_id: &str,
-    pack: &str,
-    hand_off: &str,
+    specialist: &str,
     specialist_only_tools: &[&str],
 ) {
     reset_script(vec![
-        packed_tool_call_completion(
-            pack,
-            hand_off,
+        tool_call_completion(
+            "spawn_subagent",
             json!({
-                "agent_id": hand_off,
-                "prompt": format!("Handle this through {hand_off}")
+                "agent_id": specialist,
+                "prompt": format!("Handle this through {specialist}"),
+                "task_key": format!("route-{specialist}")
             }),
         ),
         text_completion("The specialist finished the task."),
@@ -3639,8 +3623,8 @@ async fn assert_packed_hand_off_reaches_specialist(
         &stack.rpc_base,
         rpc_id,
         client_id,
-        &format!("thread-{hand_off}"),
-        &format!("Please hand this to {hand_off}"),
+        &format!("thread-{specialist}"),
+        &format!("Please hand this to {specialist}"),
     )
     .await;
     let done = wait_for_terminal(events, Duration::from_secs(120)).await;
@@ -3649,13 +3633,13 @@ async fn assert_packed_hand_off_reaches_specialist(
     assert_eq!(
         done.get("event").and_then(Value::as_str),
         Some("chat_done"),
-        "the `{hand_off}` turn must finish: {done}\nrequests: {}",
+        "the `{specialist}` turn must finish: {done}\nrequests: {}",
         dump()
     );
 
     let orchestrator = requests
         .first()
-        .unwrap_or_else(|| panic!("no model request for the `{hand_off}` turn"));
+        .unwrap_or_else(|| panic!("no model request for the `{specialist}` turn"));
     let belt = advertised_tool_names(orchestrator);
     assert!(
         belt.iter().any(|name| name == "use_skill") && use_skill_offers_pack(orchestrator, pack),
