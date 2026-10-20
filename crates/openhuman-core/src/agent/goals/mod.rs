@@ -8,7 +8,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, Weak};
 
-use tinyagents_harness_tools::goals::{GoalObserver, GoalStore, GoalTool, GoalToolKind, ThreadGoal};
+use tinyagents_harness_tools::goals::{
+    GoalObserver, GoalStore, GoalTool, GoalToolKind, ThreadGoal,
+};
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolPolicy, ToolResult, ToolRunContext};
 
 /// Serialize a [`ThreadGoal`] for the existing goal event and RPC payload.
@@ -77,9 +79,7 @@ impl GoalObserver for OpenHumanGoalObserver {
 pub fn goal_tools(workspace_dir: &Path) -> Vec<Box<dyn Tool>> {
     GoalToolKind::MODEL_FACING
         .into_iter()
-        .map(|kind| {
-            Box::new(OpenHumanGoalTool::new(kind, workspace_dir)) as Box<dyn Tool>
-        })
+        .map(|kind| Box::new(OpenHumanGoalTool::new(kind, workspace_dir)) as Box<dyn Tool>)
         .collect()
 }
 
@@ -100,12 +100,8 @@ impl OpenHumanGoalTool {
     }
 
     fn for_context(&self, context: Option<&dyn ToolRunContext>) -> GoalTool {
-        let dispatch =
-            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
-        GoalTool::new(
-            self.kind,
-            goal_store(&self.workspace_dir, &dispatch),
-        )
+        let dispatch = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        GoalTool::new(self.kind, goal_store(&self.workspace_dir, &dispatch))
     }
 }
 
