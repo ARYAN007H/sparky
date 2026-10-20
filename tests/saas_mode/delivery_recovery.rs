@@ -100,9 +100,8 @@ fn leave_undelivered_result(root: &std::path::Path, user: &str) {
     })
     .expect("open the profile's database");
     let scope = openhuman_core::storage::scope_for_profile(id.as_str());
-    let store: Arc<dyn CompletionStore> = Arc::new(
-        DriverCompletionStore::new(backend, scope).expect("open the completion queue"),
-    );
+    let store: Arc<dyn CompletionStore> =
+        Arc::new(DriverCompletionStore::new(backend, scope).expect("open the completion queue"));
     let record = CompletionRecord::new(
         "task-delivery-recovery-1",
         THREAD,
