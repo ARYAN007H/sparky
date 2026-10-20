@@ -439,7 +439,7 @@ neutral TinyAgents lifecycle:
 
 The model-facing orchestration surface has one child tool: `spawn_subagent`. It always returns asynchronously and accepts `agent_id` to select a specialist. A matching `task_key` reuses the compatible durable child session; when that child is paused on clarification, another spawn with the same key resumes its checkpoint and preserves the original task identity. The child result is delivered to the parent chat when a delivery thread exists. Headless callers remain asynchronous and record completion in the run log.
 
-Former specialist delegation aliases are represented by `agent_id` values on `spawn_subagent`, so the model sees one spawn schema. The asynchronous result path delivers child completions to a parent chat when available; otherwise it records the result in the run log. Compatible follow-ups use the durable session keyed by `task_key`, and clarification checkpoints resume through the same spawn tool.
+The completion router deduplicates by task and holds a claimed batch until the delivery turn has been persisted. Failed delivery releases the batch for retry, and startup recovery drains completions that were not delivered before a restart. The OpenHuman host debounces nearby completions into one system turn and persists that reply under a deterministic run id before it publishes `chat_done`; the frontend can reuse that id without appending a duplicate row. If retries are exhausted, the host writes an undelivered notice into the thread. The completion store uses the caller's profile-scoped storage backend. A `workflow_proposal` in a child's history is also persisted as a parent-thread message so the frontend can restore the proposal after reload.
 
 ### Spawn hierarchy and tiers
 

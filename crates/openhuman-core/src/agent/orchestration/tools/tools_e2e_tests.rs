@@ -250,6 +250,10 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
     })
     .await
     .expect("asynchronous child failure reaches the parent");
+    assert!(
+        failure.starts_with("spawn_subagent failed and did not complete."),
+        "failure copy remains recognizable to the parent: {failure}"
+    );
     assert!(failure.contains("scripted provider outage"), "{failure}");
     assert!(!failure.contains("completed successfully"), "{failure}");
 }
