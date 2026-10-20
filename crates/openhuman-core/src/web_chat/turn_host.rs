@@ -123,9 +123,8 @@ impl WebHost {
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.
-        let deferred_user_message =
-            self.shared.was_queued(id) && request.disposition == QueueDisposition::Followup;
-        if deferred_user_message {
+        let was_queued = self.shared.was_queued(id);
+        if was_queued && request.disposition == QueueDisposition::Followup {
             crate::core::bus::BUS.publish(DomainEvent::RunQueueFollowupDispatched {
                 thread_id: request.thread_id.clone(),
                 followup_count: 1,
@@ -133,9 +132,6 @@ impl WebHost {
                 text_preview: Some(crate::agent::queued_turn::text_preview(&request.text)),
             });
         }
-        self.shared.with(id, |slot| {
-            slot.deferred_user_message = deferred_user_message;
-        });
         self.shared.admit(id, Admission::Started);
         let session = TurnSession {
             session_id: request.thread_id.clone(),
@@ -236,15 +232,13 @@ impl WebHost {
             return outcome;
         }
 
-        let (config, thread_dir, checked, projection, activity, deferred_user_message) =
-            self.shared.with(id, |slot| {
+        let (config, thread_dir, checked, projection, activity) = self.shared.with(id, |slot| {
                 (
                     slot.config.clone(),
                     slot.thread_dir.clone(),
                     slot.session.take(),
                     slot.projection.clone(),
                     slot.activity.clone(),
-                    slot.deferred_user_message,
                 )
             });
         let (Some(config), Some(mut checked), Some(projection)) = (config, checked, projection)
@@ -282,7 +276,7 @@ impl WebHost {
             },
         );
 
-        let message_input = if deferred_user_message {
+        let message_input = if payload.deferred_user_message {
             let staged_parts = payload
                 .pending_attachments
                 .as_ref()
