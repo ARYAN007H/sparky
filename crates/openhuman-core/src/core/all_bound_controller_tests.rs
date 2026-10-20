@@ -322,7 +322,7 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
         entry.rpc_method_name(),
         "openhuman.mcp_clients_registry_get"
     );
-    let contract = crate::mcp::registry::schemas::registry_get_parameter_contract();
+    let contract = crate::mcp::registry::registry_get_parameter_contract();
     crate::core::all::verify_parameter_contracts(
         std::slice::from_ref(entry),
         std::slice::from_ref(&contract),
