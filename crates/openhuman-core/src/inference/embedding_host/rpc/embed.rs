@@ -5,6 +5,7 @@ use crate::core::Outcome;
 
 use super::{resolve_api_key, LOG_PREFIX};
 use crate::inference::embedding_host::factory::create_embedding_provider_with_config;
+use tinyinference_providers::route::split_custom_provider;
 use tinyinference_embeddings::probe::probe_custom_embeddings;
 
 /// Generates embeddings for the given input texts using the currently
@@ -19,18 +20,12 @@ pub async fn embed(
 
     let api_key = resolve_api_key(config, provider_name);
 
-    let custom_endpoint = if provider_name.starts_with("custom:") {
-        provider_name
-            .strip_prefix("custom:")
-            .map(|s: &str| s.to_string())
-    } else {
-        None
-    };
+    let (provider_slug, custom_endpoint) = split_custom_provider(provider_name);
 
-    let provider_slug = if provider_name.starts_with("custom:") {
+    let provider_slug = if custom_endpoint.is_some() {
         "custom"
     } else {
-        provider_name.as_str()
+        provider_slug.as_str()
     };
 
     let embedder = create_embedding_provider_with_config(
@@ -80,16 +75,12 @@ pub async fn test_connection(
 
     let api_key = resolve_api_key(config, slug);
 
-    let custom_endpoint = if slug.starts_with("custom:") {
-        slug.strip_prefix("custom:").map(|s| s.to_string())
-    } else {
-        None
-    };
+    let (provider_slug, custom_endpoint) = split_custom_provider(slug);
 
-    let provider_tag = if slug.starts_with("custom:") {
+    let provider_tag = if custom_endpoint.is_some() {
         "custom"
     } else {
-        slug
+        provider_slug.as_str()
     };
 
     tracing::debug!(
