@@ -98,8 +98,9 @@
 //!     that emits one `composio_list_tools` tool call on iteration 1
 //!     and stops on iteration 2.
 //!
-//! Assertion is implicit: cargo reports the test as failed when the
-//! tokio runtime aborts with stack overflow.
+//! The test also asserts that the real Composio handler ran once and the
+//! stub model received its second call. Cargo reports a stack regression as
+//! process abort when the tokio worker overflows.
 
 // This stress target is still compiled by normal cargo test. Under llvm-cov,
 // coverage instrumentation makes the already-large integration-test binary
@@ -209,6 +210,7 @@ struct StubModel {
 struct CountedComposioTool {
     inner: ComposioListToolsTool,
     executions: Arc<std::sync::atomic::AtomicUsize>,
+    output: Arc<Mutex<Option<String>>>,
 }
 
 #[async_trait]
@@ -236,7 +238,9 @@ impl Tool for CountedComposioTool {
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
         self.executions
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        self.inner.execute(args).await
+        let result = self.inner.execute(args).await?;
+        *self.output.lock() = Some(result.output().to_string());
+        Ok(result)
     }
 }
 
@@ -343,9 +347,16 @@ async fn drive_subagent() {
     });
 
     let executions = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let tool_output = Arc::new(Mutex::new(None));
+    let workspace =
+        std::path::PathBuf::from(std::env::var("OPENHUMAN_WORKSPACE").expect("test workspace set"));
+    let mut tool_config = openhuman_core::config::Config::default();
+    tool_config.config_path = workspace.join("config.toml");
+    tool_config.workspace_dir = workspace;
     let composio_tool = CountedComposioTool {
-        inner: ComposioListToolsTool::new(Arc::new(openhuman_core::config::Config::default())),
+        inner: ComposioListToolsTool::new(Arc::new(tool_config)),
         executions: executions.clone(),
+        output: tool_output.clone(),
     };
     let composio_spec = Arc::new(composio_tool.spec());
     let parent = ParentExecutionContext {
@@ -401,10 +412,9 @@ async fn drive_subagent() {
     );
     def.extensions.prompt_builder = None;
 
-    // The assertion is implicit: if the worker thread overflows its
-    // stack the cargo-test process aborts (SIGABRT / SIGBUS) and no
-    // test report is emitted. We don't care whether the sub-agent
-    // semantically "succeeded" — only that the runtime did not abort.
+    // The worker must execute the real tool handler and return to the stub
+    // model. If its thread overflows, the cargo-test process aborts
+    // (SIGABRT / SIGBUS) before these assertions can run.
     // The parent is an explicit value on the run options, not ambient state.
     let mut options = SubagentRunOptions::default();
     options.run_context.parent = Some(parent);
@@ -419,4 +429,8 @@ async fn drive_subagent() {
         2,
         "the model must continue after the tool result"
     );
+    assert!(tool_output
+        .lock()
+        .as_deref()
+        .is_some_and(|output| output.contains("composio is disabled")));
 }
