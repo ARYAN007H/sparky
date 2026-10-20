@@ -81,6 +81,7 @@ jobs:
             echo "recursive submodules are not at their recorded pins"
             exit 1
           fi
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
 
       - name: Apply exactly the selected mutation
         if: matrix.case != 'baseline'
@@ -144,6 +145,10 @@ jobs:
             printf 'schemas_blob=%s\n' "$actual_blob"
             cat target/profiles-proof/mutation.patch.sha256
             printf 'features=default,voice,inference\n'
+            printf 'rustc_version=%s\n' "$(rustc --version)"
+            printf 'cargo_version=%s\n' "$(cargo --version)"
+            printf 'host_mem_available_kib=%s\n' "$(awk '/MemAvailable/ {print $2}' /proc/meminfo)"
+            printf 'build_filesystem=%s\n' "$(df -Pk . | tail -n 1)"
           } > target/profiles-proof/receipt.txt
           git status --short
 
@@ -174,7 +179,15 @@ jobs:
           fi
           test "$(git write-tree)" = '${{ matrix.expected_tree }}'
           test "$(git rev-parse :crates/openhuman-core/src/profiles/schemas.rs)" = '${{ matrix.expected_schema_blob }}'
-          git diff --exit-code
+          git diff --exit-code --ignore-submodules=none
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+          git status --porcelain=v1 --untracked-files=all --ignore-submodules=none > target/profiles-proof/post-build-status.txt
+          status="$(git status --porcelain=v1 --ignore-submodules=none)"
+          if [ '${{ matrix.case }}' = baseline ]; then
+            test -z "$status"
+          else
+            test "$status" = 'M  crates/openhuman-core/src/profiles/schemas.rs'
+          fi
           git submodule status --recursive > target/profiles-proof/submodules-after-build.txt
           cmp target/profiles-proof/submodules.txt target/profiles-proof/submodules-after-build.txt
           python3 - "$build_json" <<'PY'
@@ -208,6 +221,7 @@ jobs:
           cp "$source_binary" "$binary"
           sha256sum "$binary" > target/profiles-proof/test-binary.sha256
           "$binary" --list > target/profiles-proof/test-list.txt
+          sha256sum target/profiles-proof/test-list.txt > target/profiles-proof/test-list.sha256
           printf 'immutable_binary=%s\n' "$binary" >> target/profiles-proof/receipt.txt
           cat target/profiles-proof/test-binary.sha256 >> target/profiles-proof/receipt.txt
           printf '%s\n' "$binary --list" > target/profiles-proof/test-list-command.txt
@@ -216,6 +230,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_RUNTIME_EXIT: ${{ matrix.expected_runtime_exit }}
+          PROFILES_PROOF_CASE: ${{ matrix.case }}
         run: |
           set -euo pipefail
           binary=target/debug/proof-binaries/profiles-${{ matrix.case }}
@@ -232,7 +247,7 @@ jobs:
             echo "unexpected raw contract exit: $raw_exit"
             exit 1
           fi
-          case '${{ matrix.case }}' in
+          case "$PROFILES_PROOF_CASE" in
             baseline)
               grep -Fq 'test result: ok. 1 passed; 0 failed;' "$raw_log"
               ;;
