@@ -94,11 +94,12 @@ fn open_strict(workspace_dir: &Path, name: &str) -> Result<StateKv> {
     Ok(kv)
 }
 
-/// Imports every `<workspace>/memory/*.json` state file into the `local` scope
-/// of an explicit `scoped` handle, once each. For the layout migration
-/// (`storage::layout`), which deletes those files afterwards; a file that is
-/// not JSON is an error here (nothing may be deleted unimported), so it is
-/// imported strictly. Returns the names imported.
+/// Imports every `<workspace>/memory/*.json` state file once into the local
+/// scope, except the pending-deletion queue, which is imported into its
+/// workspace-owned module scope. For the layout migration (`storage::layout`),
+/// which deletes those files afterwards; a file that is not JSON is an error
+/// here (nothing may be deleted unimported), so it is imported strictly.
+/// Returns the names imported.
 ///
 /// # Errors
 ///
@@ -142,20 +143,29 @@ pub(crate) fn import_all(
     if let Some(previous) =
         local_kv.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
     {
-        let mut pending = queue_kv
-            .get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
-            .unwrap_or_default();
-        for deletion in previous {
-            if !pending.contains(&deletion) {
-                pending.push(deletion);
-            }
-        }
-        if pending.is_empty() {
-            queue_kv.delete("pending_deletions")?;
-        } else {
-            queue_kv.put("pending_deletions", &pending)?;
-        }
-        local_kv.delete("pending_deletions")?;
+        let transferred = previous.clone();
+        queue_kv.update::<Vec<super::deletion::PendingDeletion>, _>(
+            "pending_deletions",
+            move |pending| {
+                let mut changed = false;
+                for deletion in &previous {
+                    if !pending.contains(deletion) {
+                        pending.push(deletion.clone());
+                        changed = true;
+                    }
+                }
+                ((), changed)
+            },
+        )?;
+        local_kv.update::<Vec<super::deletion::PendingDeletion>, _>(
+            "pending_deletions",
+            move |pending| {
+                let before = pending.len();
+                pending.retain(|deletion| !transferred.contains(deletion));
+                let changed = before != pending.len();
+                ((), changed)
+            },
+        )?;
     }
     names.sort();
     Ok(names)

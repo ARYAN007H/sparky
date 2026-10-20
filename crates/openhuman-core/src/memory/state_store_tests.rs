@@ -123,7 +123,8 @@ fn layout_import_places_legacy_retry_queue_in_its_workspace_scope() {
         local_queue
             .get::<Vec<crate::memory::deletion::PendingDeletion>>("pending_deletions")
             .unwrap()
-            .is_none(),
+            .unwrap_or_default()
+            .is_empty(),
         "the migration must not strand a duplicate queue in local scope"
     );
 }
