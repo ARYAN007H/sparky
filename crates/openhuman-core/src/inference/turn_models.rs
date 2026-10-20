@@ -204,7 +204,10 @@ fn build_turn_models_crate(
             if tier == model {
                 continue;
             }
-            let tier_role = factory::role_for_model_tier(tier);
+            let tier_role = crate::inference::provider_model::role_for_provider_model(
+                factory::PROVIDER_OPENHUMAN,
+                tier,
+            );
             if let Some(custom) = ctx.host_overrides().and_then(|local| {
                 local
                     .role_models
@@ -473,7 +476,10 @@ impl TurnModelSource {
                         .with_attachment_config(source.config.clone())
                         .build(model, temperature, context_window, thread_id)?;
                     for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
-                        let role = crate::inference::provider::factory::role_for_model_tier(tier);
+                        let role = crate::inference::provider_model::role_for_provider_model(
+                            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                            tier,
+                        );
                         if let Some(custom) = local
                             .role_models
                             .get(tier)

@@ -15,7 +15,7 @@ use tinyflows::error::{EngineError, Result};
 use super::*;
 use crate::config::Config;
 use crate::inference::provider::{
-    create_chat_model_with_model_id_in, is_raw_passthrough_model, role_for_model_tier,
+    create_chat_model_with_model_id_in, is_raw_passthrough_model,
 };
 use tinyflows::nodes::integration::agent_prompt;
 use tinyinference_llm::model::ModelRequest;
@@ -71,7 +71,10 @@ impl LlmProvider for OpenHumanLlm {
             .filter(|s| !s.is_empty());
         let role = match node_model {
             Some(model) => {
-                let mapped = role_for_model_tier(model);
+                let mapped = crate::inference::provider_model::role_for_provider_model(
+                    crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                    model,
+                );
                 tracing::debug!(
                     target: "flows",
                     node_model = model,

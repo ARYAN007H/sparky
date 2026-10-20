@@ -62,7 +62,10 @@ pub(crate) fn provider_role_for_model_override(model_override: Option<&str>) -> 
     // that workload's route; a concrete model id rides the chat route.
     match model_override.map(str::trim) {
         Some(value) if value.starts_with("hint:") || crate::config::is_legacy_tier_model(value) => {
-            match crate::inference::provider::factory::role_for_model_tier(value) {
+            match crate::inference::provider_model::role_for_provider_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                value,
+            ) {
                 role @ ("agentic" | "coding" | "summarization" | "reasoning") => role,
                 _ => "chat",
             }
@@ -329,7 +332,8 @@ pub(super) fn build_session_fingerprint(
     let effective = effective_session_config(config, model_override.as_deref(), temperature);
     SessionCacheFingerprint {
         model_override,
-        effective_model: crate::inference::provider::factory::resolve_model_for_hint(
+        effective_model: crate::inference::provider_model::resolve_provider_model_hint(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
             &format!("hint:{provider_role}"),
             &effective,
         ),

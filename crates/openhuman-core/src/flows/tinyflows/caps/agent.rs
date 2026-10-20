@@ -18,7 +18,7 @@ use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
-use crate::inference::provider::{is_raw_passthrough_model, role_for_model_tier};
+use crate::inference::provider::is_raw_passthrough_model;
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected
 /// agent kind by one of two paths, chosen by [`route_for_agent_ref`]:
@@ -166,7 +166,13 @@ pub(crate) fn harness_model_default_override(node_model: &str) -> String {
     if is_raw_passthrough_model(node_model) {
         return node_model.to_string();
     }
-    format!("hint:{}", role_for_model_tier(node_model))
+    format!(
+        "hint:{}",
+        crate::inference::provider_model::role_for_provider_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            node_model,
+        )
+    )
 }
 
 #[async_trait]
