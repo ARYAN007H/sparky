@@ -163,6 +163,19 @@ test('the linked-modules bridge is allowed directly under the CLI only, without 
   assert.deepEqual(policy.linkedHost.allowedParents, ['openhuman-cli']);
 });
 
+test('a legal direct bridge edge does not hide a second path through a wrapper', () => {
+  const linked = { ...strict, linkedHost: { package: 'openhuman-modules-linked', allowedParents: ['openhuman-cli'] } };
+  const m = metadata({
+    'openhuman-cli': [['openhuman-modules-linked'], ['wrapper']],
+    wrapper: [['openhuman-modules-linked']],
+    'openhuman-modules-linked': [['tinydocs-module']],
+  });
+  assert.deepEqual(
+    auditGraph(m, ['openhuman-cli'], linked).violations.map(v => v.path),
+    [['openhuman-cli', 'wrapper', 'openhuman-modules-linked']],
+  );
+});
+
 test('deliberate violation: the bridge reached from the app, the TUI, the core or through a wrapper fails', () => {
   const linked = { ...strict, linkedHost: { package: 'openhuman-modules-linked', allowedParents: ['openhuman-cli'] } };
   for (const host of ['openhuman-app', 'openhuman-tui', 'openhuman']) {
@@ -308,8 +321,14 @@ test('host boundary audit ignores writer features unified only by unrelated work
       const manifestPath = cargoArgs[cargoArgs.indexOf('--manifest-path') + 1];
       if (cargoArgs[0] === 'tree') {
         const packageName = cargoArgs[cargoArgs.indexOf('-p') + 1];
+        assert.ok(packageName, 'every host tree must be rooted at a package, including binaries');
         const links = packageName === 'openhuman-cli' && cargoArgs.includes('--features') &&
           cargoArgs[cargoArgs.indexOf('--features') + 1].split(',').includes('linked-modules');
+        if (packageName === 'openhuman-cli' && !links && cargoArgs.includes('--features')) {
+          const selected = cargoArgs[cargoArgs.indexOf('--features') + 1].split(',');
+          assert.ok(selected.includes('flow-write'), 'all non-bridge CLI features remain covered');
+          assert.ok(!selected.includes('linked-modules'), 'linked-modules is isolated from the shipping graph');
+        }
         const tinyflowsBus = resolve(harnessRoot, 'vendor/tinyflows/crates/tinyflows-bus');
         return [
           `0${packageName} v0.0.0`,
