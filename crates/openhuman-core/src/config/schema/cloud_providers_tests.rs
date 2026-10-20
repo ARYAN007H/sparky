@@ -126,6 +126,41 @@ fn only_openai_builtin_exposes_responses_api() {
     }
 }
 
+#[test]
+fn hosted_presets_and_classification_are_context_scoped() {
+    use crate::core::slots::Extensions;
+
+    let extensions = Extensions::new();
+    super::register_hosted_cloud_preset_in(
+        &extensions,
+        "tenant-hosted",
+        super::BuiltinCloudProvider {
+            slug: "tenant-hosted",
+            label: "Tenant Hosted",
+            endpoint: "https://tenant.example/v1",
+            auth_style: AuthStyle::Bearer,
+        },
+    );
+    super::register_hosted_cloud_provider_policy_in(
+        &extensions,
+        std::sync::Arc::new(|slug, _| slug == "tenant-hosted"),
+    );
+    let context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        None,
+        extensions,
+    );
+
+    assert!(super::builtin_cloud_provider("tenant-hosted").is_none());
+    crate::core::runtime::CoreContext::sync_scope(context, || {
+        assert!(super::builtin_cloud_provider("tenant-hosted").is_some());
+        assert!(super::is_hosted_cloud_provider("tenant-hosted", AuthStyle::Bearer));
+        assert!(!super::is_hosted_cloud_provider("openai", AuthStyle::Bearer));
+    });
+    assert!(super::builtin_cloud_provider("tenant-hosted").is_none());
+    assert!(!super::is_hosted_cloud_provider("tenant-hosted", AuthStyle::Bearer));
+}
+
 /// Drift guard (TAURI-RUST-5EN): couple the capability helper to the
 /// preset list so adding a new built-in that wrongly claims the Responses
 /// API — or renaming `openai` — fails CI rather than silently re-enabling
