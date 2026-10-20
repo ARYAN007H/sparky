@@ -140,8 +140,6 @@ pub(crate) fn tool_group(name: &str) -> crate::core::all::DomainGroup {
         || matches!(
             name,
             "ask_user_clarification"
-                | "delegate"
-                | "delegate_graph"
                 | "delegate_to_personality"
                 | "todo"
                 | "wait"

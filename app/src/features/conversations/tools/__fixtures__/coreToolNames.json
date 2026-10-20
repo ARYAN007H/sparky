@@ -34,7 +34,6 @@
   "daemon_host_prefs_get",
   "daemon_host_prefs_set",
   "dashboard_model_health",
-  "delegate_graph",
   "delete_artifact",
   "describe_workflow",
   "desktop_continue_goal",
