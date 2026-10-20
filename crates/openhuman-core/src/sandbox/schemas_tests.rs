@@ -13,6 +13,7 @@ fn scoped_ctx(config: crate::config::Config) -> std::sync::Arc<CoreContext> {
 
 #[test]
 fn sandbox_schema_catalog_matches_registered_controllers() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "sandbox");
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),

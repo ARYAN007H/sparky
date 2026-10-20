@@ -3,6 +3,7 @@ use crate::core::all::{assert_schema_controller_parity, expect_schema_identity};
 
 #[test]
 fn app_state_schema_contracts_and_registration_are_preserved() {
+    crate::core::all::expect_schema_namespace(&all_app_state_controller_schemas(), "app_state");
     assert_eq!(all_app_state_controller_schemas().len(), 2);
     assert_schema_controller_parity(
         &all_app_state_controller_schemas(),

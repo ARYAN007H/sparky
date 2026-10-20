@@ -92,6 +92,18 @@ pub(crate) fn verify_parameter_schema(
     Ok(())
 }
 
+/// Owner-authored namespace literals must cover the complete family, including
+/// methods without their own field contract; parity alone is self-derived.
+pub(crate) fn expect_schema_namespace(schemas: &[ControllerSchema], expected: &str) {
+    for schema in schemas {
+        assert_eq!(
+            schema.namespace, expected,
+            "{} wire namespace",
+            schema.function
+        );
+    }
+}
+
 pub(crate) fn expect_schema_identity(schema: &ControllerSchema, namespace: &str, function: &str) {
     assert_eq!(schema.namespace, namespace);
     assert_eq!(schema.function, function);

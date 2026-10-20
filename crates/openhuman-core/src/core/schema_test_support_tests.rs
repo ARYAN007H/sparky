@@ -148,3 +148,31 @@ fn examples_must_be_objects_and_satisfy_schema_before_decoding() {
         .unwrap_err()
         .contains("schema rejects example"));
 }
+
+#[test]
+fn real_owner_namespaces_reject_each_controller_namespace_typo() {
+    let families = vec![(
+        "inference",
+        crate::inference::all_inference_controller_schemas(),
+    )];
+    #[cfg(feature = "mcp")]
+    let families = families
+        .into_iter()
+        .chain([(
+            "mcp_clients",
+            crate::mcp::registry::all_mcp_registry_controller_schemas(),
+        )])
+        .collect::<Vec<_>>();
+    for (expected, schemas) in families {
+        assert!(!schemas.is_empty(), "{expected} owner fixture must exist");
+        expect_schema_namespace(&schemas, expected);
+        for mut schema in schemas {
+            let function = schema.function;
+            schema.namespace = "misspelled_owner";
+            assert!(
+                std::panic::catch_unwind(|| expect_schema_namespace(&[schema], expected)).is_err(),
+                "{expected}.{function} namespace mutation escaped"
+            );
+        }
+    }
+}

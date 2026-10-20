@@ -5,6 +5,7 @@ use crate::core::runtime::DispatchCtx;
 use crate::core::TypeSchema;
 #[test]
 fn inference_schema_function_names_are_stable() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "inference");
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),

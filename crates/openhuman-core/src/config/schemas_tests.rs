@@ -4,6 +4,7 @@ use crate::core::all::assert_schema_controller_parity;
 
 #[test]
 fn config_schema_catalog_matches_registered_controllers() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "config");
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),

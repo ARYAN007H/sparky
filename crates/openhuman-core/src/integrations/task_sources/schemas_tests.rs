@@ -6,6 +6,7 @@ use serde_json::json;
 
 #[test]
 fn task_source_schema_contracts_and_registration_are_preserved() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "task_sources");
     let names: Vec<_> = all_controller_schemas()
         .into_iter()
         .map(|s| s.function)

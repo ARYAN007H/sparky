@@ -6,6 +6,7 @@ use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn mcp_ui_schema_contracts_are_preserved() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "mcp_ui");
     let schema = schemas("tool_call");
     expect_schema_identity(&schema, "mcp_ui", "tool_call");
     expect_schema_required_inputs(&schema, &["server_id", "tool_name"]);

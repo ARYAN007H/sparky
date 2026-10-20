@@ -4,6 +4,7 @@ use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn subsystem_catalog_matches_registered_controllers() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "subsystems");
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),

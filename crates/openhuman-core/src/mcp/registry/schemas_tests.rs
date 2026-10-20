@@ -9,6 +9,7 @@ use serde_json::Map;
 
 #[test]
 fn registry_schema_contracts_are_preserved() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "mcp_clients");
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),

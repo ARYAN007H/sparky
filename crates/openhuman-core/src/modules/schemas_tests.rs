@@ -6,6 +6,7 @@ use serde_json::{Map, Value};
 
 #[test]
 fn registered_controllers_match_the_advertised_schemas() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "modules");
     // Two lists that must agree: one drives `/schema`, the other dispatch.
     let advertised: Vec<&str> = all_controller_schemas()
         .iter()

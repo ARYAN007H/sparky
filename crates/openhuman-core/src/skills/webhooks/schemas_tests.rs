@@ -6,6 +6,7 @@ use crate::core::all::{
 
 #[test]
 fn webhook_schema_contracts_are_preserved() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "webhooks");
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),
