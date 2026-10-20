@@ -4,7 +4,7 @@
 //! - **Spawn**: `spawn_subagent` and `spawn_async_subagent`.
 //! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
 //!   `wait_subagent`, `wait` / `wait_loop`, `list_subagents`.
-//! - **Delegation**: `DelegateGraphTool` and `ArchetypeDelegationTool`.
+//! - **Delegation**: `ArchetypeDelegationTool`.
 //!
 //! TinyAgents owns generic control operations; the host control module keeps
 //! the product declarations and projections. Worker-thread persistence lives

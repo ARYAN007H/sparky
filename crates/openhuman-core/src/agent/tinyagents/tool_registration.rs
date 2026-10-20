@@ -19,7 +19,7 @@ use tinyinference_llm::model::ChatModel;
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 use crate::agent::orchestration::tools::{
-    ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
+    ContinueSubagentDispatch, DelegationDispatch,
     SpawnAsyncSubagentDispatch, SpawnSubagentDispatch,
 };
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
@@ -27,7 +27,6 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
 use crate::agent::tools::TodoToolDispatch;
 use crate::core::runtime::CoreContext;
-use crate::tools::delegate::DelegateToolDispatch;
 
 pub(crate) type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
 
@@ -120,8 +119,6 @@ pub(crate) fn typed_dispatch_for(
         "spawn_async_subagent" => Arc::new(SpawnAsyncSubagentDispatch::new(adapter)),
         "spawn_subagent" => Arc::new(SpawnSubagentDispatch::new(adapter)),
         "continue_subagent" => Arc::new(ContinueSubagentDispatch::new(adapter)),
-        "delegate_graph" => Arc::new(DelegateGraphDispatch::new(adapter)),
-        "delegate" => Arc::new(DelegateToolDispatch::new(adapter)),
         "memory" => Arc::new(LiveToolContextDispatch::new(adapter)),
         "todo" => Arc::new(TodoToolDispatch::new(adapter)),
         _ => {
@@ -618,13 +615,6 @@ pub(crate) fn capability_diagnostics(
             registry.replace_tool(Arc::new(adapter));
         }
     }
-    project_descriptors(
-        &mut registry,
-        ComponentKind::Graph,
-        host_graph_topologies()
-            .into_iter()
-            .map(|report| report.name),
-    );
 
     // The agents visible to this turn, as name-only `ComponentKind::Agent`
     // descriptors (issue #4249, Workstream 10.1): metadata only, no executable
@@ -657,24 +647,11 @@ pub(crate) fn capability_diagnostics(
     tracing::debug!(
         models = registry.to_model_registry().names().len(),
         tools = registry.names(ComponentKind::Tool).len(),
-        graphs = registry.names(ComponentKind::Graph).len(),
         agents = runtime_agent_count + builtin_supplement_count,
         diagnostics = diagnostics.len(),
         "[registry] per-turn capability projection summary"
     );
     diagnostics
-}
-
-/// Graph descriptors that remain part of OpenHuman's host capability surface.
-/// Team and workflow graphs were used only by the retired graph-workflow
-/// feature; delegation remains live for sub-agent orchestration.
-pub(crate) fn host_graph_topologies() -> Vec<tinyagents_graph::GraphTopologyReport> {
-    tinyagents_orchestration::topology::all_graph_topologies()
-        .into_iter()
-        .filter(|report| {
-            !report.name.starts_with("agent_teams:") && !report.name.starts_with("workflow_runs:")
-        })
-        .collect()
 }
 
 #[cfg(test)]
