@@ -22,6 +22,7 @@ pub mod backfill;
 pub mod billing;
 pub mod brain;
 pub mod bus;
+pub mod confine;
 pub mod deletion;
 pub mod engine;
 pub mod engine_registry;
@@ -42,6 +43,8 @@ mod tool_budget;
 pub(crate) mod tool_writes;
 pub mod tools;
 pub mod types;
+
+pub use error::{MemoryError, MemoryResult};
 
 #[cfg(test)]
 pub(crate) mod test_fixtures;

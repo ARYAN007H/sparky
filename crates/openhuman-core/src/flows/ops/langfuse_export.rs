@@ -1,9 +1,8 @@
 //! Langfuse export for `flows::` graph runs.
 //!
 //! After a `flows_run` / `flows_resume` settles, the `flows::` domain hands
-//! this module the run's durable [`GraphObservation`] slice (captured by the
-//! per-run in-memory journal that `tinyflows`' journaled entry points fill)
-//! and it exports the run as one Langfuse trace via the backend's Langfuse
+//! this module the run's [`GraphObservation`] slice collected from the Runs
+//! bus event stream, and it exports the run as one Langfuse trace via the backend's Langfuse
 //! OTLP proxy route (Langfuse v4; the legacy batch ingestion path is not used
 //! for traces).
 //!
@@ -159,7 +158,7 @@ pub async fn export_flow_run_trace(
             target: LOG_TARGET,
             flow_id = %flow_id,
             thread_id = %thread_id,
-            "[flows] langfuse export skipped: run journal is empty"
+            "[flows] langfuse export skipped: PollRun observations are empty"
         );
         return;
     }

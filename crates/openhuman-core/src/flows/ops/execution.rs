@@ -9,6 +9,9 @@ use tinyflows_catalog::Flow;
 
 use crate::config::Config;
 
+#[path = "langfuse_export.rs"]
+mod langfuse_export;
+
 /// Exports one module-projected run segment to Langfuse. Failures remain
 /// best-effort and cannot change a workflow result.
 pub(crate) async fn export_run_to_langfuse(
@@ -20,7 +23,7 @@ pub(crate) async fn export_run_to_langfuse(
     trigger: FlowRunTrigger,
     observations: &[GraphObservation],
 ) {
-    crate::flows::tinyflows::langfuse_export::export_flow_run_trace(
+    langfuse_export::export_flow_run_trace(
         config,
         flow_name,
         flow_id,
