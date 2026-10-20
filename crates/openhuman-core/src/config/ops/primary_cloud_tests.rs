@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::config::schema::cloud_providers::CloudProviderCreds;
+use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 
 fn provider(id: &str, slug: &str, endpoint: &str, auth_style: AuthStyle) -> CloudProviderCreds {
     CloudProviderCreds {

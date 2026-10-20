@@ -20,7 +20,8 @@ fn openai_entry(id: &str, slug: &str) -> CloudProviderCreds {
 fn managed_route_without_a_registered_provider_fails_closed() {
     let config = test_config();
     let error = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .expect_err("bare core has no hosted model source");
+        .err()
+        .expect("bare core has no hosted model source");
     assert!(error.to_string().contains("BACKEND_UNAVAILABLE"));
 }
 
@@ -29,7 +30,8 @@ fn managed_route_does_not_invent_a_model_when_provider_policy_is_absent() {
     let mut config = test_config();
     config.default_model = Some("reasoning-v1".to_string());
     let error = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .expect_err("retired pin is not a concrete model source");
+        .err()
+        .expect("retired pin is not a concrete model source");
     assert!(error.to_string().contains("BACKEND_UNAVAILABLE"));
 
     config.default_model = Some("openrouter/deepseek/deepseek-v4-pro".to_string());

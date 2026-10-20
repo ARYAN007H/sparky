@@ -310,7 +310,7 @@ fn a_call_is_checked_against_its_own_model() {
     }];
     let gate = OpenHumanBudgetGate::new(Arc::new(config));
     // Another call left a different model in the shared attribution.
-    *gate.last_model.write() = "other".into();
+    *gate.last_model.write() = Some("other".into());
     let policies = gate.live_budgets();
     assert!(gate
         .check_budgets_against(&estimate_for("planner"), &policies, &tracker)

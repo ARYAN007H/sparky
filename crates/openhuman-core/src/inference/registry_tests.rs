@@ -125,7 +125,7 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
     });
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
         "cloud",
-        "any-model",
+        Some("any-model"),
         8,
         "",
         None,
