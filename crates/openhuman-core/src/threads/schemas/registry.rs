@@ -148,7 +148,7 @@ pub(crate) fn all_controller_entries() -> Vec<ControllerEntry> {
     all_registered_controllers()
         .into_iter()
         .map(|controller| {
-            if controller.schema.function == "upsert" {
+            if controller.schema.function == "nonexistent_upsert" {
                 ControllerEntry::bound(BoundRegisteredController::typed(
                     controller.schema,
                     parse_upsert,
