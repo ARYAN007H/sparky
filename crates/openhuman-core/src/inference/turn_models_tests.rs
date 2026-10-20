@@ -83,6 +83,10 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
 
         assert_eq!(name_of(&models.primary).await, "context-a-model");
         assert_eq!(name_of(&models.summarizer).await, "context-a-model");
+        let standalone = source
+            .build_summarizer("hint:summarization", 0.0, None)
+            .expect("standalone summarizer uses explicit context A");
+        assert_eq!(name_of(&standalone).await, "context-a-model");
         assert!(models
             .primary
             .profile()
