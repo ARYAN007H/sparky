@@ -26,22 +26,18 @@ pub fn synthesize_local_runtime_entry(
 ) -> Option<crate::config::schema::cloud_providers::CloudProviderCreds> {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 
-    let endpoint = match slug {
-        // Ollama's OpenAI-compatible surface at `<base>/v1/models` returns
-        // the same `{"data": [...]}` shape the existing parser handles, so
-        // we route through that rather than the native `/api/tags`.
-        "ollama" => {
-            let base = tinyinference_local::ollama::ollama_base_url_from_override(
-                config.local_ai.base_url.as_deref(),
-            );
-            format!("{}/v1", base.trim_end_matches('/'))
-        }
-        // `lm_studio_base_url` already ends in `/v1`.
+    let runtime_base = match slug {
+        "ollama" => tinyinference_local::ollama::ollama_base_url_from_override(
+            config.local_ai.base_url.as_deref(),
+        ),
         "lmstudio" => {
             tinyinference_local::lm_studio::lm_studio_base_url(config.local_ai.base_url.as_deref())
         }
         _ => return None,
     };
+    let endpoint = tinyinference_local::provider::local_runtime_models_endpoint(slug, &runtime_base)?
+        .strip_suffix("/models")?
+        .to_string();
 
     Some(CloudProviderCreds {
         id: format!("synthetic_local_{slug}"),
