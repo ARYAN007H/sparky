@@ -298,34 +298,7 @@ pub(crate) async fn stage_queued_parts(
     Ok(public)
 }
 
-/// Resolve staged queue refs immediately before execution. The caller gets
-/// trusted relative paths only after exact tenant, thread, token, and limit
-/// checks pass.
-pub(crate) async fn resolve_staged_parts(
-    ctx: &crate::core::runtime::DispatchCtx,
-    thread_id: &str,
-    requested: &[ContentPart],
-) -> Result<Vec<ContentPart>, String> {
-    if thread_id.is_empty() || requested.is_empty() {
-        return Err("staged attachment scope and refs must be non-empty".into());
-    }
-    let config = ctx
-        .load_config()
-        .await
-        .map_err(|error| format!("staged attachment configuration unavailable: {error}"))?;
-    let entries = read_staged_entries(ctx, thread_id, requested, &config).await?;
-    validate_staged_files(ctx, thread_id, &config, &entries).await?;
-    let mut resolved = Vec::with_capacity(entries.len());
-    for mut entry in entries {
-        let media = opaque_media_mut(&mut entry.part)
-            .ok_or_else(|| "staged attachment has an unsupported kind".to_string())?;
-        media.path = Some(entry.path);
-        resolved.push(entry.part);
-    }
-    Ok(resolved)
-}
-
-pub(super) async fn validate_staged_files(
+async fn validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     config: &crate::config::Config,

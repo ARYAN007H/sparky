@@ -1,7 +1,5 @@
-use super::*;
 use crate::threads::ops::persist_queued_user_message;
 use crate::threads::store as conversations;
-use base64::Engine as _;
 
 async fn setup() -> (tempfile::TempDir, crate::config::Config) {
     let temp = tempfile::tempdir().unwrap();
@@ -29,7 +27,6 @@ async fn setup() -> (tempfile::TempDir, crate::config::Config) {
 #[tokio::test]
 async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
-    use base64::Engine as _;
     use tinychannels_bus::{ContentPart, MediaReference};
 
     let (_temp, config) = setup().await;
@@ -100,7 +97,6 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
 #[tokio::test]
 async fn concurrent_queued_attachment_transfer_has_one_exact_owner() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
-    use base64::Engine as _;
     use tinychannels_bus::{ContentPart, MediaReference};
 
     let (_temp, config) = setup().await;

@@ -130,6 +130,7 @@ async fn staged_claim_and_cancellation_have_one_atomic_document_winner() {
         let repo = repo.clone();
         let bound = bound.clone();
         let part = part.clone();
+        let id = id.clone();
         tokio::spawn(async move {
             barrier.wait().await;
             claim_staged_record(&repo, &bound.tenant, "thread", &id, &part, &bound)
@@ -140,6 +141,7 @@ async fn staged_claim_and_cancellation_have_one_atomic_document_winner() {
         let repo = repo.clone();
         let canceled = canceled.clone();
         let part = part.clone();
+        let id = id.clone();
         tokio::spawn(async move {
             barrier.wait().await;
             cancel_staged_record(&repo, &canceled.tenant, "thread", &id, &part, &canceled)

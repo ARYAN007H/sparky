@@ -11,10 +11,7 @@ use tinychannels_bus::{ContentPart, MediaReference};
 use tinystoragedrivers::Precondition;
 
 use crate::agent::attachments::Attachment;
-use crate::storage::{
-    self,
-    documents::{Repo, compare_and_swap},
-};
+use crate::storage::{self, documents::Repo};
 
 const STORAGE_KEY: &str = "__openhumanStoredAttachments";
 
@@ -22,8 +19,8 @@ const STORAGE_KEY: &str = "__openhumanStoredAttachments";
 mod staged;
 use staged::*;
 pub(crate) use staged::{
-    bind_staged_refs, consume_staged_parts, discard_staged_parts, resolve_staged_parts,
-    stage_queued_parts, validate_opaque_parts,
+    bind_staged_refs, consume_staged_parts, discard_staged_parts, stage_queued_parts,
+    validate_opaque_parts,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
