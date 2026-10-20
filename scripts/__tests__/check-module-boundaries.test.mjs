@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { auditGraph, bridgeReach, graph, isImplementation, run, treeGraph, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
+import { auditGraph, bridgeReach, graph, isImplementation, linkedHostAudit, run, treeGraph, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
 
 const policy = JSON.parse(readFileSync(new URL('../ci/module-boundaries.json', import.meta.url), 'utf8'));
 const strict = { ...policy, exceptions: [] };
@@ -172,6 +172,10 @@ test('a legal direct bridge edge does not hide a second path through a wrapper',
   });
   assert.deepEqual(
     auditGraph(m, ['openhuman-cli'], linked).violations.map(v => v.path),
+    [['openhuman-cli', 'wrapper', 'openhuman-modules-linked']],
+  );
+  assert.deepEqual(
+    linkedHostAudit(m, 'openhuman-cli', linked).map(v => v.path),
     [['openhuman-cli', 'wrapper', 'openhuman-modules-linked']],
   );
 });

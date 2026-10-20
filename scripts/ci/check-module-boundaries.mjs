@@ -141,6 +141,35 @@ export function bridgeReach(metadata, roots, policy) {
   return found;
 }
 
+/** Check bridge incoming edges without auditing feature-unified descendants. */
+export function linkedHostAudit(metadata, root, policy) {
+  const target = policy.linkedHost?.package;
+  if (!target) return [];
+  const { packages, edges } = graph(metadata);
+  const candidates = [...packages.values()].filter(pkg => pkg.name === root);
+  if (candidates.length !== 1) throw new Error(`expected exactly one root package ${root}`);
+  const rootId = candidates[0].id;
+  const queue = [[rootId]];
+  const seen = new Set();
+  const violations = [];
+  for (let at = 0; at < queue.length; at++) {
+    const path = queue[at];
+    const id = path.at(-1);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const next of edges(id)) {
+      if (packages.get(next).name === target) {
+        if (id !== rootId || !policy.linkedHost.allowedParents.includes(root)) {
+          violations.push({ scope: 'hosts', package: target, path: [...path, next].map(item => packages.get(item).name) });
+        }
+        continue;
+      }
+      queue.push([...path, next]);
+    }
+  }
+  return violations;
+}
+
 export function validatePolicy(policy) {
   for (const key of ['implementationPackages', 'implementationPrefixes', 'contracts', 'pendingContracts', 'exceptions']) {
     if (!Array.isArray(policy[key])) throw new Error(`policy.${key} must be an array`);
@@ -341,7 +370,10 @@ export function run(root, strict = false, execute = execFileSync) {
   // The linked-modules CLI feature is local-only, never shipped. Audit its
   // separately rooted graph for a direct CLI edge; do not let its feature
   // unification contaminate the CLI's shipping feature graph above.
-  results.push(auditGraph(linkedCliTree(root, execute), ['openhuman-cli'], policy));
+  results.push({
+    violations: linkedHostAudit(linkedCliTree(root, execute), 'openhuman-cli', policy),
+    exceptions: [],
+  });
   // Default-feature graphs also guard against accidental bridge activation.
   for (const packageName of ['openhuman-cli', 'openhuman-tui', 'openhuman']) {
     results.push({
