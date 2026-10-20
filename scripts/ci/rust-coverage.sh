@@ -66,6 +66,25 @@ llvm_cov_embed() {
   llvm_cov_product_facade "$@"
 }
 
+# The nextest runner builds every product-feature package with ONE Cargo
+# argument set and varies only the nextest filter between suites. Cargo hashes
+# each unit by its resolved feature set, and the core's feature graph differs
+# per selected package set (core alone, embed/tinyhumans, and the cli, which
+# drops the core's `default` alias), so separate `-p` invocations each compile
+# the core and its dependencies again. With the same packages, `--all-targets`
+# and `--features` on every invocation, the first suite builds them once and
+# the rest find them fresh. Suites, reports and execution order are unchanged;
+# each filter selects what the old per-package arguments built and ran:
+#   core        its only target is the lib (`--lib --bins`)
+#   embed       `--all-targets`
+#   tinyhumans  `--all-targets`
+#   cli         `--tests -E 'kind(test)'` (integration targets only)
+UNIFIED_PRODUCT_ARGS=(-p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets)
+FILTER_CORE='package(=openhuman)'
+FILTER_EMBED='package(=openhuman-embed)'
+FILTER_TINYHUMANS='package(=openhuman-tinyhumans)'
+FILTER_CLI_TESTS='package(=openhuman-cli) & kind(test)'
+
 integration_test_targets() {
   find tests -maxdepth 1 -type f -name '*.rs' -print |
     sed -e 's#^tests/##' -e 's#\.rs$##' |
@@ -146,10 +165,20 @@ target_expected_in_coverage() {
 # merged from whatever did run. A cancellation (130/143 from
 # scripts/ci-cancel-aware.sh) stops the run at once.
 FAILED_SUITES=()
+
 suite() {
   local name="$1" rc=0
   shift
   COV_SUITE="$(printf '%s' "$name" | tr -cs '[:alnum:]' '-')" "$@" || rc=$?
+  # On the self-hosted guest (CI_SCRATCH_DIR is set) log what the scratch disk
+  # has left and how large the coverage target and its raw profiles are after
+  # each suite, so a full disk (EX63 run 39292268284) names the suite that
+  # grew it.
+  if [ -n "${CI_SCRATCH_DIR:-}" ]; then
+    log "disk after ${name}: $(df -h "${CI_SCRATCH_DIR}" 2>/dev/null | awk 'NR==2 { print $4 " free of " $2 }')," \
+      "target $(du -sh "${CARGO_BUILD_TARGET_DIR:-target}" 2>/dev/null | cut -f1)," \
+      "profraw $(find "${CARGO_BUILD_TARGET_DIR:-target}" -name '*.profraw' -print0 2>/dev/null | du -ch --files0-from=- 2>/dev/null | tail -1 | cut -f1)"
+  fi
   case "${rc}" in
     0) ;;
     130 | 143)
@@ -259,7 +288,8 @@ trap 'exit 143' TERM HUP
 
 if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   # One process per test isolates process globals without separate target dirs.
-  suite "openhuman lib+bins (nextest)" llvm_cov --no-report --no-fail-fast -p openhuman --lib --bins
+  suite "openhuman lib+bins (nextest)" llvm_cov --no-report --no-fail-fast \
+    "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_CORE}"
 else
   # Keep the aggregate unit-test process aligned with the canonical Rust runner.
   # The isolated reaper test installs one-shot process globals, so it cannot run
@@ -275,9 +305,20 @@ fi
 # Run every root-workspace Rust support crate rather than only crates named by
 # changed paths. Product features are forwarded to the embedding facade; the
 # remaining crates do not expose that feature vocabulary.
-suite "openhuman-embed" llvm_cov_embed --no-report --no-fail-fast -p openhuman-embed --all-targets
-suite "openhuman-rpc" llvm_cov_package --no-report --no-fail-fast -p openhuman-rpc --all-targets
-suite "openhuman-tinyhumans" llvm_cov_product_facade --no-report --no-fail-fast -p openhuman-tinyhumans --all-targets
+if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
+  suite "openhuman-embed" llvm_cov --no-report --no-fail-fast \
+    "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_EMBED}"
+else
+  suite "openhuman-embed" llvm_cov_embed --no-report --no-fail-fast -p openhuman-embed --all-targets
+fi
+suite "openhuman-rpc" llvm_cov_package --no-report --no-fail-fast -p openhuman-rpc --all-targets \
+  --features storage-sqlite
+if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
+  suite "openhuman-tinyhumans" llvm_cov --no-report --no-fail-fast \
+    "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_TINYHUMANS}"
+else
+  suite "openhuman-tinyhumans" llvm_cov_product_facade --no-report --no-fail-fast -p openhuman-tinyhumans --all-targets
+fi
 if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   # Contributor/default features are distinct from product features. Keep both
   # configurations instrumented rather than dropping the default-only surface.
@@ -312,19 +353,28 @@ if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   if [ -s "${expected_targets}" ]; then
     expected_inventory="${PWD}/ci-out/nextest/cli-inventory.json"
     # Listing executes no tests. cargo-llvm-cov supplies the same wrapper and
-    # instrumentation environment, so Cargo can reuse this CLI test build.
+    # instrumentation environment, but show-env leaves Cargo on the plain
+    # target dir while `cargo llvm-cov nextest` builds in its llvm-cov-target
+    # subdir. Without the explicit --target-dir the listing re-instrumented
+    # the whole graph a second time (578 crates, +53 GB on the EX63 scratch
+    # disk in run 39315551099, which then filled it). Listing also launches
+    # each instrumented binary; keep those profiles out of the report.
     cli_inventory() (
       inventory_env="$(bash scripts/ci-cancel-aware.sh cargo llvm-cov show-env --sh)" || exit $?
       eval "${inventory_env}"
+      inventory_profiles="${PWD}/ci-out/nextest/cli-inventory-profraw"
+      export LLVM_PROFILE_FILE="${inventory_profiles}/list-%p.profraw"
       bash scripts/ci-cancel-aware.sh cargo nextest list --message-format json --features "${CORE_PRODUCT_FEATURES}" \
-        -p openhuman-cli --tests -E 'kind(test)' >"${expected_inventory}"
+        --target-dir "${CARGO_LLVM_COV_TARGET_DIR}/llvm-cov-target" \
+        "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_CLI_TESTS}" >"${expected_inventory}"
+      rm -rf "${inventory_profiles}"
     )
     suite "openhuman-cli test inventory" cli_inventory
   fi
   NEXTEST_EXPECTED_TARGETS="${expected_targets}" \
   NEXTEST_EXPECTED_INVENTORY="${expected_inventory}" \
   suite "openhuman-cli integration tests (nextest)" llvm_cov \
-    --no-report --no-fail-fast -p openhuman-cli --tests -E 'kind(test)'
+    --no-report --no-fail-fast "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_CLI_TESTS}"
 else
   while IFS= read -r target; do
     [ -n "${target}" ] || continue
