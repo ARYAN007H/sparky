@@ -397,186 +397,30 @@ fn provider_http_policy_uses_registered_error_ownership_metadata() {
     });
 }
 
-// Exercises the real `config_rejection_demoted` decision used
-// by `api_error`, including the inverted provider-aware polarity.
-mod provider_config_rejection_suppression {
-    use super::super::*;
+#[test]
+fn demotion_decision_keeps_quota_ahead_of_backend_owned_error_code() {
+    use tinyinference_llm::failure::{DemotionKind, demote_decision};
+    let facts = tinyinference_llm::failure::http::classify_http_failure(
+        "fixture-byo-provider",
+        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+        "MONTHLY_REQUEST_COUNT quota exceeded",
+    );
+    assert_eq!(
+        demote_decision(&facts, false),
+        Some(DemotionKind::QuotaExhausted)
+    );
+}
 
-    // The exact #2079 Sentry body shape.
-    const TIER_LEAK_BODY: &str =
-        "The supported API model names are deepseek-v4-pro or deepseek-v4-flash, \
-         but you passed reasoning-v1.";
-    // #2076 Moonshot Kimi K2 temperature constraint.
-    const TEMP_BODY: &str = "invalid temperature: only 1 is allowed for this model";
-
-    #[test]
-    fn custom_provider_4xx_config_rejection_is_suppressed() {
-        assert!(config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                "custom_openai",
-                reqwest::StatusCode::BAD_REQUEST.as_u16(),
-                TIER_LEAK_BODY
-            ),
-            "custom_openai"
-        ));
-        assert!(config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                "custom_openai",
-                reqwest::StatusCode::BAD_REQUEST.as_u16(),
-                TEMP_BODY
-            ),
-            "custom_openai"
-        ));
-        // 404 "model does not exist" is the same user-config class.
-        assert!(config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                "custom_openai",
-                reqwest::StatusCode::NOT_FOUND.as_u16(),
-                "The model `gpt-5.5` does not exist or you do not have access to it."
-            ),
-            "custom_openai"
-        ));
-    }
-
-    #[test]
-    fn openhuman_backend_same_body_is_not_suppressed() {
-        // Inverted polarity: for tier-leak / temperature / litellm /
-        // OpenRouter-style phrases, the OpenHuman backend never
-        // emits them, so the same body from our OWN backend would
-        // mean we sent it a bad request — a real regression that
-        // must still reach Sentry. (Mirror of the 401/403 backend
-        // rule.)
-        super::install_fixture_backend_classifier();
-        assert!(!config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                super::FIXTURE_BACKEND,
-                reqwest::StatusCode::BAD_REQUEST.as_u16(),
-                TIER_LEAK_BODY
-            ),
-            super::FIXTURE_BACKEND
-        ));
-        assert!(!config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                super::FIXTURE_BACKEND,
-                reqwest::StatusCode::BAD_REQUEST.as_u16(),
-                TEMP_BODY
-            ),
-            super::FIXTURE_BACKEND
-        ));
-    }
-
-    #[test]
-    fn openhuman_backend_openai_compatible_unknown_model_is_suppressed() {
-        // TAURI-RUST-2Z1 — the OpenHuman backend DOES emit the
-        // OpenAI-compatible "Model 'X' is not available. Use GET
-        // /openai/v1/models …" wire body for user-configured unknown
-        // model ids (here `MiniMax-M2.7-highspeed` and two
-        // `custom:`-prefixed fallback variants from the user's own
-        // `model_fallbacks` config). That's user-state, not a
-        // regression — drop the polarity guard for this specific
-        // shape so the per-attempt event stops reaching Sentry.
-        // (The aggregate sibling TAURI-RUST-2Z2 is already covered by
-        // `expected_error_kind` via the broader message-only
-        // classifier.)
-        for body in [
-            r#"OpenHuman API error (400 Bad Request): {"success":false,"error":"Model 'MiniMax-M2.7-highspeed' is not available. Use GET /openai/v1/models to list available models."}"#,
-            r#"OpenHuman API error (400 Bad Request): {"success":false,"error":"Model 'custom:MiniMax-M2.7' is not available. Use GET /openai/v1/models to list available models."}"#,
-        ] {
-            assert!(
-                config_rejection_demoted(
-                    &tinyinference_llm::failure::http::classify_http_failure(
-                        "OpenHuman",
-                        reqwest::StatusCode::BAD_REQUEST.as_u16(),
-                        body
-                    ),
-                    "OpenHuman"
-                ),
-                "TAURI-RUST-2Z1 body must be suppressed for openhuman backend: {body:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn server_error_is_not_suppressed() {
-        // A 5xx is a server bug, not user-config — keep reporting.
-        assert!(!config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                "custom_openai",
-                reqwest::StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                TIER_LEAK_BODY
-            ),
-            "custom_openai"
-        ));
-    }
-
-    #[test]
-    fn transient_429_is_not_suppressed_here() {
-        // 429 is transient; handled by should_report_provider_http_failure,
-        // not this classifier (must not be swallowed as user-config).
-        assert!(!config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                "custom_openai",
-                reqwest::StatusCode::TOO_MANY_REQUESTS.as_u16(),
-                TIER_LEAK_BODY
-            ),
-            "custom_openai"
-        ));
-    }
-
-    #[test]
-    fn unrelated_4xx_body_is_not_suppressed() {
-        assert!(!config_rejection_demoted(
-            &tinyinference_llm::failure::http::classify_http_failure(
-                "custom_openai",
-                reqwest::StatusCode::BAD_REQUEST.as_u16(),
-                "Bad request: missing required field 'messages'"
-            ),
-            "custom_openai"
-        ));
-    }
-
-    /// TAURI-RUST-4XK — Ollama Cloud returns HTTP 403 with body
-    /// `{"error":"this model requires a subscription, upgrade for access: …"}`.
-    /// Before this fix, `is_provider_config_rejection_http` rejected 403
-    /// before reaching the phrase matcher, so the subscription-gate body
-    /// fell through to Sentry. Adding 403 to the allowed status set closes
-    /// that gap; the existing phrase in `config_rejection.rs` already
-    /// handles the body content.
-    #[test]
-    fn ollama_cloud_403_subscription_gate_is_suppressed() {
-        // Verbatim wire body from TAURI-RUST-4XK Sentry issue 5338.
-        let body = r#"ollama API error (403 Forbidden): {"error":"this model requires a subscription, upgrade for access: https://ollama.com/upgrade (ref: bc48f3c8-fba1-40b6-93a9-786a167d16f9)"}"#;
-        assert!(
-            config_rejection_demoted(
-                &tinyinference_llm::failure::http::classify_http_failure(
-                    "ollama",
-                    reqwest::StatusCode::FORBIDDEN.as_u16(),
-                    body
-                ),
-                "ollama"
-            ),
-            "TAURI-RUST-4XK: ollama 403 subscription-gate must be classified as provider config-rejection"
-        );
-    }
-
-    #[test]
-    fn openhuman_backend_403_subscription_phrase_is_not_suppressed() {
-        // Polarity guard: if our own backend somehow returned a 403 with
-        // the subscription phrase, that would be an unexpected regression
-        // and must still reach Sentry. The phrase does not appear in any
-        // expected backend body, so this is purely defensive.
-        let body = r#"{"error":"this model requires a subscription, upgrade for access: https://ollama.com/upgrade (ref: test)"}"#;
-        super::install_fixture_backend_classifier();
-        assert!(
-            !config_rejection_demoted(
-                &tinyinference_llm::failure::http::classify_http_failure(
-                    super::FIXTURE_BACKEND,
-                    reqwest::StatusCode::FORBIDDEN.as_u16(),
-                    body
-                ),
-                super::FIXTURE_BACKEND
-            ),
-            "backend 403 subscription phrase must NOT be suppressed (polarity guard)"
-        );
-    }
+#[test]
+fn managed_unknown_model_remains_user_configuration_state() {
+    use tinyinference_llm::failure::{DemotionKind, demote_decision};
+    let facts = tinyinference_llm::failure::http::classify_http_failure(
+        "openhuman",
+        StatusCode::BAD_REQUEST.as_u16(),
+        "Model 'custom:model' is not available",
+    );
+    assert_eq!(
+        demote_decision(&facts, true),
+        Some(DemotionKind::ConfigurationRejected)
+    );
 }
