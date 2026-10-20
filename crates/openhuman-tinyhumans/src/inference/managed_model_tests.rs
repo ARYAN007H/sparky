@@ -84,6 +84,41 @@ fn managed_bearer_keeps_the_stored_key_transport_guard() {
     assert!(error.to_string().contains("unmanaged or insecure"));
 }
 
+#[test]
+fn managed_bearer_refusal_redacts_foreign_endpoint_details() {
+    let tmp = tempfile::TempDir::new().expect("temporary credentials");
+    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+        tmp.path(),
+        false,
+        "SYNTHETIC_BEARER_MARKER",
+    )
+    .expect("store test API key");
+    let options = ManagedOptions {
+        openhuman_dir: Some(tmp.path().to_path_buf()),
+        secrets_encrypt: false,
+        ..ManagedOptions::default()
+    };
+    let endpoint = "https://synthetic-user:SYNTHETIC_PASSWORD@foreign.example/private/SYNTHETIC_PATH?token=SYNTHETIC_QUERY";
+
+    let error = options
+        .resolve_bearer(endpoint)
+        .expect_err("foreign endpoint must remain rejected");
+    let diagnostic = error.to_string();
+    for marker in [
+        "synthetic-user",
+        "SYNTHETIC_PASSWORD",
+        "SYNTHETIC_PATH",
+        "SYNTHETIC_QUERY",
+        "SYNTHETIC_BEARER_MARKER",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "refusal diagnostic exposed {marker}: {diagnostic}"
+        );
+    }
+    assert!(diagnostic.contains("refusing to send"), "{diagnostic}");
+}
+
 async fn unauthorized_chat_response() -> axum::response::Response {
     use axum::response::IntoResponse;
     (
