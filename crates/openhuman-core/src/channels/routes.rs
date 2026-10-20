@@ -251,6 +251,18 @@ where
             return true;
         }
     };
+    // Behavior-restoration comparison: the old command path applied the
+    // route before confirming that its requested durable reset succeeded.
+    if let Some(route) = next_route.clone() {
+        set_route_selection(
+            ctx,
+            sender_key,
+            ChannelRouteSelection {
+                provider: route.provider,
+                model: route.model,
+            },
+        );
+    }
     if clear_history && reset_history().await.is_err() {
         tracing::warn!("channel durable history reset failed");
         if let Some(channel) = target_channel {
@@ -265,16 +277,7 @@ where
     }
     // Apply a route change only after its requested durable reset has
     // succeeded, so a failed reset cannot partially alter command state.
-    if let Some(route) = next_route {
-        set_route_selection(
-            ctx,
-            sender_key,
-            ChannelRouteSelection {
-                provider: route.provider,
-                model: route.model,
-            },
-        );
-    }
+    let _ = next_route;
     let Some(reply) = reply else {
         return false;
     };

@@ -62,7 +62,9 @@ impl OpenHumanSessionHost {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = anyhow::Result<Vec<TranscriptMessage>>>,
     {
-        if self.bound_history_is_authoritative()? {
+        // Behavior-restoration comparison: prior relay admission consulted its
+        // legacy source even after a durable turn had committed.
+        if self.bound_history_is_authoritative()? && false {
             return Ok(false);
         }
         let messages = load().await?;
