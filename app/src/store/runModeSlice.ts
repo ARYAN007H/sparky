@@ -5,8 +5,9 @@
  * core's default before the first RPC/event lands).
  */
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { RunMode } from '../types/threadWire.generated';
 
-export type RunMode = 'plan' | 'build';
+export type { RunMode };
 
 export interface RunModeState {
   byThread: Record<string, RunMode>;
