@@ -96,26 +96,18 @@ async fn explicit_profile_projects_spawn_completion_and_cancel_without_ambient_s
 
     let alice_spawned = records(&alice, workspace.path());
     let bob_spawned = records(&bob, workspace.path());
-    assert!(
-        alice_spawned
-            .iter()
-            .any(|row| row.spec.task_id.as_str() == alice_task)
-    );
-    assert!(
-        alice_spawned
-            .iter()
-            .all(|row| row.spec.task_id.as_str() != bob_task)
-    );
-    assert!(
-        bob_spawned
-            .iter()
-            .any(|row| row.spec.task_id.as_str() == bob_task)
-    );
-    assert!(
-        bob_spawned
-            .iter()
-            .all(|row| row.spec.task_id.as_str() != alice_task)
-    );
+    assert!(alice_spawned
+        .iter()
+        .any(|row| row.spec.task_id.as_str() == alice_task));
+    assert!(alice_spawned
+        .iter()
+        .all(|row| row.spec.task_id.as_str() != bob_task));
+    assert!(bob_spawned
+        .iter()
+        .any(|row| row.spec.task_id.as_str() == bob_task));
+    assert!(bob_spawned
+        .iter()
+        .all(|row| row.spec.task_id.as_str() != alice_task));
 
     alice_tx
         .send(DetachedSubagentStatus::Completed {
@@ -213,9 +205,7 @@ async fn cancellation_projection_uses_the_captured_profile_store() {
         .find(|row| row.spec.task_id.as_str() == task_id)
         .expect("Alice cancellation is persisted to Alice's profile store");
     assert_eq!(alice_row.status, OrchestrationTaskStatus::Cancelled);
-    assert!(
-        records(&bob, workspace.path())
-            .iter()
-            .all(|row| row.spec.task_id.as_str() != task_id)
-    );
+    assert!(records(&bob, workspace.path())
+        .iter()
+        .all(|row| row.spec.task_id.as_str() != task_id));
 }

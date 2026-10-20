@@ -416,11 +416,8 @@ fn connected_integrations_block_is_format_independent() {
 #[test]
 fn connected_integrations_block_routes_capability_questions_to_search() {
     let guide = render_connected_integrations(&gmail_only());
-    assert!(
-        guide.contains(
-            "Its results, not prior knowledge or past answers, say what a toolkit can do."
-        )
-    );
+    assert!(guide
+        .contains("Its results, not prior knowledge or past answers, say what a toolkit can do."));
     assert!(!guide.contains("integrations_agent"));
 }
 
@@ -557,11 +554,8 @@ fn build_carries_the_spec_check_grounding_rules() {
     assert!(body.contains("Checks must mirror how the task is specified or graded"));
     assert!(body.contains("Never delete state, data or services the solution needs at runtime"));
     assert!(body.contains("Verify the final state as a fresh consumer would see it."));
-    assert!(
-        body.contains(
-            "List the request's stated constraints, filters and thresholds as `todo` items"
-        )
-    );
+    assert!(body
+        .contains("List the request's stated constraints, filters and thresholds as `todo` items"));
 }
 
 #[test]

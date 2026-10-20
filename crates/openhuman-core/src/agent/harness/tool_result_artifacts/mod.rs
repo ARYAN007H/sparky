@@ -32,7 +32,7 @@ use serde_json::Value;
 use tinyagents_harness::artifacts::tool_results::{self, ArtifactRead, ToolResultArtifactStore};
 use tinystoragedrivers::BlobStore;
 
-use crate::agent::harness::artifact_offload::{READ_TOOL, SanitizingRedactor};
+use crate::agent::harness::artifact_offload::{SanitizingRedactor, READ_TOOL};
 use tinytools_std::filesystem::FileReadTool;
 
 /// Namespace of the artifact index in the run's store registry.

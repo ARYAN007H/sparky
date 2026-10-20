@@ -21,7 +21,7 @@ use tinyagents_harness::run_queue::{QueueLane, RunQueue};
 use tinyagents_harness::steering::{SteeringCommand, SteeringHandle};
 use tinyagents_orchestration::subagent::FinishedOutcome;
 use tinyagents_orchestration::subagent::{
-    DETACHED_LEDGER_TIMEOUT_MS, DetachedSubagentStatus, WaitError, WaitOutcome,
+    DetachedSubagentStatus, WaitError, WaitOutcome, DETACHED_LEDGER_TIMEOUT_MS,
 };
 use tinyagents_tasks::OrchestrationTaskStatus;
 use tokio::sync::watch;
@@ -284,15 +284,13 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     assert!(block.ends_with("[/active_subagents]\n\n"));
 
     // A parent with no registered workers gets no block (no perturbation).
-    assert!(
-        active_subagents_context_block(
-            &cx(),
-            "nobody-here",
-            &test_workspace(),
-            &FleetToolSet::all()
-        )
-        .is_none()
-    );
+    assert!(active_subagents_context_block(
+        &cx(),
+        "nobody-here",
+        &test_workspace(),
+        &FleetToolSet::all()
+    )
+    .is_none());
 
     // The shipped orchestrator has no wait/steer/close tools (#5701): the
     // guidance must not name them and must say results arrive on their own.
@@ -374,15 +372,13 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
         assert!(block.contains("status=idle"));
         assert!(block.contains("about: Daily X trending email workflow"));
         // Other parents' durable sessions must not leak in.
-        assert!(
-            active_subagents_context_block(
-                &cx(),
-                "unrelated-parent",
-                durable_ws.path(),
-                &FleetToolSet::all()
-            )
-            .is_none()
-        );
+        assert!(active_subagents_context_block(
+            &cx(),
+            "unrelated-parent",
+            durable_ws.path(),
+            &FleetToolSet::all()
+        )
+        .is_none());
     }
 
     let _ = tx_a.send(DetachedSubagentStatus::Completed {
@@ -531,17 +527,15 @@ async fn wait_times_out_and_leaves_entry_intact() {
     ));
 
     // still steerable after a timed-out wait
-    assert!(
-        steer(
-            &cx(),
-            "task-slow",
-            "session-A",
-            "still here".into(),
-            QueueLane::Steer
-        )
-        .await
-        .is_ok()
-    );
+    assert!(steer(
+        &cx(),
+        "task-slow",
+        "session-A",
+        "still here".into(),
+        QueueLane::Steer
+    )
+    .await
+    .is_ok());
     prune("task-slow");
 }
 
@@ -589,17 +583,15 @@ async fn cancel_for_thread_aborts_only_matching_entries() {
             .await
             .is_ok()
     );
-    assert!(
-        steer(
-            &cx(),
-            "task-headless",
-            "session-A",
-            "x".into(),
-            QueueLane::Steer
-        )
-        .await
-        .is_ok()
-    );
+    assert!(steer(
+        &cx(),
+        "task-headless",
+        "session-A",
+        "x".into(),
+        QueueLane::Steer
+    )
+    .await
+    .is_ok());
 
     // Idempotent: a second pass cancels nothing.
     assert_eq!(cancel_for_thread(&cx(), "thread-X"), 0);

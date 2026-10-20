@@ -9,7 +9,7 @@ use crate::agent::prompts::PromptContext;
 use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_definition::{PromptSource, ToolScope};
 use tinyagents_harness::tool::ToolSnapshot;
-use tinyagents_orchestration::subagent::{SubagentRole, restrict_tools_with_scope};
+use tinyagents_orchestration::subagent::{restrict_tools_with_scope, SubagentRole};
 use tinytools::Tool;
 
 // ── Prompt dialect selection ────────────────────────────────────────────

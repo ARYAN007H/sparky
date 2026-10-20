@@ -27,9 +27,9 @@ pub(super) fn make_completion(
     Result<SubagentRunOutcome, String>,
     bool,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
-+ Send
-+ Sync
-+ 'static {
+       + Send
+       + Sync
+       + 'static {
     move |_target: String,
           result: Result<SubagentRunOutcome, String>,
           emit_lifecycle_effects: bool|

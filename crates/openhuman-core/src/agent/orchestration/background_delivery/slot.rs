@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use tinyagents_tasks::{CompletionReceipt, CompletionRouter};
 
-use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::tenant;
+use crate::core::runtime::DispatchCtx;
 
 /// The per-thread (per profile) delivery slot, plus the batch lease.
 /// Dropping it frees both: `release` on an already-settled record is a no-op,

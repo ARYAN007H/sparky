@@ -1,4 +1,4 @@
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::config::Config;
 use crate::core::Outcome;
@@ -6,9 +6,9 @@ use crate::core::Outcome;
 // Imports used only by the `documents`-gated presentation regeneration helper
 // below; when the feature is off the PresentationTool is compiled out.
 #[cfg(feature = "documents")]
-use crate::security::SecurityPolicy;
-#[cfg(feature = "documents")]
 use crate::security::approval::ApprovalChatContext;
+#[cfg(feature = "documents")]
+use crate::security::SecurityPolicy;
 #[cfg(feature = "documents")]
 use crate::tools::PresentationTool;
 

@@ -520,14 +520,12 @@ async fn timed_out_repair_keeps_the_usage_of_its_answered_call() {
     };
     // A full channel whose receiver is alive: the correction's send blocks.
     let (progress, _receiver) = tokio::sync::mpsc::channel(1);
-    assert!(
-        progress
-            .try_send(AgentProgress::TextDelta {
-                delta: "earlier".into(),
-                iteration: 1,
-            })
-            .is_ok()
-    );
+    assert!(progress
+        .try_send(AgentProgress::TextDelta {
+            delta: "earlier".into(),
+            iteration: 1,
+        })
+        .is_ok());
     let mut usage = RepairUsage::for_model("test-model");
 
     let repaired = tokio::time::timeout(

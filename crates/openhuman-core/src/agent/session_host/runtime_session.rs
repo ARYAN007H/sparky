@@ -39,7 +39,7 @@ use super::types::OpenHumanSessionHost;
 use crate::agent::{
     message_convert::{user_message_from_text, user_text_with_markers},
     session_host::{
-        OpenHumanSessionHooks, OpenHumanTranscriptCodec, driver::OpenHumanSessionDriver,
+        driver::OpenHumanSessionDriver, OpenHumanSessionHooks, OpenHumanTranscriptCodec,
     },
     tinyagents::{host::OpenHumanRunContext, middleware::turn_context::TurnContextMiddleware},
 };
@@ -86,8 +86,8 @@ struct OpenHumanTurnPrelude {
     context_config: crate::config::ContextConfig,
     tool_policy: Arc<
         dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >,
     >,
     tool_dispatcher: Arc<dyn tinytools_agent::dialect::ToolDialect>,
     workspace_dir: std::path::PathBuf,

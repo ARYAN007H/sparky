@@ -35,11 +35,9 @@ async fn records_round_trip_through_the_document_store() {
     assert!(store.get("a-1").await.unwrap().is_none());
     assert!(!store.delete("a-1").await.unwrap());
     // Nothing is written as a file.
-    assert!(
-        !super::super::tiny_store::legacy_versioned_dir(&ws)
-            .join("a-2.json")
-            .exists()
-    );
+    assert!(!super::super::tiny_store::legacy_versioned_dir(&ws)
+        .join("a-2.json")
+        .exists());
 }
 
 #[tokio::test]

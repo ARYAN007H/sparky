@@ -12,7 +12,7 @@
 //! `{"_args": <value>}`, so the body is always an object and
 //! [`args_of_body`] reads either form back.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinystoragedrivers::schema::{Schema, ScopeClass, SourceRecord, Step, TargetRecord};
 use tinystoragedrivers::{CollectionSpec, IndexSpec, Result};
 

@@ -57,12 +57,10 @@ fn record_is_thread_scoped_and_batches_in_completion_order() {
     let claimed = router.claim_pending("thread-A", usize::MAX).unwrap();
     assert_eq!(claimed.len(), 2, "everything ready is claimed as one batch");
     assert_eq!(claimed[0].result.text, "eiffel");
-    assert!(
-        router
-            .claim_pending("thread-A", usize::MAX)
-            .unwrap()
-            .is_empty()
-    );
+    assert!(router
+        .claim_pending("thread-A", usize::MAX)
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
@@ -82,12 +80,10 @@ fn headless_completion_is_dropped() {
     let _guard = test_guard();
     let ws = workspace();
     record(ws.path(), "sess-headless", "sub-1", "x", None);
-    assert!(
-        router_for_workspace(ws.path())
-            .claim_pending("", usize::MAX)
-            .unwrap()
-            .is_empty()
-    );
+    assert!(router_for_workspace(ws.path())
+        .claim_pending("", usize::MAX)
+        .unwrap()
+        .is_empty());
     assert!(recover_pending_threads(&cx(), ws.path()).is_empty());
 }
 

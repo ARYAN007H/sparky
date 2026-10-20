@@ -144,15 +144,13 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
             &context_b,
         );
         assert!(artifacts_b.get(&id).await.unwrap().is_none());
-        assert!(
-            files_b
-                .as_ref()
-                .unwrap()
-                .metadata(&file.key)
-                .await
-                .unwrap()
-                .is_none()
-        );
+        assert!(files_b
+            .as_ref()
+            .unwrap()
+            .metadata(&file.key)
+            .await
+            .unwrap()
+            .is_none());
     })
     .await;
 }
@@ -292,20 +290,16 @@ async fn deleting_an_artifact_removes_its_card() {
         .await
         .unwrap();
     let id = saved.record.id;
-    assert!(
-        super::super::store::get_artifact(&workspace, &id)
-            .await
-            .is_ok()
-    );
+    assert!(super::super::store::get_artifact(&workspace, &id)
+        .await
+        .is_ok());
 
     let (removed, notice) = artifacts.delete(&id).await.unwrap();
     assert!(removed);
     assert!(notice.is_none(), "{notice:?}");
-    assert!(
-        super::super::store::get_artifact(&workspace, &id)
-            .await
-            .is_err()
-    );
+    assert!(super::super::store::get_artifact(&workspace, &id)
+        .await
+        .is_err());
 }
 
 struct NoopPublisher;

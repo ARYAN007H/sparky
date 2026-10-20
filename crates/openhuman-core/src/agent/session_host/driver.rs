@@ -18,7 +18,7 @@ use tinyinference_llm::message::Message;
 use tinytools_agent::dialect::ToolDialect;
 
 use crate::agent::tinyagents::{
-    TurnModelSource, TurnSpec, host::OpenHumanHostBase, host::OpenHumanRunContext,
+    host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource, TurnSpec,
 };
 
 /// Immutable host composition consumed by [`OpenHumanSessionDriver`].

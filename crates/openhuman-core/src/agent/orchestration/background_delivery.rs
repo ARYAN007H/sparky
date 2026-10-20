@@ -56,7 +56,7 @@ use slot::DeliverySlot;
 use super::background_completions;
 use super::busy_guard::is_busy;
 #[cfg(test)]
-use super::busy_guard::{TurnBusy, busy, clear_busy_for_thread};
+use super::busy_guard::{busy, clear_busy_for_thread, TurnBusy};
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
 use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};
@@ -64,9 +64,9 @@ use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};
 mod delivery_events;
 use crate::core::runtime::CoreContext;
 #[cfg(test)]
-pub(super) use delivery_events::Drain;
-#[cfg(test)]
 pub(super) use delivery_events::drain_schedule;
+#[cfg(test)]
+pub(super) use delivery_events::Drain;
 pub(super) use delivery_events::{drain_schedule_in, owning_profiles};
 
 /// Coalesce completions landing within this window into one delivery turn.
@@ -157,8 +157,8 @@ fn schedule_delivery_inner(
         .push((thread_id.clone(), delay));
     #[cfg(not(test))]
     let _ = delay; // The owner applies debounce/recovery timing inside its delivery API.
-    // Scoped: the thread -> workspace table is keyed per profile, so the
-    // delayed task must run under the profile that scheduled it.
+                   // Scoped: the thread -> workspace table is keyed per profile, so the
+                   // delayed task must run under the profile that scheduled it.
     ctx.clone().spawn(async move {
         let outcome = try_deliver(ctx.clone(), thread_id.clone(), fence.clone(), wait_idle).await;
         if outcome == DeliveryOutcome::ParentBusy {

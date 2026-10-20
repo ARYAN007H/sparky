@@ -23,7 +23,7 @@ use crate::agent::{
     },
     tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
-use crate::inference::provider::{AGENT_TURN_MAX_OUTPUT_TOKENS, BilledUsage};
+use crate::inference::provider::{BilledUsage, AGENT_TURN_MAX_OUTPUT_TOKENS};
 
 /// Accounting from model calls performed after the harness loop has ended.
 #[derive(Default)]

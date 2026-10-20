@@ -24,11 +24,9 @@ async fn goal_store_is_reused_within_a_context_and_isolated_between_agents() {
     drop(first);
     drop(repeated);
     let reacquired = goal_store(first_workspace.path(), &first_dispatch);
-    assert!(
-        cache_owns_store
-            .upgrade()
-            .is_some_and(|cached| Arc::ptr_eq(&cached, &reacquired))
-    );
+    assert!(cache_owns_store
+        .upgrade()
+        .is_some_and(|cached| Arc::ptr_eq(&cached, &reacquired)));
     let isolated = goal_store(first_workspace.path(), &second_dispatch);
     let other_workspace = goal_store(second_workspace.path(), &first_dispatch);
 
@@ -39,13 +37,11 @@ async fn goal_store_is_reused_within_a_context_and_isolated_between_agents() {
         .set("same-thread", "agent a objective", None)
         .await
         .expect("write first agent goal");
-    assert!(
-        isolated
-            .get("same-thread")
-            .await
-            .expect("read second agent goal")
-            .is_none()
-    );
+    assert!(isolated
+        .get("same-thread")
+        .await
+        .expect("read second agent goal")
+        .is_none());
 }
 
 #[tokio::test]
@@ -74,13 +70,11 @@ async fn goal_store_isolated_between_profiles_with_the_same_agent_and_thread() {
         .set("shared-thread-id", "profile A objective", None)
         .await
         .expect("write profile A goal");
-    assert!(
-        store_b
-            .get("shared-thread-id")
-            .await
-            .expect("read profile B goal")
-            .is_none()
-    );
+    assert!(store_b
+        .get("shared-thread-id")
+        .await
+        .expect("read profile B goal")
+        .is_none());
 }
 
 #[tokio::test]
@@ -150,13 +144,11 @@ async fn goal_tool_with_context_uses_the_business_goal_store() {
             .await
             .expect("execute without a thread");
         assert!(no_thread.is_error);
-        assert!(
-            goal_store(workspace.path(), &dispatch)
-                .get("goal-tool-business-store")
-                .await
-                .expect("confirm existing goal")
-                .is_some()
-        );
+        assert!(goal_store(workspace.path(), &dispatch)
+            .get("goal-tool-business-store")
+            .await
+            .expect("confirm existing goal")
+            .is_some());
     })
     .await;
 }
