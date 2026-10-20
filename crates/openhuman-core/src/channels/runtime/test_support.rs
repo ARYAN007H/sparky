@@ -22,7 +22,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus::{ChannelMessage, SendMessage};
-use tinychannels_runtime::context::ChatMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 
@@ -38,7 +37,6 @@ pub struct DispatchHarnessOptions {
     pub handler_error: Option<String>,
     pub handler_delay_ms: u64,
     pub timeout_secs: u64,
-    pub seed_history_len: usize,
     /// Workspace the runtime context reports; `None` falls back to the OS temp dir.
     ///
     /// `pub`, like every other field here, and it has to be: integration tests
@@ -109,7 +107,6 @@ impl Default for DispatchHarnessOptions {
             handler_error: None,
             handler_delay_ms: 0,
             timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
-            seed_history_len: 0,
             workspace_dir: None,
             system_prompt: HarnessSystemPrompt::default(),
         }
@@ -135,7 +132,6 @@ pub struct DispatchHarnessObservation {
     pub handler_provider_name: String,
     pub handler_channel_name: String,
     pub handler_had_progress: bool,
-    pub retained_history_len: usize,
 }
 
 #[derive(Default)]
@@ -384,23 +380,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         "harness-provider".to_string(),
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::clone(&model)),
     );
-    let conversation_histories = Arc::new(Mutex::new(HashMap::new()));
-    let history_key = if options.channel_name == "telegram" {
-        format!("{}_alice_reply", options.channel_name)
-    } else if let Some(thread_ts) = options.thread_ts.as_deref() {
-        format!("{}_alice_reply_thread:{thread_ts}", options.channel_name)
-    } else {
-        format!("{}_alice_reply", options.channel_name)
-    };
-    if options.seed_history_len > 0 {
-        conversation_histories.lock().expect("history lock").insert(
-            history_key.clone(),
-            (0..options.seed_history_len)
-                .map(|idx| ChatMessage::assistant(format!("prior {idx} {}", "x".repeat(700))))
-                .collect(),
-        );
-    }
-
     let harness_system_prompt = options
         .system_prompt
         .clone()
@@ -479,13 +458,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     let handler_history_text = handler_text.lock().expect("text lock").clone();
     let handler_provider_name = handler_provider.lock().expect("provider lock").clone();
     let handler_channel_name = handler_channel.lock().expect("channel lock").clone();
-    let retained_history_len = conversation_histories
-        .lock()
-        .expect("history lock")
-        .get(&history_key)
-        .map(Vec::len)
-        .unwrap_or_default();
-
     DispatchHarnessObservation {
         sends,
         start_typing_calls: state.start_typing_calls.load(Ordering::SeqCst),
@@ -496,6 +468,5 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         handler_provider_name,
         handler_channel_name,
         handler_had_progress: handler_progress.load(Ordering::SeqCst) > 0,
-        retained_history_len,
     }
 }
