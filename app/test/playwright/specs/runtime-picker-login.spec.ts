@@ -4,7 +4,6 @@ import {
   bootRuntimeReadyGuestPage,
   callCoreRpc,
   dismissWalkthroughIfPresent,
-  signInViaBypassUser,
   signInViaBypassUserPreservingConfig,
   waitForAppReady,
 } from '../helpers/core-rpc';
