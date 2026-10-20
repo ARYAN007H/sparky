@@ -107,6 +107,7 @@
 #![cfg(not(coverage))]
 
 use async_trait::async_trait;
+use openhuman_core::integrations::composio::tools::ComposioListToolsTool;
 use openhuman_core::agent::harness::ParentExecutionContext;
 use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};
 use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
@@ -116,6 +117,7 @@ use serde_json::json;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tinyagents_definition::{ModelSpec, PromptSource, ToolScope};
+use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 use tinyinference_llm::message::AssistantMessage;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
@@ -202,6 +204,40 @@ entity_id = "test-entity"
 struct StubModel {
     iter: Arc<Mutex<usize>>,
     profile: ModelProfile,
+}
+
+struct CountedComposioTool {
+    inner: ComposioListToolsTool,
+    executions: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[async_trait]
+impl Tool for CountedComposioTool {
+    fn name(&self) -> &str {
+        "composio_list_tools"
+    }
+
+    fn description(&self) -> &str {
+        "List Composio tools for the stack regression."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        self.inner.parameters_schema()
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
+
+    fn category(&self) -> ToolCategory {
+        ToolCategory::Workflow
+    }
+
+    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        self.executions
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.execute(args).await
+    }
 }
 
 #[async_trait]
@@ -305,6 +341,7 @@ async fn drive_subagent() {
         profile,
     });
 
+    let executions = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let parent = ParentExecutionContext {
         agent_definition_id: "orchestrator".into(),
         allowed_subagent_ids: ["stack_regression_worker".to_string()]
@@ -366,4 +403,9 @@ async fn drive_subagent() {
     let mut options = SubagentRunOptions::default();
     options.run_context.parent = Some(parent);
     let _ = run_subagent(&def, "list available gmail actions", options).await;
+    assert_eq!(
+        executions.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the stub model's tool call must execute the real Composio list handler"
+    );
 }
