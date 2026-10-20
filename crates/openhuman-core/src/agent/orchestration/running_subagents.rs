@@ -14,6 +14,4 @@ pub(crate) use cancel::{
 pub(crate) use registry::admit_spawn;
 pub(crate) use registry::RegistrationError;
 pub(crate) use roster::active_subagents_context_block;
-pub(crate) use task_ledger::{
-    reconcile_orphaned_tasks_on_boot, task_store_for_workspace,
-};
+pub(crate) use task_ledger::reconcile_orphaned_tasks_on_boot;

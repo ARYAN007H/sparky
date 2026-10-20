@@ -60,11 +60,12 @@ pub(crate) use lifecycle::detached_subagent_parent;
 pub(crate) use lifecycle::load_subagent_checkpoint;
 pub(crate) use lifecycle::load_terminal_outcome;
 pub(crate) use lifecycle::resume_async_via_driver_tool;
+#[cfg(test)]
 pub(crate) use lifecycle::run_subagent_via_driver_tool;
 pub(crate) use lifecycle::spawn_async_via_driver_tool;
 #[cfg(test)]
 pub(crate) use lifecycle::spawn_async_via_driver_tool_with_jobs;
-pub(crate) use lifecycle::{checkpoint_resume, continue_subagent_via_driver_tool};
+pub(crate) use lifecycle::checkpoint_resume;
 pub use lifecycle::{
     continue_subagent, continue_subagent_with_parent, run_subagent, run_subagent_with_parent,
     OpenHumanSubagentHost,
