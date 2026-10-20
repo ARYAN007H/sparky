@@ -272,9 +272,9 @@ async fn media_tools_deliver_images_and_videos_through_the_backend_proxy() {
             &config,
             id,
         )
-            .await
-            .expect("filed artifact record")
-            .value;
+        .await
+        .expect("filed artifact record")
+        .value;
         assert_eq!(record["kind"], kind);
         assert_eq!(record["status"], "ready");
         let path = std::path::Path::new(
