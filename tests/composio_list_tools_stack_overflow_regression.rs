@@ -195,7 +195,7 @@ chat_onboarding_completed = true
 [agent]
 [orchestrator]
 [composio]
-mode = "backend"
+mode = "disabled"
 entity_id = "test-entity"
 "#;
 
@@ -336,20 +336,26 @@ async fn drive_subagent() {
         tool_calling: true,
         ..Default::default()
     };
+    let model_calls = Arc::new(Mutex::new(0));
     let model = Arc::new(StubModel {
-        iter: Arc::new(Mutex::new(0)),
+        iter: model_calls.clone(),
         profile,
     });
 
     let executions = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let composio_tool = CountedComposioTool {
+        inner: ComposioListToolsTool::new(Arc::new(openhuman_core::config::Config::default())),
+        executions: executions.clone(),
+    };
+    let composio_spec = Arc::new(composio_tool.spec());
     let parent = ParentExecutionContext {
         agent_definition_id: "orchestrator".into(),
         allowed_subagent_ids: ["stack_regression_worker".to_string()]
             .into_iter()
             .collect(),
         turn_model_source: openhuman_core::agent::tinyagents::TurnModelSource::from_model(model),
-        all_tools: Arc::new(vec![]),
-        all_tool_specs: Arc::new(vec![]),
+        all_tools: Arc::new(vec![Box::new(composio_tool)]),
+        all_tool_specs: Arc::new(vec![composio_spec]),
         // #6145: empty means "same surface as `all_tool_specs`" — the
         // catalogue falls back to it, so these stubs keep the behaviour
         // they had before the parent's visible set became its own field.
@@ -407,5 +413,10 @@ async fn drive_subagent() {
         executions.load(std::sync::atomic::Ordering::SeqCst),
         1,
         "the stub model's tool call must execute the real Composio list handler"
+    );
+    assert_eq!(
+        *model_calls.lock(),
+        2,
+        "the model must continue after the tool result"
     );
 }
