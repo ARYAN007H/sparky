@@ -220,7 +220,11 @@ async fn files_made_before_a_folder_change_keep_resolving() {
         "{:?}",
         cfg.files_dir_history
     );
-    let value = crate::artifacts::ops::ai_get_artifact(&cfg, &meta.id)
+    let value = crate::artifacts::ops::ai_get_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &cfg,
+        &meta.id,
+    )
         .await
         .expect("an artifact from the previous folder still resolves")
         .into_cli_compatible_json()

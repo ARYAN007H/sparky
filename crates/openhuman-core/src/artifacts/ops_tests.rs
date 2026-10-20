@@ -454,7 +454,7 @@ async fn get_returns_the_files_folder_path() {
         .await
         .unwrap();
 
-    let value = ai_get_artifact(&config, &meta.id)
+    let value = ai_get_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, &meta.id)
         .await
         .unwrap()
         .into_cli_compatible_json()
@@ -489,7 +489,9 @@ async fn get_reports_a_ready_file_removed_outside_openhuman() {
         .unwrap();
     std::fs::remove_file(&path).unwrap();
 
-    let err = ai_get_artifact(&config, &meta.id).await.unwrap_err();
+    let err = ai_get_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, &meta.id)
+        .await
+        .unwrap_err();
     assert!(err.contains("file missing"), "{err}");
 }
 
@@ -526,10 +528,22 @@ async fn get_and_delete_refuse_a_record_rooted_outside_the_files_folder() {
     .await
     .unwrap();
 
-    let err = ai_get_artifact(&config, "claims-home").await.unwrap_err();
+    let err = ai_get_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "claims-home",
+    )
+    .await
+    .unwrap_err();
     assert!(err.contains("not a files folder"), "{err}");
 
-    ai_delete_artifact(&config, "claims-home").await.unwrap();
+    ai_delete_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "claims-home",
+    )
+    .await
+    .unwrap();
     assert!(
         private.exists(),
         "the file outside the files folder is left alone"
