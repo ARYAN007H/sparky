@@ -256,7 +256,7 @@ pub(crate) fn classify_error(message: String) -> ArmError {
             FailoverReason::RateLimit
         }
         tinyinference_llm::failure::ProviderFailureClass::UpstreamUnhealthy => {
-            FailoverReason::UpstreamUnavailable
+            FailoverReason::Overloaded
         }
         tinyinference_llm::failure::ProviderFailureClass::Retryable => {
             FailoverReason::Unknown
