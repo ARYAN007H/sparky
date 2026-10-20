@@ -82,6 +82,7 @@ fn env_lock() -> std::sync::MutexGuard<'static, ()> {
 
 static SCRIPTED_COMPLETIONS: OnceLock<Mutex<std::collections::VecDeque<Value>>> = OnceLock::new();
 static CAPTURED_COMPLETION_REQUESTS: OnceLock<Mutex<Vec<Value>>> = OnceLock::new();
+static CAPTURED_MANAGED_GEMINI_REQUESTS: OnceLock<Mutex<Vec<Value>>> = OnceLock::new();
 const SCRIPT_DISCOVERED_MCP_TOOL: &str = "__script_discovered_mcp_tool__";
 
 fn with_scripted<T>(f: impl FnOnce(&mut std::collections::VecDeque<Value>) -> T) -> T {
@@ -102,6 +103,15 @@ fn with_captured<T>(f: impl FnOnce(&mut Vec<Value>) -> T) -> T {
     f(&mut guard)
 }
 
+fn with_captured_managed_gemini<T>(f: impl FnOnce(&mut Vec<Value>) -> T) -> T {
+    let m = CAPTURED_MANAGED_GEMINI_REQUESTS.get_or_init(|| Mutex::new(Vec::new()));
+    let mut guard = match m.lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    f(&mut guard)
+}
+
 /// Reset scripted queue + captures. Call at the start of every test, under the env lock.
 fn reset_script(responses: Vec<Value>) {
     with_scripted(|q| {
@@ -109,6 +119,7 @@ fn reset_script(responses: Vec<Value>) {
         q.extend(responses);
     });
     with_captured(|c| c.clear());
+    with_captured_managed_gemini(|requests| requests.clear());
 }
 
 fn tool_call_completion(name: &str, arguments: Value) -> Value {
@@ -401,6 +412,42 @@ fn completion_response(streaming: bool, message: Value) -> axum::response::Respo
         .into_response()
 }
 
+/// Test-owned managed Gemini endpoint used to prove the released TinySearch
+/// module's grounded answer and citation cross back into the next model turn.
+async fn scripted_managed_gemini_generate_content(Json(body): Json<Value>) -> Json<Value> {
+    with_captured_managed_gemini(|requests| requests.push(body.clone()));
+    let query = body
+        .pointer("/contents/0/parts/0/text")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    Json(json!({
+        "success": true,
+        "data": {
+            "modelVersion": "gemini-3.8-flash",
+            "responseId": "agent-harness-managed-gemini-fixture",
+            "candidates": [{
+                "content": {
+                    "role": "model",
+                    "parts": [{ "text": "The fixture's distinct grounded answer is cerulean." }]
+                },
+                "groundingMetadata": {
+                    "webSearchQueries": [query],
+                    "groundingChunks": [{
+                        "web": {
+                            "uri": "https://fixture.invalid/source",
+                            "title": "Test-owned source"
+                        }
+                    }],
+                    "groundingSupports": [{
+                        "segment": { "startIndex": 0, "endIndex": 10 },
+                        "groundingChunkIndices": [0]
+                    }]
+                }
+            }]
+        }
+    }))
+}
+
 fn scripted_upstream_router() -> Router {
     Router::new()
         .route("/settings", get(current_user))
@@ -408,6 +455,10 @@ fn scripted_upstream_router() -> Router {
         .route(
             "/openai/v1/chat/completions",
             post(scripted_chat_completions),
+        )
+        .route(
+            "/agent-integrations/gemini/models/gemini-3.8-flash/generate-content",
+            post(scripted_managed_gemini_generate_content),
         )
         .route("/v1/chat/completions", post(scripted_chat_completions))
         .route("/chat/completions", post(scripted_chat_completions))
