@@ -95,6 +95,24 @@ fn synthesized_reply_metadata_preserves_its_viseme_timeline() {
 }
 
 #[test]
+fn legacy_viseme_timeline_remains_readable() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = reply_note_id("legacy");
+    store_note(tmp.path(), &id, "audio/mpeg", b"audio").unwrap();
+    std::fs::write(
+        tmp.path()
+            .join("voice_notes")
+            .join(format!("{id}.visemes.json")),
+        serde_json::to_vec(&serde_json::json!([{"viseme": "aa", "start_ms": 0, "end_ms": 100}]))
+            .unwrap(),
+    )
+    .unwrap();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let meta = reply_note_metadata(&ctx, tmp.path(), "legacy").unwrap();
+    assert_eq!(meta["visemes"][0]["viseme"], "aa");
+}
+
+#[test]
 fn rpc_round_trip_and_bad_base64() {
     let tmp = tempfile::tempdir().unwrap();
     let out = store_from_rpc(tmp.path(), "rt", "audio/webm", "YWJj").unwrap();

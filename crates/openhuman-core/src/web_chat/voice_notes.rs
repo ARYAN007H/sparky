@@ -242,7 +242,7 @@ pub(crate) fn reply_note_metadata(
         if !root.join(format!("{id}.{ext}")).is_file() {
             return None;
         }
-        let mut metadata = json!({ "noteId": id, "mime": mime });
+        let mut metadata = json!({ "noteId": id.clone(), "mime": mime });
         let timeline = viseme_repo(ctx, workspace).ok().and_then(|repo| {
             repo.run(|docs| {
                 let id = id.clone();
@@ -251,20 +251,22 @@ pub(crate) fn reply_note_metadata(
             .ok()
             .flatten()
         });
-        let frames = timeline
-            .and_then(|record| serde_json::from_value::<ReplyVisemeTimeline>(record.doc).ok())
-            .filter(|record| {
-                crate::core::runtime::tenant::tenant_in(
-                    crate::core::runtime::is_saas(),
-                    ctx.resolved().as_deref(),
-                )
-                .is_ok_and(|tenant| tenant == record.tenant)
-            })
-            .map(|record| record.frames)
-            .or_else(|| {
-                let bytes = std::fs::read(root.join(format!("{id}.visemes.json"))).ok()?;
-                serde_json::from_slice::<Vec<Value>>(&bytes).ok()
-            });
+        let frames = match timeline {
+            Some(record) => serde_json::from_value::<ReplyVisemeTimeline>(record.doc)
+                .ok()
+                .filter(|record| {
+                    crate::core::runtime::tenant::tenant_in(
+                        crate::core::runtime::is_saas(),
+                        ctx.resolved().as_deref(),
+                    )
+                    .is_ok_and(|tenant| tenant == record.tenant)
+                })
+                .map(|record| record.frames),
+            None => {
+                let bytes = std::fs::read(root.join(format!("{id}.visemes.json"))).ok();
+                bytes.and_then(|bytes| serde_json::from_slice::<Vec<Value>>(&bytes).ok())
+            }
+        };
         if let Some(frames) = frames.filter(|frames| !frames.is_empty()) {
             metadata["visemes"] = json!(frames);
         }
