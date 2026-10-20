@@ -1,6 +1,6 @@
 use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
 use super::*;
-use openhuman_embed::__host::inference_registry::REASONING_OFF_METADATA_KEY;
+use super::managed_reasoning::REASONING_OFF_METADATA_KEY;
 use serde_json::Value;
 use tinyinference_llm::model::ChatModel;
 
@@ -101,11 +101,11 @@ fn managed_model_supports_only_serializable_native_media_inputs() {
 fn resolve_model_normalizes_blank_and_trims_non_empty_values() {
     assert_eq!(
         resolve_model(""),
-        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+        super::tiers::MODEL_MANAGED_DEFAULT
     );
     assert_eq!(
         resolve_model(" \t\n"),
-        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+        super::tiers::MODEL_MANAGED_DEFAULT
     );
     assert_eq!(resolve_model("  reasoning-v1  "), "reasoning-v1");
     assert_eq!(resolve_model("hint:reasoning"), "hint:reasoning");

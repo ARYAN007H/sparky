@@ -318,9 +318,9 @@ fn resolve_model(model: &str) -> String {
         log::debug!(
             "[providers][openhuman-backend] empty model passed to OpenHuman backend; \
              substituting default `{}` (TAURI-RUST-RS)",
-            openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+            super::tiers::MODEL_MANAGED_DEFAULT
         );
-        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT.to_string()
+        super::tiers::MODEL_MANAGED_DEFAULT.to_string()
     } else {
         trimmed.to_string()
     }

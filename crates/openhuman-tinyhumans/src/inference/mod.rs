@@ -58,9 +58,10 @@ pub(crate) fn build_chat_model(
         .model_override
         .map(str::trim)
         .filter(|model| !model.is_empty())
-        .or_else(|| tiers::default_model())
+        .map(str::to_string)
+        .or_else(tiers::default_model)
         .expect("TinyHumans registers its managed default")
-        .to_string();
+        ;
     let default_model = request
         .default_model
         .map(str::trim)
