@@ -101,7 +101,7 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
   and provider model-listing tests: error classification and model listing.
 - Claude Code provider tests live with the provider in
   [`vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/`](../../../../../vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/).
-- [`openhuman_backend_model_tests.rs`](./openhuman_backend_model_tests.rs): managed host transport; reusable provider
+- [`http_error_tests.rs`](./http_error_tests.rs): generic host error handling with provider ownership from the installed classifier.
   builder and Codex tests live in TinyInference and TinyAgents.
 
 Local runtime chat providers (Ollama, LM Studio, MLX, oMLX, local-openai)
