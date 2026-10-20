@@ -115,3 +115,44 @@ fn managed_vision_capability_is_absent_without_provider_policy() {
     assert!(!model_supports_vision("hint:reasoning", &config));
     assert!(!model_supports_vision("openrouter/qwen/qwen3.5-flash-02-23", &config));
 }
+
+#[test]
+fn model_supports_vision_uses_the_scoped_provider_capability_hook() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelHooks};
+    use std::sync::Arc;
+
+    let extensions = Extensions::new();
+    register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        ChatModelEntry {
+            build: Arc::new(|_| Err(anyhow::anyhow!("test factory"))),
+            probe: None,
+            models: Some(ProviderModelHooks {
+                default_model: Arc::new(|| None),
+                role_for_model: Arc::new(|_| None),
+                is_alias: Arc::new(|_| false),
+                is_raw_model: Arc::new(|_| true),
+                supports_vision: Arc::new(|model| model == "host/vision"),
+                resolve_model: Arc::new(|_, _, _| None),
+                context_window: Arc::new(|_| None),
+                default_pricing: Arc::new(|| None),
+                without_reasoning: Arc::new(|request| request),
+            }),
+        },
+    );
+    let context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        None,
+        extensions,
+    );
+    let config = crate::config::Config::default();
+
+    assert!(!model_supports_vision("host/vision", &config));
+    crate::core::runtime::CoreContext::sync_scope(context, || {
+        assert!(model_supports_vision("host/vision", &config));
+        assert!(!model_supports_vision("host/text", &config));
+    });
+    assert!(!model_supports_vision("host/vision", &config));
+}
