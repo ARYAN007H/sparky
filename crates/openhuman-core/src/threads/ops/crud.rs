@@ -240,6 +240,15 @@ async fn persist_queued_user_message_with_config(
         if existing.sender != "user" || existing.content != text || stored_parts != opaque_parts {
             return Err("queued message request ID conflicts with an existing row".into());
         }
+        if !opaque_parts.is_empty() {
+            crate::threads::attachments::consume_staged_parts(
+                ctx,
+                thread_id,
+                opaque_parts,
+                &row_id,
+            )
+            .await?;
+        }
         return Ok(message_to_record(existing));
     }
 
@@ -266,10 +275,22 @@ async fn persist_queued_user_message_with_config(
     )
     .await
     .map_err(|error| error.to_string())?;
-    outcome
+    let persisted = outcome
         .value
         .data
-        .ok_or_else(|| "queued message append returned no row".into())
+        .ok_or_else(|| "queued message append returned no row".to_string())?;
+    if persisted.id != row_id
+        || persisted.sender != "user"
+        || persisted.content != text
+        || persisted.attachments != opaque_parts
+    {
+        if !opaque_parts.is_empty() {
+            let _ = crate::threads::attachments::discard_staged_parts(ctx, thread_id, opaque_parts)
+                .await;
+        }
+        return Err("queued message request ID conflicts with a concurrently persisted row".into());
+    }
+    Ok(persisted)
 }
 
 async fn message_append_with_config(
