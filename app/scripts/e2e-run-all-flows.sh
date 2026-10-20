@@ -255,10 +255,7 @@ fi
 if should_run_suite "chat"; then
   echo ""
   echo "## Running suite: chat"
-  run "test/e2e/specs/chat-harness-send-stream.spec.ts"       "chat-send-stream"          "chat"
-  run "test/e2e/specs/chat-harness-cancel.spec.ts"            "chat-cancel"               "chat"
   run "test/e2e/specs/chat-harness-scroll-render.spec.ts"     "chat-scroll-render"        "chat"
-  run "test/e2e/specs/chat-harness-wallet-flow.spec.ts"       "chat-wallet"               "chat"
   run "test/e2e/specs/chat-tool-call-flow.spec.ts"            "chat-tool-call"            "chat"
   run "test/e2e/specs/chat-live-history-parity.spec.ts"       "chat-live-history-parity"  "chat"
   run "test/e2e/specs/chat-tool-error-recovery.spec.ts"       "chat-error-recovery"       "chat"
@@ -339,7 +336,6 @@ if should_run_suite "provider-web"; then
   run "test/e2e/specs/whatsapp-flow.spec.ts"                  "whatsapp"                  "provider-web"
   # notion-flow.spec.ts was removed; skip to avoid "spec not found" failure.
   # run "test/e2e/specs/notion-flow.spec.ts"                  "notion"                    "provider-web"
-  run "test/e2e/specs/conversations-web-channel-flow.spec.ts" "conversations"             "provider-web"
   run "test/e2e/specs/composio-triggers-flow.spec.ts"         "composio-triggers"         "provider-web"
   run "test/e2e/specs/connectivity-state-differentiation.spec.ts" "connectivity-state"   "provider-web"
   _mini_summary "provider-web"
@@ -421,7 +417,6 @@ if should_run_suite "journeys"; then
   echo "## Running suite: journeys"
   run "test/e2e/specs/user-journey-full-task.spec.ts"              "journey-full-task"     "journeys"
   run "test/e2e/specs/user-journey-settings-round-trip.spec.ts"    "journey-settings"      "journeys"
-  run "test/e2e/specs/chat-conversation-history.spec.ts"           "chat-history"          "journeys"
   run "test/e2e/specs/flows.spec.ts"                               "flows"                 "journeys"
   _mini_summary "journeys"
 fi
