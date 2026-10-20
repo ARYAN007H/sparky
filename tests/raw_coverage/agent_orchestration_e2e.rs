@@ -266,4 +266,3 @@ async fn subagent_steer_honours_and_defaults_the_queue_mode() {
 
     h.join.abort();
 }
-
