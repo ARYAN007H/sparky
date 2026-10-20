@@ -170,7 +170,7 @@ async fn agent_refusal_names_no_rpc_method() {
 
 /// Every tool an agent refusal names must be callable by every agent that can
 /// receive it, i.e. every built-in agent with `mcp_registry_list_tools` on its
-/// belt. The read-only planner has no `mcp_registry_connect`.
+/// belt. The orchestrator's refusal messages name only tools it can call.
 #[test]
 fn refusals_name_only_tools_on_every_listing_belt() {
     let install = tinymcp_bus::ConnStatus {

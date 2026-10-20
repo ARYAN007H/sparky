@@ -43,7 +43,4 @@ mod background_delivery_tenant_tests;
 pub async fn release_background_completion_stores() -> usize {
     background_completions::release_all().await
 }
-pub use types::{
-    AgentSnapshot, SpawnAgentRequest, SpawnAgentResponse, WaitAgentOptions, WaitAgentResponse,
-};
 pub use worktree::OpenHumanWorktreeIsolation;

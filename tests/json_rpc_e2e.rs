@@ -1813,7 +1813,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         .and_then(Value::as_array)
         .expect("agent_list_definitions should return definitions array");
     // The v1 `agent_memory` built-in was removed with the v1 memory system
-    // (Memory v2 is one `memory` tool, not a sub-agent); `critic` is the
+    // (Memory v2 is one `memory` tool, not a sub-agent); `summarizer` is the
     // stand-in safe-library entry.
     assert!(
         !definitions
@@ -1823,8 +1823,8 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
     );
     let memory_agent = definitions
         .iter()
-        .find(|definition| definition.get("id").and_then(Value::as_str) == Some("critic"))
-        .expect("safe agent library should include critic");
+        .find(|definition| definition.get("id").and_then(Value::as_str) == Some("summarizer"))
+        .expect("safe agent library should include summarizer");
     assert!(
         memory_agent
             .get("display_name")
