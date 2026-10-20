@@ -226,20 +226,14 @@ fn channel_activity_metadata(
     let activity = activity
         .as_object_mut()
         .ok_or_else(|| anyhow!("channelActivity metadata is not an object"))?;
-    let reactions = activity
-        .entry("reactions")
-        .or_insert_with(|| json!([]))
-        .as_array_mut()
-        .ok_or_else(|| anyhow!("channelActivity.reactions is not an array"))?;
-    let read_receipts = activity
-        .entry("readReceipts")
-        .or_insert_with(|| json!([]))
-        .as_array_mut()
-        .ok_or_else(|| anyhow!("channelActivity.readReceipts is not an array"))?;
-
     match &event.event {
         Kind::ReadReceipt { actor, timestamp, .. } => {
             let actor_id = actor.as_ref().map(|actor| actor.id.as_str()).unwrap_or("");
+            let read_receipts = activity
+                .entry("readReceipts")
+                .or_insert_with(|| json!([]))
+                .as_array_mut()
+                .ok_or_else(|| anyhow!("channelActivity.readReceipts is not an array"))?;
             if let Some(existing) = read_receipts.iter_mut().find(|receipt| {
                 receipt.get("actorId").and_then(Value::as_str).unwrap_or("") == actor_id
             }) {
@@ -249,6 +243,11 @@ fn channel_activity_metadata(
             }
         }
         Kind::ReactionAdded { actor, reaction, .. } => {
+            let reactions = activity
+                .entry("reactions")
+                .or_insert_with(|| json!([]))
+                .as_array_mut()
+                .ok_or_else(|| anyhow!("channelActivity.reactions is not an array"))?;
             let value = json!({
                 "actorId": actor.id,
                 "value": reaction.value,
@@ -259,6 +258,11 @@ fn channel_activity_metadata(
             }
         }
         Kind::ReactionRemoved { actor, reaction, .. } => {
+            let reactions = activity
+                .entry("reactions")
+                .or_insert_with(|| json!([]))
+                .as_array_mut()
+                .ok_or_else(|| anyhow!("channelActivity.reactions is not an array"))?;
             reactions.retain(|existing| {
                 existing.get("actorId").and_then(Value::as_str) != Some(&actor.id)
                     || existing.get("value").and_then(Value::as_str)
