@@ -116,10 +116,15 @@ fn install_suggestions_model_fixture() {
                 context_window: Arc::new(|_| None),
                 default_pricing: Arc::new(|| None),
                 without_reasoning: Arc::new(|mut request| {
-                    request.metadata.insert(
-                        "fixture.no_reasoning".to_string(),
-                        serde_json::Value::Bool(true),
-                    );
+                    if !request.metadata.is_object() {
+                        request.metadata = serde_json::Value::Object(serde_json::Map::new());
+                    }
+                    if let Some(metadata) = request.metadata.as_object_mut() {
+                        metadata.insert(
+                            "fixture.no_reasoning".to_string(),
+                            serde_json::Value::Bool(true),
+                        );
+                    }
                     request
                 }),
             }),
