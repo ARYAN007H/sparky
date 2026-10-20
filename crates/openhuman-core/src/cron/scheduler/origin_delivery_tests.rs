@@ -300,7 +300,7 @@ async fn transcript_append_waits_for_a_live_turn() {
         append_to_origin_transcript(
             locator.as_ref(),
             &TranscriptAppend {
-                thread_id: "t-1",
+                session_key: "t-1",
                 agent_id: "orchestrator",
                 text: "hi",
                 idempotency_key: "cron:job-1:run-1",
@@ -355,7 +355,7 @@ async fn transcript_append_lands_in_the_tenants_store() {
         .unwrap();
 
     let append = TranscriptAppend {
-        thread_id: "t-p",
+        session_key: "t-p",
         agent_id: "orchestrator",
         text: "Ping!",
         idempotency_key: "cron:job-p:run-1",
