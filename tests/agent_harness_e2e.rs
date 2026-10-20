@@ -898,10 +898,9 @@ async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
             && std::env::var_os("OPENHUMAN_MODULE_SOURCE_TINYSEARCH").is_none(),
         "the integration must use the staged release, not a source or linked override"
     );
-    let module_paths = std::env::var_os("OPENHUMAN_MODULE_PATH")
-        .map(std::env::split_paths)
-        .expect("the standard Rust test runner must stage TinySearch on OPENHUMAN_MODULE_PATH")
-        .collect::<Vec<_>>();
+    let module_paths_env = std::env::var_os("OPENHUMAN_MODULE_PATH")
+        .expect("the standard Rust test runner must stage TinySearch on OPENHUMAN_MODULE_PATH");
+    let module_paths = std::env::split_paths(&module_paths_env).collect::<Vec<_>>();
     let artifact = openhuman_core::modules::local_artifact("tinysearch")
         .expect("the standard Rust test runner must stage the pinned TinySearch library");
     let artifact_dir = artifact
