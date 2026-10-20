@@ -4,7 +4,7 @@
 //! memory, or the network. Wire names are
 //! given in parentheses where they differ from the type name:
 //!
-//! - `AskClarificationTool` (`ask_user_clarification`, from `tinyagents_harness::tools`) — returns the
+//! - `AskClarificationTool` (`ask_user_clarification`, from `tinyagents_harness_tools`) — returns the
 //!   question as its output; the turn actually pauses only because callers
 //!   list this name in the harness seam's `early_exit_tools`.
 //! - [`PlanExitTool`] — ends a plan-mode pass by returning the plan plus

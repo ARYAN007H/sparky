@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tinyagents_harness::tool::packs::{PackSelection, UseSkillDispatch, USE_SKILL};
+use tinyagents_harness_tools::skills::{PackSelection, UseSkillDispatch, USE_SKILL};
 use tinyagents_harness::tool::{
     CanonicalSharedToolAdapter, ToolDispatch, ToolExecScope, ToolExecution, ToolExecutionContext,
 };
@@ -346,7 +346,7 @@ fn dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
             return typed_dispatch_for(name, adapter, delegation_target);
         }
         let selector: Arc<
-            tinyagents_harness::tool::packs::PackDispatchSelector<(), OpenHumanRunContext>,
+            tinyagents_harness_tools::skills::PackDispatchSelector<(), OpenHumanRunContext>,
         > = Arc::new(select_packed_tool_dispatch);
         Some(Arc::new(UseSkillDispatch::new(adapter, selector)))
     })
