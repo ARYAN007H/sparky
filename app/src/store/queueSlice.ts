@@ -151,11 +151,12 @@ const queueSlice = createSlice({
         threadId: string;
         message: ThreadMessage;
         text: string;
-        requestId: string;
+        requestId?: string;
         attachments?: ContentPart[];
       }>
     ) => {
-      const { threadId, message, text, requestId, attachments = [] } = action.payload;
+      const { threadId, message, text, attachments = [] } = action.payload;
+      const requestId = action.payload.requestId ?? message.id;
       const bucket = state.pendingFollowupsByThread[threadId] ?? [];
       bucket.push({ message, attachments, requestId, preview: clipQueuePreview(text, attachments) });
       state.pendingFollowupsByThread[threadId] = bucket;
