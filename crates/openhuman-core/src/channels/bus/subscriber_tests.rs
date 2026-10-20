@@ -43,7 +43,7 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
     let ctx = DispatchCtx::ambient();
     let client_id = "channel-timeout-client";
     let thread_id = "channel-timeout-thread";
-    let event_rx = crate::web_chat::subscribe_web_channel_events();
+    let mut event_rx = crate::web_chat::subscribe_web_channel_events();
     let request_id = crate::web_chat::start_chat(
         &ctx,
         client_id,
