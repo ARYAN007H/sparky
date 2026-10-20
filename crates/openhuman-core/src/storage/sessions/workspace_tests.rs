@@ -52,6 +52,35 @@ fn an_attachment_stash_and_artifact_blobs_bind_the_tenant_scope() {
     assert!(matches!(found, Ok(Ok(None))), "{found:?}");
 }
 
+#[tokio::test]
+async fn artifact_scope_uses_the_carried_profile_when_ambient_profile_differs() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let ws = scratch();
+    let context_for = |profile: &'static str| {
+        let overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::kernel(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile(profile);
+        CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
+    };
+    let artifact_context = DispatchCtx::new(context_for("artifact-owner"));
+    let ambient_context = context_for("different-ambient-owner");
+
+    CoreContext::scope(ambient_context, async {
+        let scoped = artifact_scoped_for_in(ws.path(), &artifact_context)
+            .expect("the explicit artifact owner has a storage scope");
+        assert_eq!(
+            scoped.scope(),
+            &session_scope("artifact-owner~default"),
+            "artifact storage follows the carried call context, not the ambient profile"
+        );
+    })
+    .await;
+}
+
 #[test]
 fn a_run_status_store_is_built_for_the_workspace() {
     let ws = scratch();
