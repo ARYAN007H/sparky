@@ -157,6 +157,43 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     sessions
         .save(&mismatched_records)
         .expect("corrupt only the persisted lifecycle owner key");
+    let definition = AgentDefinitionRegistry::builtins_only()
+        .get("task_manager_agent")
+        .expect("task manager definition");
+    let selector = crate::agent::orchestration::subagent_sessions::SubagentSessionSelector {
+        parent_session: "continue-paused-e2e".into(),
+        parent_thread_id: Some("continue-paused-e2e-thread".into()),
+        agent_id: "task_manager_agent".into(),
+        model: Some("test-model".into()),
+        sandbox_mode: format!("{:?}", definition.sandbox_mode),
+        action_root: None,
+        task_key: "pause-resume-fixture".into(),
+    };
+    let (saved_key, reusable_session_id) =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || {
+            let reread = sessions.load().expect("reread corrupted paused row");
+            let persisted = reread
+                .iter()
+                .find(|session| {
+                    session.subagent_session_id == before_session.subagent_session_id
+                })
+                .expect("corrupted paused row remains persisted");
+            let reusable = crate::agent::orchestration::subagent_sessions::find_reusable(
+                &sessions,
+                &selector,
+            )
+            .expect("find matching paused session")
+            .expect("the exact spawn selector still selects the paused session");
+            (
+                persisted.lifecycle_key.clone().expect("persisted key"),
+                reusable.subagent_session_id,
+            )
+        });
+    assert_ne!(saved_key, original_lifecycle_key);
+    assert_eq!(
+        reusable_session_id, before_session.subagent_session_id,
+        "the production reuse selector sees the corrupted paused row"
+    );
     let refused_resume = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({

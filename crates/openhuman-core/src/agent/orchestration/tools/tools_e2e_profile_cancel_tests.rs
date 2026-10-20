@@ -147,8 +147,18 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     let alice_jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&alice_ctx);
+    let alice_owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &workspace,
+        "shared-profile-parent-session",
+        Some(thread_id),
+    );
+    let parent_scope = tinyagents_orchestration::subagent::ParentJobScope::new(
+        tinytools::WorkspaceDescriptor::new(&workspace),
+        thread_id,
+    );
     let alice_job = alice_jobs
-        .list()
+        .list_for_parent_scope(&alice_owner, &parent_scope)
+        .expect("read Alice's owner-scoped driver jobs")
         .into_iter()
         .find(|job| {
             job.extensions

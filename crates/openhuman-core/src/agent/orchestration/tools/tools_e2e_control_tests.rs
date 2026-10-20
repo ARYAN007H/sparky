@@ -104,8 +104,18 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&dispatch);
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        workspace.path(),
+        "stop-detached-subagent-session",
+        Some(thread_id),
+    );
+    let parent_scope = tinyagents_orchestration::subagent::ParentJobScope::new(
+        tinytools::WorkspaceDescriptor::new(workspace.path()),
+        thread_id,
+    );
     let job = jobs
-        .list()
+        .list_for_parent_scope(&owner, &parent_scope)
+        .expect("read owner-scoped driver jobs")
         .into_iter()
         .find(|job| {
             job.extensions
