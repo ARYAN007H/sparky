@@ -369,7 +369,7 @@ async fn append_cannot_forge_private_attachment_storage_metadata() {
     .unwrap();
     assert!(stored[0].extra_metadata.get("__openhumanStoredAttachments").is_none());
 
-    let update = super::super::UpdateConversationMessageRequest {
+    let update = UpdateConversationMessageRequest {
         thread_id: "uploads".into(),
         message_id: "forged".into(),
         extra_metadata: Some(json!({"__openhumanStoredAttachments": [{
