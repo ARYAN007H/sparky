@@ -476,6 +476,7 @@ fn availability_notes_are_status_not_instructions() {
 /// thread would write into the same file.
 #[test]
 fn a_subagent_thread_binding_claims_no_session_identity() {
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -537,6 +538,7 @@ async fn cold_resumed_thread_can_send_again() {
     let new_host = || {
         crate::agent::SessionHostBuilder::new()
             .chat_model(model.clone())
+            .model_name("test/session-fixture".to_string())
             .tools(Vec::new())
             .workspace_dir(root.path().join("workspace"))
             .action_dir(root.path().to_path_buf())
@@ -585,6 +587,7 @@ async fn production_turn_path_wires_an_artifact_store_outside_the_project() {
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .workspace_dir(workspace.path().to_path_buf())
         .action_dir(action_dir.path().to_path_buf())
@@ -631,6 +634,7 @@ async fn artifact_store_stays_in_the_workspace_without_a_descriptor() {
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .workspace_dir(workspace.path().to_path_buf())
         .action_dir(action_dir.path().to_path_buf())
@@ -687,6 +691,7 @@ async fn reply_language_directive_rides_each_user_message_until_cleared_body() {
     ]));
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model(model.clone() as Arc<dyn tinyinference_llm::model::ChatModel<()>>)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())

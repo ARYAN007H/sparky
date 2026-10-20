@@ -24,7 +24,7 @@ use tinyinference_local::service::LocalAiService;
 use openhuman_core::inference::provider::factory::{
     auth_key_for_slug, create_chat_model_from_string_with_model_id, provider_for_role,
 };
-use openhuman_core::inference::provider::list_configured_models;
+use openhuman_core::inference::provider::models::catalog_listing::list_configured_models;
 use openhuman_core::security::credentials::{
     AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
 };

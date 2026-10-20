@@ -1,7 +1,14 @@
 //! Access chokepoints every provider constructor runs through: privacy-mode
 //! `LocalOnly` enforcement, the backend-session requirement, and egress disclosure.
 
-use super::*;
+use super::{
+    BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER,
+    PROVIDER_OPENHUMAN,
+};
+use crate::config::Config;
+use crate::security::credentials::AuthService;
+use crate::security::egress::EgressLedger;
+use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// Human-readable label for an *external* provider string, used in the
 /// LocalOnly privacy-mode block message so the user knows what was refused.
@@ -19,11 +26,17 @@ pub(super) fn external_provider_label(provider: &str) -> String {
     if p.starts_with(tinyagents_harness::providers::claude_code::PROVIDER_PREFIX) {
         return "Claude Code CLI".to_string();
     }
-    // Concrete cloud slug "<slug>:<model>" → surface just the slug.
-    match p.split_once(':') {
-        Some((slug, _)) if !slug.trim().is_empty() => slug.trim().to_string(),
-        _ => p.to_string(),
+    // A concrete external route exposes just its provider slug.
+    if let Some(route) = ProviderRoute::parse(p) {
+        if route.is_external() {
+            if let RouteKind::Cloud { slug } = route.kind() {
+                if !slug.trim().is_empty() {
+                    return slug.trim().to_string();
+                }
+            }
+        }
     }
+    p.to_string()
 }
 
 /// Privacy Mode (#4435) pure decision: under `mode`, is constructing chat

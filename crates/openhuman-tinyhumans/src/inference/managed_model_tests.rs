@@ -1,16 +1,28 @@
-use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
 use super::*;
-use openhuman_embed::__host::inference_registry::REASONING_OFF_METADATA_KEY;
+
+use super::super::managed_reasoning::REASONING_OFF_METADATA_KEY;
+use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id, without_reasoning};
 use serde_json::Value;
 use tinyinference_llm::model::ChatModel;
 
-/// Mirror of the core's `without_reasoning` hint: the metadata flag the managed
-/// model turns into `reasoning: { enabled: false }`.
-fn without_reasoning(mut request: ModelRequest) -> ModelRequest {
-    request.metadata = serde_json::json!({ REASONING_OFF_METADATA_KEY: true });
-    request
-}
 use tinyinference_llm::message::Message;
+
+#[test]
+fn without_reasoning_sets_the_managed_hint_and_preserves_request_data() {
+    let options = serde_json::json!({ "transport": { "trace": true } });
+    let mut request =
+        ModelRequest::new(vec![Message::user("hi")]).with_provider_options(options.clone());
+    request.metadata = serde_json::json!({ "caller": "kept" });
+
+    let updated = without_reasoning(request);
+
+    assert_eq!(updated.metadata["caller"], "kept");
+    assert_eq!(
+        updated.metadata[REASONING_OFF_METADATA_KEY],
+        serde_json::Value::Bool(true)
+    );
+    assert_eq!(updated.provider_options, options);
+}
 
 fn backend() -> OpenHumanBackendModel {
     OpenHumanBackendModel::new(
@@ -47,8 +59,21 @@ fn managed_model_keeps_its_explicit_thread_without_an_ambient_scope() {
 fn managed_model_advertises_tool_and_vision_capabilities() {
     let model = backend();
     let profile = model.profile().expect("managed profile");
+    assert_eq!(profile.provider.as_deref(), Some("managed"));
     assert!(profile.tool_calling);
+    assert!(profile.parallel_tool_calls);
+    assert!(profile.streaming_tool_chunks);
     assert!(profile.modalities.image_in);
+}
+
+#[test]
+fn managed_model_forced_text_mode_disables_native_tool_capabilities() {
+    let model = backend().with_native_tool_calling(false);
+    let profile = model.profile().expect("managed profile");
+    assert_eq!(profile.provider.as_deref(), Some("managed"));
+    assert!(!profile.tool_calling);
+    assert!(!profile.parallel_tool_calls);
+    assert!(!profile.streaming_tool_chunks);
 }
 
 #[test]
@@ -101,11 +126,11 @@ fn managed_model_supports_only_serializable_native_media_inputs() {
 fn resolve_model_normalizes_blank_and_trims_non_empty_values() {
     assert_eq!(
         resolve_model(""),
-        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+        super::super::tiers::MODEL_MANAGED_DEFAULT
     );
     assert_eq!(
         resolve_model(" \t\n"),
-        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+        super::super::tiers::MODEL_MANAGED_DEFAULT
     );
     assert_eq!(resolve_model("  reasoning-v1  "), "reasoning-v1");
     assert_eq!(resolve_model("hint:reasoning"), "hint:reasoning");

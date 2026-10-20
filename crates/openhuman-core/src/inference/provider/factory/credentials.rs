@@ -2,6 +2,7 @@
 //! OpenAI OAuth fallback and the scoped legacy `config.api_key` fallback.
 
 use super::*;
+use crate::config::ops::legacy_inference_slug;
 
 /// Auth-profile storage key for a slug-keyed provider.
 ///
