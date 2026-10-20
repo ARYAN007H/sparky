@@ -1191,6 +1191,10 @@ mod schema_test_support;
 pub(crate) use schema_test_support::*;
 
 #[cfg(test)]
+#[path = "all_bound_controller_tests.rs"]
+mod bound_controller_tests;
+
+#[cfg(test)]
 #[path = "all_schema_contract_tests.rs"]
 mod schema_contract_tests;
 
