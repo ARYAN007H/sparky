@@ -47,8 +47,7 @@ fn schema() -> ControllerSchema {
 }
 
 fn params() -> Map<String, Value> {
-    serde_json::from_value(serde_json::json!({"value":"fixture"}))
-        .expect("fixture is an object")
+    serde_json::from_value(serde_json::json!({"value":"fixture"})).expect("fixture is an object")
 }
 
 #[test]
@@ -64,18 +63,20 @@ fn bound_controller_uses_its_parser_for_decode_and_runtime_invocation() {
     let output = futures::executor::block_on(controller.invoke(DispatchCtx::unbound(), params()))
         .expect("runtime invocation succeeds");
     assert_eq!(output, Value::String("fixture".to_owned()));
-    assert_eq!(CALLS.load(Ordering::SeqCst), 3, "invocation parses then runs");
+    assert_eq!(
+        CALLS.load(Ordering::SeqCst),
+        3,
+        "invocation parses then runs"
+    );
 }
 
 #[test]
 fn bound_controller_decode_does_not_run_gate_or_business_handler() {
     CALLS.store(0, Ordering::SeqCst);
-    let controller = BoundRegisteredController::after_gate(
-        schema(),
-        gate,
-        parse_value,
-        |_ctx, (), parsed| run_value(DispatchCtx::unbound(), parsed),
-    );
+    let controller =
+        BoundRegisteredController::after_gate(schema(), gate, parse_value, |_ctx, (), parsed| {
+            run_value(DispatchCtx::unbound(), parsed)
+        });
 
     controller
         .decode_params(params())
@@ -91,12 +92,8 @@ fn bound_controller_decode_does_not_run_gate_or_business_handler() {
 #[test]
 fn bound_controller_runs_gate_before_parser() {
     CALLS.store(0, Ordering::SeqCst);
-    let controller = BoundRegisteredController::after_gate(
-        schema(),
-        gate,
-        parse_value,
-        run_value_after_gate,
-    );
+    let controller =
+        BoundRegisteredController::after_gate(schema(), gate, parse_value, run_value_after_gate);
 
     let output = futures::executor::block_on(controller.invoke(DispatchCtx::unbound(), params()))
         .expect("gated runtime invocation succeeds");

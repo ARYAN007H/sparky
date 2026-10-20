@@ -61,9 +61,11 @@ fn contract_inventory_rejects_missing_extra_duplicate_and_empty_rows() {
             .unwrap_err()
             .contains("duplicate contract")
     );
-    assert!(verify_parameter_contracts(&[], &[])
-        .unwrap_err()
-        .contains("empty"));
+    assert!(
+        verify_parameter_contracts(&[], &[])
+            .unwrap_err()
+            .contains("empty")
+    );
 }
 
 #[test]
@@ -110,43 +112,55 @@ fn callback_identity_and_explicit_example_failures_are_not_hidden() {
     );
     let mut broken = contract;
     broken.examples = vec![serde_json::json!({"id":7})];
-    assert!(verify_parameter_contracts(&[controller], &[broken])
-        .unwrap_err()
-        .contains("schema rejects example"));
+    assert!(
+        verify_parameter_contracts(&[controller], &[broken])
+            .unwrap_err()
+            .contains("schema rejects example")
+    );
 }
 
 #[test]
 fn duplicate_controller_and_schema_identity_failures_are_rejected() {
     let (controller, contract) = fixture();
-    assert!(verify_parameter_contracts(
-        &[controller.clone(), controller.clone()],
-        std::slice::from_ref(&contract)
-    )
-    .unwrap_err()
-    .contains("duplicate controller"));
+    assert!(
+        verify_parameter_contracts(
+            &[controller.clone(), controller.clone()],
+            std::slice::from_ref(&contract)
+        )
+        .unwrap_err()
+        .contains("duplicate controller")
+    );
     let mut broken = controller.schema.clone();
     broken.function = "other";
-    assert!(verify_parameter_schema(&broken, &contract)
-        .unwrap_err()
-        .contains("method identity"));
+    assert!(
+        verify_parameter_schema(&broken, &contract)
+            .unwrap_err()
+            .contains("method identity")
+    );
     let mut broken = controller.schema;
     broken.description = " ";
-    assert!(verify_parameter_schema(&broken, &contract)
-        .unwrap_err()
-        .contains("no description"));
+    assert!(
+        verify_parameter_schema(&broken, &contract)
+            .unwrap_err()
+            .contains("no description")
+    );
 }
 
 #[test]
 fn examples_must_be_objects_and_satisfy_schema_before_decoding() {
     let (controller, mut contract) = fixture();
     contract.examples = vec![Value::Null];
-    assert!(verify_parameter_schema(&controller.schema, &contract)
-        .unwrap_err()
-        .contains("not an object"));
+    assert!(
+        verify_parameter_schema(&controller.schema, &contract)
+            .unwrap_err()
+            .contains("not an object")
+    );
     contract.examples = vec![serde_json::json!({})];
-    assert!(verify_parameter_schema(&controller.schema, &contract)
-        .unwrap_err()
-        .contains("schema rejects example"));
+    assert!(
+        verify_parameter_schema(&controller.schema, &contract)
+            .unwrap_err()
+            .contains("schema rejects example")
+    );
 }
 
 #[test]

@@ -12,8 +12,8 @@ use std::{
 
 use serde_json::{Map, Value};
 
-use crate::core::runtime::DispatchCtx;
 use crate::core::ControllerSchema;
+use crate::core::runtime::DispatchCtx;
 
 /// A pinned, boxed future returned by a controller handler.
 pub type ControllerFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'static>>;
@@ -69,11 +69,16 @@ impl BoundRegisteredController {
         parse: fn(Map<String, Value>) -> Result<P, String>,
         run: fn(DispatchCtx, P) -> ControllerFuture,
     ) -> Self {
-        let decode = Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
+        let decode =
+            Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
         let invoke = Arc::new(move |ctx, params| {
             Box::pin(async move { run(ctx, parse(params)?).await }) as ControllerFuture
         }) as Arc<dyn Fn(_, _) -> _ + Send + Sync>;
-        Self { schema, invoke, decode }
+        Self {
+            schema,
+            invoke,
+            decode,
+        }
     }
 
     /// Preserve a manual pre-parse gate while sharing the parser with validation.
@@ -83,14 +88,19 @@ impl BoundRegisteredController {
         parse: fn(Map<String, Value>) -> Result<P, String>,
         run: fn(DispatchCtx, G, P) -> ControllerFuture,
     ) -> Self {
-        let decode = Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
+        let decode =
+            Arc::new(move |params| parse(params).map(|_| ())) as Arc<dyn Fn(_) -> _ + Send + Sync>;
         let invoke = Arc::new(move |ctx, params| {
             Box::pin(async move {
                 let gated = gate(ctx.clone()).await?;
                 run(ctx, gated, parse(params)?).await
             }) as ControllerFuture
         }) as Arc<dyn Fn(_, _) -> _ + Send + Sync>;
-        Self { schema, invoke, decode }
+        Self {
+            schema,
+            invoke,
+            decode,
+        }
     }
 
     /// Decode params through the parser used by runtime invocation.
@@ -118,15 +128,33 @@ enum EntryHandler {
 
 impl ControllerEntry {
     pub(crate) fn legacy(controller: RegisteredController) -> Self {
-        Self { schema: controller.schema, handler: EntryHandler::Legacy(controller.handler) }
+        Self {
+            schema: controller.schema,
+            handler: EntryHandler::Legacy(controller.handler),
+        }
     }
 
     pub(crate) fn bound(controller: BoundRegisteredController) -> Self {
-        Self { schema: controller.schema.clone(), handler: EntryHandler::Bound(controller) }
+        Self {
+            schema: controller.schema.clone(),
+            handler: EntryHandler::Bound(controller),
+        }
     }
 
     /// Returns the canonical RPC method name for this controller.
-    pub fn rpc_method_name(&self) -> String { rpc_method_name(&self.schema) }
+    pub fn rpc_method_name(&self) -> String {
+        rpc_method_name(&self.schema)
+    }
+
+    fn legacy_controller(&self) -> Option<RegisteredController> {
+        match &self.handler {
+            EntryHandler::Legacy(handler) => Some(RegisteredController {
+                schema: self.schema.clone(),
+                handler: *handler,
+            }),
+            EntryHandler::Bound(_) => None,
+        }
+    }
 
     fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
         match &self.handler {
@@ -158,15 +186,18 @@ struct GroupedController {
 /// This is the single seam that attaches a [`DomainGroup`] to every domain's
 /// controllers without the domain modules knowing about groups.
 fn push(dst: &mut Vec<GroupedController>, group: DomainGroup, items: Vec<RegisteredController>) {
-    dst.extend(
-        items
-            .into_iter()
-            .map(|controller| GroupedController { group, controller: ControllerEntry::legacy(controller) }),
-    );
+    dst.extend(items.into_iter().map(|controller| GroupedController {
+        group,
+        controller: ControllerEntry::legacy(controller),
+    }));
 }
 
 fn push_entries(dst: &mut Vec<GroupedController>, group: DomainGroup, items: Vec<ControllerEntry>) {
-    dst.extend(items.into_iter().map(|controller| GroupedController { group, controller }));
+    dst.extend(
+        items
+            .into_iter()
+            .map(|controller| GroupedController { group, controller }),
+    );
 }
 
 /// The [`DomainSet`](crate::core::runtime::DomainSet) of the ambient dispatch

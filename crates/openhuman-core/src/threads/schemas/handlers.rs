@@ -32,10 +32,7 @@ pub(super) fn parse_upsert(
     parse(params)
 }
 
-pub(super) fn run_upsert(
-    ctx: DispatchCtx,
-    p: UpsertConversationThreadRequest,
-) -> ControllerFuture {
+pub(super) fn run_upsert(ctx: DispatchCtx, p: UpsertConversationThreadRequest) -> ControllerFuture {
     Box::pin(async move {
         // A SaaS user picks thread ids for their own threads only; reserved
         // prefixes and path-like ids are refused (no-op outside SaaS).
