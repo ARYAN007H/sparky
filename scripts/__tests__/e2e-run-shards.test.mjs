@@ -56,22 +56,48 @@ test("local Linux E2E shards cover every CI suite", () => {
     { name: "settings", suites: "settings,notifications,payments,webhooks" },
   ];
   assert.deepEqual(localShards, expectedShards);
-  assert.equal(allWorkflowShards.length, expectedShards.length * 3, "three OS matrices each have four groups");
-  for (let index = 0; index < allWorkflowShards.length; index += expectedShards.length) {
-    assert.deepEqual(allWorkflowShards.slice(index, index + expectedShards.length), expectedShards);
+  assert.equal(
+    allWorkflowShards.length,
+    expectedShards.length * 3,
+    "three OS matrices each have four groups",
+  );
+  for (
+    let index = 0;
+    index < allWorkflowShards.length;
+    index += expectedShards.length
+  ) {
+    assert.deepEqual(
+      allWorkflowShards.slice(index, index + expectedShards.length),
+      expectedShards,
+    );
   }
 
   const scheduled = Array.from(
-    flowRunner.matchAll(/^\s*run "(test\/e2e\/specs\/[^\"]+)"\s+"[^\"]+"\s+"([^\"]+)"/gm),
+    flowRunner.matchAll(
+      /^\s*run "(test\/e2e\/specs\/[^\"]+)"\s+"[^\"]+"\s+"([^\"]+)"/gm,
+    ),
     ([, spec, suite]) => ({ spec: path.join(repoRoot, "app", spec), suite }),
   );
   assert.ok(scheduled.length > 0);
-  assert.equal(new Set(scheduled.map(({ spec }) => spec)).size, scheduled.length, "each native spec is scheduled once");
-  for (const { spec } of scheduled) assert.ok(fs.existsSync(spec), `scheduled native spec exists: ${spec}`);
+  assert.equal(
+    new Set(scheduled.map(({ spec }) => spec)).size,
+    scheduled.length,
+    "each native spec is scheduled once",
+  );
+  for (const { spec } of scheduled)
+    assert.ok(fs.existsSync(spec), `scheduled native spec exists: ${spec}`);
   const suites = new Set(scheduled.map(({ suite }) => suite));
-  const assignedSuites = new Set(localShards.flatMap(({ suites: list }) => list.split(",")));
-  const activeAssignedSuites = new Set([...assignedSuites].filter((suite) => suites.has(suite)));
-  assert.equal(suites.size, 11, "the native runner schedules only its 11 nonempty suites");
+  const assignedSuites = new Set(
+    localShards.flatMap(({ suites: list }) => list.split(",")),
+  );
+  const activeAssignedSuites = new Set(
+    [...assignedSuites].filter((suite) => suites.has(suite)),
+  );
+  assert.equal(
+    suites.size,
+    11,
+    "the native runner schedules only its 11 nonempty suites",
+  );
   assert.deepEqual([...suites].sort(), [...activeAssignedSuites].sort());
   assert.ok(
     localShards.every(({ suites: list }) =>
