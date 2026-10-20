@@ -1,4 +1,4 @@
-//! Cron jobs, the flow catalog and flow state on a configured storage
+//! Cron jobs and the flow catalog on a configured storage
 //! backend, end to end through the core's public functions.
 //!
 //! Its own test binary because it installs a backend into the process-wide
@@ -16,7 +16,7 @@ mod storage_drivers;
 
 use storage_drivers::Case;
 
-async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
+async fn a_configured_backend_holds_cron_jobs_and_flow_catalog(case: Case) {
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: workspace.path().to_path_buf(),
@@ -142,7 +142,7 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     openhuman_core::agent::orchestration::open_delegation_checkpointer(&config).unwrap();
 }
 
-/// The stores tinyflows used to write (`jobs.db`, `flows.db`, `checkpoints.db`,
+/// The stores TinyFlows used to write (`jobs.db`, `flows.db`, `checkpoints.db`,
 /// `drafts/`) are copied into a configured backend by the boot-time import,
 /// read-only: the legacy files are byte-identical afterwards.
 async fn legacy_tinyflows_files_are_imported_into_a_configured_backend(case: Case) {
@@ -211,6 +211,6 @@ fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
 }
 
 driver_cases!(
-    async a_configured_backend_holds_cron_flows_and_flow_state,
+    async a_configured_backend_holds_cron_jobs_and_flow_catalog,
     legacy_tinyflows_files_are_imported_into_a_configured_backend
 );
