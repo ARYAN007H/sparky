@@ -186,6 +186,7 @@ impl<T: Tool> MediaArtifactTool<T> {
         args: &Value,
         call_id: Option<String>,
         chat: Option<&ApprovalChatContext>,
+        ctx: &crate::core::runtime::DispatchCtx,
     ) -> ToolResult {
         let Some(data) = result.content.iter_mut().find_map(|block| match block {
             ToolContent::Json { data } => Some(data),
@@ -212,6 +213,7 @@ impl<T: Tool> MediaArtifactTool<T> {
                     total,
                     call_id.as_deref(),
                     chat,
+                    ctx,
                 )
                 .await
             {
@@ -235,6 +237,7 @@ impl<T: Tool> MediaArtifactTool<T> {
         total: usize,
         call_id: Option<&str>,
         chat: Option<&ApprovalChatContext>,
+        ctx: &crate::core::runtime::DispatchCtx,
     ) -> Option<String> {
         let ext = src
             .extension()
@@ -249,7 +252,8 @@ impl<T: Tool> MediaArtifactTool<T> {
         // Reserve the file in the files folder (the card shows
         // "generating…", tied to this tool call's bubble) and open the
         // versioned artifact under the same id.
-        let production = match Production::start(
+        let production = match Production::start_in(
+            ctx,
             &self.workspace_dir,
             self.files_dir.clone(),
             kind,
@@ -565,6 +569,7 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         };
         let job_state = JobStateSlot::default();
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let dispatch_ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
         let per_call_inner = self.per_call.as_ref().map(|build| {
             build(
                 video_status_observer(job_state.clone()),
@@ -585,7 +590,7 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         }
         let call_id = tool_call_id(context);
         Ok(self
-            .attach_artifacts(result, &args, call_id, approval.chat.as_ref())
+            .attach_artifacts(result, &args, call_id, approval.chat.as_ref(), &dispatch_ctx)
             .await)
     }
 }
