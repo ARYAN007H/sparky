@@ -759,7 +759,12 @@ async fn channels_status_reflects_managed_dm_credential_e2e() {
 /// using the registry-pinned TinyChannels release staged by the standard Rust
 /// test runner. Telegram credential validation is local to the module and
 /// does not call the Bot API.
-#[cfg(all(target_os = "linux", target_arch = "x86_64", feature = "modules"))]
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    feature = "modules",
+    feature = "channels"
+))]
 #[tokio::test]
 async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rpc_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
