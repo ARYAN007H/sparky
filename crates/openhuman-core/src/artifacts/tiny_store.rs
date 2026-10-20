@@ -419,7 +419,7 @@ fn build_artifacts_service(
     build_artifacts_service_with_scope(workspace_dir, files, action_dir, chat, scoped, publisher)
 }
 
-fn build_artifacts_service_with_scope(
+pub(super) fn build_artifacts_service_with_scope(
     workspace_dir: &Path,
     files: FileRoots,
     action_dir: Option<&Path>,
