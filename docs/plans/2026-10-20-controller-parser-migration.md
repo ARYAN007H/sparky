@@ -21,12 +21,12 @@ type RunController<P> = fn(DispatchCtx, P) -> ControllerFuture;
 type ControllerTask<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send + 'static>>;
 type Gate<G> = fn(DispatchCtx) -> ControllerTask<G>;
 
-pub struct RegisteredController {
+pub struct BoundRegisteredController {
     pub schema: ControllerSchema,
     handler: BoundHandler,
 }
 
-impl RegisteredController {
+impl BoundRegisteredController {
     pub fn typed<P: Send + 'static>(
         schema: ControllerSchema,
         parse: ParseParams<P>,
@@ -49,7 +49,7 @@ impl RegisteredController {
 
 The signatures above are a design target, not a claim that all current handlers fit `typed` directly. For example, `threads::schemas::handlers::handle_upsert` parses first, then checks user-surface thread and parent ids, then invokes the operation. Its bound `run` function must retain those checks between decode and operation. `integrations::composio::schemas::handlers_tools::handle_execute` loads config first, parses `tool`/`arguments`/`connection_id` second, then calls the operation; use `after_gate` with config as `G`, and preserve the existing readers and error order. `modules::schemas::handle_computer_status` reads `load` before loading config and checking the computer component; use `typed` with a parser returning the bool, then keep config load and component check in `run`. Thus the parser observation is side-effect-free, while runtime ordering stays exactly where it is today.
 
-Registration compatibility is explicit. Keep today's public `RegisteredController { schema, handler: fn(...) }` temporarily as `LegacyController` and leave today's `ControllerExtension` and `register_controller_extension` as deprecated compatibility adapters. Introduce the new constructor-only `RegisteredController` and `BoundControllerExtension`; neither exposes a writable handler field. Internally store `GroupedController { group, entry: ControllerEntry }`, where `ControllerEntry::{Legacy(LegacyController), Bound(RegisteredController)}` dispatches each variant through its own invoke path. Add `register_bound_controller_extension` as the hosted migration entry point. Migrate the existing in-repository providers and snapshot consumers to the bound entry/snapshot API namespace by namespace; do not silently label the old projection complete. During rollout, contract tests report legacy rows explicitly. In the final state the built-in and hosted complete snapshots reject `Legacy` entries, and the old API remains only as an adapter for external consumers who have not migrated. This avoids adding a mandatory field to the old public extension literal while making completeness and the temporary compatibility boundary visible.
+Registration compatibility is explicit. Keep today's public `RegisteredController { schema, handler: fn(...) }` name, fields, and struct-literal construction unchanged as the deprecated legacy adapter. Introduce a distinct constructor-only `BoundRegisteredController`; it has public read-only schema access and a private bound handler. Keep today's `ControllerExtension { group, controllers: Vec<RegisteredController>, namespaces }` and `register_controller_extension` unchanged. Add `BoundControllerExtension { group, controllers: Vec<BoundRegisteredController>, namespaces }` and `register_bound_controller_extension`. Internally store `GroupedController { group, entry: ControllerEntry }`, where `ControllerEntry::{Legacy(RegisteredController), Bound(BoundRegisteredController)}` dispatches each variant through its own invoke path. Migrate in-repository providers and snapshot consumers to the bound entry/snapshot API namespace by namespace; do not silently label the old projection complete. During rollout, contract tests report legacy rows explicitly. In the final state the raw built-in/internal and each owner extension snapshot reject `Legacy` entries. This preserves existing external struct literals while exposing migration debt and a constructor-only path for complete coverage.
 
 The concrete registration diff for the first typed vertical slice is:
 
@@ -58,7 +58,7 @@ The concrete registration diff for the first typed vertical slice is:
 RegisteredController { schema: schemas("upsert"), handler: handle_upsert }
 
 // after
-RegisteredController::typed(schemas("upsert"), parse_upsert, run_upsert)
+BoundRegisteredController::typed(schemas("upsert"), parse_upsert, run_upsert)
 ```
 
 The manual gate-before-parse registration is:
