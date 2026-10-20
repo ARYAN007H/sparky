@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use tinyagents_harness_tools::goals::{
     GoalObserver, GoalStore, GoalTool, GoalToolKind, ThreadGoal,
@@ -20,7 +20,7 @@ pub fn goal_to_value(goal: &ThreadGoal) -> serde_json::Value {
 }
 
 #[derive(Default)]
-struct ScopedGoalStores(Mutex<HashMap<PathBuf, Weak<GoalStore>>>);
+struct ScopedGoalStores(Mutex<HashMap<PathBuf, Arc<GoalStore>>>);
 
 /// Returns the goal store owned by this dispatch context and workspace.
 ///
@@ -35,11 +35,11 @@ pub fn goal_store(
         .0
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if let Some(store) = stores.get(workspace_dir).and_then(Weak::upgrade) {
-        return store;
+    if let Some(store) = stores.get(workspace_dir) {
+        return Arc::clone(store);
     }
 
-    let stores = match context.tenant() {
+    let owner_stores = match context.tenant() {
         Ok(tenant) => crate::storage::sessions::provider_for_workspace(workspace_dir)
             .for_agent(&crate::core::runtime::session_key(&tenant)),
         Err(no_tenant) => {
@@ -47,12 +47,12 @@ pub fn goal_store(
             tinyagents_session::port::InMemorySessionStores::new().for_agent("ephemeral")
         }
     };
-    let kv = stores.kv;
+    let kv = owner_stores.kv;
     let store = Arc::new(GoalStore::with_observer(
         kv,
         Arc::new(OpenHumanGoalObserver),
     ));
-    stores.insert(workspace_dir.to_path_buf(), Arc::downgrade(&store));
+    stores.insert(workspace_dir.to_path_buf(), Arc::clone(&store));
     store
 }
 
