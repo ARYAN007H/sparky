@@ -11,10 +11,8 @@ impl Tool for SpawnSubagentTool {
          immediately — pass `blocking: true` to run it inline and get the \
          sub-agent's final output back in this turn. To run several independent \
          workers at once (e.g. \"a separate worker for each X\", a council \
-         of opinions, or \"fan out over N items\"), use `spawn_parallel_agents` \
-         with one task per worker — a SINGLE call that launches them \
-         concurrently. Do NOT call this tool in a loop to fan out: repeated \
-         `spawn_subagent` calls each delegate a single task and never launch \
+         of opinions, or \"fan out over N items\"), issue separate async \
+         sub-agent requests and collect their results. \
          workers concurrently, which serializes the whole request. See the Delegation \
          Guide in the system prompt for available agent_ids and when to \
          use each."

@@ -446,8 +446,8 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     iterations: outcome.iterations as u32,
                                     output_chars: outcome.output.chars().count(),
                                     output: outcome.output.clone(),
-                                    // Synchronous delegate dispatch has no worktree
-                                    // isolation (that is a `spawn_subagent` concept).
+                                    // Synchronous delegate dispatch inherits the
+                                    // parent's workspace context.
                                     // Not audited for whether this child's spend reached the
                                     // parent turn's ledger, so it stays silent: omission adds
                                     // nothing, which is the status quo. See the field's docs.

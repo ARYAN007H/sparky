@@ -95,8 +95,7 @@ impl Tool for ArchetypeDelegationTool {
     /// TAURI-RUST-8HB `run_code`: thousands of 120.000s truncations). The
     /// child's lifetime is already bounded internally — by its `max_iterations`,
     /// the run cancellation token, and each inner tool's own timeout — so it
-    /// governs its own duration, exactly like the sibling `spawn_parallel_agents`
-    /// fan-out and the long-running shell tool.
+    /// governs its own duration independently of the parent turn.
     fn timeout_policy(&self, _args: &serde_json::Value) -> ToolTimeout {
         ToolTimeout::Unbounded
     }
