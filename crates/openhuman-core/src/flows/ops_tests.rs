@@ -657,6 +657,10 @@ mod inference_gate_tests;
 mod migration_and_side_effect_tests;
 #[path = "ops_resume_checkpoint_tests.rs"]
 mod resume_checkpoint_tests;
+#[path = "ops_resume_compatibility_tests.rs"]
+mod resume_compatibility_tests;
+#[path = "ops_resume_decision_tests.rs"]
+mod resume_decision_tests;
 #[path = "ops_run_finalizer_tests.rs"]
 mod run_finalizer_tests;
 #[path = "ops_run_lifecycle_tests.rs"]
