@@ -7,10 +7,10 @@ use crate::config::Config;
 use crate::core::events::DomainEvent;
 use crate::flows::store;
 use crate::memory::types::{ForgetParams, ItemsListParams, MAX_LIMIT};
-use crate::memory::{MemoryError, MemoryResult};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinybus::EventHandler;
+use tinymemory_api::{Error, Result};
 use tinymemory_api::{ItemKind, MetaFilter, StoreItem};
 use {crate::flows::flow_meta, crate::flows::flow_tag, tinyflows_catalog::FlowRun};
 
@@ -111,7 +111,7 @@ impl FlowRunDigestSubscriber {
             Ok(receipt) => {
                 tracing::debug!(target: "flows", %flow_id, %run_id, replayed = receipt.replayed, "[flows] digest: run digest stored");
             }
-            Err(MemoryError::Off(_)) => {
+            Err(Error::Off(_)) => {
                 tracing::debug!(target: "flows", %flow_id, %run_id, "[flows] digest: memory is off — skipping");
                 return;
             }
@@ -139,7 +139,7 @@ pub(super) async fn enforce_retention_cap(
     config: &Config,
     flow_id: &str,
     cap: usize,
-) -> MemoryResult<usize> {
+) -> Result<usize> {
     let mut digests = Vec::new();
     let mut cursor = None;
     loop {
