@@ -1805,7 +1805,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         .and_then(Value::as_array)
         .expect("agent_list_definitions should return definitions array");
     // The v1 `agent_memory` built-in was removed with the v1 memory system
-    // (Memory v2 is one `memory` tool, not a sub-agent); `critic` is the
+    // (Memory v2 is one `memory` tool, not a sub-agent); `summarizer` is the
     // stand-in safe-library entry.
     assert!(
         !definitions
@@ -1815,8 +1815,8 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
     );
     let memory_agent = definitions
         .iter()
-        .find(|definition| definition.get("id").and_then(Value::as_str) == Some("critic"))
-        .expect("safe agent library should include critic");
+        .find(|definition| definition.get("id").and_then(Value::as_str) == Some("summarizer"))
+        .expect("safe agent library should include summarizer");
     assert!(memory_agent
         .get("display_name")
         .and_then(Value::as_str)
@@ -2726,6 +2726,19 @@ async fn json_rpc_protocol_auth_and_agent_hello_inner() {
         post_json_rpc(&rpc_base, 10_000, "openhuman.agent_team_list", json!({})).await;
     assert_unknown_method(&retired_team_method, "openhuman.agent_team_list");
 
+    for (id, method) in [
+        (10_001, "openhuman.workflow_run_list_definitions"),
+        (10_002, "openhuman.workflow_run_list"),
+        (10_003, "openhuman.workflow_run_get"),
+        (10_004, "openhuman.workflow_run_start"),
+        (10_005, "openhuman.workflow_run_stop"),
+        (10_006, "openhuman.workflow_run_resume"),
+        (10_007, "openhuman.agent_graph_topologies"),
+    ] {
+        let retired_method = post_json_rpc(&rpc_base, id, method, json!({})).await;
+        assert_unknown_method(&retired_method, method);
+    }
+
     // --- auth: session state (no JWT yet) ---
     let state_before = post_json_rpc(&rpc_base, 3, "openhuman.auth_get_state", json!({})).await;
     let state_outer = assert_no_jsonrpc_error(&state_before, "get_state");
@@ -3559,8 +3572,7 @@ async fn json_rpc_thread_generate_title_falls_back_when_provider_path_is_unavail
 
     assert_ne!(generated_title, original_title);
     assert_eq!(
-        generated_title,
-        "summarize latest five",
+        generated_title, "summarize latest five",
         "fallback title should be the 3-word shape derived from the first user message (filler stripped), got: {generated_title}"
     );
 
@@ -3999,111 +4011,6 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
     assert_eq!(count_of("completed"), 1);
     assert_eq!(count_of("failed"), 0);
     assert_eq!(count_of("stopped"), 0);
-
-    api_join.abort();
-    rpc_join.abort();
-}
-
-#[tokio::test]
-async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
-    let _env_lock = json_rpc_e2e_env_lock_async().await;
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path();
-    let openhuman_home = home.join(".openhuman");
-
-    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
-    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
-    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
-    let _vite_backend_url_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
-    let _api_url_guard = EnvVarGuard::unset("OPENHUMAN_API_URL");
-
-    let (api_addr, api_join) = serve_on_ephemeral(mock_upstream_router()).await;
-    let api_origin = format!("http://{api_addr}");
-    write_min_config(openhuman_home.as_path(), &api_origin);
-
-    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
-    let rpc_base = format!("http://{rpc_addr}");
-
-    let config = openhuman_core::config::Config::load_or_init()
-        .await
-        .expect("load config");
-
-    // Builtin definitions are available with no seeding.
-    let defs = post_json_rpc(
-        &rpc_base,
-        9141,
-        "openhuman.workflow_run_list_definitions",
-        json!({}),
-    )
-    .await;
-    let defs_outer = assert_no_jsonrpc_error(&defs, "workflow_run_list_definitions");
-    assert_eq!(
-        defs_outer.get("count").and_then(serde_json::Value::as_u64),
-        Some(1)
-    );
-    assert_eq!(
-        defs_outer
-            .get("definitions")
-            .and_then(|d| d.get(0))
-            .and_then(|d| d.get("id"))
-            .and_then(serde_json::Value::as_str),
-        Some("parallel_research_cross_check")
-    );
-
-    // Seed a durable workflow run, then list + get it.
-    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = tinyagents_session::run_ledger::WorkflowRunUpsert {
-            id: "wf-run-1".to_string(),
-            definition_id: "parallel_research_cross_check".to_string(),
-            parent_thread_id: Some("thread-wf-1".to_string()),
-            input: json!({ "question": "test" }),
-            phase_states: json!({ "decompose": "completed" }),
-            child_run_ids: vec!["child-1".to_string()],
-            status: tinyagents_session::run_ledger::WorkflowRunStatus::Running,
-            summary: None,
-            started_at: None,
-            completed_at: None,
-        };
-        async move { ledger.upsert_workflow_run(ledger_arg_0).await }
-    })
-    .expect("seed workflow run");
-
-    let list = post_json_rpc(
-        &rpc_base,
-        9142,
-        "openhuman.workflow_run_list",
-        json!({ "definitionId": "parallel_research_cross_check" }),
-    )
-    .await;
-    let list_outer = assert_no_jsonrpc_error(&list, "workflow_run_list");
-    assert_eq!(
-        list_outer.get("count").and_then(serde_json::Value::as_u64),
-        Some(1)
-    );
-    assert_eq!(
-        list_outer
-            .get("runs")
-            .and_then(|r| r.get(0))
-            .and_then(|r| r.get("status"))
-            .and_then(serde_json::Value::as_str),
-        Some("running")
-    );
-
-    let get = post_json_rpc(
-        &rpc_base,
-        9143,
-        "openhuman.workflow_run_get",
-        json!({ "id": "wf-run-1" }),
-    )
-    .await;
-    let get_outer = assert_no_jsonrpc_error(&get, "workflow_run_get");
-    assert_eq!(
-        get_outer
-            .get("workflowRun")
-            .and_then(|r| r.get("definitionId"))
-            .and_then(serde_json::Value::as_str),
-        Some("parallel_research_cross_check")
-    );
 
     api_join.abort();
     rpc_join.abort();
@@ -6131,7 +6038,9 @@ async fn json_rpc_wallet_solana_prepare_execute_round_trips() {
     );
     assert_eq!(
         exec_result.get("transactionHash").and_then(Value::as_str),
-        Some("5xS9pXmqVz8R1nuRZTfsdsAxBdBFmtnAtuYbCsmK5DYzGn5vR4VqWGmiR5McLnYx8oFqLdo62q4qiUZpQyR4Hkn3"),
+        Some(
+            "5xS9pXmqVz8R1nuRZTfsdsAxBdBFmtnAtuYbCsmK5DYzGn5vR4VqWGmiR5McLnYx8oFqLdo62q4qiUZpQyR4Hkn3"
+        ),
     );
 
     mock_join.abort();
@@ -11957,158 +11866,6 @@ async fn json_rpc_voice_server_settings_roundtrip_always_on_and_wake_word() {
     );
 
     rpc_join.abort();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Workflow run execution engine (#3375 PR2)
-//
-// Starts the builtin read-only "parallel research with cross-checking" workflow
-// over the live JSON-RPC core with the mock backend, then polls workflow_run_get
-// until the run reaches `completed` with a non-empty `summary`. Child agents are
-// pinned to the mock provider via `modelOverride` so every phase resolves against
-// the in-process mock `/openai/v1/chat/completions` (no live network).
-//
-// Self-contained: boots its own mock + core stack and tears them down. Appended
-// at the END of the file per the multi-agent coordination protocol (#3370 epic).
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[test]
-fn json_rpc_workflow_run_engine_executes_builtin_to_completion() {
-    run_json_rpc_e2e_on_agent_stack(
-        "json_rpc_workflow_run_engine_executes_builtin_to_completion",
-        json_rpc_workflow_run_engine_executes_builtin_to_completion_inner,
-    );
-}
-
-async fn json_rpc_workflow_run_engine_executes_builtin_to_completion_inner() {
-    let _env_lock = json_rpc_e2e_env_lock_async().await;
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path();
-    let openhuman_home = home.join(".openhuman");
-
-    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
-    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
-    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
-    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
-
-    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
-    let mock_origin = format!("http://{}", mock_addr);
-
-    write_min_config(&openhuman_home, &mock_origin);
-    let user_scoped_dir = openhuman_home.join("users").join("e2e-user");
-    write_min_config(&user_scoped_dir, &mock_origin);
-
-    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
-    let rpc_base = format!("http://{}", rpc_addr);
-
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    // Authenticate so the child agents' provider has a backend session.
-    let store = post_json_rpc(
-        &rpc_base,
-        375_001,
-        "openhuman.auth_store_session",
-        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
-    )
-    .await;
-    assert_no_jsonrpc_error(&store, "store_session");
-
-    // Sanity: the builtin definition is listed.
-    let defs = post_json_rpc(
-        &rpc_base,
-        375_002,
-        "openhuman.workflow_run_list_definitions",
-        json!({}),
-    )
-    .await;
-    let defs_result = assert_no_jsonrpc_error(&defs, "list_definitions");
-    let defs_body = peel_logs_envelope(defs_result.get("result").unwrap_or(defs_result));
-    let definition_id = defs_body
-        .get("definitions")
-        .and_then(Value::as_array)
-        .and_then(|arr| arr.first())
-        .and_then(|d| d.get("id"))
-        .and_then(Value::as_str)
-        .expect("at least one builtin workflow definition")
-        .to_string();
-    assert_eq!(definition_id, "parallel_research_cross_check");
-
-    // Start the workflow. Children inherit the parent (root) provider via the
-    // `modelOverride` pin → every phase hits the mock chat-completions route.
-    let start = post_json_rpc(
-        &rpc_base,
-        375_003,
-        "openhuman.workflow_run_start",
-        json!({
-            "definitionId": definition_id,
-            "input": { "question": "What is the capital of France?", "modelOverride": "e2e-mock-model" },
-        }),
-    )
-    .await;
-    let start_result = assert_no_jsonrpc_error(&start, "workflow_run_start");
-    let start_body = peel_logs_envelope(start_result.get("result").unwrap_or(start_result));
-    let run = start_body
-        .get("workflowRun")
-        .expect("workflowRun in start response");
-    let run_id = run
-        .get("id")
-        .and_then(Value::as_str)
-        .expect("run id")
-        .to_string();
-    assert_eq!(
-        run.get("status").and_then(Value::as_str),
-        Some("running"),
-        "fresh run should be running: {run}"
-    );
-
-    // Poll workflow_run_get until terminal (or timeout). The four-phase builtin
-    // fans out 5 children total against the mock — completes quickly.
-    let mut final_status = String::new();
-    let mut final_summary = String::new();
-    for attempt in 0..120 {
-        tokio::time::sleep(Duration::from_millis(250)).await;
-        let got = post_json_rpc(
-            &rpc_base,
-            37_500_100 + attempt,
-            "openhuman.workflow_run_get",
-            json!({ "id": run_id }),
-        )
-        .await;
-        let got_result = assert_no_jsonrpc_error(&got, "workflow_run_get");
-        let got_body = peel_logs_envelope(got_result.get("result").unwrap_or(got_result));
-        let wf = got_body
-            .get("workflowRun")
-            .expect("workflowRun payload present");
-        let status = wf
-            .get("status")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
-        if matches!(
-            status.as_str(),
-            "completed" | "failed" | "cancelled" | "interrupted"
-        ) {
-            final_status = status;
-            final_summary = wf
-                .get("summary")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            break;
-        }
-    }
-
-    assert_eq!(
-        final_status, "completed",
-        "workflow run must reach completed; got status={final_status:?} summary={final_summary:?}"
-    );
-    assert!(
-        !final_summary.trim().is_empty(),
-        "completed workflow run must carry a non-empty summary"
-    );
-
-    rpc_join.abort();
-    mock_join.abort();
 }
 
 #[tokio::test]

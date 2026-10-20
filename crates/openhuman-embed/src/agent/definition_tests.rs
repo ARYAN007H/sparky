@@ -132,11 +132,11 @@ fn template_overrides_are_independent_and_keep_restrictions() {
 #[test]
 fn base_can_be_named_or_custom_and_unknown_names_are_typed() {
     let original = AgentDefinitionRegistry::builtins_only()
-        .get("planner")
+        .get("vision_agent")
         .unwrap()
         .clone();
-    let named = AgentDefinitionSpec::from_base("planner")
-        .into_core("my-planner")
+    let named = AgentDefinitionSpec::from_base("vision_agent")
+        .into_core("my-vision-agent")
         .unwrap();
     assert_eq!(named.agent_tier, original.agent_tier);
     let custom = AgentDefinitionSpec::from_base(original.clone())

@@ -81,6 +81,49 @@ fn threaded_turn_keeps_goal_tools_as_exposure_candidates() {
     }
 }
 
+struct NamedTopologyTool(&'static str);
+
+#[async_trait]
+impl Tool for NamedTopologyTool {
+    fn name(&self) -> &str {
+        self.0
+    }
+
+    fn description(&self) -> &str {
+        "Topology projection test tool."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        Ok(ToolResult::success("ok"))
+    }
+}
+
+#[test]
+fn capability_diagnostics_only_projects_live_delegation_graph() {
+    let names = [
+        "agent_teams:member",
+        "delegation",
+        "workflow_runs:scheduler_preview",
+    ];
+    let tools: SharedToolSet = Arc::new(
+        names
+            .iter()
+            .map(|name| Box::new(NamedTopologyTool(name)) as Box<dyn Tool>)
+            .collect(),
+    );
+    let diagnostics = capability_diagnostics(&[], &[tools], &names.map(str::to_owned));
+
+    let reused_names: Vec<_> = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.name.as_str())
+        .collect();
+    assert_eq!(reused_names, vec!["delegation"]);
+}
+
 #[tokio::test]
 async fn static_live_harness_builder_resolves_control_aliases_from_the_execution_parent() {
     use crate::agent::harness::fork_context::ParentExecutionContext;

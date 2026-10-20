@@ -178,8 +178,7 @@ fn skill_sections_name_the_hand_off_this_session_can_call() {
         hand_off_route(&ctx, "image_agent").as_deref(),
         Some("`create_image` (`use_skill` skill `media`)")
     );
-    // Not in the orchestrator's allowlist: no route, so name nothing. `planner`
-    // is registered for workflow runs but is not a chat delegate.
+    // Not in the orchestrator's allowlist: no route, so name nothing.
     assert_eq!(hand_off_route(&ctx, "summarizer"), None);
     assert_eq!(hand_off_route(&ctx, "planner"), None);
 

@@ -38,7 +38,7 @@ pub(crate) fn subagent_prompt_protocol(
 /// Matches TinyAgents' spawn-tool list, the host's `delegate` and
 /// `continue_subagent` tools, and every synthesised per-archetype `delegate_*` tool
 ///   ([`crate::tools::orchestrator_tools::collect_orchestrator_tools`]
-///   emits `delegate_code_executor`, `delegate_planner`, …).
+///   emits tools for each configured delegation target).
 ///
 /// The shared static names stay aligned with TinyAgents; registry lookup is
 /// needed only for host-defined, unprefixed `delegate_name` overrides.
@@ -46,6 +46,14 @@ pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
     if crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool(name) {
         return true;
     }
+    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
+    is_registered_delegate_alias(name, registry.as_deref())
+}
+
+fn is_registered_delegate_alias(
+    name: &str,
+    registry: Option<&crate::agent_registry::host_definition::AgentDefinitionRegistry>,
+) -> bool {
     // Synthesised delegation tools are named by the target agent's
     // `delegate_name` override, which mostly does NOT carry the `delegate_`
     // prefix (`manage_tasks`, `create_image`, `setup_skills`,
@@ -53,9 +61,7 @@ pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
     // which let wildcard-scoped children inherit the orchestrator's spawn
     // surface. Resolve the override names via the registry so the strip
     // stays in lockstep with `collect_orchestrator_tools`'s naming.
-    if let Some(registry) =
-        crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
-    {
+    if let Some(registry) = registry {
         return registry
             .list()
             .iter()
@@ -293,7 +299,7 @@ pub(super) fn load_prompt_source(
             // file write — so we re-use that scaffolding by reading from
             // `<workspace>/<filename>` after the parent agent has
             // bootstrapped its workspace files. For sub-agent
-            // archetype prompts (e.g. `archetypes/critic.md`),
+            // archetype prompts (e.g. `archetypes/<agent_id>.md`),
             // we look up by basename in the workspace, then accept
             // missing files as an empty body (the runner will fall
             // back to a generic role hint).

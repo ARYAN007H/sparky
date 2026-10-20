@@ -566,13 +566,13 @@ fn chat_agent_id_selects_the_web_chat_agent_and_defaults_to_the_orchestrator() {
         "unset falls back to what the app runs"
     );
 
-    config.agent.chat_agent_id = Some("planner".to_string());
-    assert_eq!(pick_target_agent_id(&config), "planner");
+    config.agent.chat_agent_id = Some("summarizer".to_string());
+    assert_eq!(pick_target_agent_id(&config), "summarizer");
 
     // Padding is an operator typo in a hand-edited config.toml, not a request
     // for an agent whose id has spaces in it.
-    config.agent.chat_agent_id = Some("  planner  ".to_string());
-    assert_eq!(pick_target_agent_id(&config), "planner");
+    config.agent.chat_agent_id = Some("  summarizer  ".to_string());
+    assert_eq!(pick_target_agent_id(&config), "summarizer");
 
     // Blank is "unset", not "an agent named empty string": a turn routed at an
     // id the registry cannot answer would fail chat outright.

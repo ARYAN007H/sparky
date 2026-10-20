@@ -1,10 +1,9 @@
 //! Shared root [`ParentExecutionContext`] builder for controller-spawned
-//! orchestration tasks (#3374 PR4, extracted from the #3375 workflow engine).
+//! orchestration tasks.
 //!
-//! The workflow-run engine ([`workflow_runs::engine`]) needs to spawn real
-//! sub-agents from a background task that has **no** enclosing agent turn on the
-//! stack, so there is no live parent execution context for the spawn to inherit —
-//! a naive spawn fails with `NoParentContext` (the TAURI-RUST-HMW regression, #4337).
+//! Background host tasks that spawn real sub-agents have **no** enclosing agent
+//! turn on the stack, so there is no live parent execution context for the spawn
+//! to inherit — a naive spawn fails with `NoParentContext`.
 //!
 //! The fix (proven in `triage::escalation::dispatch_target_agent`) is to build a
 //! *root* [`ParentExecutionContext`] from a config-built [`Agent`] and hand it,
@@ -123,7 +122,7 @@ pub(crate) async fn build_root_parent(
 
 /// Build (or accept) the parent execution context for a **controller-spawned
 /// background orchestration surface** that has no enclosing agent turn (the
-/// workflow-run engine or cron jobs), then run
+/// cron jobs), then run
 /// `run(parent)` with it.
 ///
 /// Folds [`build_root_parent`] and the hand-off into one call so a surface
@@ -131,7 +130,7 @@ pub(crate) async fn build_root_parent(
 /// have every nested `spawn_subagent` die at runtime with
 /// [`SubagentRunError::NoParentContext`](crate::agent::subagent_host::SubagentRunError::NoParentContext).
 /// The parent is a value the closure receives and passes to the spawns it makes
-/// (`AgentOrchestrationSession::spawn_agent`); nothing reads it ambiently.
+/// (the host sub-agent dispatch path); nothing reads it ambiently.
 ///
 /// `parent_override` is the explicit injection point for a parent the caller
 /// already has (a test driving a surface under a mock parent, and thus a mock

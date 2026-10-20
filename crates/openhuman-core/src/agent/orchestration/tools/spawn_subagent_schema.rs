@@ -23,7 +23,7 @@ fn spawn_subagent_parameters_schema() -> serde_json::Value {
     let agent_id_schema = if agent_ids.is_empty() {
         json!({
             "type": "string",
-            "description": "Sub-agent id (e.g. code_executor, planner, critic)."
+            "description": "Sub-agent id (e.g. code_executor, researcher, summarizer)."
         })
     } else {
         json!({

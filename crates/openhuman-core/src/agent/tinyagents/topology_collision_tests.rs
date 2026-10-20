@@ -36,7 +36,7 @@ fn all_topologies_names_do_not_collide_with_production_tools() {
         "expected spawn_parallel_agents in production all_tools registration"
     );
 
-    let reports = tinyagents_orchestration::topology::all_graph_topologies();
+    let reports = crate::agent::tinyagents::tool_registration::host_graph_topologies();
     for report in &reports {
         assert!(
             !tool_names.contains(report.name),

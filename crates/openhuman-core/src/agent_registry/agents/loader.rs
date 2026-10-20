@@ -57,22 +57,6 @@ pub const BUILTINS: &[BuiltinAgent] = &[
         toml: include_str!("orchestrator/agent.toml"),
         prompt_fn: super::orchestrator::build,
     },
-    // `planner` and `critic` are not delegable from chat (the orchestrator does
-    // not list them): they exist for the `parallel_research_cross_check`
-    // workflow-run template (`orchestration/workflow_runs/ops.rs`), whose
-    // read-only safety tier admits only read-only agents. Planning and
-    // code review in chat are the orchestrator's own `## Plans` rules and
-    // skill `coding`.
-    BuiltinAgent {
-        id: "planner",
-        toml: include_str!("planner/agent.toml"),
-        prompt_fn: super::planner::build,
-    },
-    BuiltinAgent {
-        id: "critic",
-        toml: include_str!("critic/agent.toml"),
-        prompt_fn: super::critic::build,
-    },
     BuiltinAgent {
         id: "task_manager_agent",
         toml: include_str!("task_manager_agent/agent.toml"),
