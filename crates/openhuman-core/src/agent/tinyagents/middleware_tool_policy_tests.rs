@@ -10,7 +10,6 @@ use crate::agent::tinyagents::middleware::tool_policy::ToolPolicyMiddleware;
 // these pin that the middleware feeds it the *session's* answer and resolves
 // the route out of the session's own delegation tools.
 
-use crate::agent::orchestration::tools::{ArchetypeDelegationTool, DelegationTarget};
 use crate::tools::toolpacks::{append_pack_tools, bind_pack_registry};
 use tinyagents_harness_tools::skills::USE_SKILL;
 use tinytools::{PermissionLevel, ToolResult};
@@ -53,7 +52,7 @@ fn allow(name: &str) -> (String, ToolPolicyDecision) {
 }
 
 /// A non-owner session: it holds the whole `workflows` pack in its registry and
-/// a `build_workflow` delegate, but may only call the delegate and the pack
+/// a `build_workflow` route, but may only call that route and the pack
 /// tool — exactly the orchestrator's shape. Anything not named here is denied,
 /// because `decision_for` defaults to `Deny`.
 fn non_owner_middleware() -> ToolPolicyMiddleware {
@@ -67,11 +66,6 @@ fn non_owner_middleware_at(allowed: PermissionLevel) -> ToolPolicyMiddleware {
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![
         Box::new(RoutingFakeTool("build_workflow")),
         Box::new(RoutingFakeTool("propose_workflow")),
-        Box::new(ArchetypeDelegationTool {
-            tool_name: "build_workflow".to_string(),
-            agent_id: DelegationTarget("workflow_builder".to_string()),
-            tool_description: "Build a workflow".to_string(),
-        }),
     ];
     append_pack_tools(&mut tools);
     let tools = Arc::new(tools);

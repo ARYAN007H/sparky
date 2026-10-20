@@ -41,7 +41,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             }),
             None,
             live.data.child(),
-            Some(&live),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "pause-resume-child")
+                .expect("detached parent"),
         )
         .await
         .expect("initial spawn");
@@ -67,7 +68,14 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .expect("initial child is registered in shared Jobs");
     let paused_job = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        jobs.wait_owned(running_job.id.as_str(), running_job.owner.clone()),
+        jobs.wait_owned(
+            running_job.id.as_str(),
+            crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                workspace.path(),
+                "continue-paused-e2e",
+                None,
+            ),
+        ),
     )
     .await
     .expect("child reaches its clarification checkpoint")
@@ -94,7 +102,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             }),
             None,
             live.data.child(),
-            Some(&live),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "pause-resume-child")
+                .expect("detached parent"),
         )
         .await
         .expect("continue");
@@ -217,7 +226,8 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
             }),
             None,
             live.data.child(),
-            Some(&live),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "paused-cancel-child")
+                .expect("detached parent"),
         )
         .await
         .expect("initial spawn");

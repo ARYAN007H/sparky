@@ -280,7 +280,8 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
             }),
             None,
             live.data.child(),
-            Some(&live),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "headless-child")
+                .expect("detached parent"),
         )
         .await
         .unwrap();
@@ -304,7 +305,14 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
         .expect("headless child is registered");
     let finished = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        jobs.wait_owned(job.id.as_str(), job.owner.clone()),
+        jobs.wait_owned(
+            job.id.as_str(),
+            crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                workspace.path(),
+                "headless-spawn-session",
+                None,
+            ),
+        ),
     )
     .await
     .expect("headless child completes")
