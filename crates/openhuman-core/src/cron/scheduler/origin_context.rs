@@ -168,7 +168,7 @@ pub(super) fn validated_channel_session(
             .or_else(|| config.agent.channel_agents.get(provider))
             .map(|agent| agent.trim())
             .filter(|agent| !agent.is_empty())
-            .unwrap_or_else(|| "")
+            .unwrap_or("")
     };
     let selected_agent = if configured_agent.is_empty() {
         crate::web_chat::pick_target_agent_id(config)

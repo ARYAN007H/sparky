@@ -20,6 +20,9 @@ const MAX_CALLBACK_BYTES: usize = 128 * 1024;
 const MAX_TRANSCRIPTION_BYTES: usize = 12 * 1024 * 1024;
 const MAX_CONTROLLER_BYTES: usize = 1024 * 1024;
 
+type ProgressiveChannelRegistry =
+    Arc<OnceLock<Arc<HashMap<String, Weak<dyn ProgressiveChannelTransport>>>>>;
+
 #[async_trait::async_trait]
 pub(super) trait ProgressiveChannelTransport: Send + Sync {
     fn configured_name(&self) -> &str;
@@ -51,8 +54,7 @@ pub(super) struct ChannelHostCallbacks {
     tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
     context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
-    progressive_channels:
-        Arc<OnceLock<Arc<HashMap<String, Weak<dyn ProgressiveChannelTransport>>>>>,
+    progressive_channels: ProgressiveChannelRegistry,
     output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
     dispatch: mpsc::Sender<RuntimeChannelMessage>,
 }
@@ -62,9 +64,7 @@ impl ChannelHostCallbacks {
         ctx: &crate::core::runtime::DispatchCtx,
         config: Arc<Config>,
         context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
-        progressive_channels: Arc<
-            OnceLock<Arc<HashMap<String, Weak<dyn ProgressiveChannelTransport>>>>,
-        >,
+        progressive_channels: ProgressiveChannelRegistry,
         output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Self {

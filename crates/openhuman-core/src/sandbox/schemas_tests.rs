@@ -3,6 +3,8 @@ use crate::core::runtime::context::CoreContext;
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::DomainSet;
 
+type ComponentControllerHandler = fn(DispatchCtx, Map<String, Value>) -> ControllerFuture;
+
 /// Scope a `Config` onto the embedder-config seam that `load_config_with_timeout()`
 /// prefers, so a handler reads it instead of doing live disk I/O against
 /// `~/.openhuman` — which is slow and racy across parallel unit tests (#6081).
@@ -226,7 +228,7 @@ async fn every_sandbox_method_answers_component_disabled_when_sandbox_is_off() {
     let mut set = crate::core::runtime::ComponentSet::all();
     set.sandbox = false;
     let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(set);
-    let handlers: [fn(DispatchCtx, Map<String, Value>) -> ControllerFuture; 4] = [
+    let handlers: [ComponentControllerHandler; 4] = [
         handle_status,
         handle_resolve_policy,
         handle_cleanup_orphans,
