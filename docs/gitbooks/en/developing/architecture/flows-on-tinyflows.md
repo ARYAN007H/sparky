@@ -134,5 +134,5 @@ changing graph data.
 - `vendor/tinyflows/crates/tinyflows-bus/` defines the contracts; the engine and
   module implementation live in the TinyFlows repository.
 
-See the [Flows domain README](../../../../crates/openhuman-core/src/flows/README.md)
+See the [Flows domain README](../../../../../crates/openhuman-core/src/flows/README.md)
 for RPC names, authoring gates, and module integration tests.
