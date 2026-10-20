@@ -28,8 +28,6 @@ import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import {
   dumpAccessibilityTree,
   hasAppChrome,
-  textExists,
-  waitForText,
   waitForWebView,
   waitForWindowVisible,
 } from '../helpers/element-helpers';

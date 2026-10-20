@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 
 export const MIXED_RUNNER_EXCEPTIONS = [
   { basename: "smoke.spec.ts", reason: "Native smoke proves a live Wry window and embedded core; Playwright smoke proves standalone browser bootstrap and RPC." },
-  { basename: "login-flow.spec.ts", reason: "Native login proves desktop deep-link entry; Playwright login proves browser callback entry." },
-  { basename: "auth-access-control.spec.ts", reason: "Native auth proves device reauthentication and expiry events; Playwright auth proves account, billing, logout and revocation UI." },
-  { basename: "notifications.spec.ts", reason: "Native notifications prove OS permission and plugin calls; Playwright proves rendered notification content and empty-state UI." },
+  { basename: "login-flow.spec.ts", reason: "Native login proves desktop window and deep-link token handling; Playwright login proves browser callback entry." },
+  { basename: "auth-access-control.spec.ts", reason: "Native auth proves desktop deep-link reauthentication and native auth-expiry event delivery; Playwright owns account, billing, logout and revocation UI." },
+  { basename: "notifications.spec.ts", reason: "Native notifications prove OS permission state and real plugin calls; Playwright owns rendered notification content and empty-state UI." },
   { basename: "settings-data-management.spec.ts", reason: "Native reset proves the host reset IPC and embedded-core restart; Playwright proves confirmation and cancellation UI." },
 ];
 
