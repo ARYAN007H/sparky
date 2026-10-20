@@ -189,6 +189,52 @@ pub(crate) fn register(
     abort: AbortHandle,
     status: watch::Receiver<DetachedSubagentStatus>,
 ) -> Result<(), RegistrationError> {
+    let parent_epoch = match parent_thread_id.as_deref() {
+        Some(thread_id) => Some(
+            crate::agent::orchestration::background_completions::CompletionTarget::new(
+                ctx.clone(),
+                workspace_dir.clone(),
+                parent_session.clone(),
+                Some(thread_id.to_owned()),
+            )
+            .map_err(RegistrationError::ParentLifecycle)?
+            .parent_epoch()
+            .expect("threaded spawn captures a parent generation"),
+        ),
+        None => None,
+    };
+    register_with_parent_epoch(
+        ctx,
+        task_id,
+        agent_id,
+        parent_session,
+        session_parent_prefix,
+        subagent_session_id,
+        workspace_dir,
+        parent_thread_id,
+        parent_epoch,
+        run_queue,
+        abort,
+        status,
+    )
+}
+
+/// Test-only lower-level hook for exercising registration after a previously
+/// captured spawn generation has gone stale.
+pub(crate) fn register_with_parent_epoch(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: String,
+    agent_id: String,
+    parent_session: String,
+    session_parent_prefix: Option<String>,
+    subagent_session_id: Option<String>,
+    workspace_dir: PathBuf,
+    parent_thread_id: Option<String>,
+    parent_epoch: Option<u64>,
+    run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
+    abort: AbortHandle,
+    status: watch::Receiver<DetachedSubagentStatus>,
+) -> Result<(), RegistrationError> {
     let profile = match admit_spawn(ctx, &workspace_dir) {
         Ok(profile) => profile,
         Err(error) => {

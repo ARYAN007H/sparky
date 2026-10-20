@@ -74,7 +74,9 @@ pub(crate) use cancel::{
 };
 pub(crate) use registry::admit_spawn;
 #[cfg(test)]
-pub(crate) use registry::{register, status_channel, RegistrationError};
+pub(crate) use registry::{
+    register, register_with_parent_epoch, status_channel, RegistrationError,
+};
 pub(crate) use roster::active_subagents_context_block;
 #[cfg(test)]
 pub(crate) use steering::steer;

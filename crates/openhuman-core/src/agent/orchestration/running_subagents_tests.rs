@@ -101,29 +101,15 @@ fn register_test_with_thread(
     rq: Arc<RunQueue<QueuedTurn>>,
 ) -> watch::Sender<DetachedSubagentStatus> {
     let (tx, rx) = status_channel();
-    let ctx = cx();
-    let workspace = test_workspace();
-    let parent_epoch = parent_thread_id.map(|thread_id| {
-        crate::agent::orchestration::background_completions::CompletionTarget::new(
-            ctx.clone(),
-            workspace.clone(),
-            parent_session.to_owned(),
-            Some(thread_id.to_owned()),
-        )
-        .expect("capture parent generation at spawn")
-        .parent_epoch()
-        .expect("threaded spawn has a parent generation")
-    });
     register(
-        &ctx,
+        &cx(),
         task_id.into(),
         "researcher".into(),
         parent_session.into(),
         None,
         None,
-        workspace,
+        test_workspace(),
         parent_thread_id.map(Into::into),
-        parent_epoch,
         rq,
         dummy_abort(),
         rx,
@@ -161,7 +147,7 @@ async fn late_registration_rejects_a_parent_generation_reopened_after_spawn() {
 
     let child = tokio::spawn(std::future::pending::<()>());
     let (_status_tx, status_rx) = status_channel();
-    let result = register(
+    let result = register_with_parent_epoch(
         &ctx,
         "late-register-old-task".into(),
         "researcher".into(),
