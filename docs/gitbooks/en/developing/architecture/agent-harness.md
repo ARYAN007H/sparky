@@ -706,4 +706,4 @@ Goals and todos are crate-backed outright, with no shadow: thread goals live in 
 - [Architecture overview](README.md): where the harness sits in the bigger picture.
 - [Memory](../../features/memory.md) and [Memory architecture](memory.md): the `memory` tool, the per-turn memory lifecycle and conversation logging.
 - [Automatic model routing](../../features/model-routing/README.md): how `model: "hint:reasoning"` resolves to a concrete provider+model.
-- [Native tools: agent coordination](../../features/native-tools/agent-coordination.md): the user-facing surface for `spawn_subagent`, `delegate_*`, `todo`.
+- [Native tools: agent coordination](../../features/native-tools/agent-coordination.md): the user-facing surface for `spawn_subagent` and `todo`.
