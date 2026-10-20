@@ -246,7 +246,11 @@ pub(crate) async fn resolve_persisted_parts(
     )
     .await
     .map_err(|error| format!("stored attachment workspace unavailable: {error}"))?;
-    let messages = crate::threads::store::get_messages(ctx, config.workspace_dir, thread_id)?;
+    let messages = crate::threads::store::get_messages(
+        ctx,
+        config.workspace_dir.clone(),
+        thread_id,
+    )?;
     let row = messages
         .iter()
         .find(|message| message.id == persisted_message_id && message.sender == "user")
