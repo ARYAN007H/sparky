@@ -11,7 +11,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use tinyinference_providers::builtin::{
     BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
@@ -20,8 +20,8 @@ use crate::core::slots::HookSlot;
 
 static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
     HookSlot::new("config::hosted_cloud_presets");
-type HostedAuthStyle = Arc<dyn Fn(AuthStyle) -> bool + Send + Sync>;
-static HOSTED_AUTH_STYLE: HookSlot<HostedAuthStyle> =
+pub type HostedAuthStyleClassifier = Arc<dyn Fn(AuthStyle) -> bool + Send + Sync>;
+static HOSTED_AUTH_STYLE: HookSlot<HostedAuthStyleClassifier> =
     HookSlot::new("config::hosted_auth_style");
 
 /// A built-in cloud provider preset in the host's [`AuthStyle`] vocabulary.
@@ -40,7 +40,7 @@ pub fn register_hosted_cloud_preset(id: impl Into<String>, preset: BuiltinCloudP
 
 /// Register host-owned auth-style classification without making it core
 /// inference policy.
-pub fn register_hosted_auth_style(classifier: HostedAuthStyle) {
+pub fn register_hosted_auth_style(classifier: HostedAuthStyleClassifier) {
     HOSTED_AUTH_STYLE.register("default", classifier);
 }
 
@@ -69,18 +69,18 @@ impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
 
 /// Every built-in preset: host-provided entries followed by the
 /// provider-neutral catalog from `tinyinference-providers`.
-pub static BUILTIN_CLOUD_PROVIDERS: LazyLock<Vec<BuiltinCloudProvider>> = LazyLock::new(|| {
+pub fn builtin_cloud_providers() -> Vec<BuiltinCloudProvider> {
     HOSTED_PRESETS
         .entries_context_first()
         .into_iter()
         .map(|(_, preset)| preset)
         .chain(UPSTREAM_BUILTINS.iter().map(BuiltinCloudProvider::from))
         .collect()
-});
+}
 
-pub(crate) fn builtin_cloud_provider(type_str: &str) -> Option<&'static BuiltinCloudProvider> {
-    BUILTIN_CLOUD_PROVIDERS
-        .iter()
+pub(crate) fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
+    builtin_cloud_providers()
+        .into_iter()
         .find(|provider| provider.slug == type_str)
 }
 
@@ -167,7 +167,7 @@ pub fn host_is_builtin_cloud_provider(host: &str) -> bool {
     if host.is_empty() {
         return false;
     }
-    BUILTIN_CLOUD_PROVIDERS
+    builtin_cloud_providers()
         .iter()
         .any(|p| endpoint_host(p.endpoint).as_deref() == Some(host.as_str()))
 }
@@ -189,7 +189,7 @@ pub fn endpoint_host_is_chat_completions_only(endpoint: &str) -> bool {
         return false;
     };
     let mut matched_chat_only = false;
-    for provider in BUILTIN_CLOUD_PROVIDERS.iter() {
+    for provider in builtin_cloud_providers().iter() {
         if endpoint_host(provider.endpoint).as_deref() == Some(host.as_str()) {
             if builtin_cloud_supports_responses_api(provider.slug) {
                 // A Responses-capable built-in lives at this host → not chat-only.
