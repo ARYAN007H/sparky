@@ -194,9 +194,11 @@ fn validate_queue_mode_media(
     has_stored_media: bool,
     has_uploads: bool,
 ) -> Result<(), StartChatError> {
-    if mode == QueueMode::Collect && (has_voice_note || has_stored_media || has_uploads) {
+    if matches!(mode, QueueMode::Collect | QueueMode::Steer)
+        && (has_voice_note || has_stored_media || has_uploads)
+    {
         return Err(StartChatError::Other(
-            "collect queue mode does not support typed attachments".to_string(),
+            "collect and steer queue modes do not support typed attachments".to_string(),
         ));
     }
     Ok(())
