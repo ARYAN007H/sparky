@@ -16,8 +16,7 @@ async fn flows_resume_marks_an_incompatible_legacy_checkpoint_failed() {
         FlowRunTrigger::Rpc,
     )
     .await
-    .unwrap()
-    .workflow;
+    .unwrap();
     let thread_id = run.value["thread_id"].as_str().unwrap().to_string();
     let pending: Vec<String> =
         serde_json::from_value(run.value["pending_approvals"].clone()).unwrap();
