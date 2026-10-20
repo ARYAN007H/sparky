@@ -154,7 +154,7 @@ impl FlowStore for FlowsHost {
 #[async_trait]
 impl SandboxRunner for FlowsHost {
     async fn run(&self, request: SandboxRunRequest) -> PortResult<Value> {
-        use tinybus::{ObjectPath, Proxy};
+        use tinybus::Proxy;
         use tinyflows_bus::runs::{self, SandboxRun, SandboxRunResponse};
 
         // Loading the module first applies the normal component/registry gate.

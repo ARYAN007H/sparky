@@ -10,6 +10,52 @@ fn sandbox_callback_path_is_accepted_by_tinybus() {
     assert!(path.as_str().starts_with("/ai/tinyhumans/openhuman/FlowSandbox/"));
 }
 
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn sandbox_callback_serves_scoped_tool_preflight() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection};
+
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+    let service = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let caller = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let config = Arc::new(Config::default());
+    let dispatch = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        (*config).clone(),
+    ));
+    let path = super::sandbox_callback_object_path(uuid::Uuid::new_v4()).unwrap();
+    service
+        .serve_at(
+            path.clone(),
+            SandboxToolPreflight { config, dispatch },
+        )
+        .await
+        .unwrap();
+    service.request_name(SANDBOX_CALLBACK_BUS).await.unwrap();
+    let proxy = caller
+        .proxy(
+            SANDBOX_CALLBACK_BUS,
+            path.as_str(),
+            "ai.tinyhumans.tinyflows.CapsHost",
+        )
+        .unwrap();
+
+    let output: serde_json::Value = proxy
+        .call(
+            tinyflows_bus::runs::caps::TOOL_INVOKE,
+            &("unknown-tool", serde_json::json!({}), Option::<String>::None),
+        )
+        .await
+        .unwrap();
+    assert_eq!(output, serde_json::json!({"preflight": "passed"}));
+}
+
 struct DropNotice {
     drops: Arc<AtomicUsize>,
     completed: Arc<Notify>,
