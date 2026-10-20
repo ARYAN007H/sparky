@@ -25,8 +25,8 @@ fn registry_get_config(ctx: DispatchCtx) -> ControllerTask<Config> {
     Box::pin(async move { ctx.load_config().await })
 }
 
-fn parse_registry_get_params(_params: Map<String, serde_json::Value>) -> Result<String, String> {
-    Err("mutated parser rejection".into())
+fn parse_registry_get_params(params: Map<String, serde_json::Value>) -> Result<String, String> {
+    super::handlers::parse_registry_get(&params)
 }
 
 fn run_registry_get(_ctx: DispatchCtx, config: Config, qualified_name: String) -> ControllerFuture {
