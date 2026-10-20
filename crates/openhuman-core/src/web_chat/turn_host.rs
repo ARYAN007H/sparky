@@ -89,23 +89,28 @@ impl WebHost {
         let ctx = Self::ctx_of(request)?;
         let id = request.request_id.as_str();
         let payload = &request.payload;
+        let lease_config = self
+            .shared
+            .with(id, |slot| slot.config.clone())
+            .ok_or_else(|| "web chat turn started without resolved configuration".to_owned())?;
         // The harness lock is local to this WebRuntime. Native channel and
         // relay runners use the same agent-domain lease before checking out
         // this durable identity, so separate surface runners cannot resume
         // and commit the same transcript concurrently.
         let tenant = ctx.tenant().map_err(|error| error.to_string())?;
         let tenant_scope = crate::core::runtime::tenant::tenant_key(&tenant, "");
+        let agent_id = super::session::pick_target_agent_id(&lease_config);
         // A parallel fork has its own transcript identity, while the other
         // queue modes resume the canonical thread session.
         let session_identity = if policy == CheckoutPolicy::Fork {
             format!("fork:{}", request.request_id)
         } else {
-            request.thread_id.clone()
+            crate::core::runtime::tenant::tenant_key(&tenant, &request.thread_id)
         };
         let lease = crate::agent::session_lease::SessionLease::acquire(
             crate::agent::session_lease::SessionLeaseKey::new(
                 tenant_scope,
-                request.scope.agent_id.clone(),
+                agent_id,
                 session_identity,
             ),
             None,

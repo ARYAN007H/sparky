@@ -5,17 +5,6 @@ use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus::module_progressive::ChannelOutputEvent;
 use tokio::sync::mpsc;
 
-pub(super) async fn open_native_reply(
-    ctx: &crate::channels::context::ChannelRuntimeContext,
-    envelope: &tinychannels_bus::channel::ChannelInboundEnvelope,
-    turn_id: &str,
-) -> anyhow::Result<Option<std::sync::Arc<NativeProgressiveReply>>> {
-    let Some(target) = native_target(ctx, envelope)? else {
-        return Ok(None);
-    };
-    target.open(turn_id).await.map(Some)
-}
-
 /// Captured configured module target for a single inbound conversation.
 /// Opening the progressive handle is deferred until TurnRunner checkout, so a
 /// queued follow-up gets a fresh module handle after it wins admission.
