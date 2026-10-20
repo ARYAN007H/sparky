@@ -56,7 +56,7 @@ impl ListStore<PendingDeletion> for FileStore {
                 &self.workspace_dir,
                 STATE,
             )
-                .map_err(|error| StoreError(error.to_string()));
+            .map_err(|error| StoreError(error.to_string()));
         }
         let all = all.to_vec();
         super::state_store::save_workspace(&self.workspace_dir, STATE, &all)

@@ -136,15 +136,17 @@ fn legacy_queue_scopes(workspace_dir: &Path) -> Vec<crate::storage::Scope> {
         .is_some_and(|(active, requested)| active == requested);
     if active_matches {
         if let Ok(tenant) = dispatch.tenant() {
-        match (tenant.profile, tenant.agent) {
-            (Some(profile), _) if known_profile.as_ref().is_none_or(|known| known == &profile) => {
-                scopes.push(crate::storage::scope_for_profile(&profile));
+            match (tenant.profile, tenant.agent) {
+                (Some(profile), _)
+                    if known_profile.as_ref().is_none_or(|known| known == &profile) =>
+                {
+                    scopes.push(crate::storage::scope_for_profile(&profile));
+                }
+                (None, Some(agent)) if known_profile.is_none() => {
+                    scopes.push(crate::storage::scope_for_agent(&agent));
+                }
+                _ => {}
             }
-            (None, Some(agent)) if known_profile.is_none() => {
-                scopes.push(crate::storage::scope_for_agent(&agent));
-            }
-            _ => {}
-        }
         }
     }
 
