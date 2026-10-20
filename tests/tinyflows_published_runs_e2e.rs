@@ -29,7 +29,7 @@ fn write_config(home: &Path, module: &Path) -> std::path::PathBuf {
     )
     .expect("quoted module path");
     let config = format!(
-        "api_url = \"http://127.0.0.1:1\"\n\n[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_module}\n\n[autonomy]\nenabled = true\nlevel = \"read_only\"\n"
+        "api_url = \"http://127.0.0.1:1\"\n\n[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_module}\n\n[autonomy]\nenabled = true\nlevel = \"readonly\"\n"
     );
     for dir in [home.join(".openhuman"), home.join(".openhuman/users/local")] {
         std::fs::create_dir_all(&dir).expect("create isolated config directory");
@@ -147,6 +147,15 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     let config = openhuman_core::config::Config::load_from_config_path(&config_path, &workspace)
         .await
         .expect("load the isolated ReadOnly module configuration");
+    assert!(
+        config.autonomy.enabled,
+        "the host autonomy policy is enabled"
+    );
+    assert_eq!(
+        config.autonomy.level,
+        openhuman_core::security::AutonomyLevel::ReadOnly,
+        "the exact ReadOnly tier must be captured by the RPC context"
+    );
     let (core_context, _, _) = openhuman_core::core::runtime::CoreContext::init_with_config(
         openhuman_core::core::types::HostKind::Library,
         &openhuman_core::core::runtime::TokenSource::Fixed(Arc::new(TEST_TOKEN.to_owned())),
