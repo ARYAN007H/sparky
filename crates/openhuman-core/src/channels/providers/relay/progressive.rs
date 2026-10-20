@@ -14,6 +14,7 @@ use tinychannels_bus::{
 use super::channel::RelayChannel;
 
 pub(crate) struct RelayProgressiveTransport {
+    ctx: crate::core::runtime::DispatchCtx,
     channel: Arc<RelayChannel>,
     channel_ref: tinychannels_bus::ChannelRef,
     conversation: tinychannels_bus::ConversationRef,
@@ -23,6 +24,7 @@ pub(crate) struct RelayProgressiveTransport {
 
 impl RelayProgressiveTransport {
     pub(crate) fn new(
+        ctx: crate::core::runtime::DispatchCtx,
         channel: Arc<RelayChannel>,
         channel_ref: tinychannels_bus::ChannelRef,
         conversation: tinychannels_bus::ConversationRef,
@@ -30,6 +32,7 @@ impl RelayProgressiveTransport {
         projection: Arc<crate::web_chat::Surface>,
     ) -> Self {
         Self {
+            ctx,
             channel,
             channel_ref,
             conversation,
@@ -107,6 +110,7 @@ impl RelayProgressiveTransport {
                     return Err(Error::failed("hosted relay send identity is invalid"));
                 }
                 self.channel.publish_typed_reply(
+                    &self.ctx,
                     &self.channel_ref,
                     &self.conversation,
                     &self.turn_id,

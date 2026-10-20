@@ -261,6 +261,8 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
 
 #[tokio::test]
 async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
     let _env_lock = EnvVarGuard::locked_async().await;
     let _storage = crate::channels::module_fixture::install_memory_storage();
     let client = crate::channels::module_fixture::client().await;
@@ -284,19 +286,26 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         ..Default::default()
     };
     let mut web_events = crate::web_chat::subscribe_web_channel_events();
+    let config = Config::default();
+    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
+            .session_agent("relay-agent")
+            .session_profile("relay-profile"),
+    ));
     let projection = Arc::new(
         crate::web_chat::Surface::new(
-            &crate::core::runtime::DispatchCtx::ambient(),
+            &ctx,
             crate::web_chat::TurnIds {
                 client_id: "relay-fixture-client".into(),
                 thread_id: "channel:telegram/sender-7/chat-42".into(),
                 request_id: "relay-fixture-request".into(),
             },
-            Config::default(),
+            config,
         )
         .await,
     );
     let callback = crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
+        ctx,
         Arc::clone(&relay),
         channel.clone(),
         conversation.clone(),
@@ -360,18 +369,26 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
     assert_eq!(outcome.receipt.conversation.as_ref(), Some(&conversation));
     assert_eq!(outcome.receipt.thread_id.as_deref(), Some("topic-3"));
     assert_eq!(relay.sent(), vec!["typed hosted relay reply".to_owned()]);
-    let projected = tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
+    let mut projected = None;
+    let mut terminal = None;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while projected.is_none() || terminal.is_none() {
             let event = web_events.recv().await.expect("web event bus");
-            if event.context().request_id == "relay-fixture-request"
-                && event.event_name() == "chat_done"
-            {
-                break event;
+            if event.context().request_id != "relay-fixture-request" {
+                continue;
+            }
+            match event.event_name() {
+                "chat_done" => projected = Some(event),
+                crate::channels::providers::relay::CHANNEL_OUTBOUND_EVENT => {
+                    terminal = Some(event)
+                }
+                _ => panic!("unexpected relayed output event: {}", event.event_name()),
             }
         }
     })
     .await
-    .expect("compiled relay output is projected through the web adapter");
+    .expect("web projection and SaaS terminal both arrive without dropping either");
+    let projected = projected.expect("compiled relay output is projected through the web adapter");
     let projected_wire = serde_json::to_value(&projected).expect("projected wire event");
     assert_eq!(projected.context().client_id, "relay-fixture-client");
     assert_eq!(
@@ -379,21 +396,13 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         "channel:telegram/sender-7/chat-42"
     );
     assert_eq!(projected.context().seq, Some(1));
+    assert!(projected.belongs_to("relay-agent"));
+    assert!(projected.belongs_to_profile("relay-profile"));
     assert_eq!(projected_wire["full_response"], "typed hosted relay reply");
-
-    let terminal = tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            let event = web_events.recv().await.expect("web event bus");
-            if event.context().request_id == "relay-fixture-request"
-                && event.event_name() == crate::channels::providers::relay::CHANNEL_OUTBOUND_EVENT
-            {
-                break event;
-            }
-        }
-    })
-    .await
-    .expect("SaaS terminal delivery remains available");
+    let terminal = terminal.expect("SaaS terminal delivery remains available");
     assert_eq!(terminal.context().client_id, "relay-fixture-client");
+    assert!(terminal.belongs_to("relay-agent"));
+    assert!(terminal.belongs_to_profile("relay-profile"));
     assert_eq!(relay.sent().len(), 1, "terminal output is not duplicated");
     runtime
         .close()
@@ -403,6 +412,8 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
 
 #[tokio::test]
 async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_terminal() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
     let _env_lock = EnvVarGuard::locked_async().await;
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
@@ -429,10 +440,15 @@ async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_te
         topic_id: Some("topic-3".into()),
         ..Default::default()
     };
-    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let config = Config::default();
+    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
+            .session_agent("relay-target-agent")
+            .session_profile("relay-target-profile"),
+    ));
     let target = crate::channels::runtime::dispatch::hosted_relay_target(
         &ctx,
-        &Config::default(),
+        &config,
         Arc::clone(&relay),
         channel,
         conversation,
@@ -478,12 +494,16 @@ async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_te
     assert_eq!(projected.context().client_id, client_id);
     assert_eq!(projected.context().thread_id, thread_id);
     assert_eq!(projected.context().seq, Some(1));
+    assert!(projected.belongs_to("relay-target-agent"));
+    assert!(projected.belongs_to_profile("relay-target-profile"));
     assert_eq!(projected_wire["full_response"], "projected hosted reply");
 
     let gateway_terminal = gateway_terminal.expect("legacy SaaS terminal");
     let terminal_wire = serde_json::to_value(&gateway_terminal).expect("gateway wire");
     assert_eq!(gateway_terminal.context().client_id, client_id);
     assert_eq!(gateway_terminal.context().thread_id, thread_id);
+    assert!(gateway_terminal.belongs_to("relay-target-agent"));
+    assert!(gateway_terminal.belongs_to_profile("relay-target-profile"));
     assert_eq!(terminal_wire["structured"]["kind"], "channel_outbound");
     assert_eq!(relay.sent().len(), 1, "one provider terminal is published");
 

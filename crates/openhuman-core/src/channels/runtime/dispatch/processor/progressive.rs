@@ -70,6 +70,7 @@ impl NativeProgressiveTarget {
                 );
                 let callback =
                     crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
+                        ctx.clone(),
                         Arc::clone(channel),
                         self.channel.clone(),
                         self.conversation.clone(),
