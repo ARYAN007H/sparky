@@ -72,9 +72,7 @@ pub(crate) use turn_model::{
 // Factory-internal helpers shared across the submodules (and their tests)
 // through `use super::*`.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
-use chat_model::{
-    unresolved_chat_model_error, unresolved_chat_model_error_for, with_default_temperature,
-};
+use chat_model::{unresolved_chat_model_error_for, with_default_temperature};
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
 use cloud_slug::{
