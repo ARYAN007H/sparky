@@ -21,7 +21,9 @@ function supportedLocales(source: string): string[] {
   }
   const locales = [...union[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
   if (!locales.length || new Set(locales).size !== locales.length) {
-    throw new Error(`${localeTypesPath}: Locale union is empty or contains duplicates`);
+    throw new Error(
+      `${localeTypesPath}: Locale union is empty or contains duplicates`,
+    );
   }
   return locales;
 }
@@ -29,7 +31,7 @@ function supportedLocales(source: string): string[] {
 async function loadLocale(locale: string): Promise<Record<string, unknown>> {
   const file = path.join(i18nDir, `${locale}.ts`);
   const translations = (await import(pathToFileURL(file).href)).default;
-  if (translations == null || typeof translations !== 'object') {
+  if (translations == null || typeof translations !== "object") {
     throw new Error(`${file}: expected a translation map`);
   }
   return translations as Record<string, unknown>;
@@ -55,7 +57,8 @@ async function renderCatalog(): Promise<string> {
   const keys = Object.keys(english)
     .filter((key) => key.startsWith("chat_error."))
     .sort();
-  if (!keys.length) throw new Error("English catalog contains no chat_error keys");
+  if (!keys.length)
+    throw new Error("English catalog contains no chat_error keys");
 
   const entries: Array<[string, string, string]> = [];
   for (const key of keys) {
@@ -70,7 +73,9 @@ async function renderCatalog(): Promise<string> {
         throw new Error(`${locale}:${key} is missing or is not a string`);
       }
       if (placeholders(translated).join(",") !== expectedPlaceholders) {
-        throw new Error(`${locale}:${key} has different interpolation placeholders`);
+        throw new Error(
+          `${locale}:${key} has different interpolation placeholders`,
+        );
       }
       entries.push([locale, key, translated]);
     }
@@ -115,16 +120,24 @@ async function main() {
   try {
     current = await readFile(outputPath, "utf8");
   } catch {
-    throw new Error(`${path.relative(root, outputPath)} is missing; run with --write`);
+    throw new Error(
+      `${path.relative(root, outputPath)} is missing; run with --write`,
+    );
   }
   if (current !== rendered) {
-    throw new Error(`${path.relative(root, outputPath)} is stale; run with --write`);
+    throw new Error(
+      `${path.relative(root, outputPath)} is stale; run with --write`,
+    );
   }
-  const localeCount = supportedLocales(await readFile(localeTypesPath, "utf8")).length;
-  console.log(`verified ${path.relative(root, outputPath)} (${localeCount} locales)`);
+  const localeCount = supportedLocales(
+    await readFile(localeTypesPath, "utf8"),
+  ).length;
+  console.log(
+    `verified ${path.relative(root, outputPath)} (${localeCount} locales)`,
+  );
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
