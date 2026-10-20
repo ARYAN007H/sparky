@@ -175,3 +175,4 @@ pub fn redact_endpoint(url: &str) -> String {
     }
     "<endpoint>".to_string()
 }
+use crate::config::ops::legacy_inference_slug;

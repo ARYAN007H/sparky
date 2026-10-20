@@ -46,7 +46,6 @@ mod credentials;
 mod discovery;
 mod local_runtime;
 mod managed_backend;
-mod primary_cloud;
 mod routing;
 mod subprocess_providers;
 mod tiers;
@@ -93,7 +92,6 @@ pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread,
 };
 use managed_backend::{managed_chat_model, resolve_managed_model};
-use primary_cloud::{legacy_inference_slug, resolve_primary_cloud_provider_string};
 use subprocess_providers::{
     prepare_claude_agent_sdk_chat_model, try_create_claude_agent_sdk_chat_model,
     try_create_claude_agent_sdk_chat_model_from_string, try_create_claude_code_chat_model,

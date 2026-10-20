@@ -437,3 +437,4 @@ pub(super) fn unresolved_chat_model_error(
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
+use crate::config::ops::resolve_primary_cloud_provider_string;

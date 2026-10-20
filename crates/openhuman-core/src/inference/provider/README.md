@@ -10,7 +10,7 @@ previously `providers/` (pre-consolidation single-crate layout); see
 
 ## Public surface
 
-- **Factory** ([`factory.rs`](./factory.rs) + `factory/`: `routing.rs`, `tiers.rs`, `turn_model.rs`, `subprocess_providers.rs`, `access_gates.rs`, `chat_model.rs`, `cloud_slug.rs`, `credentials.rs`, `local_runtime.rs`, `managed_backend.rs`, `primary_cloud.rs`), `create_chat_model`,
+- **Factory** ([`factory.rs`](./factory.rs) + `factory/`: `routing.rs`, `tiers.rs`, `turn_model.rs`, `subprocess_providers.rs`, `access_gates.rs`, `chat_model.rs`, `cloud_slug.rs`, `credentials.rs`, `local_runtime.rs`, `managed_backend.rs`), `create_chat_model`,
   `create_chat_model_from_string[_with_model_id]`,
   `create_chat_model_with_model_id`, `provider_for_role`, `role_for_model_tier`,
   `probe_inference_readiness`, `BYOK_INCOMPLETE_SENTINEL`. Parses the
