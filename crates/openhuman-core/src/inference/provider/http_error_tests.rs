@@ -86,7 +86,7 @@ async fn backend_401_publishes_session_expired_through_reporter() {
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
     let marker = "REPORTER_MARKER_SESSION";
     let _ = api_error(
-        openhuman_backend_model::PROVIDER_LABEL,
+        "OpenHuman",
         response(StatusCode::UNAUTHORIZED, marker),
     )
     .await;
@@ -128,7 +128,7 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
     let _ = api_error(
-        openhuman_backend_model::PROVIDER_LABEL,
+        "OpenHuman",
         response(
             StatusCode::UNAUTHORIZED,
             r#"{"error":{"type":"authentication_error"}}"#,
@@ -137,7 +137,7 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
     .await;
     let rejected = drain_until(&mut rx, |e| match e {
         DomainEvent::ProviderApiKeyRejected { provider, .. }
-            if provider == openhuman_backend_model::PROVIDER_LABEL =>
+            if provider == "OpenHuman" =>
         {
             Some(())
         }
@@ -154,7 +154,7 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
 #[test]
 fn is_backend_auth_failure_only_matches_openhuman_backend_401_403() {
     use reqwest::StatusCode;
-    let backend = crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL;
+    let backend = "OpenHuman";
 
     assert!(is_backend_auth_failure(backend, StatusCode::UNAUTHORIZED));
     assert!(is_backend_auth_failure(backend, StatusCode::FORBIDDEN));
@@ -275,7 +275,7 @@ async fn publish_backend_session_expired_emits_sanitized_session_expired() {
     );
     publish_backend_session_expired(
         "chat_completions",
-        crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL,
+        "OpenHuman",
         reqwest::StatusCode::UNAUTHORIZED,
         &msg,
     );
@@ -344,7 +344,7 @@ fn skips_sentry_report_for_transient_upstream_statuses() {
 
 #[test]
 fn backend_error_code_owned_gates_managed_errors_except_malformed_bad_request() {
-    use crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL;
+    const PROVIDER_LABEL: &str = "OpenHuman";
 
     // F2/F4: backend-owned / expected-user-state errorCodes must NOT page the
     // provider HTTP layer.
