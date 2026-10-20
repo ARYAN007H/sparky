@@ -26,7 +26,7 @@ fn registry_get_config(ctx: DispatchCtx) -> ControllerTask<Config> {
 }
 
 fn parse_registry_get_params(params: Map<String, serde_json::Value>) -> Result<String, String> {
-    super::handlers::parse_registry_get(&params)
+    handlers::parse_registry_get(&params)
 }
 
 fn run_registry_get(_ctx: DispatchCtx, config: Config, qualified_name: String) -> ControllerFuture {
