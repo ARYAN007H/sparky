@@ -249,7 +249,12 @@ fn frozen_legacy_mode_arguments_are_accepted_but_ignored() {
         "dedicated_thread": true,
     });
     let decoded = decode_async_spawn_args(&args);
+    let plain = decode_async_spawn_args(&json!({
+        "agent_id": "task_manager_agent",
+        "prompt": "inspect the frozen-session compatibility route",
+    }));
     assert_eq!(decoded.agent_id, "task_manager_agent");
     assert_eq!(decoded.prompt, "inspect the frozen-session compatibility route");
-    assert_eq!(decoded.task_key, durable_task_key_source(&args, &decoded.prompt, None));
+    assert_eq!(decoded.task_key, plain.task_key);
+    assert!(!decoded.force_fresh);
 }
