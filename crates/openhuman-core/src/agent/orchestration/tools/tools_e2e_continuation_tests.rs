@@ -6,9 +6,12 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         DurableSubagentStatus, SubagentSessionStore,
     };
     use crate::agent::orchestration::tools::SpawnSubagentTool;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
+    let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
     let provider = Arc::new(PauseThenAnswerModel {
@@ -19,6 +22,8 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         Box::new(tinyagents_harness_tools::AskClarificationTool::new());
     let ask_spec = Arc::new(ask_tool.spec());
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    parent.workspace_dir = workspace.path().to_path_buf();
+    parent.session_id = "continue-paused-e2e".into();
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);
     parent.on_progress = Some(progress_tx);
     parent.all_tools = Arc::new(vec![ask_tool]);
@@ -30,8 +35,28 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     parent
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
-    let live =
-        crate::agent::orchestration::tools::live_parent_run_context("continue-paused-e2e", parent);
+    let mut definition = AgentDefinitionRegistry::builtins_only()
+        .get("task_manager_agent")
+        .expect("task manager definition")
+        .clone();
+    definition.model = tinyagents_definition::ModelSpec::Inherit;
+    let definitions =
+        Arc::new(AgentDefinitionRegistry::builtins_only().with_definitions([definition]));
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
+    );
+    let mut host_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    host_context.thread_id = Some("continue-paused-e2e-thread".into());
+    let live = tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new("continue-paused-e2e")
+            .with_thread("continue-paused-e2e-thread"),
+        host_context,
+    );
     let paused = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -79,7 +104,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             crate::agent::tinyagents::tool_registration::subagent_owner_key(
                 workspace.path(),
                 "continue-paused-e2e",
-                None,
+                Some("continue-paused-e2e-thread"),
             ),
         ),
     )
