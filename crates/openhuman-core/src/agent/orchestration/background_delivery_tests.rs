@@ -401,7 +401,7 @@ async fn a_malicious_summary_cannot_forge_or_escape_the_persisted_envelope() {
 #[tokio::test]
 async fn a_pending_completion_survives_a_restart_and_is_delivered() {
     // The user-approved goal: a result that finished but was never delivered
-    // (the process died first) reaches its thread after the restart.
+    // (the process died before claiming it) reaches its thread after restart.
     let _g = test_guard().await;
     let ws = workspace();
     let w = ws.path();
@@ -413,17 +413,11 @@ async fn a_pending_completion_survives_a_restart_and_is_delivered() {
         "thread-restart",
     )
     .await;
-    // The first delivery attempt is claimed and then the process "dies": the
-    // lease is in memory only.
-    let router = router_for_workspace(w);
     assert_eq!(
-        router
-            .claim_pending("thread-restart", usize::MAX)
-            .unwrap()
-            .len(),
-        1
+        pending_ids(w, "thread-restart"),
+        ["sub-1"],
+        "the undelivered result is durable before the restart"
     );
-    drop(router);
 
     forget_workspace_for_test(w);
     let threads = background_completions::recover_pending_threads(&cx(), w);
@@ -461,6 +455,44 @@ async fn a_pending_completion_survives_a_restart_and_is_delivered() {
 
     forget_workspace_for_test(w);
     assert!(background_completions::recover_pending_threads(&cx(), w).is_empty());
+}
+
+#[tokio::test]
+async fn an_unexpired_completion_claim_stays_leased_after_router_reopen() {
+    let _g = test_guard().await;
+    let ws = workspace();
+    let w = ws.path();
+    record(
+        w,
+        "bd-claimed-restart",
+        "sub-1",
+        "claimed before restart",
+        "thread-claimed-restart",
+    )
+    .await;
+
+    let router = router_for_workspace(w);
+    let claimed = router
+        .claim_pending("thread-claimed-restart", usize::MAX)
+        .unwrap();
+    assert_eq!(claimed.len(), 1, "the first owner holds the completion");
+    drop(claimed);
+    drop(router);
+    forget_workspace_for_test(w);
+
+    let reopened = router_for_workspace(w);
+    assert!(
+        reopened
+            .claim_pending("thread-claimed-restart", usize::MAX)
+            .unwrap()
+            .is_empty(),
+        "an unexpired durable claim prevents duplicate delivery after reopening"
+    );
+    assert_eq!(
+        pending_ids(w, "thread-claimed-restart"),
+        ["sub-1"],
+        "the leased completion remains pending for delivery after its visibility lease expires"
+    );
 }
 
 #[tokio::test]
