@@ -194,8 +194,7 @@ fn install_request_turns_on_the_handle_preview_by_default() {
     assert!(request.options.router_enabled);
     assert!(request.options.ccr_enabled);
     assert!(request.options.repl_handle);
-    // The plain-text copy on disk is opt-in.
-    assert_eq!(request.options.repl_save_dir, None);
+    assert!(!request.ccr_durable);
 }
 
 #[test]
@@ -212,22 +211,40 @@ fn install_request_handle_mode_follows_every_switch_it_needs() {
         config.tokenjuice.repl_save_enabled = true;
         let request = install_request(&config);
         assert!(!request.options.repl_handle);
-        assert_eq!(
-            request.options.repl_save_dir, None,
-            "no handle, so nothing to save a copy of"
-        );
     }
 }
 
 #[test]
-fn install_request_saves_a_copy_under_the_workspace_when_asked() {
+fn install_request_projects_durable_ccr_and_ttl_without_filesystem_paths() {
     let mut config = crate::config::Config::default();
     config.workspace_dir = std::path::PathBuf::from("/ws");
-    config.tokenjuice.repl_save_enabled = true;
+    config.tokenjuice.ccr_disk_enabled = true;
+    config.tokenjuice.ccr_ttl_secs = Some(73);
     let request = install_request(&config);
+    assert!(request.ccr_durable);
+    assert_eq!(request.ccr_ttl_secs, Some(73));
+
+    let wire = serde_json::to_value(request).unwrap();
+    assert_eq!(wire["ccrDurable"], true);
+    assert_eq!(wire["ccrTtlSecs"], 73);
+    assert!(wire.get("diskTierRoot").is_none());
+    assert!(wire["options"].get("replSaveDir").is_none());
+}
+
+#[test]
+fn retired_repl_save_setting_remains_compatible_but_does_not_change_module_request() {
+    let config = crate::config::Config::default();
+    let mut enabled = config.clone();
+    enabled.tokenjuice.repl_save_enabled = true;
+
+    assert_ne!(
+        config.tokenjuice.repl_save_enabled,
+        enabled.tokenjuice.repl_save_enabled
+    );
     assert_eq!(
-        request.options.repl_save_dir,
-        Some(std::path::PathBuf::from("/ws/.tokenjuice/repl"))
+        serde_json::to_value(install_request(&config)).unwrap(),
+        serde_json::to_value(install_request(&enabled)).unwrap(),
+        "the retired filesystem snapshot setting is retained for config compatibility, not sent to TinyJuice"
     );
 }
 
