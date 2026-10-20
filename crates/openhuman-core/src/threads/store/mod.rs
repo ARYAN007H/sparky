@@ -71,6 +71,7 @@ impl From<types::ConversationPurgeStats> for ConversationPurgeStats {
 // Only the hosted-channel relay (`channels`) claims turns.
 #[cfg(feature = "channels")]
 pub(crate) use bus::claim_channel_turn;
+#[cfg(test)]
 pub(crate) use bus::persist_channel_message;
 pub use bus::register_conversation_persistence_subscriber;
 pub use store::{
