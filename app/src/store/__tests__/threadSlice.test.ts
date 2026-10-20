@@ -114,7 +114,7 @@ describe('threadSlice synchronous reducers', () => {
 
     expect(
       store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]
-        ?.extraMetadata.channelActivity
+        ?.extraMetadata?.channelActivity
     ).toEqual({
       reactions: [{ actorId: 'alice', value: '🔥' }],
       readReceipts: [],

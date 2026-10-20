@@ -432,10 +432,11 @@ export const persistMessageFeedback = createAsyncThunk(
     const message = stored.find(e => e.id === payload.messageId);
     if (!message) return rejectWithValue('Message not found');
 
-    const previous = message.extraMetadata[FEEDBACK_METADATA_KEY];
+    const currentMetadata = message.extraMetadata ?? {};
+    const previous = currentMetadata[FEEDBACK_METADATA_KEY];
     const next = previous === payload.feedback ? undefined : payload.feedback;
     const extraMetadata: Record<string, unknown> = {
-      ...message.extraMetadata,
+      ...currentMetadata,
       [FEEDBACK_METADATA_KEY]: next,
     };
     if (payload.rowIds && payload.rowIds.length > 1) {
@@ -544,7 +545,7 @@ const threadSlice = createSlice({
       const updateMessage = (message: ThreadMessage) => {
         if (message.id !== rowId) return;
         message.extraMetadata = {
-          ...message.extraMetadata,
+          ...(message.extraMetadata ?? {}),
           channelActivity: {
             reactions: activity.reactions,
             readReceipts: activity.readReceipts,
