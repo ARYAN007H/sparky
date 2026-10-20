@@ -31,6 +31,12 @@ fn open(workspace_dir: &Path, name: &str) -> Result<StateKv> {
     Ok(kv)
 }
 
+fn open_quarantining<T: DeserializeOwned>(workspace_dir: &Path, name: &str) -> Result<StateKv> {
+    let kv = StateKv::open(workspace_dir, OWNER, NS)?;
+    kv.import_file_quarantining::<T>(name, &legacy_path(workspace_dir, name))?;
+    Ok(kv)
+}
+
 /// [`open`] for a value a damaged legacy file must not reset.
 fn open_strict(workspace_dir: &Path, name: &str) -> Result<StateKv> {
     let kv = StateKv::open(workspace_dir, OWNER, NS)?;
@@ -98,7 +104,7 @@ pub(crate) fn load<T: DeserializeOwned + Send + 'static>(
     workspace_dir: &Path,
     name: &str,
 ) -> Result<Option<T>> {
-    open(workspace_dir, name)?.get(name)
+    open_quarantining::<T>(workspace_dir, name)?.get(name)
 }
 
 /// The names of the state values starting with `prefix`: those stored, plus

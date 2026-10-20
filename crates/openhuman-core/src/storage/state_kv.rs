@@ -228,6 +228,78 @@ impl StateKv {
         self.import_file_with(name, legacy, false)
     }
 
+    /// Imports a typed legacy JSON value once, preserving invalid input beside
+    /// the source as `<name>.json.corrupt` so the state port can start fresh.
+    /// Existing generic and strict import paths keep their original behavior.
+    ///
+    /// # Errors
+    ///
+    /// A storage error, a legacy read error, or a failure to quarantine an
+    /// invalid legacy file.
+    pub fn import_file_quarantining<T: DeserializeOwned>(
+        &self,
+        name: &str,
+        legacy: &Path,
+    ) -> Result<()> {
+        self.import_once(name, || {
+            match std::fs::read(legacy) {
+                Ok(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => {}
+                Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
+                    Ok(value) if serde_json::from_value::<T>(value.clone()).is_ok() => {
+                        let wrote = self.insert_if_absent(name, &value)?;
+                        log::debug!(
+                            "[storage::state_kv] imported {}/{}/{name} (written={wrote})",
+                            self.owner,
+                            self.ns
+                        );
+                    }
+                    Ok(_) => log::warn!(
+                        "[storage::state_kv] legacy {}/{}/{name} has the wrong value type; quarantining",
+                        self.owner,
+                        self.ns
+                    ),
+                    Err(error) => log::warn!(
+                        "[storage::state_kv] legacy {}/{}/{name} is not JSON ({error}); quarantining",
+                        self.owner,
+                        self.ns
+                    ),
+                },
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(error)
+                        .with_context(|| format!("read the legacy state file {}", legacy.display()));
+                }
+            }
+            Ok(())
+        })?;
+        self.quarantine_invalid_legacy::<T>(legacy)
+    }
+
+    fn quarantine_invalid_legacy<T: DeserializeOwned>(&self, legacy: &Path) -> Result<()> {
+        let bytes = match std::fs::read(legacy) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("read the legacy state file {}", legacy.display()));
+            }
+        };
+        if bytes.iter().all(u8::is_ascii_whitespace)
+            || serde_json::from_slice::<Value>(&bytes)
+                .and_then(|value| serde_json::from_value::<T>(value))
+                .is_ok()
+        {
+            return Ok(());
+        }
+
+        let backup = legacy.with_extension("json.corrupt");
+        if backup.exists() {
+            anyhow::bail!("the corrupt legacy backup {} already exists", backup.display());
+        }
+        std::fs::rename(legacy, &backup)
+            .with_context(|| format!("quarantine corrupt legacy state {}", legacy.display()))
+    }
+
     /// [`Self::import_file`] for a value that must not start over from a
     /// damaged file: an unparsable file is an error and is not recorded, so
     /// every read fails closed until the file is repaired or removed.
