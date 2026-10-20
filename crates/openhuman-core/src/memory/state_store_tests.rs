@@ -102,6 +102,16 @@ fn layout_import_places_legacy_retry_queue_in_its_workspace_scope() {
 
     let backend: std::sync::Arc<dyn crate::storage::StorageBackend> =
         std::sync::Arc::new(crate::storage::MemoryStorage::new());
+    let local = backend.for_scope(&crate::storage::Scope::local()).unwrap();
+    let local_queue = crate::storage::state_kv::StateKv::over(&local, "memory", "state");
+    local_queue
+        .put(
+            "pending_deletions",
+            &vec![crate::memory::deletion::PendingDeletion::Thread {
+                thread_id: "thread-previously-imported".into(),
+            }],
+        )
+        .unwrap();
     super::import_all(&backend, tmp.path()).unwrap();
 
     let workspace_scope = super::workspace_scope(tmp.path()).unwrap();
@@ -111,13 +121,16 @@ fn layout_import_places_legacy_retry_queue_in_its_workspace_scope() {
         queue
             .get::<Vec<crate::memory::deletion::PendingDeletion>>("pending_deletions")
             .unwrap(),
-        Some(vec![crate::memory::deletion::PendingDeletion::Thread {
-            thread_id: "thread-legacy".into(),
-        }])
+        Some(vec![
+            crate::memory::deletion::PendingDeletion::Thread {
+                thread_id: "thread-legacy".into(),
+            },
+            crate::memory::deletion::PendingDeletion::Thread {
+                thread_id: "thread-previously-imported".into(),
+            },
+        ])
     );
 
-    let local = backend.for_scope(&crate::storage::Scope::local()).unwrap();
-    let local_queue = crate::storage::state_kv::StateKv::over(&local, "memory", "state");
     assert!(
         local_queue
             .get::<Vec<crate::memory::deletion::PendingDeletion>>("pending_deletions")

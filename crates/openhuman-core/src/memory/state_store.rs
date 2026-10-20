@@ -135,6 +135,27 @@ pub(crate) fn import_all(
         }
         names.push(name);
     }
+    // Earlier versions imported this queue with the rest of memory state in
+    // `local`. Move any such durable entries to the workspace-owned scope
+    // before the layout migrator archives the old files. Remove the source
+    // only after the target write succeeds so an interrupted migration can
+    // retry without losing owed deletions.
+    if let Some(previous) = local_kv.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")? {
+        let mut pending = queue_kv
+            .get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
+            .unwrap_or_default();
+        for deletion in previous {
+            if !pending.contains(&deletion) {
+                pending.push(deletion);
+            }
+        }
+        if pending.is_empty() {
+            queue_kv.delete("pending_deletions")?;
+        } else {
+            queue_kv.put("pending_deletions", &pending)?;
+        }
+        local_kv.delete("pending_deletions")?;
+    }
     names.sort();
     Ok(names)
 }
