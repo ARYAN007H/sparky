@@ -4,7 +4,6 @@ use tinybus::module::platform::candidates_for;
 #[path = "registry_computer_release_tests.rs"]
 mod computer_release_tests;
 
-
 #[test]
 #[cfg(feature = "web3")]
 fn tinywallet_registry_matches_the_verified_v0241_release_manifest() {
