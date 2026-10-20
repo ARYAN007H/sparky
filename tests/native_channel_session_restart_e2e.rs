@@ -781,19 +781,13 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
         .expect("Telegram updates")
         .push_back(voice_update(200, 20));
 
-    wait_until("voice note reaches inference and sendVoice", || {
+    wait_until("voice note reaches inference", || {
         !mocks
             .state
             .completions
             .lock()
             .expect("model requests")
             .is_empty()
-            && !mocks
-                .state
-                .sent_voice_uploads
-                .lock()
-                .expect("voice uploads")
-                .is_empty()
     })
     .await;
 
@@ -842,6 +836,15 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
         &["fixture-voice-file"],
         "the real Telegram voice file ID is resolved before scoped transcription"
     );
+    wait_until("mirror reply reaches Telegram sendVoice", || {
+        !mocks
+            .state
+            .sent_voice_uploads
+            .lock()
+            .expect("voice uploads")
+            .is_empty()
+    })
+    .await;
     assert_eq!(
         mocks
             .state
