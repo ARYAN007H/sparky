@@ -564,10 +564,10 @@ default_model = "e2e-mock-model"
 default_temperature = 0.7
 chat_onboarding_completed = true
 
+{extra_config}
+
 [secrets]
 encrypt = false
-
-{extra_config}
 "#
     );
     fn write_config_file(config_dir: &Path, cfg: &str) {
@@ -581,8 +581,11 @@ encrypt = false
     {
         write_config_file(&openhuman_dir.join("users").join("local"), &cfg);
     }
-    let _: openhuman_core::config::Config =
+    let parsed: openhuman_core::config::Config =
         toml::from_str(&cfg).expect("config toml must match Config schema");
+    if extra_config.contains("user_timezone = \"UTC\"") {
+        assert_eq!(parsed.user_timezone.as_deref(), Some("UTC"));
+    }
 }
 
 // ─── SSE collector ──────────────────────────────────────────────────────────
