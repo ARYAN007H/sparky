@@ -156,6 +156,7 @@ impl ControllerEntry {
         }
     }
 
+    #[cfg(test)]
     fn legacy_controller(&self) -> Option<RegisteredController> {
         match &self.handler {
             EntryHandler::Legacy(handler) => Some(RegisteredController {
