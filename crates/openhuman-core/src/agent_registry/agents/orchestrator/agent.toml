@@ -218,36 +218,9 @@ named = [
     "storage_download_file",
     "storage_list_files",
     "storage_get_link",
-    # Sub-agent surface, deliberately three tools (#5701). A sub-agent is
-    # always async: `spawn_subagent` returns a task id immediately and
-    # the runner delivers the result back on an idle system turn via
-    # `orchestration::background_delivery`. Nothing has to block for it, so
-    # the collection surface that used to sit here — `wait`, `wait_loop`,
-    # `wait_subagent` — bought nothing but tokens and an invitation to stall
-    # the turn. Multiple async sub-agent requests can also be sent in parallel:
-    # already several workers in flight, so a dedicated fan-out tool was a
-    # second way to say the same thing. `steer_subagent` and `close_subagent`
-    # were fleet-management affordances for a fleet the model no longer
-    # enumerates; a worker that needs different instructions is cheaper to
-    # respawn, and idle sessions are reaped against the registry cap anyway.
+    # Sub-agent work always uses the asynchronous spawn surface. Select the
+    # specialist with agent_id and reuse task_key to continue an existing task.
     "spawn_subagent",
-    # Fleet awareness. Re-enumerates the workers this parent has in flight
-    # (running / awaiting_user / completed-uncollected / failed) plus reusable
-    # durable sessions — the recovery move when the `[async_subagent_ref]`
-    # blocks have scrolled out of context and the model would otherwise lose
-    # track of, or needlessly re-spawn, a worker. Reads the same live
-    # `running_subagents` registry the ambient `[active_subagents]` turn block
-    # is built from.
-    "list_subagents",
-    # Resume a sub-agent that paused on `ask_user_clarification` (#4291). When
-    # a delegated sub-agent (e.g. task_manager_agent via `manage_tasks`)
-    # asks the user a question, the runner checkpoints it and the orchestrator
-    # gets a `[SUBAGENT_AWAITING_USER]` envelope with the task_id/agent_id. The
-    # orchestrator MUST resume that exact checkpoint with the user's answer via
-    # this tool — without it, the only continuation is to re-delegate a fresh,
-    # stateless sub-agent that asks again, looping forever. Both the async
-    # spawn and the synchronous delegate paths instruct the model to call it.
-    "continue_subagent",
     "composio_list_connections",
     # "What can I connect?" — the backend allowlist as
     # `{toolkits, catalog:[{slug, name, description, categories}]}`. Distinct
