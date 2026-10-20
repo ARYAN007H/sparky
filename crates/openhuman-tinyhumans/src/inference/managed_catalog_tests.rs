@@ -8,7 +8,10 @@ use openhuman_embed::__host::security::credentials::{AuthService, APP_SESSION_PR
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
-async fn catalog_server(status: StatusCode, body: &'static str) -> (String, Arc<Mutex<Vec<Option<String>>>>) {
+async fn catalog_server(
+    status: StatusCode,
+    body: &'static str,
+) -> (String, Arc<Mutex<Vec<Option<String>>>>) {
     let authorization = Arc::new(Mutex::new(Vec::new()));
     let captured = Arc::clone(&authorization);
     let app = Router::new().route(
@@ -184,11 +187,8 @@ async fn managed_catalog_keeps_provider_key_401_as_a_provider_error() {
 
 #[tokio::test]
 async fn managed_catalog_does_not_infer_http_status_from_error_payload_text() {
-    let (base_url, _authorization) = catalog_server(
-        StatusCode::OK,
-        r#"{"error":"401 session expired"}"#,
-    )
-    .await;
+    let (base_url, _authorization) =
+        catalog_server(StatusCode::OK, r#"{"error":"401 session expired"}"#).await;
     let tmp = TempDir::new().unwrap();
     let config = catalog_config(&tmp, &base_url);
     crate::hosted::test_support::store_session(&config, "fixture-live-session");

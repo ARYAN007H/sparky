@@ -134,7 +134,10 @@ pub(super) async fn list_models(
     // session.
     let session_attached = attach && session_token;
     let mut discovery = DiscoveryRequest::new(
-        format!("{}/openai/v1", effective_api_url(&config.api_url).trim_end_matches('/')),
+        format!(
+            "{}/openai/v1",
+            effective_api_url(&config.api_url).trim_end_matches('/')
+        ),
         String::new(),
     )
     .with_listing_url(url.clone())

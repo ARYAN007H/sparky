@@ -6,8 +6,8 @@
 use super::super::openai_codex::resolve_openai_codex_routing;
 use super::local_runtime::synthesize_local_runtime_entry;
 use tinyinference_llm::catalog::{
-    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider,
-    list_models, merge_openai_codex_model_hints, validate_openrouter_key, ModelInfo,
+    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider, list_models,
+    merge_openai_codex_model_hints, validate_openrouter_key, ModelInfo,
 };
 use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::providers::openai::codex::{

@@ -35,9 +35,10 @@ pub fn synthesize_local_runtime_entry(
         }
         _ => return None,
     };
-    let endpoint = tinyinference_local::provider::local_runtime_models_endpoint(slug, &runtime_base)?
-        .strip_suffix("/models")?
-        .to_string();
+    let endpoint =
+        tinyinference_local::provider::local_runtime_models_endpoint(slug, &runtime_base)?
+            .strip_suffix("/models")?
+            .to_string();
 
     Some(CloudProviderCreds {
         id: format!("synthetic_local_{slug}"),
