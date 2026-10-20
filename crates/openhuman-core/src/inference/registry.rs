@@ -67,6 +67,15 @@ pub type ChatModelFactory = Arc<
 pub type ReadinessProbe =
     Arc<dyn Fn(String, String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
 
+/// Resolves a provider-owned model id to its workload role.
+pub type ModelRoleResolver = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+
+/// Resolves a workload role and optional model pin to a concrete model id.
+pub type ModelResolver = Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>;
+
+/// Looks up a provider-owned static context window for a model id.
+pub type ModelContextWindow = Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>;
+
 /// A registered chat-model provider.
 #[derive(Clone)]
 pub struct ChatModelEntry {
@@ -74,6 +83,103 @@ pub struct ChatModelEntry {
     pub build: ChatModelFactory,
     /// Optional readiness probe (the flows inference probe).
     pub probe: Option<ReadinessProbe>,
+    /// Optional model vocabulary and defaults owned by this provider. The
+    /// core calls these hooks without interpreting provider-specific ids.
+    pub models: Option<ProviderModelHooks>,
+}
+
+/// Provider-owned model behavior consulted by generic inference callers.
+#[derive(Clone)]
+pub struct ProviderModelHooks {
+    /// The provider's default model, absent when it has no default.
+    pub default_model: Arc<dyn Fn() -> Option<String> + Send + Sync>,
+    /// Resolves a role alias or legacy model id to its workload role.
+    pub role_for_model: ModelRoleResolver,
+    /// Whether a model is a provider-specific alias rather than a concrete id.
+    pub is_alias: Arc<dyn Fn(&str) -> bool + Send + Sync>,
+    /// Whether a model is a concrete id suitable for pass-through.
+    pub is_raw_model: Arc<dyn Fn(&str) -> bool + Send + Sync>,
+    /// Whether a model accepts image input according to provider metadata.
+    pub supports_vision: Arc<dyn Fn(&str) -> bool + Send + Sync>,
+    /// Resolves the provider's default/alias policy for a managed construction.
+    pub resolve_model: ModelResolver,
+    /// The default model's static context window, if the provider knows it.
+    pub context_window: ModelContextWindow,
+    /// Provider default pricing as (model id, input USD/1M, output USD/1M).
+    pub default_pricing: Arc<dyn Fn() -> Option<(String, f64, f64)> + Send + Sync>,
+    /// Applies a provider-specific request hint without exposing its wire key.
+    pub without_reasoning: Arc<
+        dyn Fn(tinyinference_llm::model::ModelRequest) -> tinyinference_llm::model::ModelRequest
+            + Send
+            + Sync,
+    >,
+}
+
+/// A provider-neutral semantic category for a backend error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackendErrorKind {
+    RateLimited,
+    InsufficientCredits,
+    UpstreamUnavailable,
+    ModelUnavailable,
+    PayloadTooLarge,
+    ContextLengthExceeded,
+    BadRequest,
+    Internal,
+}
+
+/// Provider-owned classification, with reporting ownership kept separate from
+/// display semantics and the optional canonical backend token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendErrorClassification {
+    /// Whether this classifier owns the provider identity itself.
+    pub provider_owned: bool,
+    /// Whether the backend owns the response for duplicate-report purposes.
+    pub backend_owned: bool,
+    /// Whether this client should still report the event (for known client bugs).
+    pub reportable: bool,
+    /// Canonical raw token, including unknown future tokens.
+    pub token: Option<String>,
+    /// Recognized provider-neutral display category.
+    pub kind: Option<BackendErrorKind>,
+    /// Whether a BAD_REQUEST was explicitly marked as malformed.
+    pub malformed_bad_request: bool,
+}
+
+/// Classifies a provider's backend error. `provider` is present at a typed
+/// provider boundary and absent for flattened, string-only host call sites.
+pub type BackendErrorClassifier =
+    Arc<dyn Fn(Option<&str>, &str) -> BackendErrorClassification + Send + Sync>;
+
+static BACKEND_ERROR_CLASSIFIER: HookSlot<BackendErrorClassifier> =
+    HookSlot::new("inference::backend_error_classifier");
+
+/// Registers a backend error classifier process-wide.
+pub fn register_backend_error_classifier(classifier: BackendErrorClassifier) {
+    BACKEND_ERROR_CLASSIFIER.register("default", classifier);
+}
+
+/// Removes the process-wide backend error classifier.
+pub fn unregister_backend_error_classifier() -> bool {
+    BACKEND_ERROR_CLASSIFIER.unregister("default")
+}
+
+/// Registers a backend error classifier for a CoreContext.
+pub fn register_backend_error_classifier_in(
+    extensions: &Extensions,
+    classifier: BackendErrorClassifier,
+) {
+    BACKEND_ERROR_CLASSIFIER.register_in(extensions, "default", classifier);
+}
+
+/// Classifies an error when a host has supplied a classifier.
+pub fn classify_backend_error(
+    provider: Option<&str>,
+    error: &str,
+) -> Option<BackendErrorClassification> {
+    BACKEND_ERROR_CLASSIFIER
+        .get("default")
+        .map(|classifier| classifier(provider, error))
 }
 
 static CHAT_MODELS: HookSlot<ChatModelEntry> = HookSlot::new("inference::chat_models");
@@ -100,14 +206,165 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 
 /// The registered chat-model provider, if any.
 pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
-    let registered = CHAT_MODELS.get(provider_id);
-    // Unit tests model "a hosted provider is present" by default, as the old
-    // built-in managed backend was; a test that wants the bare core asks for it
-    // with `without_managed_provider`.
-    #[cfg(test)]
-    let registered =
-        registered.or_else(|| super::registry_test_support::default_managed_entry(provider_id));
-    registered
+    CHAT_MODELS.get(provider_id)
+}
+
+/// The chat-model provider selected by an explicit context, falling back only
+/// to process registration when that context has no entry.
+pub(crate) fn chat_model_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+) -> Option<ChatModelEntry> {
+    CHAT_MODELS.get_for(extensions, provider_id)
+}
+
+/// The registered provider's model hooks, if it has any.
+pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelHooks> {
+    chat_model(provider_id)?.models
+}
+
+/// The registered provider's default model, if it declares one.
+pub fn provider_default_model(provider_id: &str) -> Option<String> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.default_model)()
+}
+
+/// Default pricing supplied by the registered provider, if any.
+pub fn provider_default_pricing(provider_id: &str) -> Option<(String, f64, f64)> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.default_pricing)()
+}
+
+/// The workload role assigned to a provider-specific model alias.
+pub fn provider_model_role(provider_id: &str, model: &str) -> Option<String> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.role_for_model)(model)
+}
+
+pub(crate) fn provider_model_role_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> Option<String> {
+    let hooks = chat_model_for(extensions, provider_id)?.models?;
+    (hooks.role_for_model)(model)
+}
+
+/// Whether the provider recognizes `model` as an abstract alias.
+pub fn provider_model_is_alias(provider_id: &str, model: &str) -> bool {
+    provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.is_alias)(model))
+}
+
+pub(crate) fn provider_model_is_alias_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> bool {
+    chat_model_for(extensions, provider_id)
+        .and_then(|entry| entry.models)
+        .is_some_and(|hooks| (hooks.is_alias)(model))
+}
+
+/// Whether the provider regards `model` as a concrete id for pass-through.
+pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
+    let model = model.trim();
+    !model.is_empty()
+        && !model.starts_with("hint:")
+        && provider_model_hooks(provider_id).is_none_or(|hooks| (hooks.is_raw_model)(model))
+}
+
+/// Whether the provider says `model` supports image input.
+pub fn provider_model_supports_vision(provider_id: &str, model: &str) -> bool {
+    provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.supports_vision)(model))
+}
+
+pub(crate) fn provider_model_supports_vision_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> bool {
+    chat_model_for(extensions, provider_id)
+        .and_then(|entry| entry.models)
+        .is_some_and(|hooks| (hooks.supports_vision)(model))
+}
+
+/// Provider-specific resolution of a role alias, configured default, or pin.
+pub fn resolve_provider_model(
+    provider_id: &str,
+    role: &str,
+    config: &Config,
+    model_override: Option<&str>,
+) -> Option<String> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.resolve_model)(role, config, model_override)
+}
+
+pub(crate) fn resolve_provider_model_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    role: &str,
+    config: &Config,
+    model_override: Option<&str>,
+) -> Option<String> {
+    let hooks = chat_model_for(extensions, provider_id)?.models?;
+    (hooks.resolve_model)(role, config, model_override)
+}
+
+/// The provider's model-specific context window, if known.
+pub fn provider_model_context_window(provider_id: &str, model: &str) -> Option<u64> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.context_window)(model)
+}
+
+pub(crate) fn provider_model_context_window_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> Option<u64> {
+    let hooks = chat_model_for(extensions, provider_id)?.models?;
+    (hooks.context_window)(model)
+}
+
+/// Applies a provider-specific no-reasoning hint when the provider is installed.
+pub fn provider_request_without_reasoning(
+    provider_id: &str,
+    request: tinyinference_llm::model::ModelRequest,
+) -> tinyinference_llm::model::ModelRequest {
+    match provider_model_hooks(provider_id) {
+        Some(hooks) => (hooks.without_reasoning)(request),
+        None => request,
+    }
+}
+
+/// Registers a generic config normalizer, such as a provider-owned migration
+/// that must also run after the config schema reaches its current version.
+pub type ConfigNormalizer = Arc<dyn Fn(&mut Config) -> bool + Send + Sync>;
+
+static CONFIG_NORMALIZERS: HookSlot<ConfigNormalizer> = HookSlot::new("config::normalizers");
+
+/// Registers a config normalizer for the process.
+pub fn register_config_normalizer(id: impl Into<String>, normalizer: ConfigNormalizer) {
+    CONFIG_NORMALIZERS.register(id, normalizer);
+}
+
+/// Registers a config normalizer for a CoreContext's extensions.
+pub fn register_config_normalizer_in(
+    extensions: &Extensions,
+    id: impl Into<String>,
+    normalizer: ConfigNormalizer,
+) {
+    CONFIG_NORMALIZERS.register_in(extensions, id, normalizer);
+}
+
+/// Runs the currently registered config normalizers and reports whether any
+/// changed the config.
+pub(crate) fn normalize_config(config: &mut Config) -> bool {
+    CONFIG_NORMALIZERS
+        .entries_context_first()
+        .into_iter()
+        .fold(false, |changed, (_, normalize)| {
+            normalize(config) || changed
+        })
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +501,13 @@ pub fn unregister_catalog(provider_id: &str) -> bool {
 /// The registered catalog, if any.
 pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry> {
     CATALOGS.get(provider_id)
+}
+
+pub(crate) fn catalog_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+) -> Option<CatalogEntry> {
+    CATALOGS.get_for(extensions, provider_id)
 }
 
 #[cfg(test)]

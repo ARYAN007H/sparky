@@ -66,14 +66,13 @@ pub fn redact_url_for_log(raw: &str) -> String {
 /// untouched. Routing fields that already contain a `:` are assumed to be
 /// in the new `<slug>:<model>` form.
 pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
-    use super::super::cloud_providers::{builtin_cloud_provider, AuthStyle};
+    use super::super::cloud_providers::builtin_cloud_provider;
 
     for entry in &mut config.cloud_providers {
         if entry.label.is_empty() {
             entry.label = builtin_cloud_provider(&entry.slug)
-                .map(|provider| provider.label)
-                .unwrap_or("Custom")
-                .to_string();
+                .map(|provider| provider.label.to_string())
+                .unwrap_or_else(|| "Custom".to_string());
         }
     }
 
@@ -90,8 +89,8 @@ pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
 
     let is_openhuman_provider_entry =
         |entry: &super::super::cloud_providers::CloudProviderCreds| {
-            entry.slug == "openhuman"
-                || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
+            crate::config::schema::cloud_providers::is_hosted_cloud_identity(&entry.slug)
+                || crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style)
                 || looks_like_openhuman_provider_endpoint(&entry.endpoint)
         };
 

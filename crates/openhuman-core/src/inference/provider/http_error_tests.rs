@@ -11,6 +11,24 @@ fn response(status: StatusCode, body: &str) -> reqwest::Response {
     )
 }
 
+const FIXTURE_BACKEND: &str = "fixture-managed-provider";
+
+fn install_fixture_backend_classifier() {
+    use crate::inference::registry::{
+        register_backend_error_classifier, BackendErrorClassification,
+    };
+    register_backend_error_classifier(std::sync::Arc::new(|provider, _message| {
+        BackendErrorClassification {
+            provider_owned: provider == Some(FIXTURE_BACKEND),
+            backend_owned: false,
+            reportable: false,
+            token: None,
+            kind: None,
+            malformed_bad_request: false,
+        }
+    }));
+}
+
 /// Drain the shared bus until `pick` matches an event or the queue is empty.
 fn drain_until<T>(
     rx: &mut tinybus::EventReceiver<DomainEvent>,
@@ -82,14 +100,11 @@ async fn api_error_keeps_raw_message_for_unclassified_status() {
 
 #[tokio::test]
 async fn backend_401_publishes_session_expired_through_reporter() {
+    install_fixture_backend_classifier();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
     let marker = "REPORTER_MARKER_SESSION";
-    let _ = api_error(
-        openhuman_backend_model::PROVIDER_LABEL,
-        response(StatusCode::UNAUTHORIZED, marker),
-    )
-    .await;
+    let _ = api_error(FIXTURE_BACKEND, response(StatusCode::UNAUTHORIZED, marker)).await;
     let seen = drain_until(&mut rx, |e| match e {
         DomainEvent::SessionExpired { reason, .. } if reason.contains(marker) => Some(()),
         _ => None,
@@ -125,10 +140,11 @@ async fn byo_401_publishes_api_key_rejected_not_session_expired() {
 
 #[tokio::test]
 async fn backend_provider_does_not_get_byo_key_rejection() {
+    install_fixture_backend_classifier();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
     let _ = api_error(
-        openhuman_backend_model::PROVIDER_LABEL,
+        FIXTURE_BACKEND,
         response(
             StatusCode::UNAUTHORIZED,
             r#"{"error":{"type":"authentication_error"}}"#,
@@ -136,9 +152,7 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
     )
     .await;
     let rejected = drain_until(&mut rx, |e| match e {
-        DomainEvent::ProviderApiKeyRejected { provider, .. }
-            if provider == openhuman_backend_model::PROVIDER_LABEL =>
-        {
+        DomainEvent::ProviderApiKeyRejected { provider, .. } if provider == FIXTURE_BACKEND => {
             Some(())
         }
         _ => None,
@@ -154,7 +168,8 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
 #[test]
 fn is_backend_auth_failure_only_matches_openhuman_backend_401_403() {
     use reqwest::StatusCode;
-    let backend = crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL;
+    install_fixture_backend_classifier();
+    let backend = FIXTURE_BACKEND;
 
     assert!(is_backend_auth_failure(backend, StatusCode::UNAUTHORIZED));
     assert!(is_backend_auth_failure(backend, StatusCode::FORBIDDEN));
@@ -275,7 +290,7 @@ async fn publish_backend_session_expired_emits_sanitized_session_expired() {
     );
     publish_backend_session_expired(
         "chat_completions",
-        crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL,
+        "OpenHuman",
         reqwest::StatusCode::UNAUTHORIZED,
         &msg,
     );
@@ -343,64 +358,43 @@ fn skips_sentry_report_for_transient_upstream_statuses() {
 }
 
 #[test]
-fn backend_error_code_owned_gates_managed_errors_except_malformed_bad_request() {
-    use crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL;
+fn provider_http_policy_uses_registered_error_ownership_metadata() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{
+        register_backend_error_classifier_in, BackendErrorClassification, BackendErrorKind,
+    };
+    use std::sync::Arc;
 
-    // F2/F4: backend-owned / expected-user-state errorCodes must NOT page the
-    // provider HTTP layer.
-    for code in [
-        "RATE_LIMITED",
-        "USER_INSUFFICIENT_CREDITS",
-        "UPSTREAM_UNAVAILABLE",
-        "MODEL_UNAVAILABLE",
-        "INTERNAL_ERROR",
-    ] {
-        let body = format!("{{\"error\":{{\"errorCode\":\"{code}\",\"message\":\"x\"}}}}");
-        assert!(
-            is_backend_error_code_owned(PROVIDER_LABEL, &body),
-            "errorCode={code} must be backend-owned (no provider-layer Sentry)"
-        );
-    }
+    const PROVIDER: &str = "fixture-managed-provider";
+    const OWNED: &str = "owned fixture";
+    const REPORTABLE: &str = "reportable fixture";
+    let extensions = Extensions::new();
+    register_backend_error_classifier_in(
+        &extensions,
+        Arc::new(|provider, message| {
+            let is_owned = provider == Some(PROVIDER) && message == OWNED;
+            let is_reportable = provider == Some(PROVIDER) && message == REPORTABLE;
+            BackendErrorClassification {
+                provider_owned: is_owned || is_reportable,
+                backend_owned: is_owned || is_reportable,
+                reportable: !is_owned,
+                token: None,
+                kind: is_reportable.then_some(BackendErrorKind::Internal),
+                malformed_bad_request: false,
+            }
+        }),
+    );
+    let context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        None,
+        extensions,
+    );
 
-    // A user-param BAD_REQUEST is still backend-owned (F8 only carves out the
-    // malformed variant).
-    assert!(is_backend_error_code_owned(
-        PROVIDER_LABEL,
-        "{\"error\":{\"errorCode\":\"BAD_REQUEST\",\"message\":\"bad param\"}}"
-    ));
-
-    // Client-guard-leak codes page: the client enforces these limits before
-    // sending (attachment size gates; context-window management), so a backend
-    // rejection means our guard leaked — the gate must NOT claim them.
-    for code in ["PAYLOAD_TOO_LARGE", "CONTEXT_LENGTH_EXCEEDED"] {
-        let body = format!("{{\"error\":{{\"errorCode\":\"{code}\",\"message\":\"x\"}}}}");
-        assert!(
-            !is_backend_error_code_owned(PROVIDER_LABEL, &body),
-            "errorCode={code} is a client guard leak and must page (not owned)"
-        );
-    }
-
-    // F8: a backend-flagged malformed BAD_REQUEST is also a case the FE still
-    // pages — the gate must NOT claim it.
-    assert!(!is_backend_error_code_owned(
-        PROVIDER_LABEL,
-        "{\"error\":{\"errorCode\":\"BAD_REQUEST\",\"malformed\":true}}"
-    ));
-
-    // BYO (no errorCode) is never claimed by this gate — it falls through to
-    // the status-based decision.
-    assert!(!is_backend_error_code_owned(
-        PROVIDER_LABEL,
-        "{\"error\":{\"message\":\"Incorrect API key provided\"}}"
-    ));
-
-    // CodeRabbit: a BYO / direct provider whose body merely contains an
-    // `errorCode`-shaped field must NOT be claimed as backend-owned — the
-    // provider gate keeps it reaching Sentry via the status decision.
-    assert!(!is_backend_error_code_owned(
-        "custom_openai",
-        "{\"error\":{\"errorCode\":\"RATE_LIMITED\"}}"
-    ));
+    crate::core::runtime::CoreContext::sync_scope(context, || {
+        assert!(is_backend_error_code_owned(PROVIDER, OWNED));
+        assert!(!is_backend_error_code_owned(PROVIDER, REPORTABLE));
+        assert!(!is_backend_error_code_owned("fixture-byo-provider", OWNED));
+    });
 }
 
 // Exercises the real `config_rejection_demoted` decision used
@@ -452,21 +446,22 @@ mod provider_config_rejection_suppression {
         // mean we sent it a bad request — a real regression that
         // must still reach Sentry. (Mirror of the 401/403 backend
         // rule.)
+        super::install_fixture_backend_classifier();
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                openhuman_backend_model::PROVIDER_LABEL,
+                super::FIXTURE_BACKEND,
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TIER_LEAK_BODY
             ),
-            openhuman_backend_model::PROVIDER_LABEL
+            super::FIXTURE_BACKEND
         ));
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                openhuman_backend_model::PROVIDER_LABEL,
+                super::FIXTURE_BACKEND,
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TEMP_BODY
             ),
-            openhuman_backend_model::PROVIDER_LABEL
+            super::FIXTURE_BACKEND
         ));
     }
 
@@ -490,11 +485,11 @@ mod provider_config_rejection_suppression {
             assert!(
                 config_rejection_demoted(
                     &tinyinference_llm::failure::http::classify_http_failure(
-                        openhuman_backend_model::PROVIDER_LABEL,
+                        "OpenHuman",
                         reqwest::StatusCode::BAD_REQUEST.as_u16(),
                         body
                     ),
-                    openhuman_backend_model::PROVIDER_LABEL
+                    "OpenHuman"
                 ),
                 "TAURI-RUST-2Z1 body must be suppressed for openhuman backend: {body:?}"
             );
@@ -571,14 +566,15 @@ mod provider_config_rejection_suppression {
         // and must still reach Sentry. The phrase does not appear in any
         // expected backend body, so this is purely defensive.
         let body = r#"{"error":"this model requires a subscription, upgrade for access: https://ollama.com/upgrade (ref: test)"}"#;
+        super::install_fixture_backend_classifier();
         assert!(
             !config_rejection_demoted(
                 &tinyinference_llm::failure::http::classify_http_failure(
-                    openhuman_backend_model::PROVIDER_LABEL,
+                    super::FIXTURE_BACKEND,
                     reqwest::StatusCode::FORBIDDEN.as_u16(),
                     body
                 ),
-                openhuman_backend_model::PROVIDER_LABEL
+                super::FIXTURE_BACKEND
             ),
             "backend 403 subscription phrase must NOT be suppressed (polarity guard)"
         );

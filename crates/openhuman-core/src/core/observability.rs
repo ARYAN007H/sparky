@@ -369,32 +369,26 @@ pub enum ExpectedErrorKind {
 
 pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     let lower = message.to_ascii_lowercase();
-    // F2/F4: a managed-backend `errorCode` (#870) means the backend owns this
-    // error — it already paged its own 5xx, or the code is expected user-state.
-    // Trust it FIRST, before the substring matchers, so a managed 500
-    // `INTERNAL_ERROR` (which no substring matcher below would otherwise demote)
-    // stops double-reporting. The one exception — a backend-flagged malformed
-    // `BAD_REQUEST` — is excluded by `managed_error_skips_sentry` and falls
-    // through to the matchers / capture so the FE still pages (F8). The
-    // decision is gated on the managed-backend envelope so a BYO payload
-    // carrying an `errorCode`-shaped field is not wrongly suppressed
-    // (CodeRabbit).
-    if crate::inference::provider::managed_error_skips_sentry(message) {
+    // Explicit host ownership/reportability metadata precedes text heuristics.
+    let backend_error = crate::inference::registry::classify_backend_error(None, message);
+    if backend_error
+        .as_ref()
+        .is_some_and(|classification| classification.backend_owned && !classification.reportable)
+    {
         return Some(ExpectedErrorKind::BackendErrorCodeOwned);
     }
-    // A managed-backend client-guard-leak code (`PAYLOAD_TOO_LARGE` /
-    // `CONTEXT_LENGTH_EXCEEDED`) must PAGE — the client enforces these limits
-    // before sending, so a backend rejection is our guard leaking. Force
-    // capture (return `None`) here, BEFORE the substring matchers below: a real
-    // managed `CONTEXT_LENGTH_EXCEEDED` body carries "context length
-    // exceeded"-style text that `is_context_window_exceeded_message` (further
-    // down) would otherwise re-demote into the suppressed
-    // `ContextWindowExceeded` bucket (CodeRabbit). Gated on the managed envelope
-    // so a BYO provider's own context-overflow — genuine user-state, not our
-    // guard — still flows to that matcher and stays demoted.
-    if crate::inference::provider::is_managed_backend_envelope(message)
-        && crate::inference::provider::is_backend_client_guard_leak(message)
-    {
+    // Explicitly reportable guard failures must bypass broader text demotions.
+    if backend_error.as_ref().is_some_and(|classification| {
+        classification.provider_owned
+            && classification.reportable
+            && matches!(
+                classification.kind,
+                Some(
+                    crate::inference::registry::BackendErrorKind::PayloadTooLarge
+                        | crate::inference::registry::BackendErrorKind::ContextLengthExceeded
+                )
+            )
+    }) {
         return None;
     }
     // Check the Codex-CLI import envelope first: it is highly specific
@@ -2301,12 +2295,10 @@ fn report_expected_message(kind: ExpectedErrorKind, message: &str, domain: &str,
             );
         }
         ExpectedErrorKind::BackendErrorCodeOwned => {
-            // Managed-backend `errorCode` (#870) re-report — the backend owns
-            // this error (already paged its own 5xx, or expected user-state).
-            // The FE surfaces actionable copy via `classify_inference_error`;
-            // Sentry must not double-report (F2/F4). Demote at `warn!` so the
-            // breadcrumb retains the code for triage without spawning an event.
-            let code = crate::inference::provider::extract_backend_error_code_token(message)
+            // The classifier's canonical token aids triage without re-parsing
+            // provider-specific strings in this generic module.
+            let code = crate::inference::registry::classify_backend_error(None, message)
+                .and_then(|classification| classification.token)
                 .unwrap_or_default();
             tracing::warn!(
                 domain = domain,
@@ -2595,7 +2587,11 @@ pub fn is_backend_error_code_event(event: &sentry::protocol::Event<'_>) -> bool 
     [direct, from_logentry, from_exception]
         .into_iter()
         .flatten()
-        .any(crate::inference::provider::managed_error_skips_sentry)
+        .any(|message| {
+            crate::inference::registry::classify_backend_error(None, message).is_some_and(
+                |classification| classification.backend_owned && !classification.reportable,
+            )
+        })
 }
 
 /// Defense-in-depth `before_send` filter for transient streaming **transport**

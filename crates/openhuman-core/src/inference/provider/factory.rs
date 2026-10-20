@@ -25,7 +25,6 @@
 //!
 //! ## Module layout
 //!
-//! - [`tiers`] — managed tier / `hint:*` vocabulary and capability lookups.
 //! - [`routing`] — role → configured provider string resolution.
 //! - [`primary_cloud`] — `primary_cloud` / legacy `inference_url` resolution.
 //! - [`access_gates`] — privacy-mode, session, and egress chokepoints.
@@ -48,7 +47,6 @@ mod local_runtime;
 mod managed_backend;
 mod routing;
 mod subprocess_providers;
-mod tiers;
 mod turn_model;
 
 #[cfg(feature = "flows")]
@@ -60,15 +58,11 @@ pub use chat_model::{
 };
 pub(crate) use credentials::openai_bearer_is_oauth;
 pub use credentials::{auth_key_for_slug, lookup_key_for_slug, redact_endpoint};
-pub(crate) use discovery::model_limits_request;
+pub(crate) use discovery::{model_limits_request, model_limits_request_for};
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use managed_backend::make_openhuman_backend_model;
 pub(crate) use routing::role_uses_implicit_cloud_fallback;
 pub use routing::{provider_for_role, role_bypasses_managed_credits};
-pub(crate) use tiers::{
-    is_known_openhuman_tier, is_raw_passthrough_model, oh_tier_supports_vision,
-};
-pub use tiers::{resolve_model_for_hint, role_for_model_tier};
 pub(crate) use turn_model::{
     create_turn_chat_model, create_turn_chat_model_from_string,
     create_turn_chat_model_from_string_with_native_tools_and_route,
@@ -78,26 +72,29 @@ pub(crate) use turn_model::{
 // Factory-internal helpers shared across the submodules (and their tests)
 // through `use super::*`.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
-use chat_model::{unresolved_chat_model_error, with_default_temperature};
+use chat_model::{unresolved_chat_model_error_for, with_default_temperature};
+#[cfg(test)]
+use cloud_slug::try_create_cloud_slug_chat_model;
 use cloud_slug::{
-    resolve_cloud_slug, try_create_cloud_slug_chat_model,
-    try_create_cloud_slug_chat_model_from_string,
-    try_create_cloud_slug_chat_model_with_native_tools,
+    resolve_cloud_slug_for, try_create_cloud_slug_chat_model_from_string,
+    try_create_cloud_slug_chat_model_with_native_tools_for,
 };
 use local_runtime::{
     try_create_local_runtime_chat_model, try_create_local_runtime_chat_model_from_string,
     OptionalChatModelResult,
 };
+#[cfg(test)]
+pub(crate) use managed_backend::make_openhuman_backend_model_for_thread;
+use managed_backend::managed_chat_model_for;
 pub(crate) use managed_backend::{
-    make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread,
+    make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
+    make_openhuman_backend_model_in,
 };
-use managed_backend::{managed_chat_model, resolve_managed_model};
 use subprocess_providers::{
     prepare_claude_agent_sdk_chat_model, try_create_claude_agent_sdk_chat_model,
     try_create_claude_agent_sdk_chat_model_from_string, try_create_claude_code_chat_model,
     try_create_claude_code_chat_model_from_string,
 };
-use tiers::{is_abstract_tier_model, managed_default_model};
 use tinyinference_providers::route::split_model_and_temperature;
 
 /// Test-only seam: inject a mock [`ChatModel`] so e2e tests can drive the

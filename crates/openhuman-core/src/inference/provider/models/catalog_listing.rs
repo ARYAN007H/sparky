@@ -142,7 +142,7 @@ pub async fn list_configured_models_from_config(
     // An entry that authenticates with the managed session is the managed
     // catalog: the registered provider lists it, and with none registered
     // there is nothing to list.
-    if entry.auth_style == AuthStyle::OpenhumanJwt {
+    if crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style) {
         return match crate::inference::registry::catalog(
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ) {
@@ -248,7 +248,9 @@ pub async fn list_configured_models_from_config(
             r
         }
         // Handled above: the managed catalog is served by the registered provider.
-        AuthStyle::OpenhumanJwt => request,
+        AuthStyle::OpenhumanJwt => {
+            return Err("hosted cloud catalog is unavailable without a registered host".into());
+        }
         AuthStyle::None => request,
     };
 

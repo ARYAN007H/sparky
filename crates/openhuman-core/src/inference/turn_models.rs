@@ -132,6 +132,10 @@ fn build_turn_models_crate(
     // P2, PR #4812). The ledger collapses same-destination repeats to one
     // disclosure per turn while still surfacing each distinct tier model.
     let egress = crate::security::egress::EgressLedger::per_turn();
+    let resolved_context = ctx.resolved();
+    let context_extensions = resolved_context
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
 
     // The primary honours an explicit provider-string override when the producer's
     // effective provider differs from `provider_for_role(role)` (triage #1257).
@@ -146,8 +150,14 @@ fn build_turn_models_crate(
             })
             .unwrap_or_else(|| factory::resolves_to_managed_backend(role, config));
         if managed {
-            let (backend, _) = factory::make_openhuman_backend_model_for_thread(
-                role, config, m, true, thread_id, &egress,
+            let (backend, _) = factory::make_openhuman_backend_model_for_thread_in(
+                context_extensions,
+                role,
+                config,
+                Some(m),
+                true,
+                thread_id,
+                &egress,
             )?;
             return Ok(Arc::new(RouteRecordingModel::new(
                 crate::attachments::provider::wrap(
@@ -204,7 +214,20 @@ fn build_turn_models_crate(
             if tier == model {
                 continue;
             }
-            let tier_role = factory::role_for_model_tier(tier);
+            let registered_role = crate::inference::registry::provider_model_role_for(
+                context_extensions,
+                factory::PROVIDER_OPENHUMAN,
+                tier,
+            );
+            let tier_role = tier
+                .strip_prefix("hint:")
+                .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+                .or_else(|| {
+                    registered_role
+                        .as_deref()
+                        .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+                })
+                .unwrap_or("chat");
             if let Some(custom) = ctx.host_overrides().and_then(|local| {
                 local
                     .role_models
@@ -223,8 +246,14 @@ fn build_turn_models_crate(
                 continue;
             }
             let route = if factory::resolves_to_managed_backend(tier_role, config) {
-                factory::make_openhuman_backend_model_for_thread(
-                    tier_role, config, tier, true, thread_id, &egress,
+                factory::make_openhuman_backend_model_for_thread_in(
+                    context_extensions,
+                    tier_role,
+                    config,
+                    Some(tier),
+                    true,
+                    thread_id,
+                    &egress,
                 )
                 .map(|(backend, _)| (backend, "openhuman".to_string(), tier.to_string()))
             } else {
@@ -447,11 +476,16 @@ impl TurnModelSource {
         let provider_string = source.primary_override.clone().unwrap_or_else(|| {
             crate::inference::provider::provider_for_role(&source.role, &source.config)
         });
-        crate::inference::context_window::resolve_context_window(
+        let resolved_context = source.ctx().resolved();
+        let extensions = resolved_context
+            .as_deref()
+            .map(crate::core::runtime::CoreContext::extensions);
+        crate::inference::context_window::resolve_context_window_in(
             &source.role,
             &provider_string,
             model,
             &source.config,
+            extensions,
         )
         .await
     }
@@ -473,7 +507,15 @@ impl TurnModelSource {
                         .with_attachment_config(source.config.clone())
                         .build(model, temperature, context_window, thread_id)?;
                     for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
-                        let role = crate::inference::provider::factory::role_for_model_tier(tier);
+                        let resolved_context = source_ctx.resolved();
+                        let extensions = resolved_context
+                            .as_deref()
+                            .map(crate::core::runtime::CoreContext::extensions);
+                        let role = crate::inference::provider_model::role_for_provider_model_for(
+                            extensions,
+                            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                            tier,
+                        );
                         if let Some(custom) = local
                             .role_models
                             .get(tier)
@@ -639,10 +681,15 @@ impl TurnModelSource {
                     )
                 });
             if managed {
-                return crate::inference::provider::factory::make_openhuman_backend_model_for_thread(
+                let resolved_context = cn.ctx().resolved();
+                let extensions = resolved_context
+                    .as_deref()
+                    .map(crate::core::runtime::CoreContext::extensions);
+                return crate::inference::provider::factory::make_openhuman_backend_model_for_thread_in(
+                    extensions,
                     &cn.role,
                     &cn.config,
-                    model,
+                    Some(model),
                     true,
                     thread_id,
                     &crate::security::egress::EgressLedger::none(),

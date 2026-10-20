@@ -40,7 +40,7 @@ pub(super) fn registry_auth_style(style: AuthStyle) -> Option<CompatAuthStyle> {
         AuthStyle::Bearer => Some(CompatAuthStyle::Bearer),
         AuthStyle::Anthropic => Some(CompatAuthStyle::Anthropic),
         AuthStyle::None => Some(CompatAuthStyle::None),
-        AuthStyle::OpenhumanJwt => None,
+        _ => None,
     }
 }
 

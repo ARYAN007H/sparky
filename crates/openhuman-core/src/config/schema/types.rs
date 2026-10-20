@@ -13,11 +13,7 @@ mod time_zone;
 
 pub(crate) use config::ConfigDocumentSnapshot;
 pub use config::{Config, ConfigRuntimeState, CustomEmbeddingsConfig, ModelRegistryEntry};
-pub use model_ids::{
-    is_legacy_tier_model, legacy_tier_role, DEFAULT_MODEL, LEGACY_TIER_MODELS,
-    MANAGED_MULTIMODAL_MODELS, MODEL_IMAGE_GENERATION_AGENT, MODEL_MANAGED_DEFAULT,
-    MODEL_MEDIA_UNDERSTANDING, MODEL_VIDEO_GENERATION_AGENT, WORKLOAD_ROLES,
-};
+pub use model_ids::WORKLOAD_ROLES;
 pub use output_language::{normalize_output_language, output_language_directive};
 pub use time_zone::{device_time_zone, normalize_time_zone};
 

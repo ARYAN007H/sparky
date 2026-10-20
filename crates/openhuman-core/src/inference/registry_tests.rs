@@ -37,13 +37,33 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
             ))
         }),
         probe: None,
+        models: Some(ProviderModelHooks {
+            default_model: Arc::new(|| Some("host/fake-default".to_string())),
+            role_for_model: Arc::new(|model| {
+                (model == "hint:reasoning").then(|| "reasoning".to_string())
+            }),
+            is_alias: Arc::new(|model| model == "hint:reasoning"),
+            is_raw_model: Arc::new(|model| model != "hint:reasoning"),
+            supports_vision: Arc::new(|_| false),
+            resolve_model: Arc::new(|_, config, model| match model {
+                Some("hint:reasoning") => Some("host/resolved-reasoning".to_string()),
+                Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
+                Some(_) => None,
+                None => config
+                    .default_model
+                    .clone()
+                    .or_else(|| Some("host/fake-default".to_string())),
+            }),
+            context_window: Arc::new(|_| None),
+            default_pricing: Arc::new(|| None),
+            without_reasoning: Arc::new(|request| request),
+        }),
     }
 }
 
 #[test]
 fn nothing_registered_resolves_no_provider() {
     let _guard = crate::inference::inference_test_guard();
-    let _bare = crate::inference::registry_test_support::without_managed_provider();
     assert!(chat_model(PROVIDER_OPENHUMAN).is_none());
     assert!(embedding(PROVIDER_OPENHUMAN).is_none());
     assert!(catalog(PROVIDER_OPENHUMAN).is_none());
@@ -59,7 +79,7 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
     let built = make_openhuman_backend_model_for_thread(
         "chat",
         &Config::default(),
-        "hint:reasoning",
+        Some("hint:reasoning"),
         true,
         Some("thread-1"),
         &EgressLedger::none(),
@@ -81,10 +101,11 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
         seen[0],
         (
             "chat".to_string(),
-            Some(crate::config::MODEL_MANAGED_DEFAULT.to_string()),
+            Some("host/resolved-reasoning".to_string()),
             Some("thread-1".to_string())
         )
     );
+    assert_eq!(seen[1].1.as_deref(), Some("host/fake-default"));
     assert_eq!(
         seen.len(),
         2,
@@ -174,12 +195,11 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
 #[test]
 fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable() {
     let _guard = crate::inference::inference_test_guard();
-    let _bare = crate::inference::registry_test_support::without_managed_provider();
     let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
     let error = make_openhuman_backend_model_for_thread(
         "chat",
         &Config::default(),
-        "any-model",
+        Some("any-model"),
         true,
         None,
         &EgressLedger::none(),
@@ -205,6 +225,10 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
     use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
     let seen = Arc::new(Mutex::new(String::new()));
+    crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == EPHEMERAL_ROUTE_SLUG),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
     let sink = Arc::clone(&seen);
     register_catalog(
         PROVIDER_OPENHUMAN,

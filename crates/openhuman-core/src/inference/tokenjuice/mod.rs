@@ -136,12 +136,13 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
         log::debug!("[tokenjuice] component disabled; module install skipped");
         return Ok(());
     }
-    savings::configure(
-        config
-            .default_model
-            .clone()
-            .unwrap_or_else(|| crate::config::DEFAULT_MODEL.to_string()),
-    );
+    if let Some(model) = config.default_model.clone().or_else(|| {
+        crate::inference::registry::provider_default_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        )
+    }) {
+        savings::configure(model);
+    }
     // Totals the old build kept in a snapshot file move into the module's
     // storage first (once per file, best effort).
     crate::modules::import_legacy_tinyjuice_savings(

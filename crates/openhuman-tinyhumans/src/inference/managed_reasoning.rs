@@ -4,7 +4,17 @@
 use serde_json::Value;
 use tinyinference_llm::model::ModelRequest;
 
-use openhuman_embed::__host::inference_registry::REASONING_OFF_METADATA_KEY;
+pub(crate) const REASONING_OFF_METADATA_KEY: &str = "openhuman_reasoning_off";
+
+pub(crate) fn without_reasoning(mut request: ModelRequest) -> ModelRequest {
+    if !request.metadata.is_object() {
+        request.metadata = Value::Object(serde_json::Map::new());
+    }
+    if let Some(map) = request.metadata.as_object_mut() {
+        map.insert(REASONING_OFF_METADATA_KEY.to_string(), Value::Bool(true));
+    }
+    request
+}
 
 /// Translate the request's reasoning choice into the managed backend's wire
 /// field: the OpenRouter-style `reasoning` object, which the backend forwards

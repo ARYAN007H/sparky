@@ -72,9 +72,13 @@ pub(super) fn create_chat_model_with_model_id_inner(
             false
         }
     };
+    let resolved_context = ctx.resolved();
+    let extensions = resolved_context
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
     if !test_override_active {
         if resolves_to_managed_backend(role, config) {
-            return make_openhuman_backend_model(role, config);
+            return make_openhuman_backend_model_in(extensions, role, config);
         }
         if let Some(result) =
             try_create_claude_agent_sdk_chat_model(role, config, &EgressLedger::none())
@@ -99,16 +103,22 @@ pub(super) fn create_chat_model_with_model_id_inner(
         // codex-oauth or `/v1/responses` fallback) → crate-native `ChatModel`
         // (issue #4727 Phase 3, conservative subset). `openai`/codex, custom
         // proxy slugs, and the managed entry return `None` and fall through.
-        if let Some(result) = try_create_cloud_slug_chat_model(role, config, &EgressLedger::none())
-        {
+        if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools_for(
+            role,
+            config,
+            true,
+            &EgressLedger::none(),
+            extensions,
+        ) {
             return result;
         }
     }
-    Err(unresolved_chat_model_error(
+    Err(unresolved_chat_model_error_for(
         role,
         &provider_for_role(role, config),
         config,
         &EgressLedger::none(),
+        extensions,
     ))
 }
 
@@ -178,15 +188,34 @@ pub async fn probe_inference_readiness(
         "[flows][inference-probe] role={role} resolves to the managed OpenHuman backend — \
          probing readiness"
     );
-    let Some(probe) =
-        crate::inference::registry::chat_model(PROVIDER_OPENHUMAN).and_then(|entry| entry.probe)
+    let resolved_context = ctx.resolved();
+    let extensions = resolved_context
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
+    let Some(entry) = crate::inference::registry::chat_model_for(extensions, PROVIDER_OPENHUMAN)
     else {
+        log::debug!("[flows][inference-probe] role={role} managed provider was unregistered");
+        return Ok(());
+    };
+    let Some(probe) = entry.probe else {
         // The registered provider has no readiness probe: construction above
         // succeeded, and there is nothing further to ask it.
         log::debug!("[flows][inference-probe] role={role} managed provider registered no probe");
         return Ok(());
     };
-    let model_id = resolve_managed_model(role, config, None);
+    let model_id = entry
+        .models
+        .as_ref()
+        .and_then(|models| (models.resolve_model)(role, config, None))
+        .or_else(|| {
+            config
+                .default_model
+                .as_deref()
+                .map(str::trim)
+                .filter(|model| !model.is_empty())
+                .map(str::to_string)
+        })
+        .ok_or_else(|| format!("provider {PROVIDER_OPENHUMAN} has no model for role {role}"))?;
     let result = probe(role.to_string(), model_id.clone(), config.clone()).await;
     log::debug!(
         "[flows][inference-probe] role={role} model={model_id} probe result: {}",
@@ -362,6 +391,17 @@ pub(super) fn unresolved_chat_model_error(
     config: &Config,
     egress: &EgressLedger,
 ) -> anyhow::Error {
+    let extensions = crate::core::runtime::CoreContext::current_extensions();
+    unresolved_chat_model_error_for(role, provider, config, egress, extensions.as_ref())
+}
+
+pub(super) fn unresolved_chat_model_error_for(
+    role: &str,
+    provider: &str,
+    config: &Config,
+    egress: &EgressLedger,
+    extensions: Option<&crate::core::slots::Extensions>,
+) -> anyhow::Error {
     let p = provider.trim();
 
     if let Err(error) = enforce_local_only_inference(role, p) {
@@ -384,11 +424,12 @@ pub(super) fn unresolved_chat_model_error(
     }
 
     if p.is_empty() || p == "cloud" {
-        return unresolved_chat_model_error(
+        return unresolved_chat_model_error_for(
             role,
             &resolve_primary_cloud_provider_string(config),
             config,
             egress,
+            extensions,
         );
     }
 
@@ -411,7 +452,7 @@ pub(super) fn unresolved_chat_model_error(
             );
         }
         let (model, _) = split_model_and_temperature(model_with_temperature);
-        return match resolve_cloud_slug(role, slug.trim(), &model, config) {
+        return match resolve_cloud_slug_for(role, slug.trim(), &model, config, extensions) {
             Err(error) => error,
             Ok(_) => anyhow::anyhow!(
                 "[chat-factory] configured provider '{}' for role '{}' did not produce a crate-native chat model",

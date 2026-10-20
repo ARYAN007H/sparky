@@ -22,11 +22,12 @@ pub(super) struct CloudSlugResolution<'a> {
     pub(super) codex: tinyinference_llm::providers::openai::codex::OpenAiCodexRouting,
 }
 
-pub(super) fn resolve_cloud_slug<'a>(
+pub(super) fn resolve_cloud_slug_for<'a>(
     role: &str,
     slug: &str,
     model: &str,
     config: &'a Config,
+    extensions: Option<&crate::core::slots::Extensions>,
 ) -> anyhow::Result<CloudSlugResolution<'a>> {
     let entry = config.cloud_providers.iter().find(|e| e.slug == slug);
 
@@ -64,7 +65,11 @@ pub(super) fn resolve_cloud_slug<'a>(
     // OpenhumanJwt entries are exempt: they always delegate to
     // make_openhuman_backend which derives the model from config.default_model,
     // ignoring whatever effective_model we computed here.
-    if entry.auth_style != AuthStyle::OpenhumanJwt && effective_model.trim().is_empty() {
+    let hosted = crate::config::schema::cloud_providers::is_hosted_auth_style_for(
+        extensions,
+        entry.auth_style,
+    );
+    if !hosted && effective_model.trim().is_empty() {
         log::warn!(
             "[providers][chat-factory] role={} slug={} resolved to empty model — \
              provider string must include a model id (e.g. '{}:<model-id>') or \
@@ -82,13 +87,21 @@ pub(super) fn resolve_cloud_slug<'a>(
         );
     }
 
-    if entry.auth_style != AuthStyle::OpenhumanJwt && is_abstract_tier_model(&effective_model) {
-        if let Some(default_model) = entry
-            .default_model
-            .as_deref()
-            .map(str::trim)
-            .filter(|m| !m.is_empty() && !is_abstract_tier_model(m))
-        {
+    if !hosted
+        && crate::inference::provider_model::is_abstract_model_for(
+            extensions,
+            PROVIDER_OPENHUMAN,
+            &effective_model,
+        )
+    {
+        if let Some(default_model) = entry.default_model.as_deref().map(str::trim).filter(|m| {
+            !m.is_empty()
+                && !crate::inference::provider_model::is_abstract_model_for(
+                    extensions,
+                    PROVIDER_OPENHUMAN,
+                    m,
+                )
+        }) {
             log::info!(
                 "[providers][chat-factory] role={} slug={} remapping abstract model {} -> {}",
                 role,
@@ -201,25 +214,34 @@ pub(super) fn resolve_cloud_slug<'a>(
 /// non-codex slugs is not replicated (the crate has responses-*primary*, not
 /// fallback); chat completions is the primary path those slugs use in practice.
 ///
-/// The resolution is shared via [`resolve_cloud_slug`], so slugs resolve
+/// The resolution is shared via [`resolve_cloud_slug_for`], so slugs resolve
 /// identically to the legacy path; only the wire client differs. The **same**
 /// access gate the `Provider` path applies (`enforce_local_only_inference` +
 /// `verify_session_active`) runs before building. Temperature rides the per-call
 /// `ModelRequest` (managed/local parity; the `@<temp>` suffix still bakes a fixed
 /// override).
+#[cfg(test)]
 pub(super) fn try_create_cloud_slug_chat_model(
     role: &str,
     config: &Config,
     egress: &EgressLedger,
 ) -> OptionalChatModelResult {
-    try_create_cloud_slug_chat_model_with_native_tools(role, config, true, egress)
+    let extensions = crate::core::runtime::CoreContext::current_extensions();
+    try_create_cloud_slug_chat_model_with_native_tools_for(
+        role,
+        config,
+        true,
+        egress,
+        extensions.as_ref(),
+    )
 }
 
-pub(super) fn try_create_cloud_slug_chat_model_with_native_tools(
+pub(super) fn try_create_cloud_slug_chat_model_with_native_tools_for(
     role: &str,
     config: &Config,
     native_tool_calling: bool,
     egress: &EgressLedger,
+    extensions: Option<&crate::core::slots::Extensions>,
 ) -> OptionalChatModelResult {
     // Resolve the role's provider string, expanding the empty / "cloud" sentinel
     // to the primary cloud target.
@@ -227,12 +249,13 @@ pub(super) fn try_create_cloud_slug_chat_model_with_native_tools(
     if resolved.trim().is_empty() || resolved.trim() == "cloud" {
         resolved = resolve_primary_cloud_provider_string(config);
     }
-    try_create_cloud_slug_chat_model_from_string_with_native_tools(
+    try_create_cloud_slug_chat_model_from_string_with_native_tools_for(
         role,
         &resolved,
         config,
         native_tool_calling,
         egress,
+        extensions,
     )
 }
 
@@ -253,6 +276,25 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
     config: &Config,
     native_tool_calling: bool,
     egress: &EgressLedger,
+) -> OptionalChatModelResult {
+    let extensions = crate::core::runtime::CoreContext::current_extensions();
+    try_create_cloud_slug_chat_model_from_string_with_native_tools_for(
+        role,
+        provider,
+        config,
+        native_tool_calling,
+        egress,
+        extensions.as_ref(),
+    )
+}
+
+pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools_for(
+    role: &str,
+    provider: &str,
+    config: &Config,
+    native_tool_calling: bool,
+    egress: &EgressLedger,
+    extensions: Option<&crate::core::slots::Extensions>,
 ) -> OptionalChatModelResult {
     let p = provider.trim().to_string();
 
@@ -293,7 +335,7 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
         effective_model,
         key,
         codex,
-    } = match resolve_cloud_slug(role, &slug, &raw_model, config) {
+    } = match resolve_cloud_slug_for(role, &slug, &raw_model, config, extensions) {
         Ok(r) => r,
         Err(e) => return Some(Err(e)),
     };
@@ -332,14 +374,19 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
             );
         }
         AuthStyle::Anthropic | AuthStyle::None => {}
-        AuthStyle::OpenhumanJwt => {
+        style
+            if crate::config::schema::cloud_providers::is_hosted_auth_style_for(
+                extensions, style,
+            ) =>
+        {
             #[cfg(not(test))]
             if let Err(error) = verify_backend_session_active(config) {
                 return Some(Err(error));
             }
             let model_override =
                 (!effective_model.trim().is_empty()).then_some(effective_model.as_str());
-            return Some(managed_chat_model(
+            return Some(managed_chat_model_for(
+                extensions,
                 role,
                 config,
                 model_override,
@@ -371,6 +418,11 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
                     .push(("client_version".to_string(), openai_codex_client_version()));
             }
             codex_route = Some(&codex);
+        }
+        AuthStyle::OpenhumanJwt => {
+            return Some(Err(anyhow::anyhow!(
+                "hosted cloud authentication is unavailable without a registered host provider"
+            )));
         }
     }
 

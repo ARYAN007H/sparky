@@ -74,6 +74,7 @@ async fn process_channel_message_executes_native_tool_calls() {
 
 #[tokio::test]
 async fn process_channel_message_handles_models_command_without_llm_call() {
+    crate::channels::register_hosted_route_test_policy();
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(TelegramRecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
@@ -96,6 +97,17 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         crate::agent::tinyagents::TurnModelSource::from_model(fallback_provider),
     );
 
+    let mut config = crate::config::Config::default();
+    config
+        .cloud_providers
+        .push(crate::config::schema::CloudProviderCreds {
+            id: "p_managed_models_test".to_string(),
+            slug: "openhuman".to_string(),
+            label: "Managed Backend".to_string(),
+            endpoint: "https://api.openhuman.ai/v1".to_string(),
+            auth_style: crate::config::schema::AuthStyle::OpenhumanJwt,
+            default_model: Some("default-model".to_string()),
+        });
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
@@ -119,7 +131,7 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
-        config: None,
+        config: Some(Arc::new(config)),
         core: None,
     });
 

@@ -25,7 +25,7 @@ Every caller starts with a role (`chat`, `reasoning`, `agentic`, `coding`, `visi
      |
      |  role or hint:*         e.g. "reasoning", "hint:coding"
      v
-  routing.rs / tiers.rs     role -> provider string from config
+  routing.rs                 role -> provider string from config
      |                        (chat_provider, reasoning_provider, ...)
      |  provider string       e.g. "openhuman", "ollama:qwen3@0.2"
      v
@@ -67,10 +67,9 @@ most BYOK slugs do not serve. [`provider/fallback_diagnostics.rs`](./provider/fa
 lands on a provider with no credentials, the error says it was a background role that fell back,
 instead of naming a slug the user never configured.
 
-Hints and retired tier slugs never reach the managed backend verbatim. `tiers.rs` maps them to a
-role (`role_for_model_tier`) or to the concrete managed default (`resolve_model_for_hint`), while
-raw catalog ids a user pins on an agent (for example `openrouter/deepseek/deepseek-v4-pro`) pass
-through unchanged (`is_raw_passthrough_model`). The TinyAgents workload router that consumes this
+Provider model aliases, defaults, and capabilities come from the registered provider-model hooks
+in `registry.rs`. The generic `provider_model.rs` adapter maps workload-role hints and preserves
+concrete ids without carrying a hosted catalog. The TinyAgents workload router that consumes this
 for agent turns is in [`agent/tinyagents/routes.rs`](../agent/tinyagents/routes.rs).
 
 There are two families of entry points. `create_chat_model*` in `factory/chat_model.rs` is for
@@ -163,7 +162,7 @@ A failed provider call passes through several layers, each with one job:
      |                     401/403 on a BYO key -> auth_error_registry::record
      |                        -> ProviderApiKeyRejected (once per episode)
      v
-  provider/error_code.rs     managed errorCode present? backend owns Sentry
+  registry.rs                provider-owned classification metadata
   provider/error_classify.rs rate-limit / upstream-unhealthy / retry-after
      v
   failure_copy/table.rs      class -> error_type, source, retryable, copy
@@ -198,10 +197,10 @@ picks the provider the same way a provider string does.
 | `auth_error_registry.rs` | Process singleton and user-facing copy over `tinyinference_providers::auth_registry::ProviderAuthErrorRegistry` (the once-per-episode latch). |
 | `failure_copy/` | `table.rs` maps a failure class to the wire `error_type`, source, retry verdict and user copy. `halt.rs` has loop-guard halt summaries. |
 | `provider/` | Model construction and provider policy. See [`provider/README.md`](provider/README.md). |
-| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `tiers`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
-| `provider/openhuman_backend_model.rs` | Provider-neutral managed pieces kept in the core (`PROVIDER_LABEL`, `without_reasoning`). The managed `ChatModel`, catalog and embeddings live in `openhuman-tinyhumans` and register through `registry.rs`. |
+| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
+| `provider_model.rs`, `registry.rs` | Provider-neutral model hooks and caller adapters; hosted aliases, model defaults, pricing, and request metadata are registered by `openhuman-tinyhumans`. |
 | `provider/openai_codex.rs` | Codex routing metadata for the `openai` slug when Codex OAuth is connected. |
-| [`provider/error_code.rs`](./provider/error_code.rs), [`provider/error_classify.rs`](./provider/error_classify.rs) | Managed `errorCode` extraction and Sentry ownership; OpenHuman policy over TinyInference's classifier. |
+| [`provider/error_classify.rs`](./provider/error_classify.rs), `registry.rs` | Provider-neutral retry classification and registered provider ownership metadata. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |
 | [`provider/`](./provider/) | [`http_error.rs`](./provider/http_error.rs) (host reporter over `tinyinference_llm::failure::http`, `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `factory/` (chat-model construction and cloud provider resolution). |
 | [`provider/types.rs`](./provider/types.rs) | Host DTOs kept at product and RPC boundaries: `ChatResponse`, `ProviderDelta`, `BilledUsage`, `AGENT_TURN_MAX_OUTPUT_TOKENS`. |
@@ -218,8 +217,7 @@ picks the provider the same way a provider string does.
 - `create_turn_chat_model*` ([`provider/factory/turn_model.rs`](./provider/factory/turn_model.rs), crate-private) build the model for
   an agent turn.
 - `provider_for_role` ([`provider/factory/routing.rs`](./provider/factory/routing.rs)) returns the configured provider string for a
-  role. `resolve_model_for_hint` and `role_for_model_tier` ([`provider/factory/tiers.rs`](./provider/factory/tiers.rs)) handle
-  `hint:*` markers.
+  role. `provider_model.rs` handles generic `hint:*` workload markers and consults provider hooks for provider-owned aliases.
 - `probe_inference_readiness` (`provider/factory/chat_model.rs`) checks that a role can actually
   run: it builds the model and, for the managed backend, makes one cheap completion.
 - `BYOK_INCOMPLETE_SENTINEL` (`provider/factory.rs`) marks a BYOK route with missing pieces.
@@ -269,7 +267,7 @@ Outside JSON-RPC, `http::router()` serves `/v1/chat/completions` and `/v1/models
 ## Events and persistence
 
 This domain publishes but does not subscribe; there is no `bus.rs`. `SessionExpired` comes from
-[`provider/http_error.rs`](./provider/http_error.rs) and `provider/openhuman_backend_model.rs` (the managed model itself is in `openhuman-tinyhumans`).
+[`provider/http_error.rs`](./provider/http_error.rs) using registered backend ownership metadata.
 `ProviderApiKeyRejected` comes from `provider/http_error.rs`, gated by `auth_error_registry`.
 
 There is no `store.rs`. Routing, provider and local settings persist through `config` (`config/ops/

@@ -1,6 +1,6 @@
 //! Primary cloud-provider selection and legacy direct-inference compatibility.
 
-use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+use crate::config::schema::cloud_providers::CloudProviderCreds;
 use crate::config::Config;
 use crate::inference::provider::factory::{BYOK_INCOMPLETE_SENTINEL, PROVIDER_OPENHUMAN};
 
@@ -138,15 +138,17 @@ fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> S
                 .as_deref()
                 .map(str::trim)
                 .filter(|model| !model.is_empty())
-        })
-        .unwrap_or(crate::config::DEFAULT_MODEL);
+        });
+    let Some(model) = model else {
+        return BYOK_INCOMPLETE_SENTINEL.to_string();
+    };
 
     format!("{}:{model}", entry.slug)
 }
 
 fn is_openhuman_cloud_entry(config: &Config, entry: &CloudProviderCreds) -> bool {
-    entry.slug == PROVIDER_OPENHUMAN
-        || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
+    crate::config::schema::cloud_providers::is_hosted_cloud_identity(&entry.slug)
+        || crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style)
         || looks_like_openhuman_backend(config, &entry.endpoint)
 }
 
