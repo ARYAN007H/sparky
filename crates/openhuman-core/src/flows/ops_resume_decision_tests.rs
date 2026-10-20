@@ -92,22 +92,9 @@ async fn flows_resume_with_mismatched_approvals_is_rejected() {
 async fn flows_resume_with_the_correct_gate_completes_and_runs_downstream() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let created = flows_create(&config, "gated".to_string(), approval_gated_graph(), false).await;
-    if std::env::var_os("OPENHUMAN_TINYFLOWS_RUN_DIAGNOSTICS").is_some() {
-        if let Err(error) = &created {
-            let tenant_scoped = crate::core::runtime::DispatchCtx::ambient()
-                .tenant()
-                .map(|tenant| tenant.is_scoped())
-                .unwrap_or(false);
-            let module_state = crate::modules::ops::state_of("tinyflows");
-            eprintln!(
-                "flows_create after resume fixtures failed: {error}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; artifact={:?}",
-                config.workspace_dir.display(),
-                crate::modules::local_artifact("tinyflows")
-            );
-        }
-    }
-    let created = created.unwrap();
+    let created = flows_create(&config, "gated".to_string(), approval_gated_graph(), false)
+        .await
+        .unwrap();
 
     let run = flows_run(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -312,41 +299,6 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
     .await
     .expect_err("resuming an already-completed run must be a clear error, not a silent no-op");
     let expected = "is not waiting for approval";
-    if std::env::var_os("OPENHUMAN_TINYFLOWS_RUN_DIAGNOSTICS").is_some() || !err.contains(expected)
-    {
-        let dispatch = crate::core::runtime::DispatchCtx::ambient();
-        let tenant_scoped = dispatch
-            .tenant()
-            .map(|tenant| tenant.is_scoped())
-            .unwrap_or(false);
-        let module_state = crate::modules::ops::state_of("tinyflows");
-        let module_version = crate::modules::registry::find("tinyflows")
-            .map(|record| record.version)
-            .unwrap_or("missing");
-        let loaded_module = crate::modules::runtime::runtime()
-            .await
-            .ok()
-            .and_then(|runtime| {
-                runtime
-                    .host()
-                    .list()
-                    .into_iter()
-                    .find(|module| module.name == "tinyflows-module")
-            });
-        eprintln!(
-            "ResumeRun nonparked-status diagnostic: error={err}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; registry_version={module_version}; loaded_version={}; loaded_file={}; artifact={:?}",
-            config.workspace_dir.display(),
-            loaded_module
-                .as_ref()
-                .map(|module| module.version.as_str())
-                .unwrap_or("missing"),
-            loaded_module
-                .as_ref()
-                .map(|module| module.file.as_str())
-                .unwrap_or("missing"),
-            crate::modules::local_artifact("tinyflows")
-        );
-    }
     assert!(
         err.contains(expected),
         "expected a clear non-paused-run error, got: {err}"

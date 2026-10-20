@@ -139,15 +139,6 @@ async fn flows_validate_reports_error_for_graph_without_trigger() {
         graph,
     )
     .await;
-    if std::env::var_os("OPENHUMAN_TINYFLOWS_RUN_DIAGNOSTICS").is_some() {
-        eprintln!(
-            "flows_validate structural diagnostic: valid={} errors={:?} warnings={:?} error_details={:?}",
-            outcome.value.valid,
-            outcome.value.errors,
-            outcome.value.warnings,
-            outcome.value.error_details
-        );
-    }
     assert!(!outcome.value.valid);
     assert_eq!(outcome.value.errors.len(), 1);
     assert!(outcome.value.errors[0].contains("trigger"));
