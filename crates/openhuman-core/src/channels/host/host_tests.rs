@@ -159,10 +159,12 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
         },
     };
 
-    assert!(super::adapters::project_channel_event(&bob, event.clone())
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        super::adapters::project_channel_event(&bob, event.clone())
+            .await
+            .unwrap()
+            .is_none()
+    );
     let bob_messages = crate::threads::store::blocking::get_messages(
         bob.clone(),
         workspace.clone(),
@@ -170,8 +172,16 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
     )
     .await
     .unwrap();
-    assert_eq!(bob_messages[0].extra_metadata["voiceNote"]["opaqueId"], "bob-voice");
-    assert!(bob_messages[0].extra_metadata.get("channelActivity").is_none());
+    assert_eq!(
+        bob_messages[0].extra_metadata["voiceNote"]["opaqueId"],
+        "bob-voice"
+    );
+    assert!(
+        bob_messages[0]
+            .extra_metadata
+            .get("channelActivity")
+            .is_none()
+    );
 
     let projected = super::adapters::project_channel_event(&alice, event.clone())
         .await
@@ -203,21 +213,22 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
         },
         ..event
     };
-    assert!(super::adapters::project_channel_event(&restarted, read)
+    assert!(
+        super::adapters::project_channel_event(&restarted, read)
+            .await
+            .unwrap()
+            .is_some()
+    );
+    let messages = crate::threads::store::blocking::get_messages(restarted, workspace, thread_id)
         .await
-        .unwrap()
-        .is_some());
-    let messages = crate::threads::store::blocking::get_messages(
-        restarted,
-        workspace,
-        thread_id,
-    )
-    .await
-    .unwrap();
+        .unwrap();
     let activity = &messages[0].extra_metadata["channelActivity"];
     assert_eq!(activity["reactions"].as_object().unwrap().len(), 1);
     assert_eq!(activity["readReceipts"].as_object().unwrap().len(), 1);
-    assert_eq!(messages[0].extra_metadata["voiceNote"]["opaqueId"], "voice-asset-7");
+    assert_eq!(
+        messages[0].extra_metadata["voiceNote"]["opaqueId"],
+        "voice-asset-7"
+    );
 }
 
 // --- ApprovalGate::parse_reply -------------------------------------------
@@ -275,8 +286,8 @@ async fn event_sink_rejects_non_object_payload() {
 #[tokio::test]
 async fn event_sink_routes_channel_reactions_to_domain_bus() {
     let sink = OpenHumanEventSink;
-    assert!(sink
-        .publish(
+    assert!(
+        sink.publish(
             "channel",
             "reaction_received",
             serde_json::json!({
@@ -285,9 +296,10 @@ async fn event_sink_routes_channel_reactions_to_domain_bus() {
             }),
         )
         .await
-        .is_ok());
-    assert!(sink
-        .publish(
+        .is_ok()
+    );
+    assert!(
+        sink.publish(
             "channel",
             "reaction_sent",
             serde_json::json!({
@@ -296,16 +308,19 @@ async fn event_sink_routes_channel_reactions_to_domain_bus() {
             }),
         )
         .await
-        .is_ok());
+        .is_ok()
+    );
     // Unknown domain/kind is a benign no-op.
-    assert!(sink
-        .publish("mystery", "x", serde_json::json!({}))
-        .await
-        .is_ok());
-    assert!(sink
-        .publish("channel", "unknown", serde_json::json!({}))
-        .await
-        .is_ok());
+    assert!(
+        sink.publish("mystery", "x", serde_json::json!({}))
+            .await
+            .is_ok()
+    );
+    assert!(
+        sink.publish("channel", "unknown", serde_json::json!({}))
+            .await
+            .is_ok()
+    );
 }
 
 // --- ConversationHistoryStore --------------------------------------------
