@@ -532,11 +532,7 @@ async fn message_append_with_config(
         .await
         .map_err(ThreadsError::Message)?;
     }
-    Ok(envelope(
-        message,
-        Some(counts([("num_messages", 1)])),
-        None,
-    ))
+    Ok(envelope(message, Some(counts([("num_messages", 1)])), None))
 }
 
 #[cfg(test)]
