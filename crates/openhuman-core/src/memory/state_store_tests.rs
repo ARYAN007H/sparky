@@ -139,11 +139,13 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
         .unwrap();
 
     let alice_scope = super::workspace_scope(&alice_workspace).unwrap();
-    let alice_target =
-        crate::storage::state_kv::StateKv::on_backend(&backend, &alice_scope, "memory", "state")
-            .unwrap();
-    super::migrate_existing_queue_scopes(&alice_workspace, &backend, &alice_scope, &alice_target)
-        .unwrap();
+    let alice_target = super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
+        &alice_workspace,
+        &backend,
+        &alice_scope,
+        "pending_deletions",
+    )
+    .unwrap();
     assert_eq!(
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -159,8 +161,13 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
     );
 
     alice_target.delete("pending_deletions").unwrap();
-    super::migrate_existing_queue_scopes(&alice_workspace, &backend, &alice_scope, &alice_target)
-        .unwrap();
+    super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
+        &alice_workspace,
+        &backend,
+        &alice_scope,
+        "pending_deletions",
+    )
+    .unwrap();
     assert!(
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -175,8 +182,13 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
     alice_old
         .put("pending_deletions", &vec![late_item.clone()])
         .unwrap();
-    super::migrate_existing_queue_scopes(&alice_workspace, &backend, &alice_scope, &alice_target)
-        .unwrap();
+    super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
+        &alice_workspace,
+        &backend,
+        &alice_scope,
+        "pending_deletions",
+    )
+    .unwrap();
     assert_eq!(
         alice_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -186,11 +198,13 @@ fn first_workspace_open_transfers_only_its_old_profile_queue_and_rechecks_after_
     );
 
     let bob_scope = super::workspace_scope(&bob_workspace).unwrap();
-    let bob_target =
-        crate::storage::state_kv::StateKv::on_backend(&backend, &bob_scope, "memory", "state")
-            .unwrap();
-    super::migrate_existing_queue_scopes(&bob_workspace, &backend, &bob_scope, &bob_target)
-        .unwrap();
+    let bob_target = super::open_workspace_quarantining_on::<Vec<PendingDeletion>>(
+        &bob_workspace,
+        &backend,
+        &bob_scope,
+        "pending_deletions",
+    )
+    .unwrap();
     assert_eq!(
         bob_target
             .get::<Vec<PendingDeletion>>("pending_deletions")
@@ -222,14 +236,18 @@ async fn a_matching_active_agent_scope_is_a_legacy_source() {
     };
     old.put("pending_deletions", &vec![item.clone()]).unwrap();
     let target_scope = super::workspace_scope(&workspace).unwrap();
-    let target =
-        crate::storage::state_kv::StateKv::on_backend(&backend, &target_scope, "memory", "state")
-            .unwrap();
+    let target = super::open_workspace_quarantining_on::<
+        Vec<crate::memory::deletion::PendingDeletion>,
+    >(&workspace, &backend, &target_scope, "pending_deletions")
+    .unwrap();
 
     let migrated = CoreContext::scope(context.clone(), async {
-        super::legacy_queue_scopes(&workspace).contains(&old_scope)
-            && super::migrate_existing_queue_scopes(&workspace, &backend, &target_scope, &target)
-                .is_ok()
+        let includes_own_scope = super::legacy_queue_scopes(&workspace).contains(&old_scope);
+        includes_own_scope
+            && super::open_workspace_quarantining_on::<
+                Vec<crate::memory::deletion::PendingDeletion>,
+            >(&workspace, &backend, &target_scope, "pending_deletions")
+            .is_ok()
     })
     .await;
     assert!(migrated);
@@ -242,9 +260,10 @@ async fn a_matching_active_agent_scope_is_a_legacy_source() {
 
     let other_workspace = tmp.path().join("other-workspace");
     let other_scope = super::workspace_scope(&other_workspace).unwrap();
-    let other_target =
-        crate::storage::state_kv::StateKv::on_backend(&backend, &other_scope, "memory", "state")
-            .unwrap();
+    let other_target = super::open_workspace_quarantining_on::<
+        Vec<crate::memory::deletion::PendingDeletion>,
+    >(&other_workspace, &backend, &other_scope, "pending_deletions")
+    .unwrap();
     CoreContext::scope(context, async {
         super::migrate_existing_queue_scopes(
             &other_workspace,

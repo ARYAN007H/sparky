@@ -180,6 +180,11 @@ fn migrate_existing_queue_scopes(
     target_scope: &crate::storage::Scope,
     target: &StateKv,
 ) -> Result<()> {
+    // The per-source marker records that migration has run, but each queue
+    // access still checks the eligible source value. A concurrently running
+    // older host may append after a pass; the next access must see that owed
+    // work. Once removed, a normally drained value is absent from the source,
+    // so it cannot be resurrected after a restart.
     for source_scope in legacy_queue_scopes(workspace_dir) {
         if &source_scope == target_scope {
             continue;
