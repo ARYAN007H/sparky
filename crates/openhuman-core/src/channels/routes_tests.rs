@@ -393,6 +393,7 @@ async fn clear_history_command_uses_reset_callback_and_persists_route_override()
         Some(&channel),
         &conversation_history_key(&msg),
         None,
+        None,
         &msg,
         move || async move {
             callback_flag.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -436,7 +437,10 @@ async fn remote_clear_without_captured_scope_fails_closed() {
     )
     .await;
 
-    assert!(result.is_err(), "an unscoped reset must never report success");
+    assert!(
+        result.is_err(),
+        "an unscoped reset must never report success"
+    );
 }
 
 #[cfg(feature = "modules")]
@@ -448,6 +452,7 @@ async fn remote_clear_rejects_an_unconfigured_captured_account() {
     let scope = remote_session_scope();
     let reset_context = crate::channels::host::remote_control::RemoteResetContext {
         scope: scope.clone(),
+        durable_session_key: "tenant:session:telegram:bot-a:group:room-1".into(),
         message: ChannelMessage {
             channel: "telegram:bot-a".into(),
             reply_target: "room-1".into(),

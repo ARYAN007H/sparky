@@ -1,12 +1,16 @@
 //! Captured host conversation and session state supplied to the channel module.
 
 use crate::channels::context::ChannelRuntimeContext;
+use crate::channels::Channel;
 use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, CreateConversationThread};
-use crate::channels::Channel;
 
 pub(crate) struct RemoteResetContext {
     pub(crate) scope: tinychannels_bus::module_remote::RemoteSessionScope,
+    /// Host-derived tenant-scoped identity used by TinyAgents. This is kept
+    /// separate from the module's opaque route key so remote commands cannot
+    /// choose or broaden session identity.
+    pub(crate) durable_session_key: String,
     pub(crate) message: tinychannels_bus::ChannelMessage,
     pub(crate) history_key: String,
 }
@@ -86,12 +90,9 @@ pub(crate) async fn dispatch_callback(
                 .account_id
                 .as_deref()
                 .ok_or_else(|| tinybus::Error::failed("remote reset account is unavailable"))?;
-            let configured = ctx
-                .channels_by_name
-                .get(account)
-                .is_some_and(|channel| {
-                    tinychannels_bus::provider_id(channel.name()) == session_scope.channel.id
-                });
+            let configured = ctx.channels_by_name.get(account).is_some_and(|channel| {
+                tinychannels_bus::provider_id(channel.name()) == session_scope.channel.id
+            });
             if !configured {
                 return Err(tinybus::Error::failed(
                     "remote reset account is not configured",
@@ -100,7 +101,7 @@ pub(crate) async fn dispatch_callback(
             crate::channels::runtime::dispatch::reset_durable_channel_session(
                 ctx,
                 &reset.message,
-                &reset.scope.session_key,
+                &reset.durable_session_key,
                 &reset.history_key,
             )
             .await

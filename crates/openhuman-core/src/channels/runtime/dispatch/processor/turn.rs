@@ -142,6 +142,7 @@ pub(crate) async fn process_channel_runtime_message(
         target_channel.as_ref(),
         &history_key,
         Some(remote_reset_scope),
+        Some(session_key.clone()),
         &msg,
         || async move {
             reset_durable_channel_session(
