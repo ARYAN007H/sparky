@@ -12,12 +12,49 @@
 
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tinystoragedrivers::{CollectionSpec, Precondition};
+
+use crate::storage::{self, documents::Repo};
 
 const LOG_PREFIX: &str = "[web_channel][voice_note]";
 /// `source` the composer stamps on a turn that began as a voice note.
 pub(crate) const VOICE_NOTE_SOURCE: &str = "voice_note";
 const DIR: &str = "voice_notes";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReplyVisemeTimeline {
+    tenant: crate::core::runtime::Tenant,
+    frames: Vec<Value>,
+}
+
+fn viseme_repo(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace: &Path,
+) -> Result<Repo, String> {
+    let tenant = crate::core::runtime::tenant::tenant_in(
+        crate::core::runtime::is_saas(),
+        ctx.resolved().as_deref(),
+    )
+    .map_err(|error| error.to_string())?;
+    let backend = storage::local::backend_for(workspace)
+        .map_err(|error| format!("open voice-note storage: {error}"))?;
+    let scope = storage::scope_from(
+        tenant.profile.as_deref(),
+        tenant.agent.as_deref(),
+        crate::core::runtime::mode::is_saas(),
+    )
+    .map_err(|error| format!("scope voice-note storage: {error}"))?;
+    Repo::on(&backend, &scope, VISEME_DOMAIN, || {
+        vec![CollectionSpec::new(VISEME_COLLECTION)]
+    })
+    .map_err(|error| format!("open voice-note timeline collection: {error}"))
+}
+
+const VISEME_DOMAIN: &str = "web_chat::voice_notes";
+const VISEME_COLLECTION: &str = "reply_viseme_timelines";
 /// Largest note the store accepts (decoded bytes).
 pub(crate) const MAX_NOTE_BYTES: usize = 25 * 1024 * 1024;
 
@@ -164,7 +201,43 @@ pub(crate) fn validate_typed_media(
 }
 
 /// The `voiceNote` metadata for a reply whose audio was stored, if any.
-pub(crate) fn reply_note_metadata(workspace: &Path, request_id: &str) -> Option<Value> {
+pub(crate) fn persist_reply_visemes(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace: &Path,
+    request_id: &str,
+    frames: &[impl serde::Serialize],
+) -> Result<(), String> {
+    let id = reply_note_id(request_id);
+    if !is_valid_note_id(&id) {
+        return Err("invalid voice-note request id".into());
+    }
+    let tenant = crate::core::runtime::tenant::tenant_in(
+        crate::core::runtime::is_saas(),
+        ctx.resolved().as_deref(),
+    )
+    .map_err(|error| error.to_string())?;
+    let frames = serde_json::to_value(frames)
+        .map_err(|error| format!("serialize voice-note timeline: {error}"))?
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let repo = viseme_repo(ctx, workspace)?;
+    let body = serde_json::to_value(ReplyVisemeTimeline { tenant, frames })
+        .map_err(|error| format!("serialize voice-note timeline record: {error}"))?;
+    repo.run(|docs| async move {
+        docs.put(VISEME_COLLECTION, &id, body, Precondition::None).await?;
+        Ok(())
+    })
+    .map_err(|error| format!("persist voice-note timeline: {error}"))
+}
+
+/// Voice-note timelines use scoped documents; the file read is compatibility
+/// for replies written before the timelines moved to the storage port.
+pub(crate) fn reply_note_metadata(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace: &Path,
+    request_id: &str,
+) -> Option<Value> {
     let id = reply_note_id(request_id);
     let root = dir(workspace);
     KNOWN.iter().find_map(|(ext, mime)| {
@@ -172,13 +245,30 @@ pub(crate) fn reply_note_metadata(workspace: &Path, request_id: &str) -> Option<
             return None;
         }
         let mut metadata = json!({ "noteId": id, "mime": mime });
-        let viseme_path = root.join(format!("{id}.visemes.json"));
-        if let Ok(bytes) = std::fs::read(viseme_path) {
-            if let Ok(frames) = serde_json::from_slice::<Vec<Value>>(&bytes) {
-                if !frames.is_empty() {
-                    metadata["visemes"] = json!(frames);
-                }
-            }
+        let timeline = viseme_repo(ctx, workspace).ok().and_then(|repo| {
+            repo.run(|docs| {
+                let id = id.clone();
+                async move { docs.get(VISEME_COLLECTION, &id).await }
+            })
+            .ok()
+            .flatten()
+        });
+        let frames = timeline
+            .and_then(|record| serde_json::from_value::<ReplyVisemeTimeline>(record.doc).ok())
+            .filter(|record| {
+                crate::core::runtime::tenant::tenant_in(
+                    crate::core::runtime::is_saas(),
+                    ctx.resolved().as_deref(),
+                )
+                .is_ok_and(|tenant| tenant == record.tenant)
+            })
+            .map(|record| record.frames)
+            .or_else(|| {
+                let bytes = std::fs::read(root.join(format!("{id}.visemes.json"))).ok()?;
+                serde_json::from_slice::<Vec<Value>>(&bytes).ok()
+            });
+        if let Some(frames) = frames.filter(|frames| !frames.is_empty()) {
+            metadata["visemes"] = json!(frames);
         }
         Some(metadata)
     })
@@ -246,7 +336,6 @@ pub(crate) fn store_synthesized_reply(
     request_id: &str,
     audio_base64: &str,
     audio_mime: &str,
-    visemes: &[impl serde::Serialize],
 ) -> bool {
     use base64::Engine as _;
     if audio_base64.is_empty() {
@@ -261,22 +350,7 @@ pub(crate) fn store_synthesized_reply(
     };
     let id = reply_note_id(request_id);
     match store_note(workspace, &id, audio_mime, &bytes) {
-        Ok(_) => {
-            if !visemes.is_empty() {
-                let path = dir(workspace).join(format!("{id}.visemes.json"));
-                if let Err(err) = serde_json::to_vec(visemes)
-                    .map_err(|err| err.to_string())
-                    .and_then(|encoded| {
-                        std::fs::write(path, encoded).map_err(|err| err.to_string())
-                    })
-                {
-                    log::warn!(
-                        "{LOG_PREFIX} could not store reply visemes request_id={request_id}: {err}"
-                    );
-                }
-            }
-            true
-        }
+        Ok(_) => true,
         Err(err) => {
             log::warn!("{LOG_PREFIX} could not store reply audio request_id={request_id}: {err}");
             false
