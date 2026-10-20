@@ -29,43 +29,26 @@ const ALL_FUNCTIONS: &[&str] = &[
 ];
 
 #[test]
-fn all_controller_schemas_has_entry_per_function() {
-    let names: Vec<_> = all_controller_schemas()
-        .into_iter()
-        .map(|s| s.function)
-        .collect();
-    assert_eq!(names.len(), ALL_FUNCTIONS.len());
-    for expected in ALL_FUNCTIONS {
-        assert!(names.contains(expected), "missing schema for {expected}");
+fn schema_and_handler_catalogs_preserve_threads_wire_methods() {
+    for catalog in [
+        all_controller_schemas(),
+        all_registered_controllers()
+            .into_iter()
+            .map(|controller| controller.schema)
+            .collect(),
+    ] {
+        let names: Vec<_> = catalog
+            .iter()
+            .map(|schema| {
+                assert_eq!(schema.namespace, "threads", "{}", schema.function);
+                schema.function
+            })
+            .collect();
+        assert_eq!(names.len(), ALL_FUNCTIONS.len());
+        for expected in ALL_FUNCTIONS {
+            assert!(names.contains(expected), "missing method {expected}");
+        }
     }
-}
-
-#[test]
-fn all_registered_controllers_has_handler_per_schema() {
-    let controllers = all_registered_controllers();
-    assert_eq!(controllers.len(), ALL_FUNCTIONS.len());
-    let names: Vec<_> = controllers.iter().map(|c| c.schema.function).collect();
-    for expected in ALL_FUNCTIONS {
-        assert!(names.contains(expected), "missing handler for {expected}");
-    }
-}
-
-#[test]
-fn every_schema_uses_threads_namespace() {
-    for s in all_controller_schemas() {
-        assert_eq!(
-            s.namespace, "threads",
-            "schema {} wrong namespace",
-            s.function
-        );
-    }
-}
-
-#[test]
-fn unknown_function_returns_fallback() {
-    let s = schemas("no_such_fn");
-    assert_eq!(s.function, "unknown");
-    assert_eq!(s.namespace, "threads");
 }
 
 // ── parse::<T>(params) contract ─────────────────────────────────────

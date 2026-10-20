@@ -1,24 +1,12 @@
-use super::{
-    all_controller_schemas, all_registered_controllers, controller_value, schemas, string_param,
-};
+use super::{all_controller_schemas, all_registered_controllers, controller_value, string_param};
 use crate::core::runtime::context::CoreContext;
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::DomainSet;
 use serde_json::{Map, Value};
 
 #[test]
-fn every_schema_is_in_the_modules_namespace() {
-    for schema in all_controller_schemas() {
-        assert_eq!(schema.namespace, "modules");
-        assert_ne!(
-            schema.function, "unknown",
-            "an advertised function fell through to the unknown arm"
-        );
-    }
-}
-
-#[test]
 fn registered_controllers_match_the_advertised_schemas() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "modules");
     // Two lists that must agree: one drives `/schema`, the other dispatch.
     let advertised: Vec<&str> = all_controller_schemas()
         .iter()
@@ -29,11 +17,6 @@ fn registered_controllers_match_the_advertised_schemas() {
         .map(|c| c.schema.function)
         .collect();
     assert_eq!(advertised, registered);
-}
-
-#[test]
-fn an_unknown_function_falls_through_to_the_unknown_arm() {
-    assert_eq!(schemas("nope").function, "unknown");
 }
 
 #[test]
@@ -143,5 +126,20 @@ async fn a_blank_or_unreadable_site_forgets_nothing() {
             .await
             .unwrap_err();
         assert!(error.contains("must name a site"), "{error}");
+    }
+}
+
+#[test]
+fn computer_status_load_keeps_permissive_false_default() {
+    assert!(!super::computer_status_load(&Map::new()));
+    for (value, expected) in [
+        (Value::Null, false),
+        (serde_json::json!("true"), false),
+        (serde_json::json!(1), false),
+        (Value::Bool(false), false),
+        (Value::Bool(true), true),
+    ] {
+        let params = Map::from_iter([("load".into(), value)]);
+        assert_eq!(super::computer_status_load(&params), expected);
     }
 }

@@ -38,8 +38,6 @@ pub use definitions::schemas;
 // when this was one un-split file. See each item's `pub(super)` in its
 // owning submodule.
 #[cfg(test)]
-use crate::core::Outcome;
-#[cfg(test)]
 use serde_json::{Map, Value};
 #[cfg(test)]
-use util::{read_optional, read_required, read_required_non_empty, to_json};
+use util::{read_optional, read_required, read_required_non_empty};
