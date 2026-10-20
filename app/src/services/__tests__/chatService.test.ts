@@ -406,13 +406,28 @@ describe('chatService.subscribeChatEvents', () => {
     bindMockSocket(socket);
     const attachments = [{ kind: 'image', media: { opaqueId: 'opaque-1' } }];
     mockCallCoreRpc.mockResolvedValue({
+      queued: true,
+      queue_mode: 'followup',
+      client_id: 'socket-1',
+      thread_id: 'thread-1',
       request_id: 'request-1',
+      queue_depth: 1,
       queued_attachments: attachments,
     });
 
     await expect(
       chatSendWithAck({ threadId: 'thread-1', message: '', queueMode: 'followup' })
     ).resolves.toEqual({ requestId: 'request-1', queuedAttachments: attachments });
+  });
+
+  it('rejects an invalid queue acknowledgement instead of trusting raw RPC data', async () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    mockCallCoreRpc.mockResolvedValue({ request_id: 'request-1', queued_attachments: [] });
+
+    await expect(
+      chatSendWithAck({ threadId: 'thread-1', message: '', queueMode: 'followup' })
+    ).rejects.toThrow('invalid chat queue acknowledgement');
   });
 
   it('forwards speak_reply, source, session_id when provided', async () => {
