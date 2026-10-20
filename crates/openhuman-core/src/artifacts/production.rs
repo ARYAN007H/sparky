@@ -307,6 +307,7 @@ impl Production {
         let bridge = super::tiny_store::LegacyUiBridge::new(
             &self.workspace_dir,
             self.files.clone(),
+            super::tiny_store::guarded_roots(self.files.trusted().to_vec()),
             self.file_store.clone(),
             self.chat.as_ref(),
             &self.ctx,
