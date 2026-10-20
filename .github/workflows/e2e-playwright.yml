@@ -126,7 +126,7 @@ jobs:
       - name: Run Playwright web E2E suite
         env:
           OPENHUMAN_WORKSPACE: ${{ runner.temp }}/openhuman-playwright-workspace
-          OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: "1"
+          OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: '1'
         run: bash app/scripts/e2e-web-shards.sh --lane=${{ matrix.lane }} --lanes=4 --selection=all
 
       - name: Pack Playwright E2E failure artifacts
