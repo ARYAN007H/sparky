@@ -89,13 +89,18 @@ pub fn flow_entries(config: &Config) -> Vec<Workflow> {
 }
 
 fn entry_for_with_config(config: &Config, flow: tinyflows_catalog::types::Flow) -> Workflow {
+    let description = describe(config, &flow);
+    entry_with_description(flow, description)
+}
+
+fn entry_with_description(flow: tinyflows_catalog::types::Flow, description: String) -> Workflow {
     Workflow {
         name: flow.name.clone(),
         // The flow id, because that is what `run_workflow` / `get_flow` take.
         // A slug of the name would be a second identifier that resolves
         // nowhere.
         dir_name: flow.id.clone(),
-        description: describe(config, &flow),
+        description,
         scope: WorkflowScope::Flow,
         // No bundle on disk: no manifest to read, no resources to page
         // through. Left explicitly empty so a consumer that reads them gets an
@@ -107,17 +112,6 @@ fn entry_for_with_config(config: &Config, flow: tinyflows_catalog::types::Flow) 
 
 /// A structural summary of the flow graph.
 fn describe(config: &Config, flow: &tinyflows_catalog::types::Flow) -> String {
-    describe_shape(config, flow)
-}
-
-/// A one-line summary of what the graph *is*, for a flow with no description.
-///
-/// Deliberately structural — trigger, size, paused-ness — because that is all
-/// the record carries. See the module docs: inventing a purpose from node
-/// internals would read as authoritative and frequently be wrong.
-fn describe_shape(config: &Config, flow: &tinyflows_catalog::types::Flow) -> String {
-    // Trigger semantics belong to TinyFlows. A graph with no recognized
-    // trigger is summarized as manual, matching the catalogue's former copy.
     let trigger = match bus::describe_trigger(config, flow) {
         Ok(details) => details.kind.unwrap_or_else(|| "manual".to_string()),
         Err(error) => {
@@ -125,6 +119,15 @@ fn describe_shape(config: &Config, flow: &tinyflows_catalog::types::Flow) -> Str
             "unknown".to_string()
         }
     };
+    describe_shape(flow, trigger)
+}
+
+/// A one-line summary of what the graph *is*, for a flow with no description.
+///
+/// Deliberately structural — trigger, size, paused-ness — because that is all
+/// the record carries. See the module docs: inventing a purpose from node
+/// internals would read as authoritative and frequently be wrong.
+fn describe_shape(flow: &tinyflows_catalog::types::Flow, trigger: String) -> String {
     let steps = flow
         .graph
         .nodes
@@ -143,7 +146,15 @@ fn describe_shape(config: &Config, flow: &tinyflows_catalog::types::Flow) -> Str
 
 #[cfg(test)]
 fn entry_for(flow: tinyflows_catalog::types::Flow) -> Workflow {
-    entry_for_with_config(&Config::default(), flow)
+    let trigger = flow
+        .graph
+        .trigger()
+        .and_then(|node| node.config.get("trigger_kind"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("manual")
+        .to_string();
+    let description = describe_shape(&flow, trigger);
+    entry_with_description(flow, description)
 }
 
 #[cfg(test)]
