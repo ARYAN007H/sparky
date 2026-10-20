@@ -1,127 +1,105 @@
-use super::handlers::*;
-use super::params::*;
 use crate::core::all::ControllerParamContract;
-use serde::de::DeserializeOwned;
-use serde_json::{json, Map, Value};
+use serde_json::json;
 
-fn decode<T: DeserializeOwned>(params: Map<String, Value>) -> Result<(), String> {
-    super::helpers::deserialize_params::<T>(params).map(drop)
-}
-
-fn ignored(_params: Map<String, Value>) -> Result<(), String> {
-    Ok(())
-}
-
-/// Explicit parameter fixtures; decoder types match the named handlers.
+/// Independent parameter fixtures for the production-bound voice entries.
 /// Domain-specific defaults, values and errors remain in schemas_tests.rs.
 pub(crate) fn contracts() -> Vec<ControllerParamContract> {
     let mut contracts = vec![
         ControllerParamContract {
             method: "voice.status",
             required: &[],
-            handler: handle_voice_status,
+            optional: &[],
             examples: vec![json!({})],
-            parse: ignored,
         },
         ControllerParamContract {
             method: "voice.transcribe",
             required: &["audio_path"],
-            handler: handle_voice_transcribe,
+            optional: &["context", "skip_cleanup"],
             examples: vec![
                 json!({"audio_path":"fixture.wav"}),
                 json!({"audio_path":"fixture.wav","context":"example","skip_cleanup":true}),
             ],
-            parse: decode::<TranscribeParams>,
         },
         ControllerParamContract {
             method: "voice.transcribe_bytes",
             required: &["audio_bytes"],
-            handler: handle_voice_transcribe_bytes,
+            optional: &["extension", "context", "skip_cleanup"],
             examples: vec![
                 json!({"audio_bytes":[0,1]}),
                 json!({"audio_bytes":[0,1],"extension":"wav","context":"example","skip_cleanup":true}),
             ],
-            parse: decode::<TranscribeBytesParams>,
         },
         ControllerParamContract {
             method: "voice.tts",
             required: &["text"],
-            handler: handle_voice_tts,
+            optional: &["output_path"],
             examples: vec![
                 json!({"text":"Hello"}),
                 json!({"text":"Hello","output_path":"fixture.wav"}),
             ],
-            parse: decode::<TtsParams>,
         },
         ControllerParamContract {
             method: "voice.reply_synthesize",
             required: &["text"],
-            handler: handle_voice_reply_synthesize,
+            optional: &["voice_id", "model_id", "output_format"],
             examples: vec![
                 json!({"text":"Hello"}),
                 json!({"text":"Hello","voice_id":"fixture","model_id":"fixture","output_format":"mp3_44100"}),
             ],
-            parse: decode::<ReplySynthesizeParams>,
         },
         ControllerParamContract {
             method: "voice.stt_dispatch",
             required: &["audio_base64"],
-            handler: handle_voice_stt_dispatch,
+            optional: &["provider", "model", "mime_type", "file_name", "language"],
             examples: vec![
                 json!({"audio_base64":"AA=="}),
                 json!({"audio_base64":"AA==","provider":"cloud","model":"fixture","mime_type":"audio/wav","file_name":"fixture.wav","language":"en"}),
             ],
-            parse: decode::<SttDispatchParams>,
         },
         ControllerParamContract {
             method: "voice.tts_dispatch",
             required: &["text"],
-            handler: handle_voice_tts_dispatch,
+            optional: &["provider", "voice"],
             examples: vec![
                 json!({"text":"Hello"}),
                 json!({"text":"Hello","provider":"cloud","voice":"fixture"}),
             ],
-            parse: decode::<TtsDispatchParams>,
         },
         ControllerParamContract {
             method: "voice.set_providers",
             required: &[],
-            handler: handle_voice_set_providers,
+            optional: &["stt_provider", "tts_provider", "stt_model", "tts_voice"],
             examples: vec![
                 json!({}),
                 json!({"stt_provider":"cloud","tts_provider":"cloud","stt_model":"fixture","tts_voice":"fixture"}),
             ],
-            parse: decode::<SetProvidersParams>,
         },
         ControllerParamContract {
             method: "voice.update_provider_settings",
             required: &[],
-            handler: handle_voice_update_provider_settings,
+            optional: &["voice_providers", "stt_provider", "tts_provider"],
             examples: vec![
                 json!({}),
                 json!({"voice_providers":[{"slug":"fixture-provider"}],"stt_provider":"cloud","tts_provider":"cloud"}),
             ],
-            parse: decode::<VoiceUpdateProviderSettingsParams>,
         },
         ControllerParamContract {
             method: "voice.list_models",
             required: &["provider_id"],
-            handler: handle_voice_list_models,
+            optional: &["capability"],
             examples: vec![
                 json!({"provider_id":"fixture"}),
                 json!({"provider_id":"fixture","capability":"stt"}),
             ],
-            parse: decode::<VoiceListModelsParams>,
         },
         ControllerParamContract {
             method: "voice.test_provider",
             required: &["workload", "provider"],
-            handler: handle_voice_test_provider,
+            optional: &["validate_only", "api_key"],
             examples: vec![
                 json!({"workload":"tts","provider":"cloud"}),
                 json!({"workload":"stt","provider":"cloud","validate_only":true,"api_key":"fixture-key"}),
             ],
-            parse: decode::<VoiceTestProviderParams>,
         },
     ];
     contracts.extend(crate::voice::live::schemas::parameter_contracts());

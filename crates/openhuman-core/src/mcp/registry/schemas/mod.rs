@@ -52,13 +52,3 @@ pub(crate) fn registry_get_controller_entry() -> ControllerEntry {
 #[cfg(test)]
 use params::{read_optional_u32, read_required};
 
-#[cfg(test)]
-pub(crate) fn registry_get_parameter_contract() -> crate::core::all::ControllerParamContract {
-    crate::core::all::ControllerParamContract {
-        method: "mcp_clients.registry_get",
-        required: &["qualified_name"],
-        handler: handlers::handle_registry_get,
-        examples: vec![serde_json::json!({"qualified_name":"example/server"})],
-        parse: |params| handlers::parse_registry_get(&params).map(drop),
-    }
-}
