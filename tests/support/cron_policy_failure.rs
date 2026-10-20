@@ -329,7 +329,7 @@ async fn policy_reads_refuse_execution_without_consuming_a_slot() {
         let docs = storage::current_scoped().unwrap().unwrap();
         let mut stored = docs
             .documents()
-            .get("cron_jobs", &job.id)
+            .get(JOBS, &job.id)
             .await
             .unwrap()
             .unwrap();
@@ -338,7 +338,7 @@ async fn policy_reads_refuse_execution_without_consuming_a_slot() {
         stored.doc["next_run_ms"] = json!(due.timestamp_millis());
         stored.doc["next_run_ns"] = json!(due.timestamp_nanos_opt().unwrap());
         docs.documents()
-            .put("cron_jobs", &job.id, stored.doc, Precondition::None)
+            .put(JOBS, &job.id, stored.doc, Precondition::None)
             .await
             .unwrap();
     })
