@@ -292,20 +292,47 @@ impl Default for NativeRuntime {
 }
 
 pub(crate) struct NativeTurnExecution {
-    pub(crate) result: Result<TurnResult, String>,
+    pub(crate) result: Result<crate::agent::bus::AgentTurnResponse, String>,
     pub(crate) lease: Option<SessionLease>,
     pub(crate) progress_failed: bool,
 }
 
 pub(crate) async fn run(
     dispatch: &DispatchCtx,
-    mut request: TurnRequest<QueuedPayload>,
+    thread_id: String,
+    request_id: String,
+    text: String,
+    trusted: Arc<crate::agent::turn_host::TrustedAgentTurn>,
 ) -> NativeTurnExecution {
     let runtime = crate::core::runtime::slot_for::<NativeRuntime>(dispatch);
-    let request_id = request.request_id.clone();
-    if request.payload.ctx.is_none() {
-        request.payload.ctx = Some(dispatch.clone());
-    }
+    let tenant = match dispatch.tenant() {
+        Ok(tenant) => tenant,
+        Err(error) => {
+            return NativeTurnExecution {
+                result: Err(error.to_string()),
+                lease: None,
+                progress_failed: false,
+            };
+        }
+    };
+    let request = TurnRequest {
+        scope: ScopeKey {
+            agent_id: trusted.host_agent.definition.id.clone(),
+            profile_id: tenant.profile,
+        },
+        thread_id,
+        request_id: request_id.clone(),
+        text,
+        payload: QueuedPayload {
+            ctx: Some(dispatch.clone()),
+            trusted_turn: Some(trusted),
+            ..Default::default()
+        },
+        host_authored: false,
+        disposition: QueueDisposition::Interrupt,
+        deadline: Some(crate::agent::session_host::turn_backstop::configured_backstop()),
+        idle_timeout: Some(std::time::Duration::from_secs(900)),
+    };
     let result = runtime.runner.run(request).await.map_err(|error| error.to_string());
     let slot = runtime
         .shared
@@ -314,6 +341,15 @@ pub(crate) async fn run(
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .remove(&request_id)
         .unwrap_or_default();
+    let result = result.map(|result| {
+        let provider = result.data["provider"].as_str().map(str::to_owned);
+        let model = result.data["model"].as_str().map(str::to_owned);
+        crate::agent::bus::AgentTurnResponse {
+            text: result.reply,
+            resolved_provider: provider,
+            resolved_model: model,
+        }
+    });
     NativeTurnExecution {
         result,
         lease: slot.lease,
