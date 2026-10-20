@@ -61,19 +61,11 @@ fn resolve_completion_model_leaves_managed_tier_and_hint_node_models_untouched()
     );
     // No pinned model, or a whitespace-only pin, keeps the resolved default.
     assert_eq!(
-        agent_prompt::resolve_completion_model(
-            None,
-            "chat-v1".to_string(),
-            is_raw_model
-        ),
+        agent_prompt::resolve_completion_model(None, "chat-v1".to_string(), is_raw_model),
         "chat-v1"
     );
     assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("   "),
-            "chat-v1".to_string(),
-            is_raw_model
-        ),
+        agent_prompt::resolve_completion_model(Some("   "), "chat-v1".to_string(), is_raw_model),
         "chat-v1"
     );
 }

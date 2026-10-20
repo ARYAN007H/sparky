@@ -37,7 +37,10 @@ async fn managed_construction_ledger_collapses_repeat_disclosures() {
         provider_id,
         crate::inference::registry::ChatModelEntry {
             build: Arc::new(|request| {
-                let model = request.model_override.unwrap_or("fixture-model").to_string();
+                let model = request
+                    .model_override
+                    .unwrap_or("fixture-model")
+                    .to_string();
                 Ok((Arc::new(LedgerTestModel), model))
             }),
             probe: None,
