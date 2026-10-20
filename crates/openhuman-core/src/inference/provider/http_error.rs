@@ -129,6 +129,39 @@ struct HostErrorReporter<'a> {
     backend_error_code_owned: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HostDemotion {
+    Provider(DemotionKind),
+    BackendOwned,
+    Report,
+}
+
+/// Compose the host's backend `errorCode` guard at its historical position:
+/// after quota demotion, before the remaining provider/account classifications.
+fn select_demotion(
+    facts: &ProviderHttpFailureFacts,
+    provider_is_managed: bool,
+    backend_error_code_owned: bool,
+) -> HostDemotion {
+    let decision = demote_decision(facts, provider_is_managed);
+    if let Some(kind @ (DemotionKind::BudgetExhausted
+    | DemotionKind::NoModelLoaded
+    | DemotionKind::CustomUpstreamBadRequest
+    | DemotionKind::AccessPolicyDenied
+    | DemotionKind::ConfigurationRejected
+    | DemotionKind::ContextWindowExceeded
+    | DemotionKind::QuotaExhausted)) = decision
+    {
+        HostDemotion::Provider(kind)
+    } else if backend_error_code_owned {
+        HostDemotion::BackendOwned
+    } else if let Some(kind) = decision {
+        HostDemotion::Provider(kind)
+    } else {
+        HostDemotion::Report
+    }
+}
+
 impl ErrorReporter for HostErrorReporter<'_> {
     fn report(&self, failure: ProviderHttpFailure<'_>) {
         let ProviderHttpFailure {
@@ -145,13 +178,13 @@ impl ErrorReporter for HostErrorReporter<'_> {
         let demote = |kind: &str, reason: &str, warn: bool| {
             log_user_state(warn, kind, reason, operation, provider, model, status);
         };
-        let decision = demote_decision(&facts, is_backend);
+        let decision = select_demotion(&facts, is_backend, self.backend_error_code_owned);
 
         if matches!(status, 401 | 403) && is_backend {
             publish_backend_session_expired(operation, provider, status_code, self.message);
         } else if matches!(
             decision,
-            Some(
+            HostDemotion::Provider(
                 DemotionKind::BudgetExhausted
                     | DemotionKind::NoModelLoaded
                     | DemotionKind::CustomUpstreamBadRequest
@@ -161,7 +194,8 @@ impl ErrorReporter for HostErrorReporter<'_> {
                     | DemotionKind::QuotaExhausted
             )
         ) {
-            match decision.expect("matched demotion") {
+            match decision {
+                HostDemotion::Provider(kind) => match kind {
                 DemotionKind::BudgetExhausted => demote("budget", "budget-exhausted 400", false),
                 DemotionKind::NoModelLoaded => demote(
                     "provider_user_state",
@@ -190,10 +224,12 @@ impl ErrorReporter for HostErrorReporter<'_> {
                     demote("quota_exhausted", "provider monthly-quota exhausted", false)
                 }
                 _ => unreachable!("only precedence-preserving decisions enter this arm"),
+                },
+                _ => unreachable!("precedence arm only selects provider demotions"),
             }
-        } else if self.backend_error_code_owned {
+        } else if decision == HostDemotion::BackendOwned {
             demote("backend_error_code", "backend errorCode owned", false);
-        } else if let Some(decision) = decision {
+        } else if let HostDemotion::Provider(decision) = decision {
             match decision {
                 DemotionKind::ApiKeyRejected => {
                     log_byo_provider_auth_failure(operation, provider, model, status_code)
