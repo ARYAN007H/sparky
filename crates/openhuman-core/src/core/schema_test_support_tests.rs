@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 fn handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     panic!("the pure contract runner must never execute handlers");
