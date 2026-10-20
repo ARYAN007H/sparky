@@ -38,7 +38,7 @@ test.describe('Navigation', () => {
     await bootAuthenticatedPage(page, 'pw-navigation-user');
   });
 
-  for (const { route, expectedHash } of ROUTES) {
+  for (const { route, expectedHash, readyTestId } of ROUTES) {
     const landing = expectedHash ?? route;
     test(`renders ${route}`, async ({ page }) => {
       await page.goto(`/#${route}`);
