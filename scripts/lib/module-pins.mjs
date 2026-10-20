@@ -190,7 +190,9 @@ export function classifyPin({
 /**
  * Verify one reviewed, exact source-parity attestation for a test-only commit.
  * This deliberately proves a named Git pair and a named test file; it does not
- * infer Rust test-only semantics for arbitrary diffs.
+ * infer Rust test-only semantics for arbitrary diffs. The asset digest covers
+ * the registry version plus assets sorted by host key; the source digest covers
+ * sorted `mode type oid<TAB>path<LF>` entries other than the named test file.
  */
 export function validateTestOnlySourceParity({
   repoPath,
