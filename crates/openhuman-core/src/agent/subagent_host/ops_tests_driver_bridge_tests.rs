@@ -379,6 +379,13 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         Some("close-driver-thread".into()),
     )
     .with_jobs(jobs.clone());
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &workspace,
+        "test-session",
+        Some("close-driver-thread"),
+    );
+    let owner_scope: std::sync::Arc<dyn Fn(u64) -> String + Send + Sync> =
+        std::sync::Arc::new(move |_| owner.clone());
     assert!(port
         .close("close-driver-session")
         .await

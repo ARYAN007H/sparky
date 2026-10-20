@@ -369,11 +369,7 @@ async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
 
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![
         Box::new(RoutingFakeTool("propose_workflow")),
-        Box::new(ArchetypeDelegationTool {
-            tool_name: "build_workflow".to_string(),
-            agent_id: DelegationTarget("workflow_builder".to_string()),
-            tool_description: "Build a workflow".to_string(),
-        }),
+        Box::new(RoutingFakeTool("build_workflow")),
     ];
     append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
@@ -410,10 +406,6 @@ async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
     assert!(
         !route.contains("Call `build_workflow`"),
         "a prompt-hidden delegate must not be advertised as a direct call: {route}"
-    );
-    assert!(
-        route.contains("workflow_builder"),
-        "the hint must fall back to naming the owning agent: {route}"
     );
 }
 

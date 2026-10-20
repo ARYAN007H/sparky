@@ -38,7 +38,8 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
         }),
         None,
         live.data.child(),
-        Some(&live),
+        crate::agent::subagent_host::detached_subagent_parent(&live, "spawn-subagent-child")
+            .expect("detached parent"),
     ))
     .await
     .expect("tool execution");
@@ -89,7 +90,8 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
         }),
         None,
         run_context,
-        Some(&live),
+        crate::agent::subagent_host::detached_subagent_parent(&live, "stopped-child")
+            .expect("detached parent"),
     ))
     .await
     .expect("tool execution");
