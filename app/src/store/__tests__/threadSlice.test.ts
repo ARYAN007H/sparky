@@ -89,7 +89,15 @@ describe('threadSlice synchronous reducers', () => {
 
   it('applies provider reactions only to the exact OpenHuman row and persists read state in metadata', async () => {
     const store = createStore();
-    const message = makeMessage({ id: 'user:row-42' });
+    const message = makeMessage({
+      id: 'user:row-42',
+      extraMetadata: {
+        channelActivity: {
+          reactions: { 'persisted-reaction': { actorId: 'bob', value: '🎉' } },
+          readReceipts: { 'persisted-receipt': { actorId: 'carol', timestamp: 123 } },
+        },
+      },
+    });
     mockedThreadApi.getThreadMessages.mockResolvedValueOnce({ messages: [message], count: 1 });
     await store.dispatch(loadThreadMessages('channel:telegram/alice/room-1'));
 
@@ -115,7 +123,13 @@ describe('threadSlice synchronous reducers', () => {
     expect(
       store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]
         ?.extraMetadata?.channelActivity
-    ).toEqual({ reactions: [{ actorId: 'alice', value: '🔥' }], readReceipts: [] });
+    ).toEqual({
+      reactions: [
+        { actorId: 'bob', value: '🎉' },
+        { actorId: 'alice', value: '🔥' },
+      ],
+      readReceipts: [{ actorId: 'carol', timestamp: 123 }],
+    });
     expect(
       store.getState().thread.messagesByThreadId['channel:telegram/alice/room-1']?.[0]?.id
     ).toBe('user:row-42');
