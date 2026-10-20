@@ -258,11 +258,7 @@ fn master_agent_has_coding_hint_and_named_tools() {
             // always async and its result is delivered back on an idle
             // system turn, so there is nothing to collect and nothing to
             // block on.
-            for required in [
-                "spawn_subagent",
-                "list_subagents",
-                "continue_subagent",
-            ] {
+            for required in ["spawn_subagent", "list_subagents", "continue_subagent"] {
                 assert!(
                     tools.iter().any(|t| t == required),
                     "orchestrator must have sub-agent tool `{required}`"

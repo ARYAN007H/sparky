@@ -2,10 +2,10 @@ use super::*;
 
 #[tokio::test]
 async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_driver() {
-    use crate::agent::orchestration::tools::SpawnSubagentTool;
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentStatus, SubagentSessionStore,
     };
+    use crate::agent::orchestration::tools::SpawnSubagentTool;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
@@ -54,7 +54,12 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .nth(1)
         .and_then(|value| value.split("\n[/async_subagent_ref]").next())
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
-        .unwrap_or_else(|| panic!("accepted envelope carries task reference: {}", paused.output()));
+        .unwrap_or_else(|| {
+            panic!(
+                "accepted envelope carries task reference: {}",
+                paused.output()
+            )
+        });
     let task_id = paused_ref["task_id"]
         .as_str()
         .expect("accepted task id")
@@ -114,13 +119,22 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .nth(1)
         .and_then(|value| value.split("\n[/async_subagent_ref]").next())
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
-        .unwrap_or_else(|| panic!("resumed result carries task reference: {}", resumed.output()));
+        .unwrap_or_else(|| {
+            panic!(
+                "resumed result carries task reference: {}",
+                resumed.output()
+            )
+        });
     assert_eq!(
         resumed_ref["task_id"].as_str(),
         Some(task_id.as_str()),
         "resuming a checkpoint must keep its registered task identity"
     );
-    assert_eq!(jobs.list().len(), before_job_count, "resume must not spawn a second child");
+    assert_eq!(
+        jobs.list().len(),
+        before_job_count,
+        "resume must not spawn a second child"
+    );
     assert_eq!(
         resumed_ref["subagent_session_id"].as_str(),
         Some(before_session.subagent_session_id.as_str()),

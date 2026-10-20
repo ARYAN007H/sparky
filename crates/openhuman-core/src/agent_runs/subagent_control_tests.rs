@@ -230,4 +230,3 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     assert!(delivery[0].result.text.contains("[SUBAGENT_FAILED]"));
     assert!(delivery[0].result.text.contains("user requested stop"));
 }
-

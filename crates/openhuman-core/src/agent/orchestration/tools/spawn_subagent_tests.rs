@@ -5,11 +5,14 @@ fn parameters_schema_hides_legacy_mode_flags_and_keeps_required_agent_id() {
     let schema = tool.parameters_schema();
     let props = schema.get("properties").expect("schema has properties");
     for legacy in ["blocking", "dedicated_thread", "archetype", "toolkit"] {
-        assert!(props.get(legacy).is_none(), "legacy `{legacy}` is not advertised");
+        assert!(
+            props.get(legacy).is_none(),
+            "legacy `{legacy}` is not advertised"
+        );
     }
-    assert!(schema["required"].as_array().is_some_and(|required| {
-        required.iter().any(|key| key.as_str() == Some("agent_id"))
-    }));
+    assert!(schema["required"]
+        .as_array()
+        .is_some_and(|required| { required.iter().any(|key| key.as_str() == Some("agent_id")) }));
 }
 
 #[test]
@@ -102,7 +105,10 @@ fn frozen_legacy_mode_arguments_are_accepted_but_ignored() {
         "prompt": "inspect the frozen-session compatibility route",
     }));
     assert_eq!(decoded.agent_id, "task_manager_agent");
-    assert_eq!(decoded.prompt, "inspect the frozen-session compatibility route");
+    assert_eq!(
+        decoded.prompt,
+        "inspect the frozen-session compatibility route"
+    );
     assert_eq!(decoded.task_key, plain.task_key);
     assert!(!decoded.force_fresh);
 }

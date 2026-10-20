@@ -382,10 +382,7 @@ fn finish_spawn_registration(
 /// The wording follows what the parent can actually do: a parent without
 /// `wait_subagent` (the orchestrator, #5701) is told the result arrives on its
 /// own and not to poll, instead of being invited to "wait for completion".
-fn format_async_subagent_accepted(
-    agent_id: &str,
-    payload_json: &str,
-) -> String {
+fn format_async_subagent_accepted(agent_id: &str, payload_json: &str) -> String {
     format!(
         "Accepted async sub-agent `{agent_id}`. Its result is delivered automatically. To continue or answer a clarification, call `spawn_subagent` again with the same task_key.
 

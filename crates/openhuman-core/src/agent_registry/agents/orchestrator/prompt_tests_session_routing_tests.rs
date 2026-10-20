@@ -105,9 +105,8 @@ fn prompt_routes_workflow_authoring_to_the_builder_not_use_skill() {
     // The gate is the fix; this pins the prompt so the model is told the route
     // before it discovers the wall.
     assert!(
-        ARCHETYPE.contains(
-            "Build or edit a workflow: spawn `workflow_builder` with `spawn_subagent`"
-        ),
+        ARCHETYPE
+            .contains("Build or edit a workflow: spawn `workflow_builder` with `spawn_subagent`"),
         "orchestrator prompt must carry the workflow routing rule and name the spawn to make"
     );
 

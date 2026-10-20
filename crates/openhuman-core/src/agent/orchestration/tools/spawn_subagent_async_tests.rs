@@ -26,7 +26,10 @@ fn parameters_schema_advertises_fire_and_forget_fields() {
         assert!(props.contains_key(key), "missing {key}");
     }
     for retired in ["blocking", "dedicated_thread", "archetype"] {
-        assert!(!props.contains_key(retired), "legacy {retired} was advertised");
+        assert!(
+            !props.contains_key(retired),
+            "legacy {retired} was advertised"
+        );
     }
     assert!(
         !props.contains_key("toolkit"),
@@ -72,14 +75,25 @@ fn async_reference_payload_routes_follow_up_through_the_same_task_key() {
 
     assert_eq!(payload["agent_id"], "task_manager_agent");
     assert_eq!(payload["task_key"], "research-work");
-    assert_eq!(payload["instructions"]["answer_or_resume"]["tool"], "spawn_subagent");
+    assert_eq!(
+        payload["instructions"]["answer_or_resume"]["tool"],
+        "spawn_subagent"
+    );
     assert_eq!(
         payload["instructions"]["answer_or_resume"]["arguments"]["task_key"],
         "research-work"
     );
     let serialized = serde_json::to_string(&payload).unwrap();
-    for retired in ["continue_subagent", "wait_subagent", "steer_subagent", "close_subagent"] {
-        assert!(!serialized.contains(retired), "{retired} leaked into the envelope");
+    for retired in [
+        "continue_subagent",
+        "wait_subagent",
+        "steer_subagent",
+        "close_subagent",
+    ] {
+        assert!(
+            !serialized.contains(retired),
+            "{retired} leaked into the envelope"
+        );
     }
 }
 

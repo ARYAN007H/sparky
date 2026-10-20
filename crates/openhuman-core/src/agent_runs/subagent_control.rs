@@ -30,12 +30,10 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
 
 /// Registered controllers (schema + handler) for detached sub-agent control.
 pub fn all_registered_controllers() -> Vec<RegisteredController> {
-    vec![
-        RegisteredController {
-            schema: schema_for("subagent_cancel"),
-            handler: handle_subagent_cancel,
-        },
-    ]
+    vec![RegisteredController {
+        schema: schema_for("subagent_cancel"),
+        handler: handle_subagent_cancel,
+    }]
 }
 
 fn schema_for(function: &str) -> ControllerSchema {

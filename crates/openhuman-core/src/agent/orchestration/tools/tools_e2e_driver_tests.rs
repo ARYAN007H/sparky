@@ -3,8 +3,7 @@ use super::*;
 #[tokio::test]
 async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
     use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore,
-        SubagentSessionUpsert,
+        DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
     };
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
@@ -45,10 +44,13 @@ async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
         parent_thread_id: Some(thread_id.into()),
         agent_id: "task_manager_agent".into(),
         model: Some("test-model".into()),
-        sandbox_mode: format!("{:?}", AgentDefinitionRegistry::builtins_only()
-            .get("task_manager_agent")
-            .expect("task manager definition")
-            .sandbox_mode),
+        sandbox_mode: format!(
+            "{:?}",
+            AgentDefinitionRegistry::builtins_only()
+                .get("task_manager_agent")
+                .expect("task manager definition")
+                .sandbox_mode
+        ),
         action_root: None,
         task_key: "failed-steer-canary".into(),
     };
@@ -97,15 +99,26 @@ async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
         .await
         .expect("spawn tool executes");
 
-    assert!(result.is_error, "failed steer must be reported, got: {}", result.output());
+    assert!(
+        result.is_error,
+        "failed steer must be reported, got: {}",
+        result.output()
+    );
     assert!(
         result.output().contains("refusing to start a duplicate")
             && result.output().contains("existing-running-task"),
         "the refusal identifies the failed reusable task: {}",
         result.output()
     );
-    assert!(provider.seen.lock().is_empty(), "no second child model run may start");
-    assert_eq!(jobs.list().len(), jobs_before, "no second child job is admitted");
+    assert!(
+        provider.seen.lock().is_empty(),
+        "no second child model run may start"
+    );
+    assert_eq!(
+        jobs.list().len(),
+        jobs_before,
+        "no second child job is admitted"
+    );
     let after = store
         .load()
         .expect("session store remains readable")
@@ -113,7 +126,10 @@ async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
         .find(|row| row.subagent_session_id == existing.subagent_session_id)
         .expect("the original session remains");
     assert_eq!(after.status, DurableSubagentStatus::Running);
-    assert_eq!(after.current_task_id.as_deref(), Some("existing-running-task"));
+    assert_eq!(
+        after.current_task_id.as_deref(),
+        Some("existing-running-task")
+    );
 }
 
 #[tokio::test]

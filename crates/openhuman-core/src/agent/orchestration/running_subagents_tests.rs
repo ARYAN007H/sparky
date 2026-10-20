@@ -316,12 +316,8 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     assert_eq!(snap[1].agent_id, "researcher");
     assert_eq!(snap[1].status, "running");
 
-    let block = active_subagents_context_block(
-        &cx(),
-        "fleet-parent",
-        &test_workspace(),
-    )
-    .expect("block present");
+    let block = active_subagents_context_block(&cx(), "fleet-parent", &test_workspace())
+        .expect("block present");
     assert!(block.contains("[active_subagents]"));
     assert!(block.contains("reuse its task_key with spawn_subagent"));
     assert!(block.contains("You have 2 sub-agent worker(s)"));
@@ -330,19 +326,13 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     assert!(block.ends_with("[/active_subagents]\n\n"));
 
     // A parent with no registered workers gets no block (no perturbation).
-    assert!(active_subagents_context_block(
-        &cx(),
-        "nobody-here",
-        &test_workspace(),
-    )
-    .is_none());
+    assert!(active_subagents_context_block(&cx(), "nobody-here", &test_workspace(),).is_none());
 
     // The shipped orchestrator has no wait/steer/close tools (#5701): the
     // guidance must not name them and must say results arrive on their own.
     {
-        let block =
-            active_subagents_context_block(&cx(), "fleet-parent", &test_workspace())
-                .expect("block present");
+        let block = active_subagents_context_block(&cx(), "fleet-parent", &test_workspace())
+            .expect("block present");
         for name in [
             "wait_subagent",
             "steer_subagent",
@@ -401,22 +391,15 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
         )
         .expect("mark idle");
 
-        let block = active_subagents_context_block(
-            &cx(),
-            "cold-parent",
-            durable_ws.path(),
-            )
-        .expect("durable-only roster present");
+        let block = active_subagents_context_block(&cx(), "cold-parent", durable_ws.path())
+            .expect("durable-only roster present");
         assert!(block.contains(&format!("session={}", session.subagent_session_id)));
         assert!(block.contains("status=idle"));
         assert!(block.contains("about: Daily X trending email workflow"));
         // Other parents' durable sessions must not leak in.
-        assert!(active_subagents_context_block(
-            &cx(),
-            "unrelated-parent",
-            durable_ws.path(),
-            )
-        .is_none());
+        assert!(
+            active_subagents_context_block(&cx(), "unrelated-parent", durable_ws.path(),).is_none()
+        );
     }
 
     let _ = tx_a.send(DetachedSubagentStatus::Completed {
