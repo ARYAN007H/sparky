@@ -371,9 +371,8 @@ fn headless_core_backed_parent(
         .expect("task manager definition")
         .clone();
     definition.model = tinyagents_definition::ModelSpec::Inherit;
-    let definitions = Arc::new(
-        AgentDefinitionRegistry::builtins_only().with_definitions([definition]),
-    );
+    let definitions =
+        Arc::new(AgentDefinitionRegistry::builtins_only().with_definitions([definition]));
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.to_path_buf();
     config.components.juice = false;

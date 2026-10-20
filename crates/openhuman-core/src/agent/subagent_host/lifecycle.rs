@@ -203,8 +203,10 @@ pub(crate) async fn spawn_async_via_driver_tool(
         + Sync
         + 'static,
 ) -> Result<String, SubagentRunError> {
-    spawn_async_via_driver_tool_using_jobs(parent, definition, input, options, None, None, completion)
-        .await
+    spawn_async_via_driver_tool_using_jobs(
+        parent, definition, input, options, None, None, completion,
+    )
+    .await
 }
 
 /// Resumes a host-authorized clarification checkpoint through the same
