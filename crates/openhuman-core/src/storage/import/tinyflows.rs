@@ -20,8 +20,9 @@
 //! - an embedded agent's `agents/<id>/cron/jobs.db` goes to that agent's scope
 //!   ([`crate::storage::scope_for_agent`]), the one its cron calls resolve to.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 
@@ -30,6 +31,11 @@ use crate::config::Config;
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
 use crate::storage::{Scope, StorageBackend};
+
+type CatalogMigrationKey = (PathBuf, String);
+
+static CATALOG_MIGRATIONS: LazyLock<Mutex<HashMap<CatalogMigrationKey, Result<(), String>>>> =
+    LazyLock::new(Default::default);
 
 /// The marker name of the flow catalog (flows, revisions, runs, state,
 /// suggestions, drafts) and checkpoints.
@@ -149,16 +155,176 @@ pub fn import_flows(
     let backend_for_migration = Arc::clone(backend);
     let scope_for_migration = scope.clone();
     let config_for_migration = config.clone();
-    crate::storage::block_on_anyhow(async move {
+    let migration = crate::storage::block_on_anyhow(async move {
         migrate_catalog_storage(
             &backend_for_migration,
             &config_for_migration,
             &scope_for_migration,
         )
         .await
-    })?;
-    record_catalog_migration(config, scope, Ok(()));
+    });
+    record_catalog_migration(
+        config,
+        scope,
+        migration.as_ref().map(|_| ()).map_err(ToString::to_string),
+    );
+    migration?;
     import_flows_after_migration(backend, scope, config)
+}
+
+#[cfg(feature = "flows")]
+async fn migrate_catalog_storage(
+    backend: &Arc<dyn StorageBackend>,
+    config: &Config,
+    scope: &Scope,
+) -> Result<()> {
+    let registration = crate::flows::catalog_storage::register_backend_scope(
+        config,
+        Arc::clone(backend),
+        scope.clone(),
+    )
+    .await
+    .map_err(anyhow::Error::msg)?;
+    let proxy = crate::modules::tinyflows::catalog_proxy_for_migration(config)
+        .await
+        .map_err(anyhow::Error::msg)?;
+    proxy
+        .call::<()>(
+            tinyflows_bus::catalog::members::MIGRATE_STORAGE,
+            &(registration.storage(),),
+        )
+        .await
+        .context("migrate the TinyFlows catalog storage")
+}
+
+fn record_catalog_migration(config: &Config, scope: &Scope, outcome: Result<(), String>) {
+    let key = (config.workspace_dir.clone(), scope.as_str().to_owned());
+    CATALOG_MIGRATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(key, outcome);
+}
+
+fn catalog_migration_ready(config: &Config, scope: &Scope) -> bool {
+    let key = (config.workspace_dir.clone(), scope.as_str().to_owned());
+    matches!(
+        CATALOG_MIGRATIONS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&key),
+        Some(Ok(()))
+    )
+}
+
+fn flow_import_marker_done(
+    backend: &Arc<dyn StorageBackend>,
+    config: &Config,
+) -> Result<bool> {
+    let markers = Repo::on(
+        backend,
+        &crate::storage::tenant_scope(None),
+        "storage::import",
+        marker_spec,
+    )?;
+    let step = marker_step(FLOWS_DOMAIN, &config.workspace_dir);
+    import_state::is_done(&markers, MARKER_OWNER, &step)
+}
+
+/// Make the acting scope safe for workflow calls, retrying a failed Catalog
+/// migration before allowing access. A pending local legacy import gates only
+/// the local workflow scope; other domains and other storage scopes continue.
+#[cfg(feature = "flows")]
+pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Result<(), String> {
+    let Some(backend) = crate::storage::installed() else {
+        return Ok(());
+    };
+    let scope = crate::storage::current_scope().map_err(|error| error.to_string())?;
+    if !catalog_migration_ready(config, &scope) {
+        let result = migrate_catalog_storage(&backend, config, &scope)
+            .await
+            .map_err(|error| format!("{error:#}"));
+        record_catalog_migration(config, &scope, result.clone());
+        result?;
+    }
+    if scope == Scope::local() && flow_sources_present(&config.workspace_dir.join("flows")) {
+        let done = flow_import_marker_done(&backend, config)
+            .map_err(|error| format!("check the legacy flow import marker: {error:#}"))?;
+        if !done {
+            return Err(
+                "legacy flow import is incomplete for this workspace; workflow access is paused until it succeeds"
+                    .to_owned(),
+            );
+        }
+    }
+    Ok(())
+}
+
+async fn migrate_schedule_storage(
+    backend: &Arc<dyn StorageBackend>,
+    config: &Config,
+    scope: &Scope,
+) -> Result<()> {
+    let doc_scope = crate::cron::documents_port::DocScope::on_backend(
+        config,
+        Arc::clone(backend),
+        scope.clone(),
+    );
+    let _: serde_json::Value = crate::cron::client::store_in(
+        config,
+        &doc_scope,
+        tinyflows_bus::schedule::StoreOperation::Migrate,
+    )
+    .await
+    .context("migrate the TinyFlows Schedule storage")?;
+    Ok(())
+}
+
+async fn migrate_owner_stores(
+    backend: Arc<dyn StorageBackend>,
+    config: Config,
+) -> (Vec<Report>, bool) {
+    let scopes = crate::storage::boot::scopes_to_migrate(&backend).await;
+    let local = Scope::local();
+    #[cfg(feature = "flows")]
+    let mut local_catalog_ready = false;
+    #[cfg(not(feature = "flows"))]
+    let local_catalog_ready = true;
+    let mut reports = Vec::new();
+
+    for scope in scopes {
+        #[cfg(feature = "flows")]
+        {
+            let catalog = migrate_catalog_storage(&backend, &config, &scope).await;
+            record_catalog_migration(
+                &config,
+                &scope,
+                catalog.as_ref().map(|_| ()).map_err(ToString::to_string),
+            );
+            if scope == local {
+                local_catalog_ready = catalog.is_ok();
+            }
+            if let Err(error) = catalog {
+                reports.push(finish(
+                    FLOWS_DOMAIN,
+                    Err(error.context(format!(
+                        "migrate the catalog for scope {}",
+                        scope.as_str()
+                    ))),
+                ));
+            }
+        }
+
+        if let Err(error) = migrate_schedule_storage(&backend, &config, &scope).await {
+            reports.push(finish(
+                CRON_DOMAIN,
+                Err(error.context(format!(
+                    "migrate the schedule for scope {}",
+                    scope.as_str()
+                ))),
+            ));
+        }
+    }
+    (reports, local_catalog_ready)
 }
 
 #[cfg(feature = "flows")]
@@ -347,12 +513,25 @@ fn agent_cron_dirs(workspace: &Path) -> Vec<(String, PathBuf)> {
 /// failure in one does not stop the rest. The cron importer needs only the
 /// `schedule` reader, so a build without `flows` still keeps its cron jobs.
 pub fn run_with(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report> {
-    let mut reports = Vec::new();
+    let backend_for_migration = Arc::clone(backend);
+    let config_for_migration = config.clone();
+    let (mut reports, local_catalog_ready) =
+        match crate::storage::block_on_anyhow(async move {
+            Ok(migrate_owner_stores(backend_for_migration, config_for_migration).await)
+        }) {
+            Ok(result) => result,
+            Err(error) => (
+                vec![finish(FLOWS_DOMAIN, Err(error))],
+                false,
+            ),
+        };
     #[cfg(feature = "flows")]
-    reports.push(finish(
-        FLOWS_DOMAIN,
-        import_flows(backend, &crate::storage::tenant_scope(None), config),
-    ));
+    if local_catalog_ready {
+        reports.push(finish(
+            FLOWS_DOMAIN,
+            import_flows_after_migration(backend, &crate::storage::tenant_scope(None), config),
+        ));
+    }
     #[cfg(not(feature = "flows"))]
     if config.workspace_dir.join("flows").exists() {
         tracing::warn!(
