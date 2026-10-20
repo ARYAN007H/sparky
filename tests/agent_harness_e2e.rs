@@ -1049,7 +1049,33 @@ fn managed_capture_identity() -> Value {
     })
 }
 
-async fn run_managed_capture_turn(api_origin: String, home: PathBuf) -> Vec<Value> {
+async fn wait_for_capture_summaries(directory: &Path, expected_count: usize) -> Vec<Value> {
+    let summary_path = directory.join("summary.ndjson");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let summaries = std::fs::read_to_string(&summary_path)
+            .unwrap_or_default()
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("valid capture summary JSON"))
+            .collect::<Vec<Value>>();
+        if summaries.len() >= expected_count {
+            return summaries;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "timed out waiting for {expected_count} completed proxy responses; saw {}",
+            summaries.len()
+        );
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+
+async fn run_managed_capture_turn(
+    api_origin: String,
+    home: PathBuf,
+    capture_dir: &Path,
+    expected_summary_count: usize,
+) -> Vec<Value> {
     reset_script(vec![text_completion(
         "The managed gateway request is stable.",
     )]);
@@ -1079,8 +1105,13 @@ async fn run_managed_capture_turn(api_origin: String, home: PathBuf) -> Vec<Valu
             .and_then(Value::as_str)
             .unwrap_or("missing")
     );
-    let _suggestions =
-        wait_for_event(&mut events, "chat_suggestions", Duration::from_secs(30)).await;
+    let completed = wait_for_capture_summaries(&capture_dir, expected_summary_count).await;
+    assert!(
+        completed[..expected_summary_count]
+            .iter()
+            .all(|summary| summary.get("status").and_then(Value::as_u64) == Some(200)),
+        "mock inference responses did not all complete successfully: {completed:?}"
+    );
     drop(events);
     stack.shutdown_and_wait().await;
 
@@ -1207,7 +1238,19 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
             std::fs::remove_dir_all(&home).expect("reset only the managed capture profile");
         }
         std::fs::create_dir_all(&home).expect("create managed capture profile");
-        let metadata = run_managed_capture_turn(proxy_origin.clone(), home).await;
+        let expected_summary_count = prior_count + 2;
+        let metadata = run_managed_capture_turn(
+            proxy_origin.clone(),
+            home,
+            &capture_dir,
+            expected_summary_count,
+        )
+        .await;
+        assert_eq!(
+            metadata.len(),
+            2,
+            "expected one managed turn and one completed follow-up-suggestions request"
+        );
         assert!(
             !metadata.is_empty(),
             "the mock saw no managed inference requests"
