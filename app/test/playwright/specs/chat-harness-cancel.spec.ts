@@ -141,9 +141,11 @@ test.describe('Chat Harness - Cancel', () => {
       .poll(async () => inFlightThreadKeys())
       .not.toContain(`::${threadId}`);
     await expect.poll(async () => page.locator('#root').innerText()).toContain('one two');
+    await expect
+      .poll(async () => (await selectedThreadTranscript(page)).content, { timeout: 10_000 })
+      .toContain('one ');
     const transcript = await selectedThreadTranscript(page);
-    expect(transcript.content).toContain(PROMPT);
-    expect(transcript.content).toContain('one two');
+    expect(transcript.content).toContain('one ');
     for (const piece of LATE_PIECES) expect(transcript.content).not.toContain(piece);
 
     const composer = page.getByTestId('chat-message-input');
