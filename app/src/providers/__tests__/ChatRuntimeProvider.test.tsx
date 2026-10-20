@@ -931,6 +931,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           attachments: stagedParts,
         })
       );
+      expect(
+        JSON.stringify(store.getState().queue.pendingFollowupsByThread['t-upload'])
+      ).not.toContain('base64');
       vi.mocked(threadApi.getThreadMessages).mockResolvedValueOnce({
         messages: [
           {
