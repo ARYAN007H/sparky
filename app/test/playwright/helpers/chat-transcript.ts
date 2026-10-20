@@ -3,6 +3,28 @@ import { expect, type Page } from '@playwright/test';
 import { callCoreRpc } from './core-rpc';
 import { waitForSelectedThreadId } from './chat-drive';
 
+export interface PersistedThreadMessage {
+  content: string;
+  sender: string;
+  extraMetadata: Record<string, unknown>;
+}
+
+export async function persistedThreadMessages(threadId: string): Promise<PersistedThreadMessage[]> {
+  let response = await callCoreRpc<unknown>('openhuman.threads_messages_list', {
+    thread_id: threadId,
+  });
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (!response || typeof response !== 'object' || !('result' in response)) break;
+    response = (response as { result: unknown }).result;
+  }
+  expect(response && typeof response === 'object' && 'data' in response).toBe(true);
+  const data = (response as { data: unknown }).data;
+  expect(data && typeof data === 'object' && 'messages' in data).toBe(true);
+  const messages = (data as { messages: unknown }).messages;
+  expect(Array.isArray(messages)).toBe(true);
+  return messages as PersistedThreadMessage[];
+}
+
 export async function selectedThreadTranscript(page: Page): Promise<{
   threadId: string;
   content: string;

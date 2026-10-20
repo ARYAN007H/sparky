@@ -5,7 +5,7 @@ import {
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
-import { inFlightThreadKeys, selectedThreadTranscript } from '../helpers/chat-transcript';
+import { inFlightThreadKeys, persistedThreadMessages } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-cancel';
@@ -142,11 +142,27 @@ test.describe('Chat Harness - Cancel', () => {
       .not.toContain(`::${threadId}`);
     await expect.poll(async () => page.locator('#root').innerText()).toContain('one two');
     await expect
-      .poll(async () => (await selectedThreadTranscript(page)).content, { timeout: 10_000 })
-      .toContain('one ');
-    const transcript = await selectedThreadTranscript(page);
-    expect(transcript.content).toContain('one ');
-    for (const piece of LATE_PIECES) expect(transcript.content).not.toContain(piece);
+      .poll(async () => {
+        const messages = await persistedThreadMessages(threadId);
+        return messages.some(
+          message => message.sender === 'user' && message.content === PROMPT
+        ) && messages.some(
+          message =>
+            message.sender === 'agent' &&
+            message.content.includes('one two') &&
+            message.extraMetadata.stopped === true
+        );
+      }, { timeout: 10_000 })
+      .toBe(true);
+    const messages = await persistedThreadMessages(threadId);
+    const stopped = messages.find(
+      message => message.sender === 'agent' && message.extraMetadata.stopped === true
+    );
+    expect(stopped).toBeDefined();
+    expect(stopped?.extraMetadata.requestId).toBeTruthy();
+    for (const piece of LATE_PIECES) {
+      expect(messages.some(message => message.content.includes(piece))).toBe(false);
+    }
 
     const composer = page.getByTestId('chat-message-input');
     await expect(composer).toBeEnabled();
