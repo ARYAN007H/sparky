@@ -27,12 +27,12 @@ type ActiveTerminalSidecar = std::sync::Arc<
 use std::sync::Arc;
 
 use anyhow::Result;
-use tinyagents_graph::goals::ThreadGoalStatus;
 use tinyagents_harness::multimodal::markers::extract_image_placeholders_in_text;
 use tinyagents_runtime::{
-    CommitReceipt, ResumePreparation, SessionBuilder, SessionTerminal, ToolSnapshot,
+    CommitReceipt, ResumePreparation, SessionBuilder, SessionTerminal,
     TranscriptTarget, TurnPreparation,
 };
+use tinyagents_harness::tool::ToolSnapshot;
 use tinyinference_llm::message::Message;
 
 use super::types::OpenHumanSessionHost;

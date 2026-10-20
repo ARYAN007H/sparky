@@ -236,6 +236,7 @@ pub(super) async fn finalize_committed_turn(
             let started = std::time::Instant::now();
             super::account_committed_turn_against_goal(
                 &prelude.workspace_dir,
+                &receipt.options.context.dispatch_ctx(),
                 thread_id.as_deref(),
                 &sidecar,
             )
