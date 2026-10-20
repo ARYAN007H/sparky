@@ -6,6 +6,7 @@
 //!
 //! * [`versioned_store`] — the records, in the configured storage backend
 //!   ([`super::version_documents::DocumentArtifactStore`]);
+//! * the acting tenant's scoped blob store as TinyArtifacts' file store;
 //! * [`LegacyUiBridge`] — the observer that shows each artifact in the
 //!   desktop UI;
 //! * the folders file artifacts may point into: the agent's working folder
@@ -411,8 +412,8 @@ pub fn artifacts_service(
 }
 
 /// Where each file version keeps its own copy:
-/// `<workspace>/artifacts/versioned/files/<id>/v<N>.<ext>`. The visible file
-/// in the files folder shows the newest version.
+/// Legacy workspace folder that earlier builds used for per-version file
+/// copies. New file bytes live in the acting tenant's scoped blob store.
 pub fn version_files_dir(workspace_dir: &Path) -> PathBuf {
     workspace_dir
         .join("artifacts")

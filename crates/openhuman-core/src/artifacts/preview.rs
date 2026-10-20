@@ -5,12 +5,11 @@
 //! runs where the artifact lives.
 //!
 //! * Text kinds (`text`, `markdown`, `html`) return their stored content.
-//! * A file or image version is opened only when its path is inside the
-//!   folders file artifacts may point into (the agent's working folder and the
-//!   files folders), and only up to [`PREVIEW_MAX_BYTES`]. A UTF-8 file comes
-//!   back as text; a DOCX, PPTX, XLSX or PDF is converted to Markdown through
-//!   the TinyDocs module. Anything else comes back as its path, for the panel
-//!   to show as a file.
+//! * File and image bytes are read from the acting tenant's scoped artifact
+//!   store, and only up to [`PREVIEW_MAX_BYTES`]. Legacy path references are
+//!   imported through the host's guarded file roots. A UTF-8 file comes back
+//!   as text; a DOCX, PPTX, XLSX or PDF is converted to Markdown through the
+//!   TinyDocs module. Anything else comes back as its visible file path.
 
 use std::path::Path;
 
@@ -192,8 +191,7 @@ impl<'a> DocumentConverter<'a> {
     }
 }
 
-/// The preview of `record`'s newest version, opening files only inside
-/// `roots`.
+/// The preview of `record`'s newest version, reading file bytes by storage key.
 pub(crate) async fn body_of(
     record: &ArtifactRecord,
     file_store: Option<&std::sync::Arc<dyn FileStore>>,
