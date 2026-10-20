@@ -347,6 +347,20 @@ async fn start_chat_inner(
     ) {
         return Err(StartChatError::Other("message is required".to_string()));
     }
+    let mode = parse_mode(queue_mode.as_deref());
+    if mode == QueueMode::Collect
+        && (voice_note_id.is_some()
+            || stored_attachments
+                .as_ref()
+                .is_some_and(|input| !input.parts.is_empty())
+            || attachment_uploads
+                .as_ref()
+                .is_some_and(|parts| !parts.is_empty()))
+    {
+        return Err(StartChatError::Other(
+            "collect queue mode does not support typed attachments".to_string(),
+        ));
+    }
     // A profile this node no longer hosts (its lease was lost or released)
     // starts no new turn here. No-op outside SaaS.
     crate::profiles::host::ensure_hosted(ctx).map_err(StartChatError::Other)?;
@@ -361,7 +375,6 @@ async fn start_chat_inner(
         _ => None,
     };
 
-    let mode = parse_mode(queue_mode.as_deref());
     let request_id = Uuid::new_v4().to_string();
     if let Some(note_id) = voice_note_id.as_deref() {
         bind_voice_note_request_id(ctx, &thread_id, &message, note_id, &request_id).await?;
@@ -386,7 +399,7 @@ async fn start_chat_inner(
             locale,
             metadata,
             queued_at_ms,
-            deferred_user_message: mode == QueueMode::Followup,
+            deferred_user_message: mode == QueueMode::Followup && stored_attachments.is_none(),
             stored_attachments,
             pending_attachments: pending_attachments.clone(),
         },
