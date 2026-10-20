@@ -203,9 +203,6 @@ async fn message_append_with_config(
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     persistence_dir: &std::path::Path,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
-    // This field is reserved for paths minted after OpenHuman stages an
-    // upload. Client metadata must never be able to grant storage authority.
-    crate::threads::attachments::strip_private_metadata(&mut request.message.extra_metadata);
     let typed_attachments = if request.message.sender == "user" {
         std::mem::take(&mut request.attachments)
     } else {
