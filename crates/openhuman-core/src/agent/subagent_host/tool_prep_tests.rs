@@ -1,9 +1,10 @@
 use super::*;
 
 #[test]
-fn custom_delegate_is_treated_as_spawn_tool() {
+fn the_single_openhuman_spawn_tool_is_protected_from_nested_runs() {
     assert!(is_subagent_spawn_tool("spawn_subagent"));
-    assert!(is_subagent_spawn_tool("delegate_researcher"));
+    assert!(!is_subagent_spawn_tool("delegate_researcher"));
+    assert!(!is_subagent_spawn_tool("continue_subagent"));
     assert!(!is_subagent_spawn_tool("directory_resolve"));
 }
 
@@ -12,7 +13,6 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
     let spawn_names = tinyagents_definition::SPAWN_TOOL_NAMES
         .iter()
         .copied()
-        .chain(["delegate_researcher", "continue_subagent"])
         .collect::<Vec<_>>();
     for name in &spawn_names {
         assert!(
@@ -35,50 +35,6 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
             .map(|&index| tools[index].name())
             .collect::<Vec<_>>()
     );
-}
-
-#[test]
-fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
-    // Most synthesised delegation tools use an unprefixed
-    // `delegate_name` override (`plan`, `manage_tasks`, `create_image`, …).
-    // They must be stripped from every sub-agent surface, exactly like
-    // the `delegate_*`-prefixed defaults.
-    let mut registry =
-        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
-    let mut plan_alias = registry
-        .get("orchestrator")
-        .expect("built-in orchestrator")
-        .clone();
-    plan_alias.id = "test_plan_alias".to_string();
-    plan_alias.delegate_name = Some("plan".to_string());
-    registry.insert(plan_alias);
-    for delegate in [
-        "plan",
-        "manage_tasks",
-        "create_image",
-        #[cfg(feature = "flows")]
-        "build_workflow",
-        #[cfg(feature = "flows")]
-        "discover_workflows",
-        // `make_presentation` is `presentation_agent`'s `delegate_name`; the agent —
-        // and therefore this delegate tool — is compiled out with the
-        // `documents` feature.
-        #[cfg(feature = "documents")]
-        "make_presentation",
-    ] {
-        assert!(
-            super::is_registered_delegate_alias(delegate, Some(&registry)),
-            "`{delegate}` is a synthesised delegation tool and must be \
-             stripped from sub-agent tool surfaces"
-        );
-    }
-    // Ordinary worker tools stay visible.
-    for plain in ["shell", "file_read", "web_fetch", "todo"] {
-        assert!(
-            !super::is_registered_delegate_alias(plain, Some(&registry)),
-            "`{plain}` must not be classified as a spawn tool"
-        );
-    }
 }
 
 #[test]
