@@ -4,14 +4,12 @@
 //! parses the response.
 
 use super::super::openai_codex::resolve_openai_codex_routing;
-use super::{
-    local_runtime::synthesize_local_runtime_entry, openrouter::validate_openrouter_api_key,
-};
-use tinyinference_core::sanitize::sanitize_api_error;
+use super::local_runtime::synthesize_local_runtime_entry;
 use tinyinference_llm::catalog::{
-    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider,
-    merge_openai_codex_model_hints, parse_models_response, ModelInfo,
+    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider, list_models,
+    merge_openai_codex_model_hints, validate_openrouter_key, ModelInfo,
 };
+use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::providers::openai::codex::{
     openai_codex_client_version, openai_codex_user_agent, OpenAiCodexRouting,
     OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
@@ -173,9 +171,10 @@ pub async fn list_configured_models_from_config(
         ));
     }
 
-    let looked_up = crate::inference::provider::factory::lookup_key_for_slug(&entry.slug, config)
-        .unwrap_or_default();
-    let api_key = resolve_local_runtime_key(&entry.slug, looked_up, config);
+    let crate::inference::registry::CatalogRequest {
+        provider_key: api_key,
+        client,
+    } = catalog_request(config, Some(&entry))?;
 
     let bearer_is_oauth = entry.slug == "openai"
         && crate::inference::provider::factory::openai_bearer_is_oauth(config);
@@ -203,37 +202,31 @@ pub async fn list_configured_models_from_config(
     );
 
     use crate::config::schema::cloud_providers::AuthStyle;
-    let service_key = "providers.list_models";
-    let client = if let Some(pem) = config
-        .cloud_provider_ca_certs
-        .get(entry.slug.trim())
-        .filter(|pem| !pem.is_empty())
-    {
-        crate::util::tls::client_with_ca_bundle_with_timeouts(pem, service_key, 30, 10)?
-    } else {
-        crate::config::build_runtime_proxy_client_with_timeouts(service_key, 30, 10)
-    };
-
     if is_openrouter_provider(&entry.slug, &entry.endpoint) {
-        validate_openrouter_api_key(&client, &routing.endpoint, &api_key).await?;
+        validate_openrouter_key(&client, &routing.endpoint, &api_key)
+            .await
+            .map_err(|error| error.to_string())?;
     }
 
-    let mut request = client.get(&models_url);
+    let mut request = DiscoveryRequest::new(routing.endpoint.clone(), String::new())
+        .with_listing_url(models_url.clone())
+        .with_single_model_probe(false)
+        .with_timeout(std::time::Duration::from_secs(30));
     if routing.using_oauth {
         request = request
-            .header(
-                reqwest::header::USER_AGENT,
+            .with_header(
+                reqwest::header::USER_AGENT.as_str(),
                 openai_codex_user_agent("OpenHuman", env!("CARGO_PKG_VERSION")),
             )
-            .header(OPENAI_CODEX_ORIGINATOR_HEADER, OPENAI_CODEX_ORIGINATOR);
+            .with_header(OPENAI_CODEX_ORIGINATOR_HEADER, OPENAI_CODEX_ORIGINATOR);
     }
 
     request = match entry.auth_style {
         AuthStyle::Bearer => {
             if !api_key.is_empty() {
-                let mut r = request.header("Authorization", format!("Bearer {}", api_key));
+                let mut r = request.with_header("Authorization", format!("Bearer {}", api_key));
                 if let Some(account_id) = routing.account_id.as_deref() {
-                    r = r.header(OPENAI_CODEX_ACCOUNT_HEADER, account_id);
+                    r = r.with_header(OPENAI_CODEX_ACCOUNT_HEADER, account_id);
                 }
                 r
             } else {
@@ -241,9 +234,9 @@ pub async fn list_configured_models_from_config(
             }
         }
         AuthStyle::Anthropic => {
-            let mut r = request.header("anthropic-version", "2023-06-01");
+            let mut r = request.with_header("anthropic-version", "2023-06-01");
             if !api_key.is_empty() {
-                r = r.header("x-api-key", &api_key);
+                r = r.with_header("x-api-key", &api_key);
             }
             r
         }
@@ -254,87 +247,11 @@ pub async fn list_configured_models_from_config(
         AuthStyle::None => request,
     };
 
-    let response = request
-        .send()
+    // Keep the host-built client so its proxy and custom CA policy applies to this upstream-owned catalog fetch.
+    let mut models = list_models(&client, request)
         .await
-        .map_err(|e| format!("[providers][list_models] HTTP request failed: {}", e))?;
+        .map_err(|error| error.to_string())?;
 
-    let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        let sanitized = sanitize_api_error(&body);
-        let truncated = crate::util::truncate_with_ellipsis(&sanitized, 300);
-        // TAURI-RUST-8X3: a 404 from the `<base>/models` probe means the
-        // configured base URL does not host an OpenAI-compatible `/models`
-        // listing (wrong base, a model-only proxy, or a missing `/v1`
-        // suffix). Append an actionable hint so the model-dropdown probe
-        // surfaces *recovery guidance* inline instead of the bare Go-style
-        // `404 page not found`. The `provider returned 404` prefix is kept
-        // verbatim so the `is_provider_user_state_message` classifier anchor
-        // (which demotes this preventable user-state case out of Sentry)
-        // still matches — see `crates/openhuman-core/src/core/observability.rs`.
-        if status.as_u16() == 404 {
-            return Err(format!(
-                "provider returned 404: {} — the configured base URL does not expose a `/models` endpoint; check the provider's base URL (it usually ends in `/v1`)",
-                truncated
-            ));
-        }
-        return Err(format!(
-            "provider returned {}: {}",
-            status.as_u16(),
-            truncated
-        ));
-    }
-
-    // TAURI-RUST-12: `response.json()` discards the body when decoding fails,
-    // so Sentry just sees `error decoding response body` with no clue what the
-    // server actually sent. In practice the offending body is HTML from a
-    // captive portal / corporate proxy login page, an upstream load-balancer
-    // 502 served as HTML with a `200 OK`, or a JSON parser tripping on a
-    // wrong-path endpoint. Read the body as text first, then parse, and
-    // surface a sanitized + truncated snippet so the failure is diagnosable
-    // from the error string alone.
-    let raw_body = response.text().await.map_err(|e| {
-        format!(
-            "[providers][list_models] failed to read response body: {}",
-            e
-        )
-    })?;
-    let body: serde_json::Value = serde_json::from_str(&raw_body).map_err(|e| {
-        let sanitized = sanitize_api_error(&raw_body);
-        let snippet = crate::util::truncate_with_ellipsis(&sanitized, 300);
-        format!(
-            "[providers][list_models] failed to parse JSON: {} (body: {})",
-            e, snippet
-        )
-    })?;
-
-    // OpenAI-compatible servers occasionally return HTTP 200 with an error
-    // payload instead of a 4xx (LM Studio does this for unknown paths like
-    // `/v11/models` — body `{"error":"Unexpected endpoint or method..."}`).
-    // Treat any top-level `error` field as a failure so the AI-panel probe
-    // doesn't silently accept a typo'd endpoint.
-    if let Some(err_field) = body.get("error") {
-        let msg = err_field
-            .as_str()
-            .map(|s| s.to_string())
-            .or_else(|| {
-                err_field
-                    .get("message")
-                    .and_then(|m| m.as_str())
-                    .map(|s| s.to_string())
-            })
-            .unwrap_or_else(|| err_field.to_string());
-        let sanitized = sanitize_api_error(&msg);
-        return Err(format!("provider returned error payload: {}", sanitized));
-    }
-
-    // Parse the OpenAI-compatible `/models` envelope into typed model
-    // entries. See `parse_models_response` for the distinct error shapes
-    // returned for "missing field" vs "field present but wrong type"
-    // (TAURI-RUST-4Y). The ChatGPT Codex backend uses a sibling `models`
-    // array keyed by `slug`, so that shape is accepted here too.
-    let mut models = parse_models_response(&body).map_err(|error| error.to_string())?;
     if routing.using_oauth {
         merge_openai_codex_model_hints(&mut models);
     }
