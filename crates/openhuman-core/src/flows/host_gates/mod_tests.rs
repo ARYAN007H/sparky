@@ -1,9 +1,9 @@
 use super::*;
 use crate::config::Config;
+use crate::flows::ops::FlowConnection;
 use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
 use serde_json::{json, Value};
 use tempfile::TempDir;
-use crate::flows::ops::FlowConnection;
 
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
