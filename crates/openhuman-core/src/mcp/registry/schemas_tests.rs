@@ -108,6 +108,12 @@ fn registry_get_shared_parser_preserves_value_and_validation_errors() {
         super::handlers::parse_registry_get(&valid).unwrap(),
         "example/server"
     );
+    let padded = Map::from_iter([("qualified_name".into(), json!(" example/server "))]);
+    assert_eq!(
+        super::handlers::parse_registry_get(&padded).unwrap(),
+        " example/server ",
+        "registry parser preserves the qualified name for downstream operation validation"
+    );
     assert!(super::handlers::parse_registry_get(&Map::new())
         .unwrap_err()
         .contains("missing required param 'qualified_name'"));
@@ -115,4 +121,17 @@ fn registry_get_shared_parser_preserves_value_and_validation_errors() {
     assert!(super::handlers::parse_registry_get(&invalid)
         .unwrap_err()
         .contains("invalid 'qualified_name'"));
+}
+
+#[test]
+fn registry_get_legacy_catalog_keeps_its_handler_and_fixture_contract() {
+    let controllers = all_registered_controllers()
+        .into_iter()
+        .filter(|controller| controller.schema.method_name() == "mcp_clients.registry_get")
+        .collect::<Vec<_>>();
+    crate::core::all::verify_parameter_contracts(
+        &controllers,
+        &[super::registry_get_parameter_contract()],
+    )
+    .expect("legacy catalogue keeps its public handler and authored parser example");
 }

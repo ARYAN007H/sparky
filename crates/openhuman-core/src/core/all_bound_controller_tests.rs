@@ -11,6 +11,8 @@ static EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
 fn staged_bound_methods() -> Vec<&'static str> {
     let mut methods = vec!["composio.execute"];
+    #[cfg(feature = "mcp")]
+    methods.push("mcp_clients.registry_get");
     #[cfg(feature = "voice")]
     methods.extend([
         "voice.status",
@@ -30,6 +32,8 @@ fn staged_bound_methods() -> Vec<&'static str> {
         "voice.live_test_provider",
     ]);
     methods.push("threads.upsert");
+    #[cfg(feature = "modules")]
+    methods.push("modules.computer_status");
     methods
 }
 
@@ -293,6 +297,115 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
             entry.decode_params(params).is_err(),
             "runtime parser rejects missing `{missing}`"
         );
+    }
+}
+
+#[test]
+#[cfg(feature = "mcp")]
+fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
+    use serde_json::json;
+
+    let entries: Vec<_> = registry()
+        .iter()
+        .filter(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get")
+        .collect();
+    assert_eq!(entries.len(), 1, "registry_get has one public raw entry");
+    assert!(!internal_registry()
+        .iter()
+        .any(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get"));
+    let grouped = entries[0];
+    assert_eq!(grouped.group, DomainGroup::Mcp);
+    let entry = &grouped.controller;
+    assert!(
+        entry.is_bound(),
+        "registry_get must bind at production registration"
+    );
+    assert_eq!(
+        entry.rpc_method_name(),
+        "openhuman.mcp_clients_registry_get"
+    );
+    required_input_contract(&entry.schema, &["qualified_name"])
+        .expect("qualified_name is an independently required input");
+    assert!(entry.schema.inputs.iter().all(|field| field.required));
+
+    for example in [
+        json!({"qualified_name":"example/server"}),
+        json!({"qualified_name":" example/server "}),
+    ] {
+        let params = example.as_object().expect("example object").clone();
+        validate_params(&entry.schema, &params).expect("schema accepts independent example");
+        entry
+            .decode_params(params)
+            .expect("bound decoder accepts independent example");
+    }
+
+    for remove in [true, false] {
+        let mut broken = entry.schema.clone();
+        if remove {
+            broken.inputs.retain(|field| field.name != "qualified_name");
+        } else {
+            broken
+                .inputs
+                .iter_mut()
+                .find(|field| field.name == "qualified_name")
+                .expect("positive contract includes qualified_name")
+                .required = false;
+        }
+        assert!(required_input_contract(&broken, &["qualified_name"])
+            .unwrap_err()
+            .contains("required inputs mismatch"));
+    }
+}
+
+#[test]
+#[cfg(feature = "modules")]
+fn production_registry_binds_computer_status_to_its_declared_parser() {
+    use serde_json::json;
+
+    let entries: Vec<_> = internal_registry()
+        .iter()
+        .filter(|grouped| grouped.controller.schema.method_name() == "modules.computer_status")
+        .collect();
+    assert_eq!(
+        entries.len(),
+        1,
+        "computer_status has one internal raw registry entry"
+    );
+    assert!(!registry()
+        .iter()
+        .any(|grouped| grouped.controller.schema.method_name() == "modules.computer_status"));
+    let grouped = entries[0];
+    assert_eq!(grouped.group, DomainGroup::Modules);
+    let entry = &grouped.controller;
+    assert!(
+        entry.is_bound(),
+        "computer_status must bind at production registration"
+    );
+    assert_eq!(entry.rpc_method_name(), "openhuman.modules_computer_status");
+    required_input_contract(&entry.schema, &[]).expect("computer_status has no required inputs");
+    assert_eq!(entry.schema.inputs.len(), 1);
+    assert_eq!(entry.schema.inputs[0].name, "load");
+    assert!(!entry.schema.inputs[0].required);
+
+    for example in [json!({}), json!({"load":true}), json!({"load":false})] {
+        let params = example.as_object().expect("example object").clone();
+        validate_params(&entry.schema, &params).expect("schema accepts independent example");
+        entry
+            .decode_params(params)
+            .expect("bound decoder accepts independent example");
+    }
+
+    // Runtime parsing intentionally keeps its permissive false default for
+    // non-boolean inputs; these maps are parser cases, not schema examples.
+    for example in [
+        json!({"load":null}),
+        json!({"load":"true"}),
+        json!({"load":1}),
+    ] {
+        let params = example.as_object().expect("parser case object").clone();
+        entry
+            .decode_params(params)
+            .expect("actual bound parser preserves permissive false defaults");
     }
 }
 

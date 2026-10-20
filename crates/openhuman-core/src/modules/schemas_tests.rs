@@ -143,3 +143,16 @@ fn computer_status_load_keeps_permissive_false_default() {
         assert_eq!(super::computer_status_load(&params), expected);
     }
 }
+
+#[test]
+fn computer_status_legacy_catalog_keeps_its_handler_and_fixture_contract() {
+    let controllers = all_registered_controllers()
+        .into_iter()
+        .filter(|controller| controller.schema.method_name() == "modules.computer_status")
+        .collect::<Vec<_>>();
+    crate::core::all::verify_parameter_contracts(
+        &controllers,
+        &[super::computer_status_parameter_contract()],
+    )
+    .expect("legacy catalogue keeps its public handler and authored parser examples");
+}

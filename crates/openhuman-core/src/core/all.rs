@@ -326,10 +326,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         DomainGroup::Desktop,
         crate::desktop::dashboard::all_dashboard_registered_controllers(),
     );
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Mcp,
-        crate::mcp::all_registered_controllers(),
+        crate::mcp::all_controller_entries(),
     );
     // Agent definition and prompt inspection
     push(
@@ -693,10 +693,10 @@ fn build_internal_only_controllers() -> Vec<GroupedController> {
     // compiled into `modules::registry`, so this namespace can start a module
     // the build already trusts and nothing else.
     #[cfg(feature = "modules")]
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Modules,
-        crate::modules::all_registered_controllers(),
+        crate::modules::schemas::all_controller_entries(),
     );
     controllers
 }
