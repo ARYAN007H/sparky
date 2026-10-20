@@ -1,8 +1,12 @@
 use super::*;
 use crate::core::{FieldSchema, TypeSchema};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
 
 static CALLS: AtomicUsize = AtomicUsize::new(0);
+static TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug)]
 struct Parsed(String);
@@ -52,6 +56,7 @@ fn params() -> Map<String, Value> {
 
 #[test]
 fn bound_controller_uses_its_parser_for_decode_and_runtime_invocation() {
+    let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
     CALLS.store(0, Ordering::SeqCst);
     let controller = BoundRegisteredController::typed(schema(), parse_value, run_value);
 
@@ -72,6 +77,7 @@ fn bound_controller_uses_its_parser_for_decode_and_runtime_invocation() {
 
 #[test]
 fn bound_controller_decode_does_not_run_gate_or_business_handler() {
+    let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
     CALLS.store(0, Ordering::SeqCst);
     let controller =
         BoundRegisteredController::after_gate(schema(), gate, parse_value, |_ctx, (), parsed| {
@@ -91,6 +97,7 @@ fn bound_controller_decode_does_not_run_gate_or_business_handler() {
 
 #[test]
 fn bound_controller_runs_gate_before_parser() {
+    let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
     CALLS.store(0, Ordering::SeqCst);
     let controller =
         BoundRegisteredController::after_gate(schema(), gate, parse_value, run_value_after_gate);
@@ -107,6 +114,7 @@ fn run_value_after_gate(_ctx: DispatchCtx, _gate: (), parsed: Parsed) -> Control
 
 #[test]
 fn bound_controller_preserves_parser_errors() {
+    let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
     let controller = BoundRegisteredController::typed(schema(), parse_value, run_value);
     let error = controller
         .decode_params(Map::new())
