@@ -53,7 +53,8 @@ fn build_cloud_model(
             if !is_managed_endpoint_for_api_key(&key_endpoint) {
                 return Err(tinyinference_embeddings::Error::Validation(format!(
                     "refusing to send the TinyHumans API key over a non-HTTPS, non-loopback \
-                     endpoint: {key_endpoint}"
+                     endpoint: {}",
+                    super::managed_model::endpoint_origin_for_log(&key_endpoint)
                 )));
             }
             log::debug!("[tinyhumans][embeddings] authenticating with api-key");

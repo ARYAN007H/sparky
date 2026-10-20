@@ -45,7 +45,8 @@ impl ManagedOptions {
             if !is_managed_endpoint_for_api_key(endpoint) {
                 anyhow::bail!(
                     "refusing to send the TinyHumans API key to an unmanaged or insecure \
-                     endpoint: {endpoint} — use the managed backend or loopback for local testing"
+                     endpoint: {} — use the managed backend or loopback for local testing",
+                    endpoint_origin_for_log(endpoint)
                 );
             }
             log::debug!(
@@ -60,6 +61,16 @@ impl ManagedOptions {
             "openhuman_backend_model.resolve_bearer",
         )
     }
+}
+
+/// Returns only a URL origin for diagnostics, never userinfo, path, query, or
+/// fragment data. Invalid and opaque URLs use a constant placeholder.
+pub(super) fn endpoint_origin_for_log(endpoint: &str) -> String {
+    url::Url::parse(endpoint)
+        .ok()
+        .map(|url| url.origin().ascii_serialization())
+        .filter(|origin| origin != "null")
+        .unwrap_or_else(|| "<invalid endpoint>".to_string())
 }
 
 /// Constructs the owning TinyInference model with OpenHuman's rotating
