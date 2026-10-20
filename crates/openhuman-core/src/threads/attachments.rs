@@ -561,7 +561,13 @@ async fn discard_staged_entries(
             part: entry.part.clone(),
             canceled: true,
         };
-        publish_staged_claim(&claim_path, &cancellation).await?;
+        match publish_staged_claim(&claim_path, &cancellation).await {
+            Ok(_) => {}
+            Err(error) if error == "staged attachment is already bound to another message" => {
+                continue;
+            }
+            Err(error) => return Err(error),
+        }
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
