@@ -5,20 +5,7 @@
 //! otherwise long histories produce upstream `400 Bad Request` errors when usage
 //! metadata is not yet available.
 
-
-/// Conservative default for OpenHuman abstract tier models (tokens).
-const TIER_LARGE_CONTEXT: u64 = 200_000;
-/// Reasoning tier — backed by a 1M-context model.
-const TIER_REASONING_CONTEXT: u64 = 1_000_000;
-const TIER_STANDARD_CONTEXT: u64 = 128_000;
-const TIER_LOCAL_CONTEXT: u64 = 8_192;
-
-/// DeepSeek v4 Flash window (~1M tokens) — the managed default model
-/// (`MODEL_MANAGED_DEFAULT`) and the backing of the retired flash tiers. It
-/// must reflect the real model's capacity.
-const TIER_FLASH_CONTEXT: u64 = 1_000_000;
-
-/// Resolve the context window (in tokens) for a model id or OpenHuman tier alias.
+/// Resolve the context window (in tokens) for a model id or registered provider alias.
 ///
 /// Returns the static model estimate. Call [`context_window_for_route`] when
 /// the provider route is known; provider-discovered values are stored per
@@ -42,7 +29,7 @@ pub(crate) fn context_window_for_route(
         .or_else(|| static_context_window_for_model(model))
 }
 
-/// The static guess for a model's window: tier aliases, then the cost catalog,
+/// The static guess for a model's window: provider metadata, then the cost catalog,
 /// then the generic id-pattern hints. These never override a provider-reported
 /// window; [`crate::inference::context_window`] consults them last.
 pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
