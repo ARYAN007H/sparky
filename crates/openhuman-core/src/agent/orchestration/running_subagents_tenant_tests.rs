@@ -210,6 +210,7 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
         );
     })
     .await;
+    assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
     CoreContext::scope(pair.alice.clone(), async {
         assert!(resume_ref_for_task(&DispatchCtx::ambient(), &pair.a.task, PARENT).is_ok());
     })
