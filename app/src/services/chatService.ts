@@ -953,7 +953,12 @@ interface ChatSendParams {
  * one — used by `parallel` sends to register the forked turn's stream lane.
  * `undefined` if the ack carried no id.
  */
-export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
+export interface ChatSendAck {
+  requestId?: string;
+  queuedAttachments: ContentPart[];
+}
+
+export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendAck> {
   const socket = socketService.getSocket();
   const clientId = socket?.id;
   if (!clientId) {
@@ -978,8 +983,20 @@ export async function chatSend(params: ChatSendParams): Promise<string | undefin
     },
   });
 
-  const requestId = (result as { request_id?: unknown } | null)?.request_id;
-  return typeof requestId === 'string' ? requestId : undefined;
+  const ack = result as
+    | { request_id?: unknown; queued_attachments?: unknown }
+    | null;
+  const requestId = ack?.request_id;
+  return {
+    requestId: typeof requestId === 'string' ? requestId : undefined,
+    queuedAttachments: Array.isArray(ack?.queued_attachments)
+      ? (ack.queued_attachments as ContentPart[])
+      : [],
+  };
+}
+
+export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
+  return (await chatSendWithAck(params)).requestId;
 }
 
 /** `client_id` sent with a Stop issued while the socket has no id. */
