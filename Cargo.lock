@@ -9601,7 +9601,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-api"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9615,7 +9615,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-integrations"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9640,7 +9640,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-tools"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "async-lock",
  "async-trait",
@@ -9660,7 +9660,7 @@ dependencies = [
 
 [[package]]
 name = "tinyredact"
-version = "1.28.0"
+version = "1.29.0"
 dependencies = [
  "log",
  "regex",
