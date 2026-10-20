@@ -283,6 +283,7 @@ impl WebHost {
             agent,
             crate::agent::turn_host::AgentTurnRequest {
                 message: request.text.clone(),
+                message_input: None,
                 thread_id: Some(thread_id.to_owned()),
                 origin,
                 approval,

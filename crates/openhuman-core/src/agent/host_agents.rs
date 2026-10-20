@@ -113,6 +113,7 @@ impl HostAgent {
             &mut session,
             crate::agent::turn_host::AgentTurnRequest {
                 message: message.to_owned(),
+                message_input: None,
                 thread_id: Some(session_key.to_owned()),
                 origin,
                 approval: approval.clone(),
