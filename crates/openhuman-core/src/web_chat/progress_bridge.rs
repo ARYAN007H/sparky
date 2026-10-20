@@ -176,29 +176,6 @@ use wire_caps::{cap_wire_args, cap_wire_output};
 mod ledger;
 pub(super) use ledger::{ledger_append_event, ledger_upsert_agent_run, ledger_upsert_telemetry};
 
-/// Build the worktree-isolation slice of a `subagent_completed`
-/// [`SubagentProgressDetail`] (#3376). An empty `changed_files` collapses to
-/// `None` so the renderer omits an empty "changed files" list rather than
-/// showing "0 files"; a non-empty list is forwarded verbatim. `worktree_path`
-/// / `dirty_status` pass through (`None` for non-isolated workers). Split out
-/// so the empty/non-empty branch is unit-testable without a live DB + channel.
-fn subagent_worktree_detail(
-    worktree_path: Option<String>,
-    changed_files: Vec<String>,
-    dirty_status: Option<bool>,
-) -> SubagentProgressDetail {
-    SubagentProgressDetail {
-        worktree_path,
-        changed_files: if changed_files.is_empty() {
-            None
-        } else {
-            Some(changed_files)
-        },
-        dirty_status,
-        ..Default::default()
-    }
-}
-
 /// Trace user attribution for a turn whose stored user payload carries no identity
 /// (headless / autonomous / freshly booted cores): read the on-disk
 /// app-session profile and return the user's email (preferred) or backend
@@ -649,9 +626,6 @@ pub(crate) fn spawn_progress_bridge(
                     output_chars,
                     output,
                     usage,
-                    worktree_path,
-                    changed_files,
-                    dirty_status,
                     ..
                 } => {
                     subagent_events::on_subagent_completed(
@@ -667,9 +641,6 @@ pub(crate) fn spawn_progress_bridge(
                         output_chars,
                         output,
                         usage,
-                        worktree_path,
-                        changed_files,
-                        dirty_status,
                     );
                 }
                 AgentProgress::SubagentFailed {
