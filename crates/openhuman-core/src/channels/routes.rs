@@ -83,12 +83,14 @@ struct RouteCallbacks {
     core_context: Option<Arc<crate::core::runtime::CoreContext>>,
     tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
+    reset_context: Option<crate::channels::host::remote_control::RemoteResetContext>,
 }
 
 impl RouteCallbacks {
     fn new(
         context: ChannelRuntimeContext,
         cancellation: tokio_util::sync::CancellationToken,
+        reset_context: Option<crate::channels::host::remote_control::RemoteResetContext>,
     ) -> Self {
         let ctx = context.dispatch_ctx();
         Self {
@@ -99,6 +101,7 @@ impl RouteCallbacks {
             ),
             context,
             cancellation,
+            reset_context,
         }
     }
 }
@@ -128,6 +131,7 @@ impl RouteCallbacks {
                             &self.context,
                             &self.tenant,
                             &self.cancellation,
+                            self.reset_context.as_ref(),
                             request,
                         ) => result.map(tinychannels_bus::ChannelBackendResult::RemoteControl),
                     }
@@ -150,6 +154,8 @@ pub(crate) async fn handle_runtime_command_with_reset<F, Fut>(
     msg: &traits::ChannelMessage,
     target_channel: Option<&Arc<dyn Channel>>,
     sender_key: &str,
+    reset_scope: Option<tinychannels_bus::module_remote::RemoteSessionScope>,
+    reset_message: &traits::ChannelMessage,
     reset_history: F,
 ) -> bool
 where
@@ -173,7 +179,17 @@ where
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
             client,
-            RouteCallbacks::new(ctx.clone(), super::runtime::session::channel_session()),
+            RouteCallbacks::new(
+                ctx.clone(),
+                super::runtime::session::channel_session(),
+                reset_scope.clone().map(|scope| {
+                    crate::channels::host::remote_control::RemoteResetContext {
+                        scope,
+                        message: reset_message.clone(),
+                        history_key: sender_key.to_owned(),
+                    }
+                }),
+            ),
         )
         .await?;
         let response: Result<ChannelControlResult, _> = lease
@@ -188,6 +204,7 @@ where
                         model: current.model,
                     },
                     history_len,
+                    session_scope: reset_scope,
                     providers: provider_descriptors(),
                 },),
             )
@@ -271,7 +288,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
     target_channel: Option<&Arc<dyn Channel>>,
     sender_key: &str,
 ) -> bool {
-    handle_runtime_command_with_reset(ctx, msg, target_channel, sender_key, || async {
+    handle_runtime_command_with_reset(ctx, msg, target_channel, sender_key, None, msg, || async {
         clear_sender_history(&ctx.conversation_histories, sender_key);
         Ok(())
     })
