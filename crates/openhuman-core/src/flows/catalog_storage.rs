@@ -485,6 +485,6 @@ impl CatalogStoragePort {
 #[path = "catalog_storage_tests.rs"]
 mod tests;
 
-#[cfg(all(test, unix))]
+#[cfg(all(test, unix, feature = "storage-sqlite"))]
 #[path = "catalog_storage_resource_tests.rs"]
 mod resource_tests;
