@@ -356,9 +356,14 @@ pub fn registered_tools(
     let service = {
         let workspace_dir = workspace_dir.to_path_buf();
         let action_dir = action_dir.to_path_buf();
-        Arc::new(move |chat: Option<&ApprovalChatContext>| {
-            let mut service =
-                artifacts_service(&workspace_dir, files.clone(), Some(&action_dir), chat);
+        Arc::new(move |chat: Option<&ApprovalChatContext>, ctx: &crate::core::runtime::DispatchCtx| {
+            let mut service = artifacts_service(
+                &workspace_dir,
+                files.clone(),
+                Some(&action_dir),
+                chat,
+                ctx,
+            );
             if let Some(publisher) = &publisher {
                 service = service.with_publisher(publisher.clone());
             }
@@ -369,31 +374,37 @@ pub fn registered_tools(
     let mut tools: Vec<Box<dyn tinytools::Tool>> = Vec::new();
     {
         let (service, author) = (service.clone(), author.clone());
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::CreateArtifactTool::new(service(chat), author.clone())
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::CreateArtifactTool::new(service(chat, ctx), author.clone())
         })));
     }
-    tools.push(Box::new(tiny_artifacts::ReadArtifactTool::new(service(
-        None,
-    ))));
-    {
-        let (service, author) = (service.clone(), author.clone());
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::UpdateArtifactTool::new(service(chat), author.clone())
-        })));
-    }
-    tools.push(Box::new(tiny_artifacts::ListArtifactsTool::new(service(
-        None,
-    ))));
     {
         let service = service.clone();
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::DeleteArtifactTool::new(service(chat))
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::ReadArtifactTool::new(service(chat, ctx))
+        })));
+    }
+    {
+        let (service, author) = (service.clone(), author.clone());
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::UpdateArtifactTool::new(service(chat, ctx), author.clone())
+        })));
+    }
+    {
+        let service = service.clone();
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::ListArtifactsTool::new(service(chat, ctx))
+        })));
+    }
+    {
+        let service = service.clone();
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::DeleteArtifactTool::new(service(chat, ctx))
         })));
     }
     if can_publish {
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::ShareArtifactTool::new(service(chat))
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::ShareArtifactTool::new(service(chat, ctx))
         })));
     }
     tools
@@ -416,8 +427,9 @@ pub async fn save_operator_version(
     files: FileRoots,
     id: &str,
     body: &str,
+    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<SavedVersion, String> {
-    let saved = artifacts_service(workspace_dir, files, None, None)
+    let saved = artifacts_service(workspace_dir, files, None, None, ctx)
         .revise(
             id,
             Content::Text(body.to_string()),
