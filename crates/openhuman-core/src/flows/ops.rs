@@ -113,7 +113,6 @@ const FLOW_PARKED_TTL_SECS: i64 = tinyflows_catalog::run_management::PARKED_RUN_
 // `auto_approve` short-circuits the ApprovalGate — matching `curl`/`shell`.
 // `Write` (code) is `Allow` under full, so trusted automations run sandboxed
 // code unattended; read-only blocks both outright.
-
 mod approval_manifest;
 mod builder;
 mod builder_gates;

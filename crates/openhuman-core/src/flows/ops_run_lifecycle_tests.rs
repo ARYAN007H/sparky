@@ -51,7 +51,10 @@ async fn flows_resume_rejects_a_stale_graph_without_mutating_the_parked_run_summ
     )
     .await
     .expect_err("the module must refuse a resume against a stale graph");
-    assert!(error.contains("graph changed after the run parked"), "{error}");
+    assert!(
+        error.contains("graph changed after the run parked"),
+        "{error}"
+    );
 
     let after_run = flows_get_run(&config, &run_id).await.unwrap().value;
     assert_eq!(after_run.status, before_run.status);
