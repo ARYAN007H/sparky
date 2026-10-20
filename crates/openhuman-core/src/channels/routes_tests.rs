@@ -117,6 +117,7 @@ async fn module_route_help_response(
         },
         history_len: 0,
         session_scope: None,
+        configured_channel: None,
         providers,
     };
     let response: ChannelControlResult = crate::channels::module_fixture::client()

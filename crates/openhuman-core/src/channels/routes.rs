@@ -204,6 +204,12 @@ where
                     },
                     history_len,
                     session_scope: reset_scope.map(Box::new),
+                    configured_channel: target_channel
+                        .filter(|channel| channel.name() == msg.channel)
+                        .map(|channel| tinychannels_bus::module_control::ConfiguredControlChannel {
+                            name: channel.name().to_owned(),
+                            capabilities: channel.capabilities(),
+                        }),
                     providers: provider_descriptors(),
                 },),
             )
