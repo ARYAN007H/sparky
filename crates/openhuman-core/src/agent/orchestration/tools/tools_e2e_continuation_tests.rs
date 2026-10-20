@@ -183,6 +183,11 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
                 .expect("paused session retains lifecycle key")
                 .root_run_id
                 .push_str("-mismatch");
+            let updated_at = chrono::DateTime::parse_from_rfc3339(&row.updated_at)
+                .expect("persisted update timestamp")
+                .with_timezone(&chrono::Utc)
+                + chrono::Duration::milliseconds(1);
+            row.updated_at = updated_at.to_rfc3339();
             sessions
                 .save(&records)
                 .expect("corrupt only the persisted lifecycle owner key");
@@ -273,9 +278,24 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             .find(|session| session.subagent_session_id == before_session.subagent_session_id)
             .expect("paused row to restore");
         row.lifecycle_key = Some(original_lifecycle_key.clone());
+        let updated_at = chrono::DateTime::parse_from_rfc3339(&row.updated_at)
+            .expect("corrupted update timestamp")
+            .with_timezone(&chrono::Utc)
+            + chrono::Duration::milliseconds(1);
+        row.updated_at = updated_at.to_rfc3339();
         sessions
             .save(&restored_records)
             .expect("restore the persisted lifecycle key for the valid continuation");
+        let restored = sessions.load().expect("reread restored paused row");
+        let restored = restored
+            .iter()
+            .find(|session| session.subagent_session_id == before_session.subagent_session_id)
+            .expect("restored paused row remains persisted");
+        assert_eq!(
+            restored.lifecycle_key.as_ref(),
+            Some(&original_lifecycle_key),
+            "valid continuation starts only after the original lifecycle key is restored"
+        );
     });
 
     let resumed = crate::core::runtime::CoreContext::scope(
