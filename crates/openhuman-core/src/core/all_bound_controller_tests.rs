@@ -11,6 +11,13 @@ static EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
 fn staged_bound_methods() -> Vec<&'static str> {
     let mut methods = vec!["composio.execute"];
+    methods.extend([
+        "socket.connect",
+        "socket.disconnect",
+        "socket.state",
+        "socket.emit",
+        "socket.connect_with_session",
+    ]);
     #[cfg(feature = "mcp")]
     methods.push("mcp_clients.registry_get");
     #[cfg(feature = "voice")]
@@ -35,6 +42,110 @@ fn staged_bound_methods() -> Vec<&'static str> {
     #[cfg(feature = "modules")]
     methods.push("modules.computer_status");
     methods
+}
+
+#[test]
+fn production_registry_binds_every_socket_controller_to_its_declared_parser() {
+    use serde_json::json;
+
+    let entries: Vec<_> = registry()
+        .iter()
+        .filter(|grouped| {
+            grouped
+                .controller
+                .schema
+                .method_name()
+                .starts_with("socket.")
+        })
+        .map(|grouped| grouped.controller.clone())
+        .collect();
+    assert!(
+        internal_registry().iter().all(|row| !row
+            .controller
+            .schema
+            .method_name()
+            .starts_with("socket.")),
+        "socket methods remain public registry entries"
+    );
+    let contracts = [
+        ControllerParamContract {
+            method: "socket.connect",
+            required: &["url", "token"],
+            optional: &[],
+            examples: vec![json!({"url":"https://example.invalid/socket", "token":"test-token"})],
+        },
+        ControllerParamContract {
+            method: "socket.disconnect",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+        ControllerParamContract {
+            method: "socket.state",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+        ControllerParamContract {
+            method: "socket.emit",
+            required: &["event"],
+            optional: &["data"],
+            examples: vec![
+                json!({"event":"message", "data":{"text":"hello"}}),
+                json!({"event":"message"}),
+            ],
+        },
+        ControllerParamContract {
+            method: "socket.connect_with_session",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+    ];
+    assert_eq!(
+        entries.len(),
+        contracts.len(),
+        "complete raw socket inventory"
+    );
+    assert!(
+        entries
+            .iter()
+            .all(|entry| entry.schema.namespace == "socket")
+    );
+    assert_eq!(
+        entries
+            .iter()
+            .map(|entry| entry.schema.method_name())
+            .collect::<Vec<_>>(),
+        contracts
+            .iter()
+            .map(|contract| contract.method)
+            .collect::<Vec<_>>(),
+        "independent socket inventory and registration order"
+    );
+    let grouped: Vec<_> = registry()
+        .iter()
+        .chain(internal_registry())
+        .filter(|row| row.controller.schema.method_name().starts_with("socket."))
+        .collect();
+    assert!(grouped.iter().all(|row| row.group == DomainGroup::Platform));
+    let rpc_methods = [
+        "openhuman.socket_connect",
+        "openhuman.socket_disconnect",
+        "openhuman.socket_state",
+        "openhuman.socket_emit",
+        "openhuman.socket_connect_with_session",
+    ];
+    assert_eq!(
+        entries
+            .iter()
+            .map(|entry| entry.rpc_method_name())
+            .collect::<Vec<_>>(),
+        rpc_methods,
+        "socket RPC method names remain stable"
+    );
+    verify_parameter_contracts(&entries, &contracts)
+        .expect("raw socket entries use their declared schemas and runtime decoders");
 }
 
 fn record_event(event: &'static str) {
@@ -456,9 +567,9 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
         .find(|field| field.name == "tool")
         .expect("tool schema field")
         .required = false;
-    assert!(required_input_contract(&optional_required, &["tool"])
-        .unwrap_err()
-        .contains("required inputs mismatch"));
+        assert!(required_input_contract(&optional_required, &["tool"])
+            .unwrap_err()
+            .contains("required inputs mismatch"));
 
     for example in [
         json!({"tool":"GMAIL_SEND_EMAIL"}),
