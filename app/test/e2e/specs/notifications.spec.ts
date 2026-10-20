@@ -3,10 +3,8 @@ import { browser, expect } from '@wdio/globals';
 
 import { waitForApp } from '../helpers/app-helpers';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { dumpAccessibilityTree, waitForText } from '../helpers/element-helpers';
 import { supportsExecuteScript } from '../helpers/platform';
 import { resetApp } from '../helpers/reset-app';
-import { navigateViaHash } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 function stepLog(message: string, context?: unknown): void {
@@ -16,20 +14,6 @@ function stepLog(message: string, context?: unknown): void {
     return;
   }
   console.log(`[NotificationsE2E][${stamp}] ${message}`, JSON.stringify(context, null, 2));
-}
-
-async function waitForNotificationsSections(timeout = 10_000): Promise<void> {
-  await browser.waitUntil(
-    async () =>
-      (await browser.execute(() => {
-        const integration = document.querySelector(
-          '[data-testid="integration-notifications-section"]'
-        );
-        const system = document.querySelector('[data-testid="system-events-section"]');
-        return integration !== null && system !== null;
-      })) === true,
-    { timeout, timeoutMsg: 'Notifications sections did not render in time' }
-  );
 }
 
 /**
