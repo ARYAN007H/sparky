@@ -24,13 +24,9 @@ impl FlowCallPolicy for FlowPolicy {
         security: &SecurityPolicy,
         class: tinybox_bus::CommandClass,
     ) -> std::result::Result<GateDecision, String> {
-        let policy = super::super::tier::tier_policy_from_config(
-            dispatch,
-            captured,
-            Some(live),
-            security,
-        )
-        .map_err(capability_payload)?;
+        let policy =
+            super::super::tier::tier_policy_from_config(dispatch, captured, Some(live), security)
+                .map_err(capability_payload)?;
         super::super::enforce_node_tier_gate(&policy, class, "tool_call")
             .map_err(capability_payload)
     }

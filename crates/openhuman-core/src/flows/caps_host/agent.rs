@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
+use super::prompt::build_completion_messages;
 use super::*;
 use crate::config::Config;
 use crate::flows::agent_route::{
     harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
 };
-use super::prompt::build_completion_messages;
 use crate::modules::tinyflows as module;
 
 #[path = "agent_fallback.rs"]

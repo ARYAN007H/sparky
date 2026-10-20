@@ -1,6 +1,6 @@
+use super::tier::escalated_origin_for_nested_harness;
 use super::*;
 use std::borrow::Cow;
-use super::tier::escalated_origin_for_nested_harness;
 
 impl OpenHumanAgentRunner {
     /// Full harness turn: build a real session agent for `agent_ref` and drive
