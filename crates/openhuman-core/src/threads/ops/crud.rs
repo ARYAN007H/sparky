@@ -492,14 +492,21 @@ pub async fn message_update(
     {
         return Err("private attachment storage metadata is reserved".into());
     }
-    let dir = workspace_dir().await?;
+    let dir = ctx
+        .load_config()
+        .await
+        .map_err(|error| format!("load config: {error}"))?
+        .workspace_dir;
     let message = conversations::blocking::update_message(
         ctx.clone(),
         dir,
         request.thread_id.clone(),
         request.message_id.clone(),
         ConversationMessagePatch {
-            extra_metadata: request.extra_metadata,
+            // Merge public metadata inside the store's CAS retry. This keeps
+            // the private attachment path map invisible to callers while
+            // preventing an ordinary UI metadata update from erasing it.
+            merge_extra_metadata: request.extra_metadata,
             ..Default::default()
         },
     )

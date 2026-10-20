@@ -258,7 +258,13 @@ pub(crate) async fn bind_staged_refs(
 ) -> Result<Vec<ContentPart>, String> {
     let entries = read_staged_entries(ctx, thread_id, requested, config).await?;
     validate_staged_files(ctx, thread_id, config, &entries).await?;
-    Ok(save(metadata, entries))
+    Ok(save(
+        metadata,
+        entries
+            .into_iter()
+            .map(|entry| (entry.part, entry.path))
+            .collect(),
+    ))
 }
 
 /// Stage media supplied with a queued follow-up, returning only opaque refs.

@@ -453,3 +453,92 @@ async fn typed_attachment_with_a_local_path_is_rejected() {
         .expect_err("local paths must be refused");
     assert!(err.to_string().contains("local paths"), "{err}");
 }
+
+#[tokio::test]
+async fn public_metadata_updates_preserve_private_attachment_bindings() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use tinychannels_bus::{ContentPart, MediaReference};
+
+    let (_temp, config) = setup().await;
+    let mut req = request("metadata-image", "look", "user");
+    req.attachments = vec![ContentPart::Image {
+        media: MediaReference {
+            url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+            ..Default::default()
+        },
+        caption: None,
+        alt_text: None,
+    }];
+    let saved = append_with_test_config(req, &config, None)
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config.clone(),
+    ));
+    message_update(
+        &ctx,
+        UpdateConversationMessageRequest {
+            thread_id: "uploads".into(),
+            message_id: saved.id.clone(),
+            extra_metadata: Some(json!({"pinned": true})),
+        },
+    )
+    .await
+    .expect("public metadata update");
+
+    let (left, right) = tokio::join!(
+        message_update(
+            &ctx,
+            UpdateConversationMessageRequest {
+                thread_id: "uploads".into(),
+                message_id: saved.id.clone(),
+                extra_metadata: Some(json!({"seen": true})),
+            },
+        ),
+        message_update(
+            &ctx,
+            UpdateConversationMessageRequest {
+                thread_id: "uploads".into(),
+                message_id: saved.id.clone(),
+                extra_metadata: Some(json!({"reactionSummary": {"heart": 1}})),
+            },
+        ),
+    );
+    left.expect("concurrent metadata update one");
+    right.expect("concurrent metadata update two");
+    let current = conversations::blocking::get_messages(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+        "uploads",
+    )
+    .await
+    .unwrap()
+    .into_iter()
+    .find(|message| message.id == saved.id)
+    .unwrap();
+    assert_eq!(current.extra_metadata["pinned"], true);
+    assert_eq!(current.extra_metadata["seen"], true);
+    assert_eq!(current.extra_metadata["reactionSummary"]["heart"], 1);
+
+    let resolved = crate::threads::attachments::resolve_persisted_parts(
+        &ctx,
+        "uploads",
+        &saved.id,
+        &saved.attachments,
+    )
+    .await
+    .expect("attachment binding survives metadata update");
+    let path = match &resolved[0] {
+        ContentPart::Image { media, .. } => media.path.as_deref().expect("resolved path"),
+        other => panic!("expected image attachment, got {other:?}"),
+    };
+    assert_eq!(
+        tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
+        b"\x89PNG\r\n\x1a\n"
+    );
+}
