@@ -215,8 +215,7 @@ pub async fn edit_message(
     }
     .await;
     if edit_result.is_err() && !staged_parts.is_empty() {
-        let _ = crate::threads::attachments::discard_staged_parts(ctx, &thread_id, &staged_parts)
-            .await;
+        let _ = crate::threads::attachments::discard_staged_parts(ctx, &thread_id, &staged_parts).await;
     }
     let new_request_id = edit_result?;
 
