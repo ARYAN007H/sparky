@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn classify_inference_error_empty_response_does_not_claim_credit_exhaustion() {
     // An empty successful completion provides no evidence about the user's
-    // balance. A real credit error has its own backend errorCode classification.
+    // balance. A real credit failure has its own provider classification.
     let raw = "run_chat_task failed client_id=abc thread_id=t-1 request_id=r-1 \
                error=The model returned an empty response. Please try again.";
     let classified = classify_inference_error(raw);
@@ -387,9 +387,8 @@ fn backend_internal_error_metadata_is_generic_retryable() {
 
 #[test]
 fn classify_inference_error_byo_no_code_keeps_user_actionable_copy() {
-    // Managed-vs-BYO: a BYO provider key bad (direct 401, no errorCode) must
-    // STILL get the user-actionable "check your API key" copy via the
-    // substring fallback — the errorCode branch must not steal it.
+    // A BYO provider key failure must still get the user-actionable
+    // "check your API key" copy via the generic message fallback.
     let auth = r#"openai API error (401 Unauthorized): {"error":{"message":"Incorrect API key provided"}}"#;
     let classified = classify_inference_error(auth);
     assert_eq!(classified.error_type, "auth_error");
@@ -399,9 +398,8 @@ fn classify_inference_error_byo_no_code_keeps_user_actionable_copy() {
         classified.message
     );
 
-    // BYO model misconfig (no errorCode) stays `model_unavailable` with the
-    // "check your model settings" copy — distinct from the managed
-    // MODEL_UNAVAILABLE provider_error route above (F6).
+    // BYO model misconfiguration stays `model_unavailable` with the
+    // "check your model settings" copy.
     let model = r#"custom_openai API error (404 Not Found): {"error":{"message":"model unavailable on this endpoint"}}"#;
     let classified = classify_inference_error(model);
     assert_eq!(classified.error_type, "model_unavailable");
@@ -418,10 +416,8 @@ fn classify_byo_rate_limit_keeps_provider_copy() {
     // classifier metadata is installed.
     let raw = "custom_openai API error (429 Too Many Requests): slow down";
     let classified = classify_inference_error(raw);
-    // Still classified as rate_limited via the substring ladder, but through
-    // the BYO path: the message uses the existing substring-arm copy ("This is
-    // a transient upstream limit"), NOT the managed errorCode copy ("You can
-    // retry in this thread.").
+    // Still classified as rate_limited via generic text matching: the direct
+    // provider copy offers the existing transient-upstream guidance.
     assert_eq!(classified.error_type, "rate_limited");
     assert!(
         classified.message.contains("transient upstream limit"),

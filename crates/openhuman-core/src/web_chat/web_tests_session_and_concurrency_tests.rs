@@ -528,8 +528,8 @@ fn classify_connection_drop_routes_to_network_retryable() {
         "error sending request for url (https://api.tinyhumans.ai/openai/v1/chat/completions): \
          connection closed before message completed",
         "request or response body error: unexpected end of file",
-        // Raw mid-stream SSE drop: managed backend leaves OFF the errorCode, so
-        // it reaches the ladder as a streaming error with a transport body.
+        // Raw mid-stream SSE drop reaches generic classification as a
+        // streaming transport failure.
         "OpenHuman streaming API error: error reading a body from connection: \
          end of file before message length reached",
     ] {
