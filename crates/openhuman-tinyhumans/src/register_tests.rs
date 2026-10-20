@@ -17,7 +17,7 @@ async fn boot_registration_supplies_hosted_model_default_and_normalizer_before_c
     let config = openhuman_embed::__host::config::Config::default();
     assert_eq!(
         config.default_model.as_deref(),
-        Some(crate::inference::tiers::MODEL_MANAGED_DEFAULT)
+        Some(crate::inference::MODEL_MANAGED_DEFAULT)
     );
 
     let mut legacy = openhuman_embed::__host::config::Config::default();
@@ -31,6 +31,6 @@ async fn boot_registration_supplies_hosted_model_default_and_normalizer_before_c
     openhuman_embed::__host::config::migrations::run_pending(&mut legacy).await;
     assert_eq!(
         legacy.default_model.as_deref(),
-        Some(crate::inference::tiers::MODEL_MANAGED_DEFAULT)
+        Some(crate::inference::MODEL_MANAGED_DEFAULT)
     );
 }
