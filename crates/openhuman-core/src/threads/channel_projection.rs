@@ -1,11 +1,12 @@
-//! Durable ownership of provider conversations by OpenHuman threads.
+//! Durable ownership of provider messages by OpenHuman threads and rows.
 //!
-//! Channel events can arrive without an active turn and after a restart. This
+//! Provider events can arrive without an active turn and after a restart. This
 //! index records the exact trusted channel/account and conversation address
-//! observed during ingress, so later receipts and reactions can be projected
-//! without guessing from a sender, recent message, or current session.
+//! observed during ingress, then binds the provider receipt to the OpenHuman
+//! thread and persisted row when those identities are known. Projection never
+//! guesses from a sender, recent message, or equality between provider and row
+//! identifiers.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
@@ -19,30 +20,42 @@ use crate::core::runtime::{DispatchCtx, Tenant, tenant::tenant_key};
 use crate::storage::{self, StorageBackend, documents::Repo};
 
 const DOMAIN: &str = "threads::channel_projection";
-const COLLECTION: &str = "thread_channel_conversations";
+const COLLECTION: &str = "thread_channel_messages";
 const LOG_PREFIX: &str = "[threads:channel-projection]";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ConversationBindingKey {
+struct MessageBindingKey {
     tenant_key: String,
     channel: ChannelRef,
     conversation: ConversationRef,
+    provider_message_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ConversationBinding {
-    key: ConversationBindingKey,
+struct MessageBinding {
+    key: MessageBindingKey,
     thread_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    row_id: Option<String>,
+}
+
+/// Exact OpenHuman target for a provider event, if both durable bindings exist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProjectedMessageTarget {
+    /// OpenHuman conversation that owns the provider message.
+    pub thread_id: String,
+    /// OpenHuman row ID; remains distinct from the provider's message ID.
+    pub row_id: String,
 }
 
 fn collections() -> Vec<CollectionSpec> {
     vec![CollectionSpec::new(COLLECTION)]
 }
 
-fn doc_id(key: &ConversationBindingKey) -> Result<String> {
-    let encoded = serde_json::to_vec(key).context("serialize channel conversation key")?;
+fn doc_id(key: &MessageBindingKey) -> Result<String> {
+    let encoded = serde_json::to_vec(key).context("serialize channel message key")?;
     Ok(hex::encode(Sha256::digest(encoded)))
 }
 
@@ -59,11 +72,15 @@ fn repo_for(ctx: &DispatchCtx, tenant: &Tenant) -> Result<Repo> {
     let workspace = core
         .workspace_dir()
         .map_err(|error| anyhow!("resolve projection workspace: {error}"))?;
-    let backend = storage::local::backend_for(&workspace)
+    repo_for_workspace(&workspace, tenant)
+}
+
+fn repo_for_workspace(workspace: &std::path::Path, tenant: &Tenant) -> Result<Repo> {
+    let backend = storage::local::backend_for(workspace)
         .context("open channel projection storage backend")?;
-    // Conversation records are shared by the agents of one profile, like
-    // OpenHuman thread records. The injective tenant key below still narrows
-    // event correlation to the exact agent that installed the binding.
+    // Conversations span agents, so records live in the profile scope like
+    // OpenHuman's thread store. The injective tenant key still narrows each
+    // binding to the exact agent that installed it.
     let scope = storage::scope_from(
         tenant.profile.as_deref(),
         None,
@@ -72,66 +89,96 @@ fn repo_for(ctx: &DispatchCtx, tenant: &Tenant) -> Result<Repo> {
     Repo::on(&backend, &scope, DOMAIN, collections).context("open channel projection collection")
 }
 
-/// Bind a provider conversation to the canonical OpenHuman thread after
-/// trusted inbound preparation has selected both identities.
+fn binding_key(
+    tenant_key: String,
+    channel: &ChannelRef,
+    conversation: &ConversationRef,
+    provider_message_id: &str,
+) -> Result<MessageBindingKey> {
+    if channel.id.is_empty() || conversation.id.is_empty() || provider_message_id.is_empty() {
+        return Err(anyhow!("channel, conversation, and provider message IDs must be non-empty"));
+    }
+    Ok(MessageBindingKey {
+        tenant_key,
+        channel: channel.clone(),
+        conversation: conversation.clone(),
+        provider_message_id: provider_message_id.to_string(),
+    })
+}
+
+/// Bind a trusted provider message to the OpenHuman thread selected by ingress.
 ///
 /// Repeated binding to the same thread is idempotent. A conflicting binding
-/// fails closed instead of silently rerouting later receipts or reactions.
-pub(crate) fn bind_conversation(
+/// fails closed; sender-scoped conversations are supported because each
+/// provider message has its own key.
+pub(crate) fn bind_message(
     ctx: &DispatchCtx,
     channel: &ChannelRef,
     conversation: &ConversationRef,
+    provider_message_id: &str,
     openhuman_thread_id: &str,
 ) -> Result<(), String> {
     let result = (|| -> Result<()> {
-        if channel.id.is_empty() || conversation.id.is_empty() || openhuman_thread_id.is_empty() {
-            return Err(anyhow!("channel, conversation, and thread identities must be non-empty"));
+        if openhuman_thread_id.is_empty() {
+            return Err(anyhow!("OpenHuman thread ID must be non-empty"));
         }
-        let (tenant, key) = tenant_key_for(ctx)?;
+        let (tenant, tenant_key) = tenant_key_for(ctx)?;
+        let key = binding_key(tenant_key, channel, conversation, provider_message_id)?;
         let repo = repo_for(ctx, &tenant)?;
-        bind_in(
-            &repo,
-            ConversationBindingKey {
-                tenant_key: key,
-                channel: channel.clone(),
-                conversation: conversation.clone(),
-            },
-            openhuman_thread_id,
-        )
+        bind_in(&repo, key, openhuman_thread_id)
     })();
     result.map_err(|error| format!("{LOG_PREFIX} bind: {error:#}"))
 }
 
-/// Resolve only an exact, previously trusted channel conversation binding.
+/// Bind the provider receipt to the row ID returned by OpenHuman persistence.
 ///
-/// Missing records return `None`; the caller must not guess a thread.
-pub(crate) fn resolve_conversation(
+/// This is called only at the persistence boundary that knows the authoritative
+/// OpenHuman row ID. It never assumes that row IDs and provider IDs are equal.
+pub(crate) fn bind_row(
     ctx: &DispatchCtx,
     channel: &ChannelRef,
     conversation: &ConversationRef,
-) -> Result<Option<String>, String> {
-    let result = (|| -> Result<Option<String>> {
-        let (tenant, key) = tenant_key_for(ctx)?;
+    provider_message_id: &str,
+    openhuman_thread_id: &str,
+    openhuman_row_id: &str,
+) -> Result<(), String> {
+    let result = (|| -> Result<()> {
+        if openhuman_thread_id.is_empty() || openhuman_row_id.is_empty() {
+            return Err(anyhow!("OpenHuman thread and row IDs must be non-empty"));
+        }
+        let (tenant, tenant_key) = tenant_key_for(ctx)?;
+        let key = binding_key(tenant_key, channel, conversation, provider_message_id)?;
         let repo = repo_for(ctx, &tenant)?;
-        resolve_in(
-            &repo,
-            &ConversationBindingKey {
-                tenant_key: key,
-                channel: channel.clone(),
-                conversation: conversation.clone(),
-            },
-        )
+        bind_row_in(&repo, key, openhuman_thread_id, openhuman_row_id)
+    })();
+    result.map_err(|error| format!("{LOG_PREFIX} bind row: {error:#}"))
+}
+
+/// Resolve only an exact provider message binding with an authoritative row.
+/// Missing or incomplete records return `None`; callers must not guess.
+pub(crate) fn resolve_message(
+    ctx: &DispatchCtx,
+    channel: &ChannelRef,
+    conversation: &ConversationRef,
+    provider_message_id: &str,
+) -> Result<Option<ProjectedMessageTarget>, String> {
+    let result = (|| -> Result<Option<ProjectedMessageTarget>> {
+        let (tenant, tenant_key) = tenant_key_for(ctx)?;
+        let key = binding_key(tenant_key, channel, conversation, provider_message_id)?;
+        let repo = repo_for(ctx, &tenant)?;
+        resolve_in(&repo, &key)
     })();
     result.map_err(|error| format!("{LOG_PREFIX} resolve: {error:#}"))
 }
 
-fn bind_in(repo: &Repo, key: ConversationBindingKey, thread_id: &str) -> Result<()> {
+fn bind_in(repo: &Repo, key: MessageBindingKey, thread_id: &str) -> Result<()> {
     let id = doc_id(&key)?;
-    let binding = ConversationBinding {
+    let binding = MessageBinding {
         key: key.clone(),
         thread_id: thread_id.to_string(),
+        row_id: None,
     };
-    let body = serde_json::to_value(&binding).context("serialize channel conversation binding")?;
+    let body = serde_json::to_value(&binding).context("serialize channel message binding")?;
     repo.run(|docs| async move {
         match docs.put(COLLECTION, &id, body, Precondition::Absent).await {
             Ok(_) => Ok(()),
@@ -140,13 +187,13 @@ fn bind_in(repo: &Repo, key: ConversationBindingKey, thread_id: &str) -> Result<
                 let Some(stored) = stored else {
                     return Err(error);
                 };
-                let existing: ConversationBinding = serde_json::from_value(stored.doc)
+                let existing: MessageBinding = serde_json::from_value(stored.doc)
                     .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
                 if existing.key == key && existing.thread_id == binding.thread_id {
                     Ok(())
                 } else {
                     Err(tinystoragedrivers::StorageError::conflict(
-                        "provider conversation is already bound to another OpenHuman thread",
+                        "provider message is already bound to another OpenHuman thread",
                     ))
                 }
             }
@@ -156,21 +203,61 @@ fn bind_in(repo: &Repo, key: ConversationBindingKey, thread_id: &str) -> Result<
     Ok(())
 }
 
-fn resolve_in(repo: &Repo, key: &ConversationBindingKey) -> Result<Option<String>> {
+fn bind_row_in(
+    repo: &Repo,
+    key: MessageBindingKey,
+    thread_id: &str,
+    row_id: &str,
+) -> Result<()> {
+    let id = doc_id(&key)?;
+    let (thread_id, row_id) = (thread_id.to_string(), row_id.to_string());
+    repo.run(|docs| async move {
+        let stored = docs.get(COLLECTION, &id).await?;
+        let Some(stored) = stored else {
+            return Err(tinystoragedrivers::StorageError::not_found(
+                "provider message has no trusted thread binding",
+            ));
+        };
+        let mut binding: MessageBinding = serde_json::from_value(stored.doc)
+            .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
+        if binding.key != key || binding.thread_id != thread_id {
+            return Err(tinystoragedrivers::StorageError::conflict(
+                "provider message thread binding does not match persisted row",
+            ));
+        }
+        if binding.row_id.as_deref().is_some_and(|existing| existing != row_id) {
+            return Err(tinystoragedrivers::StorageError::conflict(
+                "provider message is already bound to another OpenHuman row",
+            ));
+        }
+        binding.row_id = Some(row_id);
+        let body: Value = serde_json::to_value(binding)
+            .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
+        docs.put(COLLECTION, &id, json!(body), stored.unchanged()).await?;
+        Ok(())
+    })?;
+    Ok(())
+}
+
+fn resolve_in(repo: &Repo, key: &MessageBindingKey) -> Result<Option<ProjectedMessageTarget>> {
     let id = doc_id(key)?;
     let expected = key.clone();
     let stored = repo.run(|docs| async move { docs.get(COLLECTION, &id).await })?;
     let Some(stored) = stored else {
         return Ok(None);
     };
-    let binding: ConversationBinding = serde_json::from_value(stored.doc)
-        .context("decode channel conversation binding")?;
-    // Verify the full values after digest lookup, so a collision or malformed
-    // legacy row can never broaden the mapping.
+    let binding: MessageBinding = serde_json::from_value(stored.doc)
+        .context("decode channel message binding")?;
     if binding.key != expected || binding.thread_id.is_empty() {
         return Ok(None);
     }
-    Ok(Some(binding.thread_id))
+    let Some(row_id) = binding.row_id.filter(|row_id| !row_id.is_empty()) else {
+        return Ok(None);
+    };
+    Ok(Some(ProjectedMessageTarget {
+        thread_id: binding.thread_id,
+        row_id,
+    }))
 }
 
 #[cfg(test)]
