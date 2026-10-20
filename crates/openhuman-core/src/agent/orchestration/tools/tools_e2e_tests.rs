@@ -28,19 +28,21 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
         parent_context(workspace.path(), provider.clone(), vec![]),
     );
     // Boxed: the inline spawn future is too large for a test thread's stack.
-    let result = Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
-        json!({
-            "agent_id": "task_manager_agent",
-            "prompt": format!("Investigate {SPAWN_SUBAGENT_CANARY}"),
-            "context": "parent supplied context",
-            "model": "test-model",
-            "blocking": true
-        }),
-        None,
-        live.data.child(),
-        crate::agent::subagent_host::detached_subagent_parent(&live, "spawn-subagent-child")
-            .expect("detached parent"),
-    ))
+    let result = Box::pin(
+        SpawnSubagentTool::new().execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": format!("Investigate {SPAWN_SUBAGENT_CANARY}"),
+                "context": "parent supplied context",
+                "model": "test-model",
+                "blocking": true
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "spawn-subagent-child")
+                .expect("detached parent"),
+        ),
+    )
     .await
     .expect("tool execution");
 
@@ -81,18 +83,20 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
     // Boxed: the inline spawn future is too large for a test thread's
     // stack (the trait `execute` path boxes it the same way).
     let tool = SpawnSubagentTool::new();
-    let result = Box::pin(tool.execute_with_live_parent_context(
-        json!({
-            "agent_id": "task_manager_agent",
-            "prompt": "List the task sources",
-            "model": "test-model",
-            "blocking": true
-        }),
-        None,
-        run_context,
-        crate::agent::subagent_host::detached_subagent_parent(&live, "stopped-child")
-            .expect("detached parent"),
-    ))
+    let result = Box::pin(
+        tool.execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "List the task sources",
+                "model": "test-model",
+                "blocking": true
+            }),
+            None,
+            run_context,
+            crate::agent::subagent_host::detached_subagent_parent(&live, "stopped-child")
+                .expect("detached parent"),
+        ),
+    )
     .await
     .expect("tool execution");
 
