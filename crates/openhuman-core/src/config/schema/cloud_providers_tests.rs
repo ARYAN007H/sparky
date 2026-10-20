@@ -143,7 +143,8 @@ fn hosted_presets_and_classification_are_context_scoped() {
     );
     super::register_hosted_cloud_provider_policy_in(
         &extensions,
-        std::sync::Arc::new(|slug, _| slug == "tenant-hosted"),
+        std::sync::Arc::new(|slug| slug == "tenant-hosted"),
+        std::sync::Arc::new(|style| style == AuthStyle::OpenhumanJwt),
     );
     let context = crate::core::runtime::CoreContext::for_test_with_extensions(
         crate::core::runtime::DomainSet::full(),
@@ -158,6 +159,8 @@ fn hosted_presets_and_classification_are_context_scoped() {
             "tenant-hosted",
             AuthStyle::Bearer
         ));
+        assert!(super::is_hosted_cloud_identity("tenant-hosted"));
+        assert!(!super::is_hosted_auth_style(AuthStyle::Bearer));
         assert!(!super::is_hosted_cloud_provider(
             "openai",
             AuthStyle::Bearer
