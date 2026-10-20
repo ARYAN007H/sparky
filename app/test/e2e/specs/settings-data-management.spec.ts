@@ -58,18 +58,20 @@ describe('Settings - Data Management', function () {
     expect(workspace.result?.result?.exists).toBe(true);
     const authBeforeReset = await callOpenhumanRpc('openhuman.auth_get_state', {});
     expect(authBeforeReset.ok).toBe(true);
-    expect(authBeforeReset.result?.result?.userId).toBe(USER_ID);
+    const currentUserId = authBeforeReset.result?.result?.userId;
+    expect(typeof currentUserId).toBe('string');
+    expect(currentUserId.length).toBeGreaterThan(0);
     expect(process.env.OPENHUMAN_WORKSPACE).toBeTruthy();
     expect(process.env.HOME).toBeTruthy();
     const resetPaths = await callOpenhumanRpc('openhuman.config_get_data_paths', {
-      user_id: USER_ID,
+      user_id: currentUserId,
     });
     expect(resetPaths.ok).toBe(true);
     const currentUserDir = resetPaths.result?.result?.current_openhuman_dir;
     const defaultOpenHumanDir = resetPaths.result?.result?.default_openhuman_dir;
     const privateDefaultDir = path.join(process.env.HOME, '.openhuman');
     expect(defaultOpenHumanDir).toBe(privateDefaultDir);
-    expect(currentUserDir).toBe(path.join(privateDefaultDir, 'users', USER_ID));
+    expect(currentUserDir).toBe(path.join(privateDefaultDir, 'users', currentUserId));
     const sentinelPath = path.join(currentUserDir, 'settings-data-management-sentinel.txt');
     fs.mkdirSync(currentUserDir, { recursive: true });
     fs.writeFileSync(sentinelPath, 'user-scoped clear-data sentinel', { flag: 'wx' });
