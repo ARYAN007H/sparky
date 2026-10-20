@@ -1016,6 +1016,14 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
     },
   });
 
+  // Started turns keep the legacy scalar request_id response. Only queued
+  // turns return the typed acknowledgement object below.
+  if (typeof result === 'string') {
+    return { requestId: result, queuedAttachments: [] };
+  }
+  if (result == null) {
+    return { queuedAttachments: [] };
+  }
   if (!isQueuedChatAck(result)) {
     throw new Error('Core returned an invalid chat queue acknowledgement');
   }
