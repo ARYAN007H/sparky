@@ -17,7 +17,7 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result, spawn_typing_task,
+    build_channel_context_block, log_worker_join_result, spawn_draft_updater, spawn_typing_task,
     REPLY_LOG_TRUNCATE_CHARS,
 };
 use super::super::host_agent::{self, HostRoute};
@@ -331,67 +331,17 @@ pub(crate) async fn process_channel_runtime_message(
     };
 
     // Spawn a task to forward streaming progress to draft updates
-    let draft_updater = if let (Some(mut rx), Some(draft_id_ref), Some(channel_ref)) = (
+    let draft_updater = if let (Some(rx), Some(draft_id_ref), Some(channel_ref)) = (
         progress_rx,
         draft_message_id.as_deref(),
         target_channel.as_ref(),
     ) {
-        let channel = Arc::clone(channel_ref);
-        let reply_target = msg.reply_target.clone();
-        let draft_id = draft_id_ref.to_string();
-        Some(AbortOnDropHandle::new(tokio::spawn(async move {
-            let mut accumulated = String::new();
-            let mut last_thinking_update = None;
-            const THINKING_UPDATE_INTERVAL_MS: u128 = 2000;
-
-            while let Some(progress) = rx.recv().await {
-                match progress {
-                    AgentProgress::TextDelta { delta, .. } => {
-                        accumulated.push_str(&delta);
-                        if let Err(e) = channel
-                            .update_draft(&reply_target, &draft_id, &accumulated)
-                            .await
-                        {
-                            tracing::debug!("Draft update failed: {e}");
-                        }
-                    }
-                    AgentProgress::ThinkingDelta { .. } => {
-                        // Suppress thinking text to Telegram; only show a placeholder if we haven't
-                        // started receiving the final answer yet.
-                        if accumulated.is_empty() {
-                            let now = std::time::Instant::now();
-                            let should_update = match last_thinking_update {
-                                None => true,
-                                Some(last) => {
-                                    now.duration_since(last).as_millis()
-                                        > THINKING_UPDATE_INTERVAL_MS
-                                }
-                            };
-
-                            if should_update {
-                                if let Err(e) = channel
-                                    .update_draft(&reply_target, &draft_id, "Thinking...")
-                                    .await
-                                {
-                                    tracing::debug!("Thinking update failed: {e}");
-                                }
-                                last_thinking_update = Some(now);
-                            }
-                        }
-                    }
-                    AgentProgress::ToolCallStarted { tool_name, .. } if accumulated.is_empty() => {
-                        let _ = channel
-                            .update_draft(
-                                &reply_target,
-                                &draft_id,
-                                &format!("Working ({})...", tool_name),
-                            )
-                            .await;
-                    }
-                    _ => {}
-                }
-            }
-        })))
+        Some(spawn_draft_updater(
+            rx,
+            Arc::clone(channel_ref),
+            msg.reply_target.clone(),
+            draft_id_ref.to_string(),
+        ))
     } else {
         None
     };

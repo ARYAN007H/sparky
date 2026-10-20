@@ -1,6 +1,9 @@
 //! OpenHuman-specific dispatch prompt context plus TinyChannels helpers.
 
 use crate::channels::context::CHANNEL_TYPING_REFRESH_INTERVAL_SECS;
+use crate::channels::Channel;
+use std::sync::Arc;
+use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus as traits;
 
 /// Maximum characters shown in the debug reply println.
@@ -50,6 +53,66 @@ pub(super) fn spawn_typing_task(
     dispatch.spawn(async move {
         let _ = finished_rx.await;
     })
+}
+
+/// Forward agent progress to a provider draft while keeping the updater
+/// attached to the current dispatch worker's cancellation lifecycle.
+pub(super) fn spawn_draft_updater(
+    mut progress: tokio::sync::mpsc::Receiver<AgentProgress>,
+    channel: Arc<dyn Channel>,
+    reply_target: String,
+    draft_id: String,
+) -> tokio_util::task::AbortOnDropHandle<()> {
+    tokio_util::task::AbortOnDropHandle::new(tokio::spawn(async move {
+        let mut accumulated = String::new();
+        let mut last_thinking_update = None;
+        const THINKING_UPDATE_INTERVAL_MS: u128 = 2000;
+
+        while let Some(progress) = progress.recv().await {
+            match progress {
+                AgentProgress::TextDelta { delta, .. } => {
+                    accumulated.push_str(&delta);
+                    if let Err(error) = channel
+                        .update_draft(&reply_target, &draft_id, &accumulated)
+                        .await
+                    {
+                        tracing::debug!("Draft update failed: {error}");
+                    }
+                }
+                AgentProgress::ThinkingDelta { .. } => {
+                    if accumulated.is_empty() {
+                        let now = std::time::Instant::now();
+                        let should_update = match last_thinking_update {
+                            None => true,
+                            Some(last) => {
+                                now.duration_since(last).as_millis() > THINKING_UPDATE_INTERVAL_MS
+                            }
+                        };
+
+                        if should_update {
+                            if let Err(error) = channel
+                                .update_draft(&reply_target, &draft_id, "Thinking...")
+                                .await
+                            {
+                                tracing::debug!("Thinking update failed: {error}");
+                            }
+                            last_thinking_update = Some(now);
+                        }
+                    }
+                }
+                AgentProgress::ToolCallStarted { tool_name, .. } if accumulated.is_empty() => {
+                    let _ = channel
+                        .update_draft(
+                            &reply_target,
+                            &draft_id,
+                            &format!("Working ({tool_name})..."),
+                        )
+                        .await;
+                }
+                _ => {}
+            }
+        }
+    }))
 }
 
 /// Build the `[Channel context]` block for a channel turn.
