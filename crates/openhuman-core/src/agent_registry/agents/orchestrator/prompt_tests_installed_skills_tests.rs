@@ -24,7 +24,8 @@ fn render_installed_skills_lists_skills_and_names_the_hand_offs_it_is_given() {
     );
     assert!(out.contains("## Installed Skills"));
     assert!(
-        out.contains("`run_workflow`") && out.contains("`spawn_subagent` with agent_id `skill_setup`"),
+        out.contains("`run_workflow`")
+            && out.contains("`spawn_subagent` with agent_id `skill_setup`"),
         "catalogue must name the run and install hand-offs it was given: {out}"
     );
     assert!(
@@ -89,7 +90,11 @@ fn prompt_documents_the_single_always_async_spawn_contract() {
     assert!(ARCHETYPE.contains("Calls are asynchronous; completed results arrive automatically."));
     assert!(ARCHETYPE.contains("Reuse the same `task_key` to continue a worker"));
     assert!(ARCHETYPE.contains("including one paused on `ask_user_clarification`"));
-    for retired in ["blocking: true", "continue_subagent", "delegate_make_presentation"] {
+    for retired in [
+        "blocking: true",
+        "continue_subagent",
+        "delegate_make_presentation",
+    ] {
         assert!(
             !ARCHETYPE.contains(retired),
             "retired dispatch contract leaked into prompt: {retired}"

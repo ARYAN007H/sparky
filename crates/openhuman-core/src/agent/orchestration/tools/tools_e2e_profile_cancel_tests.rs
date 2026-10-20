@@ -5,18 +5,16 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     const CHILD: &str = "OPENHUMAN_SAAS_SUBAGENT_CANCEL_SCOPE_CHILD";
     if std::env::var_os(CHILD).is_none() {
         let module_path = module_path!().trim_start_matches("openhuman_core::");
-        let test_name = format!(
-            "{module_path}::profile_scope_cannot_cancel_another_profiles_driver_child"
-        );
-        let output = std::process::Command::new(
-            std::env::current_exe().expect("unit test executable path"),
-        )
-        .arg("--exact")
-        .arg(&test_name)
-        .arg("--nocapture")
-        .env(CHILD, "1")
-        .output()
-        .expect("run isolated SaaS-mode driver cancellation case");
+        let test_name =
+            format!("{module_path}::profile_scope_cannot_cancel_another_profiles_driver_child");
+        let output =
+            std::process::Command::new(std::env::current_exe().expect("unit test executable path"))
+                .arg("--exact")
+                .arg(&test_name)
+                .arg("--nocapture")
+                .env(CHILD, "1")
+                .output()
+                .expect("run isolated SaaS-mode driver cancellation case");
         assert!(
             output.status.success()
                 && String::from_utf8_lossy(&output.stdout).contains(&test_name)
@@ -104,8 +102,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .with_parent(parent);
     host.thread_id = Some(thread_id.into());
     let live = RunContext::<OpenHumanRunContext>::new(
-        tinyagents_harness::context::RunConfig::new("profile-cancel-parent")
-            .with_thread(thread_id),
+        tinyagents_harness::context::RunConfig::new("profile-cancel-parent").with_thread(thread_id),
         host,
     );
     let detached_data = live.data.detached_child();
@@ -209,9 +206,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     assert_eq!(after_bob.latest_error, row_before.latest_error);
     assert_eq!(
         crate::agent::orchestration::background_completions::pending_for_ctx(
-            &bob_ctx,
-            &workspace,
-            thread_id,
+            &bob_ctx, &workspace, thread_id,
         )
         .len(),
         0,
@@ -238,9 +233,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     assert_eq!(after_unbound.latest_error, row_before.latest_error);
     assert!(
         crate::agent::orchestration::background_completions::pending_for_ctx(
-            &alice_ctx,
-            &workspace,
-            thread_id,
+            &alice_ctx, &workspace, thread_id,
         )
         .is_empty(),
         "neither rejected control attempt emits an Alice completion"
@@ -274,4 +267,3 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     assert_eq!(terminal.status, SubAgentJobStatus::Cancelled);
     release.notify_one();
 }
-

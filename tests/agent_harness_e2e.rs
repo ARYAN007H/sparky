@@ -3369,11 +3369,11 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     reset_script(vec![
         // Orchestrator hands the install to `skill_setup` (a direct hand-off, #6302).
         tool_call_completion(
-        "spawn_subagent",
-        json!({
-            "agent_id": "skill_setup",
-            "prompt": "Install the harness registry skill"
-        }),
+            "spawn_subagent",
+            json!({
+                "agent_id": "skill_setup",
+                "prompt": "Install the harness registry skill"
+            }),
         ),
         // skill_setup finds the entry, then installs it (the gate parks here).
         tool_call_completion(

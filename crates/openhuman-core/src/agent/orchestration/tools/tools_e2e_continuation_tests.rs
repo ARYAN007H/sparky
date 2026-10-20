@@ -180,7 +180,11 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         "refusal identifies the mismatched checkpoint: {}",
         refused_resume.output()
     );
-    assert_eq!(jobs.list().len(), before_job_count, "refusal admits no child");
+    assert_eq!(
+        jobs.list().len(),
+        before_job_count,
+        "refusal admits no child"
+    );
     assert_eq!(
         provider.calls.load(std::sync::atomic::Ordering::SeqCst),
         1,
@@ -354,19 +358,21 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
         .expect("first durable session");
     assert_eq!(first_session.status, DurableSubagentStatus::Idle);
     let original_session_id = first_session.subagent_session_id.clone();
-    let first_task_id = first_session.current_task_id.clone().expect("first task id");
-    let first_job = crate::core::runtime::slot_for::<SubAgentJobRegistry>(
-        &live.data.dispatch_ctx(),
-    )
-    .list()
-    .into_iter()
-    .find(|job| {
-        job.extensions
-            .get("task_id")
-            .and_then(serde_json::Value::as_str)
-            == Some(first_task_id.as_str())
-    })
-    .expect("first child is registered");
+    let first_task_id = first_session
+        .current_task_id
+        .clone()
+        .expect("first task id");
+    let first_job =
+        crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx())
+            .list()
+            .into_iter()
+            .find(|job| {
+                job.extensions
+                    .get("task_id")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(first_task_id.as_str())
+            })
+            .expect("first child is registered");
     assert_eq!(first_job.status, SubAgentJobStatus::Completed);
 
     let second = tool
@@ -393,13 +399,19 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
         .find(|session| session.subagent_session_id == original_session_id)
         .expect("same durable child session is reused");
     assert_eq!(second_session.status, DurableSubagentStatus::Idle);
-    assert_ne!(second_session.current_task_id.as_deref(), Some(first_task_id.as_str()));
+    assert_ne!(
+        second_session.current_task_id.as_deref(),
+        Some(first_task_id.as_str())
+    );
     assert!(provider.saw("idle-history-first-prompt"));
     assert!(provider.saw("idle-child-first-result"));
     assert!(provider.saw("idle-history-follow-up-prompt"));
     let requests = provider.seen.lock();
     assert_eq!(requests.len(), 2, "both spawns use the injected model");
-    assert_eq!(requests[1].matches("idle-history-follow-up-prompt").count(), 1);
+    assert_eq!(
+        requests[1].matches("idle-history-follow-up-prompt").count(),
+        1
+    );
 }
 
 async fn wait_completed(
@@ -409,7 +421,10 @@ async fn wait_completed(
         loop {
             match progress.recv().await {
                 Some(crate::progress::AgentProgress::SubagentCompleted { agent_id, .. })
-                    if agent_id == "task_manager_agent" => break,
+                    if agent_id == "task_manager_agent" =>
+                {
+                    break
+                }
                 Some(crate::progress::AgentProgress::SubagentFailed { error, .. }) => {
                     panic!("child failed before completion: {error}")
                 }
@@ -430,7 +445,10 @@ struct TwoTurnModel {
 
 impl TwoTurnModel {
     fn saw(&self, needle: &str) -> bool {
-        self.seen.lock().iter().any(|payload| payload.contains(needle))
+        self.seen
+            .lock()
+            .iter()
+            .any(|payload| payload.contains(needle))
     }
 }
 
@@ -462,7 +480,11 @@ impl tinyinference_llm::model::ChatModel<()> for TwoTurnModel {
         let answer = match self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) {
             0 => "idle-child-first-result",
             1 => "idle-child-follow-up-result",
-            call => return Err(tinyinference_llm::Error::Model(format!("unexpected call {call}"))),
+            call => {
+                return Err(tinyinference_llm::Error::Model(format!(
+                    "unexpected call {call}"
+                )))
+            }
         };
         Ok(tinyinference_llm::model::ModelResponse::assistant(answer))
     }

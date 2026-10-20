@@ -56,6 +56,7 @@ mod persisted_compat_tests;
 
 // Public API — the entry point and the shapes it returns.
 pub use autonomous::{definition_iter_cap, subagent_iter_cap_with_autonomous_lift};
+pub(crate) use lifecycle::checkpoint_resume;
 pub(crate) use lifecycle::detached_subagent_parent;
 pub(crate) use lifecycle::load_subagent_checkpoint;
 pub(crate) use lifecycle::load_terminal_outcome;
@@ -65,7 +66,6 @@ pub(crate) use lifecycle::run_subagent_via_driver_tool;
 pub(crate) use lifecycle::spawn_async_via_driver_tool;
 #[cfg(test)]
 pub(crate) use lifecycle::spawn_async_via_driver_tool_with_jobs;
-pub(crate) use lifecycle::checkpoint_resume;
 pub use lifecycle::{
     continue_subagent, continue_subagent_with_parent, run_subagent, run_subagent_with_parent,
     OpenHumanSubagentHost,

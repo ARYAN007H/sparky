@@ -257,7 +257,9 @@ fn orchestrator_routes_every_registered_specialist_through_spawn_subagent() {
             continue;
         };
         assert!(
-            allowed.iter().any(|candidate| candidate.as_str() == Some(agent_id)),
+            allowed
+                .iter()
+                .any(|candidate| candidate.as_str() == Some(agent_id)),
             "orchestrator allows `{agent_id}` but spawn_subagent does not"
         );
     }

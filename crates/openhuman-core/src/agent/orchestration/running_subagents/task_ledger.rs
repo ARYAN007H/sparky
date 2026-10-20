@@ -89,7 +89,6 @@ pub(crate) fn task_store_for_workspace(workspace_dir: &Path) -> Arc<dyn TaskStor
     }
 }
 
-
 /// Restart/resume reconciliation for detached sub-agents (issue #4249 / 07.2
 /// steps 2 & 4).
 ///
@@ -173,4 +172,3 @@ pub(crate) fn reconcile_orphaned_tasks_on_boot(workspace_dir: &Path) -> usize {
     );
     reconciled
 }
-

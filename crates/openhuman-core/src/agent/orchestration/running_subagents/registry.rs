@@ -40,11 +40,7 @@ pub(super) fn admit_workspace(
     }
     caller_profile(ctx).map_err(|_| WaitError::NotOwned)?;
     let context = ctx.resolved().ok_or(WaitError::NotOwned)?;
-    if context
-        .workspace_dir()
-        .map_err(|_| WaitError::NotOwned)?
-        != workspace
-    {
+    if context.workspace_dir().map_err(|_| WaitError::NotOwned)? != workspace {
         return Err(WaitError::NotOwned);
     }
     Ok(())

@@ -256,13 +256,7 @@ fn every_pack_declares_the_tools_it_is_named_for() {
                 "read_workflow_resource",
             ],
         ),
-        (
-            "documents",
-            &[
-                "generate_document",
-                "generate_presentation",
-            ],
-        ),
+        ("documents", &["generate_document", "generate_presentation"]),
         (
             "system",
             &[

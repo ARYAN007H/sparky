@@ -320,7 +320,10 @@ fn retired_specialist_aliases_are_not_packed() {
         "analyze_image",
     ] {
         assert_eq!(registry::pack_for_tool(alias), None, "{alias}");
-        assert!(!registry::all_packed_tool_names().contains(&alias), "{alias}");
+        assert!(
+            !registry::all_packed_tool_names().contains(&alias),
+            "{alias}"
+        );
     }
 }
 

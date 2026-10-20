@@ -154,10 +154,7 @@ fn skill_sections_name_the_hand_off_this_session_can_call() {
     // A packed route needs `use_skill` on the belt. A session filtered down to
     // neither the delegate nor `use_skill` cannot reach the specialist at all,
     // and naming a call it cannot make is the bug, not the fix.
-    let no_use_skill: HashSet<String> = ["file_read"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let no_use_skill: HashSet<String> = ["file_read"].iter().map(|s| s.to_string()).collect();
     ctx.visible_tool_names = &no_use_skill;
     assert_eq!(
         hand_off_route(&ctx, "image_agent"),

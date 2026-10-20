@@ -25,7 +25,11 @@ fn visible_tool_names(def: &AgentDefinition) -> HashSet<String> {
     };
     visible.extend(def.extra_tools.iter().cloned());
 
-    if def.subagents.iter().any(|entry| matches!(entry, SubagentEntry::AgentId(_))) {
+    if def
+        .subagents
+        .iter()
+        .any(|entry| matches!(entry, SubagentEntry::AgentId(_)))
+    {
         visible.insert("spawn_subagent".to_string());
     }
     visible

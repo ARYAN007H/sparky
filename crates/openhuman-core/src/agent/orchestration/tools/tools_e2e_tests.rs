@@ -140,7 +140,10 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
         terminal.status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
     );
-    assert_eq!(terminal.output.as_deref(), Some("spawn-subagent-child-answer"));
+    assert_eq!(
+        terminal.output.as_deref(),
+        Some("spawn-subagent-child-answer")
+    );
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
@@ -229,7 +232,10 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         )
         .await
         .expect("the asynchronous spawn request is accepted");
-    assert!(!accepted.is_error, "child failure is delivered asynchronously");
+    assert!(
+        !accepted.is_error,
+        "child failure is delivered asynchronously"
+    );
 
     let failure = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
@@ -253,12 +259,10 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
     const STUB_CANARY: &str = "unexecuted-tool-call-stub-canary";
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
-    let provider = Arc::new(ScriptedModel::new(vec![
-        (
-            STUB_CANARY,
-            r#"{"tool_calls":[{"type":"function","function":{"name":"missing","arguments":"{}"}}]}"#,
-        ),
-    ]));
+    let provider = Arc::new(ScriptedModel::new(vec![(
+        STUB_CANARY,
+        r#"{"tool_calls":[{"type":"function","function":{"name":"missing","arguments":"{}"}}]}"#,
+    )]));
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
     parent.on_progress = Some(progress_tx);
@@ -302,7 +306,10 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
     .expect("the completion guard projects the stub to the parent");
     assert!(provider.saw(STUB_CANARY));
     assert!(completed.0.contains("tool_calls"), "{}", completed.0);
-    assert!(completed.1.is_some(), "a stub is incomplete, not successful");
+    assert!(
+        completed.1.is_some(),
+        "a stub is incomplete, not successful"
+    );
 }
 
 struct FailingModel;
@@ -501,10 +508,10 @@ impl ChatModel<()> for LoopingToolModel {
     }
 }
 
-#[path = "tools_e2e_driver_tests.rs"]
-mod driver_tests;
 #[path = "tools_e2e_driver_reuse_tests.rs"]
 mod driver_reuse_tests;
+#[path = "tools_e2e_driver_tests.rs"]
+mod driver_tests;
 #[path = "tools_e2e_profile_cancel_tests.rs"]
 mod profile_cancel_tests;
 

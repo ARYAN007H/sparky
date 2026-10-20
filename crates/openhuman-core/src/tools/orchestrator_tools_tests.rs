@@ -55,9 +55,7 @@ fn agent_id_allowlist_entries_do_not_synthesize_model_facing_dispatch_tools() {
     );
     let subagent_tools: Vec<_> = spawn
         .iter()
-        .filter(|tool| {
-            tool.name().contains("subagent") || tool.name().starts_with("delegate_")
-        })
+        .filter(|tool| tool.name().contains("subagent") || tool.name().starts_with("delegate_"))
         .map(|tool| tool.name())
         .collect();
     assert_eq!(subagent_tools, ["spawn_subagent"]);
