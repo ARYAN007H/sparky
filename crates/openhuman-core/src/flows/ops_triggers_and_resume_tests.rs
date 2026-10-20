@@ -268,7 +268,13 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
         "the flow remains enabled during the edit"
     );
     assert_eq!(
-        updated.value.graph["nodes"][0]["config"]["inputs"]["team"], "platform",
+        updated.value.graph["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|node| node["kind"] == "trigger")
+            .expect("schedule trigger exists")["config"]["inputs"]["team"],
+        "platform",
         "the input edit must be persisted for this rebind regression"
     );
 
