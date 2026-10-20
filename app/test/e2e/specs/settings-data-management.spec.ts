@@ -56,7 +56,14 @@ describe('Settings - Data Management', function () {
     const workspacePath = workspace.result?.result?.path;
     expect(typeof workspacePath).toBe('string');
     expect(workspace.result?.result?.exists).toBe(true);
-    expect(workspacePath).toContain(`${path.sep}users${path.sep}${USER_ID}${path.sep}workspace`);
+    const authBeforeReset = await callOpenhumanRpc('openhuman.auth_get_state', {});
+    expect(authBeforeReset.ok).toBe(true);
+    expect(authBeforeReset.result?.result?.userId).toBe(USER_ID);
+    expect(process.env.OPENHUMAN_WORKSPACE).toBeTruthy();
+    const isolatedWorkspace = path.resolve(process.env.OPENHUMAN_WORKSPACE as string);
+    const workspaceRelativePath = path.relative(isolatedWorkspace, workspacePath);
+    expect(workspaceRelativePath.startsWith('..')).toBe(false);
+    expect(path.isAbsolute(workspaceRelativePath)).toBe(false);
     const sentinelPath = path.join(workspacePath, 'settings-data-management-sentinel.txt');
     fs.writeFileSync(sentinelPath, 'user-scoped clear-data sentinel', { flag: 'wx' });
     expect(fs.readFileSync(sentinelPath, 'utf8')).toBe('user-scoped clear-data sentinel');
