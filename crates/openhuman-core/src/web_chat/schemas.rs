@@ -10,8 +10,8 @@ use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use super::ops::{
-    channel_web_cancel, channel_web_chat, channel_web_queue_clear, channel_web_queue_remove,
-    channel_web_queue_status,
+    channel_web_cancel, channel_web_chat_with_stored_attachments, channel_web_queue_clear,
+    channel_web_queue_remove, channel_web_queue_status,
 };
 use super::types::{
     ChatRequestMetadata, VoiceNoteReadParams, VoiceNoteStoreParams, WebCancelParams, WebChatParams,
