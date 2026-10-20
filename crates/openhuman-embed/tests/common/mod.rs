@@ -286,6 +286,7 @@ impl PointedInference {
             ChatModelEntry {
                 build: std::sync::Arc::new(build),
                 probe: None,
+                models: None,
             },
         );
     }

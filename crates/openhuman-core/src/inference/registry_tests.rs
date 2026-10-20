@@ -37,6 +37,7 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
             ))
         }),
         probe: None,
+        models: None,
     }
 }
 
