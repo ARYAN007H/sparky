@@ -47,6 +47,9 @@ pub struct QueuedPayload {
     /// Requeued placeholders inherit it from their running turn; public chat
     /// metadata never supplies or overrides this value.
     pub(crate) trusted_turn: Option<Arc<super::turn_host::TrustedAgentTurn>>,
+    /// Follow-up submissions defer their user row until the trusted runner
+    /// admits them, so transcript order follows the preceding assistant turn.
+    pub(crate) deferred_user_message: bool,
     pub(crate) stored_attachments: Option<StoredAttachmentInput>,
     pub(crate) pending_attachments: Option<PendingAttachmentInput>,
 }
@@ -60,6 +63,7 @@ impl std::fmt::Debug for QueuedPayload {
             .field("locale", &self.locale)
             .field("queued_at_ms", &self.queued_at_ms)
             .field("has_trusted_turn", &self.trusted_turn.is_some())
+            .field("deferred_user_message", &self.deferred_user_message)
             .field("has_stored_attachments", &self.stored_attachments.is_some())
             .field(
                 "has_pending_attachments",
@@ -84,6 +88,7 @@ impl RequeuePayload for QueuedPayload {
         if self.trusted_turn.is_none() {
             self.trusted_turn.clone_from(&running.trusted_turn);
         }
+        self.deferred_user_message |= running.deferred_user_message;
         if self.pending_attachments.is_none() {
             self.pending_attachments
                 .clone_from(&running.pending_attachments);

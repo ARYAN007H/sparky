@@ -83,10 +83,6 @@ pub(super) struct TurnSlot {
     /// Cross-surface lease survives TinyAgents' early `checkin` until the
     /// terminal projection has finished delivering this turn.
     pub(super) session_lease: Option<SessionLease>,
-    /// The runner removed this request from a queue and its user row has not
-    /// been persisted by the web submit path. The trusted host persists it
-    /// immediately before execution, preserving transcript order.
-    pub(super) deferred_user_message: bool,
     pub(super) fork: bool,
     pub(super) config: Option<Arc<crate::config::Config>>,
     pub(super) thread_dir: Option<std::path::PathBuf>,

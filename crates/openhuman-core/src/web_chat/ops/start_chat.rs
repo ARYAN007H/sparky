@@ -386,6 +386,7 @@ async fn start_chat_inner(
             locale,
             metadata,
             queued_at_ms,
+            deferred_user_message: mode == QueueMode::Followup,
             stored_attachments,
             pending_attachments: pending_attachments.clone(),
         },
