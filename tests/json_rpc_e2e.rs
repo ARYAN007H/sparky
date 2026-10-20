@@ -2868,7 +2868,6 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         DomainSet::full(),
         openhuman_core::tools::toolpacks::ToolGroups::none(),
         Some(config.clone()),
-        None,
     )
     .await
     .expect("initialize the isolated core context for the native host scenario");
