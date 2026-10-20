@@ -17,9 +17,15 @@
  */
 import type { ChatErrorCopyParams } from '../lib/chatErrorCopy';
 import type {
+  ArtifactKind as ArtifactKindWire,
   ChatSuggestion,
   ContentPart,
   OutboundContentPart,
+  QueueMode as QueueModeWire,
+  RunMode as RunModeWire,
+  ThreadGoal as ThreadGoalWire,
+  TodoItem as TodoItemWire,
+  TurnCitation as TurnCitationWire,
   WebChannelEvent,
   WebGuardrailPayload,
   WebGuardrailReason,
@@ -31,6 +37,9 @@ import type {
 } from './chatWire.generated';
 
 export type { ContentPart, OutboundContentPart, WebChannelEvent };
+export type QueueMode = QueueModeWire;
+export type RunMode = RunModeWire;
+export type ArtifactKind = ArtifactKindWire;
 
 type Tag = WebChannelEvent['event'];
 type Variant<K extends Tag> = Extract<WebChannelEvent, { event: K }>;
@@ -73,15 +82,8 @@ export type QueueItemPayload = NoNull<WebQueueItemPayload>;
 /** One follow-up suggestion chip. */
 export type ChatSuggestionWire = NoNull<ChatSuggestion>;
 
-/** A memory citation on `chat_done` / `chat_segment` (open JSON in the schema). */
-export interface ChatCitation {
-  id: string;
-  key: string;
-  namespace?: string;
-  score?: number;
-  timestamp: string;
-  snippet: string;
-}
+/** A memory citation on `chat_done` / `chat_segment`, from the core record schema. */
+export type ChatCitation = TurnCitationWire;
 
 // ── Turn lifecycle ───────────────────────────────────────────────────────────
 
@@ -203,22 +205,11 @@ export type ChatPlanReviewRequestEvent = Omit<
 
 // ── Thread state (goal, todos, run mode) ─────────────────────────────────────
 
-/** One item of a thread's todo list (open JSON in the schema). */
-export interface ChatThreadTodoItem {
-  content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  reason?: string;
-}
+/** One item of a thread's todo list, from the TinyAgents owner schema. */
+export type ChatThreadTodoItem = TodoItemWire;
 
-/** The thread's durable goal (open JSON in the schema; owned by tinyagents-graph). */
-export interface ThreadGoal {
-  goal_id: string;
-  objective: string;
-  status: 'active' | 'paused' | 'budget_limited' | 'complete';
-  token_budget?: number;
-  tokens_used: number;
-  time_used_seconds: number;
-}
+/** The thread's durable goal, from the TinyAgents owner schema. */
+export type ThreadGoal = ThreadGoalWire;
 
 export type ChatThreadTodosChangedEvent = Omit<WireEvent<'thread_todos_changed'>, 'todos'> & {
   todos: ChatThreadTodoItem[];
@@ -227,8 +218,6 @@ export type ChatThreadGoalUpdatedEvent = Omit<WireEvent<'thread_goal_updated'>, 
   goal: ThreadGoal;
 };
 export type ChatThreadGoalClearedEvent = WireEvent<'thread_goal_cleared'>;
-export type RunMode = 'plan' | 'build';
-
 /** `run_mode_changed` as consumers see it; the wire carries the mode in `message`. */
 export type ChatRunModeChangedEvent = Omit<WireEvent<'run_mode_changed'>, 'message'> & {
   mode: RunMode;
@@ -245,8 +234,6 @@ export function decodeRunModeChanged(
 // ── Artifacts ────────────────────────────────────────────────────────────────
 // The artifact payload rides the wire event's open `args` JSON; chatService
 // validates it and flattens it into these views.
-
-export type ArtifactKind = 'presentation' | 'document' | 'image' | 'video' | 'other';
 
 interface ArtifactBase {
   thread_id: string;
