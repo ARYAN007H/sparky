@@ -232,7 +232,7 @@ pub(super) fn try_create_cloud_slug_chat_model(
         config,
         true,
         egress,
-        extensions.as_deref(),
+        extensions.as_ref(),
     )
 }
 
@@ -284,7 +284,7 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
         config,
         native_tool_calling,
         egress,
-        extensions.as_deref(),
+        extensions.as_ref(),
     )
 }
 

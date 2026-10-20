@@ -392,7 +392,7 @@ pub(super) fn unresolved_chat_model_error(
     egress: &EgressLedger,
 ) -> anyhow::Error {
     let extensions = crate::core::runtime::CoreContext::current_extensions();
-    unresolved_chat_model_error_for(role, provider, config, egress, extensions.as_deref())
+    unresolved_chat_model_error_for(role, provider, config, egress, extensions.as_ref())
 }
 
 pub(super) fn unresolved_chat_model_error_for(

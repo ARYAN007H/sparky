@@ -24,7 +24,7 @@ pub(crate) fn model_limits_request(
     config: &Config,
 ) -> Option<DiscoveryRequest> {
     let extensions = crate::core::runtime::CoreContext::current_extensions();
-    model_limits_request_for(role, provider, model, config, extensions.as_deref())
+    model_limits_request_for(role, provider, model, config, extensions.as_ref())
 }
 
 pub(crate) fn model_limits_request_for(
