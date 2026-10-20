@@ -78,6 +78,10 @@ async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
         )
         .expect("detached child context")
         .with_cancellation(detached_data.cancellation.clone());
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(&live.data.dispatch_ctx());
+    let jobs_before = jobs.list().len();
     let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -94,7 +98,14 @@ async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
         .expect("spawn tool executes");
 
     assert!(result.is_error, "failed steer must be reported, got: {}", result.output());
+    assert!(
+        result.output().contains("refusing to start a duplicate")
+            && result.output().contains("existing-running-task"),
+        "the refusal identifies the failed reusable task: {}",
+        result.output()
+    );
     assert!(provider.seen.lock().is_empty(), "no second child model run may start");
+    assert_eq!(jobs.list().len(), jobs_before, "no second child job is admitted");
     let after = store
         .load()
         .expect("session store remains readable")

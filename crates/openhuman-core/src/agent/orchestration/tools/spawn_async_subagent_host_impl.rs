@@ -248,6 +248,10 @@ impl SpawnAsyncSubagentTool {
                                 definition.id,
                                 err
                             );
+                            return Ok(ToolResult::error(format!(
+                                "spawn_async_subagent: failed to continue existing running task '{}' in session '{}'; refusing to start a duplicate: {err}",
+                                running_task_id, session.subagent_session_id
+                            )));
                         }
                     }
                 }
