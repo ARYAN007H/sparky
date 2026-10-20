@@ -63,7 +63,7 @@ async fn goal_get_reads_back_a_stored_goal() {
         .await
         .unwrap()
         .workspace_dir;
-    tinyagents_graph::goals::store::set(
+    tinyagents_harness_tools::goals::store::set(
         &crate::storage::sessions::stores_or_ephemeral(&dir).kv,
         "thread-goal-live",
         "ship it",
