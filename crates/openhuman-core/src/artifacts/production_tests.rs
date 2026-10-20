@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use tiny_artifacts::FileStore;
 use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore};
 
 use super::*;

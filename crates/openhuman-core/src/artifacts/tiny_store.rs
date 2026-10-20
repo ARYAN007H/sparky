@@ -298,20 +298,6 @@ impl LegacyUiBridge {
             .map_err(anyhow::Error::msg)?;
         Ok(())
     }
-}
-
-fn same_file(a: &Path, b: &Path) -> bool {
-    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
-        (Ok(a), Ok(b)) => a == b,
-        _ => false,
-    }
-}
-
-#[async_trait]
-impl ArtifactObserver for LegacyUiBridge {
-    async fn on_event(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
-        self.ctx.enter(self.on_event_in_scope(event)).await
-    }
 
     async fn on_event_in_scope(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
         let id = &event.record.id;
@@ -347,6 +333,21 @@ impl ArtifactObserver for LegacyUiBridge {
             ArtifactEventKind::Pending => Ok(()),
         }
     }
+}
+
+fn same_file(a: &Path, b: &Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
+#[async_trait]
+impl ArtifactObserver for LegacyUiBridge {
+    async fn on_event(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
+        self.ctx.enter(self.on_event_in_scope(event)).await
+    }
+
 }
 
 /// The folders a file version may point into: its own kept copy, the agent's
@@ -450,7 +451,15 @@ fn build_artifacts_service(
     publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
 ) -> (Artifacts, Option<Arc<dyn FileStore>>) {
     let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
-    build_artifacts_service_with_scope(workspace_dir, files, action_dir, chat, scoped, publisher)
+    build_artifacts_service_with_scope(
+        workspace_dir,
+        files,
+        action_dir,
+        chat,
+        ctx,
+        scoped,
+        publisher,
+    )
 }
 
 pub(super) fn build_artifacts_service_with_scope(
@@ -458,6 +467,7 @@ pub(super) fn build_artifacts_service_with_scope(
     files: FileRoots,
     action_dir: Option<&Path>,
     chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
     scoped: Option<crate::storage::ScopedStorage>,
     publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
 ) -> (Artifacts, Option<Arc<dyn FileStore>>) {
@@ -465,12 +475,12 @@ pub(super) fn build_artifacts_service_with_scope(
     let file_store = scoped
         .as_ref()
         .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(scoped)) as Arc<dyn FileStore>);
-    let mut records: Arc<dyn ArtifactStore> = Arc::new(match scoped.as_ref() {
-        Some(scoped) => {
-            super::version_documents::DocumentArtifactStore::over(workspace_dir, scoped)
-        }
-        None => UnavailableArtifactStore,
-    });
+    let mut records: Arc<dyn ArtifactStore> = match scoped.as_ref() {
+        Some(scoped) => Arc::new(
+            super::version_documents::DocumentArtifactStore::over(workspace_dir, scoped),
+        ),
+        None => Arc::new(UnavailableArtifactStore),
+    };
     if let Some(store) = file_store.as_ref() {
         records = Arc::new(LegacyFileImportStore {
             records,

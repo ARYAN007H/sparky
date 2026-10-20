@@ -141,6 +141,7 @@ impl Production {
             files.clone(),
             None,
             chat,
+            ctx,
             scoped,
             None,
         );

@@ -212,6 +212,7 @@ async fn missing_artifact_storage_binding_does_not_fall_back_to_ambient_records(
             FileRoots::new(&files),
             None,
             None,
+            &context_b,
             None,
             None,
         );
