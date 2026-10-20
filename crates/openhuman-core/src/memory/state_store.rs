@@ -113,26 +113,26 @@ pub(crate) fn import_all(
     let queue_kv = StateKv::on_backend(backend, &queue_scope, OWNER, NS)?;
     let mut names = Vec::new();
     if let Ok(entries) = std::fs::read_dir(workspace_dir.join("memory")) {
-      for entry in entries.flatten() {
-        let path = entry.path();
-        let Some(name) = path
-            .file_name()
-            .and_then(|f| f.to_str())
-            .and_then(|f| f.strip_suffix(".json"))
-            .map(str::to_owned)
-        else {
-            continue;
-        };
-        if !path.is_file() {
-            continue;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(name) = path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .and_then(|f| f.strip_suffix(".json"))
+                .map(str::to_owned)
+            else {
+                continue;
+            };
+            if !path.is_file() {
+                continue;
+            }
+            if name == "pending_deletions" {
+                queue_kv.import_file_strict(&name, &path)?;
+            } else {
+                local_kv.import_file_strict(&name, &path)?;
+            }
+            names.push(name);
         }
-        if name == "pending_deletions" {
-            queue_kv.import_file_strict(&name, &path)?;
-        } else {
-            local_kv.import_file_strict(&name, &path)?;
-        }
-        names.push(name);
-      }
     }
     // Earlier versions imported this queue with the rest of memory state in
     // `local`. Move any such durable entries to the workspace-owned scope
