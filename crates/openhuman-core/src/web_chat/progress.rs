@@ -165,13 +165,13 @@ impl ProgressProjection {
         self.started.elapsed().as_millis() as u64
     }
 
-    fn ledger(&self) -> Ledger<'_> {
-        Ledger {
-            config: &self.config,
-            client_id: &self.ids.client_id,
-            thread_id: &self.ids.thread_id,
-            request_id: &self.ids.request_id,
-        }
+    fn ledger(&self) -> Option<Ledger> {
+        super::progress_ledger::for_turn(
+            &self.config.workspace_dir,
+            &self.ids.client_id,
+            &self.ids.thread_id,
+            &self.ids.request_id,
+        )
     }
 
     /// One liveness beat; nothing before `TurnStarted` or after the parent
@@ -213,7 +213,9 @@ impl ProgressProjection {
         match event {
             AgentProgress::TurnStarted => {
                 self.turn_active = true;
-                self.ledger().turn_started();
+                if let Some(ledger) = self.ledger() {
+                    ledger.turn_started().await;
+                }
                 self.surface.output(map::inference_start()).await;
             }
             AgentProgress::IterationStarted {
@@ -246,8 +248,11 @@ impl ProgressProjection {
                 // activity.
                 self.flush_interim_narration(iteration).await;
                 self.parent_tool_count += 1;
-                self.ledger()
-                    .tool_started(&call_id, &tool_name, iteration, self.parent_tool_count);
+                if let Some(ledger) = self.ledger() {
+                    ledger
+                        .tool_started(&call_id, &tool_name, iteration, self.parent_tool_count)
+                        .await;
+                }
                 log::debug!(
                     "[web_channel][bridge] tool_call round={iteration} tool={tool_name} call_id={call_id} request_id={}",
                     self.ids.request_id
@@ -310,7 +315,7 @@ impl ProgressProjection {
                     .await;
             }
             AgentProgress::TurnCompleted { iterations, .. } => {
-                self.on_turn_completed(iterations);
+                self.on_turn_completed(iterations).await;
             }
             AgentProgress::TurnCostUpdated {
                 model,
@@ -320,13 +325,17 @@ impl ProgressProjection {
                 cached_input_tokens,
                 total_usd,
             } => {
-                self.ledger().cost(
-                    &model,
-                    input_tokens,
-                    output_tokens,
-                    cached_input_tokens,
-                    total_usd,
-                );
+                if let Some(ledger) = self.ledger() {
+                    ledger
+                        .cost(
+                            &model,
+                            input_tokens,
+                            output_tokens,
+                            cached_input_tokens,
+                            total_usd,
+                        )
+                        .await;
+                }
                 log::debug!(
                     "[web_channel] turn cost update model={model} iter={iteration} in={input_tokens} out={output_tokens} cached_in={cached_input_tokens} total_usd={total_usd:.4} thread_id={}",
                     self.ids.thread_id
@@ -384,15 +393,19 @@ impl ProgressProjection {
             ..
         } = &event
         {
-            self.ledger().tool_completed(json!({
-                "callId": call_id,
-                "toolName": tool_name,
-                "success": success,
-                "outputChars": output_chars,
-                "elapsedMs": elapsed_ms,
-                "iteration": iteration,
-                "failure": failure.as_ref().and_then(|f| serde_json::to_value(f).ok()),
-            }));
+            if let Some(ledger) = self.ledger() {
+                ledger
+                    .tool_completed(json!({
+                        "callId": call_id,
+                        "toolName": tool_name,
+                        "success": success,
+                        "outputChars": output_chars,
+                        "elapsedMs": elapsed_ms,
+                        "iteration": iteration,
+                        "failure": failure.as_ref().and_then(|f| serde_json::to_value(f).ok()),
+                    }))
+                    .await;
+            }
             log::debug!(
                 "[web_channel][bridge] tool_result round={iteration} tool={tool_name} call_id={call_id} success={success} elapsed_ms={elapsed_ms} has_structured={} request_id={}",
                 structured.is_some(),
@@ -404,7 +417,7 @@ impl ProgressProjection {
         }
     }
 
-    fn on_turn_completed(&mut self, iterations: u32) {
+    async fn on_turn_completed(&mut self, iterations: u32) {
         self.parent_completed = true;
         let snapshot = self.timing.snapshot(self.elapsed_ms());
         log::info!(
@@ -418,7 +431,9 @@ impl ProgressProjection {
         self.timing_snapshot = Some(snapshot);
         // The turn is done: stop liveness beats.
         self.turn_active = false;
-        self.ledger().turn_completed(iterations);
+        if let Some(ledger) = self.ledger() {
+            ledger.turn_completed(iterations).await;
+        }
         log::debug!(
             "[web_channel] turn completed after {iterations} iteration(s) thread_id={} request_id={} speak_reply={:?} source={:?} session_id={:?}",
             self.ids.thread_id,
@@ -437,7 +452,9 @@ impl ProgressProjection {
             mirror.finish();
         }
         if !self.parent_completed {
-            self.ledger().turn_interrupted(self.events_seen);
+            if let Some(ledger) = self.ledger() {
+                ledger.turn_interrupted(self.events_seen).await;
+            }
         }
         if let Some(mut collector) = self.span_collector.take() {
             collector.finish(unix_epoch_ms());
@@ -456,7 +473,11 @@ impl ProgressProjection {
                 None
             };
             if let Some((trace_ctx, observations)) = journal_export {
-                let run_telemetry = self.ledger().read_telemetry();
+                let run_telemetry = if let Some(ledger) = self.ledger() {
+                    ledger.read_telemetry().await
+                } else {
+                    None
+                };
                 crate::agent::progress_tracing::export_run_trace_from_journal(
                     &self.config,
                     &trace_ctx,
