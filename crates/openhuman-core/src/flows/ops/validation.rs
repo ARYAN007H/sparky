@@ -58,7 +58,7 @@ pub(crate) async fn validate_and_migrate_graph(
     ctx: &DispatchCtx,
     config: &Config,
     graph: Value,
-) -> Result<WorkflowGraph, String> {
+) -> Result<Value, String> {
     let report = validate_over_bus(ctx, config, graph).await?;
     if let Some(error) = report
         .errors
@@ -70,7 +70,6 @@ pub(crate) async fn validate_and_migrate_graph(
     report
         .graph
         .ok_or_else(|| "TinyFlows validation returned no graph".to_string())
-        .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))
 }
 
 /// Host-aware compatibility errors for graphs that can reference saved flows.
@@ -91,9 +90,8 @@ pub(crate) async fn config_aware_engine_compatibility_errors(
 pub(super) async fn ensure_config_aware_engine_compatible(
     ctx: &DispatchCtx,
     config: &Config,
-    graph: &WorkflowGraph,
+    graph: &Value,
 ) -> Result<(), String> {
-    let graph = serde_json::to_value(graph).map_err(|error| error.to_string())?;
     match config_aware_engine_compatibility_errors(ctx, config, graph)
         .await?
         .into_iter()
@@ -110,8 +108,8 @@ pub async fn flows_validate(
     ctx: &DispatchCtx,
     config: &Config,
     graph_json: Value,
-) -> Outcome<tinyflows_catalog::FlowValidation> {
-    use tinyflows_catalog::{FlowValidation, FlowValidationError};
+) -> Outcome<tinyflows_bus::copilot::FlowValidation> {
+    use tinyflows_bus::copilot::{FlowValidation, FlowValidationError};
     let report = match validate_over_bus(ctx, config, graph_json).await {
         Ok(report) => report,
         Err(error) => {
@@ -153,13 +151,8 @@ pub async fn flows_validate(
             "flow validation failed",
         );
     }
-    let _graph: WorkflowGraph = match report
-        .graph
-        .ok_or_else(|| "TinyFlows validation returned no graph".to_string())
-        .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))
-    {
-        Ok(graph) => graph,
-        Err(error) => {
+    if report.graph.is_none() {
+        let error = "TinyFlows validation returned no graph".to_string();
             return Outcome::single_log(
                 FlowValidation {
                     valid: false,
@@ -174,8 +167,7 @@ pub async fn flows_validate(
                 },
                 "flow validation failed",
             );
-        }
-    };
+    }
     let warnings = report.warnings;
     Outcome::single_log(
         FlowValidation {
@@ -195,8 +187,7 @@ pub async fn flows_import(
     config: &Config,
     graph_json: Value,
     format: Option<String>,
-) -> Result<Outcome<tinyflows_catalog::FlowImport>, String> {
-    use tinyflows_catalog::FlowImport;
+) -> Result<Outcome<FlowImport>, String> {
     let requested = format
         .as_deref()
         .unwrap_or("auto")
@@ -224,15 +215,21 @@ pub async fn flows_import(
     if let Some(error) = imported.errors.first() {
         return Err(error.message.clone());
     }
-    let graph: WorkflowGraph = imported
+    let graph: Value = imported
         .graph
-        .ok_or_else(|| "TinyFlows import returned no graph".to_string())
-        .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))?;
+        .ok_or_else(|| "TinyFlows import returned no graph".to_string())?;
     let warnings = imported.warnings;
     Ok(Outcome::single_log(
         FlowImport { graph, warnings },
         "flow imported",
     ))
+}
+
+/// OpenHuman RPC projection of the module's imported graph and warnings.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq)]
+pub struct FlowImport {
+    pub graph: Value,
+    pub warnings: Vec<String>,
 }
 
 /// Compatibility diagnostics for a portable Copilot graph payload.

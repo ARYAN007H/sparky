@@ -1,5 +1,4 @@
 use super::*;
-use tinyflows_catalog::graph_policy::{enforce_side_effect_approval, trigger_is_automatic};
 
 /// Publishes a [`DomainEvent::FlowChanged`](crate::core::events::DomainEvent::FlowChanged)
 /// so an open Workflows list/canvas refetches (bridged to a `flow:changed`
@@ -81,31 +80,16 @@ pub(crate) async fn flows_create_with_context(
 
     // Rule 1: automatic triggers create DISABLED — the user must arm them
     // explicitly.
-    let enabled = !trigger_is_automatic(&graph);
-
-    // Rule 2: any outbound side-effect node forces require_approval, no
-    // matter what the caller asked for.
-    let (effective_require_approval, side_effect_forced) =
-        enforce_side_effect_approval(&graph, require_approval);
-    if side_effect_forced {
-        tracing::info!(
-            target: "flows",
-            %name,
-            "[flows] flows_create: forcing require_approval=true — graph contains outbound \
-             side-effect node(s) (tool_call / http_request / code)"
-        );
-    }
-
     tracing::debug!(
         target: "flows",
         %name,
-        node_count = graph.nodes.len(),
-        enabled,
-        require_approval = effective_require_approval,
+        node_count = graph.get("nodes").and_then(Value::as_array).map_or(0, Vec::len),
+        require_approval,
         "[flows] flows_create: persisting new flow"
     );
-    let flow = store::create_flow(config, name, graph, effective_require_approval, enabled)
+    let result = store::create_flow(config, name, graph, require_approval)
         .map_err(|e| e.to_string())?;
+    let flow = result.workflow;
 
     if flow.enabled {
         tracing::debug!(target: "flows", flow_id = %flow.id, "[flows] flows_create: flow is enabled — binding automatic-dispatch trigger");
@@ -113,7 +97,7 @@ pub(crate) async fn flows_create_with_context(
     }
 
     let mut logs = vec!["flow created".to_string()];
-    if !enabled {
+    if result.born_disabled {
         let trigger_label = match bus::describe_trigger(config, &flow) {
             Ok(details) => details
                 .kind
@@ -128,7 +112,7 @@ pub(crate) async fn flows_create_with_context(
              Enable it explicitly (flows_set_enabled) when you are ready for it to fire."
         ));
     }
-    if side_effect_forced {
+    if result.approval_forced {
         logs.push(
             "require_approval forced to true because the graph contains outbound side-effect \
              nodes (tool_call / http_request / code)."
@@ -182,7 +166,7 @@ pub async fn flows_get(config: &Config, id: &str) -> Result<Outcome<Flow>, Strin
 /// Returns `Ok(None)` when no flow with that id exists (the resolver turns that
 /// into a capability error naming the missing id), and `Err` only on a store
 /// failure. Kept sync because the underlying [`store::get_flow`] is sync.
-pub fn load_flow_graph(config: &Config, id: &str) -> Result<Option<WorkflowGraph>, String> {
+pub fn load_flow_graph(config: &Config, id: &str) -> Result<Option<Value>, String> {
     tracing::debug!(target: "flows", flow_id = %id, "[flows] load_flow_graph: loading saved flow graph for sub_workflow resolver");
     let graph = store::get_flow(config, id)
         .map_err(|e| e.to_string())?
@@ -203,7 +187,7 @@ pub(crate) async fn load_engine_compatible_flow_graph(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: &str,
-) -> Result<Option<WorkflowGraph>, String> {
+    ) -> Result<Option<Value>, String> {
     let graph = load_flow_graph(config, id)?;
     if let Some(graph) = graph.as_ref() {
         ensure_config_aware_engine_compatible(ctx, config, graph)

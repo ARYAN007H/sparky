@@ -10,6 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tinyflows_bus::catalog::{
     self, DeleteWorkflowResult, FlowUpdateError as BusUpdateError, GetRevisionRequest,
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
+    PutWorkflowResult,
     SetEnabledRequest, Workflow, WorkflowRevision,
 };
 use tinyflows_bus::catalog::{
@@ -48,9 +49,9 @@ where
     serde_json::from_value(serde_json::to_value(value)?).map_err(Into::into)
 }
 
-fn put_result(response: PutWorkflowResponse) -> Result<Flow> {
+fn put_result(response: PutWorkflowResponse) -> Result<PutWorkflowResult> {
     match response {
-        PutWorkflowResponse::Ok(result) => flow_from_wire(result.workflow),
+        PutWorkflowResponse::Ok(result) => Ok(result),
         PutWorkflowResponse::Error(error) => Err(anyhow!(match error {
             BusUpdateError::NotFound { message }
             | BusUpdateError::VersionConflict { message, .. }
@@ -69,7 +70,7 @@ pub fn insert_duplicate_flow(config: &Config, source: &Flow, new_name: String) -
     };
     let response: PutWorkflowResponse =
         call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
-    put_result(response)
+    put_result(response).map(|result| result.workflow)
 }
 
 /// Create a workflow through the module's Catalog contract.
@@ -78,8 +79,7 @@ pub fn create_flow(
     name: String,
     graph: Value,
     require_approval: bool,
-    enabled: bool,
-) -> Result<Flow> {
+) -> Result<PutWorkflowResult> {
     let storage = super::catalog_storage::register_blocking(config)?;
     let request = PutWorkflowRequest::Create {
         storage,
@@ -89,12 +89,7 @@ pub fn create_flow(
     };
     let response: PutWorkflowResponse =
         call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
-    let flow = put_result(response)?;
-    if !enabled && flow.enabled {
-        set_enabled(config, &flow.id, false)
-    } else {
-        Ok(flow)
-    }
+    put_result(response)
 }
 
 /// Read one workflow by id.
@@ -176,7 +171,7 @@ pub fn update_flow_graph(
     _enabled_override: Option<bool>,
     force_disarm_if_automatic: bool,
     expected_updated_at: Option<&str>,
-) -> std::result::Result<Flow, BusUpdateError> {
+) -> std::result::Result<PutWorkflowResult, BusUpdateError> {
     let storage = super::catalog_storage::register_blocking(config).map_err(|error| {
         BusUpdateError::Store {
             message: error.to_string(),
@@ -198,7 +193,7 @@ pub fn update_flow_graph(
             }
         })?;
     match response {
-        PutWorkflowResponse::Ok(result) => Ok(result.workflow),
+        PutWorkflowResponse::Ok(result) => Ok(result),
         PutWorkflowResponse::Error(error) => Err(error),
     }
 }
