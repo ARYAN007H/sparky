@@ -1,15 +1,12 @@
-//! Literal wire fixtures for the running-sub-agent surface: status labels the
-//! roster/UI read, the durable ledger's JSONL record shape, the durable→status
-//! mapping `wait` falls back to, and the cancel `outcome` strings. These pin
-//! the bytes; they must not change when the generic logic moves upstream.
+//! Literal fixtures for the surviving sub-agent roster and cancellation
+//! surfaces, plus the durable task-ledger record shape.
 
 use super::*;
 use crate::agent::orchestration::running_subagents::roster::snapshot_for_parent;
 use crate::agent::orchestration::running_subagents::task_ledger::task_store_for_workspace;
 use tinyagents_harness::ids::TaskId;
 use tinyagents_orchestration::subagent::FinishedOutcome;
-use tinyagents_orchestration::subagent::WaitError;
-use tinyagents_tasks::{OrchestrationTaskKind, OrchestrationTaskResult, OrchestrationTaskSpec};
+use tinyagents_tasks::{OrchestrationTaskKind, OrchestrationTaskSpec};
 
 fn spec(id: &str, parent: &str, session: Option<&str>) -> OrchestrationTaskSpec {
     let mut spec = OrchestrationTaskSpec::new(
