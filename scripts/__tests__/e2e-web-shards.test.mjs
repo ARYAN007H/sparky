@@ -11,6 +11,10 @@ const repoRoot = path.resolve(
   "../..",
 );
 const script = path.join(repoRoot, "app/scripts/e2e-web-shards.sh");
+const selectionResolver = path.join(
+  repoRoot,
+  "app/scripts/e2e-web-selection.mjs",
+);
 fs.mkdirSync(path.join(repoRoot, "target"), { recursive: true });
 const fixtureRoot = fs.mkdtempSync(
   path.join(repoRoot, "target", "e2e-web-shards-test-"),
@@ -62,6 +66,54 @@ test("invalid lane is rejected", () => {
   const result = run(["--lane=5", "--lanes=4", "--list"]);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /exceeds lane count/);
+});
+
+test("strict and diagnostic selections partition discovered specs fail-closed", () => {
+  const requiredResult = spawnSync(
+    "node",
+    [selectionResolver, "--selection=required", "--json"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(requiredResult.status, 0, requiredResult.stderr);
+  const required = JSON.parse(requiredResult.stdout);
+
+  const diagnosticResult = spawnSync(
+    "node",
+    [selectionResolver, "--selection=diagnostic", "--json"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(diagnosticResult.status, 0, diagnosticResult.stderr);
+  const diagnostic = JSON.parse(diagnosticResult.stdout);
+
+  const allResult = spawnSync(
+    "node",
+    [selectionResolver, "--selection=all", "--json"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(allResult.status, 0, allResult.stderr);
+  const all = JSON.parse(allResult.stdout);
+
+  assert.equal(diagnostic.files.length, 1);
+  assert.match(diagnostic.files[0], /aui-tool-result-elements\.spec\.ts$/);
+  assert.ok(required.files.includes("test/playwright/specs/agent-review.spec.ts"));
+  assert.ok(required.files.includes("test/playwright/specs/command-palette-keyboard.spec.ts"));
+  assert.ok(required.files.includes("test/playwright/specs/skills-search-install.spec.ts"));
+  assert.ok(required.files.includes("test/playwright/specs/webhooks-tunnel-flow.spec.ts"));
+  assert.deepEqual(
+    [...required.files, ...diagnostic.files].sort(),
+    all.files,
+    "required and diagnostic must be disjoint and cover all discovered specs",
+  );
+  assert.equal(new Set([...required.files, ...diagnostic.files]).size, all.files.length);
+});
+
+test("diagnostic runtime rejects changed baseline bytes and stale owner metadata", () => {
+  const result = spawnSync("node", [selectionResolver, "--selection=diagnostic"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /aui-tool-result-elements\.spec\.ts/);
 });
 
 test("CI Full requires every Playwright lane and manual workflow shares the artifact scheduler", () => {
