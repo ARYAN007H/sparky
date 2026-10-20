@@ -17,33 +17,24 @@ fn openai_entry(id: &str, slug: &str) -> CloudProviderCreds {
 }
 
 #[test]
-fn build_remote_provider_managed_uses_backend_id_and_default_model() {
-    // Default config → chat workload resolves to the managed backend →
-    // the managed default model.
+fn managed_route_without_a_registered_provider_fails_closed() {
     let config = test_config();
-    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .expect("remote provider should build");
-    assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
-    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-flash");
-    assert!(!resolved.used_local, "used_local is always false");
+    let error = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
+        .expect_err("bare core has no hosted model source");
+    assert!(error.to_string().contains("BACKEND_UNAVAILABLE"));
 }
 
 #[test]
-fn build_remote_provider_managed_follows_the_pinned_default_model() {
-    // Triage's managed arm runs on the managed default model: a retired tier
-    // slug in `default_model` is not a pin, a catalog id is.
+fn managed_route_does_not_invent_a_model_when_provider_policy_is_absent() {
     let mut config = test_config();
     config.default_model = Some("reasoning-v1".to_string());
-    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .expect("remote provider should build");
-    assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
-    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-flash");
+    let error = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
+        .expect_err("retired pin is not a concrete model source");
+    assert!(error.to_string().contains("BACKEND_UNAVAILABLE"));
 
     config.default_model = Some("openrouter/deepseek/deepseek-v4-pro".to_string());
-    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .expect("remote provider should build");
-    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-pro");
-    assert!(!resolved.used_local);
+    assert!(build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
+        .is_err(), "an explicit pin still needs a registered hosted constructor");
 }
 
 #[test]
@@ -53,11 +44,8 @@ fn build_remote_provider_falls_back_to_managed_when_chat_local() {
     // never errors because Ollama is down.
     let mut config = test_config();
     config.chat_provider = Some("ollama:llama3.2:3b".to_string());
-    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-        .expect("remote provider should build");
-    assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
-    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-flash");
-    assert!(!resolved.used_local, "triage never goes local");
+    assert!(build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
+        .is_err(), "triage's managed fallback requires an installed provider");
 }
 
 #[test]
@@ -72,19 +60,10 @@ fn build_remote_provider_forces_managed_for_local_cli_routes() {
     ] {
         let mut config = test_config();
         config.chat_provider = Some(route.to_string());
-        let resolved =
-            build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
-                .unwrap_or_else(|e| panic!("route {route} should build, got {e}"));
-        assert_eq!(
-            resolved.provider_name, INFERENCE_BACKEND_ID,
-            "route {route} must force managed backend"
+        assert!(
+            build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).is_err(),
+            "route {route} must fail closed without hosted construction policy"
         );
-        assert_eq!(
-            resolved.model,
-            "openrouter/deepseek/deepseek-v4-flash",
-            "route {route} must run the managed default"
-        );
-        assert!(!resolved.used_local);
     }
 }
 
