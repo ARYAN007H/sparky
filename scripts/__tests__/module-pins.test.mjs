@@ -239,7 +239,7 @@ function sourceParityFixture() {
       testPath: "src/tests.rs",
     },
   };
-  const canonicalTree = execFileSync("git", ["ls-tree", "-r", "--full-tree", releaseCommit], { cwd: root, encoding: "utf8" })
+  const canonicalTree = execFileSync("git", ["ls-tree", "-r", "--full-tree", "-z", releaseCommit], { cwd: root, encoding: "utf8" })
     .split("\0").filter(Boolean).map((entry) => {
       const match = entry.match(/^([0-7]{6}) (blob|commit) ([0-9a-f]{40})\t([\s\S]+)$/);
       if (match[4] === "src/tests.rs") return null;
