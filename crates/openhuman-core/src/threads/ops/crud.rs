@@ -492,6 +492,10 @@ async fn message_append_with_config(
             }
         }
     }
+    let expected_id = request.message.id.clone();
+    let expected_sender = request.message.sender.clone();
+    let expected_content = request.message.content.clone();
+    let expected_attachments = request.message.attachments.clone();
     let message = conversations::blocking::append_message(
         ctx.clone(),
         persistence_dir.to_path_buf(),
@@ -500,6 +504,24 @@ async fn message_append_with_config(
     )
     .await
     .map_err(|err| ThreadsError::from_thread_scoped_store_error(&request.thread_id, err))?;
+    let message = message_to_record(message);
+    if message.id != expected_id
+        || message.sender != expected_sender
+        || message.content != expected_content
+        || message.attachments != expected_attachments
+    {
+        if let Some(staged_refs) = &staged_refs {
+            let _ = crate::threads::attachments::discard_staged_parts(
+                ctx,
+                &request.thread_id,
+                staged_refs,
+            )
+            .await;
+        }
+        return Err(ThreadsError::Message(
+            "message ID conflicts with an existing persisted row".into(),
+        ));
+    }
     if let Some(staged_refs) = staged_refs {
         crate::threads::attachments::consume_staged_parts(
             ctx,
@@ -511,7 +533,7 @@ async fn message_append_with_config(
         .map_err(ThreadsError::Message)?;
     }
     Ok(envelope(
-        message_to_record(message),
+        message,
         Some(counts([("num_messages", 1)])),
         None,
     ))
