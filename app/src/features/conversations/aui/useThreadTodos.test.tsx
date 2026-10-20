@@ -51,7 +51,11 @@ describe('useLoadThreadTodos', () => {
   });
 
   it('preserves the core reason for a cancelled todo item', async () => {
-    const cancelled = { content: 'Review the migration', status: 'cancelled' as const, reason: null };
+    const cancelled = {
+      content: 'Review the migration',
+      status: 'cancelled' as const,
+      reason: null,
+    };
     vi.mocked(threadApi.getTodos).mockResolvedValue([cancelled]);
     const { store, wrapper } = setup();
     renderHook(() => useLoadThreadTodos('t1'), { wrapper });
