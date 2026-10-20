@@ -107,20 +107,20 @@
 #![cfg(not(coverage))]
 
 use async_trait::async_trait;
-use openhuman_core::integrations::composio::tools::ComposioListToolsTool;
 use openhuman_core::agent::harness::ParentExecutionContext;
 use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};
 use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
 use openhuman_core::config::AgentConfig;
+use openhuman_core::integrations::composio::tools::ComposioListToolsTool;
 use parking_lot::Mutex;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tinyagents_definition::{ModelSpec, PromptSource, ToolScope};
-use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 use tinyinference_llm::message::AssistantMessage;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
+use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 use tinytools_agent::dialect::ToolCallFormat;
 
 /// Worker stack for this guard: 3 MiB, deliberately far below the production
