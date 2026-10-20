@@ -418,4 +418,3 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
     });
     Some(chat.map(|chat| (chat, effective_model)))
 }
-use crate::config::ops::resolve_primary_cloud_provider_string;

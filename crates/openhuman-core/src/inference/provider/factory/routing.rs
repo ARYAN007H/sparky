@@ -257,4 +257,3 @@ pub(super) fn route_has_usable_credentials(resolved: &str, config: &Config) -> b
 #[cfg(test)]
 #[path = "routing_tests.rs"]
 mod routing_tests;
-use crate::config::ops::resolve_primary_cloud_provider_string;
