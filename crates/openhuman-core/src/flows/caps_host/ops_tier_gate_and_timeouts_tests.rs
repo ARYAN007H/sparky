@@ -1,5 +1,11 @@
+use super::super::tier::{escalated_origin_for_nested_harness, escalated_origin_for_prompt};
 use super::*;
+use crate::config::schema::tools::HttpRequestConfig;
+use crate::security::GateDecision;
+use serde_json::json;
+use std::sync::Arc;
 use tinyagents_harness::tool::response_fields_from_schema;
+use tinybox_bus::CommandClass;
 use tinytools::status::POLICY_BLOCKED_MARKER;
 
 /// The tier gate an `http_request` (Network-class) node calls: BLOCKED under

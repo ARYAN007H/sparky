@@ -320,8 +320,8 @@ async fn claude_agent_flow_readiness_does_not_require_an_openhuman_session() {
     }
 }
 
-#[test]
-fn harness_readiness_uses_runtime_role_and_node_override() {
+#[tokio::test]
+async fn harness_readiness_uses_runtime_role_and_node_override() {
     let tmp = TempDir::new().unwrap();
     let mut config = test_config(&tmp);
     config.default_model = None;
@@ -334,15 +334,15 @@ fn harness_readiness_uses_runtime_role_and_node_override() {
         "edges": [{"from_node": "t", "to_node": "a"}]
     }));
     let node = g.nodes.iter_mut().find(|n| n.id == "a").unwrap();
-    assert_eq!(agent_node_role(&config, node), "coding");
+    assert_eq!(agent_node_role(&config, node).await, "coding");
     config.default_model = Some("hint:reasoning".into());
-    assert_eq!(agent_node_role(&config, node), "reasoning");
+    assert_eq!(agent_node_role(&config, node).await, "reasoning");
     node.config["model"] = json!("chat-v1");
-    assert_eq!(agent_node_role(&config, node), "chat");
+    assert_eq!(agent_node_role(&config, node).await, "chat");
     node.config["model"] = json!("hint:summarization");
-    assert_eq!(agent_node_role(&config, node), "summarization");
+    assert_eq!(agent_node_role(&config, node).await, "summarization");
     node.config["model"] = json!("custom-model-id");
-    assert_eq!(agent_node_role(&config, node), "chat");
+    assert_eq!(agent_node_role(&config, node).await, "chat");
 }
 
 #[tokio::test]
