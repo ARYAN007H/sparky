@@ -56,13 +56,11 @@ pub(crate) async fn flows_create_with_context(
         require_approval,
         "[flows] flows_create: persisting new flow"
     );
-    let result = store::create_flow(config, name, graph, require_approval)
+    let result = store::create_flow(config, name, graph, require_approval, true)
         .map_err(|e| e.to_string())?;
-    let tinyflows_bus::catalog::PutWorkflowResult {
-        workflow: flow,
-        born_disabled,
-        approval_forced,
-    } = result;
+    let flow = result.workflow;
+    let born_disabled = result.born_disabled;
+    let approval_forced = result.approval_forced;
 
     if flow.enabled {
         tracing::debug!(target: "flows", flow_id = %flow.id, "[flows] flows_create: flow is enabled — binding automatic-dispatch trigger");

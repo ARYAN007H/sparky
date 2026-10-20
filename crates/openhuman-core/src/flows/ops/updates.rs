@@ -184,7 +184,7 @@ async fn flows_update_inner(
     // happened store-side against a fresh read, so this is purely for the
     // info log / result message wording below and can't desync from what
     // was actually persisted.
-    let tinyflows_bus::catalog::PutWorkflowResult {
+    let store::FlowWriteResult {
         workflow: updated,
         born_disabled: should_disarm,
         approval_forced,

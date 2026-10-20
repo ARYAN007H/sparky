@@ -196,6 +196,7 @@ fn a_saved_flow_reaches_the_catalogue_with_its_real_id() {
         "Weekly Report".to_string(),
         graph,
         false,
+        true,
     )
     .expect("flow saves")
     .workflow;
@@ -226,7 +227,7 @@ fn entries_are_sorted_by_name_so_the_prompt_prefix_is_stable() {
             serde_json::json!({ "trigger_kind": "manual" }),
         )]);
     for name in ["Zebra", "Alpha", "Mango"] {
-        super::super::store::create_flow(&config, name.to_string(), graph.clone(), false)
+        super::super::store::create_flow(&config, name.to_string(), graph.clone(), false, true)
             .expect("flow saves");
     }
     let names: Vec<String> = flow_entries(&config).into_iter().map(|e| e.name).collect();

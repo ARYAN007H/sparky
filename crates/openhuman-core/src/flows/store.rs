@@ -7,15 +7,33 @@
 
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
+use std::ops::Deref;
 use tinyflows_bus::catalog::{
     self, DeleteWorkflowResult, FlowUpdateError as BusUpdateError, GetRevisionRequest,
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
-    PutWorkflowResult, SetEnabledRequest, Workflow as Flow, WorkflowRevision,
+    SetEnabledRequest, Workflow as Flow, WorkflowRevision,
 };
 use tinyflows_bus::catalog::{FlowSuggestion, SuggestionStatus};
 
 use crate::config::Config;
 use crate::modules::tinyflows as module;
+
+/// Host projection of a Catalog write, retaining owner policy flags while
+/// dereferencing to the persisted workflow for existing internal callers.
+#[derive(Clone, Debug)]
+pub(crate) struct FlowWriteResult {
+    pub(crate) workflow: Flow,
+    pub(crate) born_disabled: bool,
+    pub(crate) approval_forced: bool,
+}
+
+impl Deref for FlowWriteResult {
+    type Target = Flow;
+
+    fn deref(&self) -> &Self::Target {
+        &self.workflow
+    }
+}
 
 pub(crate) fn call_catalog<T, A>(config: &Config, member: &'static str, args: A) -> Result<T>
 where
@@ -42,9 +60,13 @@ where
     serde_json::from_value(serde_json::to_value(value)?).map_err(Into::into)
 }
 
-fn put_result(response: PutWorkflowResponse) -> Result<PutWorkflowResult> {
+fn put_result(response: PutWorkflowResponse) -> Result<FlowWriteResult> {
     match response {
-        PutWorkflowResponse::Ok(result) => Ok(result),
+        PutWorkflowResponse::Ok(result) => Ok(FlowWriteResult {
+            workflow: result.workflow,
+            born_disabled: result.born_disabled,
+            approval_forced: result.approval_forced,
+        }),
         PutWorkflowResponse::Error(error) => Err(anyhow!(match error {
             BusUpdateError::NotFound { message }
             | BusUpdateError::VersionConflict { message, .. }
@@ -72,7 +94,8 @@ pub fn create_flow(
     name: String,
     graph: Value,
     require_approval: bool,
-) -> Result<PutWorkflowResult> {
+    enabled: bool,
+) -> Result<FlowWriteResult> {
     let storage = super::catalog_storage::register_blocking(config)?;
     let request = PutWorkflowRequest::Create {
         storage,
@@ -82,7 +105,13 @@ pub fn create_flow(
     };
     let response: PutWorkflowResponse =
         call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
-    put_result(response)
+    let mut result = put_result(response)?;
+    // This is an explicit caller choice to start disabled. Catalog still
+    // authoritatively prevents automatic triggers from being born enabled.
+    if !enabled && result.workflow.enabled {
+        result.workflow = set_enabled(config, &result.workflow.id, false)?;
+    }
+    Ok(result)
 }
 
 /// Read one workflow by id.
@@ -160,7 +189,7 @@ pub fn update_flow_graph(
     _enabled_override: Option<bool>,
     force_disarm_if_automatic: bool,
     expected_updated_at: Option<&str>,
-) -> std::result::Result<PutWorkflowResult, BusUpdateError> {
+) -> std::result::Result<FlowWriteResult, BusUpdateError> {
     let storage = super::catalog_storage::register_blocking(config).map_err(|error| {
         BusUpdateError::Store {
             message: error.to_string(),
@@ -182,7 +211,11 @@ pub fn update_flow_graph(
             }
         })?;
     match response {
-        PutWorkflowResponse::Ok(result) => Ok(result),
+        PutWorkflowResponse::Ok(result) => Ok(FlowWriteResult {
+            workflow: result.workflow,
+            born_disabled: result.born_disabled,
+            approval_forced: result.approval_forced,
+        }),
         PutWorkflowResponse::Error(error) => Err(error),
     }
 }
