@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use tiny_artifacts::{
-    ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactStore, Author, Content,
+    ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactStore, ArtifactVersion, Author, Content,
+    FileRef, FileStore,
 };
 
 use super::*;
@@ -29,6 +30,41 @@ async fn seeded(
     );
     store.upsert(&record).await.unwrap();
     store
+}
+
+#[tokio::test]
+async fn legacy_path_refs_are_guarded_and_imported_as_opaque_file_keys() {
+    let dir = tempfile::tempdir().unwrap();
+    let source_root = dir.path().join("Files");
+    let records_root = dir.path().join("records");
+    let blobs_root = dir.path().join("blobs");
+    std::fs::create_dir_all(&source_root).unwrap();
+    let source = source_root.join("report.txt");
+    std::fs::write(&source, "legacy bytes").unwrap();
+
+    let records = Arc::new(tiny_artifacts::FsArtifactStore::new(&records_root));
+    let base: Arc<dyn ArtifactStore> = records.clone();
+    let blobs: Arc<dyn FileStore> = Arc::new(tiny_artifacts::FsFileStore::new(&blobs_root));
+    let importing = LegacyFileImportStore {
+        records: base,
+        files: blobs.clone(),
+        roots: guarded_roots(vec![source_root]),
+    };
+    let mut version = ArtifactVersion::new(1, source.display().to_string(), ArtifactAuthor::Agent, "agent", 1);
+    version.file = Some(FileRef {
+        key: source.display().to_string(),
+        size_bytes: 12,
+        media_type: None,
+    });
+    let mut record = ArtifactRecord::pending("a-legacy", "Report", ArtifactKind::File, 1);
+    record.versions.push(version);
+    records.upsert(&record).await.unwrap();
+
+    let imported = importing.get("a-legacy").await.unwrap().unwrap();
+    let file = imported.latest().unwrap().file.as_ref().unwrap();
+    assert_eq!(file.key, "artifacts/files/a-legacy/v1.txt");
+    assert_ne!(file.key, source.display().to_string());
+    assert_eq!(blobs.read(&file.key).await.unwrap(), b"legacy bytes");
 }
 
 #[tokio::test]
