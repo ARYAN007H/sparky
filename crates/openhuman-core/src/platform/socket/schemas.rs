@@ -225,7 +225,7 @@ fn connect_entry() -> ControllerEntry {
     ControllerEntry::bound(BoundRegisteredController::after_gate(
         schemas("connect"),
         gate_manager,
-        parse_connect,
+        |_params| Err::<ConnectParams, String>("mutated parser rejection".to_owned()),
         run_connect,
     ))
 }
