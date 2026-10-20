@@ -386,6 +386,10 @@ async fn invoke_driver_tool_with_request(
     )?;
     let request_host = host_request.clone();
     let request_task_id = task_id.clone();
+    let callback_lifecycle_key = continuation
+        .as_ref()
+        .map(|(key, _)| key.clone())
+        .unwrap_or_else(|| SubagentTaskKey::from_context(parent, task_id.clone(), None));
     let request_continuation = continuation;
     let dispatcher = DriverSubAgentTool::new(
         "spawn_subagent",
@@ -459,7 +463,7 @@ async fn invoke_driver_tool_with_request(
             ToolTimeout::Unbounded,
         );
     if let Some(completion) = completion {
-        let callback_task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
+        let callback_task_key = callback_lifecycle_key;
         let host_outcome = Arc::clone(&bundle.host_outcome);
         let failures = Arc::clone(&bundle.failures);
         let persistence = Arc::clone(&bundle.persistence);
