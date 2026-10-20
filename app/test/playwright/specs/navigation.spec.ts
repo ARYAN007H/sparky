@@ -6,6 +6,7 @@ interface RouteEntry {
   route: string;
   /** Expected hash after any redirect. Defaults to the route itself. */
   expectedHash?: string;
+  readyTestId?: string;
 }
 
 // Phase 2/3/6 IA revamp routes.
@@ -20,6 +21,9 @@ const ROUTES: RouteEntry[] = [
   { route: '/human' }, // first-class route (dedicated mascot stage)
   { route: '/chat' },
   { route: '/connections' },
+  { route: '/flows' },
+  { route: '/connections?tab=brain', readyTestId: 'memory-page' },
+  { route: '/brain', expectedHash: '/connections?tab=brain', readyTestId: 'memory-page' },
   { route: '/skills', expectedHash: '/connections' }, // back-compat redirect
   { route: '/activity', expectedHash: '/settings/account' }, // back-compat redirect
   { route: '/intelligence', expectedHash: '/settings/account' }, // back-compat redirect
@@ -41,9 +45,14 @@ test.describe('Navigation', () => {
       await waitForAppReady(page);
 
       // After redirects the hash should begin with the final landing path.
+      const escapedLanding = landing.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       await expect
         .poll(async () => page.evaluate(() => window.location.hash))
-        .toMatch(new RegExp(`^#${landing.replace('/', '\\/')}`));
+        .toMatch(new RegExp(`^#${escapedLanding}`));
+      if (expectedHash?.includes('?')) {
+        await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(`#${expectedHash}`);
+      }
+      if (readyTestId) await expect(page.getByTestId(readyTestId)).toBeVisible();
       await expect
         .poll(async () => {
           const text = await page.locator('#root').innerText();
