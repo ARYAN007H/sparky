@@ -182,7 +182,6 @@ impl ProfileCapabilities {
                         &config.browser,
                         &config.http_request,
                         &config.action_dir,
-                        &config.agents,
                         config,
                     )
                 });
