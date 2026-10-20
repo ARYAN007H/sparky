@@ -7,17 +7,15 @@
 //! guesses from a sender, recent message, or equality between provider and row
 //! identifiers.
 
-use std::sync::Arc;
-
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Scope};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 use tinychannels_bus::{ChannelRef, ConversationRef};
 
 use crate::core::runtime::{DispatchCtx, Tenant, tenant::tenant_key};
-use crate::storage::{self, StorageBackend, documents::Repo};
+use crate::storage::{self, documents::Repo};
 
 const DOMAIN: &str = "threads::channel_projection";
 const COLLECTION: &str = "thread_channel_messages";
