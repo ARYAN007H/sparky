@@ -21,7 +21,7 @@
 //!   ([`crate::storage::scope_for_agent`]), the one its cron calls resolve to.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 
@@ -93,76 +93,180 @@ pub(super) fn marked(
     Ok(claimed.unwrap_or(Outcome::InProgress))
 }
 
-/// `(found, written, skipped)` of a `tinyflows-import` report; problems are logged by
-/// id only, never with record content.
-fn counts(domain: &str, report: &tinyflows_import::ImportReport) -> (usize, usize, usize) {
-    for problem in report.problems() {
-        tracing::warn!(
-            target: "openhuman::storage_import",
-            domain,
-            problem = %problem,
-            "[storage::import] a legacy record was skipped"
-        );
-    }
-    let found = report
-        .kinds()
-        .map(|(_, tally)| tally.written + tally.existing + tally.invalid)
-        .sum();
-    let skipped = report.kinds().map(|(_, tally)| tally.invalid).sum();
-    (found, report.total_written(), skipped)
+#[cfg(feature = "flows")]
+#[derive(Debug, Default, Clone, Copy)]
+struct ImportTotals {
+    found: usize,
+    written: usize,
+    skipped: usize,
 }
 
-/// Copies the flow catalog and its checkpoints from `<workspace>/flows` into
-/// `backend` under `scope`.
+#[cfg(feature = "flows")]
+impl ImportTotals {
+    fn add(&mut self, response: tinyflows_bus::catalog::ImportLegacyBatchResponse) {
+        for tally in response.tallies {
+            let written = tally.written as usize;
+            let existing = tally.existing as usize;
+            let invalid = tally.invalid as usize;
+            self.found += written + existing + invalid;
+            self.written += written;
+            self.skipped += invalid;
+        }
+        for problem in response.problems {
+            tracing::warn!(
+                target: "openhuman::storage_import",
+                domain = FLOWS_DOMAIN,
+                kind = ?problem.kind,
+                identity = ?problem.identity,
+                message = %problem.message,
+                "[storage::import] a legacy flow record was skipped"
+            );
+        }
+    }
+}
+
+#[cfg(feature = "flows")]
+async fn send_legacy_batch(
+    proxy: &tinybus::Proxy,
+    storage: &tinyflows_bus::catalog::CatalogStorage,
+    records: Vec<tinyflows_bus::catalog::LegacyImportRecord>,
+) -> Result<()> {
+    use tinyflows_bus::catalog::{self, ImportLegacyBatchRequest, ImportLegacyBatchResponse};
+
+    let request = ImportLegacyBatchRequest {
+        storage: storage.clone(),
+        records,
+    };
+    let response: ImportLegacyBatchResponse = proxy
+        .call(catalog::members::IMPORT_LEGACY_BATCH, &(request,))
+        .await
+        .context("send a bounded legacy flow batch to TinyFlows")?;
+    Ok(())
+}
+
+#[cfg(feature = "flows")]
+fn flow_sources_present(dir: &Path) -> bool {
+    ["flows.db", "checkpoints.db", "checkpoints", "drafts"]
+        .iter()
+        .any(|name| dir.join(name).exists())
+}
+
+/// Copies flow catalog and checkpoint records through TinyFlows' bounded
+/// Catalog import contract. Every callback batch completes before the next is
+/// read, and the marker is written only after both readers finish cleanly.
 ///
 /// # Errors
 ///
-/// When a legacy file exists but cannot be read, or the backend fails. The
-/// legacy files are untouched either way.
+/// When a legacy file cannot be read, a bus call fails, or the owner store
+/// rejects the batch. The legacy files are untouched either way.
 #[cfg(feature = "flows")]
 pub fn import_flows(
     backend: &Arc<dyn StorageBackend>,
     scope: &Scope,
     config: &Config,
 ) -> Result<Outcome> {
-    use tinyflows_drivers::{catalog::FlowCatalogDocuments, DriverCheckpointer};
+    let backend_for_migration = Arc::clone(backend);
+    let scope_for_migration = scope.clone();
+    let config_for_migration = config.clone();
+    crate::storage::block_on_anyhow(async move {
+        migrate_catalog_storage(
+            &backend_for_migration,
+            &config_for_migration,
+            &scope_for_migration,
+        )
+        .await
+    })?;
+    record_catalog_migration(config, scope, Ok(()));
+    import_flows_after_migration(backend, scope, config)
+}
+
+#[cfg(feature = "flows")]
+fn import_flows_after_migration(
+    backend: &Arc<dyn StorageBackend>,
+    scope: &Scope,
+    config: &Config,
+) -> Result<Outcome> {
+    use tinyflows_bus::catalog::{
+        self, ImportLegacyBatchRequest, ImportLegacyBatchResponse, LegacyImportRecord,
+    };
 
     let dir = config.workspace_dir.join("flows");
     marked(backend, &config.workspace_dir, FLOWS_DOMAIN, || {
-        let present = ["flows.db", "checkpoints.db", "drafts"]
-            .iter()
-            .any(|name| dir.join(name).exists());
-        if !present {
+        if !flow_sources_present(&dir) {
             return Ok(None);
         }
-        let scoped = backend
-            .for_scope(scope)
-            .map_err(|error| anyhow!("open the storage scope: {error}"))?;
-        let docs = Arc::clone(scoped.documents());
-        let catalog = FlowCatalogDocuments::new(Arc::clone(&docs));
-        let checkpointer = DriverCheckpointer::<serde_json::Value>::new(docs);
-        let (catalog_report, checkpoint_report) = crate::storage::block_on_anyhow({
-            let dir = dir.clone();
-            async move {
-                let catalog_report = tinyflows_import::import_flow_catalog(&dir, &catalog)
-                    .await
-                    .context("import the flow catalog")?;
-                let checkpoint_report = tinyflows_import::import_sqlite_checkpoints(
-                    &dir.join("checkpoints.db"),
-                    &checkpointer,
-                )
+        let backend = Arc::clone(backend);
+        let scope = scope.clone();
+        let config = config.clone();
+        let totals = Arc::new(Mutex::new(ImportTotals::default()));
+        crate::storage::block_on_anyhow(async move {
+            let registration = crate::flows::catalog_storage::register_backend_scope(
+                &config,
+                backend,
+                scope,
+            )
+            .await
+            .map_err(anyhow::Error::msg)?;
+            let storage = registration.storage();
+            let proxy = crate::modules::tinyflows::catalog_proxy_for_migration(&config)
                 .await
-                .context("import the flow checkpoints")?;
-                Ok((catalog_report, checkpoint_report))
-            }
-        })?;
-        let (found_a, written_a, skipped_a) = counts(FLOWS_DOMAIN, &catalog_report);
-        let (found_b, written_b, skipped_b) = counts(FLOWS_DOMAIN, &checkpoint_report);
-        Ok(Some((
-            found_a + found_b,
-            written_a + written_b,
-            skipped_a + skipped_b,
-        )))
+                .map_err(anyhow::Error::msg)?;
+
+            let flow_proxy = proxy.clone();
+            let flow_storage = storage.clone();
+            let flow_totals = Arc::clone(&totals);
+            tinyflows_import::read_legacy_flow_catalog(&dir, move |records| {
+                let proxy = flow_proxy.clone();
+                let storage = flow_storage.clone();
+                let totals = Arc::clone(&flow_totals);
+                async move {
+                    let request = ImportLegacyBatchRequest { storage, records };
+                    let response: ImportLegacyBatchResponse = proxy
+                        .call(catalog::members::IMPORT_LEGACY_BATCH, &(request,))
+                        .await
+                        .context("send a bounded legacy flow batch to TinyFlows")?;
+                    totals
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .add(response);
+                    Ok(())
+                }
+            })
+            .await
+            .context("read the legacy flow catalog")?;
+
+            let checkpoint_proxy = proxy.clone();
+            let checkpoint_storage = storage.clone();
+            let checkpoint_totals = Arc::clone(&totals);
+            tinyflows_import::read_legacy_checkpoint_batches(
+                &dir.join("checkpoints.db"),
+                &dir.join("checkpoints"),
+                move |records: Vec<LegacyImportRecord>| {
+                    let proxy = checkpoint_proxy.clone();
+                    let storage = checkpoint_storage.clone();
+                    let totals = Arc::clone(&checkpoint_totals);
+                    async move {
+                        let request = ImportLegacyBatchRequest { storage, records };
+                        let response: ImportLegacyBatchResponse = proxy
+                            .call(catalog::members::IMPORT_LEGACY_BATCH, &(request,))
+                            .await
+                            .context("send a bounded checkpoint batch to TinyFlows")?;
+                        totals
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .add(response);
+                        Ok(())
+                    }
+                },
+            )
+            .await
+            .context("read the legacy flow checkpoints")?;
+
+            let totals = *totals
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            Ok(Some((totals.found, totals.written, totals.skipped)))
+        })
     })
 }
 
