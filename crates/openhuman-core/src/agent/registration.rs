@@ -39,8 +39,6 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         // durable `subagent_session_id` (preferred) or transient `task_id`.
         Box::new(ListSubagentsTool::new()),
         Box::new(SteerSubagentTool::new()),
-        Box::new(harness_tools::WaitTool::new()),
-        Box::new(harness_tools::WaitLoopTool::new()),
         Box::new(WaitSubagentTool::new()),
         Box::new(CloseSubagentTool::new()),
         Box::new(ContinueSubagentTool::new()),
