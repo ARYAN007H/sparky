@@ -6,12 +6,48 @@ use crate::core::all::{
 use serde_json::json;
 
 #[test]
-fn legacy_voice_catalog_keeps_its_handler_and_example_contracts() {
-    crate::core::all::verify_parameter_contracts(
-        &all_voice_registered_controllers(),
-        &crate::voice::parameter_contracts(),
-    )
-    .unwrap();
+fn legacy_voice_catalog_keeps_its_handlers_and_schema_fixtures() {
+    use super::handlers::*;
+    use crate::core::all::ControllerHandler;
+
+    let controllers: Vec<_> = all_voice_registered_controllers()
+        .into_iter()
+        .filter(|controller| !controller.schema.method_name().contains(".live_"))
+        .collect();
+    let expected: [(&str, ControllerHandler); 11] = [
+        ("voice.status", handle_voice_status),
+        ("voice.transcribe", handle_voice_transcribe),
+        ("voice.transcribe_bytes", handle_voice_transcribe_bytes),
+        ("voice.tts", handle_voice_tts),
+        ("voice.reply_synthesize", handle_voice_reply_synthesize),
+        ("voice.stt_dispatch", handle_voice_stt_dispatch),
+        ("voice.tts_dispatch", handle_voice_tts_dispatch),
+        ("voice.set_providers", handle_voice_set_providers),
+        (
+            "voice.update_provider_settings",
+            handle_voice_update_provider_settings,
+        ),
+        ("voice.list_models", handle_voice_list_models),
+        ("voice.test_provider", handle_voice_test_provider),
+    ];
+    assert_eq!(controllers.len(), expected.len());
+    for (controller, (method, handler)) in controllers.iter().zip(expected) {
+        assert_eq!(controller.schema.method_name(), method);
+        assert!(std::ptr::fn_addr_eq(controller.handler, handler));
+    }
+
+    let contracts = crate::voice::parameter_contracts();
+    for contract in contracts
+        .iter()
+        .filter(|contract| !contract.method.contains(".live_"))
+    {
+        let controller = controllers
+            .iter()
+            .find(|controller| controller.schema.method_name() == contract.method)
+            .expect("each core voice schema fixture has a legacy row");
+        crate::core::all::verify_parameter_schema(&controller.schema, contract)
+            .expect("legacy core voice schema retains its independent fixture");
+    }
 }
 
 #[test]

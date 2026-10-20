@@ -1,20 +1,20 @@
 use super::*;
 
-/// Independent wire fixtures paired with the handler's real pure decoder.
-/// The runner checks parameter acceptance and never invokes the handler.
+/// Independently authored wire fixtures checked against an actual bound
+/// registry entry. The runner validates examples with the production schema
+/// and decoder, but never invokes its gate or business handler.
 #[derive(Clone)]
 pub(crate) struct ControllerParamContract {
     pub method: &'static str,
     pub required: &'static [&'static str],
-    pub handler: ControllerHandler,
+    pub optional: &'static [&'static str],
     pub examples: Vec<Value>,
-    pub parse: fn(Map<String, Value>) -> Result<(), String>,
 }
 
 /// Select controllers independently of the fixture table, so a missing fixture
 /// cannot silently remove its own controller from the check.
 pub(crate) fn verify_parameter_contracts(
-    controllers: &[RegisteredController],
+    controllers: &[ControllerEntry],
     contracts: &[ControllerParamContract],
 ) -> Result<(), String> {
     use std::collections::BTreeMap;
@@ -45,12 +45,19 @@ pub(crate) fn verify_parameter_contracts(
     }
     for (method, controller) in registered {
         let contract = by_method[method.as_str()];
-        if !std::ptr::fn_addr_eq(controller.handler, contract.handler) {
-            return Err(format!(
-                "{method} handler identity differs from its contract"
-            ));
+        if !controller.is_bound() {
+            return Err(format!("{method} registry entry is legacy, not bound"));
         }
         verify_parameter_schema(&controller.schema, contract)?;
+        for (index, example) in contract.examples.iter().enumerate() {
+            let params = example
+                .as_object()
+                .expect("schema verifier rejects non-object examples")
+                .clone();
+            controller.decode_params(params).map_err(|error| {
+                format!("{method} bound decoder rejects example {index}: {error}")
+            })?;
+        }
     }
     Ok(())
 }
@@ -69,6 +76,7 @@ pub(crate) fn verify_parameter_schema(
         return Err(format!("{} has no description", contract.method));
     }
     required_input_contract(schema, contract.required)?;
+    optional_input_contract(schema, contract.optional)?;
     if contract.examples.is_empty() {
         return Err(format!("{} has no examples", contract.method));
     }
@@ -82,14 +90,28 @@ pub(crate) fn verify_parameter_schema(
                 contract.method
             )
         })?;
-        (contract.parse)(params.clone()).map_err(|error| {
-            format!(
-                "{} pure parser rejects example {index}: {error}",
-                contract.method
-            )
-        })?;
     }
     Ok(())
+}
+
+pub(crate) fn optional_input_contract(
+    schema: &ControllerSchema,
+    optional: &[&str],
+) -> Result<(), String> {
+    let actual: Vec<_> = schema
+        .inputs
+        .iter()
+        .filter(|field| !field.required)
+        .map(|field| field.name)
+        .collect();
+    if actual == optional {
+        Ok(())
+    } else {
+        Err(format!(
+            "{}.{} optional inputs mismatch: expected {optional:?}, got {actual:?}",
+            schema.namespace, schema.function
+        ))
+    }
 }
 
 /// Owner-authored namespace literals must cover the complete family, including
