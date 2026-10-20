@@ -52,7 +52,10 @@ pub(crate) async fn flows_create_with_context(
     tracing::debug!(
         target: "flows",
         %name,
-        node_count = graph.get("nodes").and_then(Value::as_array).map_or(0, Vec::len),
+        node_count = graph
+            .get("nodes")
+            .and_then(serde_json::Value::as_array)
+            .map_or(0, Vec::len),
         require_approval,
         "[flows] flows_create: persisting new flow"
     );
