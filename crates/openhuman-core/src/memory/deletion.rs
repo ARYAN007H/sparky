@@ -29,19 +29,6 @@ use tinymemory_api::Error;
 
 const STATE: &str = "pending_deletions";
 
-fn quarantine_corrupt_legacy_file(workspace_dir: &Path) {
-    let legacy = super::state_store::legacy_path(workspace_dir, STATE);
-    let Ok(bytes) = std::fs::read(&legacy) else {
-        return;
-    };
-    if serde_json::from_slice::<Vec<PendingDeletion>>(&bytes).is_ok() {
-        return;
-    }
-    if let Err(error) = std::fs::rename(&legacy, legacy.with_extension("json.corrupt")) {
-        tracing::warn!(%error, "[memory:deletion] could not set the file aside");
-    }
-}
-
 /// The workspace's `pending_deletions` state value: a stop mid-write never
 /// loses the queue (the storage write is atomic). An unparsable value is
 /// dropped and logged; an empty queue removes the value.
@@ -53,13 +40,9 @@ impl ListStore<PendingDeletion> for FileStore {
     fn load(&self) -> std::result::Result<Vec<PendingDeletion>, StoreError> {
         match super::state_store::load(&self.workspace_dir, STATE) {
             Ok(Some(pending)) => Ok(pending),
-            Ok(None) => {
-                quarantine_corrupt_legacy_file(&self.workspace_dir);
-                Ok(Vec::new())
-            }
+            Ok(None) => Ok(Vec::new()),
             Err(error) => {
                 tracing::warn!(%error, "[memory:deletion] reading pending deletions failed");
-                quarantine_corrupt_legacy_file(&self.workspace_dir);
                 Err(StoreError("pending deletions unreadable".into()))
             }
         }

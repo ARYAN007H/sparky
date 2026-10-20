@@ -171,7 +171,7 @@ async fn a_credit_paused_import_waits_for_billing_and_records_a_resume_failure()
     let mut file = ImportFile::default();
     file.state.phase = ImportPhase::Error;
     file.paused_for_credits = true;
-    FileCheckpointStore::new(&config.workspace_dir)
+    StateKvCheckpointStore::new(&config.workspace_dir)
         .save(&file)
         .unwrap();
 
@@ -221,7 +221,7 @@ async fn resume_with_live_import_slot_does_not_claim_a_new_run() {
     bind_reference(&config);
     let mut file = ImportFile::default();
     file.state.phase = ImportPhase::Running;
-    let store = FileCheckpointStore::new(&config.workspace_dir);
+    let store = StateKvCheckpointStore::new(&config.workspace_dir);
     store.save(&file).unwrap();
     let guard = crate::memory::run_slots::reserve(
         &crate::memory::run_slots::IMPORT,
@@ -393,7 +393,7 @@ async fn a_real_legacy_document_imports_through_the_host_adapter() {
     let done = wait_for_host_import(&config).await;
     assert_eq!(done.imported, 1);
     assert_eq!(done.failed, 0);
-    let file = FileCheckpointStore::new(&config.workspace_dir).load();
+    let file = StateKvCheckpointStore::new(&config.workspace_dir).load();
     assert_eq!(
         file.checkpoint.documents.as_deref(),
         Some("host-import-doc")
@@ -416,7 +416,7 @@ async fn an_interrupted_import_resumes_through_the_host_adapter() {
     let mut interrupted = ImportFile::default();
     interrupted.state.phase = ImportPhase::Running;
     interrupted.state.total = 1;
-    FileCheckpointStore::new(&config.workspace_dir)
+    StateKvCheckpointStore::new(&config.workspace_dir)
         .save(&interrupted)
         .unwrap();
 
@@ -433,7 +433,7 @@ async fn an_interrupted_import_resumes_through_the_host_adapter() {
     let done = wait_for_host_import(&config).await;
     assert_eq!(done.imported, 1);
     assert_eq!(done.failed, 0);
-    let file = FileCheckpointStore::new(&config.workspace_dir).load();
+    let file = StateKvCheckpointStore::new(&config.workspace_dir).load();
     assert_eq!(
         file.checkpoint.documents.as_deref(),
         Some("host-resume-doc")
@@ -462,7 +462,7 @@ async fn retry_failed_reimports_a_real_legacy_row_through_the_host_adapter() {
         id: "memory_docs:host-retry-doc".to_string(),
         reason: "the prior engine refused this row".to_string(),
     });
-    FileCheckpointStore::new(&config.workspace_dir)
+    StateKvCheckpointStore::new(&config.workspace_dir)
         .save(&retry_state)
         .unwrap();
 
@@ -473,7 +473,7 @@ async fn retry_failed_reimports_a_real_legacy_row_through_the_host_adapter() {
     let done = wait_for_host_import(&config).await;
     assert_eq!(done.failed, 0);
     assert_eq!(done.imported, 1);
-    let file = FileCheckpointStore::new(&config.workspace_dir).load();
+    let file = StateKvCheckpointStore::new(&config.workspace_dir).load();
     assert!(file.failed.is_empty());
     assert!(!file.retrying);
     assert_reference_contains(&engine, "retried legacy body").await;
@@ -501,7 +501,7 @@ async fn an_interrupted_retry_resumes_its_real_legacy_row() {
         id: "memory_docs:host-retry-resume-doc".to_string(),
         reason: "the prior retry was interrupted".to_string(),
     });
-    FileCheckpointStore::new(&config.workspace_dir)
+    StateKvCheckpointStore::new(&config.workspace_dir)
         .save(&interrupted)
         .unwrap();
 

@@ -23,13 +23,9 @@ fn path(workspace_dir: &Path) -> PathBuf {
 fn read_all(workspace_dir: &Path) -> BTreeMap<String, SourceState> {
     match crate::memory::state_store::load(workspace_dir, STATE) {
         Ok(Some(state)) => state,
-        Ok(None) => {
-            quarantine_legacy_file(workspace_dir);
-            BTreeMap::new()
-        }
+        Ok(None) => BTreeMap::new(),
         Err(error) => {
             tracing::warn!(%error, "[memory:sources] reading sync state failed");
-            quarantine_legacy_file(workspace_dir);
             BTreeMap::new()
         }
     }
@@ -38,19 +34,6 @@ fn read_all(workspace_dir: &Path) -> BTreeMap<String, SourceState> {
 fn write_all(workspace_dir: &Path, all: &BTreeMap<String, SourceState>) {
     if let Err(error) = crate::memory::state_store::save(workspace_dir, STATE, all) {
         tracing::warn!(%error, "[memory:sources] writing sync state failed");
-    }
-}
-
-fn quarantine_legacy_file(workspace_dir: &Path) {
-    let file = path(workspace_dir);
-    let Ok(bytes) = std::fs::read(&file) else {
-        return;
-    };
-    if serde_json::from_slice::<BTreeMap<String, SourceState>>(&bytes).is_ok() {
-        return;
-    }
-    if let Err(error) = std::fs::rename(&file, file.with_extension("json.corrupt")) {
-        tracing::warn!(%error, "[memory:sources] could not set sync state file aside");
     }
 }
 

@@ -42,19 +42,6 @@ pub type JobQueue = QueueState;
 
 const STATE: &str = "jobs";
 
-fn quarantine_corrupt_legacy_file(workspace_dir: &Path) {
-    let legacy = path(workspace_dir);
-    let Ok(bytes) = std::fs::read(&legacy) else {
-        return;
-    };
-    if serde_json::from_slice::<QueueState>(&bytes).is_ok() {
-        return;
-    }
-    if let Err(error) = std::fs::rename(&legacy, legacy.with_extension("json.corrupt")) {
-        tracing::warn!(%error, "[memory:jobs] could not set queue file aside");
-    }
-}
-
 /// The queue file of a workspace.
 fn path(workspace_dir: &Path) -> PathBuf {
     super::super::state_store::legacy_path(workspace_dir, STATE)
@@ -69,13 +56,9 @@ impl QueueStore for FileQueueStore {
     fn load(&self) -> QueueState {
         match super::super::state_store::load(&self.workspace_dir, STATE) {
             Ok(Some(queue)) => queue,
-            Ok(None) => {
-                quarantine_corrupt_legacy_file(&self.workspace_dir);
-                QueueState::default()
-            }
+            Ok(None) => QueueState::default(),
             Err(error) => {
                 tracing::warn!(%error, "[memory:jobs] reading the queue failed");
-                quarantine_corrupt_legacy_file(&self.workspace_dir);
                 QueueState::default()
             }
         }

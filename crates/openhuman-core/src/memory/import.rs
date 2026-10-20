@@ -35,8 +35,6 @@ pub(crate) struct StateKvCheckpointStore {
 const STATE: &str = "import_state";
 
 /// Backwards-compatible name for the former file checkpoint adapter.
-pub(crate) type FileCheckpointStore = StateKvCheckpointStore;
-
 impl StateKvCheckpointStore {
     pub(crate) fn new(workspace_dir: &Path) -> Self {
         Self {
@@ -188,7 +186,7 @@ pub(crate) async fn resume_interrupted_with(
     if is_running(&config.workspace_dir) {
         return false;
     }
-    let store = FileCheckpointStore::new(&config.workspace_dir);
+    let store = StateKvCheckpointStore::new(&config.workspace_dir);
     let file = store.load();
     let plan = Importer::resume_plan(&file, billing(config), paused());
     let mode = match plan {

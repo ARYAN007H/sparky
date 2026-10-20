@@ -278,7 +278,7 @@ fn pause_import_for_credits(config: &Config) {
     let mut file = ImportFile::default();
     file.state.phase = ImportPhase::Error;
     file.paused_for_credits = true;
-    crate::memory::import::FileCheckpointStore::new(&config.workspace_dir)
+    crate::memory::import::StateKvCheckpointStore::new(&config.workspace_dir)
         .save(&file)
         .unwrap();
 }
