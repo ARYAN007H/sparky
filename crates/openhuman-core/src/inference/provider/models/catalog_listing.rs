@@ -171,9 +171,10 @@ pub async fn list_configured_models_from_config(
         ));
     }
 
-    let looked_up = crate::inference::provider::factory::lookup_key_for_slug(&entry.slug, config)
-        .unwrap_or_default();
-    let api_key = resolve_local_runtime_key(&entry.slug, looked_up, config);
+    let crate::inference::registry::CatalogRequest {
+        provider_key: api_key,
+        client,
+    } = catalog_request(config, Some(&entry))?;
 
     let bearer_is_oauth = entry.slug == "openai"
         && crate::inference::provider::factory::openai_bearer_is_oauth(config);
@@ -201,17 +202,6 @@ pub async fn list_configured_models_from_config(
     );
 
     use crate::config::schema::cloud_providers::AuthStyle;
-    let service_key = "providers.list_models";
-    let client = if let Some(pem) = config
-        .cloud_provider_ca_certs
-        .get(entry.slug.trim())
-        .filter(|pem| !pem.is_empty())
-    {
-        crate::util::tls::client_with_ca_bundle_with_timeouts(pem, service_key, 30, 10)?
-    } else {
-        crate::config::build_runtime_proxy_client_with_timeouts(service_key, 30, 10)
-    };
-
     if is_openrouter_provider(&entry.slug, &entry.endpoint) {
         validate_openrouter_key(&client, &routing.endpoint, &api_key)
             .await
