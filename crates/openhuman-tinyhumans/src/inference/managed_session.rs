@@ -29,7 +29,7 @@ pub(super) fn resolve_session_bearer(
 
 /// The bearer a classified app-session token yields for managed inference.
 ///
-/// Separate from `OpenHumanBackendModel::resolve_bearer` so the decision is
+/// Separate from the model factory's bearer resolver so the decision is
 /// testable without an on-disk auth profile.
 ///
 /// `exp`-less tokens carry no recorded expiry, so `classify_session_token`
@@ -68,7 +68,7 @@ pub(super) fn managed_bearer(
 }
 
 /// Publish a `SessionExpired` event when the local `exp` precheck in
-/// `OpenHumanBackendModel::resolve_bearer` rejects an expired
+/// the managed-model bearer resolver rejects an expired
 /// managed session token before a request is ever sent — mirroring
 /// `require_live_session_token`'s
 /// pre-flight publish so the credentials subscriber clears state and the UI

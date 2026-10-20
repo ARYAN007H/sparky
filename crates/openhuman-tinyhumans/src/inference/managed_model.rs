@@ -13,6 +13,11 @@ use super::managed_session::{publish_managed_auth_failure, resolve_session_beare
 use crate::backend::url::effective_api_url;
 use crate::client::endpoint::is_managed_endpoint_for_api_key;
 
+/// Provider label used by the hosted-backend error-code classifier. This is
+/// diagnostic classification only; managed-auth ownership uses the owner's
+/// typed provenance callback below.
+pub const PROVIDER_LABEL: &str = "tinyhumans";
+
 /// Where the managed model reads its credentials from.
 #[derive(Debug, Clone, Default)]
 pub struct ManagedOptions {
