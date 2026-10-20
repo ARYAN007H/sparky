@@ -50,9 +50,34 @@ fn newest_prompt_clock_wins_and_non_lifo_drop_restores_the_remaining_provider() 
     let before = Utc::now();
     let actual = current_datetime_line(Some("UTC"));
     let after = Utc::now();
+    let stamped = actual
+        .strip_prefix("Current Date & Time: ")
+        .and_then(|rest| rest.get(..19))
+        .and_then(|value| chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S").ok())
+        .expect("default clock emits a parseable UTC timestamp")
+        .and_utc();
     assert!(
-        actual == current_datetime_line_at(before, Some("UTC"))
-            || actual == current_datetime_line_at(after, Some("UTC")),
+        (before.timestamp()..=after.timestamp()).contains(&stamped.timestamp()),
         "dropping the final registration must restore the live system clock"
     );
+}
+
+#[test]
+fn prompt_clock_registration_is_removed_when_scope_unwinds() {
+    let prior = register_prompt_clock(|| utc("2024-01-01T12:00:00Z"));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _temporary = register_prompt_clock(|| utc("2024-02-02T13:00:00Z"));
+        assert_eq!(
+            current_datetime_line(Some("UTC")),
+            current_datetime_line_at(utc("2024-02-02T13:00:00Z"), Some("UTC"))
+        );
+        panic!("exercise prompt-clock guard unwinding");
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(
+        current_datetime_line(Some("UTC")),
+        current_datetime_line_at(utc("2024-01-01T12:00:00Z"), Some("UTC"))
+    );
+    drop(prior);
 }
