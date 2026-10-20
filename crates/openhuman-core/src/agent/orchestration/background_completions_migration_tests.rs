@@ -387,13 +387,8 @@ async fn transient_parent_admission_failure_does_not_permanently_delete_thread()
         "retryable-parent",
         "accepted-child",
     ));
-    assert!(CompletionTarget::new(
-        ctx,
-        w.to_path_buf(),
-        "retryable-session".into(),
-        Some("retryable-parent".into()),
-    )
-    .is_ok());
+    record_admitted(w, "retryable-session", "accepted-child", "recovered", "retryable-parent");
+    assert_eq!(pending_ids(w, "retryable-parent"), ["accepted-child"]);
 }
 
 #[tokio::test]
@@ -421,11 +416,15 @@ async fn failed_stop_resume_does_not_cache_permanent_deletion() {
         "retry-after-resume-error",
         "accepted-child",
     ));
-    assert!(CompletionTarget::new(
-        ctx,
-        w.to_path_buf(),
-        "retry-after-resume-session".into(),
-        Some("retry-after-resume-error".into()),
-    )
-    .is_ok());
+    record_admitted(
+        w,
+        "retry-after-resume-session",
+        "accepted-child",
+        "recovered after resume retry",
+        "retry-after-resume-error",
+    );
+    assert_eq!(
+        pending_ids(w, "retry-after-resume-error"),
+        ["accepted-child"]
+    );
 }
