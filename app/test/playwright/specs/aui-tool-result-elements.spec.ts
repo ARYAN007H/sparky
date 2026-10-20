@@ -37,8 +37,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
-  resetMock,
   mockRequests,
+  resetMock,
   sendTurn,
   setKeywordRules,
   setMockBehavior,
@@ -394,7 +394,10 @@ test.describe('assistant-ui tool-result elements', () => {
     await sendTurn(page, threadId, 'List my GitHub repositories');
     await waitForTurnCompletion(page, threadId);
     const execution = (await mockRequests()).find(request => {
-      if (request.method !== 'POST' || !request.url.includes('/agent-integrations/composio/execute')) {
+      if (
+        request.method !== 'POST' ||
+        !request.url.includes('/agent-integrations/composio/execute')
+      ) {
         return false;
       }
       try {
@@ -404,7 +407,10 @@ test.describe('assistant-ui tool-result elements', () => {
         return false;
       }
     });
-    expect(execution, 'the core executed the scripted Composio action against the mock').toBeDefined();
+    expect(
+      execution,
+      'the core executed the scripted Composio action against the mock'
+    ).toBeDefined();
     if (progress) {
       console.log(
         '[epic235 tool progress]',
