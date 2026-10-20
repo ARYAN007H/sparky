@@ -6,7 +6,7 @@ fn execute_parser_trims_tool_preserves_optional_values_and_ignores_unknown_keys(
     let params = Map::from_iter([
         ("tool".into(), json!("  GMAIL_SEND_EMAIL  ")),
         ("arguments".into(), json!(42)),
-        ("connection_id".into(), json!("")),
+        ("connection_id".into(), json!(" conn-1 ")),
         ("unrecognized".into(), json!(true)),
     ]);
 
@@ -15,8 +15,20 @@ fn execute_parser_trims_tool_preserves_optional_values_and_ignores_unknown_keys(
         ExecuteParams {
             tool: "GMAIL_SEND_EMAIL".into(),
             arguments: Some(json!(42)),
-            connection_id: Some(String::new()),
+            connection_id: Some(" conn-1 ".into()),
         }
+    );
+
+    let blank_connection = Map::from_iter([
+        ("tool".into(), json!("GMAIL_SEND_EMAIL")),
+        ("connection_id".into(), json!("")),
+    ]);
+    assert_eq!(
+        parse_execute(blank_connection)
+            .unwrap()
+            .connection_id
+            .as_deref(),
+        Some("")
     );
 }
 
