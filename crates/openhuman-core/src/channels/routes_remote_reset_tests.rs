@@ -25,10 +25,10 @@ impl crate::channels::Channel for ConfiguredChannel {
     }
 }
 
-fn transcript_meta(thread_id: &str) -> TranscriptMeta {
+fn transcript_meta(thread_id: &str, agent_id: &str) -> TranscriptMeta {
     TranscriptMeta {
-        agent_name: "orchestrator".into(),
-        agent_id: Some("orchestrator".into()),
+        agent_name: agent_id.into(),
+        agent_id: Some(agent_id.into()),
         agent_type: Some("root".into()),
         dispatcher: "native".into(),
         provider: Some("mock".into()),
@@ -49,7 +49,7 @@ fn transcript_meta(thread_id: &str) -> TranscriptMeta {
     }
 }
 
-fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope {
+fn remote_session_scope(session_key: &str) -> tinychannels_bus::module_remote::RemoteSessionScope {
     tinychannels_bus::module_remote::RemoteSessionScope {
         channel: tinychannels_bus::ChannelRef {
             id: "telegram".into(),
@@ -61,16 +61,25 @@ fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope
             topic_id: Some("topic-3".into()),
             ..Default::default()
         },
-        session_key: "prepared-session".into(),
+        session_key: session_key.into(),
     }
 }
 
-fn seed_session(core: &CoreContext, workspace: &Path, key: &str) -> SessionRef {
-    let session = SessionRef::scoped(key, "orchestrator");
-    let history =
-        crate::agent::session_store::transcripts_or_files_in(core, "orchestrator", workspace)
-            .open_session(&session, transcript_meta(key))
-            .unwrap();
+fn seed_session(
+    core: &CoreContext,
+    workspace: &Path,
+    key: &str,
+    agent_id: &str,
+    store_agent_id: &str,
+) -> SessionRef {
+    let session = SessionRef::scoped(key, agent_id);
+    let history = crate::agent::session_store::transcripts_or_files_in(
+        core,
+        store_agent_id,
+        workspace,
+    )
+    .open_session(&session, transcript_meta(key, agent_id))
+    .unwrap();
     history
         .append(TranscriptMessage::user("prior tenant turn"))
         .unwrap();
@@ -80,9 +89,17 @@ fn seed_session(core: &CoreContext, workspace: &Path, key: &str) -> SessionRef {
     session
 }
 
-fn session_messages(core: &CoreContext, workspace: &Path, session: &SessionRef) -> Vec<String> {
-    let locator =
-        crate::agent::session_store::transcripts_or_files_in(core, "orchestrator", workspace);
+fn session_messages(
+    core: &CoreContext,
+    workspace: &Path,
+    store_agent_id: &str,
+    session: &SessionRef,
+) -> Vec<String> {
+    let locator = crate::agent::session_store::transcripts_or_files_in(
+        core,
+        store_agent_id,
+        workspace,
+    );
     let head = locator.head_generation(session);
     locator
         .read_session_transcript(&head)
@@ -104,12 +121,20 @@ fn tenant_runtime(
     crate::channels::context::ChannelRuntimeContext,
 ) {
     let workspace = workspace.to_path_buf();
-    let config = crate::config::Config {
+    let mut config = crate::config::Config {
         workspace_dir: workspace.clone(),
         action_dir: workspace.clone(),
         config_path: workspace.join("config.toml"),
         ..Default::default()
     };
+    config.cloud_providers = vec![crate::config::schema::CloudProviderCreds {
+        id: "p_openai_reset_test".into(),
+        slug: "openai".into(),
+        label: "Reset test provider".into(),
+        endpoint: "http://127.0.0.1:9/v1".into(),
+        default_model: Some("reset-test-model".into()),
+        ..Default::default()
+    }];
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace.clone())).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default()).profile(profile),
     );
@@ -136,17 +161,78 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     let bob_dispatch = DispatchCtx::new(Arc::clone(&bob_core));
     let alice_tenant = alice_dispatch.tenant().unwrap();
     let bob_tenant = bob_dispatch.tenant().unwrap();
+    let alice_route = crate::channels::routes::get_route_selection(&alice_runtime, "remote-reset");
+    let bob_route = crate::channels::routes::get_route_selection(&_bob_runtime, "remote-reset");
+    let alice_agent =
+        match crate::channels::runtime::dispatch::host_agent::route(&alice_runtime, "telegram") {
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Agent(host) => *host,
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Unbound => {
+                crate::channels::runtime::dispatch::host_agent::configured_agent(
+                    &alice_runtime,
+                    &alice_route,
+                )
+                .await
+                .expect("Alice's configured channel agent resolves")
+            }
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Missing(agent) => {
+                panic!("Alice's channel agent {agent} is unavailable")
+            }
+        };
+    let bob_agent =
+        match crate::channels::runtime::dispatch::host_agent::route(&_bob_runtime, "telegram") {
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Agent(host) => *host,
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Unbound => {
+                crate::channels::runtime::dispatch::host_agent::configured_agent(
+                    &_bob_runtime,
+                    &bob_route,
+                )
+                .await
+                .expect("Bob's configured channel agent resolves")
+            }
+            crate::channels::runtime::dispatch::host_agent::HostRoute::Missing(agent) => {
+                panic!("Bob's channel agent {agent} is unavailable")
+            }
+        };
     let canonical = "channel-session:telegram:bot-a:group:room-1";
     let alice_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, canonical);
     let bob_key = crate::core::runtime::tenant::tenant_key(&bob_tenant, canonical);
+    let alice_store_agent = crate::agent::session_store::current_agent_key_or(
+        &alice_dispatch,
+        &alice_agent.definition.id,
+    );
+    let bob_store_agent =
+        crate::agent::session_store::current_agent_key_or(&bob_dispatch, &bob_agent.definition.id);
     assert_ne!(alice_key, bob_key);
-    let alice_session = seed_session(&alice_core, workspace, &alice_key);
-    let bob_session = seed_session(&bob_core, workspace, &bob_key);
+    let alice_session = seed_session(
+        &alice_core,
+        workspace,
+        &alice_key,
+        &alice_agent.definition.id,
+        &alice_store_agent,
+    );
+    let bob_session = seed_session(
+        &bob_core,
+        workspace,
+        &bob_key,
+        &bob_agent.definition.id,
+        &bob_store_agent,
+    );
+    assert_eq!(
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &alice_route,
+            "telegram",
+            Some(&alice_key),
+        )
+        .await,
+        2,
+        "remote status history comes from the durable session",
+    );
 
-    let scope = remote_session_scope();
+    let scope = remote_session_scope(canonical);
     let reset = crate::channels::host::remote_control::RemoteResetContext {
         scope: scope.clone(),
-        durable_session_key: alice_key,
+        durable_session_key: alice_key.clone(),
         message: tinychannels_bus::ChannelMessage {
             channel: "telegram".into(),
             reply_target: "room-1".into(),
@@ -174,11 +260,11 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         .is_err()
     );
     assert_eq!(
-        session_messages(&alice_core, workspace, &alice_session).len(),
+        session_messages(&alice_core, workspace, &alice_store_agent, &alice_session).len(),
         2
     );
     assert_eq!(
-        session_messages(&bob_core, workspace, &bob_session).len(),
+        session_messages(&bob_core, workspace, &bob_store_agent, &bob_session).len(),
         2
     );
 
@@ -195,9 +281,39 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     .await
     .expect("captured tenant reset succeeds");
     assert!(matches!(cleared, RemoteHostResult::Completed));
-    assert!(session_messages(&alice_core, workspace, &alice_session).is_empty());
+    let alice_after = session_messages(&alice_core, workspace, &alice_store_agent, &alice_session);
+    assert!(
+        alice_after.is_empty(),
+        "reset should empty Alice's actual session: agent={}, session={alice_session:?}, \
+         head={:?}, messages={alice_after:?}, history_len={}",
+        alice_agent.definition.id,
+        crate::agent::session_store::transcripts_or_files_in(
+            &alice_core,
+            &alice_store_agent,
+            workspace,
+        )
+        .head_generation(&alice_session),
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &alice_route,
+            "telegram",
+            Some(&alice_key),
+        )
+        .await,
+    );
     assert_eq!(
-        session_messages(&bob_core, workspace, &bob_session),
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &alice_route,
+            "telegram",
+            Some(&alice_key),
+        )
+        .await,
+        0,
+        "a reset clears the durable status count",
+    );
+    assert_eq!(
+        session_messages(&bob_core, workspace, &bob_store_agent, &bob_session),
         ["prior tenant turn", "prior tenant reply"]
     );
 }

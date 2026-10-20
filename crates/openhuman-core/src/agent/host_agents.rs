@@ -148,7 +148,9 @@ impl HostAgent {
         let mut session = self.session_host(&self.config, Some(session_key))?;
         session.set_thread_id(Some(session_key));
         session.set_event_context(event_session_id, channel);
-        self.scope(session.reset_bound_history()).await
+        let reset = self.scope(session.reset_bound_history()).await?;
+        anyhow::ensure!(reset, "durable channel session has no resettable history");
+        Ok(true)
     }
 
     /// Build a session for this agent from `config` -- normally a clone of

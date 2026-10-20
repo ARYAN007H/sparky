@@ -169,13 +169,9 @@ where
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
-    let history_len = ctx
-        .conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(sender_key)
-        .map(Vec::len)
-        .unwrap_or(0);
+    let history_len =
+        durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
+            .await;
     let client = super::context::module_client(ctx).await;
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
@@ -284,6 +280,56 @@ where
         }
     }
     true
+}
+
+async fn durable_channel_history_len(
+    ctx: &ChannelRuntimeContext,
+    route: &ChannelRouteSelection,
+    channel: &str,
+    session_key: Option<&str>,
+) -> usize {
+    let Some(session_key) = session_key else {
+        return 0;
+    };
+    let agent_id = match crate::channels::runtime::dispatch::host_agent::route(ctx, channel) {
+        crate::channels::runtime::dispatch::host_agent::HostRoute::Agent(host) => {
+            host.definition.id.clone()
+        }
+        crate::channels::runtime::dispatch::host_agent::HostRoute::Missing(_) => return 0,
+        crate::channels::runtime::dispatch::host_agent::HostRoute::Unbound => {
+            match crate::channels::runtime::dispatch::host_agent::configured_agent(ctx, route).await
+            {
+                Ok(host) => host.definition.id,
+                Err(error) => {
+                    tracing::debug!(%error, "channel history count unavailable");
+                    return 0;
+                }
+            }
+        }
+    };
+    let dispatch = ctx.dispatch_ctx();
+    let Some(core) = dispatch.resolved() else {
+        return 0;
+    };
+    let store_agent_id = crate::agent::session_store::current_agent_key_or(&dispatch, &agent_id);
+    let locator = crate::agent::session_store::transcripts_or_files_in(
+        &core,
+        &store_agent_id,
+        &ctx.workspace_dir,
+    );
+    let session = tinyagents_session::transcript::SessionRef::scoped(session_key, &agent_id);
+    let head = locator.head_generation(&session);
+    let Some(read) = locator.read_session_transcript(&head) else {
+        return 0;
+    };
+    let Ok(Some(transcript)) = read.read_session() else {
+        return 0;
+    };
+    transcript
+        .messages
+        .iter()
+        .filter(|message| message.role == "user" || message.role == "assistant")
+        .count()
 }
 
 #[cfg(test)]
