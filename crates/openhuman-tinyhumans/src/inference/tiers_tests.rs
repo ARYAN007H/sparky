@@ -112,6 +112,11 @@ fn managed_tier_vocabulary_maps_aliases_and_leaves_concrete_ids_raw() {
         assert!(is_alias(model));
     }
     assert!(is_raw_model("vendor/concrete-model"));
+    assert!(is_raw_model("chat"));
+    assert_eq!(
+        resolve_model("chat", &Config::default(), Some("coding")).as_deref(),
+        Some("coding")
+    );
     assert!(!is_raw_model("hint:unknown"));
 }
 

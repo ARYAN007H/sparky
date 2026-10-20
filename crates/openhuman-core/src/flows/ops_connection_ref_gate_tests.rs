@@ -11,7 +11,24 @@ use super::*;
 async fn cached_probe_inference_readiness_caches_a_negative_result() {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use crate::inference::registry::{register_chat_model, unregister_chat_model, ChatModelEntry};
+    use crate::inference::registry::{
+        register_chat_model, unregister_chat_model, BackendErrorClassification, ChatModelEntry,
+        ProviderModelHooks,
+    };
+    use async_trait::async_trait;
+    use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
+
+    struct ProbeTestModel;
+    #[async_trait]
+    impl ChatModel<()> for ProbeTestModel {
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            Ok(ModelResponse::assistant("probe test"))
+        }
+    }
 
     let _guard = crate::inference::inference_test_guard_async().await;
     let tmp = TempDir::new().unwrap();
@@ -27,15 +44,36 @@ async fn cached_probe_inference_readiness_caches_a_negative_result() {
             counter.fetch_add(1, Ordering::SeqCst);
             Box::pin(async { Err("API key not configured for provider".to_string()) })
         });
-    let base = crate::inference::registry_test_support::default_managed_entry(
-        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-    )
-    .expect("test default managed provider");
     register_chat_model(
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ChatModelEntry {
+            build: Arc::new(|request| {
+                let model = request
+                    .model_override
+                    .or(request.default_model)
+                    .unwrap_or("fixture-model")
+                    .to_string();
+                Ok((Arc::new(ProbeTestModel), model))
+            }),
             probe: Some(probe),
-            ..base
+            models: Some(ProviderModelHooks {
+                default_model: Arc::new(|| Some("fixture-model".to_string())),
+                role_for_model: Arc::new(|_| None),
+                is_alias: Arc::new(|_| false),
+                is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+                supports_vision: Arc::new(|_| false),
+                resolve_model: Arc::new(|_, config, model| {
+                    model
+                        .map(str::trim)
+                        .filter(|model| !model.is_empty() && !model.starts_with("hint:"))
+                        .map(str::to_string)
+                        .or_else(|| config.default_model.clone())
+                        .or_else(|| Some("fixture-model".to_string()))
+                }),
+                context_window: Arc::new(|_| None),
+                default_pricing: Arc::new(|| None),
+                without_reasoning: Arc::new(|request| request),
+            }),
         },
     );
     struct Unregister;

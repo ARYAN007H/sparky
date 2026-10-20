@@ -42,18 +42,11 @@ fn hint_role(model: &str) -> Option<&'static str> {
 pub(crate) fn role_for_model(model: &str) -> Option<String> {
     hint_role(model)
         .or_else(|| legacy_tier_role(model))
-        .or_else(|| {
-            openhuman_embed::__host::config::WORKLOAD_ROLES
-                .contains(&model.trim())
-                .then(|| model.trim())
-        })
         .map(str::to_string)
 }
 
 pub(crate) fn is_alias(model: &str) -> bool {
-    hint_role(model).is_some()
-        || legacy_tier_role(model).is_some()
-        || openhuman_embed::__host::config::WORKLOAD_ROLES.contains(&model.trim())
+    hint_role(model).is_some() || legacy_tier_role(model).is_some()
 }
 
 pub(crate) fn is_raw_model(model: &str) -> bool {
