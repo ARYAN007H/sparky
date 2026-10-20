@@ -1,8 +1,7 @@
 //! Declares OpenHuman's product orchestration surfaces over TinyAgents.
 //!
 //! Tools, by role:
-//! - **Spawn**: `spawn_subagent`, `spawn_async_subagent`,
-//!   `spawn_parallel_agents`.
+//! - **Spawn**: `spawn_subagent` and `spawn_async_subagent`.
 //! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
 //!   `wait_subagent`, `wait` / `wait_loop`, `list_subagents`.
 //! - **Delegation**: `DelegateGraphTool` and `ArchetypeDelegationTool`.
@@ -27,8 +26,6 @@ mod delegate_graph;
 mod dispatch;
 #[path = "tools/spawn_async_subagent_surface.rs"]
 mod spawn_async_subagent;
-#[path = "tools/spawn_parallel_agents.rs"]
-mod spawn_parallel_agents;
 #[path = "tools/spawn_subagent_surface.rs"]
 mod spawn_subagent;
 #[path = "tools/subagent_abort_report.rs"]
@@ -70,7 +67,5 @@ pub(crate) use delegate_graph::DelegateGraphDispatch;
 pub use delegate_graph::DelegateGraphTool;
 pub(crate) use spawn_async_subagent::SpawnAsyncSubagentDispatch;
 pub use spawn_async_subagent::{scope_spawn_async_subagent_spec, SpawnAsyncSubagentTool};
-pub(crate) use spawn_parallel_agents::SpawnParallelAgentsDispatch;
-pub use spawn_parallel_agents::SpawnParallelAgentsTool;
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;
 pub use spawn_subagent::SpawnSubagentTool;

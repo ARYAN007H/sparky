@@ -20,7 +20,7 @@ use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 use crate::agent::orchestration::tools::{
     ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
-    SpawnAsyncSubagentDispatch, SpawnParallelAgentsDispatch, SpawnSubagentDispatch,
+    SpawnAsyncSubagentDispatch, SpawnSubagentDispatch,
 };
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
@@ -117,7 +117,6 @@ pub(crate) fn typed_dispatch_for(
     delegation_target: Option<String>,
 ) -> Option<Arc<dyn ToolDispatch<(), OpenHumanRunContext>>> {
     let dispatch: Arc<dyn ToolDispatch<(), OpenHumanRunContext>> = match name {
-        "spawn_parallel_agents" => Arc::new(SpawnParallelAgentsDispatch::new(adapter)),
         "spawn_async_subagent" => Arc::new(SpawnAsyncSubagentDispatch::new(adapter)),
         "spawn_subagent" => Arc::new(SpawnSubagentDispatch::new(adapter)),
         "continue_subagent" => Arc::new(ContinueSubagentDispatch::new(adapter)),

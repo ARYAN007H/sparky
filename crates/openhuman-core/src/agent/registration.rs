@@ -2,7 +2,7 @@
 
 use super::orchestration::tools::{
     CloseSubagentTool, ContinueSubagentTool, DelegateGraphTool, ListSubagentsTool,
-    SpawnAsyncSubagentTool, SpawnParallelAgentsTool, SpawnSubagentTool, SteerSubagentTool,
+    SpawnAsyncSubagentTool, SpawnSubagentTool, SteerSubagentTool,
     WaitSubagentTool,
 };
 use super::tools::{PlanExitTool, TodoTool};
@@ -45,7 +45,6 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         Box::new(WaitSubagentTool::new()),
         Box::new(CloseSubagentTool::new()),
         Box::new(ContinueSubagentTool::new()),
-        Box::new(SpawnParallelAgentsTool::new()),
         // Multi-stage durable delegation (issue #4249, Phase 3): runs the chosen
         // sub-agent through the tinyagents plan→execute→review→finalize graph,
         // checkpointed to the session DB. Heavier than spawn_subagent; for
