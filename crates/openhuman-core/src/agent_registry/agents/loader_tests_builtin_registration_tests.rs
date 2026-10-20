@@ -66,19 +66,12 @@ fn trigger_reactor_has_agentic_hint_and_narrow_tools() {
 }
 
 #[test]
-fn orchestrator_can_resume_paused_subagents_via_continue_subagent() {
-    // #4291: when a delegated sub-agent (e.g. task_manager_agent) pauses on
-    // ask_user_clarification, the orchestrator gets a
-    // [SUBAGENT_AWAITING_USER] envelope and must resume that exact
-    // checkpoint with `continue_subagent`. Without the tool in scope the
-    // only continuation is to re-delegate a fresh, stateless sub-agent
-    // that asks again — the infinite re-spawn loop. Lock the tool in.
+fn orchestrator_resumes_paused_subagents_through_spawn_task_key_reuse() {
     let def = find("orchestrator");
     match &def.tools {
         ToolScope::Named(tools) => assert!(
-            tools.iter().any(|t| t == "continue_subagent"),
-            "orchestrator must expose continue_subagent to resume paused \
-             sub-agents instead of re-spawning them (#4291)"
+            tools.iter().any(|t| t == "spawn_subagent"),
+            "orchestrator must expose the single spawn tool for task_key reuse"
         ),
         ToolScope::Wildcard => {
             panic!("orchestrator must have a Named tool scope")
@@ -252,13 +245,8 @@ fn master_agent_has_coding_hint_and_named_tools() {
     assert_eq!(def.sandbox_mode, SandboxMode::Sandboxed);
     match def.tools {
         ToolScope::Named(tools) => {
-            // The builtin scope contains only registered worker surfaces.
-            // Sub-agent surface taught by prompt.md, deliberately three
-            // tools (#5701): spawn, enumerate, resume. A sub-agent is
-            // always async and its result is delivered back on an idle
-            // system turn, so there is nothing to collect and nothing to
-            // block on.
-            for required in ["spawn_subagent", "list_subagents", "continue_subagent"] {
+            // Specialist routing uses the single asynchronous spawn tool.
+            for required in ["spawn_subagent"] {
                 assert!(
                     tools.iter().any(|t| t == required),
                     "orchestrator must have sub-agent tool `{required}`"
@@ -276,6 +264,9 @@ fn master_agent_has_coding_hint_and_named_tools() {
                 "spawn_parallel_agents",
                 "steer_subagent",
                 "close_subagent",
+                "list_subagents",
+                "continue_subagent",
+                "spawn_async_subagent",
             ] {
                 assert!(
                     !tools.iter().any(|t| t == retired),

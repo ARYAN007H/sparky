@@ -129,11 +129,11 @@ fn prompt_routes_workflow_authoring_to_the_builder_not_use_skill() {
     let builder = registry
         .get("workflow_builder")
         .expect("workflow_builder is a registered agent");
-    assert_eq!(
-        builder.delegate_name.as_deref(),
-        Some("build_workflow"),
-        "the prompt tells the model to call `build_workflow`; that must still be \
-         workflow_builder's delegate_name, or the rule names a tool nobody has"
+    let orchestrator = registry.get("orchestrator").expect("orchestrator exists");
+    assert!(
+        orchestrator.subagents.iter().any(|entry| matches!(entry,
+            tinyagents_definition::SubagentEntry::AgentId(id) if id == "workflow_builder")),
+        "workflow_builder must be permitted through spawn_subagent's agent_id"
     );
     match &builder.tools {
         tinyagents_definition::ToolScope::Named(tools) => {
