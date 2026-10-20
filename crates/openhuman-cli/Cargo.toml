@@ -49,6 +49,10 @@ path = "src/bin/fleet.rs"
 # (no `http-server`) this target is skipped rather than failing to link.
 required-features = ["http-server", "bin-tools"]
 
+[[example]]
+name = "thread_wire_schema"
+path = "examples/thread_wire_schema.rs"
+
 # The benchmark and profiling binaries (`library-profile`, `rss-bench`,
 # `tool-search-bench`, `tool-dialect-bench`) and their driver scripts live in
 # tinyhumansai/openhuman-benchmarks (`profile/`), which builds them against a

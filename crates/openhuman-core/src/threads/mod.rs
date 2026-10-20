@@ -13,6 +13,7 @@ pub mod store;
 #[cfg(test)]
 mod transcript_host_tests;
 pub mod turn_state;
+pub mod wire_schema;
 pub mod welcome_migration;
 
 pub use error::{ThreadsError, THREAD_NOT_FOUND_KIND};

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub use crate::core::envelope::{ApiEnvelope, ApiError, ApiMeta, EmptyRequest, PaginationMeta};
 
 /// Request to create a new conversation thread.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CreateConversationThreadRequest {
     #[serde(default)]
@@ -25,7 +25,7 @@ pub struct CreateConversationThreadRequest {
 
 /// Request to bind or clear the working folder of a thread that has no
 /// messages yet.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateConversationThreadWorkingDirRequest {
     pub thread_id: String,
@@ -34,7 +34,7 @@ pub struct UpdateConversationThreadWorkingDirRequest {
 }
 
 /// Summary information for a workspace-backed conversation thread.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationThreadSummary {
     pub id: String,
@@ -57,7 +57,7 @@ pub struct ConversationThreadSummary {
 }
 
 /// A single persisted conversation message.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationMessageRecord {
     pub id: String,
