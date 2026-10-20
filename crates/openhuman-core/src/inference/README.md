@@ -81,10 +81,11 @@ through the same gates and constructors.
 
 Managed chat uses TinyInference's `TinyHumansModel` through the host adapter in
 `openhuman-tinyhumans/src/inference/managed_model.rs`. The adapter supplies the live bearer
-resolver and host error observer; TinyInference owns request construction and response parsing.
-The host's typed authentication-failure callback publishes `DomainEvent::SessionExpired` when a
-stored session has expired or the backend rejects it. API-key credentials remain eligible for
-managed inference and do not trigger session demotion.
+resolver and host error observer; TinyInference owns request construction and response parsing,
+including the managed usage envelope. The host checks stored-session expiry before a request and
+publishes `DomainEvent::SessionExpired` locally when that check fails. Its typed authentication-
+failure callback publishes the same event for managed endpoint authentication failures, using the
+owner's explicit provenance rather than inferring ownership from the provider label.
 
 [`provider/openai_codex.rs`](./provider/openai_codex.rs) is related but is not a model. When ChatGPT/Codex OAuth tokens exist
 for the `openai` slug, `resolve_openai_codex_routing` re-targets that slug at the Codex backend
