@@ -329,7 +329,7 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Mcp,
-        crate::mcp::all_registered_controllers(),
+        crate::mcp::all_controller_entries(),
     );
     // Agent definition and prompt inspection
     push(
@@ -696,7 +696,7 @@ fn build_internal_only_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Modules,
-        crate::modules::all_registered_controllers(),
+        crate::modules::schemas::all_controller_entries(),
     );
     controllers
 }

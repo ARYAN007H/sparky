@@ -14,6 +14,40 @@ mod registry;
 
 pub use registry::{all_controller_schemas, all_registered_controllers, schemas};
 
+use crate::config::Config;
+use crate::core::all::{
+    BoundRegisteredController, ControllerEntry, ControllerFuture, ControllerTask,
+};
+use crate::core::runtime::DispatchCtx;
+use serde_json::Map;
+
+fn registry_get_config(ctx: DispatchCtx) -> ControllerTask<Config> {
+    Box::pin(async move { ctx.load_config().await })
+}
+
+fn parse_registry_get_params(params: Map<String, serde_json::Value>) -> Result<String, String> {
+    handlers::parse_registry_get(&params)
+}
+
+fn run_registry_get(_ctx: DispatchCtx, config: Config, qualified_name: String) -> ControllerFuture {
+    Box::pin(async move {
+        to_json(crate::mcp::registry::ops::mcp_clients_registry_get(&config, qualified_name).await?)
+    })
+}
+
+pub(crate) fn registry_get_controller_entry() -> ControllerEntry {
+    ControllerEntry::bound(BoundRegisteredController::after_gate(
+        registry::schemas("registry_get"),
+        registry_get_config,
+        parse_registry_get_params,
+        run_registry_get,
+    ))
+}
+
+fn to_json(value: impl serde::Serialize) -> Result<serde_json::Value, String> {
+    serde_json::to_value(value).map_err(|error| error.to_string())
+}
+
 // Test-only bridges: `schemas_tests.rs` (kept as-is; not part of the unsplit
 // batch) reaches these through `use super::*`, mirroring the flat scope it
 // had when `include!` spliced everything into one file.

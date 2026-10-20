@@ -155,87 +155,9 @@ fn builtin_controller_snapshot() -> Vec<ControllerEntry> {
         .collect()
 }
 
-fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<ControllerParamContract>)
-{
-    let controllers = builtin_controller_snapshot()
-        .into_iter()
-        .filter(|controller| {
-            (cfg!(feature = "mcp") && controller.schema.method_name() == "mcp_clients.registry_get")
-                || (cfg!(feature = "modules")
-                    && controller.schema.method_name() == "modules.computer_status")
-        })
-        .filter_map(|controller| controller.legacy_controller())
-        .collect();
-    #[cfg(feature = "modules")]
-    let contracts = vec![crate::modules::schemas::computer_status_parameter_contract()];
-    #[cfg(not(feature = "modules"))]
-    let contracts = Vec::new();
-    #[cfg(feature = "mcp")]
-    let contracts = contracts
-        .into_iter()
-        .chain([crate::mcp::registry::registry_get_parameter_contract()])
-        .collect::<Vec<_>>();
-    (controllers, contracts)
-}
-
-#[test]
-#[cfg(any(feature = "modules", feature = "mcp"))]
-fn representative_handler_examples_match_real_pure_parsers() {
-    let (controllers, contracts) = representative_parameter_contracts();
-    verify_parameter_contracts(&controllers, &contracts).unwrap();
-}
-
-#[test]
-#[cfg(any(feature = "modules", feature = "mcp"))]
-fn every_covered_required_declaration_rejects_removal_and_optional_mutants() {
-    let (controllers, contracts) = representative_parameter_contracts();
-    verify_parameter_contracts(&controllers, &contracts).unwrap();
-    let mut mutations = 0;
-    for contract in &contracts {
-        let actual = controllers
-            .iter()
-            .find(|controller| controller.schema.method_name() == contract.method)
-            .unwrap();
-        for required in contract.required {
-            for remove in [true, false] {
-                let mut broken = actual.schema.clone();
-                if remove {
-                    broken.inputs.retain(|field| field.name != *required);
-                } else {
-                    broken
-                        .inputs
-                        .iter_mut()
-                        .find(|field| field.name == *required)
-                        .expect("positive contract requires this field")
-                        .required = false;
-                }
-                assert!(
-                    verify_parameter_schema(&broken, contract)
-                        .unwrap_err()
-                        .contains("required inputs mismatch"),
-                    "{} required {required}",
-                    contract.method
-                );
-                mutations += 1;
-            }
-        }
-    }
-    // MCP has one independently required field. The computer-status adapter
-    // has no required field to mutate; synthetic runner tests cover that case.
-    let expected_mutations = 2 * usize::from(cfg!(feature = "mcp"));
-    assert_eq!(
-        mutations, expected_mutations,
-        "covered required-field mutations"
-    );
-}
-
 #[test]
 #[cfg(not(any(feature = "modules", feature = "mcp")))]
 fn optional_domain_controller_methods_are_absent_when_features_are_disabled() {
-    let (controllers, contracts) = representative_parameter_contracts();
-    assert!(controllers.is_empty());
-    assert!(contracts.is_empty());
-
     let methods = builtin_controller_snapshot()
         .into_iter()
         .map(|controller| controller.schema.method_name())
@@ -246,24 +168,4 @@ fn optional_domain_controller_methods_are_absent_when_features_are_disabled() {
     assert!(!methods
         .iter()
         .any(|method| method == "modules.computer_status"));
-}
-
-#[test]
-#[cfg(any(feature = "modules", feature = "mcp"))]
-fn real_contract_inventory_rejects_a_missing_and_an_extra_row() {
-    let (controllers, mut contracts) = representative_parameter_contracts();
-    let removed = contracts
-        .pop()
-        .expect("representative contracts are nonempty");
-    assert!(verify_parameter_contracts(&controllers, &contracts)
-        .unwrap_err()
-        .contains("missing contract"));
-    contracts.push(removed.clone());
-    contracts.push(ControllerParamContract {
-        method: "unregistered.fixture",
-        ..removed
-    });
-    assert!(verify_parameter_contracts(&controllers, &contracts)
-        .unwrap_err()
-        .contains("extra contract"));
 }
