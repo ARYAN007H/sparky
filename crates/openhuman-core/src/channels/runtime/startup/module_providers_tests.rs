@@ -283,11 +283,25 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         topic_id: Some("topic-3".into()),
         ..Default::default()
     };
+    let mut web_events = crate::web_chat::subscribe_web_channel_events();
+    let projection = Arc::new(
+        crate::web_chat::surface::Surface::new(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            crate::web_chat::surface::TurnIds {
+                client_id: "relay-fixture-client".into(),
+                thread_id: "channel:telegram/sender-7/chat-42".into(),
+                request_id: "relay-fixture-request".into(),
+            },
+            Config::default(),
+        )
+        .await,
+    );
     let callback = crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
         Arc::clone(&relay),
         channel.clone(),
         conversation.clone(),
         "relay-turn-1".into(),
+        projection,
     );
     let runtime = ChannelRuntimeLease::open(client, callback)
         .await
@@ -346,6 +360,38 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
     assert_eq!(outcome.receipt.conversation.as_ref(), Some(&conversation));
     assert_eq!(outcome.receipt.thread_id.as_deref(), Some("topic-3"));
     assert_eq!(relay.sent(), vec!["typed hosted relay reply".to_owned()]);
+    let projected = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = web_events.recv().await.expect("web event bus");
+            if event.context().request_id == "relay-fixture-request"
+                && event.event_name() == "chat_done"
+            {
+                break event;
+            }
+        }
+    })
+    .await
+    .expect("compiled relay output is projected through the web adapter");
+    let projected_wire = serde_json::to_value(&projected).expect("projected wire event");
+    assert_eq!(projected.context().client_id, "relay-fixture-client");
+    assert_eq!(projected.context().thread_id, "channel:telegram/sender-7/chat-42");
+    assert_eq!(projected.context().seq, Some(1));
+    assert_eq!(projected_wire["full_response"], "typed hosted relay reply");
+
+    let terminal = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = web_events.recv().await.expect("web event bus");
+            if event.context().request_id == "relay-fixture-request"
+                && event.event_name() == crate::channels::providers::relay::CHANNEL_OUTBOUND_EVENT
+            {
+                break event;
+            }
+        }
+    })
+    .await
+    .expect("SaaS terminal delivery remains available");
+    assert_eq!(terminal.context().client_id, "relay-fixture-client");
+    assert_eq!(relay.sent().len(), 1, "terminal output is not duplicated");
     runtime
         .close()
         .await
