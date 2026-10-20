@@ -102,7 +102,7 @@ jobs:
               old = '''        parse_credential,
                   run_set_credential,'''
               new = '''        |_params: Map<String, Value>| -> Result<CredentialParams, String> {
-                          Err("mutation parser failure".to_owned())
+                      Err("mutation parser failure".to_owned())
                   },
                   run_set_credential,'''
           else:
@@ -117,6 +117,9 @@ jobs:
         env:
           EXPECTED_TREE: ${{ matrix.expected_tree }}
           EXPECTED_SCHEMA_BLOB: ${{ matrix.expected_schema_blob }}
+          PROOF_WORKFLOW_REF: ${{ github.workflow_ref }}
+          PROOF_WORKFLOW_SHA: ${{ github.sha }}
+          PROOF_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           source=crates/openhuman-core/src/profiles/schemas.rs
@@ -142,9 +145,6 @@ jobs:
             cat target/profiles-proof/mutation.patch.sha256
             printf 'features=default,voice,inference\n'
           } > target/profiles-proof/receipt.txt
-          printf 'workflow_ref=%s\nworkflow_sha=%s\nworkflow_repository=%s\n' \
-            "$PROOF_WORKFLOW_REF" "$PROOF_WORKFLOW_SHA" "$PROOF_REPOSITORY" \
-            >> target/profiles-proof/receipt.txt
           git status --short
 
       - name: Cache Rust build artifacts
@@ -172,6 +172,11 @@ jobs:
             cat "$build_stderr"
             exit "$build_exit"
           fi
+          test "$(git write-tree)" = '${{ matrix.expected_tree }}'
+          test "$(git rev-parse :crates/openhuman-core/src/profiles/schemas.rs)" = '${{ matrix.expected_schema_blob }}'
+          git diff --exit-code
+          git submodule status --recursive > target/profiles-proof/submodules-after-build.txt
+          cmp target/profiles-proof/submodules.txt target/profiles-proof/submodules-after-build.txt
           python3 - "$build_json" <<'PY'
           import json
           import sys
@@ -236,6 +241,7 @@ jobs:
               grep -Fq 'test result: FAILED. 0 passed; 1 failed;' "$raw_log"
               ;;
             parser-wiring)
+              grep -Fq 'profiles.set_credential bound decoder rejects example 0: mutation parser failure' "$raw_log"
               grep -Fq 'mutation parser failure' "$raw_log"
               grep -Fq 'test result: FAILED. 0 passed; 1 failed;' "$raw_log"
               ;;
