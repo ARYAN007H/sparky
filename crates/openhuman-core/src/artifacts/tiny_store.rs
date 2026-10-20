@@ -100,7 +100,7 @@ pub fn legacy_versioned_dir(workspace_dir: &Path) -> PathBuf {
 pub struct LegacyUiBridge {
     workspace_dir: PathBuf,
     files: FileRoots,
-    file_store: Arc<dyn FileStore>,
+    file_store: Option<Arc<dyn FileStore>>,
     chat: Option<ApprovalChatContext>,
 }
 
@@ -110,7 +110,7 @@ impl LegacyUiBridge {
     pub fn new(
         workspace_dir: impl Into<PathBuf>,
         files: FileRoots,
-        file_store: Arc<dyn FileStore>,
+        file_store: Option<Arc<dyn FileStore>>,
         chat: Option<&ApprovalChatContext>,
     ) -> Self {
         Self {
@@ -142,7 +142,10 @@ impl LegacyUiBridge {
                         == Some(ext.clone())
                 });
                 if let Some(owned) = owned {
-                    let bytes = self.file_store.read(&file.key).await?;
+                    let file_store = self.file_store.as_ref().ok_or_else(|| {
+                        anyhow::anyhow!("artifact file storage is unavailable")
+                    })?;
+                    let bytes = file_store.read(&file.key).await?;
                     tokio::fs::write(owned, &bytes).await?;
                     let size = bytes.len() as u64;
                     super::store::finalize_artifact(
@@ -171,7 +174,10 @@ impl LegacyUiBridge {
         .map_err(anyhow::Error::msg)?;
         let size = if record.holds_file() {
             if let Some(file) = latest.file.as_ref() {
-                let bytes = self.file_store.read(&file.key).await?;
+                let file_store = self.file_store.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("artifact file storage is unavailable")
+                })?;
+                let bytes = file_store.read(&file.key).await?;
                 tokio::fs::write(&dest, &bytes).await?;
                 bytes.len() as u64
             } else {
@@ -302,24 +308,23 @@ pub fn artifacts_service(
     files: FileRoots,
     action_dir: Option<&Path>,
     chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Artifacts {
     let roots = file_roots(workspace_dir, &files, action_dir);
-    let scoped = crate::storage::sessions::artifact_scoped_for_in(
-        workspace_dir,
-        &crate::core::runtime::DispatchCtx::ambient(),
-    );
-    let file_store: Arc<dyn FileStore> = Arc::new(tiny_artifacts::BlobFileStore::new(
-        &scoped.expect("artifact storage scope is required"),
-    ));
-    Artifacts::new(Arc::new(versioned_store(workspace_dir)))
+    let file_store = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx)
+        .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)) as Arc<dyn FileStore>);
+    let mut artifacts = Artifacts::new(Arc::new(versioned_store(workspace_dir)))
         .with_observer(Arc::new(LegacyUiBridge::new(
             workspace_dir,
             files,
             file_store.clone(),
             chat,
         )))
-        .with_file_roots(guarded_roots(roots))
-        .with_file_store(file_store)
+        .with_file_roots(guarded_roots(roots));
+    if let Some(file_store) = file_store {
+        artifacts = artifacts.with_file_store(file_store);
+    }
+    artifacts
 }
 
 /// Where each file version keeps its own copy:
