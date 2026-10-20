@@ -349,16 +349,33 @@ async fn append_cannot_forge_private_attachment_storage_metadata() {
         .extra_metadata
         .get("__openhumanStoredAttachments")
         .is_none());
+    let mut user_req = request("forged-user", "hello", "user");
+    user_req.message.extra_metadata["__openhumanStoredAttachments"] = json!([{
+        "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
+        "path": "../../etc/passwd"
+    }]);
+    let saved_user = append_with_test_config(user_req, &config, None)
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+    assert!(saved_user.attachments.is_empty());
+    assert!(saved_user
+        .extra_metadata
+        .get("__openhumanStoredAttachments")
+        .is_none());
     let stored = crate::threads::store::get_messages(
         &crate::core::runtime::DispatchCtx::ambient(),
         config.workspace_dir.clone(),
         "uploads",
     )
     .unwrap();
-    assert!(stored[0]
+    assert_eq!(stored.len(), 2);
+    assert!(stored.iter().all(|message| message
         .extra_metadata
         .get("__openhumanStoredAttachments")
-        .is_none());
+        .is_none()));
 
     let update = UpdateConversationMessageRequest {
         thread_id: "uploads".into(),
