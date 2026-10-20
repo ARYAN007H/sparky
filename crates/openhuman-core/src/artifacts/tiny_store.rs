@@ -530,6 +530,7 @@ pub(super) fn build_artifacts_service_with_scope(
         .with_observer(Arc::new(LegacyUiBridge::new(
             workspace_dir,
             files,
+            guarded_roots(roots.clone()),
             file_store.clone(),
             chat,
             ctx,

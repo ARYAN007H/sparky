@@ -236,6 +236,7 @@ async fn legacy_bridge_does_not_overwrite_an_existing_card_file_outside_trusted_
     let bridge = Arc::new(LegacyUiBridge::new(
         &workspace,
         FileRoots::new(&files),
+        guarded_roots(vec![files.clone()]),
         Some(file_store.clone()),
         None,
         &ctx,
