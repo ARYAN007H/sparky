@@ -875,8 +875,8 @@ async fn credential_channel_describe_fields_are_wired_over_json_rpc_e2e() {
 #[tokio::test]
 async fn credential_yuanbao_connect_and_disconnect_roundtrip_over_json_rpc_e2e() {
     use std::sync::{
-        Arc,
         atomic::{AtomicUsize, Ordering},
+        Arc,
     };
 
     let _env_lock = json_rpc_e2e_env_lock_async().await;
