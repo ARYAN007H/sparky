@@ -11,11 +11,18 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use tinyinference_providers::builtin::{
     BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
 };
+use crate::core::slots::HookSlot;
+
+static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
+    HookSlot::new("config::hosted_cloud_presets");
+type HostedAuthStyle = Arc<dyn Fn(AuthStyle) -> bool + Send + Sync>;
+static HOSTED_AUTH_STYLE: HookSlot<HostedAuthStyle> =
+    HookSlot::new("config::hosted_auth_style");
 
 /// A built-in cloud provider preset in the host's [`AuthStyle`] vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,14 +33,23 @@ pub struct BuiltinCloudProvider {
     pub auth_style: AuthStyle,
 }
 
-/// The managed OpenHuman route. It is the one preset `tinyinference-providers`
-/// deliberately omits: managed gateway policy is host-owned.
-const OPENHUMAN_PRESET: BuiltinCloudProvider = BuiltinCloudProvider {
-    slug: "openhuman",
-    label: "OpenHuman",
-    endpoint: "https://api.openhuman.ai/v1",
-    auth_style: AuthStyle::OpenhumanJwt,
-};
+/// Register an additional cloud preset supplied by a host.
+pub fn register_hosted_cloud_preset(id: impl Into<String>, preset: BuiltinCloudProvider) {
+    HOSTED_PRESETS.register(id, preset);
+}
+
+/// Register host-owned auth-style classification without making it core
+/// inference policy.
+pub fn register_hosted_auth_style(classifier: HostedAuthStyle) {
+    HOSTED_AUTH_STYLE.register("default", classifier);
+}
+
+/// Whether the installed host treats this compatibility auth style as hosted.
+pub fn is_hosted_auth_style(style: AuthStyle) -> bool {
+    HOSTED_AUTH_STYLE
+        .get("default")
+        .is_some_and(|classify| classify(style))
+}
 
 impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
     for BuiltinCloudProvider
@@ -51,11 +67,13 @@ impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
     }
 }
 
-/// Every built-in preset: the managed OpenHuman route followed by the
-/// provider-neutral catalog from `tinyinference-providers`
-/// ([`UPSTREAM_BUILTINS`]), mapped onto the host's [`AuthStyle`].
+/// Every built-in preset: host-provided entries followed by the
+/// provider-neutral catalog from `tinyinference-providers`.
 pub static BUILTIN_CLOUD_PROVIDERS: LazyLock<Vec<BuiltinCloudProvider>> = LazyLock::new(|| {
-    std::iter::once(OPENHUMAN_PRESET)
+    HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
         .chain(UPSTREAM_BUILTINS.iter().map(BuiltinCloudProvider::from))
         .collect()
 });
