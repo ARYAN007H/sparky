@@ -61,7 +61,12 @@ pub(crate) fn provider_role_for_model_override(model_override: Option<&str>) -> 
     // A role alias (`hint:coding`) or a retired tier slug (`hint:coding`) picks
     // that workload's route; a concrete model id rides the chat route.
     match model_override.map(str::trim) {
-        Some(value) if value.starts_with("hint:") || crate::config::is_legacy_tier_model(value) => {
+        Some(value)
+            if crate::inference::provider_model::is_abstract_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                value,
+            ) =>
+        {
             match crate::inference::provider_model::role_for_provider_model(
                 crate::inference::provider::factory::PROVIDER_OPENHUMAN,
                 value,
@@ -98,7 +103,12 @@ fn effective_session_config(
         .default_model
         .as_deref()
         .map(str::trim)
-        .filter(|model| crate::inference::provider::factory::is_raw_passthrough_model(model))
+        .filter(|model| {
+            crate::inference::provider_model::is_raw_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                model,
+            )
+        })
     {
         if model.starts_with("openrouter/") {
             // The managed backend accepts catalog ids verbatim. This also

@@ -388,9 +388,9 @@ impl BudgetGate for OpenHumanBudgetGate {
     /// a call, so there is no enforcement to feed.
     async fn record(&self, usage: &Usage) -> Result<()> {
         log::debug!(
-            "[tinyagents][budget] observed usage model={} in={} out={} cached={} (ledger is \
+            "[tinyagents][budget] observed usage model={:?} in={} out={} cached={} (ledger is \
              written by the event bridge)",
-            model = ?self.attributed_model(),
+            self.attributed_model(),
             usage.input_tokens,
             usage.output_tokens,
             usage.cache_read_tokens,

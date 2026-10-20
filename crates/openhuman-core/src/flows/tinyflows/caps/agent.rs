@@ -18,7 +18,6 @@ use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
-use crate::inference::provider::is_raw_passthrough_model;
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected
 /// agent kind by one of two paths, chosen by [`route_for_agent_ref`]:
@@ -163,7 +162,10 @@ pub(crate) fn route_for_agent_ref(agent_ref: &str) -> AgentRoute {
 /// ids to the backend unchanged. Mirrors the per-node routing
 /// [`OpenHumanLlm::complete`] applies via `agent_prompt::resolve_completion_model`.
 pub(crate) fn harness_model_default_override(node_model: &str) -> String {
-    if is_raw_passthrough_model(node_model) {
+    if crate::inference::provider_model::is_raw_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        node_model,
+    ) {
         return node_model.to_string();
     }
     format!(
