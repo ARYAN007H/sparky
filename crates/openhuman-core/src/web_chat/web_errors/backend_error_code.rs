@@ -1,24 +1,18 @@
-//! Classifying a managed-backend error by its stable `errorCode` (#870) —
-//! the trusted fast path that runs before the substring ladder in
-//! [`classify_inference_error`](super::classify::classify_inference_error).
+//! Applying registered provider-owned semantic metadata before generic copy
+//! heuristics in [`classify_inference_error`](super::classify::classify_inference_error).
 
 use super::classify::ClassifiedError;
 use super::retry::retry_after_hint;
 use tinyinference_llm::failure::{is_malformed_tool_history_text, parse_retry_after_secs};
 
-/// Classify a managed-backend error by its stable `errorCode` (#870).
+/// Apply registered provider-owned semantic metadata when present.
 ///
-/// Returns `Some` only when the flattened error string carries a *recognised*
-/// backend `errorCode`. Because an `errorCode` is present **only** when the
-/// error came through the managed backend, branching on it here lets us trust
-/// the backend's verdict (operator faults route to the calm "temporarily
-/// unavailable — we've been notified" copy, no user-blaming) instead of the
-/// substring heuristics, which are tuned for the BYO / direct-provider path
-/// (where no `errorCode` exists and "check your API key / model settings" is
-/// the correct, user-actionable copy). See [`classify_inference_error`] (F2).
+/// Returns `Some` only when a registered provider classifier claims the error
+/// and supplies a known semantic kind. Provider-specific token parsing stays
+/// with that provider; the core uses only the provider-neutral classification.
 ///
-/// `None` falls through to the substring ladder, covering both the BYO path
-/// (no code) and any future/unrecognised managed code we don't yet map.
+/// `None` falls through to generic message heuristics, including unknown or
+/// unowned provider errors.
 pub(super) fn classify_by_backend_error_code(
     err: &str,
     provider: Option<String>,
@@ -26,21 +20,18 @@ pub(super) fn classify_by_backend_error_code(
 ) -> Option<ClassifiedError> {
     use crate::inference::registry::{classify_backend_error, BackendErrorKind};
 
-    // Managed-vs-BYO gate: an `errorCode` is only trustworthy on a
-    // managed-backend envelope. A BYO / direct-provider body that merely
-    // contains an `errorCode`-shaped field must fall through to the substring
-    // ladder (CodeRabbit), keeping its user-actionable copy intact.
+    // The provider classifier owns this distinction. Message-shaped lookalikes
+    // alone never claim provider ownership.
     let classification = classify_backend_error(None, err)?;
     if !classification.provider_owned {
         return None;
     }
     let kind = classification.kind?;
 
-    // Verbose diagnostics on the new managed-code branch (per CLAUDE.md).
-    // Low-cardinality only — the raw `err` may carry a provider payload / PII
-    // and is logged at the caller, not here.
+    // Log only the semantic kind; the raw error may carry provider payload or
+    // user data.
     log::debug!(
-        "[chat-error][classify][errorCode] code={:?} provider={:?}",
+        "[chat-error][classify][provider] kind={:?} provider={:?}",
         kind,
         provider,
     );
