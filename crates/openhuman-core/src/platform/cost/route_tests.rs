@@ -81,10 +81,11 @@ fn byok_and_local_models_are_not_managed() {
 
 #[test]
 fn normalizes_case_whitespace_and_prefixes() {
-    assert_eq!(route_for_model("  HINT:CHAT "), CostRoute::Managed);
-    assert_eq!(route_for_model("hint:chat"), CostRoute::Managed);
+    crate::agent::session_host::test_support::install_model_fixture();
+    assert_eq!(route_for_model("  FIXTURE-REASONING "), CostRoute::Managed);
+    assert_eq!(route_for_model("fixture-reasoning"), CostRoute::Managed);
     assert_eq!(
-        route_for_model("openhuman/hint:reasoning"),
+        route_for_model("openhuman/fixture-reasoning"),
         CostRoute::Managed
     );
 }

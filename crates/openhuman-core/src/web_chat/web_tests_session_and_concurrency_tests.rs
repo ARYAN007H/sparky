@@ -23,6 +23,7 @@ fn fingerprint_provider_binding_variants_differ() {
 
 #[test]
 fn provider_role_override_routes_hint_workloads() {
+    crate::agent::session_host::test_support::install_model_fixture();
     assert_eq!(
         provider_role_for_model_override(Some("hint:agentic")),
         "agentic"
@@ -51,6 +52,10 @@ fn provider_role_override_routes_hint_workloads() {
         "chat"
     );
     assert_eq!(provider_role_for_model_override(None), "chat");
+    assert_eq!(
+        provider_role_for_model_override(Some("fixture-reasoning")),
+        "reasoning"
+    );
 }
 
 #[test]
