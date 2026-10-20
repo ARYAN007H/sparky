@@ -46,7 +46,7 @@ pub(crate) async fn configured_agent(
             .await
             .map_err(|error| error.to_string())?,
     };
-    let agent_id = "orchestrator";
+    let agent_id = crate::web_chat::pick_target_agent_id(&config);
     config.chat_provider = Some(
         if route.provider == crate::inference::provider::INFERENCE_BACKEND_ID {
             crate::inference::provider::INFERENCE_BACKEND_ID.to_string()

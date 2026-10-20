@@ -231,8 +231,8 @@ where
         );
     }
     if clear_history {
-        if let Err(error) = reset_history().await {
-            tracing::warn!("channel durable history reset failed: {error}");
+        if reset_history().await.is_err() {
+            tracing::warn!("channel durable history reset failed");
             if let Some(channel) = target_channel {
                 let copy = crate::web_chat::classify_inference_error(
                     "OpenHuman session persistence failed while resetting this conversation",
