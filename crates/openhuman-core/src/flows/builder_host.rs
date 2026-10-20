@@ -173,6 +173,11 @@ impl SandboxRunner for FlowsHost {
         let served_path = object_path.clone();
         let callback = SandboxToolPreflight {
             config: self.config.clone(),
+            dispatch: crate::core::runtime::DispatchCtx::ambient(),
+        };
+        let callback_lease = SandboxCallbackLease {
+            runtime,
+            path: Some(object_path),
         };
         runtime
             .spawn(async move {
@@ -186,7 +191,7 @@ impl SandboxRunner for FlowsHost {
         let response = async {
             let proxy: Proxy = runtime
                 .connection()
-                .proxy(runs::BUS_NAME, runs::OBJECT_PATH, runs::INTERFACE)
+                .proxy(tinyflows_bus::BUS_NAME, runs::OBJECT_PATH, runs::INTERFACE)
                 .map_err(|error| error.to_string())?;
             let report: SandboxRunResponse = proxy
                 .with_timeout(std::time::Duration::from_secs(60))
@@ -207,10 +212,7 @@ impl SandboxRunner for FlowsHost {
             Ok::<_, String>(report.result)
         }
         .await;
-        runtime
-            .spawn(async move { runtime.connection().unserve(&object_path).await })
-            .await
-            .map_err(|error| error.to_string())?;
+        drop(callback_lease);
         response
     }
 }
@@ -219,6 +221,7 @@ const SANDBOX_CALLBACK_BUS: &str = "ai.tinyhumans.openhuman.FlowSandboxHost";
 
 struct SandboxToolPreflight {
     config: Arc<Config>,
+    dispatch: crate::core::runtime::DispatchCtx,
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
@@ -229,13 +232,39 @@ impl SandboxToolPreflight {
         args: Value,
         _connection: Option<String>,
     ) -> tinybus::Result<Value> {
-        if let Some(backend) = crate::flows::tinyflows::caps::tools::backend_for(&slug) {
-            backend
-                .preflight(&self.config, &slug, &args)
-                .await
-                .map_err(tinybus::Error::failed)?;
-        }
-        Ok(serde_json::json!({"preflight": "passed"}))
+        let Some(core) = self.dispatch.resolved() else {
+            return Err(tinybus::Error::failed(
+                "the workflow sandbox lost its calling context",
+            ));
+        };
+        let config = self.config.clone();
+        crate::core::runtime::CoreContext::scope(core, async move {
+            if let Some(backend) = crate::flows::tinyflows::caps::tools::backend_for(&slug) {
+                backend
+                    .preflight(&config, &slug, &args)
+                    .await
+                    .map_err(tinybus::Error::failed)?;
+            }
+            Ok(serde_json::json!({"preflight": "passed"}))
+        })
+        .await
+    }
+}
+
+struct SandboxCallbackLease {
+    runtime: &'static tinybus::module::ModuleRuntime,
+    path: Option<tinybus::ObjectPath>,
+}
+
+impl Drop for SandboxCallbackLease {
+    fn drop(&mut self) {
+        let Some(path) = self.path.take() else {
+            return;
+        };
+        let connection = self.runtime.connection().clone();
+        self.runtime.spawn(async move {
+            let _ = connection.unserve(&path).await;
+        });
     }
 }
 
