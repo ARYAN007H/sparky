@@ -74,6 +74,26 @@ pub struct ChatModelEntry {
     pub build: ChatModelFactory,
     /// Optional readiness probe (the flows inference probe).
     pub probe: Option<ReadinessProbe>,
+    /// Optional model vocabulary and defaults owned by this provider. The
+    /// core calls these hooks without interpreting provider-specific ids.
+    pub models: Option<ProviderModelHooks>,
+}
+
+/// Provider-owned model behavior consulted by generic inference callers.
+#[derive(Clone)]
+pub struct ProviderModelHooks {
+    /// The provider's default model, absent when it has no default.
+    pub default_model: Arc<dyn Fn() -> Option<String> + Send + Sync>,
+    /// Resolves a role alias or legacy model id to its workload role.
+    pub role_for_model: Arc<dyn Fn(&str) -> Option<String> + Send + Sync>,
+    /// Whether a model is a provider-specific alias rather than a concrete id.
+    pub is_alias: Arc<dyn Fn(&str) -> bool + Send + Sync>,
+    /// Whether a model is a concrete id suitable for pass-through.
+    pub is_raw_model: Arc<dyn Fn(&str) -> bool + Send + Sync>,
+    /// Whether a model accepts image input according to provider metadata.
+    pub supports_vision: Arc<dyn Fn(&str) -> bool + Send + Sync>,
+    /// Resolves the provider's default/alias policy for a managed construction.
+    pub resolve_model: Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>,
 }
 
 static CHAT_MODELS: HookSlot<ChatModelEntry> = HookSlot::new("inference::chat_models");
