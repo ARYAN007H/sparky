@@ -357,7 +357,7 @@ impl OpenHumanEventSink {
     }
 }
 
-async fn project_channel_event(
+pub(super) async fn project_channel_event(
     ctx: &crate::core::runtime::DispatchCtx,
     event: tinychannels_bus::ChannelEvent,
 ) -> Result<Option<crate::web_chat::WebChannelEvent>, String> {
