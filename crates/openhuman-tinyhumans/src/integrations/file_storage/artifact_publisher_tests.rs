@@ -17,7 +17,9 @@ use openhuman_embed::__host::artifact_publisher::versioned_store;
 use openhuman_embed::__host::security::AutonomyLevel;
 
 #[derive(Default)]
-struct MemoryFileStore(Mutex<HashMap<String, (Vec<u8>, Option<String>)>>);
+struct MemoryFileStore(Mutex<HashMap<String, StoredFile>>);
+
+type StoredFile = (Vec<u8>, Option<String>);
 
 impl MemoryFileStore {
     fn add(&self, key: &str, bytes: &[u8], media_type: Option<&str>) {
