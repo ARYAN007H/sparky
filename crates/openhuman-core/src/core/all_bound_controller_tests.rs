@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::{FieldSchema, TypeSchema};
+use crate::core::{runtime::DispatchCtx, FieldSchema, TypeSchema};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Mutex,
@@ -217,12 +217,12 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
     let bound_methods: Vec<_> = registry()
         .iter()
         .chain(internal_registry())
-        .filter(|grouped| matches!(grouped.controller.handler, EntryHandler::Bound(_)))
+        .filter(|grouped| grouped.controller.is_bound())
         .map(|grouped| grouped.controller.schema.method_name())
         .collect();
     assert_eq!(bound_methods, ["threads.upsert"], "staged bound inventory");
     assert!(
-        matches!(entry.handler, EntryHandler::Bound(_)),
+        entry.is_bound(),
         "threads.upsert must be bound at the production registration site"
     );
 

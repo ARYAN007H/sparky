@@ -101,6 +101,11 @@ impl BoundRegisteredController {
         (self.decode)(params)
     }
 
+    #[cfg(test)]
+    pub(super) fn is_bound(&self) -> bool {
+        matches!(self.handler, EntryHandler::Bound(_))
+    }
+
     pub fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
         (self.invoke)(ctx, params)
     }
