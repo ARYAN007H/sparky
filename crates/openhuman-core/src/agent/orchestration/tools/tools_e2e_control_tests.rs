@@ -55,9 +55,10 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         )
         .definitions(definitions),
     );
-    let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+    let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
+    host.thread_id = Some(thread_id.into());
     let live = tinyagents_harness::context::RunContext::new(
         tinyagents_harness::context::RunConfig::new("stop-detached-subagent-session")
             .with_thread(thread_id),
@@ -123,6 +124,13 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     let before_scoped =
         crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
             .expect("load live durable row");
+    assert!(
+        before_scoped.iter().any(|row| {
+            row.current_task_id.as_deref() == Some(task_id.as_str())
+                && row.parent_thread_id.as_deref() == Some(thread_id)
+        }),
+        "driver persistence is scoped to the stopped thread"
+    );
     let before_scoped = serde_json::to_string(&before_scoped).expect("encode live row");
 
     let scoped = crate::core::runtime::CoreContext::scope(
@@ -222,9 +230,10 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
         .definitions(definitions),
     );
     let thread_id = "completed-cancel-parent-thread";
-    let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+    let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
+    host.thread_id = Some(thread_id.into());
     let live = tinyagents_harness::context::RunContext::new(
         tinyagents_harness::context::RunConfig::new("completed-cancel-parent-session")
             .with_thread(thread_id),
@@ -287,6 +296,7 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
     assert!(before.iter().any(|row| {
         row.current_task_id.as_deref() == Some(task_id.as_str())
             && row.parent_session == "completed-cancel-parent-session"
+            && row.parent_thread_id.as_deref() == Some(thread_id)
     }));
     let before_snapshot = serde_json::to_string(&before).expect("encode completed rows");
     let controller = crate::agent_runs::all_subagent_control_registered_controllers()
