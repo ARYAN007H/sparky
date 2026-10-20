@@ -112,10 +112,8 @@ pub(crate) fn import_all(
     let queue_scope = workspace_scope(workspace_dir)?;
     let queue_kv = StateKv::on_backend(backend, &queue_scope, OWNER, NS)?;
     let mut names = Vec::new();
-    let Ok(entries) = std::fs::read_dir(workspace_dir.join("memory")) else {
-        return Ok(names);
-    };
-    for entry in entries.flatten() {
+    if let Ok(entries) = std::fs::read_dir(workspace_dir.join("memory")) {
+      for entry in entries.flatten() {
         let path = entry.path();
         let Some(name) = path
             .file_name()
@@ -134,6 +132,7 @@ pub(crate) fn import_all(
             local_kv.import_file_strict(&name, &path)?;
         }
         names.push(name);
+      }
     }
     // Earlier versions imported this queue with the rest of memory state in
     // `local`. Move any such durable entries to the workspace-owned scope
