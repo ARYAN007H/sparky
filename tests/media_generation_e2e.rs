@@ -267,7 +267,11 @@ async fn media_tools_deliver_images_and_videos_through_the_backend_proxy() {
         "blob-backed generation must not leave a filesystem staging directory"
     );
     for (id, kind) in [(&image_id, "image"), (&video_id, "video")] {
-        let record = openhuman_core::artifacts::ops::ai_get_artifact(&config, id)
+        let record = openhuman_core::artifacts::ops::ai_get_artifact(
+            &openhuman_core::core::runtime::DispatchCtx::ambient(),
+            &config,
+            id,
+        )
             .await
             .expect("filed artifact record")
             .value;
