@@ -372,36 +372,7 @@ pub fn is_slug_reserved(s: &str) -> bool {
 /// The random suffix is not cryptographically strong — it only needs to be
 /// unique within a single user's config file.
 pub fn generate_provider_id(slug: &str) -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    // Cheap pseudo-random from timestamp nanoseconds — adequate for local
-    // config uniqueness without pulling in a PRNG crate.
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-    let mut suffix = String::with_capacity(5);
-    let mut seed = nanos as usize;
-    for _ in 0..5 {
-        suffix.push(chars[seed % chars.len()] as char);
-        seed = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        seed = (seed >> 33) ^ seed;
-    }
-    // Sanitise slug to only alphanumeric + '-' for the id prefix.
-    let safe_slug: String = slug
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .take(20)
-        .collect();
-    format!("p_{}_{}", safe_slug, suffix)
+    super::generate_provider_id_with_prefix("p", slug)
 }
 
 #[cfg(test)]

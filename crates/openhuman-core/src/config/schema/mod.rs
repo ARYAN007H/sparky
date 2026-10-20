@@ -4,6 +4,30 @@
 
 pub mod cloud_providers;
 pub use cloud_providers::{generate_provider_id, is_slug_reserved, AuthStyle, CloudProviderCreds};
+
+fn generate_provider_id_with_prefix(prefix: &str, slug: &str) -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+    let mut suffix = String::with_capacity(5);
+    let mut seed = nanos as usize;
+    for _ in 0..5 {
+        suffix.push(chars[seed % chars.len()] as char);
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        seed = (seed >> 33) ^ seed;
+    }
+    let safe_slug: String = slug
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .take(20)
+        .collect();
+    format!("{prefix}_{safe_slug}_{suffix}")
+}
 pub mod ephemeral_route;
 pub use ephemeral_route::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
 pub mod resolved_endpoints;

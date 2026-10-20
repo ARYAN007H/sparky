@@ -129,11 +129,7 @@ pub async fn inference_test_provider_model(
         prompt_len = prompt.len(),
         "{LOG_PREFIX} test_provider_model:start"
     );
-    let local = provider.trim().starts_with("lmstudio:")
-        || provider.trim().starts_with("ollama:")
-        || provider.trim().starts_with("mlx:")
-        || provider.trim().starts_with("omlx:")
-        || provider.trim().starts_with("local-openai:");
+    let local = tinyinference_local::profile::is_local_provider_string(provider);
     let (chat_model, model) = if local {
         debug!(
             provider,
