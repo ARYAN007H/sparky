@@ -87,10 +87,10 @@ pub(crate) async fn process_channel_runtime_message(
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     crate::channels::host::voice::record_inbound_envelope(&envelope);
-    let native_reply = match super::progressive::open_native_reply(&ctx, &envelope, &msg.id).await {
-        Ok(reply) => reply,
+    let native_target = match super::progressive::native_target(&ctx, &envelope) {
+        Ok(target) => target.map(Arc::new),
         Err(error) => {
-            tracing::error!("[dispatch] native progressive output could not start: {error}");
+            tracing::error!("[dispatch] native channel target is invalid: {error}");
             return;
         }
     };
@@ -274,7 +274,7 @@ pub(crate) async fn process_channel_runtime_message(
     // refused rather than routed through a second execution graph.
 
     // Determine if this channel supports streaming draft updates
-    let use_streaming = native_reply.is_none()
+    let use_streaming = native_target.is_none()
         && target_channel
             .as_ref()
             .is_some_and(|ch| ch.supports_draft_updates());
@@ -457,7 +457,7 @@ pub(crate) async fn process_channel_runtime_message(
                 approval: approval.clone(),
                 relay_thread: ctx.relay_thread.clone(),
                 imported_history,
-                native_reply: native_reply.clone(),
+                native_target: native_target.clone(),
             });
             super::native_runner::run(
                 &ctx.dispatch_ctx(),
@@ -544,12 +544,12 @@ pub(crate) async fn process_channel_runtime_message(
                 started_at.elapsed().as_millis(),
                 truncate_with_ellipsis(&response_text, REPLY_LOG_TRUNCATE_CHARS)
             );
-            let delivered = if native_reply.is_some() {
+            let delivered = if native_target.is_some() {
                 native_delivery_succeeded
             } else {
                 false
             };
-            if native_reply.is_none() {
+            if native_target.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
                     if let Some(ref draft_id) = draft_message_id {
                         if let Err(e) = channel
@@ -592,10 +592,7 @@ pub(crate) async fn process_channel_runtime_message(
                     "  ⚠️ Context window exceeded after {}ms",
                     started_at.elapsed().as_millis()
                 );
-                if native_reply.is_none() {
-                    let _ = super::progressive::finish_native_reply(&native_reply, error_text).await;
-                }
-                if native_reply.is_none() {
+                if native_target.is_none() {
                     if let Some(channel) = target_channel.as_ref() {
                         if let Some(ref draft_id) = draft_message_id {
                             let _ = channel
@@ -687,10 +684,7 @@ pub(crate) async fn process_channel_runtime_message(
                     ],
                 );
             }
-            if native_reply.is_none() {
-                let _ = super::progressive::finish_native_reply(&native_reply, &error_response).await;
-            }
-            if native_reply.is_none() {
+            if native_target.is_none() {
                 if let Some(channel) = target_channel.as_ref() {
                     if let Some(ref draft_id) = draft_message_id {
                         let _ = channel
