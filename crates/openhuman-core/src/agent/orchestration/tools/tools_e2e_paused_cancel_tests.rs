@@ -1,4 +1,3 @@
-use super::continuation_tests::core_backed_live_parent;
 use super::*;
 
 #[tokio::test]
@@ -38,7 +37,7 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
 
-    let (live, _core) = core_backed_live_parent(
+    let (live, _core) = super::continuation_tests::core_backed_live_parent(
         workspace.path(),
         parent,
         "paused-cancel-rpc-parent",

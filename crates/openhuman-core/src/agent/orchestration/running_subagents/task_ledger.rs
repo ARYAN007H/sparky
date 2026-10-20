@@ -15,7 +15,8 @@ use tinyagents_orchestration::subagent::{
     task_status_label, WaitError,
 };
 use tinyagents_tasks::{
-    reconcile_orphaned_tasks, DriverTaskStore, InMemoryTaskStore, TaskStore, TaskStoreRegistry,
+    reconcile_orphaned_tasks, DriverTaskStore, InMemoryTaskStore, OrchestrationTaskFilter,
+    TaskStore, TaskStoreRegistry,
 };
 
 /// One cached ledger: a workspace and the storage scope it was opened for.
