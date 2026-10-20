@@ -467,6 +467,9 @@ impl SpawnSubagentTool {
                                 definition.id,
                                 err
                             );
+                            return Ok(ToolResult::error(format!(
+                                "spawn_subagent: refusing to start a duplicate child for reusable task '{running_task_id}': {err}"
+                            )));
                         }
                     }
                 }
