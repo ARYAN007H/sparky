@@ -108,10 +108,11 @@ describe('Chat tool-call lifecycle', () => {
       })
     ).toBe(true);
 
-    await browser.waitUntil(
-      async () => (await renderedToolNames()).includes('web_fetch'),
-      { timeout: 45_000, interval: 100, timeoutMsg: 'Rendered web_fetch tool card never appeared' }
-    );
+    await browser.waitUntil(async () => (await renderedToolNames()).includes('web_fetch'), {
+      timeout: 45_000,
+      interval: 100,
+      timeoutMsg: 'Rendered web_fetch tool card never appeared',
+    });
     expect(await renderedToolNames()).toContain('web_fetch');
   });
 

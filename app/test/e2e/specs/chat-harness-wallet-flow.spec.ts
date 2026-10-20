@@ -50,7 +50,8 @@ describe('Chat harness — wallet flow', () => {
     this.timeout(90_000);
     await navigateViaHash('/settings/recovery-phrase');
     await browser.waitUntil(
-      async () => (await textExists('Reveal recovery phrase')) || (await textExists('Copy to Clipboard')),
+      async () =>
+        (await textExists('Reveal recovery phrase')) || (await textExists('Copy to Clipboard')),
       { timeout: 20_000, timeoutMsg: 'Recovery Phrase panel did not mount' }
     );
 
