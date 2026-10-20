@@ -220,30 +220,27 @@ impl OpenHumanTurnPrelude {
 
         let active_goal = if turn.overrides.suppress_active_goal {
             None
-        } else {
-            let loaded = crate::agent::goals::runtime::load_for_thread(
-                &self.workspace_dir,
-                self.thread_id.as_deref(),
-            )
-            .await;
-            match loaded {
-                Some(goal) if matches!(goal.status, ThreadGoalStatus::Paused) => {
-                    crate::agent::goals::runtime::resume_for_thread(
-                        &self.workspace_dir,
-                        self.thread_id.as_deref(),
-                    )
-                    .await
-                    .unwrap_or(Some(goal))
+        } else if let Some(thread_id) = self.thread_id.as_deref() {
+            let store = crate::agent::goals::goal_store(&self.workspace_dir, &self.dispatch_ctx());
+            match store.prepare_turn(thread_id).await {
+                Ok(preparation) => {
+                    if let Some(block) = preparation.context_block {
+                        context.push_str(&block);
+                    }
+                    preparation.goal
                 }
-                other => other,
+                Err(error) => {
+                    tracing::debug!(thread_id, %error, "[thread_goals] prepare_turn failed");
+                    None
+                }
             }
+        } else {
+            None
         };
         if let Some(goal) = &active_goal {
-            if let Some(block) = tinyagents_graph::goals::active_goal_context_block(goal) {
-                context.push_str(&block);
-            }
             if let Some(hook) = tinyagents_hooks::stop::GoalBudgetStopHook::for_goal(
-                crate::storage::sessions::stores_or_ephemeral(&self.workspace_dir).kv,
+                crate::agent::goals::goal_store(&self.workspace_dir, &self.dispatch_ctx())
+                    .backing_store(),
                 goal,
             ) {
                 run_context.stop_hooks.push(Arc::new(hook));
