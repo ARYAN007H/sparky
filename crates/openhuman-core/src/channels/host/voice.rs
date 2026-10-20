@@ -87,9 +87,6 @@ pub(crate) fn record_inbound_envelope(
         .parts
         .iter()
         .any(|part| matches!(part, ContentPart::VoiceNote { .. }));
-    tracing::debug!(
-        "{LOG_PREFIX} inbound voice fact recorded voice_present={inbound_has_voice}"
-    );
     record_turn(
         turn_key(tenant, &envelope.channel, &envelope.conversation, turn_id),
         VoiceTurnFacts {
@@ -285,43 +282,6 @@ impl ChannelVoiceHost {
         tenant: &crate::core::runtime::Tenant,
     ) -> HostVoiceReplyPolicy {
         let policy = resolve_policy(&self.config.channel_voice, scope, tenant);
-        let requested = turn_key(tenant, &scope.channel, &scope.conversation, &scope.turn_id);
-        let turns = TURNS.lock();
-        let exact_entries = turns
-            .iter()
-            .filter(|(key, _)| key == &requested)
-            .map(|(_, facts)| facts.inbound_has_voice)
-            .collect::<Vec<_>>();
-        let same_scope_except_tenant = turns.iter().any(|(key, _)| {
-            key.channel == requested.channel
-                && key.conversation == requested.conversation
-                && key.turn_id == requested.turn_id
-        });
-        let same_scope_except_channel = turns.iter().any(|(key, _)| {
-            key.tenant == requested.tenant
-                && key.conversation == requested.conversation
-                && key.turn_id == requested.turn_id
-        });
-        let same_scope_except_conversation = turns.iter().any(|(key, _)| {
-            key.tenant == requested.tenant
-                && key.channel == requested.channel
-                && key.turn_id == requested.turn_id
-        });
-        let same_scope_except_turn = turns.iter().any(|(key, _)| {
-            key.tenant == requested.tenant
-                && key.channel == requested.channel
-                && key.conversation == requested.conversation
-        });
-        tracing::debug!(
-            "{LOG_PREFIX} policy key_match tenant={} channel={} conversation={} turn={} exact_entries={} exact_voice={:?} authenticated_scope={}",
-            same_scope_except_channel && same_scope_except_conversation && same_scope_except_turn,
-            same_scope_except_tenant && same_scope_except_conversation && same_scope_except_turn,
-            same_scope_except_tenant && same_scope_except_channel && same_scope_except_turn,
-            same_scope_except_tenant && same_scope_except_channel && same_scope_except_conversation,
-            exact_entries.len(),
-            exact_entries,
-            has_authenticated_channel_identity(scope),
-        );
         tracing::debug!(
             "{LOG_PREFIX} policy channel={} mode={:?} inbound_voice={}",
             scope.configured_instance,
