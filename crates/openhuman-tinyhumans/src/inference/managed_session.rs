@@ -4,7 +4,6 @@
 
 use tinyinference_llm::model::ProviderError;
 use tinyinference_llm::providers::tinyhumans::{TinyHumansAuthFailure, TinyHumansAuthFailureKind, TinyHumansOperation};
-use tinyinference_llm::Error as TiError;
 
 /// Resolve the persisted app-session token for a managed inference caller.
 /// Both chat and embeddings use this path so signed-out state, expiry checks,
