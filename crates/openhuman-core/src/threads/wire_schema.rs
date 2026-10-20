@@ -39,7 +39,11 @@ pub struct ThreadWireTypes {
 
 /// Serialize the authoritative core/session record schemas for TypeScript codegen.
 pub fn thread_wire_schema_json() -> Result<String, serde_json::Error> {
-    serde_json::to_string_pretty(&schemars::schema_for!(ThreadWireTypes))
+    let schema = schemars::generate::SchemaSettings::draft2020_12()
+        .for_serialize()
+        .into_generator()
+        .into_root_schema_for::<ThreadWireTypes>();
+    serde_json::to_string_pretty(&schema)
 }
 
 #[cfg(test)]
