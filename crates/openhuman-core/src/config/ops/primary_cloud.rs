@@ -56,7 +56,7 @@ pub(crate) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
 /// Return `true` when the config contains a non-openhuman `inference_url`,
 /// indicating the user intends custom/BYOK routing rather than the managed
 /// backend.
-pub(crate) fn has_custom_inference_intent(config: &Config) -> bool {
+fn has_custom_inference_intent(config: &Config) -> bool {
     config
         .inference_url
         .as_deref()
@@ -65,7 +65,7 @@ pub(crate) fn has_custom_inference_intent(config: &Config) -> bool {
         .is_some_and(|url| !looks_like_openhuman_backend(config, url))
 }
 
-pub(crate) fn legacy_custom_inference_provider_string(config: &Config) -> Option<String> {
+fn legacy_custom_inference_provider_string(config: &Config) -> Option<String> {
     let inference_url = config
         .inference_url
         .as_deref()
@@ -117,7 +117,7 @@ pub(crate) fn legacy_inference_slug(config: &Config) -> Option<&str> {
         .map(|entry| entry.slug.as_str())
 }
 
-pub(crate) fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> String {
+fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> String {
     if is_openhuman_cloud_entry(config, entry) {
         return PROVIDER_OPENHUMAN.to_string();
     }
@@ -139,20 +139,20 @@ pub(crate) fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &C
     format!("{}:{model}", entry.slug)
 }
 
-pub(crate) fn is_openhuman_cloud_entry(config: &Config, entry: &CloudProviderCreds) -> bool {
+fn is_openhuman_cloud_entry(config: &Config, entry: &CloudProviderCreds) -> bool {
     entry.slug == PROVIDER_OPENHUMAN
         || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
         || looks_like_openhuman_backend(config, &entry.endpoint)
 }
 
-pub(crate) fn normalize_endpoint_for_compare(url: &str) -> String {
+fn normalize_endpoint_for_compare(url: &str) -> String {
     url.trim().trim_end_matches('/').to_ascii_lowercase()
 }
 
 /// Whether `url` names one of the managed hosts the installed host resolved
 /// onto the config (`resolved_endpoints.managed_hosts`). With no host
 /// registered nothing is managed, so every endpoint is a custom one.
-pub(crate) fn looks_like_openhuman_backend(config: &Config, url: &str) -> bool {
+fn looks_like_openhuman_backend(config: &Config, url: &str) -> bool {
     config.resolved_endpoints.is_managed_host(url)
 }
 

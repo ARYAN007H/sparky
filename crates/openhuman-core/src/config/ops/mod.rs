@@ -117,11 +117,7 @@ pub use model::{
 };
 
 pub use cloud_providers::{build_cloud_provider_creds, CloudProviderUpdate};
-pub(crate) use primary_cloud::{
-    cloud_entry_provider_string, has_custom_inference_intent, is_openhuman_cloud_entry,
-    legacy_custom_inference_provider_string, legacy_inference_slug, looks_like_openhuman_backend,
-    normalize_endpoint_for_compare, resolve_primary_cloud_provider_string,
-};
+pub(crate) use primary_cloud::{legacy_inference_slug, resolve_primary_cloud_provider_string};
 
 pub use privacy::{
     apply_privacy_settings, get_privacy_mode, load_and_apply_privacy_settings, PrivacySettingsPatch,

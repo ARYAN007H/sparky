@@ -31,6 +31,20 @@ fn builder_preserves_legacy_preset_and_blank_fallback_rules() {
 }
 
 #[test]
+fn builder_preserves_nonblank_id_label_and_default_model_verbatim() {
+    let mut entry = update("custom");
+    entry.id = Some(" stable-id ".to_string());
+    entry.label = Some(" Display label ".to_string());
+    entry.endpoint = "https://provider.example/v1".to_string();
+    entry.default_model = Some(" model-name ".to_string());
+
+    let provider = build_cloud_provider_creds(vec![entry]).unwrap().remove(0);
+    assert_eq!(provider.id, " stable-id ");
+    assert_eq!(provider.label, " Display label ");
+    assert_eq!(provider.default_model.as_deref(), Some(" model-name "));
+}
+
+#[test]
 fn builder_keeps_explicit_whitespace_endpoint_and_drops_reserved_slugs() {
     let mut entry = update("custom");
     entry.endpoint = " ".to_string();
@@ -64,6 +78,13 @@ fn builder_preserves_auth_aliases_and_unknown_error() {
     assert_eq!(
         build_cloud_provider_creds(vec![entry]).unwrap_err(),
         "unknown auth_style 'oddauth'; valid: bearer, anthropic, openhuman_jwt, none"
+    );
+
+    let mut padded = update("custom");
+    padded.auth_style = Some(" anthropic ".to_string());
+    assert_eq!(
+        build_cloud_provider_creds(vec![padded]).unwrap_err(),
+        "unknown auth_style ' anthropic '; valid: bearer, anthropic, openhuman_jwt, none"
     );
 }
 
