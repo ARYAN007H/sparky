@@ -1,20 +1,20 @@
 use std::path::Path;
 
-use tiny_artifacts::{ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactVersion, FileRef};
+use tiny_artifacts::{ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactVersion, FileRef, FileStore};
 
 use super::*;
 
-fn file_record(path: &Path) -> ArtifactRecord {
+fn file_record(key: &str, size_bytes: u64) -> ArtifactRecord {
     let mut version = ArtifactVersion::new(
         1,
-        path.display().to_string(),
+        key,
         ArtifactAuthor::Agent,
         "agent",
         1,
     );
     version.file = Some(FileRef {
-        path: path.display().to_string(),
-        size_bytes: std::fs::metadata(path).map(|m| m.len()).unwrap_or(0),
+        key: key.to_string(),
+        size_bytes,
         media_type: None,
     });
     let mut record = ArtifactRecord::pending("f-1", "Report", ArtifactKind::File, 1);
@@ -22,8 +22,8 @@ fn file_record(path: &Path) -> ArtifactRecord {
     record
 }
 
-fn roots(dir: &Path) -> tiny_artifacts::FileRoots {
-    tiny_artifacts::FileRoots::new([dir.to_path_buf()])
+fn file_store(dir: &Path) -> std::sync::Arc<dyn FileStore> {
+    std::sync::Arc::new(tiny_artifacts::FsFileStore::new(dir))
 }
 
 #[tokio::test]
@@ -38,7 +38,7 @@ async fn a_text_kind_shows_its_newest_version() {
         2,
     ));
     let dir = tempfile::tempdir().unwrap();
-    let body = body_of(&record, &roots(dir.path()), &DocumentConverter::none()).await;
+    let body = body_of(&record, None, &DocumentConverter::none()).await;
     assert_eq!(body.kind, "markdown");
     assert_eq!(body.version, 2);
     assert_eq!(body.body, "# v2");
@@ -48,11 +48,12 @@ async fn a_text_kind_shows_its_newest_version() {
 #[tokio::test]
 async fn a_text_file_inside_the_roots_is_read() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("notes.txt");
-    std::fs::write(&file, "plain notes").unwrap();
+    let files = file_store(dir.path());
+    files.put("artifacts/files/f-1/v1.txt", b"plain notes", None).await.unwrap();
+    let record = file_record("artifacts/files/f-1/v1.txt", 11);
     let body = body_of(
-        &file_record(&file),
-        &roots(dir.path()),
+        &record,
+        Some(&files),
         &DocumentConverter::none(),
     )
     .await;
@@ -65,50 +66,51 @@ async fn a_text_file_inside_the_roots_is_read() {
 async fn a_file_outside_the_roots_is_not_opened() {
     let dir = tempfile::tempdir().unwrap();
     let elsewhere = tempfile::tempdir().unwrap();
-    let secret = elsewhere.path().join("secret.txt");
-    std::fs::write(&secret, "do not read").unwrap();
+    let files = file_store(elsewhere.path());
+    files.put("artifacts/files/f-1/v1.txt", b"do not read", None).await.unwrap();
+    let record = file_record("artifacts/files/f-1/v1.txt", 11);
     let body = body_of(
-        &file_record(&secret),
-        &roots(dir.path()),
+        &record,
+        None,
         &DocumentConverter::none(),
     )
     .await;
     // Shown as a file: its path, never its content.
     assert!(!body.is_text);
-    assert_eq!(body.body, secret.display().to_string());
+    assert_eq!(body.body, "v1.txt");
 }
 
 #[tokio::test]
 async fn a_file_over_the_preview_limit_is_not_read() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("big.txt");
-    std::fs::File::create(&file)
-        .unwrap()
-        .set_len(PREVIEW_MAX_BYTES + 1)
-        .unwrap();
+    let files = file_store(dir.path());
+    let bytes = vec![b'a'; (PREVIEW_MAX_BYTES + 1) as usize];
+    files.put("artifacts/files/f-1/v1.txt", &bytes, None).await.unwrap();
+    let record = file_record("artifacts/files/f-1/v1.txt", bytes.len() as u64);
     let body = body_of(
-        &file_record(&file),
-        &roots(dir.path()),
+        &record,
+        Some(&files),
         &DocumentConverter::none(),
     )
     .await;
     assert!(!body.is_text);
-    assert_eq!(body.body, file.display().to_string());
+    assert_eq!(body.body, "v1.txt");
 }
 
 #[tokio::test]
 async fn a_binary_file_with_no_converter_shows_as_a_file() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("report.docx");
-    std::fs::write(&file, b"PK\x03\x04\x00\x00binary").unwrap();
+    let files = file_store(dir.path());
+    files.put("artifacts/files/f-1/v1.docx", b"PK\x03\x04\x00\x00binary", None).await.unwrap();
+    let record = file_record("artifacts/files/f-1/v1.docx", 10);
     let body = body_of(
-        &file_record(&file),
-        &roots(dir.path()),
+        &record,
+        Some(&files),
         &DocumentConverter::none(),
     )
     .await;
     assert!(!body.is_text && !body.converted);
-    assert_eq!(body.body, file.display().to_string());
+    assert_eq!(body.body, "v1.docx");
 }
 
 fn config_in(workspace: &Path) -> crate::config::Config {
