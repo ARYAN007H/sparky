@@ -30,6 +30,10 @@ const MOCK_API_KEY: &str = "loopback-session-restart-key";
 const RPC_TOKEN: &str = "native-session-restart-rpc-token";
 const FIRST_TEXT: &str = "remember this after the core restarts";
 const SECOND_TEXT: &str = "what did I ask before the restart?";
+const OTHER_CHAT_TEXT: &str = "remember a separate chat history";
+const AFTER_RESET_TEXT: &str = "this starts a fresh session after new";
+const RESET_AFTER_RESTART_TEXT: &str = "continue the reset conversation after restart";
+const OTHER_AFTER_RESTART_TEXT: &str = "continue the separate chat after restart";
 
 #[derive(Default)]
 struct MockState {
@@ -176,13 +180,17 @@ async fn chat_completion(State(state): State<Arc<MockState>>, Json(body): Json<V
 }
 
 fn message_update(update_id: i64, message_id: i64, text: &str) -> Value {
+    message_update_for(update_id, message_id, 42, text)
+}
+
+fn message_update_for(update_id: i64, message_id: i64, chat_id: i64, text: &str) -> Value {
     json!({
         "update_id": update_id,
         "message": {
             "message_id": message_id,
             "date": 1_800_000_000,
-            "from": { "id": 42, "is_bot": false, "first_name": "Ada" },
-            "chat": { "id": 42, "type": "private", "first_name": "Ada" },
+            "from": { "id": chat_id, "is_bot": false, "first_name": "Ada" },
+            "chat": { "id": chat_id, "type": "private", "first_name": "Ada" },
             "text": text
         }
     })
@@ -194,6 +202,14 @@ fn push_update(state: &MockState, update_id: i64, message_id: i64, text: &str) {
         .lock()
         .expect("Telegram updates")
         .push_back(message_update(update_id, message_id, text));
+}
+
+fn push_update_for(state: &MockState, update_id: i64, message_id: i64, chat_id: i64, text: &str) {
+    state
+        .updates
+        .lock()
+        .expect("Telegram updates")
+        .push_back(message_update_for(update_id, message_id, chat_id, text));
 }
 
 fn write_config(home: &Path, workspace: &Path, inference: &str) {
@@ -220,7 +236,7 @@ enabled = false
 
 [channels_config.telegram]
 bot_token = "{BOT_TOKEN}"
-allowed_users = ["42"]
+allowed_users = ["42", "43"]
 mention_only = false
 
 [[cloud_providers]]
@@ -490,23 +506,73 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         1,
         "the first process must finish exactly one model turn before restart"
     );
-    // Telegram only acknowledges a delivered update after the client advances
-    // its polling offset; wait for that protocol step before stopping process 1.
-    wait_until("Telegram acknowledgement of first update", || {
+    let wait_for_update_ack = |update_id| {
+        let state = Arc::clone(&mocks.state);
+        async move {
+            wait_until("Telegram acknowledgement of update", || {
+                state
+                    .update_offsets
+                    .lock()
+                    .expect("Telegram offsets")
+                    .iter()
+                    .any(|offset| *offset > update_id)
+            })
+            .await;
+        }
+    };
+    wait_for_update_ack(100).await;
+
+    // A second private conversation persists independent durable history.
+    push_update_for(&mocks.state, 101, 11, 43, OTHER_CHAT_TEXT);
+    wait_for_completion(&mocks.state, 2).await;
+    wait_for_update_ack(101).await;
+    let requests = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .clone();
+    assert!(model_saw_user_text(&requests[1], OTHER_CHAT_TEXT));
+    assert!(!model_saw_user_text(&requests[1], FIRST_TEXT));
+
+    // The real module command must reset only chat 42's durable SessionRef.
+    push_update(&mocks.state, 102, 12, "/new");
+    wait_until("Telegram /new reply", || {
         mocks
             .state
-            .update_offsets
+            .sent_messages
             .lock()
-            .expect("Telegram offsets")
+            .expect("Telegram sent messages")
             .iter()
-            .any(|offset| *offset > 100)
+            .any(|body| {
+                body["text"]
+                    .as_str()
+                    .is_some_and(|text| text.contains("Started new session"))
+            })
     })
     .await;
+    wait_for_update_ack(102).await;
+
+    push_update(&mocks.state, 103, 13, AFTER_RESET_TEXT);
+    wait_for_completion(&mocks.state, 3).await;
+    wait_for_update_ack(103).await;
+    let reset_request = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .get(2)
+        .cloned()
+        .expect("post-reset Telegram update reached the model");
+    assert!(model_saw_user_text(&reset_request, AFTER_RESET_TEXT));
+    assert!(!model_saw_user_text(&reset_request, FIRST_TEXT));
+    assert!(!model_saw_user_text(&reset_request, OTHER_CHAT_TEXT));
     first.stop();
 
-    // The second process starts from the same durable workspace and gets a
-    // distinct message in the same Telegram conversation.
-    push_update(&mocks.state, 101, 11, SECOND_TEXT);
+    // Both durable session histories survive a process restart: chat 42 keeps
+    // its post-reset messages, while chat 43 retains its unrelated history.
+    push_update(&mocks.state, 104, 14, RESET_AFTER_RESTART_TEXT);
+    push_update_for(&mocks.state, 105, 15, 43, OTHER_AFTER_RESTART_TEXT);
     let (mut second, second_rpc) = start_core(
         &home,
         &workspace,
@@ -520,14 +586,14 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         "restart must use a fresh process"
     );
     wait_healthy(&second_rpc, &mut second, &logs.join("second.log")).await;
-    wait_until("second model request", || {
+    wait_until("post-restart model requests", || {
         mocks
             .state
             .completions
             .lock()
             .expect("model requests")
             .len()
-            >= 2
+            >= 5
     })
     .await;
 
@@ -539,19 +605,24 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         .clone();
     assert_eq!(
         requests.len(),
-        2,
+        5,
         "each Telegram update must reach the model once"
     );
     assert!(
-        model_saw_user_text(&requests[1], FIRST_TEXT),
-        "the restarted process must resume the first Telegram turn in the exact second model request; got {}",
-        serde_json::to_string_pretty(&requests[1]).unwrap()
+        model_saw_user_text(&requests[3], AFTER_RESET_TEXT),
+        "chat 42 must resume its post-reset transcript after process restart; got {}",
+        serde_json::to_string_pretty(&requests[3]).unwrap()
     );
     assert!(
-        model_saw_user_text(&requests[1], SECOND_TEXT),
-        "the resumed model request must include the current Telegram message too; got {}",
-        serde_json::to_string_pretty(&requests[1]).unwrap()
+        model_saw_user_text(&requests[3], RESET_AFTER_RESTART_TEXT),
+        "the resumed chat 42 request must include its current message"
     );
-    wait_for_completion(&mocks.state, 2).await;
+    assert!(!model_saw_user_text(&requests[3], FIRST_TEXT));
+    assert!(!model_saw_user_text(&requests[3], OTHER_CHAT_TEXT));
+    assert!(model_saw_user_text(&requests[4], OTHER_CHAT_TEXT));
+    assert!(model_saw_user_text(&requests[4], OTHER_AFTER_RESTART_TEXT));
+    assert!(!model_saw_user_text(&requests[4], FIRST_TEXT));
+    assert!(!model_saw_user_text(&requests[4], AFTER_RESET_TEXT));
+    wait_for_completion(&mocks.state, 5).await;
     second.stop();
 }
