@@ -146,6 +146,17 @@ impl ControllerEntry {
         rpc_method_name(&self.schema)
     }
 
+    /// Decode params with a bound runtime parser, when this entry has one.
+    pub fn decode_params(&self, params: Map<String, Value>) -> Result<(), String> {
+        match &self.handler {
+            EntryHandler::Legacy(_) => Err(format!(
+                "{} has no bound parser",
+                self.schema.method_name()
+            )),
+            EntryHandler::Bound(handler) => handler.decode_params(params),
+        }
+    }
+
     fn legacy_controller(&self) -> Option<RegisteredController> {
         match &self.handler {
             EntryHandler::Legacy(handler) => Some(RegisteredController {
