@@ -34,6 +34,7 @@ import {
   clickNativeButton,
   clickText,
   dumpAccessibilityTree,
+  getRequestLog,
   textExists,
   waitForText,
 } from '../helpers/element-helpers';
@@ -47,6 +48,7 @@ import {
 } from '../helpers/shared-flows';
 import {
   clearRequestLog,
+  getMockBehavior,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
@@ -307,7 +309,34 @@ describe('Gmail Integration Flows', () => {
           .filter(key => key.includes('composio:connections'))
           .forEach(key => window.localStorage.removeItem(key));
       });
+      const seededConnections = JSON.parse(getMockBehavior().composioConnections ?? '[]');
+      expect(seededConnections).toEqual([
+        { id: 'c-gmail-disconnect', toolkit: 'gmail', status: 'ACTIVE' },
+      ]);
+      clearRequestLog();
+      await browser.refresh();
+      await waitForApp();
       await navigateToSkills();
+      await browser.waitUntil(
+        async () =>
+          getRequestLog().some(
+            request =>
+              request.method === 'GET' &&
+              request.url.startsWith('/agent-integrations/composio/connections') &&
+              request.status === 200
+          ),
+        {
+          timeout: 15_000,
+          interval: 250,
+          timeoutMsg: 'Connections page never fetched the seeded Composio connections list',
+        }
+      );
+      const connectionRequest = getRequestLog().find(
+        request =>
+          request.method === 'GET' &&
+          request.url.startsWith('/agent-integrations/composio/connections')
+      );
+      expect(connectionRequest?.status).toBe(200);
       await assertConnectorCardVisible('Gmail');
 
       const modal = await openConnectorModal('Gmail', 15_000, 'Connected');

@@ -43,11 +43,11 @@ const FORCED_RESPONSES = [
   { content: `Here is the fetched content: ${CANARY_FINAL}` },
 ];
 
-async function renderedToolCards(): Promise<string[]> {
+async function renderedToolNames(): Promise<string[]> {
   return (await browser.execute(() =>
-    Array.from(
-      document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')
-    ).map(card => card.innerText)
+    Array.from(document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]'))
+      .map(card => card.getAttribute('data-tool-name'))
+      .filter((name): name is string => Boolean(name))
   )) as string[];
 }
 
@@ -109,10 +109,10 @@ describe('Chat tool-call lifecycle', () => {
     ).toBe(true);
 
     await browser.waitUntil(
-      async () => (await renderedToolCards()).some(card => card.includes('Fetching example.com')),
+      async () => (await renderedToolNames()).includes('web_fetch'),
       { timeout: 45_000, interval: 100, timeoutMsg: 'Rendered web_fetch tool card never appeared' }
     );
-    expect(await textExists('Fetching example.com')).toBe(true);
+    expect(await renderedToolNames()).toContain('web_fetch');
   });
 
   it('T1.2 — rendered assistant UI tool card identifies the web fetch', async () => {

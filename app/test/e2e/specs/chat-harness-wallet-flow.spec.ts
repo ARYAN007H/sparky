@@ -16,21 +16,12 @@ async function clickRecoveryConsentCheckbox(): Promise<void> {
   if (!(await checkbox.isExisting())) {
     throw new Error('Recovery phrase consent checkbox not found');
   }
+  await browser.waitUntil(async () => await checkbox.isEnabled(), {
+    timeout: 10_000,
+    timeoutMsg: 'Recovery phrase consent checkbox did not enable after revealing the phrase',
+  });
   if (!(await checkbox.isSelected())) {
-    try {
-      await checkbox.click();
-    } catch (err) {
-      console.warn(
-        `[chat-harness-wallet-flow] checkbox click intercepted; applying DOM fallback: ${err}`
-      );
-      await browser.execute(() => {
-        const input = document.querySelector<HTMLInputElement>('#mnemonic-confirm-checkbox');
-        if (!input) return;
-        input.checked = true;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-    }
+    await checkbox.click();
   }
   await browser.waitUntil(async () => await checkbox.isSelected(), {
     timeout: 5_000,
@@ -59,9 +50,7 @@ describe('Chat harness — wallet flow', () => {
     this.timeout(90_000);
     await navigateViaHash('/settings/recovery-phrase');
     await browser.waitUntil(
-      async () =>
-        (await textExists('Save Recovery Phrase')) ||
-        (await textExists('Your wallet is already set up')),
+      async () => (await textExists('Reveal recovery phrase')) || (await textExists('Copy to Clipboard')),
       { timeout: 20_000, timeoutMsg: 'Recovery Phrase panel did not mount' }
     );
 
@@ -70,18 +59,26 @@ describe('Chat harness — wallet flow', () => {
       {}
     );
     if (alreadyConfigured.ok && alreadyConfigured.result?.result?.configured === true) {
-      console.log(
-        '[chat-harness-wallet-flow] Wallet already configured after reset; verifying state'
-      );
-    } else {
-      await clickRecoveryConsentCheckbox();
-      await clickText('Save Recovery Phrase', 10_000);
-
-      await browser.waitUntil(async () => await textExists('Recovery phrase saved'), {
-        timeout: 20_000,
-        timeoutMsg: 'wallet setup success message never rendered',
-      });
+      throw new Error('Recovery Phrase setup test requires an unconfigured wallet after reset');
     }
+
+    await clickText('Reveal recovery phrase', 10_000);
+    await browser.waitUntil(async () => await textExists('Copy to Clipboard'), {
+      timeout: 10_000,
+      timeoutMsg: 'recovery phrase was not revealed',
+    });
+    await clickRecoveryConsentCheckbox();
+    const saveButton = await browser.$('button*=Save Recovery Phrase');
+    await browser.waitUntil(async () => await saveButton.isEnabled(), {
+      timeout: 5_000,
+      timeoutMsg: 'Save Recovery Phrase did not enable after consent was granted',
+    });
+    await clickText('Save Recovery Phrase', 10_000);
+
+    await browser.waitUntil(async () => await textExists('Recovery phrase saved'), {
+      timeout: 20_000,
+      timeoutMsg: 'wallet setup success message never rendered',
+    });
 
     await browser.waitUntil(
       async () => {
