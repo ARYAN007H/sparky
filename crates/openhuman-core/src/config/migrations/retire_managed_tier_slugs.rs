@@ -7,8 +7,8 @@
 //! (or an older build) could have written one is rewritten:
 //!
 //! - `default_model` — any tier slug becomes [`MODEL_MANAGED_DEFAULT`].
-//! - `orchestrator.model`, every `teams.<name>.{lead,agent}_model` and each
-//!   `agents.<id>.model` delegate pin — tier slugs become the managed default
+//! - `orchestrator.model` and every `teams.<name>.{lead,agent}_model` pin — tier
+//!   slugs become the managed default
 //!   too; a slug that was pinning a *role* (`reasoning-v1` on a lead)
 //!   loses nothing, since on the managed backend every role now runs the same
 //!   model.
@@ -66,13 +66,6 @@ pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
         rewrite_opt(
             &format!("teams.{name}.agent_model"),
             &mut team.agent_model,
-            &mut stats,
-        );
-    }
-    for (id, delegate) in config.agents.iter_mut() {
-        rewrite(
-            &format!("agents.{id}.model"),
-            &mut delegate.model,
             &mut stats,
         );
     }
