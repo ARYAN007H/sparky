@@ -42,6 +42,8 @@ export default async function typedImageAttachmentRoundtrip({
   log,
   logDir,
 }) {
+  const actionDir = process.env.OPENHUMAN_ACTION_DIR;
+  if (!actionDir) throw new Error("OPENHUMAN_ACTION_DIR must isolate staged uploads");
   const rpcCalls = [];
   let rpcUrl;
   let authorization;
@@ -151,7 +153,7 @@ export default async function typedImageAttachmentRoundtrip({
   }
   if (persisted.content !== USER_TEXT)
     throw new Error("persisted user text differs from clean composer text");
-  const stagedBytes = findStoredBytes(join(logDir, "workspace"), IMAGE_BYTES);
+  const stagedBytes = findStoredBytes(actionDir, IMAGE_BYTES);
   if (!stagedBytes)
     throw new Error("staged image bytes differ from the browser upload");
   log(

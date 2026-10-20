@@ -54,6 +54,8 @@ export default async function queuedImageAttachmentRoundtrip({
   log,
   logDir,
 }) {
+  const actionDir = process.env.OPENHUMAN_ACTION_DIR;
+  if (!actionDir) throw new Error("OPENHUMAN_ACTION_DIR must isolate staged uploads");
   const rpcCalls = [];
   const rpcResponses = [];
   let rpcUrl;
@@ -310,7 +312,7 @@ export default async function queuedImageAttachmentRoundtrip({
   ) {
     throw new Error(`queued image did not persist as an opaque typed ref: ${JSON.stringify(reference)}`);
   }
-  if (!findStoredBytes(join(logDir, "workspace"), IMAGE_BYTES)) {
+  if (!findStoredBytes(actionDir, IMAGE_BYTES)) {
     throw new Error("queued model image bytes differ from the browser upload");
   }
 
