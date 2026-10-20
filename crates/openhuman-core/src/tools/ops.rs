@@ -423,7 +423,6 @@ pub fn all_tools_with_runtime(
         browser_config,
         http_config,
         action_dir,
-        agents,
         approval_workspace_root,
     };
 

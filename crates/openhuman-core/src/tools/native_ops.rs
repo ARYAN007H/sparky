@@ -98,7 +98,6 @@ pub fn build_runtime_tools(config: &Config) -> Result<Vec<Box<dyn Tool>>, String
         &config.browser,
         &config.http_request,
         &config.action_dir,
-        &config.agents,
         config,
         None,
     );
