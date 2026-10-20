@@ -757,9 +757,9 @@
 #                      already in the graph. +4 packages / +4 names, native
 #                      unchanged. Measured: scripts/kernel-floor.sh flows.
 # 318/298/3 2026-10-21 The flows profile improved (EX63 run 39476165978,
-#                      Linux): 318 packages / 298 names against 338/315. The
-#                      upstream main merge (flows bus, #8159) moved the flows
-#                      host onto the TinyBus module contract and dropped the
-#                      crates it only pulled in directly. Native unchanged.
+#                      Linux): 318 packages / 298 names against 338/315, after
+#                      merging upstream main (flows bus, #8159). The gate only
+#                      requires the limit to follow an improvement; no
+#                      dependency was added. Native unchanged.
 #                      Measured: scripts/kernel-floor.sh flows.
 flows:318:298:3
