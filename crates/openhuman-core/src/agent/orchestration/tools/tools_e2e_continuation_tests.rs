@@ -95,7 +95,12 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     let running_job = jobs
         .list()
         .into_iter()
-        .find(|job| job.id.as_str() == task_id)
+        .find(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str())
+        })
         .expect("initial child is registered in shared Jobs");
     let paused_job = tokio::time::timeout(
         std::time::Duration::from_secs(5),
