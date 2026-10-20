@@ -34,12 +34,7 @@ pub fn goal_store(
         Ok(tenant) => tenant,
         Err(no_tenant) => {
             log::warn!("[thread_goals] {no_tenant}; using throwaway in-memory store");
-            return Arc::new(GoalStore::with_observer(
-                tinyagents_session::port::InMemorySessionStores::new()
-                    .for_agent("ephemeral")
-                    .kv,
-                Arc::new(OpenHumanGoalObserver),
-            ));
+            return isolated_goal_store();
         }
     };
     let stores = crate::core::runtime::slot_for::<ScopedGoalStores>(context);
@@ -60,6 +55,16 @@ pub fn goal_store(
     ));
     stores.insert(workspace_dir.to_path_buf(), Arc::clone(&store));
     store
+}
+
+/// A lost-scope caller gets isolated state, without permission to publish
+/// goal changes into the host's thread or web-channel event streams.
+fn isolated_goal_store() -> Arc<GoalStore> {
+    Arc::new(GoalStore::new(
+        tinyagents_session::port::InMemorySessionStores::new()
+            .for_agent("ephemeral")
+            .kv,
+    ))
 }
 
 struct OpenHumanGoalObserver;

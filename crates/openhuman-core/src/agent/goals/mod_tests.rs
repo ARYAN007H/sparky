@@ -152,3 +152,32 @@ async fn goal_store_uses_the_explicit_dispatch_context_provider() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn isolated_goal_store_does_not_publish_thread_updates() {
+    crate::core::bus::init().await.expect("bus init");
+    let mut events = crate::core::bus::BUS
+        .get()
+        .expect("bus initialized")
+        .receiver();
+    let thread_id = format!("unscoped-goal-{}", uuid::Uuid::new_v4());
+
+    isolated_goal_store()
+        .set(&thread_id, "must stay private", None)
+        .await
+        .expect("write isolated goal");
+
+    loop {
+        match events.try_recv() {
+            Ok(crate::core::events::DomainEvent::ThreadGoalUpdated {
+                thread_id: event_thread,
+                ..
+            }) if event_thread == thread_id => {
+                panic!("isolated goal mutation must not publish a thread update")
+            }
+            Ok(_) | Err(tinybus::TryRecvError::Lagged(_)) => continue,
+            Err(tinybus::TryRecvError::Empty) => break,
+            Err(tinybus::TryRecvError::Closed) => panic!("event bus closed"),
+        }
+    }
+}
