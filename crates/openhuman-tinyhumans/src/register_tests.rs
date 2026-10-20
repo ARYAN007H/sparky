@@ -20,8 +20,10 @@ async fn boot_registration_supplies_hosted_model_default_and_normalizer_before_c
         Some(crate::inference::MODEL_MANAGED_DEFAULT)
     );
 
-    let mut legacy = openhuman_embed::__host::config::Config::default();
-    legacy.default_model = Some("reasoning-v1".to_string());
+    let mut legacy = openhuman_embed::__host::config::Config {
+        default_model: Some("reasoning-v1".to_string()),
+        ..Default::default()
+    };
     let tmp = tempfile::tempdir().unwrap();
     legacy.workspace_dir = tmp.path().join("workspace");
     legacy.config_path = tmp.path().join("config.toml");

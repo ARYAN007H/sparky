@@ -8,18 +8,22 @@ fn normalize_with_hosted_registration(config: &mut Config) -> bool {
 
 #[test]
 fn hosted_normalizer_rewrites_legacy_tiers_and_preserves_concrete_pins() {
-    let mut config = Config::default();
-    config.default_model = Some("reasoning-v1".to_string());
-    config.orchestrator.model = Some("custom/orchestrator-model".to_string());
-    config.agents.insert(
-        "pinned".to_string(),
-        openhuman_embed::__host::config::schema::DelegateAgentConfig {
-            model: "vendor/model-id".to_string(),
-            system_prompt: None,
-            temperature: None,
-            max_depth: 3,
+    let mut config = Config {
+        default_model: Some("reasoning-v1".to_string()),
+        orchestrator: openhuman_embed::__host::config::schema::OrchestratorModelConfig {
+            model: Some("custom/orchestrator-model".to_string()),
         },
-    );
+        agents: std::collections::HashMap::from([(
+            "pinned".to_string(),
+            openhuman_embed::__host::config::schema::DelegateAgentConfig {
+                model: "vendor/model-id".to_string(),
+                system_prompt: None,
+                temperature: None,
+                max_depth: 3,
+            },
+        )]),
+        ..Config::default()
+    };
 
     assert!(normalize_with_hosted_registration(&mut config));
     assert_eq!(config.default_model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
@@ -33,46 +37,47 @@ fn hosted_normalizer_rewrites_legacy_tiers_and_preserves_concrete_pins() {
 
 #[test]
 fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
-    let mut config = Config::default();
-    config.default_model = Some("  reasoning-v1  ".to_string());
-    config.orchestrator.model = Some("reasoning-quick-v1".to_string());
-    config.teams.insert(
-        "team".to_string(),
-        openhuman_embed::__host::config::schema::TeamModelConfig {
-            lead_model: Some("chat-v1".to_string()),
-            agent_model: Some("burst-v1".to_string()),
-            ..Default::default()
+    let mut config = Config {
+        default_model: Some("  reasoning-v1  ".to_string()),
+        orchestrator: openhuman_embed::__host::config::schema::OrchestratorModelConfig {
+            model: Some("reasoning-quick-v1".to_string()),
         },
-    );
-    config.agents.insert(
-        "legacy".to_string(),
-        openhuman_embed::__host::config::schema::DelegateAgentConfig {
-            model: "coding-v1".to_string(),
-            system_prompt: None,
-            temperature: None,
-            max_depth: 3,
-        },
-    );
-    config
-        .model_routes
-        .push(openhuman_embed::__host::config::schema::ModelRouteConfig {
-            hint: "summary".to_string(),
-            model: "summarization-v1".to_string(),
-        });
-    config.model_routes.extend([
-        openhuman_embed::__host::config::schema::ModelRouteConfig {
-            hint: "custom".to_string(),
-            model: "vendor/pinned".to_string(),
-        },
-        openhuman_embed::__host::config::schema::ModelRouteConfig {
-            hint: "unknown".to_string(),
-            model: "hint:unknown".to_string(),
-        },
-        openhuman_embed::__host::config::schema::ModelRouteConfig {
-            hint: "blank".to_string(),
-            model: String::new(),
-        },
-    ]);
+        teams: std::collections::HashMap::from([(
+            "team".to_string(),
+            openhuman_embed::__host::config::schema::TeamModelConfig {
+                lead_model: Some("chat-v1".to_string()),
+                agent_model: Some("burst-v1".to_string()),
+            },
+        )]),
+        agents: std::collections::HashMap::from([(
+            "legacy".to_string(),
+            openhuman_embed::__host::config::schema::DelegateAgentConfig {
+                model: "coding-v1".to_string(),
+                system_prompt: None,
+                temperature: None,
+                max_depth: 3,
+            },
+        )]),
+        model_routes: vec![
+            openhuman_embed::__host::config::schema::ModelRouteConfig {
+                hint: "summary".to_string(),
+                model: "summarization-v1".to_string(),
+            },
+            openhuman_embed::__host::config::schema::ModelRouteConfig {
+                hint: "custom".to_string(),
+                model: "vendor/pinned".to_string(),
+            },
+            openhuman_embed::__host::config::schema::ModelRouteConfig {
+                hint: "unknown".to_string(),
+                model: "hint:unknown".to_string(),
+            },
+            openhuman_embed::__host::config::schema::ModelRouteConfig {
+                hint: "blank".to_string(),
+                model: String::new(),
+            },
+        ],
+        ..Config::default()
+    };
 
     assert!(normalize_with_hosted_registration(&mut config));
     assert_eq!(config.default_model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
@@ -95,8 +100,10 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
     assert_eq!(config.model_routes[3].model, "");
     assert!(!normalize_with_hosted_registration(&mut config));
 
-    let mut absent = Config::default();
-    absent.default_model = None;
+    let mut absent = Config {
+        default_model: None,
+        ..Config::default()
+    };
     assert!(normalize_with_hosted_registration(&mut absent));
     assert_eq!(absent.default_model, None);
     assert!(!normalize_with_hosted_registration(&mut absent));
@@ -104,9 +111,11 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
 
 #[test]
 fn hosted_normalizer_seeds_its_preset_using_the_configured_api_url_once() {
-    let mut config = Config::default();
-    config.default_model = None;
-    config.api_url = Some("https://custom.example/api".to_string());
+    let mut config = Config {
+        default_model: None,
+        api_url: Some("https://custom.example/api".to_string()),
+        ..Config::default()
+    };
 
     assert!(normalize_with_hosted_registration(&mut config));
     assert_eq!(config.default_model, None);
@@ -123,19 +132,21 @@ fn hosted_normalizer_seeds_its_preset_using_the_configured_api_url_once() {
 
 #[test]
 fn hosted_normalizer_selects_existing_managed_entry_for_legacy_managed_endpoint() {
-    let mut config = Config::default();
-    config.primary_cloud = None;
-    config.inference_url = Some("https://api.managed.test/v1".into());
+    let mut config = Config {
+        primary_cloud: None,
+        inference_url: Some("https://api.managed.test/v1".into()),
+        cloud_providers: vec![
+            openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
+                id: "p_existing_openhuman".to_string(),
+                slug: "openhuman".into(),
+                endpoint: "https://api.managed.test/v1".into(),
+                ..Default::default()
+            },
+        ],
+        ..Config::default()
+    };
     config.resolved_endpoints.managed_hosts = vec![".managed.test".into()];
     let managed_id = "p_existing_openhuman".to_string();
-    config.cloud_providers.push(
-        openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
-            id: managed_id.clone(),
-            slug: "openhuman".into(),
-            endpoint: "https://api.managed.test/v1".into(),
-            ..Default::default()
-        },
-    );
 
     let _ = normalize_with_hosted_registration(&mut config);
     assert_eq!(config.primary_cloud.as_deref(), Some(managed_id.as_str()));
@@ -145,17 +156,19 @@ fn hosted_normalizer_selects_existing_managed_entry_for_legacy_managed_endpoint(
 
 #[test]
 fn hosted_normalizer_leaves_custom_and_explicit_primary_choices_alone() {
-    let mut custom = Config::default();
-    custom.primary_cloud = None;
-    custom.inference_url = Some("https://custom.example/v1".into());
-    custom.cloud_providers.push(
-        openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
-            id: "p_hosted".into(),
-            slug: "openhuman".into(),
-            endpoint: "https://api.managed.test/v1".into(),
-            ..Default::default()
-        },
-    );
+    let mut custom = Config {
+        primary_cloud: None,
+        inference_url: Some("https://custom.example/v1".into()),
+        cloud_providers: vec![
+            openhuman_embed::__host::config::schema::cloud_providers::CloudProviderCreds {
+                id: "p_hosted".into(),
+                slug: "openhuman".into(),
+                endpoint: "https://api.managed.test/v1".into(),
+                ..Default::default()
+            },
+        ],
+        ..Config::default()
+    };
     assert!(!normalize_with_hosted_registration(&mut custom));
     assert_eq!(custom.primary_cloud, None);
 
