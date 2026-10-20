@@ -63,8 +63,19 @@ fn model_fixture_entry() -> ChatModelEntry {
                 Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
                 Some(model) => model
                     .strip_prefix("hint:")
-                    .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
-                    .map(|_| "test/session-fixture".to_string()),
+                    .filter(|hint_role| crate::config::WORKLOAD_ROLES.contains(hint_role))
+                    .map(|hint_role| {
+                        if hint_role == "chat" {
+                            config
+                                .default_model
+                                .as_deref()
+                                .filter(|configured| !configured.starts_with("hint:"))
+                                .map(str::to_string)
+                                .unwrap_or_else(|| "test/session-fixture".to_string())
+                        } else {
+                            "test/session-fixture".to_string()
+                        }
+                    }),
                 None if role == "agentic" => Some("test/session-fixture".into()),
                 None => match config.default_model.as_deref() {
                     Some("fixture-reasoning") => Some("test/selected-reasoning".into()),
