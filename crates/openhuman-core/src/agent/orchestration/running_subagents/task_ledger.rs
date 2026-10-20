@@ -257,18 +257,6 @@ pub(crate) fn reconcile_orphaned_tasks_on_boot(workspace_dir: &Path) -> usize {
     reconciled
 }
 
-pub(crate) fn task_record_for_task_in_workspace(
-    workspace_dir: &Path,
-    task_id: &str,
-    parent_session: &str,
-) -> Result<OrchestrationTaskRecord, WaitError> {
-    subagent_record_for_task(
-        task_store_for_workspace(workspace_dir).as_ref(),
-        task_id,
-        parent_session,
-    )
-}
-
 /// Snapshot the typed lifecycle records, optionally scoped to a `parent_session`.
 #[cfg(test)]
 pub(crate) fn task_records(parent_session: Option<&str>) -> Vec<OrchestrationTaskRecord> {
