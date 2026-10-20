@@ -101,7 +101,7 @@ impl RelayProgressiveTransport {
                 if idempotency_key.is_empty() || idempotency_key.len() > 128 {
                     return Err(Error::failed("hosted relay send identity is invalid"));
                 }
-                let outcome = self.channel.publish_typed_reply(
+                self.channel.publish_typed_reply(
                     &self.channel_ref,
                     &self.conversation,
                     &self.turn_id,
@@ -111,7 +111,7 @@ impl RelayProgressiveTransport {
                     &parts,
                     &text,
                 );
-                Ok(ProgressiveTransportResult::Outcome(Box::new(outcome)))
+                Ok(ProgressiveTransportResult::Accepted)
             }
             _ => Err(Error::failed("hosted relay operation is unavailable")),
         }
