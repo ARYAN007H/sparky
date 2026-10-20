@@ -450,7 +450,7 @@ Primary     (direct-capable, Master Agent on `coding` hint)
   │
   ├─► Worker      ◄─── fast path: one delegation, leaf does the work
   │
-  └─► Reasoning   (slow, deep-thinking, e.g. planner on `reasoning` hint)
+  └─► Reasoning   (slow, deep-thinking, e.g. a custom agent on `reasoning` hint)
         │
         └─► Worker  ◄─── deep path: reasoning decomposes, workers execute
 ```
