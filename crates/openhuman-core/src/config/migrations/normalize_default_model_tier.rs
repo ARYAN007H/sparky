@@ -5,8 +5,10 @@
 use crate::config::Config;
 
 #[derive(Debug, Default, Clone)]
-pub struct MigrationStats;
+pub struct MigrationStats {
+    pub default_model_normalized: bool,
+}
 
 pub fn run(_config: &mut Config) -> anyhow::Result<MigrationStats> {
-    Ok(MigrationStats)
+    Ok(MigrationStats::default())
 }
