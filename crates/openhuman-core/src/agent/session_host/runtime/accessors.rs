@@ -437,6 +437,11 @@ impl OpenHumanSessionHost {
         self.workspace_descriptor = descriptor;
     }
 
+    /// The current workspace binding used by this session's tools.
+    pub(crate) fn live_workspace_descriptor(&self) -> Option<tinytools::WorkspaceDescriptor> {
+        self.workspace_descriptor.clone()
+    }
+
     /// Attach an active-run queue for mid-turn steering.
     pub fn set_run_queue(
         &mut self,
@@ -585,11 +590,14 @@ impl OpenHumanSessionHost {
         ));
     }
 
-    /// Clears the agent's conversation history.
+    /// Discards this host's cached session composition.
+    ///
+    /// This synchronous compatibility method does not reset durable history;
+    /// callers that serve a user-visible reset command must use
+    /// `reset_bound_history` so the transcript generation changes atomically.
     pub fn clear_history(&mut self) {
-        // Runtime `Session` owns the only generic history and has no mutable
-        // clear operation by design. Dropping this uncommitted/committed
-        // composition starts a fresh runtime session on the next public turn.
+        // Dropping the composition only affects this host instance. Durable
+        // transcript state remains untouched.
         self.runtime_session = None;
         self.runtime_state = Arc::new(std::sync::Mutex::new(
             super::super::runtime_session::OpenHumanSessionState::default(),

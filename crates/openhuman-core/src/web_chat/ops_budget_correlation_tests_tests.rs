@@ -126,7 +126,7 @@ async fn record_prunes_other_threads_stale_entries() {
 
 #[tokio::test]
 async fn budget_signals_stay_with_the_agent_that_recorded_them() {
-    use crate::core::runtime::{ContextOverlay, DomainSet, context::CoreContext};
+    use crate::core::runtime::{context::CoreContext, ContextOverlay, DomainSet};
     let root = CoreContext::for_test(DomainSet::full(), None);
     let agent = |id: &str| {
         root.derive_with(

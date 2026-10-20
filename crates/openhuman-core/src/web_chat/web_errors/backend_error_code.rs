@@ -25,8 +25,8 @@ pub(super) fn classify_by_backend_error_code(
     fallback_available: Option<bool>,
 ) -> Option<ClassifiedError> {
     use crate::inference::provider::{
-        BackendErrorCode, body_flags_malformed, extract_backend_error_code,
-        is_managed_backend_envelope,
+        body_flags_malformed, extract_backend_error_code, is_managed_backend_envelope,
+        BackendErrorCode,
     };
 
     // Managed-vs-BYO gate: an `errorCode` is only trustworthy on a
@@ -49,7 +49,7 @@ pub(super) fn classify_by_backend_error_code(
     );
 
     use super::classify::{classified, classified_plain, copy_params};
-    use crate::inference::failure_copy::{FailureClass as C, failure_copy};
+    use crate::inference::failure_copy::{failure_copy, FailureClass as C};
 
     let classified = match code {
         BackendErrorCode::RateLimited => {

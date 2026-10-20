@@ -6,7 +6,7 @@ use super::{
 
 use crate::core_host::web_chat::{WebChannelEvent, WebEventContext};
 use engineioxide::Packet;
-use socketioxide::{SocketIo, extract::SocketRef};
+use socketioxide::{extract::SocketRef, SocketIo};
 
 #[test]
 fn companion_state_transport_delivers_payload_to_bridge() {
@@ -143,26 +143,18 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
         event_names(&reconnected_packets),
         ["chat_done", "chat:done"]
     );
-    assert!(
-        initiator_packets
-            .iter()
-            .all(|(_, payload)| payload["event"] == "chat_done")
-    );
-    assert!(
-        reconnected_packets
-            .iter()
-            .all(|(_, payload)| payload["event"] == "chat_done")
-    );
-    assert!(
-        initiator_packets
-            .iter()
-            .all(|(_, payload)| payload["full_response"] == "finished")
-    );
-    assert!(
-        reconnected_packets
-            .iter()
-            .all(|(_, payload)| payload["thread_id"] == "thread-1")
-    );
+    assert!(initiator_packets
+        .iter()
+        .all(|(_, payload)| payload["event"] == "chat_done"));
+    assert!(reconnected_packets
+        .iter()
+        .all(|(_, payload)| payload["event"] == "chat_done"));
+    assert!(initiator_packets
+        .iter()
+        .all(|(_, payload)| payload["full_response"] == "finished"));
+    assert!(reconnected_packets
+        .iter()
+        .all(|(_, payload)| payload["thread_id"] == "thread-1"));
     assert_empty_queue(&mut initiator_rx);
     assert_empty_queue(&mut reconnected_rx);
     assert_empty_queue(&mut unrelated_rx);

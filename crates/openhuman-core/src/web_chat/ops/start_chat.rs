@@ -9,7 +9,6 @@
 
 use std::time::Duration;
 
-use serde_json::json;
 use tinyagents_harness::turn_runner::{QueueDisposition, TurnRequest, TurnRunnerError};
 use tinychannels_bus::web::{ChatRequestMetadata, QueueMode};
 use uuid::Uuid;
@@ -67,6 +66,16 @@ fn guardrail_verdict_user_message(verdict: &str) -> &'static str {
         "review_blocked" => prompt_guard_user_message(PromptEnforcementAction::ReviewBlocked),
         _ => prompt_guard_user_message(PromptEnforcementAction::Allow),
     }
+}
+
+fn submission_has_content(
+    message: &str,
+    stored_attachments: Option<&crate::agent::queued_turn::StoredAttachmentInput>,
+    attachment_uploads: Option<&[tinychannels_bus::ContentPart]>,
+) -> bool {
+    !message.trim().is_empty()
+        || stored_attachments.is_some_and(|input| !input.parts.is_empty())
+        || attachment_uploads.is_some_and(|parts| !parts.is_empty())
 }
 
 impl std::error::Error for StartChatError {}
@@ -179,6 +188,22 @@ fn parse_mode(mode: Option<&str>) -> QueueMode {
     }
 }
 
+fn validate_queue_mode_media(
+    mode: QueueMode,
+    has_voice_note: bool,
+    has_stored_media: bool,
+    has_uploads: bool,
+) -> Result<(), StartChatError> {
+    if matches!(mode, QueueMode::Collect | QueueMode::Steer)
+        && (has_voice_note || has_stored_media || has_uploads)
+    {
+        return Err(StartChatError::Other(
+            "collect and steer queue modes do not support typed attachments".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn disposition(mode: QueueMode) -> QueueDisposition {
     match mode {
         QueueMode::Interrupt => QueueDisposition::Interrupt,
@@ -232,6 +257,64 @@ pub(super) fn start_chat_with_voice_note<'a>(
     metadata: ChatRequestMetadata,
     voice_note_id: Option<String>,
 ) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
+    start_chat_with_stored_attachments(
+        ctx,
+        client_id,
+        thread_id,
+        message,
+        model_override,
+        temperature,
+        locale,
+        queue_mode,
+        metadata,
+        voice_note_id,
+        None,
+    )
+}
+
+pub(super) fn start_chat_with_stored_attachments<'a>(
+    ctx: &'a crate::core::runtime::DispatchCtx,
+    client_id: &'a str,
+    thread_id: &'a str,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    locale: Option<String>,
+    queue_mode: Option<String>,
+    metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
+    stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
+) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
+    start_chat_with_attachments(
+        ctx,
+        client_id,
+        thread_id,
+        message,
+        model_override,
+        temperature,
+        locale,
+        queue_mode,
+        metadata,
+        voice_note_id,
+        stored_attachments,
+        None,
+    )
+}
+
+pub(super) fn start_chat_with_attachments<'a>(
+    ctx: &'a crate::core::runtime::DispatchCtx,
+    client_id: &'a str,
+    thread_id: &'a str,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    locale: Option<String>,
+    queue_mode: Option<String>,
+    metadata: ChatRequestMetadata,
+    voice_note_id: Option<String>,
+    stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
+    attachment_uploads: Option<Vec<tinychannels_bus::ContentPart>>,
+) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
     Box::pin(start_chat_inner(
         ctx,
         client_id,
@@ -243,6 +326,8 @@ pub(super) fn start_chat_with_voice_note<'a>(
         queue_mode,
         metadata,
         voice_note_id,
+        stored_attachments,
+        attachment_uploads,
     ))
 }
 
@@ -258,6 +343,8 @@ async fn start_chat_inner(
     queue_mode: Option<String>,
     metadata: ChatRequestMetadata,
     voice_note_id: Option<String>,
+    stored_attachments: Option<crate::agent::queued_turn::StoredAttachmentInput>,
+    attachment_uploads: Option<Vec<tinychannels_bus::ContentPart>>,
 ) -> Result<String, StartChatError> {
     let client_id = client_id.trim().to_string();
     let thread_id = thread_id.trim().to_string();
@@ -269,14 +356,38 @@ async fn start_chat_inner(
     if thread_id.is_empty() {
         return Err(StartChatError::Other("thread_id is required".to_string()));
     }
-    if message.is_empty() {
+    if !submission_has_content(
+        &message,
+        stored_attachments.as_ref(),
+        attachment_uploads.as_deref(),
+    ) {
         return Err(StartChatError::Other("message is required".to_string()));
     }
+    let mode = parse_mode(queue_mode.as_deref());
+    validate_queue_mode_media(
+        mode,
+        voice_note_id.is_some(),
+        stored_attachments
+            .as_ref()
+            .is_some_and(|input| !input.parts.is_empty()),
+        attachment_uploads
+            .as_ref()
+            .is_some_and(|parts| !parts.is_empty()),
+    )?;
     // A profile this node no longer hosts (its lease was lost or released)
     // starts no new turn here. No-op outside SaaS.
     crate::profiles::host::ensure_hosted(ctx).map_err(StartChatError::Other)?;
 
-    let mode = parse_mode(queue_mode.as_deref());
+    let pending_attachments = match attachment_uploads {
+        Some(parts) if !parts.is_empty() => Some(
+            crate::threads::attachments::stage_queued_parts(ctx, &thread_id, &parts)
+                .await
+                .map(|parts| crate::agent::queued_turn::PendingAttachmentInput { parts })
+                .map_err(StartChatError::Other)?,
+        ),
+        _ => None,
+    };
+
     let request_id = Uuid::new_v4().to_string();
     if let Some(note_id) = voice_note_id.as_deref() {
         bind_voice_note_request_id(ctx, &thread_id, &message, note_id, &request_id).await?;
@@ -295,11 +406,15 @@ async fn start_chat_inner(
         payload: QueuedPayload {
             ctx: Some(ctx.clone()),
             client_id: client_id.clone(),
+            trusted_turn: None,
             model_override,
             temperature,
             locale,
             metadata,
             queued_at_ms,
+            deferred_user_message: mode == QueueMode::Followup && stored_attachments.is_none(),
+            stored_attachments,
+            pending_attachments: pending_attachments.clone(),
         },
         host_authored: false,
         disposition: disposition(mode),
@@ -365,15 +480,18 @@ async fn start_chat_inner(
                 item_id: Some(request_id.clone()),
                 text_preview: Some(preview),
             });
-            Ok(json!({
-                "queued": true,
-                "queue_mode": mode.to_string(),
-                "client_id": client_id,
-                "thread_id": thread_id,
-                "request_id": request_id,
-                "queue_depth": queue_depth,
+            serde_json::to_string(&crate::threads::rpc_models::QueuedChatAck {
+                queued: true,
+                queue_mode: mode.to_string(),
+                client_id,
+                thread_id,
+                request_id,
+                queue_depth,
+                queued_attachments: pending_attachments
+                    .map(|input| input.parts)
+                    .unwrap_or_default(),
             })
-            .to_string())
+            .map_err(|error| StartChatError::Other(format!("serialize queued chat ack: {error}")))
         }
     }
 }
@@ -438,6 +556,7 @@ async fn bind_voice_note_request_id(
         row.id.clone(),
         ConversationMessagePatch {
             extra_metadata: Some(extra_metadata),
+            ..Default::default()
         },
     )
     .await

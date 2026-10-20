@@ -49,6 +49,10 @@ path = "src/bin/fleet.rs"
 # (no `http-server`) this target is skipped rather than failing to link.
 required-features = ["http-server", "bin-tools"]
 
+[[example]]
+name = "thread_wire_schema"
+path = "../../examples/thread_wire_schema.rs"
+
 # The benchmark and profiling binaries (`library-profile`, `rss-bench`,
 # `tool-search-bench`, `tool-dialect-bench`) and their driver scripts live in
 # tinyhumansai/openhuman-benchmarks (`profile/`), which builds them against a
@@ -74,6 +78,10 @@ required-features = ["http-server", "bin-tools"]
 # files. #5021 is still the right fix for symbols named in the middle of an
 # otherwise gate-free target — required-features is the blunt instrument, and
 # it costs the whole target when the gate is off.
+[[example]]
+name = "storage_schema_dump"
+path = "../../examples/storage_schema_dump.rs"
+
 [[test]]
 # Loads the tinydocs module from the linked executable and calls GenerateDocx
 # end to end. Local only: needs `--features linked-modules,documents`.
@@ -112,6 +120,11 @@ name = "storage_domains_e2e"
 path = "../../tests/storage_domains_e2e.rs"
 
 [[test]]
+# Spawns the binary against a tempdir HOME; installs nothing in-process.
+name = "storage_layout_migration_e2e"
+path = "../../tests/storage_layout_migration_e2e.rs"
+
+[[test]]
 # Its own binary: it installs a storage backend into the process-wide slot.
 name = "storage_flows_e2e"
 path = "../../tests/storage_flows_e2e.rs"
@@ -127,6 +140,12 @@ path = "../../tests/storage_secrets_e2e.rs"
 # process-wide slot.
 name = "storage_scope_e2e"
 path = "../../tests/storage_scope_e2e.rs"
+
+[[test]]
+name = "native_channel_session_restart_e2e"
+path = "../../tests/native_channel_session_restart_e2e.rs"
+# Boots the CLI's real native Telegram listener via a compiled TinyBus artifact.
+required-features = ["modules", "inference", "channels", "storage-sqlite"]
 
 [[test]]
 # Its own binary: two agents on one backend keep cron jobs and flows apart.
@@ -352,7 +371,7 @@ serde = { version = "1", features = ["derive"] }
 tempfile = "3"
 tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm" }
 # The document-port contract for failure injection in cron storage regressions.
-tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v0.11.0" }
+tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v1.0.0" }
 tinytools = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools" }
 tinytools-std = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
 # The completion log a detached sub-agent leaves, for the SaaS delivery-recovery e2e.

@@ -1,6 +1,6 @@
 //! Channel runtime entry points.
 
-mod dispatch;
+pub(crate) mod dispatch;
 pub(crate) mod session;
 mod startup;
 #[cfg(test)]

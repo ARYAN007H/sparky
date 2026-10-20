@@ -1,6 +1,8 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 
+type ComponentControllerHandler = fn(DispatchCtx, Map<String, Value>) -> ControllerFuture;
+
 #[test]
 fn all_schemas_have_namespace() {
     for s in all_controller_schemas() {
@@ -179,7 +181,7 @@ async fn every_tokenjuice_method_answers_component_disabled_when_juice_is_off() 
     let mut set = crate::core::runtime::ComponentSet::all();
     set.juice = false;
     let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(set);
-    let handlers: [fn(DispatchCtx, Map<String, Value>) -> ControllerFuture; 8] = [
+    let handlers: [ComponentControllerHandler; 8] = [
         handle_detect,
         handle_compress,
         handle_cache_stats,

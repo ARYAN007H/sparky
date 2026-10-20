@@ -27,6 +27,7 @@ async fn process_channel_message_executes_native_tool_calls() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(ToolCallingModel),
         )),
@@ -36,7 +37,6 @@ async fn process_channel_message_executes_native_tool_calls() {
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 10,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -102,6 +102,7 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::clone(&default_provider),
         )),
@@ -111,7 +112,6 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         model: Arc::new("default-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 5,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(provider_cache_seed)),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -208,6 +208,7 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::clone(&default_provider),
         )),
@@ -217,7 +218,6 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
         model: Arc::new("default-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 5,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(provider_cache_seed)),
         route_overrides: Arc::new(Mutex::new(route_overrides)),
         api_url: None,
@@ -258,6 +258,7 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(IterativeToolModel {
                 required_tool_iterations: 11,
@@ -269,7 +270,6 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 12,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -320,6 +320,7 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(IterativeToolModel {
                 required_tool_iterations: 20,
@@ -331,7 +332,6 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 3,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,

@@ -24,7 +24,7 @@ use std::path::Path;
 use serde_json::json;
 
 use crate::memory::types::TurnCitation;
-use crate::threads::store::{self as conversations, ConversationMessage, run_reply_message_id};
+use crate::threads::store::{self as conversations, run_reply_message_id, ConversationMessage};
 
 /// Metadata scope stamped on a reply persisted by the web-channel delivery path.
 ///
@@ -72,7 +72,7 @@ pub(crate) fn persist_delivered_reply(
         extra_metadata["citations"] = json!(citations);
     }
     // The audio a spoken reply was synthesized into, if the turn stored any.
-    if let Some(note) = super::voice_notes::reply_note_metadata(workspace_dir, request_id) {
+    if let Some(note) = super::voice_notes::reply_note_metadata(ctx, workspace_dir, request_id) {
         extra_metadata["voiceNote"] = note;
     }
     conversations::append_message(

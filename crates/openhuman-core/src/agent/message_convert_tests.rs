@@ -3,6 +3,41 @@ use tinyagents_session::transcript::TranscriptToolCall;
 use tinyinference_llm::message::{AssistantMessage, ToolMessage};
 
 #[test]
+fn stored_typed_image_parts_build_model_input_without_staging_text() {
+    let part = tinychannels_bus::ContentPart::Image {
+        media: tinychannels_bus::MediaReference {
+            path: Some("uploads/thread/image.png".into()),
+            content_type: Some("image/png".into()),
+            opaque_id: Some("opaque-image-1".into()),
+            ..Default::default()
+        },
+        caption: None,
+        alt_text: None,
+    };
+    let Message::User(user) = user_message_from_parts("Describe this.", &[part]).unwrap() else {
+        panic!("user message expected")
+    };
+    assert_eq!(user.content.len(), 2);
+    assert!(matches!(&user.content[0], ContentBlock::Text(text) if text == "Describe this."));
+    assert!(matches!(
+        &user.content[1],
+        ContentBlock::Image(ImageRef { url, mime_type: Some(mime) })
+            if url == "uploads/thread/image.png" && mime == "image/png"
+    ));
+    assert!(!format!("{:?}", user.content).contains("[ATTACHMENT:"));
+}
+
+#[test]
+fn stored_typed_media_rejects_unresolved_paths() {
+    let part = tinychannels_bus::ContentPart::Image {
+        media: tinychannels_bus::MediaReference::default(),
+        caption: None,
+        alt_text: None,
+    };
+    assert!(user_message_from_parts("image", &[part]).is_err());
+}
+
+#[test]
 fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
     let mut text = String::from("Inspect these files");
     for (name, mime) in [

@@ -5,12 +5,12 @@
 use std::time::Duration;
 
 use openhuman_embed::artifacts::{
-    ArtifactKind, ArtifactStatus, FileRoots, create_artifact, finalize_artifact, resolve_ready_file,
+    create_artifact, finalize_artifact, resolve_ready_file, ArtifactKind, ArtifactStatus, FileRoots,
 };
 use openhuman_embed::chat_surface::{
-    WebChannelEvent, WebEventContext, publish_web_channel_event, subscribe_web_channel_events,
+    publish_web_channel_event, subscribe_web_channel_events, WebChannelEvent, WebEventContext,
 };
-use openhuman_embed::identity::{UserIdentity, peek_credential_user_identity};
+use openhuman_embed::identity::{peek_credential_user_identity, UserIdentity};
 
 #[tokio::test]
 async fn an_artifact_resolves_only_once_ready_and_only_under_its_roots() {
@@ -106,13 +106,11 @@ async fn web_channel_events_reach_a_subscriber_with_a_timestamp() {
 fn identity_is_empty_when_nobody_is_signed_in() {
     assert!(peek_credential_user_identity().is_none());
     assert!(UserIdentity::default().is_empty());
-    assert!(
-        !UserIdentity {
-            id: Some("u1".into()),
-            ..UserIdentity::default()
-        }
-        .is_empty()
-    );
+    assert!(!UserIdentity {
+        id: Some("u1".into()),
+        ..UserIdentity::default()
+    }
+    .is_empty());
 }
 
 #[test]

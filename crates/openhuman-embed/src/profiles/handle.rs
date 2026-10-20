@@ -325,6 +325,7 @@ impl ProfileHandle {
                     message: ConversationMessageRecord {
                         id: format!("msg_{}", uuid::Uuid::new_v4()),
                         content: text.to_string(),
+                        attachments: Vec::new(),
                         message_type: "text".to_string(),
                         extra_metadata: serde_json::json!({}),
                         sender: "user".to_string(),

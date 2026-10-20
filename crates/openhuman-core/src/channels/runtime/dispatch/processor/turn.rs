@@ -1,24 +1,16 @@
-//! The per-message pipeline: typing indicator, ACK reaction, history
-//! assembly, dispatching the agentic turn over the native bus, and
-//! delivering the draft/final reply.
+//! The per-message pipeline: typing indicator, ACK reaction, durable-session
+//! dispatch through the shared runner, and final reply delivery.
 
-use crate::agent::bus::AgentTurnResponse;
-use crate::channels::context::{
-    compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
-};
-use crate::channels::routes::{
-    get_or_create_turn_model_source, get_route_selection, handle_runtime_command_if_needed,
-};
+use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
+#[cfg(test)]
+use crate::channels::routes::get_or_create_turn_model_source;
+use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
 use crate::channels::{ChannelSendExt, SendMessage};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tinyagents_harness::progress::AgentProgress;
-use tinyagents_session::transcript::TranscriptMessage;
-use tinychannels_bus as traits;
-use tinychannels_runtime::context::ChatMessage;
+use std::time::Instant;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
@@ -26,17 +18,9 @@ use super::super::helpers::{
     build_channel_context_block, log_worker_join_result, spawn_typing_task,
     REPLY_LOG_TRUNCATE_CHARS,
 };
-use super::super::host_agent::{self, run_host_agent_turn, seed_rows, HostChannelTurn, HostRoute};
+use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
-use super::bus_turn::dispatch_bus_turn;
 use super::RuntimeChannelMessage;
-
-pub(crate) async fn process_channel_message(
-    ctx: Arc<ChannelRuntimeContext>,
-    msg: traits::ChannelMessage,
-) {
-    process_channel_runtime_message(ctx, RuntimeChannelMessage::from(msg)).await;
-}
 
 pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
@@ -48,6 +32,8 @@ pub(crate) async fn process_channel_runtime_message(
         inbound_envelope,
         authenticated_relay,
         prepared_inbound,
+        imported_history,
+        progressive_target,
     } = runtime_msg;
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
@@ -86,9 +72,35 @@ pub(crate) async fn process_channel_runtime_message(
     };
     let msg = prepared.message;
     let history_key = prepared.history_key;
+    let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
+    let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
+        channel: envelope.channel.clone(),
+        conversation: envelope.conversation.clone(),
+        session_key: canonical_session_key.clone(),
+    };
     crate::channels::host::voice::record_inbound_envelope(&envelope);
+    let native_target = if let Some(target) = progressive_target {
+        Some(target)
+    } else {
+        match super::progressive::native_target(&ctx, &envelope) {
+            Ok(target) => target.map(Arc::new),
+            Err(error) => {
+                tracing::error!("[dispatch] native channel target is invalid: {error}");
+                return;
+            }
+        }
+    };
+
+    let tenant = match ctx.dispatch_ctx().tenant() {
+        Ok(tenant) => tenant,
+        Err(error) => {
+            tracing::warn!("[dispatch] channel turn lost its tenant scope: {error}");
+            return;
+        }
+    };
+    let session_key = crate::core::runtime::tenant::tenant_key(&tenant, &canonical_session_key);
 
     println!(
         "  💬 [{}] from {}: {}",
@@ -104,13 +116,34 @@ pub(crate) async fn process_channel_runtime_message(
         reply_target: msg.reply_target.clone(),
         content: msg.content.clone(),
         thread_ts: msg.thread_ts.clone(),
-        inbound_envelope: Some(envelope),
+        inbound_envelope: Some(envelope.clone()),
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 
     let target_channel = ctx.channels_by_name.get(&msg.channel).cloned();
-    if handle_runtime_command_if_needed(ctx.as_ref(), &msg, target_channel.as_ref(), &history_key)
-        .await
+    let reset_context = Arc::clone(&ctx);
+    let reset_message = msg.clone();
+    let reset_session_key = session_key.clone();
+    let reset_history_key = history_key.clone();
+    if handle_runtime_command_with_reset(
+        ctx.as_ref(),
+        &msg,
+        target_channel.as_ref(),
+        &history_key,
+        Some(remote_reset_scope),
+        Some(session_key.clone()),
+        &msg,
+        || async move {
+            super::reset::reset_command(
+                reset_context,
+                reset_message,
+                reset_session_key,
+                reset_history_key,
+            )
+            .await
+        },
+    )
+    .await
     {
         return;
     }
@@ -207,6 +240,7 @@ pub(crate) async fn process_channel_runtime_message(
     }
 
     let route = get_route_selection(ctx.as_ref(), &history_key);
+    #[cfg(test)]
     let active_turn_model_source = if ctx.config.is_none() {
         match get_or_create_turn_model_source(ctx.as_ref(), &route.provider).await {
             Ok(source) => Some(source),
@@ -253,133 +287,10 @@ pub(crate) async fn process_channel_runtime_message(
     println!("  ⏳ Processing message...");
     let started_at = Instant::now();
 
-    // Build history from per-sender conversation cache
-    let mut prior_turns: Vec<TranscriptMessage> = ctx
-        .conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(&history_key)
-        .map(|turns| {
-            // The cache holds the bus's plain `ChatMessage`; convert at the
-            // harness boundary.
-            turns
-                .iter()
-                .map(|turn| match turn.role.as_str() {
-                    "assistant" => TranscriptMessage::assistant(&turn.content),
-                    _ => TranscriptMessage::user(&turn.content),
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    // Re-rendered by `ChannelSystemPrompt` only when the active profile or an
-    // identity file changed since the last message (#6028); otherwise the
-    // same bytes as the previous turn.
-    let system_prompt = ctx.system_prompt.current();
-    let mut history = vec![TranscriptMessage::system(system_prompt.as_str())];
-    history.append(&mut prior_turns);
-    history.push(TranscriptMessage::user(&enriched_message));
-
-    // Determine if this channel supports streaming draft updates
-    let use_streaming = target_channel
-        .as_ref()
-        .is_some_and(|ch| ch.supports_draft_updates());
-
-    // Set up streaming channel if supported
-    let (progress_tx, progress_rx) = if use_streaming {
-        let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(64);
-        (Some(tx), Some(rx))
-    } else {
-        (None, None)
-    };
-
-    // Send initial draft message if streaming
-    let draft_message_id = if use_streaming {
-        if let Some(channel) = target_channel.as_ref() {
-            match channel
-                .send_draft(
-                    &SendMessage::new("...", &msg.reply_target).in_thread(msg.thread_ts.clone()),
-                )
-                .await
-            {
-                Ok(id) => id,
-                Err(e) => {
-                    tracing::debug!("Failed to send draft on {}: {e}", channel.name());
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    // Spawn a task to forward streaming progress to draft updates
-    let draft_updater = if let (Some(mut rx), Some(draft_id_ref), Some(channel_ref)) = (
-        progress_rx,
-        draft_message_id.as_deref(),
-        target_channel.as_ref(),
-    ) {
-        let channel = Arc::clone(channel_ref);
-        let reply_target = msg.reply_target.clone();
-        let draft_id = draft_id_ref.to_string();
-        Some(AbortOnDropHandle::new(tokio::spawn(async move {
-            let mut accumulated = String::new();
-            let mut last_thinking_update = None;
-            const THINKING_UPDATE_INTERVAL_MS: u128 = 2000;
-
-            while let Some(progress) = rx.recv().await {
-                match progress {
-                    AgentProgress::TextDelta { delta, .. } => {
-                        accumulated.push_str(&delta);
-                        if let Err(e) = channel
-                            .update_draft(&reply_target, &draft_id, &accumulated)
-                            .await
-                        {
-                            tracing::debug!("Draft update failed: {e}");
-                        }
-                    }
-                    AgentProgress::ThinkingDelta { .. } => {
-                        // Suppress thinking text to Telegram; only show a placeholder if we haven't
-                        // started receiving the final answer yet.
-                        if accumulated.is_empty() {
-                            let now = std::time::Instant::now();
-                            let should_update = match last_thinking_update {
-                                None => true,
-                                Some(last) => {
-                                    now.duration_since(last).as_millis()
-                                        > THINKING_UPDATE_INTERVAL_MS
-                                }
-                            };
-
-                            if should_update {
-                                if let Err(e) = channel
-                                    .update_draft(&reply_target, &draft_id, "Thinking...")
-                                    .await
-                                {
-                                    tracing::debug!("Thinking update failed: {e}");
-                                }
-                                last_thinking_update = Some(now);
-                            }
-                        }
-                    }
-                    AgentProgress::ToolCallStarted { tool_name, .. } if accumulated.is_empty() => {
-                        let _ = channel
-                            .update_draft(
-                                &reply_target,
-                                &draft_id,
-                                &format!("Working ({})...", tool_name),
-                            )
-                            .await;
-                    }
-                    _ => {}
-                }
-            }
-        })))
-    } else {
-        None
-    };
+    // The persisted TinyAgents transcript, bound below by `session_key`, is
+    // the sole history source. The injected-model graph remains available to
+    // unit fixtures only; a production channel turn without a host config is
+    // refused rather than routed through a second execution graph.
 
     let typing_cancellation = target_channel.as_ref().map(|_| CancellationToken::new());
     let _typing_cancel_on_drop = typing_cancellation
@@ -407,15 +318,6 @@ pub(crate) async fn process_channel_runtime_message(
     // Slack channel cannot use it from their own session — distinct senders
     // produce distinct origins, and the wallet preparer / parked-approval
     // gates compare these for equality before honouring confirmations.
-    let turn_origin = crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
-        sender_name: msg.sender_name.clone(),
-        channel: msg.channel.clone(),
-        sender: Some(msg.sender.clone()),
-        reply_target: msg.reply_target.clone(),
-        message_id: msg.id.clone(),
-        history_key: Some(history_key.clone()),
-    };
-
     // Sub-issue 2 of #3098: give the agent turn an `ApprovalTurnContext` for
     // every channel with the `chat_approvals` capability (served by
     // `ChannelApprovalSurfaceSubscriber`). Without a chat context the gate's
@@ -436,40 +338,115 @@ pub(crate) async fn process_channel_runtime_message(
 
     // A channel bound to a host agent (`agent.channel_agents`) runs as that
     // agent; every other channel goes over the bus to the orchestrator.
-    let agent_call: std::pin::Pin<
-        Box<dyn std::future::Future<Output = anyhow::Result<AgentTurnResponse>> + Send + '_>,
-    > = match bound_agent {
-        Some(host) => Box::pin(run_host_agent_turn(
-            *host,
-            HostChannelTurn {
-                relay_thread: ctx.relay_thread.clone(),
-                channel: msg.channel.clone(),
-                history_key: history_key.clone(),
-                prior_turns: seed_rows(&history),
-                message: enriched_message.clone(),
-                origin: turn_origin,
-                progress: progress_tx,
-                approval,
-            },
-        )),
-        None => Box::pin(dispatch_bus_turn(
-            ctx.as_ref(),
-            &msg,
-            &route,
-            history,
-            active_turn_model_source,
-            progress_tx,
-            turn_origin,
-            approval,
-        )),
+    let mut configured_agent_error = None;
+    let selected_host = match bound_agent {
+        Some(host) => Some(*host),
+        None if ctx.config.is_some() => {
+            match host_agent::configured_agent(ctx.as_ref(), &route).await {
+                Ok(host) => Some(host),
+                Err(error) => {
+                    tracing::warn!(channel = %msg.channel, %error, "[dispatch] configured channel agent could not be built");
+                    configured_agent_error = Some(error);
+                    None
+                }
+            }
+        }
+        None => None,
     };
-    let llm_result =
-        tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;
-
-    // Wait for draft updater to finish
-    if let Some(handle) = draft_updater {
-        let _ = handle.await;
+    let channel_session = selected_host.as_ref().and_then(|host| {
+        let account_id = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .filter(|account| !account.trim().is_empty())?;
+        Some(tinyflows_bus::schedule::types::ChannelSessionIdentity {
+            tenant_key: crate::core::runtime::tenant::tenant_key(&tenant, ""),
+            agent_id: host.definition.id.clone(),
+            session_key: canonical_session_key.clone(),
+            provider: envelope.channel.id.clone(),
+            account_id: Some(account_id.to_owned()),
+            conversation: tinyflows_bus::schedule::types::ChannelConversationIdentity {
+                kind: envelope.conversation.kind.as_session_segment().to_string(),
+                id: envelope.conversation.id.clone(),
+                scope_id: envelope.conversation.scope_id.clone(),
+                parent_id: envelope.conversation.parent_id.clone(),
+                thread_id: envelope.conversation.thread_id.clone(),
+                topic_id: envelope.conversation.topic_id.clone(),
+            },
+        })
+    });
+    let turn_origin = crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        sender_name: msg.sender_name.clone(),
+        channel: msg.channel.clone(),
+        sender: Some(msg.sender.clone()),
+        reply_target: msg.reply_target.clone(),
+        message_id: msg.id.clone(),
+        history_key: Some(history_key.clone()),
+        channel_session,
+    };
+    let execution = match selected_host {
+        Some(host) => {
+            let request_id = format!("{}:{}:{}", msg.channel, msg.id, uuid::Uuid::new_v4());
+            let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
+                host_agent: host,
+                channel: msg.channel.clone(),
+                session_key: session_key.clone(),
+                event_session_id: history_key.clone(),
+                origin: turn_origin.clone(),
+                approval: approval.clone(),
+                relay_thread: ctx.relay_thread.clone(),
+                imported_history,
+                native_target: native_target.clone(),
+            });
+            super::super::native_runner::run(
+                &ctx.dispatch_ctx(),
+                session_key.clone(),
+                request_id,
+                enriched_message.clone(),
+                trusted,
+            )
+            .await
+        }
+        None if configured_agent_error.is_some() => {
+            let error = configured_agent_error.expect("checked configured-agent failure");
+            super::super::native_runner::NativeTurnExecution {
+                result: Err(error),
+                delivery_succeeded: None,
+                queued: false,
+            }
+        }
+        #[cfg(test)]
+        None => {
+            let result = super::bus_turn::dispatch_test_turn(
+                ctx.as_ref(),
+                &msg,
+                &route,
+                &enriched_message,
+                active_turn_model_source,
+                None,
+                turn_origin,
+                approval,
+            )
+            .await
+            .map_err(|error| error.to_string());
+            super::super::native_runner::NativeTurnExecution {
+                result,
+                delivery_succeeded: None,
+                queued: false,
+            }
+        }
+        #[cfg(not(test))]
+        None => super::super::native_runner::NativeTurnExecution {
+            result: Err("channel turn has no configured host agent".to_owned()),
+            delivery_succeeded: None,
+            queued: false,
+        },
+    };
+    if execution.queued {
+        return;
     }
+    let native_delivery_succeeded = execution.delivery_succeeded.unwrap_or(false);
+    let llm_result = execution.result.map_err(anyhow::Error::msg);
 
     if let Some(token) = typing_cancellation.as_ref() {
         token.cancel();
@@ -479,7 +456,7 @@ pub(crate) async fn process_channel_runtime_message(
     }
 
     let (success, response_text, response_provider, response_model) = match llm_result {
-        Ok(Ok(response)) => {
+        Ok(response) => {
             let resolved_provider = response
                 .resolved_provider
                 .clone()
@@ -489,83 +466,43 @@ pub(crate) async fn process_channel_runtime_message(
                 .clone()
                 .unwrap_or_else(|| route.model.clone());
             let response_text = response.text;
-            // Save user + assistant turn to per-sender history
-            {
-                let mut histories = ctx
-                    .conversation_histories
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner());
-                let turns = histories.entry(history_key).or_default();
-                turns.push(ChatMessage::user(&enriched_message));
-                turns.push(ChatMessage::assistant(&response_text));
-                // Trim to MAX_CHANNEL_HISTORY (keep recent turns)
-                while turns.len() > crate::channels::context::MAX_CHANNEL_HISTORY {
-                    turns.remove(0);
-                }
-            }
             println!(
                 "  🤖 Reply ({}ms): {}",
                 started_at.elapsed().as_millis(),
                 truncate_with_ellipsis(&response_text, REPLY_LOG_TRUNCATE_CHARS)
             );
-            if let Some(channel) = target_channel.as_ref() {
-                if let Some(ref draft_id) = draft_message_id {
+            let delivered = if native_target.is_some() {
+                native_delivery_succeeded
+            } else {
+                false
+            };
+            if native_target.is_none() {
+                if let Some(channel) = target_channel.as_ref() {
                     if let Err(e) = channel
-                        .finalize_draft(
-                            &msg.reply_target,
-                            draft_id,
-                            &response_text,
-                            msg.thread_ts.as_deref(),
+                        .send_with_outbound_intent(
+                            &SendMessage::new(&response_text, &msg.reply_target)
+                                .in_thread(msg.thread_ts.clone()),
                         )
                         .await
                     {
-                        tracing::warn!("Failed to finalize draft: {e}; sending as new message");
-                        let _ = channel
-                            .send_with_outbound_intent(
-                                &SendMessage::new(&response_text, &msg.reply_target)
-                                    .in_thread(msg.thread_ts.clone()),
-                            )
-                            .await;
+                        eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
                     }
-                } else if let Err(e) = channel
-                    .send_with_outbound_intent(
-                        &SendMessage::new(&response_text, &msg.reply_target)
-                            .in_thread(msg.thread_ts.clone()),
-                    )
-                    .await
-                {
-                    eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
                 }
             }
-            (true, response_text, resolved_provider, resolved_model)
+            (delivered, response_text, resolved_provider, resolved_model)
         }
-        Ok(Err(e)) => {
+        Err(e) => {
             if is_context_window_overflow_error(&ctx, &e)
                 .await
                 .unwrap_or(false)
             {
-                let compacted = compact_sender_history(&ctx.conversation_histories, &history_key);
-                let error_text = if compacted {
-                    "⚠️ Context window exceeded for this conversation. I compacted recent history and kept the latest context. Please resend your last message."
-                } else {
-                    "⚠️ Context window exceeded for this conversation. Please resend your last message."
-                };
+                let error_text = "⚠️ Context window exceeded for this conversation. Please resend your last message.";
                 eprintln!(
-                    "  ⚠️ Context window exceeded after {}ms; sender history compacted={}",
-                    started_at.elapsed().as_millis(),
-                    compacted
+                    "  ⚠️ Context window exceeded after {}ms",
+                    started_at.elapsed().as_millis()
                 );
-                if let Some(channel) = target_channel.as_ref() {
-                    if let Some(ref draft_id) = draft_message_id {
-                        let _ = channel
-                            .finalize_draft(
-                                &msg.reply_target,
-                                draft_id,
-                                error_text,
-                                msg.thread_ts.as_deref(),
-                            )
-                            .await;
-                    } else {
+                if native_target.is_none() {
+                    if let Some(channel) = target_channel.as_ref() {
                         let _ = channel
                             .send_with_outbound_intent(
                                 &SendMessage::new(error_text, &msg.reply_target)
@@ -592,7 +529,8 @@ pub(crate) async fn process_channel_runtime_message(
                 return;
             }
 
-            let error_response = format!("⚠️ Error: {e}");
+            let classified = crate::web_chat::classify_inference_error(&e.to_string());
+            let error_response = classified.message;
             eprintln!(
                 "  ❌ LLM error after {}ms: {e}",
                 started_at.elapsed().as_millis()
@@ -644,17 +582,8 @@ pub(crate) async fn process_channel_runtime_message(
                     ],
                 );
             }
-            if let Some(channel) = target_channel.as_ref() {
-                if let Some(ref draft_id) = draft_message_id {
-                    let _ = channel
-                        .finalize_draft(
-                            &msg.reply_target,
-                            draft_id,
-                            &error_response,
-                            msg.thread_ts.as_deref(),
-                        )
-                        .await;
-                } else {
+            if native_target.is_none() {
+                if let Some(channel) = target_channel.as_ref() {
                     let _ = channel
                         .send_with_outbound_intent(
                             &SendMessage::new(&error_response, &msg.reply_target)
@@ -666,50 +595,6 @@ pub(crate) async fn process_channel_runtime_message(
             (
                 false,
                 error_response,
-                route.provider.clone(),
-                route.model.clone(),
-            )
-        }
-        Err(_) => {
-            let timeout_msg = format!("LLM response timed out after {}s", ctx.message_timeout_secs);
-            eprintln!(
-                "  ❌ {} (elapsed: {}ms)",
-                timeout_msg,
-                started_at.elapsed().as_millis()
-            );
-            crate::core::observability::report_error(
-                timeout_msg.as_str(),
-                "channels",
-                "dispatch_llm_timeout",
-                &[
-                    ("channel", msg.channel.as_str()),
-                    ("timeout_secs", &ctx.message_timeout_secs.to_string()),
-                ],
-            );
-            let error_text =
-                "⚠️ Request timed out while waiting for the model. Please try again.".to_string();
-            if let Some(channel) = target_channel.as_ref() {
-                if let Some(ref draft_id) = draft_message_id {
-                    let _ = channel
-                        .finalize_draft(
-                            &msg.reply_target,
-                            draft_id,
-                            &error_text,
-                            msg.thread_ts.as_deref(),
-                        )
-                        .await;
-                } else {
-                    let _ = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(&error_text, &msg.reply_target)
-                                .in_thread(msg.thread_ts.clone()),
-                        )
-                        .await;
-                }
-            }
-            (
-                false,
-                error_text,
                 route.provider.clone(),
                 route.model.clone(),
             )

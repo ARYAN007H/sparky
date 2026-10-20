@@ -46,9 +46,10 @@ fn empty_and_oversized_audio_are_rejected() {
 #[test]
 fn reply_metadata_exists_only_after_the_reply_audio_is_stored() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(reply_note_metadata(tmp.path(), "req/1").is_none());
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    assert!(reply_note_metadata(&ctx, tmp.path(), "req/1").is_none());
     store_note(tmp.path(), &reply_note_id("req/1"), "audio/mpeg", b"mp3").unwrap();
-    let meta = reply_note_metadata(tmp.path(), "req/1").unwrap();
+    let meta = reply_note_metadata(&ctx, tmp.path(), "req/1").unwrap();
     assert_eq!(meta["noteId"], "reply-req_1");
     assert_eq!(meta["mime"], "audio/mpeg");
 }
@@ -56,26 +57,33 @@ fn reply_metadata_exists_only_after_the_reply_audio_is_stored() {
 #[test]
 fn synthesized_reply_metadata_preserves_its_viseme_timeline() {
     let tmp = tempfile::tempdir().unwrap();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
     assert!(store_synthesized_reply(
         tmp.path(),
         "request-1",
         "YWJj",
         "audio/mpeg",
+    ));
+    persist_reply_visemes(
+        &ctx,
+        tmp.path(),
+        "request-1",
         &[
             tinyinference_voice::VisemeFrame {
                 viseme: "aa".into(),
                 start_ms: 0,
-                end_ms: 120
+                end_ms: 120,
             },
             tinyinference_voice::VisemeFrame {
                 viseme: "PP".into(),
                 start_ms: 120,
-                end_ms: 220
+                end_ms: 220,
             },
-        ]
-    ));
+        ],
+    )
+    .unwrap();
 
-    let meta = reply_note_metadata(tmp.path(), "request-1").unwrap();
+    let meta = reply_note_metadata(&ctx, tmp.path(), "request-1").unwrap();
     assert_eq!(
         meta["visemes"],
         serde_json::json!([
@@ -84,6 +92,24 @@ fn synthesized_reply_metadata_preserves_its_viseme_timeline() {
         ]),
         "replayed assistant audio needs the original TTS timeline for mascot lip-sync"
     );
+}
+
+#[test]
+fn legacy_viseme_timeline_remains_readable() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = reply_note_id("legacy");
+    store_note(tmp.path(), &id, "audio/mpeg", b"audio").unwrap();
+    std::fs::write(
+        tmp.path()
+            .join("voice_notes")
+            .join(format!("{id}.visemes.json")),
+        serde_json::to_vec(&serde_json::json!([{"viseme": "aa", "start_ms": 0, "end_ms": 100}]))
+            .unwrap(),
+    )
+    .unwrap();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let meta = reply_note_metadata(&ctx, tmp.path(), "legacy").unwrap();
+    assert_eq!(meta["visemes"][0]["viseme"], "aa");
 }
 
 #[test]
@@ -123,28 +149,21 @@ fn typed_voice_media_must_match_its_durable_note_reference() {
 #[test]
 fn synthesized_reply_is_stored_only_with_decodable_audio() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(!store_synthesized_reply(
-        tmp.path(),
-        "r1",
-        "",
-        "audio/mpeg",
-        &[] as &[serde_json::Value]
-    ));
+    assert!(!store_synthesized_reply(tmp.path(), "r1", "", "audio/mpeg"));
     assert!(!store_synthesized_reply(
         tmp.path(),
         "r1",
         "***",
-        "audio/mpeg",
-        &[] as &[serde_json::Value]
+        "audio/mpeg"
     ));
     assert!(store_synthesized_reply(
         tmp.path(),
         "r1",
         "YWJj",
-        "audio/mpeg",
-        &[] as &[serde_json::Value]
+        "audio/mpeg"
     ));
-    assert!(reply_note_metadata(tmp.path(), "r1").is_some());
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    assert!(reply_note_metadata(&ctx, tmp.path(), "r1").is_some());
 }
 
 #[test]

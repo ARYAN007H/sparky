@@ -37,7 +37,7 @@ use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
 use crate::agent::queued_turn::QueuedPayload;
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
@@ -89,10 +89,48 @@ impl WebHost {
         let ctx = Self::ctx_of(request)?;
         let id = request.request_id.as_str();
         let payload = &request.payload;
+        // The runner has not checked out a session yet, so per-request state
+        // cannot contain a resolved config at this point. Load it from the
+        // request's trusted dispatch context before deriving the durable
+        // session identity; the resolved copy is saved in the slot below.
+        let mut config = ctx.load_config().await?;
+        // The harness lock is local to this WebRuntime. Native channel and
+        // relay runners use the same agent-domain lease before checking out
+        // this durable identity, so separate surface runners cannot resume
+        // and commit the same transcript concurrently.
+        let tenant = ctx.tenant().map_err(|error| error.to_string())?;
+        let tenant_scope = crate::core::runtime::tenant::tenant_key(&tenant, "");
+        let agent_id = super::session::pick_target_agent_id(&config);
+        // A parallel fork has its own transcript identity, while the other
+        // queue modes resume the canonical thread session.
+        let session_identity = if policy == CheckoutPolicy::Fork {
+            format!("fork:{}", request.request_id)
+        } else {
+            crate::core::runtime::tenant::tenant_key(&tenant, &request.thread_id)
+        };
+        let lease = crate::agent::session_lease::SessionLease::acquire(
+            crate::agent::session_lease::SessionLeaseKey::new(
+                tenant_scope,
+                agent_id,
+                session_identity,
+            ),
+            None,
+        )
+        .await
+        .map_err(|()| "agent session lease was cancelled".to_owned())?;
+        // Every runner acquires locks in this order: durable session first,
+        // then the profile-wide chat/cron gate. This keeps native, relay and
+        // web runner instances from forming an inverse-lock cycle.
+        let profile_turn = crate::profiles::turn_gate::acquire(&ctx).await;
+        self.shared.with(id, |slot| {
+            slot.session_lease = Some(lease);
+            slot.profile_turn = profile_turn;
+        });
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.
-        if self.shared.was_queued(id) && request.disposition == QueueDisposition::Followup {
+        let was_queued = self.shared.was_queued(id);
+        if was_queued && request.disposition == QueueDisposition::Followup {
             crate::core::bus::BUS.publish(DomainEvent::RunQueueFollowupDispatched {
                 thread_id: request.thread_id.clone(),
                 followup_count: 1,
@@ -114,7 +152,6 @@ impl WebHost {
             return Ok(session);
         }
 
-        let mut config = ctx.load_config().await?;
         // A thread started in a chosen folder acts there, not in the global
         // `action_dir`. Applied before checkout so the session agent, its
         // security policy (which grants `action_dir` as a trusted root) and its
@@ -193,9 +230,6 @@ impl WebHost {
         let id = request.request_id.as_str();
         let thread_id = request.thread_id.as_str();
         let payload = &request.payload;
-        // One turn at a time per profile: wait behind its relay and cron turns.
-        let _turn = crate::profiles::turn_gate::acquire(&ctx).await;
-
         #[cfg(any(test, debug_assertions))]
         if let Some(outcome) = ops::run_test_hooks(&self.shared, request).await {
             return outcome;
@@ -232,23 +266,6 @@ impl WebHost {
         let _tap = AbortOnDrop(tap);
         let _beat = AbortOnDrop(spawn_heartbeat(&ctx, projection.clone()));
 
-        agent.set_on_progress(Some(progress_tx));
-        agent.set_run_queue(Some(queue));
-        agent.set_thread_id(Some(thread_id));
-        agent.set_host_env(crate::agent::turn_env::HostTurnEnv {
-            cancellation: Some(cancellation),
-            turn_deadline: request
-                .deadline
-                .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
-            ..Default::default()
-        });
-        // Also the turn's workspace, so attachment reads and delegated
-        // sub-agents (which load a fresh config) use the folder its uploads
-        // were staged in (#7714).
-        if let Some(dir) = thread_dir {
-            agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(dir)));
-        }
-
         let origin = AgentTurnOrigin::WebChat {
             thread_id: thread_id.to_owned(),
             client_id: payload.client_id.clone(),
@@ -262,13 +279,75 @@ impl WebHost {
             },
         );
 
+        let message_input = if payload.deferred_user_message {
+            let staged_parts = payload
+                .pending_attachments
+                .as_ref()
+                .map(|pending| pending.parts.as_slice())
+                .unwrap_or_default();
+            let persisted = crate::threads::ops::persist_queued_user_message(
+                &ctx,
+                thread_id,
+                id,
+                &request.text,
+                staged_parts,
+            )
+            .await?;
+            if staged_parts.is_empty() {
+                None
+            } else {
+                let parts = crate::threads::attachments::resolve_persisted_parts(
+                    &ctx,
+                    thread_id,
+                    &persisted.id,
+                    staged_parts,
+                )
+                .await?;
+                Some(crate::agent::message_convert::user_message_from_parts(
+                    &request.text,
+                    &parts,
+                )?)
+            }
+        } else if let Some(stored) = payload.stored_attachments.as_ref() {
+            let parts = crate::threads::attachments::resolve_persisted_parts(
+                &ctx,
+                thread_id,
+                &stored.persisted_message_id,
+                &stored.parts,
+            )
+            .await?;
+            Some(crate::agent::message_convert::user_message_from_parts(
+                &request.text,
+                &parts,
+            )?)
+        } else {
+            None
+        };
+
         // `run_single`'s future is very large; box it so the origin scope holds
         // a pointer rather than inlining it into this frame.
         #[cfg(feature = "tinymemes")]
         let turn_started = std::time::Instant::now();
-        let turn = Box::pin(with_origin(
-            origin.clone(),
-            agent.run_single_with_approval(&request.text, Some(origin), approval),
+        let turn = Box::pin(crate::agent::turn_host::AgentTurnHost::run(
+            agent,
+            crate::agent::turn_host::AgentTurnRequest {
+                message: request.text.clone(),
+                message_input,
+                thread_id: Some(thread_id.to_owned()),
+                origin,
+                approval,
+                progress: Some(progress_tx),
+                run_queue: Some(queue),
+                cancellation,
+                turn_deadline: request.deadline,
+                // Also the turn's workspace, so attachment reads and
+                // delegated sub-agents use the upload folder (#7714).
+                workspace: thread_dir
+                    .map(tinytools::WorkspaceDescriptor::new)
+                    .map(crate::agent::turn_host::WorkspaceBinding::Set)
+                    .unwrap_or(crate::agent::turn_host::WorkspaceBinding::Clear),
+                host_env: Default::default(),
+            },
         ));
         let outcome = turn.await;
         let result = match outcome {
@@ -302,7 +381,7 @@ impl WebHost {
         let turn_elapsed = turn_started.elapsed();
 
         if let Ok(task_result) = result.as_ref() {
-            speak_and_publish(&config, request, task_result).await;
+            speak_and_publish(&ctx, &config, request, task_result).await;
         }
 
         // TinyMemes: remix the final reply (slang + memes) when the flag puts
@@ -435,6 +514,7 @@ impl WebHost {
 /// Speak the reply when the request, the thread or the voice mode asks for it,
 /// and tell a push-to-talk session what was committed.
 async fn speak_and_publish(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &crate::config::Config,
     request: &TurnRequest<QueuedPayload>,
     task_result: &WebChatTaskResult,
@@ -468,8 +548,20 @@ async fn speak_and_publish(
                     &request.request_id,
                     &outcome.value.audio_base64,
                     &outcome.value.audio_mime,
-                    &outcome.value.visemes,
                 );
+                if stored {
+                    if let Err(err) = super::voice_notes::persist_reply_visemes(
+                        ctx,
+                        &config.workspace_dir,
+                        &request.request_id,
+                        &outcome.value.visemes,
+                    ) {
+                        log::warn!(
+                            "[web_channel][voice_note] could not store reply timeline request_id={}: {err}",
+                            request.request_id
+                        );
+                    }
+                }
                 log::debug!(
                     "[web_channel] reply_speech dispatched chars={} stored={stored} client_id={} thread_id={thread_id} request_id={}",
                     task_result.full_response.len(),

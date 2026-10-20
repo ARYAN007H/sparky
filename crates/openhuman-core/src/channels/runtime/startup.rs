@@ -5,6 +5,7 @@ mod chat_workload;
 mod credentials;
 mod delivery_import;
 mod module_providers;
+mod progressive_transport;
 mod prompt;
 #[cfg(test)]
 mod relay;

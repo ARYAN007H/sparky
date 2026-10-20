@@ -57,5 +57,6 @@ fn dispositions_cover_the_three_cases() {
     assert_eq!(disposition("chat_done"), Disposition::Reduced);
     assert_eq!(disposition("subagent_spawned"), Disposition::Reduced);
     assert_eq!(disposition("turn_cost"), Disposition::Ignored);
+    assert_eq!(disposition("channel_event"), Disposition::Ignored);
     assert_eq!(disposition("from_the_future"), Disposition::Unknown);
 }

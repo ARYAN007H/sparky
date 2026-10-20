@@ -16,7 +16,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SidebarSlotOutlet, SidebarSlotProvider } from '../../components/layout/shell/SidebarSlot';
 import { threadApi } from '../../services/api/threadApi';
-import { chatCancel, chatRemoveQueueItem, chatSend } from '../../services/chatService';
+import {
+  chatCancel,
+  chatRemoveQueueItem,
+  chatSend,
+  chatSendWithAck,
+} from '../../services/chatService';
 import { CoreRpcError } from '../../services/coreRpcClient';
 import chatRuntimeReducer, {
   beginInferenceTurn,
@@ -78,6 +83,7 @@ vi.mock('../../services/chatService', () => ({
   chatClearQueue: vi.fn().mockResolvedValue(0),
   chatRemoveQueueItem: vi.fn().mockResolvedValue(true),
   chatSend: vi.fn().mockResolvedValue(undefined),
+  chatSendWithAck: vi.fn().mockResolvedValue({ requestId: 'request-test', queuedAttachments: [] }),
   subscribeChatEvents: vi.fn(() => () => {}),
   useRustChat: vi.fn(() => true),
 }));
@@ -961,7 +967,8 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     await waitFor(() => {
       expect(threadApi.appendMessage).toHaveBeenCalledWith(
         thread.id,
-        expect.objectContaining({ content: 'hello cloud', sender: 'user', type: 'text' })
+        expect.objectContaining({ content: 'hello cloud', sender: 'user', type: 'text' }),
+        []
       );
     });
     expect(chatSend).toHaveBeenCalledWith(
@@ -2554,7 +2561,9 @@ describe('Conversations — queued follow-ups while a turn streams', () => {
     });
 
     await waitFor(() => {
-      expect(chatSend).toHaveBeenCalledWith(expect.objectContaining({ queueMode: 'followup' }));
+      expect(chatSendWithAck).toHaveBeenCalledWith(
+        expect.objectContaining({ queueMode: 'followup' })
+      );
     });
     await waitFor(() =>
       expect(
@@ -2577,7 +2586,9 @@ describe('Conversations — queued follow-ups while a turn streams', () => {
     });
 
     await waitFor(() => {
-      expect(chatSend).toHaveBeenCalledWith(expect.objectContaining({ queueMode: 'followup' }));
+      expect(chatSendWithAck).toHaveBeenCalledWith(
+        expect.objectContaining({ queueMode: 'followup' })
+      );
     });
   });
 
@@ -2626,7 +2637,7 @@ describe('Conversations — queued follow-ups while a turn streams', () => {
   });
 
   it('keeps the draft intact when the follow-up send fails', async () => {
-    vi.mocked(chatSend).mockRejectedValueOnce(new Error('send boom'));
+    vi.mocked(chatSendWithAck).mockRejectedValueOnce(new Error('send boom'));
     const { store, textarea } = await renderStreamingConversation();
 
     await act(async () => {
@@ -2638,7 +2649,7 @@ describe('Conversations — queued follow-ups while a turn streams', () => {
 
     // Send rejected → nothing recorded for the transcript, and the composer
     // keeps the user's text so they can retry instead of silently losing it.
-    await waitFor(() => expect(chatSend).toHaveBeenCalled());
+    await waitFor(() => expect(chatSendWithAck).toHaveBeenCalled());
     expect(store?.getState().queue.pendingFollowupsByThread['fup-thread']).toBeUndefined();
     expect(textarea).toHaveTextContent('keep me on failure');
   });

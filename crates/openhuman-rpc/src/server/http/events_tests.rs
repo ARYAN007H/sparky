@@ -1,10 +1,10 @@
 use axum::body::to_bytes;
 use axum::extract::Query;
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{header, HeaderMap, StatusCode};
 
 use super::{
-    EventsQuery, active_workspace_handle, domain_event_payload, domain_event_stream_unavailable,
-    domain_events_handler, events_handler, webhook_events_handler,
+    active_workspace_handle, domain_event_payload, domain_event_stream_unavailable,
+    domain_events_handler, events_handler, webhook_events_handler, EventsQuery,
 };
 
 #[test]
@@ -98,7 +98,7 @@ async fn events_bind_token_is_client_bound_and_single_use() {
 
 #[tokio::test]
 async fn events_stream_forwards_only_the_bound_client() {
-    use crate::core_host::web_chat::{WebChannelEvent, publish_web_channel_event};
+    use crate::core_host::web_chat::{publish_web_channel_event, WebChannelEvent};
     use tokio_stream::StreamExt;
 
     let token = crate::core_host::core::event_bind_tokens::issue("stream-client", None)

@@ -26,6 +26,7 @@ fn read_stem(
         updated: String::new(),
         turn_count: 0,
         prefix_message_count: None,
+        prefix_reset: false,
         input_tokens: 0,
         output_tokens: 0,
         cached_input_tokens: 0,
@@ -63,7 +64,7 @@ fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
         .expect("a workspace store names its destination");
     assert!(
         fallback.ends_with(&format!(
-            "/{}/transcripts",
+            "/local/agent:{}/transcripts",
             crate::agent::session_store::DEFAULT_AGENT
         )),
         "{fallback}"

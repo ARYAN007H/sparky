@@ -465,16 +465,14 @@ fn chat_schema_requires_client_thread_message() {
     assert!(required.contains(&"thread_id"));
     assert!(required.contains(&"message"));
     // model_override and temperature must be optional.
-    assert!(
-        s.inputs
-            .iter()
-            .any(|f| f.name == "model_override" && !f.required)
-    );
-    assert!(
-        s.inputs
-            .iter()
-            .any(|f| f.name == "temperature" && !f.required)
-    );
+    assert!(s
+        .inputs
+        .iter()
+        .any(|f| f.name == "model_override" && !f.required));
+    assert!(s
+        .inputs
+        .iter()
+        .any(|f| f.name == "temperature" && !f.required));
 }
 
 #[test]

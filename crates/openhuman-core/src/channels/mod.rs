@@ -32,7 +32,7 @@ pub mod providers;
 #[cfg(feature = "channels")]
 mod routes;
 #[cfg(feature = "channels")]
-mod runtime;
+pub(crate) mod runtime;
 #[cfg(feature = "channels")]
 pub(crate) mod system_prompt;
 

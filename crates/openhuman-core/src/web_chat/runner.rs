@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use tinyagents_harness::turn_runner::{ScopeKey, TurnRunner, TurnRunnerConfig};
-use tokio::sync::{Mutex as AsyncMutex, oneshot};
+use tokio::sync::{oneshot, Mutex as AsyncMutex};
 
 use super::ingress::WebIngress;
 use super::ops::StartChatError;
@@ -28,6 +28,7 @@ use super::turn_events::{WebEvents, WebFailures, WebReplies, WebSummarizer};
 use super::turn_host::WebHost;
 use super::types::WebChatTaskResult;
 use crate::agent::queued_turn::QueuedPayload;
+use crate::agent::session_lease::SessionLease;
 use crate::core::runtime::DispatchCtx;
 
 pub(super) type WebRunner = TurnRunner<
@@ -79,6 +80,14 @@ pub(super) struct CancelNote {
 pub(super) struct TurnSlot {
     pub(super) activity: TurnActivity,
     pub(super) session: Option<CheckedOutSession>,
+    /// Cross-surface lease survives TinyAgents' early `checkin` until the
+    /// terminal projection has finished delivering this turn.
+    pub(super) session_lease: Option<SessionLease>,
+    /// Profile-wide serialization is acquired after the session lease (the
+    /// same order used by native channel turns) and held through terminal
+    /// projection. Acquiring these in the opposite order can deadlock when
+    /// two Runner instances target one session.
+    pub(super) profile_turn: Option<crate::profiles::turn_gate::TurnGuard>,
     pub(super) fork: bool,
     pub(super) config: Option<Arc<crate::config::Config>>,
     pub(super) thread_dir: Option<std::path::PathBuf>,

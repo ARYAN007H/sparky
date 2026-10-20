@@ -10,8 +10,8 @@ use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use super::ops::{
-    channel_web_cancel, channel_web_chat, channel_web_queue_clear, channel_web_queue_remove,
-    channel_web_queue_status,
+    channel_web_cancel, channel_web_chat_with_attachments, channel_web_queue_clear,
+    channel_web_queue_remove, channel_web_queue_status,
 };
 use super::types::{
     ChatRequestMetadata, VoiceNoteReadParams, VoiceNoteStoreParams, WebCancelParams, WebChatParams,
@@ -76,9 +76,13 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 FieldSchema {
                     name: "attachments",
                     ty: TypeSchema::Option(Box::new(TypeSchema::Json)),
-                    comment: "Typed attachments (tinychannels ContentPart[]). VoiceNote parts carry an opaque id for audio already stored by channel.web_voice_note_store; the core validates and binds it to the user row without adding audio markers to model text. Other media parts use the regular attachment staging path.",
+                    comment: "Typed attachments (tinychannels ContentPart[]). VoiceNote parts carry an opaque id validated by channel.web_voice_note_store. Other media parts must be opaque refs returned on the persisted user message; their stored bytes are resolved under the trusted turn scope.",
                     required: false,
                 },
+                optional_string(
+                    "persisted_message_id",
+                    "User message row that owns the opaque typed attachment refs.",
+                ),
                 optional_string("model_override", "Optional model override."),
                 optional_f64("temperature", "Optional temperature override."),
                 optional_string(
@@ -110,7 +114,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     "Optional reasoning (thinking) effort for this thread: 'none', 'minimal', 'low', 'medium', 'high' or 'xhigh' ('off' and 'max' are aliases). 'default' clears the thread's choice back to config; omitted leaves it unchanged. Unknown values are rejected.",
                 ),
             ],
-            outputs: vec![json_output("ack", "Acceptance payload.")],
+            outputs: vec![json_output(
+                "ack",
+                "Acceptance payload; queued follow-ups include request_id and sanitized queued_attachments (opaque refs only).",
+            )],
         },
         "cancel" => ControllerSchema {
             namespace: "channel",
@@ -200,9 +207,56 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
     Box::pin(async move {
         let p = deserialize_params::<WebChatParams>(params)?;
         let voice_note_id = validate_voice_note_attachment(&ctx, &p).await?;
-        let message =
+        let stored_parts = p
+            .attachments
+            .iter()
+            .filter(|part| !matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. }))
+            .cloned()
+            .collect::<Vec<_>>();
+        let is_queued_followup = p.queue_mode.as_deref() == Some("followup");
+        let (stored_attachments, attachment_uploads) = if is_queued_followup {
+            if p.persisted_message_id.is_some() {
+                return Err("queued follow-ups must submit fresh attachment uploads".into());
+            }
+            if p.message.contains("[ATTACHMENT:")
+                || p.message.contains("[IMAGE:")
+                || p.message.contains("[FILE:")
+            {
+                return Err("typed media uploads require marker-free user text".into());
+            }
+            (None, (!stored_parts.is_empty()).then_some(stored_parts))
+        } else if stored_parts.is_empty() {
+            if p.persisted_message_id.is_some() {
+                return Err("persisted_message_id requires opaque media refs".into());
+            }
+            (None, None)
+        } else {
+            crate::threads::attachments::validate_opaque_parts(&stored_parts)?;
+            let persisted_message_id =
+                p.persisted_message_id
+                    .clone()
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| "opaque media refs require persisted_message_id".to_string())?;
+            (
+                Some(crate::agent::queued_turn::StoredAttachmentInput {
+                    persisted_message_id,
+                    parts: stored_parts,
+                }),
+                None,
+            )
+        };
+        let message = if stored_attachments.is_some() || is_queued_followup {
+            if p.message.contains("[ATTACHMENT:")
+                || p.message.contains("[IMAGE:")
+                || p.message.contains("[FILE:")
+            {
+                return Err("opaque media refs require marker-free user text".into());
+            }
+            p.message.clone()
+        } else {
             crate::agent::attachments::parts::fold_into_message(&p.message, &p.attachments)
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| e.to_string())?
+        };
         // Recorded before the turn starts so it reads the new choice.
         crate::agent::tinyagents::apply_requested_effort(
             &ctx,
@@ -210,7 +264,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             p.reasoning_effort.as_deref(),
         )?;
         to_json(
-            channel_web_chat(
+            channel_web_chat_with_attachments(
                 &ctx,
                 &p.client_id,
                 &p.thread_id,
@@ -232,6 +286,8 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
                     hold_text_stream: false,
                 },
                 voice_note_id,
+                stored_attachments,
+                attachment_uploads,
             )
             .await?,
         )

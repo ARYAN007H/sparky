@@ -13,17 +13,18 @@ mod system_turn;
 mod test_hooks;
 
 pub(super) use budget_correlation::{
-    BudgetCorrelation, classify_budget_correlation, clear_budget_signal, has_fresh_budget_signal,
-    record_budget_signal,
+    classify_budget_correlation, clear_budget_signal, has_fresh_budget_signal,
+    record_budget_signal, BudgetCorrelation,
 };
 
 pub use channel_ops::{
     cancel_all_turns, cancel_chat_scoped, channel_web_cancel, channel_web_chat,
+    channel_web_chat_with_attachments, channel_web_chat_with_stored_attachments,
     channel_web_queue_clear, channel_web_queue_remove, channel_web_queue_status,
 };
 
-pub use start_chat::{StartChatError, start_chat};
-pub use system_turn::{SESSION_CHECKOUT_FAILURE, SYSTEM_CLIENT_ID, run_system_turn_on_thread};
+pub use start_chat::{start_chat, StartChatError};
+pub use system_turn::{run_system_turn_on_thread, SESSION_CHECKOUT_FAILURE, SYSTEM_CLIENT_ID};
 
 #[cfg(test)]
 pub use state::drain_queued_turns_for_test;
@@ -41,12 +42,16 @@ pub(crate) use state::{key_in, unscope_in};
 pub(super) use state::{tenant_of, thread_sessions};
 
 #[cfg(any(test, debug_assertions))]
-pub use test_hooks::RUN_CHAT_TASK_TEST_LOCK;
-#[cfg(any(test, debug_assertions))]
 pub use test_hooks::set_test_forced_run_chat_task_error;
 #[cfg(test)]
 pub(crate) use test_hooks::track_parallel_turn_for_test;
 #[cfg(any(test, debug_assertions))]
-pub(super) use test_hooks::{TEST_PARK_AFTER_RUN, run_test_hooks, test_hooks_active};
+pub use test_hooks::RUN_CHAT_TASK_TEST_LOCK;
+#[cfg(test)]
+pub(crate) use test_hooks::{
+    last_run_chat_task_error_for_test, set_last_run_chat_task_error_for_test,
+};
 #[cfg(any(test, debug_assertions))]
-pub use test_hooks::{TestRunChatTaskBlock, set_test_park_after_run, set_test_run_chat_task_block};
+pub(super) use test_hooks::{run_test_hooks, test_hooks_active, TEST_PARK_AFTER_RUN};
+#[cfg(any(test, debug_assertions))]
+pub use test_hooks::{set_test_park_after_run, set_test_run_chat_task_block, TestRunChatTaskBlock};

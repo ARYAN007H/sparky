@@ -23,6 +23,7 @@
 mod channel;
 mod ops;
 mod params;
+pub(crate) mod progressive;
 mod schemas;
 mod store;
 

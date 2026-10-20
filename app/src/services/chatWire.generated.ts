@@ -547,6 +547,32 @@ export type WebChannelEvent =
     }
   | {
       client_id: string;
+      event: 'channel_outbound';
+      full_response?: string | null;
+      request_id: string;
+      seq?: number | null;
+      structured?: any;
+      thread_id: string;
+      ts?: number | null;
+      turn_request_id?: string | null;
+    }
+  | {
+      channel_event: ChannelEvent;
+      client_id: string;
+      event: 'channel_event';
+      /**
+       * OpenHuman's persisted row ID for the canonical event's target, when
+       * the host has an exact durable provider-receipt binding.
+       */
+      openhuman_message_id?: string | null;
+      request_id: string;
+      seq?: number | null;
+      thread_id: string;
+      ts?: number | null;
+      turn_request_id?: string | null;
+    }
+  | {
+      client_id: string;
       error_source?: string | null;
       error_type?: string | null;
       event: 'user_error';
@@ -607,29 +633,29 @@ export type ContentPart =
       text: string;
     }
   | {
-      altText?: string | null;
-      caption?: string | null;
+      altText: string | null;
+      caption: string | null;
       kind: 'image';
       media: MediaReference;
     }
   | {
-      caption?: string | null;
-      durationMs?: number | null;
+      caption: string | null;
+      durationMs: number | null;
       kind: 'video';
       media: MediaReference;
-      thumbnail?: MediaReference | null;
+      thumbnail: MediaReference | null;
     }
   | {
-      codec?: string | null;
-      durationMs?: number | null;
+      codec: string | null;
+      durationMs: number | null;
       kind: 'audio';
       media: MediaReference;
-      title?: string | null;
-      transcript?: string | null;
+      title: string | null;
+      transcript: string | null;
     }
   | {
-      caption?: string | null;
-      fileName?: string | null;
+      caption: string | null;
+      fileName: string | null;
       kind: 'file';
       media: MediaReference;
     }
@@ -638,27 +664,27 @@ export type ContentPart =
       voiceNote: VoiceNote;
     }
   | {
-      altText?: string | null;
-      emoji?: string | null;
+      altText: string | null;
+      emoji: string | null;
       kind: 'sticker';
       media: MediaReference;
-      packId?: string | null;
-      stickerId?: string | null;
+      packId: string | null;
+      stickerId: string | null;
     }
   | {
-      accuracyMeters?: number | null;
-      address?: string | null;
+      accuracyMeters: number | null;
+      address: string | null;
       kind: 'location';
-      label?: string | null;
+      label: string | null;
       latitude: number;
-      liveUntilUnixMs?: number | null;
+      liveUntilUnixMs: number | null;
       longitude: number;
     }
   | {
       displayName: string;
       emails: ContactMethod[];
       kind: 'contact';
-      organization?: string | null;
+      organization: string | null;
       phoneNumbers: ContactMethod[];
     }
   | {
@@ -666,11 +692,11 @@ export type ContentPart =
       rows: ButtonAction[][];
     }
   | {
-      closesAtUnixMs?: number | null;
+      closesAtUnixMs: number | null;
       kind: 'poll';
       multipleChoice: boolean;
       options: string[];
-      providerPollId?: string | null;
+      providerPollId: string | null;
       question: string;
     }
   | {
@@ -704,85 +730,185 @@ export type OutboundVoice =
        * reference remains the canonical media identity.
        */
       audioBase64?: string | null;
-      codec?: string | null;
-      durationMs?: number | null;
+      codec: string | null;
+      durationMs: number | null;
       kind: 'media';
       media: MediaReference;
+      /**
+       * Normalised 0.0-1.0 loudness preview for providers that draw one
+       * (WhatsApp push-to-talk). Absent when the codec path produced none.
+       */
+      waveform?: number[] | null;
     }
   | {
       kind: 'synthesize';
       text: string;
-      voice?: string | null;
+      voice: string | null;
+    };
+/**
+ * One normalized event emitted by a channel provider.
+ */
+export type ChannelEvent = {
+  channel: ChannelRef;
+  /**
+   * Full conversation address. Presence events may omit it.
+   */
+  conversation: ConversationRef | null;
+  /**
+   * Stable adapter event ID, suitable for host-side deduplication.
+   */
+  eventId: string;
+  /**
+   * Provider event ID, retained verbatim when supplied.
+   */
+  sourceEventId: string | null;
+  /**
+   * Provider timestamp in Unix milliseconds, when supplied.
+   */
+  sourceTimestamp: number | null;
+  /**
+   * Event vocabulary version. This DTO currently represents contract v2.
+   */
+  version: number;
+} & ChannelEvent1;
+export type ChannelEvent1 =
+  | {
+      active: boolean;
+      actor: SenderRef;
+      expiresAt: number | null;
+      type: 'typing';
+    }
+  | {
+      actor: SenderRef | null;
+      messageId: string;
+      timestamp: number | null;
+      type: 'read_receipt';
+    }
+  | {
+      actor: SenderRef | null;
+      messageId: string;
+      timestamp: number | null;
+      type: 'delivered_receipt';
+    }
+  | {
+      actor: SenderRef;
+      messageId: string;
+      providerMessageId?: string | null;
+      reaction: ChannelReaction;
+      type: 'reaction_added';
+    }
+  | {
+      actor: SenderRef;
+      messageId: string;
+      providerMessageId?: string | null;
+      reaction: ChannelReaction;
+      type: 'reaction_removed';
+    }
+  | {
+      messageId: string;
+      providerMessageId?: string | null;
+      reaction: ChannelReaction;
+      success: boolean;
+      type: 'outbound_reaction';
+    }
+  | {
+      messageId: string;
+      parts: ContentPart[];
+      providerMessageId?: string | null;
+      type: 'message_updated';
+    }
+  | {
+      messageId: string;
+      providerMessageId?: string | null;
+      type: 'message_deleted';
+    }
+  | {
+      actionId: string;
+      actor: SenderRef;
+      providerMessageId: string | null;
+      queryId: string;
+      type: 'button_callback';
+    }
+  | {
+      actor: SenderRef;
+      expiresAt: number | null;
+      state: string;
+      type: 'presence';
+    }
+  | {
+      reason: string | null;
+      state: string;
+      type: 'lifecycle';
     };
 
 /**
  * One inbound media reference, preserving provider attachment order.
  */
 export interface MediaReference {
-  codec?: string | null;
-  contentType?: string | null;
-  durationMs?: number | null;
-  fileName?: string | null;
-  height?: number | null;
+  codec: string | null;
+  contentType: string | null;
+  durationMs: number | null;
+  fileName: string | null;
+  height: number | null;
   /**
    * Provider-neutral media kind.
    */
-  kind?: 'image' | 'video' | 'audio' | 'document' | 'unknown';
-  localCachePath?: string | null;
+  kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
+  localCachePath: string | null;
   /**
    * Stable host-owned identifier for media stored outside the channel
    * provider. It is safe to persist and does not imply a shared filesystem.
    */
   opaqueId?: string | null;
-  path?: string | null;
-  platformMessageId?: string | null;
-  sizeBytes?: number | null;
-  transcribed?: boolean;
-  url?: string | null;
-  width?: number | null;
+  path: string | null;
+  platformMessageId: string | null;
+  sizeBytes: number | null;
+  transcribed: boolean;
+  url: string | null;
+  width: number | null;
 }
 /**
  * Audio message metadata and optional transcript enrichment.
  */
 export interface VoiceNote {
-  codec?: string | null;
-  durationMs?: number | null;
-  media?: MediaReference1;
-  pushToTalk?: boolean;
-  transcript?: VoiceTranscript | null;
-  waveform?: number[] | null;
+  codec: string | null;
+  durationMs: number | null;
+  media: MediaReference1;
+  pushToTalk: boolean;
+  transcript: VoiceTranscript | null;
+  waveform: number[] | null;
 }
 /**
  * One inbound media reference, preserving provider attachment order.
  */
 export interface MediaReference1 {
-  codec?: string | null;
-  contentType?: string | null;
-  durationMs?: number | null;
-  fileName?: string | null;
-  height?: number | null;
+  codec: string | null;
+  contentType: string | null;
+  durationMs: number | null;
+  fileName: string | null;
+  height: number | null;
   /**
    * Provider-neutral media kind.
    */
-  kind?: 'image' | 'video' | 'audio' | 'document' | 'unknown';
-  localCachePath?: string | null;
+  kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
+  localCachePath: string | null;
   /**
    * Stable host-owned identifier for media stored outside the channel
    * provider. It is safe to persist and does not imply a shared filesystem.
    */
   opaqueId?: string | null;
-  path?: string | null;
-  platformMessageId?: string | null;
-  sizeBytes?: number | null;
-  transcribed?: boolean;
-  url?: string | null;
-  width?: number | null;
+  path: string | null;
+  platformMessageId: string | null;
+  sizeBytes: number | null;
+  transcribed: boolean;
+  url: string | null;
+  width: number | null;
 }
 /**
  * Transcript enrichment attached to a voice note without replacing its audio.
  */
 export interface VoiceTranscript {
-  language?: string | null;
+  language: string | null;
   source: VoiceTranscriptSource;
   state: VoiceTranscriptState;
   text: string;
@@ -791,7 +917,7 @@ export interface VoiceTranscript {
  * One typed phone number or email address on a contact card.
  */
 export interface ContactMethod {
-  label?: string | null;
+  label: string | null;
   value: string;
 }
 /**
@@ -801,7 +927,7 @@ export interface ButtonAction {
   disabled: boolean;
   id: string;
   label: string;
-  style?: ButtonStyle | null;
+  style: ButtonStyle | null;
 }
 export interface WebTurnTimingPayload {
   first_token_ms?: number | null;
@@ -811,20 +937,20 @@ export interface WebTurnTimingPayload {
 }
 export interface WebTurnUsagePayload {
   cached_input_tokens: number;
-  context_tokens?: number;
+  context_tokens: number;
   context_window: number;
   /**
    * Cost provenance copied as a wire enum to avoid depending on the harness.
    */
-  cost_source?: 'charged' | 'estimated' | 'unknown';
-  cost_usd?: number | null;
+  cost_source: 'charged' | 'estimated' | 'unknown';
+  cost_usd: number | null;
   input_tokens: number;
   output_tokens: number;
   subagents?: WebSubagentUsagePayload[];
 }
 export interface WebSubagentUsagePayload {
   agent_id: string;
-  cost_usd?: number | null;
+  cost_usd: number | null;
   input_tokens: number;
   output_tokens: number;
   task_id: string;
@@ -869,4 +995,48 @@ export interface WebQueueItemPayload {
   id: string;
   lane?: string | null;
   text_preview?: string | null;
+}
+/**
+ * Configured provider/account identity.
+ */
+export interface ChannelRef {
+  accountId: string | null;
+  id: string;
+}
+/**
+ * Reference to an inbound or outbound conversation.
+ */
+export interface ConversationRef {
+  id: string;
+  /**
+   * Provider-neutral conversation kind.
+   */
+  kind: 'dm' | 'group' | 'channel' | 'thread' | 'unknown';
+  parentId: string | null;
+  scopeId: string | null;
+  threadId: string | null;
+  topicId: string | null;
+}
+/**
+ * Reference to the message sender.
+ */
+export interface SenderRef {
+  altIds: string[];
+  id: string;
+  isBot: boolean;
+  name: string | null;
+  roles: string[];
+}
+/**
+ * Provider reaction identity, including optional custom emoji identity.
+ */
+export interface ChannelReaction {
+  /**
+   * Provider-specific stable custom-emoji identity.
+   */
+  customEmojiId: string | null;
+  /**
+   * Displayable reaction text, such as an emoji.
+   */
+  value: string;
 }

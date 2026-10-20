@@ -177,6 +177,7 @@ fn text_dialect_tool_turn_projects_calls_on_their_issuing_row_as_settled() {
     let meta = transcript::TranscriptMeta {
         session_id: None,
         parent_session_id: None,
+        prefix_reset: false,
         agent_name: "orchestrator".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: Some("root".into()),
@@ -361,6 +362,7 @@ fn tool_failure_metadata_round_trips_write_to_display_line() {
     let meta = transcript::TranscriptMeta {
         session_id: None,
         parent_session_id: None,
+        prefix_reset: false,
         agent_name: "orchestrator".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: Some("root".into()),

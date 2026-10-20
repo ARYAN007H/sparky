@@ -9,12 +9,45 @@
 
 use anyhow::Result;
 use tinyagents_runtime::{ResumeMode, TurnOptions};
+use tinyagents_session::transcript::TranscriptMessage;
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
 use super::OpenHumanSessionHost;
 
 impl OpenHumanSessionHost {
+    /// Reset the bound durable transcript without deleting its sealed
+    /// generations. The runtime owns the session identity and reset
+    /// serialization; this host method only ensures the bound session is
+    /// resumed before delegating to it.
+    pub(crate) async fn reset_bound_history(&mut self) -> Result<bool> {
+        self.ensure_runtime_session()?;
+        self.resume_bound_session().await?;
+        self.runtime_session
+            .as_mut()
+            .expect("runtime session initialized")
+            .reset_history()
+            .await
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
+    }
+
+    /// Install imported conversation rows once, before the first turn binds
+    /// this durable session. Empty imports do not reserve a session, and a
+    /// transcript already written by a prior turn always wins unchanged.
+    pub(crate) fn adopt_imported_history(&self, messages: &[TranscriptMessage]) -> Result<bool> {
+        if messages.is_empty() {
+            return Ok(false);
+        }
+        let Some(session) = self.session.as_ref() else {
+            return Ok(false);
+        };
+        self.session_locator().adopt_messages_if_absent(
+            session,
+            self.runtime_transcript_meta(),
+            messages,
+        )
+    }
+
     /// Load this session's durable history now, before any turn runs.
     ///
     /// A turn resumes on its own, so this exists for hosts that want the

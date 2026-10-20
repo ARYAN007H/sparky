@@ -81,7 +81,7 @@ fn describe(error: &ConversationError, subject: Subject<'_>) -> String {
             let text = inner.to_string();
             match (subject.thread, subject.message) {
                 (Some(t), Some(m)) if text.contains("message") => {
-                    return format!("message {m} not found in thread {t}")
+                    return format!("message {m} not found in thread {t}");
                 }
                 (Some(t), _) => return format!("thread {t} not found"),
                 _ => {}
@@ -89,6 +89,36 @@ fn describe(error: &ConversationError, subject: Subject<'_>) -> String {
         }
     }
     error.to_string()
+}
+
+/// Imports the legacy JSONL conversations under `workspace_dir` into the
+/// `local` conversation scope of an explicit `backend`, once (the same
+/// `tsd.migrations` entry [`ConversationStore`] checks). For the layout
+/// migration (`storage::layout`), which runs before any store opens the new
+/// database; the source files are only read.
+///
+/// # Errors
+///
+/// A storage failure or an unreadable legacy file; the next call retries.
+pub(crate) fn import_legacy_into(
+    backend: &Arc<dyn storage::StorageBackend>,
+    workspace_dir: &Path,
+) -> Result<(), String> {
+    let scope = Scope::local();
+    let scoped = backend
+        .for_scope(&scope)
+        .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
+    let repo = Repo::on(backend, &scope, DOMAIN, super::legacy_import::collections)
+        .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
+    let store = DriverConversationStore::new(scoped.clone());
+    let docs = Arc::clone(scoped.documents());
+    storage::block_on(async move {
+        DriverConversationStore::prepare_schema(docs.as_ref()).await?;
+        DriverConversationStore::prepare_append_schema(docs.as_ref()).await
+    })
+    .map_err(|e| format!("{LOG_PREFIX} declare the conversation schema: {e}"))?;
+    super::legacy_import::import_once(workspace_dir, &repo, &store)
+        .map_err(|e| format!("{LOG_PREFIX} legacy import: {e:#}"))
 }
 
 /// A conversation store bound to one workspace's storage backend.

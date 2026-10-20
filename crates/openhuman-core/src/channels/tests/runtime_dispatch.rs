@@ -119,6 +119,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
         let runtime_ctx = Arc::new(ChannelRuntimeContext {
             relay_thread: None,
             channels_by_name: Arc::new(channels_by_name),
+            module_objects: Arc::new(HashMap::new()),
             turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
                 Arc::new(SlowModel {
                     delay: Duration::from_millis(5),
@@ -130,7 +131,6 @@ async fn message_dispatch_processes_messages_in_parallel() {
             model: Arc::new("test-model".to_string()),
             temperature: 0.0,
             max_tool_iterations: 10,
-            conversation_histories: Arc::new(Mutex::new(HashMap::new())),
             turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
             route_overrides: Arc::new(Mutex::new(HashMap::new())),
             api_url: None,
@@ -199,6 +199,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(SlowModel {
                 delay: Duration::from_millis(20),
@@ -210,7 +211,6 @@ async fn process_channel_message_cancels_scoped_typing_task() {
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 10,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -293,6 +293,7 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
         channels_by_name: Arc::new(channels_by_name),
         // Still need a model for the context field, but the stubbed bus
         // handler never invokes it — so a minimal no-op is fine.
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(super::common::DummyModel),
         )),
@@ -302,7 +303,6 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 10,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -416,6 +416,7 @@ async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
     Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(super::common::DummyModel),
         )),
@@ -425,7 +426,6 @@ async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
         model: Arc::new("requested-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 10,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -552,6 +552,7 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(super::common::DummyModel),
         )),
@@ -561,7 +562,6 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 10,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -639,6 +639,7 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(super::common::DummyModel),
         )),
@@ -648,7 +649,6 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 10,
-        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,

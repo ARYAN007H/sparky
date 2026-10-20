@@ -135,6 +135,8 @@ export function externalTransferProvider(event: ExternalTransferPendingEvent): s
 
 export type ChatTextDeltaEvent = WireEvent<'text_delta', 'delta' | 'round'>;
 export type ChatThinkingDeltaEvent = WireEvent<'thinking_delta', 'delta' | 'round'>;
+/** Provider event with an OpenHuman row ID only when ownership is exact. */
+export type ChatChannelEventEvent = WireEvent<'channel_event', 'channel_event'>;
 export type ChatToolArgsDeltaEvent = WireEvent<
   'tool_args_delta',
   'delta' | 'round' | 'tool_call_id' | 'tool_name'

@@ -1,6 +1,6 @@
 //! Per-sender routing and runtime command handling.
 
-use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
+use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
 use std::sync::Arc;
@@ -81,12 +81,14 @@ struct RouteCallbacks {
     core_context: Option<Arc<crate::core::runtime::CoreContext>>,
     tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
+    reset_context: Option<crate::channels::host::remote_control::RemoteResetContext>,
 }
 
 impl RouteCallbacks {
     fn new(
         context: ChannelRuntimeContext,
         cancellation: tokio_util::sync::CancellationToken,
+        reset_context: Option<crate::channels::host::remote_control::RemoteResetContext>,
     ) -> Self {
         let ctx = context.dispatch_ctx();
         Self {
@@ -97,6 +99,7 @@ impl RouteCallbacks {
             ),
             context,
             cancellation,
+            reset_context,
         }
     }
 }
@@ -126,6 +129,7 @@ impl RouteCallbacks {
                             &self.context,
                             &self.tenant,
                             &self.cancellation,
+                            self.reset_context.as_ref(),
                             request,
                         ) => result.map(tinychannels_bus::ChannelBackendResult::RemoteControl),
                     }
@@ -143,30 +147,48 @@ impl RouteCallbacks {
     }
 }
 
-pub(crate) async fn handle_runtime_command_if_needed(
+pub(crate) async fn handle_runtime_command_with_reset<F, Fut>(
     ctx: &ChannelRuntimeContext,
     msg: &traits::ChannelMessage,
     target_channel: Option<&Arc<dyn Channel>>,
     sender_key: &str,
-) -> bool {
+    reset_scope: Option<tinychannels_bus::module_remote::RemoteSessionScope>,
+    durable_session_key: Option<String>,
+    reset_message: &traits::ChannelMessage,
+    reset_history: F,
+) -> bool
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
     // This is a host dispatch hint; the module alone parses and recognizes
     // commands. Ordinary messages avoid creating a private callback object.
     if !msg.content.trim_start().starts_with('/') {
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
-    let history_len = ctx
-        .conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(sender_key)
-        .map(Vec::len)
-        .unwrap_or(0);
+    let history_len =
+        durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
+            .await;
     let client = super::context::module_client(ctx).await;
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
             client,
-            RouteCallbacks::new(ctx.clone(), super::runtime::session::channel_session()),
+            RouteCallbacks::new(
+                ctx.clone(),
+                super::runtime::session::channel_session(),
+                reset_scope
+                    .clone()
+                    .zip(durable_session_key)
+                    .map(|(scope, durable_session_key)| {
+                        crate::channels::host::remote_control::RemoteResetContext {
+                            scope,
+                            durable_session_key,
+                            message: reset_message.clone(),
+                            history_key: sender_key.to_owned(),
+                        }
+                    }),
+            ),
         )
         .await?;
         let response: Result<ChannelControlResult, _> = lease
@@ -181,6 +203,21 @@ pub(crate) async fn handle_runtime_command_if_needed(
                         model: current.model,
                     },
                     history_len,
+                    session_scope: reset_scope.clone().map(Box::new),
+                    configured_channel: reset_scope.as_ref().and_then(|scope| {
+                        let account = scope.channel.account_id.as_deref()?;
+                        let channel = ctx.channels_by_name.get(account)?;
+                        (channel.name() == account
+                            && tinychannels_bus::provider_id(channel.name()) == scope.channel.id)
+                            .then(|| {
+                                Box::new(
+                                    tinychannels_bus::module_control::ConfiguredControlChannel {
+                                        name: channel.name().to_owned(),
+                                        capabilities: channel.capabilities(),
+                                    },
+                                )
+                            })
+                    }),
                     providers: provider_descriptors(),
                 },),
             )
@@ -223,8 +260,20 @@ pub(crate) async fn handle_runtime_command_if_needed(
             },
         );
     }
-    if clear_history {
-        clear_sender_history(&ctx.conversation_histories, sender_key);
+    if clear_history && reset_history().await.is_err() {
+        tracing::warn!("channel durable history reset failed");
+        if let Some(channel) = target_channel {
+            let copy = crate::web_chat::classify_inference_error(
+                "OpenHuman session persistence failed while resetting this conversation",
+            );
+            let _ = channel
+                .send_with_outbound_intent(
+                    &SendMessage::new(copy.message, &msg.reply_target)
+                        .in_thread(msg.thread_ts.clone()),
+                )
+                .await;
+        }
+        return true;
     }
     let Some(reply) = reply else {
         return false;
@@ -243,6 +292,80 @@ pub(crate) async fn handle_runtime_command_if_needed(
     true
 }
 
+async fn durable_channel_history_len(
+    ctx: &ChannelRuntimeContext,
+    route: &ChannelRouteSelection,
+    channel: &str,
+    session_key: Option<&str>,
+) -> usize {
+    let Some(session_key) = session_key else {
+        return 0;
+    };
+    let agent_id = match crate::channels::runtime::dispatch::host_agent::route(ctx, channel) {
+        crate::channels::runtime::dispatch::host_agent::HostRoute::Agent(host) => {
+            host.definition.id.clone()
+        }
+        crate::channels::runtime::dispatch::host_agent::HostRoute::Missing(_) => return 0,
+        crate::channels::runtime::dispatch::host_agent::HostRoute::Unbound => {
+            match crate::channels::runtime::dispatch::host_agent::configured_agent(ctx, route).await
+            {
+                Ok(host) => host.definition.id,
+                Err(error) => {
+                    tracing::debug!(%error, "channel history count unavailable");
+                    return 0;
+                }
+            }
+        }
+    };
+    let dispatch = ctx.dispatch_ctx();
+    let Some(core) = dispatch.resolved() else {
+        return 0;
+    };
+    let store_agent_id = crate::agent::session_store::current_agent_key_or(&dispatch, &agent_id);
+    let locator = crate::agent::session_store::transcripts_or_files_in(
+        &core,
+        &store_agent_id,
+        &ctx.workspace_dir,
+    );
+    let session = tinyagents_session::transcript::SessionRef::scoped(session_key, &agent_id);
+    let head = locator.head_generation(&session);
+    let Some(read) = locator.read_session_transcript(&head) else {
+        return 0;
+    };
+    let Ok(Some(transcript)) = read.read_session() else {
+        return 0;
+    };
+    transcript
+        .messages
+        .iter()
+        .filter(|message| message.role == "user" || message.role == "assistant")
+        .count()
+}
+
+#[cfg(test)]
+pub(crate) async fn handle_runtime_command_if_needed(
+    ctx: &ChannelRuntimeContext,
+    msg: &traits::ChannelMessage,
+    target_channel: Option<&Arc<dyn Channel>>,
+    sender_key: &str,
+) -> bool {
+    handle_runtime_command_with_reset(
+        ctx,
+        msg,
+        target_channel,
+        sender_key,
+        None,
+        None,
+        msg,
+        || async { Ok(()) },
+    )
+    .await
+}
+
 #[cfg(test)]
 #[path = "routes_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "routes_remote_reset_tests.rs"]
+mod remote_reset_tests;

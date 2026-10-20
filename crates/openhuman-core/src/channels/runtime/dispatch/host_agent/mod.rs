@@ -5,7 +5,8 @@
 //! through the host agent resolver ([`crate::agent::host_agents`]) and run as
 //! that agent -- its definition, its host tools, its context -- instead of
 //! going over the bus to the orchestrator. Everything else about the channel
-//! stays: per-chat history, typing, drafts, the reply back to the chat.
+//! stays: durable session identity, typing, progressive events, and the reply
+//! back to the chat.
 //!
 //! A binding the resolver cannot satisfy (the embedder has not created the
 //! agent yet, or dropped it) is **refused**, with a short reply to the chat
@@ -29,7 +30,36 @@ use tinychannels_bus as traits;
 pub(crate) mod posture;
 mod turn;
 
-pub(crate) use turn::{run_host_agent_turn, seed_rows, HostChannelTurn};
+pub(crate) use turn::{run_host_agent_turn, HostChannelTurn};
+
+/// Resolve the config-owned target selected for an unbound channel into the
+/// same trusted host-agent carrier used by channel bindings. The effective
+/// provider/model remain the channel's configured route.
+pub(crate) async fn configured_agent(
+    ctx: &ChannelRuntimeContext,
+    route: &crate::channels::context::ChannelRouteSelection,
+) -> Result<HostAgent, String> {
+    let dispatch = ctx.dispatch_ctx();
+    let mut config = match &ctx.config {
+        Some(config) => config.as_ref().clone(),
+        None => dispatch
+            .load_config()
+            .await
+            .map_err(|error| error.to_string())?,
+    };
+    let agent_id = crate::web_chat::pick_target_agent_id(&config);
+    config.chat_provider = Some(
+        if route.provider == crate::inference::provider::INFERENCE_BACKEND_ID {
+            crate::inference::provider::INFERENCE_BACKEND_ID.to_string()
+        } else {
+            format!("{}:{}", route.provider, route.model)
+        },
+    );
+    config.default_model = Some(route.model.clone());
+    config.default_temperature = ctx.temperature;
+    config.multimodal_files = crate::config::MultimodalFileConfig::for_untrusted_channel_input();
+    HostAgent::from_config(&dispatch, config, &agent_id).map_err(|error| error.to_string())
+}
 
 /// What a channel's binding resolves to for one message.
 pub(crate) enum HostRoute {

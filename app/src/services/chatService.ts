@@ -8,6 +8,7 @@
  */
 import debug from 'debug';
 
+import type { QueuedChatAck, StartedChatAck } from '../types/threadWire.generated';
 import {
   type ArtifactFailedEvent,
   ArtifactKind,
@@ -16,6 +17,7 @@ import {
   ChatApprovalDecidedEvent,
   ChatApprovalRequestEvent,
   ChatCancelledEvent,
+  ChatChannelEventEvent,
   ChatDoneEvent,
   ChatErrorEvent,
   ChatInferenceHeartbeatEvent,
@@ -112,6 +114,7 @@ export function segmentText(event: ChatSegmentEvent): string {
 export interface ChatEventListeners {
   onInferenceStart?: (event: ChatInferenceStartEvent) => void;
   onInferenceHeartbeat?: (event: ChatInferenceHeartbeatEvent) => void;
+  onChannelEvent?: (event: ChatChannelEventEvent) => void;
   onIterationStart?: (event: ChatIterationStartEvent) => void;
   onToolCall?: (event: ChatToolCallEvent) => void;
   onToolResult?: (event: ChatToolResultEvent) => void;
@@ -164,6 +167,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
   const EVENTS = {
     inferenceStart: 'inference_start',
     inferenceHeartbeat: 'inference_heartbeat',
+    channelEvent: 'channel_event',
     iterationStart: 'iteration_start',
     toolCall: 'tool_call',
     toolResult: 'tool_result',
@@ -221,6 +225,15 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     };
     socket.on(EVENTS.inferenceHeartbeat, cb);
     handlers.push([EVENTS.inferenceHeartbeat, cb]);
+  }
+
+  if (listeners.onChannelEvent) {
+    const cb = (payload: unknown) => {
+      const event = payload as ChatChannelEventEvent;
+      listeners.onChannelEvent?.(event);
+    };
+    socket.on(EVENTS.channelEvent, cb);
+    handlers.push([EVENTS.channelEvent, cb]);
   }
 
   if (listeners.onIterationStart) {
@@ -879,11 +892,14 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
   };
 }
 
+// UI-only send options; the RPC `queue_mode` remains a server-owned string.
 type QueueMode = 'interrupt' | 'steer' | 'followup' | 'collect' | 'parallel';
 
 interface ChatSendParams {
   threadId: string;
   message: string;
+  /** Persisted user row that owns the opaque `attachments` refs. */
+  persistedMessageId?: string;
   /**
    * Typed attachments (`image`/`video`/`file` parts with an inline `data:` URI)
    * sent beside `message`; the core stages them. Never splice upload markers
@@ -939,19 +955,85 @@ interface ChatSendParams {
  * one — used by `parallel` sends to register the forked turn's stream lane.
  * `undefined` if the ack carried no id.
  */
-export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
+export interface ChatSendAck {
+  requestId?: string;
+  queuedAttachments: ContentPart[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isQueuedAttachment(value: unknown): value is ContentPart {
+  if (!isRecord(value) || !['image', 'video', 'audio', 'file'].includes(String(value.kind))) {
+    return false;
+  }
+  if (!isRecord(value.media)) return false;
+  const media = value.media;
+  const hasNoAuthority = (reference: Record<string, unknown>) =>
+    reference.url == null && reference.path == null && reference.localCachePath == null;
+  const safeMedia =
+    typeof media.opaqueId === 'string' && media.opaqueId.length > 0 && hasNoAuthority(media);
+  if (!safeMedia) return false;
+  if (value.kind === 'video' && value.thumbnail != null) {
+    return isRecord(value.thumbnail) && hasNoAuthority(value.thumbnail);
+  }
+  return true;
+}
+
+function isQueuedChatAck(value: unknown): value is QueuedChatAck {
+  return (
+    isRecord(value) &&
+    value.queued === true &&
+    typeof value.queue_mode === 'string' &&
+    typeof value.client_id === 'string' &&
+    typeof value.thread_id === 'string' &&
+    typeof value.request_id === 'string' &&
+    typeof value.queue_depth === 'number' &&
+    Array.isArray(value.queued_attachments) &&
+    value.queued_attachments.every(isQueuedAttachment)
+  );
+}
+
+function isStartedChatAck(value: unknown): value is StartedChatAck {
+  return (
+    isRecord(value) &&
+    value.accepted === true &&
+    value.queued !== true &&
+    typeof value.client_id === 'string' &&
+    value.client_id.length > 0 &&
+    typeof value.thread_id === 'string' &&
+    value.thread_id.length > 0 &&
+    typeof value.request_id === 'string' &&
+    value.request_id.length > 0
+  );
+}
+
+function unwrapChatAck(value: unknown): unknown {
+  if (
+    isRecord(value) &&
+    Object.hasOwn(value, 'result') &&
+    Array.isArray(value.logs)
+  ) {
+    return value.result;
+  }
+  return value;
+}
+
+export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendAck> {
   const socket = socketService.getSocket();
   const clientId = socket?.id;
   if (!clientId) {
     throw new Error('Socket not connected — no client ID for event routing');
   }
 
-  const result = await callCoreRpc({
+  const response = await callCoreRpc({
     method: 'openhuman.channel_web_chat',
     params: {
       client_id: clientId,
       thread_id: params.threadId,
       message: params.message,
+      persisted_message_id: params.persistedMessageId ?? undefined,
       attachments: params.attachments?.length ? params.attachments : undefined,
       model_override: params.model ?? undefined,
       locale: params.locale ?? undefined,
@@ -962,9 +1044,30 @@ export async function chatSend(params: ChatSendParams): Promise<string | undefin
       reasoning_effort: params.reasoningEffort ?? undefined,
     },
   });
+  const result = unwrapChatAck(response);
 
-  const requestId = (result as { request_id?: unknown } | null)?.request_id;
-  return typeof requestId === 'string' ? requestId : undefined;
+  // Keep accepting the legacy scalar while consuming the authoritative started
+  // and queued acknowledgement shapes returned by current cores.
+  if (typeof result === 'string') {
+    return { requestId: result, queuedAttachments: [] };
+  }
+  if (result == null) {
+    return { queuedAttachments: [] };
+  }
+  if (isQueuedChatAck(result)) {
+    return { requestId: result.request_id, queuedAttachments: result.queued_attachments };
+  }
+  if (isStartedChatAck(result)) {
+    return { requestId: result.request_id, queuedAttachments: [] };
+  }
+  if (typeof result !== 'string') {
+    throw new Error('Core returned an invalid chat queue acknowledgement');
+  }
+  return { requestId: result, queuedAttachments: [] };
+}
+
+export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
+  return (await chatSendWithAck(params)).requestId;
 }
 
 /** `client_id` sent with a Stop issued while the socket has no id. */

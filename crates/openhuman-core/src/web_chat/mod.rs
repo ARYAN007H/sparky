@@ -47,12 +47,14 @@ mod types;
 
 mod voice_notes;
 mod web_errors;
-pub(crate) use web_errors::classify_inference_error;
+pub(crate) use web_errors::{
+    classify_inference_error, turn_idle_error_message, turn_timeout_error_message,
+};
 #[cfg(any(test, debug_assertions))]
 #[allow(unused_imports)]
 pub(crate) use web_errors::{
-    ClassifiedError, generic_inference_error_user_message, is_action_budget_exhausted,
-    is_non_retryable_rate_limit_text, retry_after_hint,
+    generic_inference_error_user_message, is_action_budget_exhausted,
+    is_non_retryable_rate_limit_text, retry_after_hint, ClassifiedError,
 };
 
 // Public API — event bus
@@ -76,6 +78,7 @@ pub use progress::unix_epoch_ms;
 pub use event_bus::fresh_approval_surface_subscription;
 
 // Public API — operations
+pub(crate) use ops::channel_web_chat_with_stored_attachments;
 #[cfg(test)]
 pub use ops::drain_queued_turns_for_test;
 pub(crate) use ops::invalidate_thread_sessions_for_tenant;
@@ -86,11 +89,13 @@ pub use ops::parallel_in_flight_entries_for_test;
 #[cfg(test)]
 pub(crate) use ops::track_parallel_turn_for_test;
 pub use ops::{
-    SESSION_CHECKOUT_FAILURE, SYSTEM_CLIENT_ID, StartChatError, cancel_all_turns,
-    cancel_chat_scoped, cancel_should_target, channel_web_cancel, channel_web_chat,
-    channel_web_queue_clear, channel_web_queue_remove, channel_web_queue_status,
+    cancel_all_turns, cancel_chat_scoped, cancel_should_target, channel_web_cancel,
+    channel_web_chat, channel_web_queue_clear, channel_web_queue_remove, channel_web_queue_status,
     in_flight_entries_for_test, invalidate_thread_sessions, run_system_turn_on_thread, start_chat,
+    StartChatError, SESSION_CHECKOUT_FAILURE, SYSTEM_CLIENT_ID,
 };
+#[cfg(test)]
+pub(crate) use ops::{last_run_chat_task_error_for_test, set_last_run_chat_task_error_for_test};
 pub use types::ChatRequestMetadata;
 
 // Public API — schemas / controllers
@@ -134,11 +139,11 @@ pub(crate) use web_errors::{
 
 // Test helpers (debug/test builds only)
 #[cfg(any(test, debug_assertions))]
-pub use ops::RUN_CHAT_TASK_TEST_LOCK;
-#[cfg(any(test, debug_assertions))]
 pub use ops::set_test_forced_run_chat_task_error;
 #[cfg(any(test, debug_assertions))]
-pub use ops::{TestRunChatTaskBlock, set_test_park_after_run, set_test_run_chat_task_block};
+pub use ops::RUN_CHAT_TASK_TEST_LOCK;
+#[cfg(any(test, debug_assertions))]
+pub use ops::{set_test_park_after_run, set_test_run_chat_task_block, TestRunChatTaskBlock};
 
 #[cfg(any(test, debug_assertions))]
 #[path = "mod_test_support_tests.rs"]

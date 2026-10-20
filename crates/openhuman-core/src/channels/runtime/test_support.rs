@@ -22,7 +22,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus::{ChannelMessage, SendMessage};
-use tinychannels_runtime::context::ChatMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 
@@ -32,13 +31,11 @@ pub struct DispatchHarnessOptions {
     pub content: String,
     pub thread_ts: Option<String>,
     pub inbound_envelope: Option<tinychannels_bus::ChannelInboundEnvelope>,
-    pub streaming: bool,
     pub supports_reactions: bool,
     pub response_text: Option<String>,
     pub handler_error: Option<String>,
     pub handler_delay_ms: u64,
     pub timeout_secs: u64,
-    pub seed_history_len: usize,
     /// Workspace the runtime context reports; `None` falls back to the OS temp dir.
     ///
     /// `pub`, like every other field here, and it has to be: integration tests
@@ -103,13 +100,11 @@ impl Default for DispatchHarnessOptions {
             content: "hello".to_string(),
             thread_ts: None,
             inbound_envelope: None,
-            streaming: false,
             supports_reactions: false,
             response_text: Some("dispatch ok".to_string()),
             handler_error: None,
             handler_delay_ms: 0,
             timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
-            seed_history_len: 0,
             workspace_dir: None,
             system_prompt: HarnessSystemPrompt::default(),
         }
@@ -135,7 +130,6 @@ pub struct DispatchHarnessObservation {
     pub handler_provider_name: String,
     pub handler_channel_name: String,
     pub handler_had_progress: bool,
-    pub retained_history_len: usize,
 }
 
 #[derive(Default)]
@@ -147,7 +141,6 @@ struct HarnessState {
 
 struct HarnessChannel {
     name: String,
-    streaming: bool,
     supports_reactions: bool,
     state: Arc<HarnessState>,
 }
@@ -184,46 +177,6 @@ impl Channel for HarnessChannel {
 
     fn supports_reactions(&self) -> bool {
         self.supports_reactions
-    }
-
-    fn supports_draft_updates(&self) -> bool {
-        self.streaming
-    }
-
-    async fn send_draft(&self, message: &SendMessage) -> Result<Option<String>> {
-        self.state.sends.lock().await.push(ObservedSend {
-            kind: "draft",
-            recipient: message.recipient.clone(),
-            content: message.content.clone(),
-            thread_ts: message.thread_ts.clone(),
-        });
-        Ok(Some("draft-1".to_string()))
-    }
-
-    async fn update_draft(&self, recipient: &str, message_id: &str, text: &str) -> Result<()> {
-        self.state.sends.lock().await.push(ObservedSend {
-            kind: "update_draft",
-            recipient: format!("{recipient}:{message_id}"),
-            content: text.to_string(),
-            thread_ts: None,
-        });
-        Ok(())
-    }
-
-    async fn finalize_draft(
-        &self,
-        recipient: &str,
-        message_id: &str,
-        text: &str,
-        thread_ts: Option<&str>,
-    ) -> Result<()> {
-        self.state.sends.lock().await.push(ObservedSend {
-            kind: "finalize_draft",
-            recipient: format!("{recipient}:{message_id}"),
-            content: text.to_string(),
-            thread_ts: thread_ts.map(str::to_string),
-        });
-        Ok(())
     }
 }
 
@@ -370,7 +323,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     let state = Arc::new(HarnessState::default());
     let channel_impl = Arc::new(HarnessChannel {
         name: options.channel_name.clone(),
-        streaming: options.streaming,
         supports_reactions: options.supports_reactions,
         state: Arc::clone(&state),
     });
@@ -384,23 +336,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         "harness-provider".to_string(),
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::clone(&model)),
     );
-    let conversation_histories = Arc::new(Mutex::new(HashMap::new()));
-    let history_key = if options.channel_name == "telegram" {
-        format!("{}_alice_reply", options.channel_name)
-    } else if let Some(thread_ts) = options.thread_ts.as_deref() {
-        format!("{}_alice_reply_thread:{thread_ts}", options.channel_name)
-    } else {
-        format!("{}_alice_reply", options.channel_name)
-    };
-    if options.seed_history_len > 0 {
-        conversation_histories.lock().expect("history lock").insert(
-            history_key.clone(),
-            (0..options.seed_history_len)
-                .map(|idx| ChatMessage::assistant(format!("prior {idx} {}", "x".repeat(700))))
-                .collect(),
-        );
-    }
-
     let harness_system_prompt = options
         .system_prompt
         .clone()
@@ -413,6 +348,7 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     let ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(model)),
         default_provider: Arc::new("harness-provider".to_string()),
         tools_registry: Arc::new(vec![Box::new(HarnessTool) as Box<dyn Tool>]),
@@ -420,7 +356,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         model: Arc::new("harness-model".to_string()),
         temperature: 0.0,
         max_tool_iterations: 3,
-        conversation_histories: Arc::clone(&conversation_histories),
         turn_model_source_cache: Arc::new(Mutex::new(provider_cache)),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
@@ -479,13 +414,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     let handler_history_text = handler_text.lock().expect("text lock").clone();
     let handler_provider_name = handler_provider.lock().expect("provider lock").clone();
     let handler_channel_name = handler_channel.lock().expect("channel lock").clone();
-    let retained_history_len = conversation_histories
-        .lock()
-        .expect("history lock")
-        .get(&history_key)
-        .map(Vec::len)
-        .unwrap_or_default();
-
     DispatchHarnessObservation {
         sends,
         start_typing_calls: state.start_typing_calls.load(Ordering::SeqCst),
@@ -496,6 +424,5 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         handler_provider_name,
         handler_channel_name,
         handler_had_progress: handler_progress.load(Ordering::SeqCst) > 0,
-        retained_history_len,
     }
 }
