@@ -170,12 +170,14 @@ function readEnabledTools(snapshot: ToolsSnapshot): string[] {
 
 test.describe('Settings - Feature Preferences', () => {
   test('falls through the retired features settings route to settings home', async ({ page }) => {
+    await openAuthenticatedRoute(page, 'pw-settings-features-route', '/settings/features');
     for (const route of [
       '/settings/features',
       '/settings/screen-intelligence',
       '/settings/screen-awareness-debug',
     ]) {
-      await openAuthenticatedRoute(page, `pw-settings-features-${route}`, route);
+      await page.goto(`/#${route}`);
+      await waitForAppReady(page);
       await expect
         .poll(async () => page.evaluate(() => window.location.hash))
         .toMatch(/^#\/settings(?:\/account)?$/);
