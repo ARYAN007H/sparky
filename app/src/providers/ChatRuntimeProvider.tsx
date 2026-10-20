@@ -96,6 +96,7 @@ import { clearThreadGoal, setThreadGoal } from '../store/threadGoalSlice';
 import {
   addInferenceResponse,
   addMessageLocal,
+  applyChannelEvent,
   CHAT_ERROR_METADATA_KEY,
   clearThreadInferenceActive,
   createNewThread,
@@ -786,6 +787,10 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
     // ordering holds. See `chatDeltaCoalescer`.
     const coalesced = withCoalescedDeltas<ChatTextDeltaEvent, ChatEventListeners>(
       {
+        onChannelEvent: event => {
+          if (!event.openhuman_message_id) return;
+          dispatch(applyChannelEvent(event));
+        },
         onInferenceStart: (event: ChatInferenceStartEvent) => {
           rtLog('inference_start', { thread: event.thread_id, request: event.request_id });
           // Fresh turn: drop the previous turn's live processing transcript so a
