@@ -22,6 +22,7 @@ mod managed_reasoning;
 mod managed_session;
 mod managed_usage;
 mod tiers;
+#[cfg(test)]
 pub(crate) use tiers::MODEL_MANAGED_DEFAULT;
 
 use std::sync::Arc;

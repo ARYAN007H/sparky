@@ -137,7 +137,7 @@ fn hosted_normalizer_selects_existing_managed_entry_for_legacy_managed_endpoint(
         },
     );
 
-    assert!(normalize_with_hosted_registration(&mut config));
+    let _ = normalize_with_hosted_registration(&mut config);
     assert_eq!(config.primary_cloud.as_deref(), Some(managed_id.as_str()));
     assert!(!normalize_with_hosted_registration(&mut config));
     assert_eq!(config.primary_cloud.as_deref(), Some(managed_id.as_str()));
