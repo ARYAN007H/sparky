@@ -4,6 +4,7 @@ import {
   chatCancel,
   chatClearQueue,
   chatSend,
+  chatSendWithAck,
   NO_SOCKET_CANCEL_CLIENT_ID,
   subscribeChatEvents,
 } from '../chatService';
@@ -398,6 +399,20 @@ describe('chatService.subscribeChatEvents', () => {
         model_override: undefined,
       },
     });
+  });
+
+  it('returns the queue request identity and sanitized attachment references from the ack', async () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    const attachments = [{ kind: 'image', media: { opaqueId: 'opaque-1' } }];
+    mockCallCoreRpc.mockResolvedValue({
+      request_id: 'request-1',
+      queued_attachments: attachments,
+    });
+
+    await expect(
+      chatSendWithAck({ threadId: 'thread-1', message: '', queueMode: 'followup' })
+    ).resolves.toEqual({ requestId: 'request-1', queuedAttachments: attachments });
   });
 
   it('forwards speak_reply, source, session_id when provided', async () => {

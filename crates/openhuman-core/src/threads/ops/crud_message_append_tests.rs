@@ -674,6 +674,26 @@ async fn concurrent_queued_attachment_transfer_has_one_exact_owner() {
     let rows = conversations::get_messages(&ctx, config.workspace_dir.clone(), "uploads").unwrap();
     assert_eq!(rows.iter().filter(|row| row.id == "user:same").count(), 1);
 
+    let staged_retry = crate::threads::attachments::stage_queued_parts(&ctx, "uploads", &[image()])
+        .await
+        .unwrap();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+    let left_ctx = ctx.clone();
+    let left_refs = staged_retry.clone();
+    let left_barrier = barrier.clone();
+    let left = tokio::spawn(async move {
+        left_barrier.wait().await;
+        persist_queued_user_message(&left_ctx, "uploads", "same-retry", "same", &left_refs).await
+    });
+    let right_ctx = ctx.clone();
+    let right_refs = staged_retry.clone();
+    let right = tokio::spawn(async move {
+        barrier.wait().await;
+        persist_queued_user_message(&right_ctx, "uploads", "same-retry", "same", &right_refs).await
+    });
+    let results = [left.await.unwrap(), right.await.unwrap()];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 2);
+
     let staged_single_owner =
         crate::threads::attachments::stage_queued_parts(&ctx, "uploads", &[image()])
             .await
