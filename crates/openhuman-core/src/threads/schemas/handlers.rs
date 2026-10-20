@@ -29,8 +29,7 @@ pub(super) fn handle_upsert(ctx: DispatchCtx, params: Map<String, Value>) -> Con
 pub(super) fn parse_upsert(
     params: Map<String, Value>,
 ) -> Result<UpsertConversationThreadRequest, String> {
-    let _ = params;
-    Err("mutated parser rejects valid example".to_owned())
+    parse(params)
 }
 
 pub(super) fn run_upsert(ctx: DispatchCtx, p: UpsertConversationThreadRequest) -> ControllerFuture {
