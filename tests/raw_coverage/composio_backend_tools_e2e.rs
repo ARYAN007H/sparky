@@ -16,11 +16,11 @@ use tempfile::{Builder, TempDir};
 
 use openhuman_core::config::Config;
 use openhuman_core::integrations::composio::ops::{composio_authorize, composio_list_tools};
-use openhuman_core::security::credentials::{
-    AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
-};
 use openhuman_core::integrations::composio::tools::{
     ComposioListConnectionsTool, ComposioListToolkitsTool, ComposioListToolsTool,
+};
+use openhuman_core::security::credentials::{
+    AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
 };
 use tinytools::{Tool, ToolCallOptions};
 
@@ -56,7 +56,8 @@ fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
     ENV_LOCK
         .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock().await
+        .lock()
+        .await
 }
 
 fn tempdir() -> TempDir {

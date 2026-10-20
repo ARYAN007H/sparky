@@ -114,3 +114,49 @@ fn read_optional_helpers_preserve_typed_values_and_errors() {
     let err = read_optional::<Vec<String>>(&m, "toolkits").unwrap_err();
     assert!(err.contains("invalid 'toolkits'"));
 }
+
+#[test]
+fn controller_schema_catalog_covers_each_declared_function_shape() {
+    // Pin required inputs rather than exact counts so additive optional params
+    // remain backwards-compatible. This was previously checked by a host
+    // reachability suite despite being a schema contract owned by this domain.
+    let expected: [(&str, &[&str], &str); 22] = [
+        ("list_toolkits", &[], "toolkits"),
+        ("list_capabilities", &[], "capabilities"),
+        ("list_agent_ready_toolkits", &[], "toolkits"),
+        ("list_connections", &[], "connections"),
+        ("authorize", &["toolkit"], "connectUrl"),
+        ("delete_connection", &["connection_id"], "deleted"),
+        ("list_tools", &["toolkits"], "tools"),
+        ("execute", &["tool", "connection_id"], "result"),
+        ("list_github_repos", &["connection_id"], "result"),
+        ("create_trigger", &["slug", "connection_id"], "result"),
+        ("get_user_profile", &["connection_id"], "profile"),
+        ("refresh_all_identities", &[], "report"),
+        ("list_trigger_history", &["limit"], "result"),
+        ("get_user_scopes", &["toolkit"], "pref"),
+        ("set_user_scopes", &["toolkit", "read", "write"], "pref"),
+        ("list_available_triggers", &["toolkit"], "triggers"),
+        ("list_triggers", &["toolkit"], "triggers"),
+        ("enable_trigger", &["connection_id", "slug"], "result"),
+        ("disable_trigger", &["trigger_id"], "deleted"),
+        ("get_mode", &[], "mode"),
+        ("set_api_key", &["api_key"], "result"),
+        ("clear_api_key", &[], "result"),
+    ];
+
+    for (function, required_inputs, first_output) in expected {
+        let schema = schemas(function);
+        assert_eq!(schema.namespace, "composio");
+        assert_eq!(schema.function, function);
+        let input_names: Vec<&str> = schema.inputs.iter().map(|field| field.name).collect();
+        for required in required_inputs {
+            assert!(
+                input_names.contains(required),
+                "{function} must declare input `{required}` (got {input_names:?})"
+            );
+        }
+        assert_eq!(schema.outputs[0].name, first_output, "{function}");
+        assert!(!schema.description.is_empty());
+    }
+}

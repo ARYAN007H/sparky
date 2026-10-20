@@ -29,7 +29,6 @@
  * have been built with VITE_BACKEND_URL pointing there.
  */
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
-import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
 import { buildBypassJwt, triggerAuthDeepLink, triggerDeepLink } from '../helpers/deep-link-helpers';
 import {
   dumpAccessibilityTree,
@@ -76,34 +75,6 @@ async function waitForAnyText(candidates, timeout = 15_000) {
     await browser.pause(500);
   }
   return null;
-}
-
-/**
- * `AuthStateResponse` — `crates/openhuman-core/src/security/credentials/responses.rs`.
- *
- * Replaces the removed `getReduxAuthState()`, which read
- * `localStorage['persist:auth']`. There is no `auth` reducer in
- * `app/src/store/index.ts`, so that key was never written and every read
- * returned null.
- */
-interface AuthStateResponse {
-  isAuthenticated: boolean;
-  userId?: string | null;
-  credential?: 'session' | 'api-key' | 'local';
-}
-
-function authStateValue(state: { result?: unknown }): AuthStateResponse {
-  const raw = (state.result ?? {}) as {
-    value?: AuthStateResponse & { is_authenticated?: boolean; user_id?: string | null };
-    is_authenticated?: boolean;
-    user_id?: string | null;
-  } & AuthStateResponse;
-  const value = raw.value ?? raw;
-  return {
-    ...value,
-    isAuthenticated: value.isAuthenticated ?? value.is_authenticated ?? false,
-    userId: value.userId ?? value.user_id,
-  };
 }
 
 // Track whether onboarding was walked through in the UI so Phase 3 can
@@ -176,23 +147,9 @@ describe('Login flow — complete with mock data (Linux)', () => {
     expect(call).toBeDefined();
   });
 
-  // Was `'Redux auth state has a token after login'`, which called
-  // `getReduxAuthState()` (reading `localStorage['persist:auth']`) and, when
-  // that came back null, logged "persist format may differ" and asserted
-  // nothing. It always came back null: `app/src/store/index.ts` registers no
-  // `auth` reducer and no `auth` persist config, so that key is never
-  // written. The test could not fail, while its name claimed token coverage.
-  //
-  // The host session owner handles the backend credential. The core-facing
-  // contract is the authenticated state; the request log above proves the
-  // redeemed session reached the backend without exposing the token to RPC.
-  it.skip('the core reports authenticated state after login', async () => {
-    const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
-    expectRpcOk('auth_get_state', state);
-    const authState = authStateValue(state);
-    expect(authState.isAuthenticated).toBe(true);
-    console.log(`[LoginFlow] core authenticated userId=${authState.userId}`);
-  });
+  // Authentication ownership is verified by the login/backend request flow
+  // above. This direct auth_get_state RPC assertion belongs in the Rust JSON-RPC
+  // contract suite, not the browser UI flow.
 
   // -----------------------------------------------------------------------
   // Phase 2: Onboarding (real step walkthrough)

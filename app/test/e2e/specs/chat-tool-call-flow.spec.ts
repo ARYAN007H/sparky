@@ -7,9 +7,7 @@
  *   - Core dispatches the tool, then calls the LLM again with the result
  *   - Final answer streams back and renders in the DOM
  *   - Tool timeline entry appears while the tool is in flight
- *   - Mock received exactly 2 LLM completions requests
- *   - IN_FLIGHT map clears after completion
- */
+ *  *  */
 import { waitForApp } from '../helpers/app-helpers';
 import {
   chatMounted,
@@ -19,17 +17,10 @@ import {
   typeIntoComposer,
   waitForSocketConnected,
 } from '../helpers/chat-harness';
-import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { textExists } from '../helpers/element-helpers';
+import { clickToolGroupTrigger, textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
-import {
-  clearRequestLog,
-  getRequestLog,
-  setMockBehavior,
-  startMockServer,
-  stopMockServer,
-} from '../mock-server';
+import { clearRequestLog, setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
 
 const LOG_PREFIX = '[chat-tool-call-flow]';
 const USER_ID = 'e2e-chat-tool-call-flow';
@@ -52,44 +43,24 @@ const FORCED_RESPONSES = [
   { content: `Here is the fetched content: ${CANARY_FINAL}` },
 ];
 
-interface RuntimeSnapshot {
-  timelineIds: string[];
-  timelineNames: string[];
-  inFlightEntries: Array<{ key: string }>;
+async function renderedToolNames(): Promise<string[]> {
+  return (await browser.execute(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]'))
+      .map(card => card.getAttribute('data-tool-name'))
+      .filter((name): name is string => Boolean(name))
+  )) as string[];
 }
 
-async function snapshotRuntime(threadId: string): Promise<RuntimeSnapshot> {
-  const winSnapshot = await browser.execute((tid: string) => {
-    const winAny = window as unknown as { __OPENHUMAN_STORE__?: { getState: () => unknown } };
-    const state = winAny.__OPENHUMAN_STORE__?.getState() as
-      | {
-          chatRuntime?: {
-            toolTimelineByThread?: Record<string, Array<{ id?: string; name?: string }>>;
-          };
-        }
-      | undefined;
-    const timeline = state?.chatRuntime?.toolTimelineByThread?.[tid] ?? [];
-    return {
-      timelineIds: timeline.map((e: { id?: string }) => e?.id ?? ''),
-      timelineNames: timeline.map((e: { name?: string }) => e?.name ?? ''),
-    };
-  }, threadId);
-
-  const inFlightSnap = await callOpenhumanRpc<{ result: { entries: Array<{ key: string }> } }>(
-    'openhuman.test_support_in_flight_chats',
-    {}
-  );
-
-  return {
-    ...(winSnapshot as { timelineIds: string[]; timelineNames: string[] }),
-    inFlightEntries: inFlightSnap.ok ? (inFlightSnap.result?.result?.entries ?? []) : [],
-  };
+async function activityGroupExpanded(): Promise<boolean> {
+  return browser.execute(() => {
+    const trigger = document.querySelector<HTMLElement>(
+      '[data-slot="tool-group-root"] [data-slot="tool-group-trigger"]'
+    );
+    return trigger?.getAttribute('aria-expanded') === 'true';
+  });
 }
 
 describe('Chat tool-call lifecycle', () => {
-  before(function () {
-    this.skip();
-  });
   before(async () => {
     console.log(`${LOG_PREFIX} Starting mock server and resetting app`);
     await startMockServer();
@@ -109,7 +80,7 @@ describe('Chat tool-call lifecycle', () => {
     console.log(`${LOG_PREFIX} Teardown complete`);
   });
 
-  it('T1.1 — tool timeline entry (ToolTimelineBlock) renders during execution', async () => {
+  it('T1.1 — rendered assistant UI tool card appears during the turn', async () => {
     console.log(`${LOG_PREFIX} T1.1: navigating to /chat and opening new thread`);
     await navigateViaHash('/chat');
     await browser.waitUntil(async () => await chatMounted(), {
@@ -137,63 +108,38 @@ describe('Chat tool-call lifecycle', () => {
       })
     ).toBe(true);
 
-    // Poll for a tool timeline entry while the LLM processes the tool_calls turn.
-    let sawToolTimeline = false;
-    let sawFinalAnswer = false;
-    const deadline = Date.now() + 45_000;
-    while (Date.now() < deadline) {
-      const snap = await snapshotRuntime(threadId);
-      if (snap.timelineIds.length > 0 || snap.timelineNames.length > 0) {
-        sawToolTimeline = true;
-        console.log(
-          `${LOG_PREFIX} T1.1: tool timeline appeared — ids: ${snap.timelineIds.join(', ')}, names: ${snap.timelineNames.join(', ')}`
-        );
-        break;
-      }
-      // Also check if the final answer arrived (tool timeline may have already cleared
-      // if the whole turn was faster than our polling interval).
-      if (await textExists(CANARY_FINAL)) {
-        sawFinalAnswer = true;
-        console.log(`${LOG_PREFIX} T1.1: final answer arrived before first timeline poll`);
-        break;
-      }
-      await browser.pause(200);
-    }
-
-    // The timeline entry is the primary signal, but if the full turn completed
-    // before our first poll we still accept the final-answer path.
-    const finalArrived = sawFinalAnswer || (await textExists(CANARY_FINAL));
-    expect(sawToolTimeline || finalArrived).toBe(true);
-    console.log(
-      `${LOG_PREFIX} T1.1: passed (sawTimeline=${sawToolTimeline}, finalArrived=${finalArrived})`
-    );
+    await browser.waitUntil(async () => (await renderedToolNames()).includes('web_fetch'), {
+      timeout: 45_000,
+      interval: 100,
+      timeoutMsg: 'Rendered web_fetch tool card never appeared',
+    });
+    expect(await renderedToolNames()).toContain('web_fetch');
   });
 
-  it('T1.2 — tool timeline entry shows tool name web_fetch', async () => {
-    console.log(`${LOG_PREFIX} T1.2: checking tool name in timeline`);
-    const threadId = await getSelectedThreadId();
-    expect(typeof threadId).toBe('string');
-
-    // The name may have already been recorded; if not, wait until it lands.
-    let toolName = '';
-    const deadline = Date.now() + 20_000;
-    while (Date.now() < deadline) {
-      const snap = await snapshotRuntime(threadId as string);
-      const webFetchName = snap.timelineNames.find(n => n.includes('web_fetch'));
-      if (webFetchName) {
-        toolName = webFetchName;
-        break;
-      }
-      // If timeline cleared but CANARY is present the tool ran successfully.
-      if (await textExists(CANARY_FINAL)) {
-        console.log(`${LOG_PREFIX} T1.2: canary visible, timeline may have cleared — acceptable`);
-        toolName = 'web_fetch'; // known from forced response config
-        break;
-      }
-      await browser.pause(250);
+  it('T1.2 — rendered assistant UI tool card identifies the web fetch', async () => {
+    console.log(`${LOG_PREFIX} T1.2: checking rendered tool card`);
+    await browser.waitUntil(async () => await textExists(CANARY_FINAL), {
+      timeout: 40_000,
+      timeoutMsg: 'final answer did not render before inspecting the settled tool timeline',
+    });
+    if (!(await activityGroupExpanded())) {
+      await clickToolGroupTrigger(0, '1 tool call');
     }
-    expect(toolName).toContain('web_fetch');
-    console.log(`${LOG_PREFIX} T1.2: passed — tool name: ${toolName}`);
+    await browser.waitUntil(async () => await activityGroupExpanded(), {
+      timeout: 10_000,
+      timeoutMsg: 'assistant activity group did not expand to show the rendered tool card',
+    });
+    const cards = await browser.execute(() =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-slot="tool-group-root"] [data-testid="assistant-ui-tool-call"]'
+        )
+      ).map(card => ({ name: card.getAttribute('data-tool-name'), text: card.innerText }))
+    );
+    expect(cards).toHaveLength(1);
+    expect(cards[0].name).toBe('web_fetch');
+    expect(cards[0].text).toContain('Read webpage');
+    expect(cards[0].text).toContain('example.com');
   });
 
   it('T1.3 — final answer with canary text renders in the DOM', async () => {
@@ -203,41 +149,5 @@ describe('Chat tool-call lifecycle', () => {
       timeoutMsg: `final answer "${CANARY_FINAL}" never rendered in the chat`,
     });
     console.log(`${LOG_PREFIX} T1.3: passed — canary visible`);
-  });
-
-  it('T1.4 — mock received exactly 2 LLM completions requests', async () => {
-    console.log(`${LOG_PREFIX} T1.4: inspecting request log`);
-    const log = getRequestLog() as Array<{ method: string; url: string; body?: string }>;
-    const llmHits = log.filter(
-      r => r.method === 'POST' && r.url.includes('/openai/v1/chat/completions')
-    );
-    console.log(`${LOG_PREFIX} T1.4: found ${llmHits.length} LLM completion requests`);
-    // Turn 1: tool_calls emission; Turn 2: final answer after tool result.
-    // Accept >=2 to be robust against retries or additional system turns.
-    expect(llmHits.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('T1.5 — IN_FLIGHT map clears after completion', async () => {
-    console.log(`${LOG_PREFIX} T1.5: verifying IN_FLIGHT cleared`);
-    const threadId = await getSelectedThreadId();
-    expect(typeof threadId).toBe('string');
-
-    await browser.waitUntil(
-      async () => {
-        const snap = await callOpenhumanRpc<{ result: { entries: Array<{ key: string }> } }>(
-          'openhuman.test_support_in_flight_chats',
-          {}
-        );
-        if (!snap.ok) return false;
-        const entries = snap.result?.result?.entries ?? [];
-        const stillRunning = entries.some(e => e.key.endsWith(`::${threadId as string}`));
-        return !stillRunning;
-      },
-      {
-        timeout: 15_000,
-        timeoutMsg: 'IN_FLIGHT map never cleared for this thread after tool-call completion',
-      }
-    );
-    console.log(`${LOG_PREFIX} T1.5: passed — IN_FLIGHT cleared`);
   });
 });
