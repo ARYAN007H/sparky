@@ -263,3 +263,7 @@ fn empty_prompt_context_for_static_sections() -> PromptContext<'static> {
         flow_archetype_text: None,
     }
 }
+
+#[cfg(test)]
+#[path = "section_renderers_tests.rs"]
+mod tests;
