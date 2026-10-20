@@ -498,14 +498,15 @@ fn channel_key(channel: &str) -> String {
     channel.trim().to_ascii_lowercase()
 }
 
-/// Reads only the legacy map written by prior releases. Corrupt JSON keeps the
-/// existing quarantine behavior; current code never creates or updates it.
+/// Reads only the legacy map written by prior releases. Corrupt JSON is
+/// skipped and left untouched; current code never creates or updates it.
 #[cfg(feature = "channels")]
 fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     // Prefer the state-store value: layout migration may already have
     // removed the legacy file after importing it. The direct file fallback
-    // below preserves quarantine behavior for malformed legacy JSON and
-    // remains available when storage cannot be opened.
+    // below preserves the legacy lookup when storage cannot be opened. As
+    // with StateKv's best-effort import, malformed JSON is skipped without
+    // moving or rewriting the source file.
     if let Ok(Some(all)) = crate::memory::state_store::load::<BTreeMap<String, BTreeSet<String>>>(
         workspace,
         "channel_threads",
@@ -516,14 +517,12 @@ fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     let Ok(text) = std::fs::read_to_string(&file) else {
         return BTreeSet::new();
     };
-    let all: BTreeMap<String, BTreeSet<String>> =
-        serde_json::from_str(&text).unwrap_or_else(|error| {
-            tracing::warn!(%error, "[memory:channels] legacy channel map unparsable; set aside");
-            if let Err(error) = std::fs::rename(&file, file.with_extension("json.corrupt")) {
-                tracing::warn!(%error, "[memory:channels] could not set legacy map aside");
-            }
+    let all: BTreeMap<String, BTreeSet<String>> = serde_json::from_str(&text).unwrap_or_else(
+        |error| {
+            tracing::warn!(%error, "[memory:channels] legacy channel map unparsable; skipped");
             BTreeMap::new()
-        });
+        },
+    );
     all.get(&channel_key(channel)).cloned().unwrap_or_default()
 }
 
