@@ -170,13 +170,18 @@ function readEnabledTools(snapshot: ToolsSnapshot): string[] {
 
 test.describe('Settings - Feature Preferences', () => {
   test('falls through the retired features settings route to settings home', async ({ page }) => {
-    await openAuthenticatedRoute(page, 'pw-settings-features-route', '/settings/features');
-
-    await expect
-      .poll(async () => page.evaluate(() => window.location.hash))
-      .toMatch(/^#\/settings(?:\/account)?$/);
-    await expect(page.getByText('Screen Intelligence', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('Screen Awareness Debug', { exact: true })).toHaveCount(0);
+    for (const route of [
+      '/settings/features',
+      '/settings/screen-intelligence',
+      '/settings/screen-awareness-debug',
+    ]) {
+      await openAuthenticatedRoute(page, `pw-settings-features-${route}`, route);
+      await expect
+        .poll(async () => page.evaluate(() => window.location.hash))
+        .toMatch(/^#\/settings(?:\/account)?$/);
+      await expect(page.getByText('Screen Intelligence', { exact: true })).toHaveCount(0);
+      await expect(page.getByText('Screen Awareness Debug', { exact: true })).toHaveCount(0);
+    }
   });
 
   test('persists the default messaging channel through redux state', async ({ page }) => {
