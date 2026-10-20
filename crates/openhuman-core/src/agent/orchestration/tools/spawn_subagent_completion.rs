@@ -56,16 +56,7 @@ pub(super) fn make_completion(
                 let result = result.map_err(anyhow::Error::msg);
                 match result {
                     Ok(outcome) => {
-                        let status = if matches!(outcome.status, SubagentRunStatus::Completed)
-                            && super::super::dispatch::is_unexecuted_tool_call_stub(&outcome.output)
-                        {
-                            SubagentRunStatus::Incomplete {
-                                reason: "returned an unexecuted tool call instead of a result"
-                                    .to_string(),
-                            }
-                        } else {
-                            outcome.status.clone()
-                        };
+                        let status = outcome.status.clone();
                         match status.clone() {
                             SubagentRunStatus::Completed => {
                                 if let Err(err) = subagent_sessions::mark_finished(
@@ -319,10 +310,7 @@ pub(super) fn make_completion(
                     }
                     Err(err) => {
                         let error = err.to_string();
-                        let failure = super::super::dispatch::format_subagent_failure(
-                            "spawn_subagent",
-                            &error,
-                        );
+                        let failure = error.clone();
                         if let Err(store_err) = subagent_sessions::mark_failed(
                             &background_store,
                             &background_subagent_session_id,
