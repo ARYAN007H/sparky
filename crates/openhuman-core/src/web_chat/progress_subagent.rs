@@ -26,16 +26,20 @@ impl ProgressProjection {
             } => {
                 self.subagent_parent_call_ids
                     .insert(task_id.clone(), parent_call_id.clone());
-                self.ledger().child_spawned(
-                    &agent_id,
-                    &task_id,
-                    &mode,
-                    dedicated_thread,
-                    prompt_chars,
-                    &worker_thread_id,
-                    &display_name,
-                    &parent_call_id,
-                );
+                if let Some(ledger) = self.ledger() {
+                    ledger
+                        .child_spawned(
+                            &agent_id,
+                            &task_id,
+                            &mode,
+                            dedicated_thread,
+                            prompt_chars,
+                            &worker_thread_id,
+                            &display_name,
+                            &parent_call_id,
+                        )
+                        .await;
+                }
                 self.surface
                     .output(map::sub_spawned(
                         &agent_id,
@@ -64,18 +68,22 @@ impl ProgressProjection {
                 ..
             } => {
                 let parent_call_id = self.subagent_parent_call_ids.remove(&task_id).flatten();
-                self.ledger().child_completed(&ChildDone {
-                    agent_id: &agent_id,
-                    task_id: &task_id,
-                    elapsed_ms,
-                    iterations,
-                    output_chars,
-                    worktree_path: &worktree_path,
-                    changed_files: &changed_files,
-                    dirty_status,
-                    parent_call_id: &parent_call_id,
-                    tool_count: self.child_tool_counts.get(&task_id).copied(),
-                });
+                if let Some(ledger) = self.ledger() {
+                    ledger
+                        .child_completed(&ChildDone {
+                            agent_id: &agent_id,
+                            task_id: &task_id,
+                            elapsed_ms,
+                            iterations,
+                            output_chars,
+                            worktree_path: &worktree_path,
+                            changed_files: &changed_files,
+                            dirty_status,
+                            parent_call_id: &parent_call_id,
+                            tool_count: self.child_tool_counts.get(&task_id).copied(),
+                        })
+                        .await;
+                }
                 self.surface
                     .output(map::sub_completed(
                         &agent_id,
@@ -104,13 +112,17 @@ impl ProgressProjection {
                     self.ids.request_id
                 );
                 let parent_call_id = self.subagent_parent_call_ids.remove(&task_id).flatten();
-                self.ledger().child_failed(
-                    &agent_id,
-                    &task_id,
-                    &error,
-                    &parent_call_id,
-                    self.child_tool_counts.get(&task_id).copied(),
-                );
+                if let Some(ledger) = self.ledger() {
+                    ledger
+                        .child_failed(
+                            &agent_id,
+                            &task_id,
+                            &error,
+                            &parent_call_id,
+                            self.child_tool_counts.get(&task_id).copied(),
+                        )
+                        .await;
+                }
                 self.surface
                     .output(map::sub_failed(
                         &agent_id,
@@ -133,14 +145,18 @@ impl ProgressProjection {
                     .get(&task_id)
                     .cloned()
                     .flatten();
-                self.ledger().child_awaiting_user(
-                    &agent_id,
-                    &task_id,
-                    &question,
-                    &worker_thread_id,
-                    &checkpoint_path,
-                    &parent_call_id,
-                );
+                if let Some(ledger) = self.ledger() {
+                    ledger
+                        .child_awaiting_user(
+                            &agent_id,
+                            &task_id,
+                            &question,
+                            &worker_thread_id,
+                            &checkpoint_path,
+                            &parent_call_id,
+                        )
+                        .await;
+                }
                 self.surface
                     .output(map::sub_awaiting_user(
                         &agent_id,
@@ -182,9 +198,13 @@ impl ProgressProjection {
                 let count = self.child_tool_counts.entry(task_id.clone()).or_insert(0);
                 *count += 1;
                 let count = *count;
-                self.ledger().child_tool_started(
-                    &agent_id, &task_id, &call_id, &tool_name, iteration, count,
-                );
+                if let Some(ledger) = self.ledger() {
+                    ledger
+                        .child_tool_started(
+                            &agent_id, &task_id, &call_id, &tool_name, iteration, count,
+                        )
+                        .await;
+                }
                 self.surface
                     .output(map::sub_tool_started(
                         &agent_id,
@@ -212,19 +232,23 @@ impl ProgressProjection {
                     ..
                 } = &event
                 {
-                    self.ledger().child_tool_completed(
-                        task_id,
-                        json!({
-                            "agentId": agent_id,
-                            "callId": call_id,
-                            "toolName": tool_name,
-                            "success": success,
-                            "outputChars": output_chars,
-                            "elapsedMs": elapsed_ms,
-                            "iteration": iteration,
-                            "failure": failure.as_ref().and_then(|f| serde_json::to_value(f).ok()),
-                        }),
-                    );
+                    if let Some(ledger) = self.ledger() {
+                        ledger
+                            .child_tool_completed(
+                                task_id,
+                                json!({
+                                    "agentId": agent_id,
+                                    "callId": call_id,
+                                    "toolName": tool_name,
+                                    "success": success,
+                                    "outputChars": output_chars,
+                                    "elapsedMs": elapsed_ms,
+                                    "iteration": iteration,
+                                    "failure": failure.as_ref().and_then(|f| serde_json::to_value(f).ok()),
+                                }),
+                            )
+                            .await;
+                    }
                 }
                 if let Some(output) = map::sub_tool_completed(event) {
                     self.surface.output(output).await;
