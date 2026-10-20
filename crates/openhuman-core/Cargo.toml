@@ -145,6 +145,7 @@ tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness
     "sqlite",
     "multimodal",
     "builtin-tools",
+    "json-schema",
 ] }
 tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", features = ["storage"] }
 tiny-artifacts = { path = "../../vendor/tiny-artifacts/crates/tiny-artifacts" }
@@ -157,6 +158,7 @@ tinyagents-live = { path = "../../vendor/tinyagents/crates/tinyagents-live", opt
 tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", features = [
     "sqlite",
     "storage-drivers",
+    "json-schema",
 ] }
 tinyagents-registry = { path = "../../vendor/tinyagents/crates/tinyagents-registry" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["storage-drivers"] }

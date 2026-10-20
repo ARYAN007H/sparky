@@ -40,6 +40,9 @@ pub struct ThreadWireTypes {
     pub turn_citation: crate::memory::types::TurnCitation,
     pub queue_mode: tinychannels_bus::web::QueueMode,
     pub artifact_kind: crate::agent::artifacts::types::ArtifactKind,
+    pub thread_goal: tinyagents_graph::goals::ThreadGoal,
+    pub thread_todo_item: tinyagents_graph::todos::TodoItem,
+    pub run_mode: tinyagents_harness::middleware::library::RunMode,
 }
 
 /// Serialize the authoritative core/session record schemas for TypeScript codegen.

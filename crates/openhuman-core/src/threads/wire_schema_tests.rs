@@ -65,6 +65,9 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         "turnCitation",
         "queueMode",
         "artifactKind",
+        "threadGoal",
+        "threadTodoItem",
+        "runMode",
     ] {
         assert!(
             properties.contains_key(property),
@@ -90,6 +93,10 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
             "presentation".to_owned(),
             "video".to_owned(),
         ]
+    );
+    assert_eq!(
+        schema_string_values(&schema, &properties["runMode"]),
+        vec!["build".to_owned(), "plan".to_owned()]
     );
     let citation_schema = resolve_schema(&schema, &properties["turnCitation"]);
     for field in ["id", "key", "namespace", "score", "timestamp", "snippet"] {
