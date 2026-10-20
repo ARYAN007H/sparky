@@ -129,9 +129,6 @@ async fn control(function: &str, task: &str) -> serde_json::Value {
         .expect("public controller");
     let mut params = serde_json::Map::new();
     params.insert("taskId".into(), serde_json::json!(task));
-    if function == "steer" {
-        params.insert("message".into(), serde_json::json!("ownership regression"));
-    }
     (controller.handler)(DispatchCtx::ambient(), params)
         .await
         .expect("control response")
@@ -148,7 +145,7 @@ fn field(value: &serde_json::Value, key: &str) -> Option<bool> {
 async fn dispatched_control(function: &str, task: &str) -> Result<serde_json::Value, String> {
     let mut params = serde_json::json!({ "taskId": task });
     if function == "steer" {
-        params["message"] = serde_json::json!("scoped dispatch regression");
+        return Err("openhuman.subagent_steer must not be registered".to_string());
     }
     crate::core::invoke::invoke_method(
         DispatchCtx::process_default(),
@@ -345,63 +342,6 @@ async fn same_parent_resolution_and_wait_refuse_foreign_workers() {
             task_id_for_session(&DispatchCtx::ambient(), &pair.b.session, PARENT).unwrap(),
             pair.b.task
         );
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn same_parent_agent_steering_refuses_foreign_worker() {
-    if !child(
-        "same_parent_agent_steering_refuses_foreign_worker",
-        Mode::Saas,
-    ) {
-        return;
-    }
-    let pair = Pair::new();
-    CoreContext::scope(pair.bob.clone(), async {
-        assert_eq!(
-            steer(
-                &DispatchCtx::ambient(),
-                &pair.a.task,
-                PARENT,
-                "foreign".into(),
-                QueueLane::Steer
-            )
-            .await,
-            Err(SteerError::NotOwned)
-        );
-        assert_eq!(pair.a.queue.status().await.steers, 0);
-        steer(
-            &DispatchCtx::ambient(),
-            &pair.b.task,
-            PARENT,
-            "own".into(),
-            QueueLane::Steer,
-        )
-        .await
-        .unwrap();
-        assert_eq!(pair.b.queue.status().await.steers, 1);
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn public_steering_refuses_another_profiles_task() {
-    if !child("public_steering_refuses_another_profiles_task", Mode::Saas) {
-        return;
-    }
-    let pair = Pair::new();
-    CoreContext::scope(pair.bob.clone(), async {
-        assert_eq!(
-            field(&control("steer", &pair.a.task).await, "steered"),
-            Some(false)
-        );
-        assert_eq!(pair.a.queue.status().await.steers, 0);
-        assert_eq!(
-            field(&control("steer", &pair.b.task).await, "steered"),
-            Some(true)
-        );
-        assert_eq!(pair.b.queue.status().await.steers, 1);
     })
     .await;
 }
