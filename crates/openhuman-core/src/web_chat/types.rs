@@ -78,11 +78,13 @@ pub(crate) struct WebChatParams {
     pub(super) client_id: String,
     pub(super) thread_id: String,
     pub(super) message: String,
-    /// Typed attachments sent with `message`; ordinary media is folded into
-    /// upload markers at the RPC edge, while voice notes retain their typed
-    /// opaque reference and stay out of model-visible text.
+    /// Typed media refs returned for a previously persisted user row. The
+    /// trusted runner resolves these refs against that exact row at execution.
     #[serde(default)]
     pub(super) attachments: Vec<tinychannels_bus::ContentPart>,
+    /// Persisted user message whose opaque attachment refs accompany this turn.
+    #[serde(default)]
+    pub(super) persisted_message_id: Option<String>,
     pub(super) model_override: Option<String>,
     pub(super) temperature: Option<f64>,
     /// BCP-47 locale of the frontend UI (e.g. `ar`, `zh-CN`). When set

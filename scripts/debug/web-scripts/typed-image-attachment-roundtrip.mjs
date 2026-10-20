@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const USER_TEXT = "Describe the attached image briefly.";
@@ -14,6 +14,21 @@ function unwrap(value) {
     value = value.result ?? value.data ?? value.value;
   }
   return value;
+}
+
+function findStoredBytes(root, expected) {
+  for (const name of readdirSync(root)) {
+    const path = join(root, name);
+    const stat = statSync(path);
+    if (stat.isDirectory()) {
+      const found = findStoredBytes(path, expected);
+      if (found) return found;
+    } else if (stat.isFile() && stat.size === expected.length) {
+      const bytes = readFileSync(path);
+      if (bytes.equals(expected)) return bytes;
+    }
+  }
+  return null;
 }
 
 export default async function typedImageAttachmentRoundtrip({
@@ -107,48 +122,63 @@ export default async function typedImageAttachmentRoundtrip({
   );
   const persisted = stagedMessage?.messages?.find(
     (message) =>
-      message.sender === "user" && message.content.includes(FILE_NAME),
+      message.sender === "user" && message.id === append.params?.message?.id,
   );
   if (!persisted)
     throw new Error("typed image was not persisted in the thread message list");
-  if (/\[(?:IMAGE|FILE):/i.test(persisted.content))
+  if (/\[(?:ATTACHMENT|IMAGE|FILE):/i.test(persisted.content))
     throw new Error(
-      "modern typed upload leaked a legacy [IMAGE:]/[FILE:] marker",
+      "modern typed upload leaked a staging marker into new persisted content",
     );
-  const encoded = persisted.content.match(/\[ATTACHMENT:([^\]]+)\]/)?.[1];
-  if (!encoded)
-    throw new Error("persisted message has no durable attachment reference");
-  const reference = JSON.parse(decodeURIComponent(encoded));
+  const reference = persisted.attachments?.[0];
   if (
-    reference.name !== FILE_NAME ||
-    reference.mime !== "image/png" ||
-    reference.size_bytes !== IMAGE_BYTES.length ||
-    !reference.path.startsWith("uploads/")
+    reference?.kind !== "image" ||
+    reference.media?.contentType !== "image/png" ||
+    reference.media?.fileName !== FILE_NAME ||
+    reference.media?.sizeBytes !== IMAGE_BYTES.length ||
+    !reference.media?.opaqueId ||
+    reference.media?.path ||
+    reference.media?.url
   ) {
     throw new Error(
-      `staged reference lost image metadata: ${JSON.stringify(reference)}`,
+      `persisted image reference is not opaque and typed: ${JSON.stringify(reference)}`,
     );
   }
-  const stagedBytes = readFileSync(join(logDir, "workspace", reference.path));
-  if (!stagedBytes.equals(IMAGE_BYTES))
+  if (persisted.content !== USER_TEXT)
+    throw new Error("persisted user text differs from clean composer text");
+  const stagedBytes = findStoredBytes(join(logDir, "workspace"), IMAGE_BYTES);
+  if (!stagedBytes)
     throw new Error("staged image bytes differ from the browser upload");
   log(
-    `core staged ${reference.mime} ${reference.name} (${stagedBytes.length} bytes) at ${reference.path}`,
+    `core staged ${reference.media.contentType} ${reference.media.fileName} (${stagedBytes.length} bytes) behind opaque ref ${reference.media.opaqueId}`,
   );
 
   const chatRequest = rpcCalls.find(
     (call) => call.method === "openhuman.channel_web_chat",
   );
-  if (!chatRequest || chatRequest.params?.message !== persisted.content)
+  if (
+    !chatRequest ||
+    chatRequest.params?.message !== persisted.content ||
+    chatRequest.params?.persisted_message_id !== persisted.id
+  )
     throw new Error(
-      "chat turn did not reuse the staged durable reference as its message",
+      "chat turn did not reference the marker-free persisted user row",
     );
-  if (/\[(?:IMAGE|FILE):/i.test(chatRequest.params.message))
-    throw new Error("chat turn sent a legacy attachment marker");
-  if (chatRequest.params?.attachments?.length)
+  if (/\[(?:ATTACHMENT|IMAGE|FILE):/i.test(chatRequest.params.message))
     throw new Error(
-      "ordinary attachment was staged twice as a chat part and durable reference",
+      "chat turn sent a staging marker in its modern user text",
     );
+  if (
+    JSON.stringify(chatRequest.params?.attachments) !==
+    JSON.stringify(persisted.attachments)
+  )
+    throw new Error("chat turn did not carry the persisted opaque media ref");
+  if (
+    JSON.stringify(chatRequest.params.attachments).match(
+      /data:|base64|"(?:path|url)"\s*:/i,
+    )
+  )
+    throw new Error("chat turn sent source bytes or a filesystem/network path");
 
   const inferenceRequest = mock
     .requests()
@@ -193,10 +223,24 @@ export default async function typedImageAttachmentRoundtrip({
         message.content.includes("typed-roundtrip.png"),
     )?.content;
   }, threadId);
+  const restoredMessage = await page.evaluate((id) => {
+    const messages =
+      window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId?.[
+        id
+      ] ?? [];
+    return messages.find(
+      (message) => message.sender === "user" && message.id === id,
+    );
+  }, threadId);
   if (restored !== persisted.content)
     throw new Error(
-      "reloaded conversation did not restore the durable image reference",
+      "reloaded conversation did not restore the marker-free user text",
     );
+  if (
+    JSON.stringify(restoredMessage?.attachments) !==
+    JSON.stringify(persisted.attachments)
+  )
+    throw new Error("reloaded conversation did not restore the opaque image ref");
   log(
     "typed image attachment survived core staging, chat submission and reload",
   );

@@ -76,9 +76,13 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 FieldSchema {
                     name: "attachments",
                     ty: TypeSchema::Option(Box::new(TypeSchema::Json)),
-                    comment: "Typed attachments (tinychannels ContentPart[]). VoiceNote parts carry an opaque id for audio already stored by channel.web_voice_note_store; the core validates and binds it to the user row without adding audio markers to model text. Other media parts use the regular attachment staging path.",
+                    comment: "Typed attachments (tinychannels ContentPart[]). VoiceNote parts carry an opaque id validated by channel.web_voice_note_store. Other media parts must be opaque refs returned on the persisted user message; their stored bytes are resolved under the trusted turn scope.",
                     required: false,
                 },
+                optional_string(
+                    "persisted_message_id",
+                    "User message row that owns the opaque typed attachment refs.",
+                ),
                 optional_string("model_override", "Optional model override."),
                 optional_f64("temperature", "Optional temperature override."),
                 optional_string(
