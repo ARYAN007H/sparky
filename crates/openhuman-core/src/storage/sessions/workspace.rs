@@ -243,10 +243,15 @@ pub fn artifact_scoped_for_in(
             return None;
         }
     };
-    let core = context.resolved()?;
-    let backend = match crate::core::runtime::CoreContext::sync_scope(core, || {
-        crate::storage::local::backend_for(workspace_dir)
-    }) {
+    let backend = match context.resolved() {
+        Some(core) => crate::core::runtime::CoreContext::sync_scope(core, || {
+            crate::storage::local::backend_for(workspace_dir)
+        }),
+        // Outside SaaS, an unresolved context represents the single-user
+        // default tenant validated above. The backend slot is process-global.
+        None => crate::storage::local::backend_for(workspace_dir),
+    };
+    let backend = match backend {
         Ok(backend) => backend,
         Err(error) => {
             log::warn!("[session_store] no storage backend for artifacts: {error:#}");
