@@ -188,6 +188,16 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
     let ev = find_artifact_web_event(&mut web_rx, "artifact_pending", pending_id).await;
     assert_eq!(wire(&ev)["tool_call_id"], "call-1");
     assert_eq!(wire(&ev)["turn_request_id"], "req-1");
+    assert_eq!(
+        wire(&ev)["args"],
+        serde_json::json!({
+            "artifact_id": pending_id,
+            "kind": "image",
+            "title": "A cat",
+            "workspace_dir": "/tmp/ws",
+            "path": "artifact-corr-pending/a-cat.png",
+        })
+    );
 
     let ready_id = "artifact-corr-ready";
     crate::core::bus::BUS.publish(DomainEvent::ArtifactReady {
@@ -205,6 +215,17 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
     let ev = find_artifact_web_event(&mut web_rx, "artifact_ready", ready_id).await;
     assert_eq!(wire(&ev)["tool_call_id"], "call-2");
     assert_eq!(wire(&ev)["turn_request_id"], "req-2");
+    assert_eq!(
+        wire(&ev)["args"],
+        serde_json::json!({
+            "artifact_id": ready_id,
+            "kind": "image",
+            "title": "A cat",
+            "workspace_dir": "/tmp/ws",
+            "path": "artifact-corr-ready/a-cat.png",
+            "size_bytes": 42,
+        })
+    );
 
     let failed_id = "artifact-corr-failed";
     crate::core::bus::BUS.publish(DomainEvent::ArtifactFailed {
@@ -221,6 +242,16 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
     let ev = find_artifact_web_event(&mut web_rx, "artifact_failed", failed_id).await;
     assert_eq!(wire(&ev)["tool_call_id"], "call-3");
     assert_eq!(wire(&ev)["turn_request_id"], "req-3");
+    assert_eq!(
+        wire(&ev)["args"],
+        serde_json::json!({
+            "artifact_id": failed_id,
+            "kind": "image",
+            "title": "A cat",
+            "workspace_dir": "/tmp/ws",
+            "error": "provider timeout",
+        })
+    );
 }
 
 /// A producer that ran outside a harness tool-call context (CLI, cron)

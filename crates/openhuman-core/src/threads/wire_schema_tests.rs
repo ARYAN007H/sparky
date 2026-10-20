@@ -63,6 +63,9 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         "turnCitation",
         "queueMode",
         "artifactKind",
+        "artifactPendingPayload",
+        "artifactReadyPayload",
+        "artifactFailedPayload",
         "threadGoal",
         "threadTodoItem",
         "runMode",
@@ -101,6 +104,45 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         assert!(
             citation_schema["properties"].get(field).is_some(),
             "citation schema is missing {field}: {citation_schema}"
+        );
+    }
+    for (property, fields) in [
+        (
+            "artifactPendingPayload",
+            &["artifact_id", "kind", "title", "workspace_dir", "path"][..],
+        ),
+        (
+            "artifactReadyPayload",
+            &[
+                "artifact_id",
+                "kind",
+                "title",
+                "workspace_dir",
+                "path",
+                "size_bytes",
+            ][..],
+        ),
+        (
+            "artifactFailedPayload",
+            &["artifact_id", "kind", "title", "workspace_dir", "error"][..],
+        ),
+    ] {
+        let payload = resolve_schema(&schema, &properties[property]);
+        for field in fields {
+            assert!(
+                payload["properties"].get(field).is_some(),
+                "{property} schema is missing {field}: {payload}"
+            );
+        }
+        assert_eq!(
+            schema_string_values(&schema, &payload["properties"]["kind"]),
+            vec![
+                "document".to_owned(),
+                "image".to_owned(),
+                "other".to_owned(),
+                "presentation".to_owned(),
+                "video".to_owned(),
+            ]
         );
     }
     let ack = resolve_schema(&schema, &properties["queuedChatAck"]);

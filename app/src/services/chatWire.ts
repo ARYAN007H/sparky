@@ -1,10 +1,11 @@
 /**
  * Frontend view of the chat wire contract.
  *
- * Every shape here is DERIVED from `chatWire.generated.ts`, which is generated
- * from the tinychannels `WebChannelEvent` JSON schema (`pnpm chat-wire:generate`;
- * CI runs `pnpm chat-wire:check`). Do not re-declare a wire field by hand: change
- * the schema upstream and regenerate.
+ * Wire envelopes here are derived from `chatWire.generated.ts`, generated from
+ * the tinychannels `WebChannelEvent` schema. Core-owned artifact and thread
+ * records come from `threadWire.generated.ts` (`pnpm chat-wire:generate`; CI
+ * runs `pnpm chat-wire:check`). Do not re-declare owner record fields by hand:
+ * change the schema source and regenerate.
  *
  * Two derivations are applied to the generated variants:
  * - `null` is dropped from optional fields. The core omits `None` on the wire
