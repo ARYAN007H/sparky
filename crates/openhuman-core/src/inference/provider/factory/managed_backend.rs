@@ -70,7 +70,7 @@ pub(super) fn managed_chat_model(
 pub(crate) fn make_openhuman_backend_model_for_thread(
     role: &str,
     config: &Config,
-    model: &str,
+    model: Option<&str>,
     native_tool_calling: bool,
     thread_id: Option<&str>,
     egress: &EgressLedger,
@@ -80,7 +80,7 @@ pub(crate) fn make_openhuman_backend_model_for_thread(
     managed_chat_model(
         role,
         config,
-        Some(model),
+        model,
         None,
         native_tool_calling,
         thread_id,
