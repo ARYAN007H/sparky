@@ -737,8 +737,6 @@ mod persistence;
 #[path = "lifecycle_store.rs"]
 mod store;
 
-#[path = "lifecycle_outcome.rs"]
-mod outcome;
 pub(super) use driver_adapter::{HostRequest, OpenHumanDriverBundle};
 
 fn map_lifecycle_error(error: SubagentError) -> SubagentRunError {

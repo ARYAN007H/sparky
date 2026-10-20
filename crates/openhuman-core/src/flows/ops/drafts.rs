@@ -101,9 +101,9 @@ pub(crate) async fn flows_draft_promote_with_context(
     require_approval: Option<bool>,
 ) -> Result<Outcome<Flow>, String> {
     ctx.enter(async move {
-        let callbacks = super::authoring_host::register(Arc::new(config.clone()), ctx.clone())
+        let callbacks = crate::flows::authoring_host::register(Arc::new(config.clone()), ctx.clone())
             .await?;
-        let storage = super::catalog_storage::register(ctx, config).await?;
+        let storage = crate::flows::catalog_storage::register(ctx, config).await?;
         let proxy = crate::modules::tinyflows::catalog_proxy(config).await?;
         let response: tinyflows_bus::catalog::PromoteDraftResponse = proxy
             .call(

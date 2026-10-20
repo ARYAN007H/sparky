@@ -6,6 +6,7 @@ use tinyflows_bus::catalog::{
     self, CreateDraftRequest, DraftIdRequest, FlowDraft as WireDraft, UpdateDraftRequest,
 };
 use tinyflows_catalog::DraftOrigin;
+use tinyflows_catalog::FlowDraft;
 
 use crate::config::Config;
 use crate::flows::{catalog_storage, store};

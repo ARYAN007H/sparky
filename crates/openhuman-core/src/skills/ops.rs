@@ -32,7 +32,7 @@
 pub use super::bundled::install_bundled_skills;
 pub use super::ops_create::{create_workflow, CreateWorkflowParams, WorkflowCreateInputDef};
 pub use super::ops_discover::{
-    discover_automations, discover_workflows, init_workflows_dir, is_workspace_trusted,
+    discover_automations, discover_workflows, is_workspace_trusted,
     load_workflow_metadata, load_workflow_metadata_for, read_workflow_resource,
     read_workflow_resource_for,
 };

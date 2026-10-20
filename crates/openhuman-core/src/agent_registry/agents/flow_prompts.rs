@@ -2,7 +2,8 @@
 
 use anyhow::Result;
 
-use crate::agent::prompts::{render_tools, render_workspace, PromptContext};
+use crate::agent::prompts::PromptContext;
+use crate::prompts::{render_tools, render_workspace};
 
 /// Combine module-owned archetype text with OpenHuman's scoped runtime sections.
 pub(super) fn build_with_archetype(
