@@ -299,7 +299,8 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
     .await
     .expect_err("resuming an already-completed run must be a clear error, not a silent no-op");
     let expected = "is not waiting for approval";
-    if !err.contains(expected) {
+    if std::env::var_os("OPENHUMAN_TINYFLOWS_RUN_DIAGNOSTICS").is_some() || !err.contains(expected)
+    {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
         let tenant_scoped = dispatch
             .tenant()
