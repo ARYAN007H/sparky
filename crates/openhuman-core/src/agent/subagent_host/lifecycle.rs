@@ -315,7 +315,7 @@ async fn invoke_driver_tool_with_request(
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
-    use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
+    use tinyagents_harness_tools::subagents::{DriverSubAgentTool, SubAgentJobRegistry};
     use tinytools::{PermissionLevel, ToolCallOptions, ToolCategory, ToolScope, ToolTimeout};
 
     let task_id = host_request
