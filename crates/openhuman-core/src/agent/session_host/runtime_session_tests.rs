@@ -458,6 +458,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .action_dir(action_dir.path().to_path_buf())
         .workspace_dir(action_dir.path().to_path_buf())
@@ -527,6 +528,7 @@ async fn session_locator_is_memoized_across_calls() {
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     let host = crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .action_dir(action_dir.path().to_path_buf())
         .workspace_dir(action_dir.path().to_path_buf())
@@ -561,6 +563,7 @@ fn text_dialect_host(
     let tools = crate::agent::goals::goal_tools(action_dir.path());
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(tools)
         .action_dir(action_dir.path().to_path_buf())
         .workspace_dir(action_dir.path().to_path_buf())
@@ -677,6 +680,7 @@ async fn newly_connected_action_cannot_shadow_a_permanent_source() {
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(vec![Box::new(AttachedAction)])
         .permanent_tool_names(std::collections::HashSet::from(["GMAIL_SEND_EMAIL".into()]))
         .action_dir(action_dir.path().to_path_buf())
