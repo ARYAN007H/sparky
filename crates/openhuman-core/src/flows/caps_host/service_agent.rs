@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyflows_bus::runs;
 
 use super::super::agent::{AgentRunState, OpenHumanAgentRunner};
