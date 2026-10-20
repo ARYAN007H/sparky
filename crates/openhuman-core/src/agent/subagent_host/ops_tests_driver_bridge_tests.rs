@@ -336,6 +336,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
             task_title: "Close driver lifecycle".into(),
             current_task_id: Some("close-driver-task".into()),
             lifecycle_key: Some(task_key),
+            parent_epoch: None,
             status: DurableSubagentStatus::Running,
             reusable: true,
             latest_history: None,
