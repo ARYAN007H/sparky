@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::{FieldSchema, TypeSchema};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 static CALLS: AtomicUsize = AtomicUsize::new(0);
