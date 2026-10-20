@@ -1,6 +1,6 @@
 use super::*;
 
-use super::binding::{AgentRunRegistry, CapsHostBinding};
+use super::binding::AgentRunRegistry;
 use crate::config::Config;
 use crate::core::runtime::{ComponentSet, CoreContext, DispatchCtx, DomainSet};
 use std::sync::Arc;
