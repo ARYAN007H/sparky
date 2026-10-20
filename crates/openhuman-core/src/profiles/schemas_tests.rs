@@ -54,11 +54,25 @@ pub(crate) fn profile_parameter_contracts() -> Vec<crate::core::all::ControllerP
             method: "profiles.set_credential",
             required: &["profile_id", "kind", "token"],
             optional: &["expires_at"],
-            examples: vec![json!({
-                "profile_id":"profile-1",
-                "kind":"api_key",
-                "token":"fixture-only-token"
-            })],
+            examples: vec![
+                json!({
+                    "profile_id":"profile-1",
+                    "kind":"api_key",
+                    "token":"fixture-only-token"
+                }),
+                json!({
+                    "profile_id":"profile-1",
+                    "kind":"session",
+                    "token":"fixture-only-token",
+                    "expires_at":null
+                }),
+                json!({
+                    "profile_id":"profile-1",
+                    "kind":"session",
+                    "token":"fixture-only-token",
+                    "expires_at":"2030-01-02T03:04:05Z"
+                }),
+            ],
         },
         crate::core::all::ControllerParamContract {
             method: "profiles.clear_credential",

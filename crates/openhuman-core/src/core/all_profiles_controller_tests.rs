@@ -6,7 +6,7 @@ fn raw_profiles_operator_registry_matches_its_independent_contract() {
         .iter()
         .filter(|row| row.controller.schema.namespace == "profiles")
         .collect();
-    let contracts = crate::profiles::schemas::tests::profile_parameter_contracts();
+    let contracts = crate::profiles::schemas::profile_parameter_contracts();
     assert_eq!(entries.len(), 7, "complete raw Profiles inventory");
     assert_eq!(
         entries

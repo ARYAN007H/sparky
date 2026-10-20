@@ -271,4 +271,9 @@ fn bool_field(name: &'static str, comment: &'static str) -> FieldSchema {
 
 #[cfg(test)]
 #[path = "schemas_tests.rs"]
-pub(crate) mod tests;
+mod tests;
+
+#[cfg(test)]
+pub(crate) fn profile_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::profile_parameter_contracts()
+}
