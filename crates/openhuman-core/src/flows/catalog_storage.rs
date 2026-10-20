@@ -20,12 +20,12 @@ use tinyflows_bus::catalog::{
     CatalogVersionedDocument, DocDeleteRequest, DocDeleteWhereRequest, DocEnsureRequest,
     DocGetRequest, DocPutRequest, DocQueryRequest,
 };
+#[cfg(test)]
+use tinystoragedrivers::StorageBackend;
 use tinystoragedrivers::{
     Capability, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, Scope,
     StorageError, Versioned, WriteOptions,
 };
-#[cfg(test)]
-use tinystoragedrivers::StorageBackend;
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;

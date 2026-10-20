@@ -18,9 +18,9 @@ mod binding_tests;
 
 #[cfg(test)]
 pub(crate) use agent::OpenHumanAgentRunner;
-pub(crate) use binding::{serve, CapsHostRegistration};
 #[cfg(test)]
 pub(crate) use binding::CapsHostBinding;
+pub(crate) use binding::{serve, CapsHostRegistration};
 pub(crate) use code::OpenHumanCode;
 pub(crate) use error::{EngineError, Result};
 #[cfg(test)]
