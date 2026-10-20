@@ -554,3 +554,53 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
         b"\x89PNG\r\n\x1a\n"
     );
 }
+
+#[tokio::test]
+async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
+    let (_temp, config) = setup().await;
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let first = persist_queued_user_message_with_config(
+        &ctx,
+        "uploads",
+        "request-1",
+        "queued follow-up",
+        &[],
+        &config,
+    )
+    .await
+    .unwrap();
+    assert_eq!(first.id, "user:request-1");
+    assert_eq!(first.sender, "user");
+
+    let retry = persist_queued_user_message_with_config(
+        &ctx,
+        "uploads",
+        "request-1",
+        "queued follow-up",
+        &[],
+        &config,
+    )
+    .await
+    .unwrap();
+    assert_eq!(retry.id, first.id);
+
+    let conflicting_retry = persist_queued_user_message_with_config(
+        &ctx,
+        "uploads",
+        "request-1",
+        "different content",
+        &[],
+        &config,
+    )
+    .await;
+    assert!(conflicting_retry.is_err());
+
+    let rows = conversations::blocking::get_messages(
+        ctx,
+        config.workspace_dir.clone(),
+        "uploads".into(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(rows.iter().filter(|row| row.id == first.id).count(), 1);
+}

@@ -219,6 +219,18 @@ pub(crate) async fn persist_queued_user_message(
         .load_config()
         .await
         .map_err(|error| format!("load queued message configuration: {error}"))?;
+    persist_queued_user_message_with_config(ctx, thread_id, request_id, text, opaque_parts, &config)
+        .await
+}
+
+async fn persist_queued_user_message_with_config(
+    ctx: &DispatchCtx,
+    thread_id: &str,
+    request_id: &str,
+    text: &str,
+    opaque_parts: &[tinychannels_bus::ContentPart],
+    config: &crate::config::Config,
+) -> Result<ConversationMessageRecord, String> {
     let row_id = format!("user:{request_id}");
     let existing = conversations::get_messages(ctx, config.workspace_dir.clone(), thread_id)?
         .into_iter()
