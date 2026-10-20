@@ -38,11 +38,7 @@ async function readOnboardingCompleted(): Promise<boolean> {
  * onboarding screen to wait for. Callers assert the landing instead.
  */
 async function signInThroughOnboarding(page: Page, userId: string): Promise<void> {
-  const payload = Buffer.from(
-    JSON.stringify({ sub: userId, userId, exp: Math.floor(Date.now() / 1000) + 3600 })
-  ).toString('base64url');
-  const token = `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.${payload}.sig`;
-  await callCoreRpc('openhuman.auth_store_session', { token });
+  await signInViaBypassUser(page, userId);
   await callCoreRpc('openhuman.config_set_onboarding_completed', { value: false });
   await page.goto('/#/onboarding/welcome');
   await waitForAppReady(page);
