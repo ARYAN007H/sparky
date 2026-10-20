@@ -248,3 +248,194 @@ fn channel_activity_emits_atomic_keyed_merge_patches() {
         Value::Null
     );
 }
+
+#[tokio::test]
+async fn persisted_activity_merges_concurrent_events_for_the_exact_scoped_row() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::threads::store::{self, ConversationMessage, CreateConversationThread};
+    use tinychannels_bus::{
+        ChannelEvent, ChannelEventKind, ChannelReaction, ChannelRef, ConversationKind,
+        ConversationRef, SenderRef,
+    };
+
+    let temp = tempfile::tempdir().unwrap();
+    let workspace = temp.path().join("workspace");
+    let suffix = uuid::Uuid::new_v4().simple().to_string();
+    let make_ctx = |profile: &str| {
+        let config = crate::config::Config {
+            workspace_dir: workspace.clone(),
+            action_dir: workspace.clone(),
+            config_path: workspace.join("config.toml"),
+            ..Default::default()
+        };
+        DispatchCtx::new(
+            CoreContext::for_test(DomainSet::none(), Some(workspace.clone())).derive_with(
+                ContextOverlay::new(config, DomainSet::full(), Default::default()).profile(profile),
+            ),
+        )
+    };
+    let alice = make_ctx(&format!("activity-alice-{suffix}"));
+    let bob = make_ctx(&format!("activity-bob-{suffix}"));
+    let thread_id = format!("channel:activity:{suffix}");
+    let row_id = "user:openhuman-row-42".to_owned();
+    let channel = ChannelRef {
+        id: "telegram".into(),
+        account_id: Some("configured-account".into()),
+    };
+    let conversation = ConversationRef {
+        kind: ConversationKind::Thread,
+        id: "provider-conversation".into(),
+        scope_id: Some("workspace-scope".into()),
+        parent_id: Some("provider-parent".into()),
+        thread_id: Some("provider-thread".into()),
+        topic_id: Some("provider-topic".into()),
+    };
+    let provider_message_id = "provider-message-17";
+
+    for ctx in [&alice, &bob] {
+        store::blocking::ensure_thread(
+            ctx.clone(),
+            workspace.clone(),
+            CreateConversationThread {
+                id: thread_id.clone(),
+                title: "Activity projection".into(),
+                created_at: "2026-10-20T00:00:00Z".into(),
+                parent_thread_id: None,
+                labels: None,
+                personality_id: None,
+                working_dir: None,
+            },
+        )
+        .await
+        .unwrap();
+        store::blocking::append_message(
+            ctx.clone(),
+            workspace.clone(),
+            thread_id.clone(),
+            ConversationMessage {
+                id: row_id.clone(),
+                content: "original provider message".into(),
+                message_type: "text".into(),
+                extra_metadata: serde_json::json!({
+                    "voiceNote": {"opaqueId": "voice-asset-preserved"},
+                    "custom": {"keep": true}
+                }),
+                sender: "user".into(),
+                created_at: "2026-10-20T00:00:01Z".into(),
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    bind_message(
+        &alice,
+        &channel,
+        &conversation,
+        provider_message_id,
+        &thread_id,
+    )
+    .unwrap();
+    bind_row(
+        &alice,
+        &channel,
+        &conversation,
+        provider_message_id,
+        &thread_id,
+        &row_id,
+    )
+    .unwrap();
+    let target = ProjectedMessageTarget {
+        thread_id: thread_id.clone(),
+        row_id: row_id.clone(),
+    };
+    let event = |event_id: &str, kind| ChannelEvent {
+        version: 2,
+        event_id: event_id.into(),
+        source_event_id: None,
+        source_timestamp: None,
+        channel: channel.clone(),
+        conversation: Some(conversation.clone()),
+        event: kind,
+    };
+    let reaction = event(
+        "event-reaction",
+        ChannelEventKind::ReactionAdded {
+            message_id: provider_message_id.into(),
+            provider_message_id: None,
+            actor: SenderRef {
+                id: "reader-alice".into(),
+                ..Default::default()
+            },
+            reaction: ChannelReaction {
+                value: "👍".into(),
+                custom_emoji_id: Some("provider-emoji-1".into()),
+            },
+        },
+    );
+    let receipt = event(
+        "event-read",
+        ChannelEventKind::ReadReceipt {
+            message_id: provider_message_id.into(),
+            actor: Some(SenderRef {
+                id: "reader-bob".into(),
+                ..Default::default()
+            }),
+            timestamp: Some(1_792_444_800),
+        },
+    );
+
+    let (reaction_result, receipt_result) = tokio::join!(
+        persist_activity(&alice, &target, &reaction),
+        persist_activity(&alice, &target, &receipt),
+    );
+    reaction_result.unwrap();
+    receipt_result.unwrap();
+
+    let alice_rows =
+        store::blocking::get_messages(alice.clone(), workspace.clone(), thread_id.clone())
+            .await
+            .unwrap();
+    assert_eq!(alice_rows.len(), 1);
+    let activity = &alice_rows[0].extra_metadata["channelActivity"];
+    assert_eq!(activity["reactions"].as_object().unwrap().len(), 1);
+    assert_eq!(activity["readReceipts"].as_object().unwrap().len(), 1);
+    assert_eq!(
+        alice_rows[0].extra_metadata["voiceNote"]["opaqueId"],
+        "voice-asset-preserved"
+    );
+    assert_eq!(alice_rows[0].extra_metadata["custom"]["keep"], true);
+
+    // Reopen the workspace backend and resolve the provider target under a
+    // different profile. It must not find Alice's binding or mutate Bob's
+    // same-named row.
+    crate::storage::local::forget(&workspace);
+    let restarted_alice = make_ctx(&format!("activity-alice-{suffix}"));
+    let restarted_bob = make_ctx(&format!("activity-bob-{suffix}"));
+    assert_eq!(
+        resolve_message(&restarted_bob, &channel, &conversation, provider_message_id).unwrap(),
+        None
+    );
+    let reloaded_alice =
+        store::blocking::get_messages(restarted_alice, workspace.clone(), thread_id.clone())
+            .await
+            .unwrap();
+    assert_eq!(reloaded_alice[0].id, row_id);
+    assert_eq!(
+        reloaded_alice[0].extra_metadata,
+        alice_rows[0].extra_metadata
+    );
+    let untouched_bob = store::blocking::get_messages(restarted_bob, workspace, thread_id)
+        .await
+        .unwrap();
+    assert_eq!(untouched_bob[0].id, row_id);
+    assert_eq!(untouched_bob[0].content, "original provider message");
+    assert_eq!(
+        untouched_bob[0].extra_metadata["voiceNote"]["opaqueId"],
+        "voice-asset-preserved"
+    );
+    assert!(untouched_bob[0]
+        .extra_metadata
+        .get("channelActivity")
+        .is_none());
+}
