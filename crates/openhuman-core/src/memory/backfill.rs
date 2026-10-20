@@ -5,7 +5,7 @@
 //! source, the state-KV checkpoint, consent, engine binding and task
 //! lifetime.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::config::Config;

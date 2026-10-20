@@ -39,7 +39,7 @@ impl DateHintModel for HostDateHintModel {
                 };
             let system = format!(
                 "{}\n\n{instruction}",
-                crate::agent::prompts::current_datetime_line(Some(&zone))
+                crate::prompts::current_datetime_line(Some(&zone))
             );
             let mut request = tinyinference_llm::model::ModelRequest::new(vec![
                 tinyinference_llm::message::Message::system(system),
