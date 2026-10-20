@@ -6,7 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { AssistantUiRuntimeProvider } from '../../../providers/AssistantUiRuntimeProvider';
 import chatRuntimeReducer from '../../../store/chatRuntimeSlice';
 import threadReducer from '../../../store/threadSlice';
-import { AgentRunningStatus, hasPendingClarification, waitingOnUser } from './AgentRunningStatus';
+import {
+  AgentRunningStatus,
+  hasPendingClarification,
+  turnHasTasks,
+  waitingOnUser,
+} from './AgentRunningStatus';
 
 vi.mock('../../../services/api/threadApi', () => ({
   threadApi: {
@@ -132,5 +137,25 @@ describe('hasPendingClarification', () => {
       ])
     ).toBe(true);
     expect(hasPendingClarification([])).toBe(false);
+  });
+});
+
+describe('turnHasTasks', () => {
+  const user = { id: 'u-2', role: 'user' };
+  const earlier = { id: 'a-1', role: 'assistant' };
+  const running = { id: 'a-2', role: 'assistant' };
+
+  it('ignores delegations from earlier turns', () => {
+    expect(turnHasTasks([{ messageId: 'a-1' }], [earlier, user, running])).toBe(false);
+  });
+
+  it('is true when the running turn delegated work', () => {
+    expect(
+      turnHasTasks([{ messageId: 'a-1' }, { messageId: 'a-2' }], [earlier, user, running])
+    ).toBe(true);
+  });
+
+  it('is false before the running turn has a reply', () => {
+    expect(turnHasTasks([{ messageId: 'a-1' }], [earlier, user])).toBe(false);
   });
 });

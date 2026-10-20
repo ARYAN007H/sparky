@@ -85,6 +85,23 @@ export function hasPendingClarification(messages: ReadonlyArray<MessageLike>): b
   return false;
 }
 
+/**
+ * Whether the running turn has delegated work of its own.
+ *
+ * assistant-ui's `thread.tasks` collects delegations from every message in the
+ * thread, so a chat that ran a subagent once would hide "Thinking…" on every
+ * later turn. The running turn is the newest message when it is the
+ * assistant's; a turn whose reply has not appeared yet has no tasks.
+ */
+export function turnHasTasks(
+  tasks: ReadonlyArray<{ readonly messageId: string }>,
+  messages: ReadonlyArray<{ readonly id: string; readonly role: string }>
+): boolean {
+  const newest = messages.at(-1);
+  if (newest?.role !== 'assistant') return false;
+  return tasks.some(task => task.messageId === newest.id);
+}
+
 /** Approval outranks review outranks answer: the most blocking gate first. */
 export function waitingOnUser(args: {
   approval: boolean;
@@ -148,7 +165,8 @@ export function AgentRunningStatus() {
   const parentWaits = useParentWaitsOnSubagents();
   const [tick, setTick] = useState(0);
   const [startedAt] = useState(() => Date.now());
-  const thinking = summary.total === 0 && waiting === null;
+  const turnTasks = useAuiState(s => turnHasTasks(s.thread.tasks, s.thread.messages));
+  const thinking = !turnTasks && waiting === null;
   const elapsedMs = useTaskElapsed({ startedAt }, thinking);
 
   useEffect(() => {
@@ -159,7 +177,7 @@ export function AgentRunningStatus() {
 
   if (waiting !== null) return <WaitingLine kind={waiting} />;
 
-  if (summary.total === 0) {
+  if (!turnTasks) {
     const label =
       elapsedMs !== undefined && elapsedMs >= 1000
         ? t('chat.status.thinkingElapsed').replace('{elapsed}', formatElapsed(elapsedMs))
