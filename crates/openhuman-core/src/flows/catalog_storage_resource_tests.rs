@@ -73,6 +73,9 @@ async fn workspace_fd_lifetime_is_separate_from_catalog_callback_lifetime() {
     }
     drop(registrations);
     let after_release = open_fd_count();
+    eprintln!(
+        "workspace_fd_lifetime before={before} after_registrations={after_registrations} after_backend_opens={after_backend_opens} after_release={after_release} workspaces={WORKSPACE_COUNT}"
+    );
     assert!(
         after_release <= after_registrations + FD_TOLERANCE,
         "forgetting cached workspace backends should return to the callback-only descriptor count: registrations={after_registrations}, released={after_release}"
