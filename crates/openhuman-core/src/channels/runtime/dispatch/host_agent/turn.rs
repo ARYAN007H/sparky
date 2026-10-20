@@ -1,6 +1,7 @@
 //! Running one channel turn as a host agent.
 
 use tokio::sync::mpsc;
+use tinyagents_harness::run_queue::RunQueue;
 
 use super::posture;
 use crate::agent::bus::AgentTurnResponse;
@@ -26,6 +27,9 @@ pub(crate) struct HostChannelTurn {
     pub(crate) origin: AgentTurnOrigin,
     /// Live progress for the channel's draft updates.
     pub(crate) progress: Option<mpsc::Sender<AgentProgress>>,
+    pub(crate) run_queue: Option<
+        std::sync::Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
+    >,
     /// Where this turn's parked approvals surface; default for a channel
     /// without an approval surface.
     pub(crate) approval: crate::security::approval::ApprovalTurnContext,
@@ -49,6 +53,7 @@ pub(crate) async fn run_host_agent_turn(
         message,
         origin,
         progress,
+        run_queue,
         approval,
         cancellation,
         turn_deadline,
@@ -91,6 +96,7 @@ pub(crate) async fn run_host_agent_turn(
             origin,
             approval,
             progress,
+            run_queue,
             cancellation,
             turn_deadline,
             &imported_history,

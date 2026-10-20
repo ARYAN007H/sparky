@@ -94,6 +94,9 @@ impl HostAgent {
         origin: crate::agent::turn_origin::AgentTurnOrigin,
         approval: crate::security::approval::ApprovalTurnContext,
         progress: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
+        run_queue: Option<
+            std::sync::Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>,
+        >,
         cancellation: tinyagents_harness::CancellationToken,
         turn_deadline: Option<std::time::Duration>,
         imported_history: &[tinyagents_session::transcript::TranscriptMessage],
@@ -112,7 +115,7 @@ impl HostAgent {
                 origin,
                 approval: approval.clone(),
                 progress,
-                run_queue: None,
+                run_queue,
                 cancellation,
                 turn_deadline,
                 workspace: crate::agent::turn_host::WorkspaceBinding::Preserve,
