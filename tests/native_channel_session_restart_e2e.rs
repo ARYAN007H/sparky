@@ -804,7 +804,10 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
     );
     assert!(
         model_saw_user_text(&requests[0], "the dictated voice request"),
-        "the model receives the transcript produced by the scoped cloud STT callback"
+        "the model receives the transcript produced by the scoped cloud STT callback; mock request={:?}, file requests={:?}, transcription uploads={}",
+        requests[0],
+        mocks.state.voice_file_requests.lock().expect("voice file requests"),
+        mocks.state.transcription_uploads.lock().expect("STT uploads").len()
     );
     assert_eq!(
         mocks
