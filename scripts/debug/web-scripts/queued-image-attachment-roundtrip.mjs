@@ -273,7 +273,11 @@ export default async function queuedImageAttachmentRoundtrip({
       const body = await response.json();
       if (!response.ok) throw new Error(`thread list failed with HTTP ${response.status}`);
       if (body.error) throw new Error(`thread list RPC failed: ${JSON.stringify(body.error)}`);
-      const messages = body.result?.messages ?? body.messages;
+      const messages =
+        body.result?.data?.messages ??
+        body.result?.messages ??
+        body.data?.messages ??
+        body.messages;
       if (!Array.isArray(messages)) {
         throw new Error(`thread list response has no messages: ${JSON.stringify(body)}`);
       }
@@ -327,7 +331,11 @@ export default async function queuedImageAttachmentRoundtrip({
       const body = await response.json();
       if (!response.ok) throw new Error(`thread list failed with HTTP ${response.status}`);
       if (body.error) throw new Error(`thread list RPC failed: ${JSON.stringify(body.error)}`);
-      const messages = body.result?.messages ?? body.messages;
+      const messages =
+        body.result?.data?.messages ??
+        body.result?.messages ??
+        body.data?.messages ??
+        body.messages;
       if (!Array.isArray(messages)) {
         throw new Error(`thread list response has no messages: ${JSON.stringify(body)}`);
       }
