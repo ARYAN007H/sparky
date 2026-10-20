@@ -22,7 +22,10 @@ export async function selectedThreadTranscript(page: Page): Promise<{
   const data = (envelope as { data: unknown }).data;
   expect(data && typeof data === 'object' && 'hasTranscript' in data).toBe(true);
   expect((data as { hasTranscript: unknown }).hasTranscript).toBe(true);
+  expect((data as { threadId: unknown }).threadId).toBe(threadId);
+  expect((data as { hasMore: unknown }).hasMore).toBe(false);
   expect(Array.isArray((data as { items: unknown }).items)).toBe(true);
+  expect((data as { total: number }).total).toBeGreaterThan(0);
   return {
     threadId,
     content: JSON.stringify(data),
