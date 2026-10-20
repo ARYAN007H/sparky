@@ -370,7 +370,7 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         panic!("query succeeds");
     };
     let page: catalog::CatalogDocumentPage = serde_json::from_value(value).unwrap();
-    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items.len(), 1, "scoped query page: {page:?}");
     assert_eq!(page.items[0].doc["ns"], "flows");
 
     let delete: CatalogStorageReply = proxy
