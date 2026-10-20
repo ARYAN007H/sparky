@@ -86,10 +86,7 @@ fn channel_labelled_turn_without_history_key_has_no_origin() {
 #[test]
 fn legacy_channel_history_key_cannot_authorize_a_durable_job_origin() {
     assert_eq!(
-        job_origin_from_turn(&channel_turn_with_session(
-            Some("legacy-history-key"),
-            None,
-        )),
+        job_origin_from_turn(&channel_turn_with_session(Some("legacy-history-key"), None,)),
         None
     );
 }

@@ -4,9 +4,7 @@ use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use tinyagents_session::transcript::{
-    SessionRef, TranscriptMessage, TranscriptMeta,
-};
+use tinyagents_session::transcript::{SessionRef, TranscriptMessage, TranscriptMeta};
 
 struct ConfiguredChannel;
 
