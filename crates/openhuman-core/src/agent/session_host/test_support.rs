@@ -40,19 +40,27 @@ fn model_fixture_entry() -> ChatModelEntry {
             models: Some(ProviderModelHooks {
                 default_model: Arc::new(|| Some("test/session-fixture".into())),
                 role_for_model: Arc::new(|model| {
-                    model
-                        .strip_prefix("hint:")
-                        .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
-                        .map(str::to_string)
+                    if model == "fixture-reasoning" {
+                        Some("reasoning".to_string())
+                    } else {
+                        model
+                            .strip_prefix("hint:")
+                            .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+                            .map(str::to_string)
+                    }
                 }),
                 is_alias: Arc::new(|model| {
-                    model
+                    model == "fixture-reasoning"
+                        || model
                         .strip_prefix("hint:")
                         .is_some_and(|role| crate::config::WORKLOAD_ROLES.contains(&role))
                 }),
-                is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+                is_raw_model: Arc::new(|model| {
+                    !model.starts_with("hint:") && model != "fixture-reasoning"
+                }),
                 supports_vision: Arc::new(|_| false),
                 resolve_model: Arc::new(|_, config, model| match model {
+                    Some("fixture-reasoning") => Some("test/selected-reasoning".to_string()),
                     Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
                     Some(model) => model
                         .strip_prefix("hint:")

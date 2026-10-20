@@ -442,6 +442,12 @@ fn harness_model_default_override_preserves_unowned_model_ids() {
     // registered its provider policy. Bare core preserves arbitrary IDs.
     assert_eq!(harness_model_default_override("reasoning-v1"), "reasoning-v1");
     assert_eq!(harness_model_default_override("chat-v1"), "chat-v1");
+    crate::agent::session_host::test_support::install_model_fixture();
+    assert_eq!(
+        harness_model_default_override("fixture-reasoning"),
+        "hint:reasoning",
+        "registered generic provider aliases must still select their workload role"
+    );
     // Generic `hint:*` routing markers keep their role.
     assert_eq!(
         harness_model_default_override("hint:reasoning"),
