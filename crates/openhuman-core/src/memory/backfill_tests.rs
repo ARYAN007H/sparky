@@ -1,4 +1,5 @@
 use super::*;
+use chrono::Utc;
 
 use std::time::Duration;
 
@@ -54,7 +55,7 @@ async fn seed_thread(workspace: &Path, thread_id: &str, messages: &[(&str, &str)
 async fn wait_done(config: &Config) -> BackfillView {
     for _ in 0..200 {
         let view = status(&DispatchCtx::ambient(), config).await.unwrap();
-        if view.state.phase != ImportPhase::Running {
+        if view.state.phase != BackfillPhase::Running {
             return view;
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
@@ -82,6 +83,10 @@ async fn refuses_without_consent_and_with_memory_off() {
     .await
     .unwrap_err();
     assert_eq!(error.code(), "MEMORY_OFF");
+
+    let status = status(&DispatchCtx::ambient(), &config).await.unwrap();
+    assert_eq!(status.state.phase, BackfillPhase::Idle);
+    assert_eq!((status.pending_threads, status.pending_turns), (0, 0));
 }
 
 #[tokio::test]
@@ -132,7 +137,7 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     .await;
 
     let before = status(&DispatchCtx::ambient(), &config).await.unwrap();
-    assert_eq!(before.state.phase, ImportPhase::Idle);
+    assert_eq!(before.state.phase, BackfillPhase::Idle);
     assert_eq!((before.pending_threads, before.pending_turns), (2, 3));
 
     let started = start(
@@ -144,7 +149,7 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     .unwrap();
     assert_eq!(started.state.threads_total, 2);
     let done = wait_done(&config).await;
-    assert_eq!(done.state.phase, ImportPhase::Done, "{:?}", done.state);
+    assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
     assert_eq!(done.state.turns_stored, 3);
     assert_eq!(done.state.items_stored, 6);
     assert!(done.state.finished_at.is_some());
@@ -267,7 +272,7 @@ async fn batches_are_stored_accepted_and_the_last_one_visible() {
     .await
     .unwrap();
     let done = wait_done(&config).await;
-    assert_eq!(done.state.phase, ImportPhase::Done, "{:?}", done.state);
+    assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
     assert_eq!(done.state.items_stored, 6);
 
     let waits = engine.waits.lock().unwrap().clone();
@@ -294,4 +299,72 @@ async fn batches_are_stored_accepted_and_the_last_one_visible() {
         6,
         "an engine without accepted writes still stores everything"
     );
+}
+
+#[tokio::test]
+async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
+    #[derive(Clone, Copy)]
+    enum Peer {
+        Import,
+        Migration,
+    }
+
+    for (index, peer) in [Peer::Import, Peer::Migration].into_iter().enumerate() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = config_in(&tmp);
+        bind_reference(&config);
+        seed_thread(
+            &config.workspace_dir,
+            &format!("thread-{index}"),
+            &[("user", "past question"), ("agent", "past answer")],
+        )
+        .await;
+        let workspace = config.workspace_dir.clone();
+        let peer_guard = match peer {
+            Peer::Import => crate::memory::run_slots::reserve(
+                &crate::memory::run_slots::IMPORT,
+                &workspace,
+                &[
+                    &crate::memory::run_slots::BACKFILL,
+                    &crate::memory::run_slots::MIGRATION,
+                ],
+            ),
+            Peer::Migration => crate::memory::run_slots::reserve(
+                &crate::memory::run_slots::MIGRATION,
+                &workspace,
+                &[
+                    &crate::memory::run_slots::IMPORT,
+                    &crate::memory::run_slots::BACKFILL,
+                ],
+            ),
+        }
+        .expect("peer owns its driver-specific slot");
+        let state_path = workspace.join("memory/conversations_backfill.json");
+
+        let blocked = start(
+            &DispatchCtx::ambient(),
+            &config,
+            BackfillStartParams { consent: true },
+        )
+        .await
+        .unwrap();
+        assert_eq!(blocked.state.phase, BackfillPhase::Idle);
+        assert_eq!((blocked.pending_threads, blocked.pending_turns), (1, 1));
+        assert!(!is_running(&workspace));
+        assert!(!state_path.exists());
+
+        drop(peer_guard);
+        let started = start(
+            &DispatchCtx::ambient(),
+            &config,
+            BackfillStartParams { consent: true },
+        )
+        .await
+        .unwrap();
+        assert_eq!(started.state.phase, BackfillPhase::Running);
+        let done = wait_done(&config).await;
+        assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
+        assert_eq!(done.state.items_stored, 2);
+        assert!(state_path.is_file());
+    }
 }

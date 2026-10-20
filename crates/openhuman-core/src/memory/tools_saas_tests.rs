@@ -79,8 +79,7 @@ fn isolate(test_name: &str, marker: &str) -> Option<std::process::Output> {
 #[test]
 fn invalid_saas_roots_and_agent_overrides_reject_memory_tool_reads() {
     const MARKER: &str = "OPENHUMAN_TEST_SAAS_MEMORY_TOOL_INVALID_ROOT";
-    const TEST_NAME: &str =
-        "memory::tools::saas_tests::invalid_saas_roots_and_agent_overrides_reject_memory_tool_reads";
+    const TEST_NAME: &str = "memory::tools::saas_tests::invalid_saas_roots_and_agent_overrides_reject_memory_tool_reads";
     if let Some(output) = isolate(TEST_NAME, MARKER) {
         assert!(
             output.status.success()
@@ -159,8 +158,7 @@ fn invalid_saas_roots_and_agent_overrides_reject_memory_tool_reads() {
 #[test]
 fn valid_saas_root_keeps_tool_reads_inside_the_authenticated_namespace() {
     const MARKER: &str = "OPENHUMAN_TEST_SAAS_MEMORY_TOOL_VALID_ROOT";
-    const TEST_NAME: &str =
-        "memory::tools::saas_tests::valid_saas_root_keeps_tool_reads_inside_the_authenticated_namespace";
+    const TEST_NAME: &str = "memory::tools::saas_tests::valid_saas_root_keeps_tool_reads_inside_the_authenticated_namespace";
     if let Some(output) = isolate(TEST_NAME, MARKER) {
         assert!(
             output.status.success()
