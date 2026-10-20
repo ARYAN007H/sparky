@@ -542,3 +542,87 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
         b"\x89PNG\r\n\x1a\n"
     );
 }
+
+#[tokio::test]
+async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use tinychannels_bus::{ContentPart, MediaReference};
+
+    let (_temp, config) = setup().await;
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config.clone(),
+    ));
+    let staged = crate::threads::attachments::stage_queued_parts(
+        &ctx,
+        "uploads",
+        &[ContentPart::Image {
+            media: MediaReference {
+                url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+                ..Default::default()
+            },
+            caption: None,
+            alt_text: None,
+        }],
+    )
+    .await
+    .unwrap();
+    let first = persist_queued_user_message(
+        &ctx,
+        "uploads",
+        "request-1",
+        "queued follow-up",
+        &staged,
+    )
+    .await
+    .unwrap();
+    assert_eq!(first.id, "user:request-1");
+    assert_eq!(first.sender, "user");
+    assert_eq!(first.attachments, staged);
+    let resolved = crate::threads::attachments::resolve_persisted_parts(
+        &ctx,
+        "uploads",
+        &first.id,
+        &first.attachments,
+    )
+    .await
+    .expect("queued refs are bound to the persisted row");
+    let path = match &resolved[0] {
+        ContentPart::Image { media, .. } => media.path.as_deref().expect("resolved path"),
+        other => panic!("expected image attachment, got {other:?}"),
+    };
+    assert_eq!(
+        tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
+        b"\x89PNG\r\n\x1a\n"
+    );
+
+    let retry = persist_queued_user_message(
+        &ctx,
+        "uploads",
+        "request-1",
+        "queued follow-up",
+        &staged,
+    )
+    .await
+    .unwrap();
+    assert_eq!(retry.id, first.id);
+
+    let conflicting_retry = persist_queued_user_message(
+        &ctx,
+        "uploads",
+        "request-1",
+        "different content",
+        &staged,
+    )
+    .await;
+    assert!(conflicting_retry.is_err());
+
+    let rows = conversations::blocking::get_messages(
+        ctx,
+        config.workspace_dir.clone(),
+        "uploads".into(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(rows.iter().filter(|row| row.id == first.id).count(), 1);
+}

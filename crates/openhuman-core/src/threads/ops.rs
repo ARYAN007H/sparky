@@ -20,6 +20,7 @@ pub use crud::{
     delete_after, message_append, message_update, messages_list, thread_create_new, thread_delete,
     thread_update_labels, thread_update_title, thread_upsert, threads_list, transcript_search,
 };
+pub(crate) use crud::persist_queued_user_message;
 pub use edit::{
     edit_message, regenerate, EditMessageRequest, EditOrRegenerateResponse, RegenerateRequest,
 };
