@@ -349,6 +349,87 @@ struct ChannelTurnDescriptor<'a> {
     source: &'a str,
 }
 
+/// Persist one channel message under the trusted dispatch scope and return the
+/// OpenHuman row ID. User rows bind the provider receipt only after the row is
+/// durable; assistant rows deliberately remain outside the provider receipt
+/// index because no provider delivery receipt is available here.
+pub(crate) async fn persist_channel_message(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    channel: &tinychannels_bus::ChannelRef,
+    conversation: &tinychannels_bus::ConversationRef,
+    thread_id: &str,
+    title: &str,
+    provider_message_id: &str,
+    role: &str,
+    content: &str,
+    mut extra_metadata: serde_json::Value,
+) -> Result<String, String> {
+    if !matches!(role, "user" | "assistant") {
+        return Err("channel message role must be user or assistant".into());
+    }
+    if workspace_dir.as_os_str().is_empty()
+        || thread_id.is_empty()
+        || provider_message_id.is_empty()
+    {
+        return Err("channel message scope and provider ID must be non-empty".into());
+    }
+    if !extra_metadata.is_object() {
+        extra_metadata = serde_json::json!({});
+    }
+    let metadata = extra_metadata.as_object_mut().expect("object established");
+    metadata.insert("scope".into(), serde_json::json!("channel"));
+    metadata.insert(
+        "sourceMessageId".into(),
+        serde_json::json!(provider_message_id),
+    );
+    let row_id = format!("{role}:{provider_message_id}");
+    let now = chrono::Utc::now().to_rfc3339();
+    let workspace = workspace_dir.to_path_buf();
+    ensure_thread(
+        ctx,
+        workspace.clone(),
+        CreateConversationThread {
+            id: thread_id.to_string(),
+            title: title.to_string(),
+            created_at: now.clone(),
+            parent_thread_id: None,
+            labels: Some(vec!["general".to_string()]),
+            personality_id: None,
+            working_dir: None,
+        },
+    )?;
+    let exists = get_messages(ctx, workspace.clone(), thread_id)?
+        .iter()
+        .any(|message| message.id == row_id);
+    if !exists {
+        append_message(
+            ctx,
+            workspace,
+            thread_id,
+            ConversationMessage {
+                id: row_id.clone(),
+                content: content.to_string(),
+                message_type: "text".into(),
+                extra_metadata: serde_json::Value::Object(metadata.clone()),
+                sender: role.to_string(),
+                created_at: now,
+            },
+        )?;
+    }
+    if role == "user" {
+        crate::threads::channel_projection::bind_row(
+            ctx,
+            channel,
+            conversation,
+            provider_message_id,
+            thread_id,
+            &row_id,
+        )?;
+    }
+    Ok(row_id)
+}
+
 async fn persist_channel_turn(
     _ctx: &DispatchCtx,
     workspace_dir: &Path,
