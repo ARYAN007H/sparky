@@ -98,14 +98,14 @@ fn artifact_scope_uses_agent_scope_only_for_unprofiled_named_agents() {
         DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay))
     };
 
-    let named_agent = artifact_scoped_for_in(&ws.path(), &context_for(Some("writer")))
+    let named_agent = artifact_scoped_for_in(ws.path(), &context_for(Some("writer")))
         .expect("an unprofiled named agent has a local scope");
     assert_eq!(
         named_agent.scope(),
         &crate::storage::scope_for_agent("writer")
     );
 
-    let default_agent = artifact_scoped_for_in(&ws.path(), &context_for(None))
+    let default_agent = artifact_scoped_for_in(ws.path(), &context_for(None))
         .expect("the default agent has the local scope");
     assert!(default_agent.scope().is_local());
 }

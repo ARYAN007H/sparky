@@ -259,7 +259,10 @@ pub fn artifact_scoped_for_in(
     match backend.for_scope(&scope) {
         Ok(scoped) => Some(scoped),
         Err(error) => {
-            log::warn!("[session_store] artifact scope refused scope={scope}: {error}");
+            log::warn!(
+                "[session_store] artifact scope refused scope={}: {error}",
+                scope.as_str()
+            );
             None
         }
     }
