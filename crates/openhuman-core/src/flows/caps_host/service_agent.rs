@@ -49,23 +49,24 @@ pub(crate) async fn run_agent(
     });
 
     let mut config = request.config.clone();
-    if let Some(object) = config.as_object_mut()
-        && object.get("timeout_secs").and_then(Value::as_u64).is_none()
-    {
-        if let Some(timeout) = request.agent.limits.agent_timeout_secs {
-            object.insert("timeout_secs".to_owned(), Value::from(timeout));
+    if let Some(object) = config.as_object_mut() {
+        if object.get("timeout_secs").and_then(Value::as_u64).is_none() {
+            if let Some(timeout) = request.agent.limits.agent_timeout_secs {
+                object.insert("timeout_secs".to_owned(), Value::from(timeout));
+            }
         }
     }
-    if let (Some(model), Some(object)) = (
-        request
-            .model
-            .model
-            .as_ref()
-            .or(request.agent.model.as_ref()),
-        config.as_object_mut(),
-    ) && object.get("model").and_then(Value::as_str).is_none()
+    if let Some(model) = request
+        .model
+        .model
+        .as_ref()
+        .or(request.agent.model.as_ref())
     {
-        object.insert("model".to_owned(), Value::String(model.clone()));
+        if let Some(object) = config.as_object_mut() {
+            if object.get("model").and_then(Value::as_str).is_none() {
+                object.insert("model".to_owned(), Value::String(model.clone()));
+            }
+        }
     }
     let agent_ref = request.agent.id.clone();
     let connection = request.connection_ref.clone();
