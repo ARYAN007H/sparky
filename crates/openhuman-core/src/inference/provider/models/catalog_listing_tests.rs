@@ -41,6 +41,22 @@ async fn list_models_valid_json_still_succeeds() {
 }
 
 #[tokio::test]
+async fn unregistered_legacy_auth_style_fails_before_catalog_network_request() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let mut config = configure_generic_workspace(&tmp, "http://127.0.0.1:0/v1".to_string()).await;
+    config.cloud_providers[0].auth_style = AuthStyle::OpenhumanJwt;
+
+    let error = catalog_listing::list_configured_models_from_config("generic-test", &config)
+        .await
+        .expect_err("an unadapted legacy auth style must fail closed");
+
+    assert!(
+        error.contains("hosted cloud catalog is unavailable"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
 async fn list_models_uses_provider_ca_bundle_client() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let endpoint = spawn_static_models_server(

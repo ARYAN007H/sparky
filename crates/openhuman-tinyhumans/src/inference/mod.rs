@@ -28,9 +28,8 @@ use std::sync::Arc;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::inference_registry::{
     register_backend_error_classifier, register_catalog, register_chat_model,
-    register_config_normalizer, register_embedding, BackendErrorClassification, BackendErrorKind,
-    BoxFuture, ChatModelEntry, ChatModelFactory, ChatModelRequest, ProviderModelHooks,
-    ReadinessProbe, PROVIDER_OPENHUMAN,
+    register_config_normalizer, register_embedding, BoxFuture, ChatModelEntry, ChatModelFactory,
+    ChatModelRequest, ProviderModelHooks, ReadinessProbe, PROVIDER_OPENHUMAN,
 };
 use tinyinference_llm::model::ChatModel;
 

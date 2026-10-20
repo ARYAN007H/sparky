@@ -16,8 +16,9 @@ fn provider_descriptors(config: &crate::config::Config) -> Vec<ProviderDescripto
             name: provider.slug.clone(),
             aliases: if crate::config::schema::cloud_providers::is_hosted_cloud_identity(
                 &provider.slug,
-            ) || crate::config::schema::cloud_providers::is_hosted_auth_style(provider.auth_style)
-            {
+            ) || crate::config::schema::cloud_providers::is_hosted_auth_style(
+                provider.auth_style,
+            ) {
                 vec!["backend".to_string(), "openhuman-backend".to_string()]
             } else {
                 Vec::new()

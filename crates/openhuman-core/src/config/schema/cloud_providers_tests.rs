@@ -155,22 +155,13 @@ fn hosted_presets_and_classification_are_context_scoped() {
     assert!(super::builtin_cloud_provider("tenant-hosted").is_none());
     crate::core::runtime::CoreContext::sync_scope(context, || {
         assert!(super::builtin_cloud_provider("tenant-hosted").is_some());
-        assert!(super::is_hosted_cloud_provider(
-            "tenant-hosted",
-            AuthStyle::Bearer
-        ));
         assert!(super::is_hosted_cloud_identity("tenant-hosted"));
         assert!(!super::is_hosted_auth_style(AuthStyle::Bearer));
-        assert!(!super::is_hosted_cloud_provider(
-            "openai",
-            AuthStyle::Bearer
-        ));
+        assert!(super::is_hosted_auth_style(AuthStyle::OpenhumanJwt));
     });
     assert!(super::builtin_cloud_provider("tenant-hosted").is_none());
-    assert!(!super::is_hosted_cloud_provider(
-        "tenant-hosted",
-        AuthStyle::Bearer
-    ));
+    assert!(!super::is_hosted_cloud_identity("tenant-hosted"));
+    assert!(!super::is_hosted_auth_style(AuthStyle::OpenhumanJwt));
 }
 
 /// Drift guard (TAURI-RUST-5EN): couple the capability helper to the

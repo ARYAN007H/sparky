@@ -12,15 +12,23 @@ fn hosted_openhuman_preset_and_legacy_auth_policy_are_registered_before_config_l
     assert_eq!(preset.auth_style, AuthStyle::OpenhumanJwt);
 
     assert!(
-        openhuman_embed::__host::config::schema::cloud_providers::is_hosted_cloud_provider(
-            "openhuman",
-            AuthStyle::Bearer,
+        openhuman_embed::__host::config::schema::cloud_providers::is_hosted_cloud_identity(
+            "openhuman"
         )
     );
     assert!(
-        openhuman_embed::__host::config::schema::cloud_providers::is_hosted_cloud_provider(
-            "legacy-custom-slug",
-            AuthStyle::OpenhumanJwt,
+        !openhuman_embed::__host::config::schema::cloud_providers::is_hosted_auth_style(
+            AuthStyle::Bearer
+        )
+    );
+    assert!(
+        !openhuman_embed::__host::config::schema::cloud_providers::is_hosted_cloud_identity(
+            "legacy-custom-slug"
+        )
+    );
+    assert!(
+        openhuman_embed::__host::config::schema::cloud_providers::is_hosted_auth_style(
+            AuthStyle::OpenhumanJwt
         )
     );
     assert!(

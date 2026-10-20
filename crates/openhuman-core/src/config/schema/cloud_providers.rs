@@ -84,11 +84,6 @@ pub fn is_hosted_auth_style(style: AuthStyle) -> bool {
         .is_some_and(|classify| classify(style))
 }
 
-/// Whether either the provider identity or auth style routes through the host.
-pub fn is_hosted_cloud_provider(slug: &str, style: AuthStyle) -> bool {
-    is_hosted_cloud_identity(slug) || is_hosted_auth_style(style)
-}
-
 impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
     for BuiltinCloudProvider
 {
