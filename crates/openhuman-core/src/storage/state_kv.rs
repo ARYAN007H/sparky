@@ -294,7 +294,10 @@ impl StateKv {
 
         let backup = legacy.with_extension("json.corrupt");
         if backup.exists() {
-            anyhow::bail!("the corrupt legacy backup {} already exists", backup.display());
+            anyhow::bail!(
+                "the corrupt legacy backup {} already exists",
+                backup.display()
+            );
         }
         std::fs::rename(legacy, &backup)
             .with_context(|| format!("quarantine corrupt legacy state {}", legacy.display()))
