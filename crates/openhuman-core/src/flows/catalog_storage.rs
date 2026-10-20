@@ -20,7 +20,6 @@ use tinyflows_bus::catalog::{
     CatalogVersionedDocument, DocDeleteRequest, DocDeleteWhereRequest, DocEnsureRequest,
     DocGetRequest, DocPutRequest, DocQueryRequest,
 };
-#[cfg(test)]
 use tinystoragedrivers::StorageBackend;
 use tinystoragedrivers::{
     Capability, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, Scope,
@@ -37,6 +36,7 @@ use crate::modules::tinyflows as module;
 struct DocScope {
     workspace_dir: PathBuf,
     scope: Scope,
+    backend: Option<Arc<dyn StorageBackend>>,
 }
 
 impl DocScope {
@@ -44,12 +44,19 @@ impl DocScope {
         RegistrationKey {
             workspace_dir: self.workspace_dir.clone(),
             scope: self.scope.as_str().to_owned(),
+            backend: self
+                .backend
+                .as_ref()
+                .map(|backend| Arc::as_ptr(backend) as *const () as usize),
         }
     }
 
     fn documents(&self) -> Result<Arc<dyn DocumentStore>, StorageError> {
-        let backend = crate::storage::local::backend_for(&self.workspace_dir)
-            .map_err(|error| StorageError::unavailable(error.to_string()))?;
+        let backend = match &self.backend {
+            Some(backend) => Arc::clone(backend),
+            None => crate::storage::local::backend_for(&self.workspace_dir)
+                .map_err(|error| StorageError::unavailable(error.to_string()))?,
+        };
         let scoped = backend.for_scope(&self.scope)?;
         Ok(Arc::clone(scoped.documents()))
     }
@@ -59,6 +66,7 @@ impl DocScope {
 struct RegistrationKey {
     workspace_dir: PathBuf,
     scope: String,
+    backend: Option<usize>,
 }
 
 /// One scope's process-lifetime callback registration. TinyFlows uses this
@@ -115,7 +123,29 @@ pub(crate) async fn register(
     let documents = DocScope {
         workspace_dir: config.workspace_dir.clone(),
         scope,
+        backend: None,
     };
+    register_scope(documents).await
+}
+
+/// Register a callback for a specific backend and scope, for boot-time owner
+/// migrations that must not depend on whichever backend is globally installed.
+pub(crate) async fn register_backend_scope(
+    config: &Config,
+    backend: Arc<dyn StorageBackend>,
+    scope: Scope,
+) -> Result<Arc<CatalogStorageRegistration>, String> {
+    register_scope(DocScope {
+        workspace_dir: config.workspace_dir.clone(),
+        scope,
+        backend: Some(backend),
+    })
+    .await
+}
+
+async fn register_scope(
+    documents: DocScope,
+) -> Result<Arc<CatalogStorageRegistration>, String> {
     let key = documents.key();
     let path = path_for(&key);
     let runtime = crate::modules::runtime::runtime()
