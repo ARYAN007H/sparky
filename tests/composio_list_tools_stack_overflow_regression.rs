@@ -350,9 +350,11 @@ async fn drive_subagent() {
     let tool_output = Arc::new(Mutex::new(None));
     let workspace =
         std::path::PathBuf::from(std::env::var("OPENHUMAN_WORKSPACE").expect("test workspace set"));
-    let mut tool_config = openhuman_core::config::Config::default();
-    tool_config.config_path = workspace.join("config.toml");
-    tool_config.workspace_dir = workspace;
+    let tool_config = openhuman_core::config::Config {
+        config_path: workspace.join("config.toml"),
+        workspace_dir: workspace,
+        ..Default::default()
+    };
     let composio_tool = CountedComposioTool {
         inner: ComposioListToolsTool::new(Arc::new(tool_config)),
         executions: executions.clone(),
