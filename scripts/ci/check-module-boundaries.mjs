@@ -168,9 +168,9 @@ export function validatePolicy(policy) {
   }
 }
 
-function cargo(root, args) {
+function cargo(root, args, execute = execFileSync) {
   // All generated manifests and logs stay under the checkout's target/.
-  const stdout = execFileSync('bash', [join(root, 'scripts/ci-cancel-aware.sh'),
+  const stdout = execute('bash', [join(root, 'scripts/ci-cancel-aware.sh'),
     'cargo', 'metadata', '--format-version', '1', ...args], {
     cwd: root, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -178,9 +178,9 @@ function cargo(root, args) {
 }
 
 /** Resolve only this contract's selected features, without module/host unification. */
-function contractMetadata(root, contract, allFeatures) {
+function contractMetadata(root, contract, allFeatures, execute = execFileSync) {
   const manifest = resolve(root, contract.manifest);
-  const listing = cargo(root, ['--manifest-path', manifest, '--no-deps']);
+  const listing = cargo(root, ['--manifest-path', manifest, '--no-deps'], execute);
   const pkg = listing.packages.find(pkg => resolve(pkg.manifest_path) === manifest);
   if (!pkg || pkg.name !== contract.name) throw new Error(`missing contract ${contract.name}`);
   const harness = join(root, 'target/module-boundaries', contract.name, allFeatures ? 'all' : 'default');
@@ -188,10 +188,10 @@ function contractMetadata(root, contract, allFeatures) {
   const features = allFeatures ? Object.keys(pkg.features) : [];
   writeFileSync(join(harness, 'Cargo.toml'), `[workspace]\n[package]\nname = "boundary-probe"\nversion = "0.0.0"\nedition = "2024"\n[dependencies]\n${contract.name} = { path = ${JSON.stringify(dirname(manifest))}, features = ${JSON.stringify(features)} }\n`);
   writeFileSync(join(harness, 'src/lib.rs'), '');
-  return cargo(root, ['--manifest-path', join(harness, 'Cargo.toml')]);
+  return cargo(root, ['--manifest-path', join(harness, 'Cargo.toml')], execute);
 }
 
-export function run(root, strict = false) {
+export function run(root, strict = false, execute = execFileSync) {
   const policy = JSON.parse(readFileSync(join(root, 'scripts/ci/module-boundaries.json'), 'utf8'));
   validatePolicy(policy);
   policy.contractManifests = Object.fromEntries(policy.contracts.map(contract =>
@@ -206,18 +206,18 @@ export function run(root, strict = false) {
     ['Cargo.toml', ['openhuman', 'openhuman-cli', 'openhuman-tui']],
     ['crates/openhuman-app/Cargo.toml', ['openhuman-app']],
   ]) {
-    const metadata = cargo(root, ['--manifest-path', join(root, manifest), '--locked', '--all-features']);
+    const metadata = cargo(root, ['--manifest-path', join(root, manifest), '--locked', '--all-features'], execute);
     results.push(auditGraph(metadata, roots, policy));
   }
   // Without `linked-modules` (default features) no host reaches the bridge.
   results.push({
-    violations: bridgeReach(cargo(root, ['--manifest-path', join(root, 'Cargo.toml'), '--locked']),
+    violations: bridgeReach(cargo(root, ['--manifest-path', join(root, 'Cargo.toml'), '--locked'], execute),
       ['openhuman-cli', 'openhuman-tui', 'openhuman'], policy),
     exceptions: [],
   });
   for (const contract of policy.contracts) {
     for (const all of [false, true]) {
-      results.push(auditGraph(contractMetadata(root, contract, all), [contract.name], policy, contract.name));
+      results.push(auditGraph(contractMetadata(root, contract, all, execute), [contract.name], policy, contract.name));
     }
   }
   const violations = results.flatMap(result => result.violations);
