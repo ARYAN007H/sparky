@@ -1,5 +1,6 @@
 use crate::threads::ops::persist_queued_user_message;
 use crate::threads::store as conversations;
+use base64::Engine as _;
 
 async fn setup() -> (tempfile::TempDir, crate::config::Config) {
     let temp = tempfile::tempdir().unwrap();

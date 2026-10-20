@@ -298,7 +298,7 @@ pub(crate) async fn stage_queued_parts(
     Ok(public)
 }
 
-async fn validate_staged_files(
+pub(super) async fn validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     config: &crate::config::Config,
