@@ -51,6 +51,55 @@ fn schema_and_handler_catalogs_preserve_threads_wire_methods() {
     }
 }
 
+#[test]
+fn upsert_bound_parser_accepts_owned_examples_and_requires_declared_fields() {
+    let entry = all_controller_entries()
+        .into_iter()
+        .find(|controller| controller.schema.method_name() == "threads.upsert")
+        .expect("threads.upsert is registered");
+    let required = ["id", "title", "created_at"];
+    assert_eq!(
+        crate::core::schema_test_support::required_input_contract(&entry.schema, &required),
+        Ok(())
+    );
+
+    let examples = [
+        json!({"id":"t1", "title":"Hello", "created_at":"2026-04-22T00:00:00Z"}),
+        json!({"id":"t2", "title":"Thread", "created_at":"2026-04-22T00:00:00Z", "labels":["work"]}),
+    ];
+    for example in examples {
+        let params = obj(example);
+        crate::core::validate_params(&entry.schema, &params)
+            .expect("registered schema accepts the independent example");
+        entry
+            .decode_params(params)
+            .expect("the runtime-bound parser accepts the same example");
+    }
+
+    let mut missing_schema_field = entry.schema.clone();
+    missing_schema_field
+        .inputs
+        .retain(|field| field.name != "created_at");
+    assert!(crate::core::schema_test_support::required_input_contract(
+        &missing_schema_field,
+        &required
+    )
+    .is_err());
+
+    let mut optional_schema_field = entry.schema.clone();
+    optional_schema_field
+        .inputs
+        .iter_mut()
+        .find(|field| field.name == "created_at")
+        .expect("the contract field is declared")
+        .required = false;
+    assert!(crate::core::schema_test_support::required_input_contract(
+        &optional_schema_field,
+        &required
+    )
+    .is_err());
+}
+
 // ── parse::<T>(params) contract ─────────────────────────────────────
 
 fn obj(value: Value) -> Map<String, Value> {
