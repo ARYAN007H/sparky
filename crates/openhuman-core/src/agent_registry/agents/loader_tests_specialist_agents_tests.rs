@@ -257,7 +257,7 @@ fn orchestrator_routes_every_registered_specialist_through_spawn_subagent() {
             DomainSet::full(),
             crate::tools::toolpacks::ToolGroups::none(),
         )
-        .definitions(registry),
+        .definitions(Arc::clone(&registry)),
     );
     CoreContext::sync_scope(core, || {
         let spawn = crate::agent::orchestration::tools::SpawnSubagentTool::new();
