@@ -205,8 +205,8 @@ proves a different contract:
 | File | Native WDIO assertion | Playwright assertion |
 | --- | --- | --- |
 | `smoke.spec.ts` | Live Wry window, app chrome and normal embedded-core startup | Browser root/chrome, standalone core bootstrap URL/token and RPC |
-| `login-flow.spec.ts` | Desktop deep-link entry, token/profile outcome and invalid, expired or bypass cases | Browser callback entry, token/profile outcome and browser bypass |
-| `auth-access-control.spec.ts` | Device reauthentication handoff and native auth-expiry event | Account/billing/logout/revocation UI and authoritative auth state |
+| `login-flow.spec.ts` | Desktop window and deep-link token handling, including invalid, expired or bypass cases | Browser callback entry, token/profile outcome, browser bypass and onboarding |
+| `auth-access-control.spec.ts` | Desktop reauthentication and native auth-expiry event delivery | Account/billing/logout/revocation UI and authoritative auth state |
 | `notifications.spec.ts` | OS permission state and real notification plugin calls | Rendered notification title/body and System Events/empty Alerts UI |
 | `settings-data-management.spec.ts` | Reset IPC, user-data wipe and embedded-core restart | Clear-data confirmation and cancellation UI |
 
@@ -263,7 +263,10 @@ bash app/scripts/e2e-run-spec.sh test/e2e/specs/notifications.spec.ts notificati
 ```
 
 The native suite uses a live `tauri-driver` session; it does not own ordinary
-notification-list RPC or page-rendering assertions.
+notification-list RPC or page-rendering assertions. The former connectivity
+banner E2Es were retired because source history removed their only UI consumer
+before the baseline; focused selector and listener unit tests still cover the
+device/backend connectivity distinction. No browser banner coverage is claimed.
 
 ---
 
