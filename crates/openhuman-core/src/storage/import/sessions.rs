@@ -1,11 +1,12 @@
 //! Sessions, transcripts, turn states and the run ledger.
 //!
 //! Before the storage ports a workspace kept its conversation state in three
-//! shapes: a SQLite `session_db/sessions.db` (session history, the run ledger,
-//! entry trees), JSONL transcripts under `session_raw/`, and per-turn
+//! shapes: a SQLite `session_db/sessions.db` (session history and the run
+//! ledger), JSONL transcripts under `session_raw/`, and per-turn
 //! snapshots as JSON under `memory/conversations/turn_states/`. TinyAgents owns
 //! those formats and the importer that reads them
 //! (`tinyagents_session::legacy`): read-only, id-preserving, only-if-absent.
+//! The current importer does not import legacy entry-tree rows.
 //! This module is the host's side of it:
 //!
 //! - **Quiescence.** The importer refuses a database with a WAL or journal
