@@ -162,6 +162,9 @@ async function openFeedWith(page: Page, items: SeedItem[]): Promise<void> {
   await page.goto('/#/notifications');
   await waitForAppReady(page);
   await dismissWalkthroughIfPresent(page);
+  // Notifications now opens on its Welcome view. Enter the real feed through
+  // its user-facing action before asserting the persisted system-event rows.
+  await page.getByTestId('notifications-welcome-cta-view').click();
   await expect(page.getByTestId('system-events-section')).toBeVisible({ timeout: 20_000 });
 }
 
