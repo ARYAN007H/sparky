@@ -5,6 +5,7 @@ import {
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
+import { inFlightThreadKeys } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-conversations-web-channel';
@@ -146,5 +147,35 @@ test.describe('Conversations web channel flow', () => {
         );
       })
       .toBe(true);
+  });
+
+  test('continues an in-flight response after navigating away and back', async ({ page }) => {
+    await resetMock();
+    const reply = 'The response continued while the chat tab was away.';
+    await setMockBehavior(
+      'llmStreamScript',
+      JSON.stringify([{ text: reply, delayMs: 1_500 }, { finish: 'stop' }])
+    );
+
+    await openChat(page);
+    await createNewThread(page);
+    await sendMessage(page, 'continue this response after a tab switch');
+    await expect(page.getByTestId('stop-generation-button')).toBeVisible({ timeout: 10_000 });
+
+    await page.evaluate(() => {
+      window.location.hash = '/connections';
+    });
+    await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('#/connections');
+    await expect.poll(inFlightThreadKeys).not.toEqual([]);
+
+    await page.evaluate(() => {
+      window.location.hash = '/chat';
+    });
+    await expect(page.getByTestId('chat-message-input')).toBeVisible();
+    await expect(page.getByTestId('agent-message').filter({ hasText: reply })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.locator('#root')).not.toContainText('Something went wrong');
+    await expect.poll(inFlightThreadKeys).toEqual([]);
   });
 });
