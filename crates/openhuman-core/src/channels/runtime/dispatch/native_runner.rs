@@ -250,7 +250,7 @@ impl NativeHost {
         // Match WebHost's lock order exactly: session lease before the
         // profile-wide chat/cron gate. Both acquisitions happen in checkout,
         // after TurnRunner admission, and cancellation drops either future.
-        let profile_turn: Option<crate::profiles::turn_gate::TurnGuard> = None;
+        let profile_turn = crate::profiles::turn_gate::acquire(dispatch).await;
         // Relay keeps its thread busy through the small post-run durable
         // reply-recording tail in `run_relay_turn`; other native turns can
         // release their busy guard with progressive terminal delivery.
