@@ -370,8 +370,13 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         panic!("query succeeds");
     };
     let page: catalog::CatalogDocumentPage = serde_json::from_value(value).unwrap();
-    assert_eq!(page.items.len(), 1, "scoped query page: {page:?}");
-    assert_eq!(page.items[0].doc["ns"], "flows");
+    let mut ids: Vec<_> = page.items.iter().map(|item| item.id.as_str()).collect();
+    ids.sort_unstable();
+    assert_eq!(ids, ["flows/alice-thread", "flows/delete-me"]);
+    assert!(
+        page.items.iter().all(|item| item.doc["ns"] == "flows"),
+        "the scoped query excludes the foreign namespace: {page:?}"
+    );
 
     let delete: CatalogStorageReply = proxy
         .call(
