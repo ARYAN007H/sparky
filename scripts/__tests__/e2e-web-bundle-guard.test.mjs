@@ -341,6 +341,11 @@ test("e2e-web-build.sh marks the bundle it builds, recording the E2E settings", 
     assert.match(recorded, /^VITE_OPENHUMAN_E2E_DEFAULT_CORE_MODE=cloud$/m);
     assert.match(recorded, /^VITE_BACKEND_URL=http:\/\/127\.0\.0\.1:18473$/m);
     assert.match(recorded, /^VITE_OPENHUMAN_CORE_RPC_URL=http:\/\/127\.0\.0\.1:17788\/rpc$/m);
+    const cargoBuild = tree.calls().find((call) => call.startsWith("cargo "));
+    assert.ok(cargoBuild, "web E2E build invokes Cargo for the standalone core");
+    assert.match(cargoBuild, /--target-dir [^ ]*target\/e2e-web-test-triple/);
+    assert.match(cargoBuild, /--features voice,e2e-test-support/);
+    assert.doesNotMatch(cargoBuild, /CARGO_TARGET_DIR=/);
   } finally {
     tree.cleanup();
   }
