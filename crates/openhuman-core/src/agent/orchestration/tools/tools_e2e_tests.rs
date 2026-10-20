@@ -154,13 +154,17 @@ async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(512);
-    let parent = parent_context(workspace.path(), Arc::new(LoopingToolModel), vec![]);
-    // The live parent run a real turn hands the tool, with the turn's
-    // progress channel on the child's run context.
-    let mut live = super::live_parent_run_context("stopped-child-test", parent);
-    // The shared driver derives its child context from the live parent, so
-    // install the observer there as a real harness turn would.
-    live.data.progress = Some(progress_tx.clone());
+    let mut parent = parent_context(workspace.path(), Arc::new(LoopingToolModel), vec![]);
+    parent.session_id = "stopped-child-test".into();
+    parent.on_progress = Some(progress_tx);
+    let thread_id = "stopped-child-test-thread";
+    let (live, _core) = continuation_tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "stopped-child-test",
+        thread_id,
+    );
+    assert!(live.data.dispatch_ctx().resolved().is_some());
     let run_context = live.data.child();
     // Boxed: the inline spawn future is too large for a test thread's
     // stack (the trait `execute` path boxes it the same way).
@@ -227,6 +231,23 @@ async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
         tinyagents_harness::turn_stop::TurnStopKind::Breaker
             | tinyagents_harness::turn_stop::TurnStopKind::IterationCap
     ));
+    let incomplete_completion =
+        crate::agent::orchestration::background_completions::pending_for_ctx(
+            &live.data.dispatch_ctx(),
+            workspace.path(),
+            thread_id,
+        )
+        .into_iter()
+        .find(|record| record.task_id == task_id)
+        .expect("the asynchronous incomplete result is retained for delivery");
+    assert!(
+        incomplete_completion
+            .result
+            .text
+            .contains("[SUBAGENT_INCOMPLETE]"),
+        "the delivered result remains explicitly incomplete: {}",
+        incomplete_completion.result.text
+    );
 }
 
 #[tokio::test]
