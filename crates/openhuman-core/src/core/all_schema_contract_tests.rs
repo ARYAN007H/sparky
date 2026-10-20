@@ -160,8 +160,7 @@ fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<Contr
     let controllers = builtin_controller_snapshot()
         .into_iter()
         .filter(|controller| {
-            (cfg!(feature = "mcp")
-                && controller.schema.method_name() == "mcp_clients.registry_get")
+            (cfg!(feature = "mcp") && controller.schema.method_name() == "mcp_clients.registry_get")
                 || (cfg!(feature = "modules")
                     && controller.schema.method_name() == "modules.computer_status")
         })
