@@ -315,7 +315,6 @@ if should_run_suite "webhooks"; then
   run "test/e2e/specs/webhooks-tunnel-flow.spec.ts"           "webhooks-tunnel"           "webhooks"
   run "test/e2e/specs/harness-channel-bridge-flow.spec.ts"    "harness-channel-bridge"    "webhooks"
   run "test/e2e/specs/harness-composio-tool-flow.spec.ts"     "harness-composio-tool"     "webhooks"
-  run "test/e2e/specs/harness-search-tool-flow.spec.ts"       "harness-search-tool"       "webhooks"
   _mini_summary "webhooks"
 fi
 
