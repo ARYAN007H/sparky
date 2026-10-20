@@ -41,12 +41,14 @@ pub(super) fn managed_chat_model(
         log::debug!("[providers][chat-factory] role={role} managed provider is not registered");
         return Err(managed_unavailable_error());
     };
-    let model = crate::inference::registry::resolve_provider_model(
-        PROVIDER_OPENHUMAN,
-        role,
-        config,
-        model_override,
-    )
+    let model = match entry.models.as_ref() {
+        Some(models) => (models.resolve_model)(role, config, model_override),
+        None => model_override
+            .or(config.default_model.as_deref())
+            .map(str::trim)
+            .filter(|model| !model.is_empty() && !model.starts_with("hint:"))
+            .map(str::to_string),
+    }
     .ok_or_else(managed_unavailable_error)?;
     log::debug!(
         "[providers][chat-factory] role={role} managed provider served by a registered chat model model={model}"
