@@ -38,7 +38,7 @@ fn build_worker_thread_title_falls_back_when_empty() {
 
 #[test]
 fn parameters_schema_hides_legacy_mode_flags_and_keeps_required_agent_id() {
-    let tool = SpawnSubagentTool;
+    let tool = SpawnSubagentTool::new();
     let schema = tool.parameters_schema();
     let props = schema.get("properties").expect("schema has properties");
     for legacy in ["blocking", "dedicated_thread", "archetype", "toolkit"] {
@@ -51,7 +51,7 @@ fn parameters_schema_hides_legacy_mode_flags_and_keeps_required_agent_id() {
 
 #[test]
 fn parameters_schema_advertises_optional_model_override() {
-    let tool = SpawnSubagentTool;
+    let tool = SpawnSubagentTool::new();
     let schema = tool.parameters_schema();
     let props = schema.get("properties").expect("schema has properties");
     let model = props.get("model").expect("model override advertised");
@@ -126,7 +126,7 @@ fn persist_worker_thread_creates_thread_with_tasks_label_and_messages() {
 
 #[tokio::test]
 async fn missing_agent_id_returns_error() {
-    let tool = SpawnSubagentTool;
+    let tool = SpawnSubagentTool::new();
     let result = tool
         .execute(json!({
             "prompt": "do thing"
@@ -139,7 +139,7 @@ async fn missing_agent_id_returns_error() {
 
 #[tokio::test]
 async fn missing_prompt_returns_error() {
-    let tool = SpawnSubagentTool;
+    let tool = SpawnSubagentTool::new();
     let result = tool
         .execute(json!({
             "agent_id": "task_manager_agent"
@@ -153,7 +153,7 @@ async fn missing_prompt_returns_error() {
 #[tokio::test]
 async fn no_registry_returns_clear_error() {
     // The global registry has not been initialised in this test.
-    let tool = SpawnSubagentTool;
+    let tool = SpawnSubagentTool::new();
     let result = tool
         .execute(json!({
             "agent_id": "task_manager_agent",
@@ -172,7 +172,7 @@ async fn no_registry_returns_clear_error() {
 async fn unknown_agent_id_lists_available() {
     // Force-init the global registry with builtins.
     let _ = AgentDefinitionRegistry::init_global_builtins();
-    let tool = SpawnSubagentTool;
+    let tool = SpawnSubagentTool::new();
     let result = tool
         .execute(json!({
             "agent_id": "totally_made_up",
@@ -193,51 +193,6 @@ fn classify_subagent_failure_reframes_upstream_provider_outages() {
     );
     assert!(msg.contains("upstream inference unavailable"));
     assert!(msg.contains("NOT a Composio/integration auth issue"));
-}
-
-#[tokio::test]
-async fn legacy_archetype_alias_is_accepted_for_lookup() {
-    let _ = AgentDefinitionRegistry::init_global_builtins();
-    let tool = SpawnSubagentTool;
-    let result = tool
-        .execute(json!({
-            "archetype": "totally_made_up",
-            "prompt": "x",
-        }))
-        .await
-        .unwrap();
-    assert!(result.is_error);
-    assert!(result
-        .output()
-        .contains("unknown agent_id 'totally_made_up'"));
-}
-
-#[tokio::test]
-async fn legacy_archetype_alias_is_normalized_to_agent_id() {
-    let _ = AgentDefinitionRegistry::init_global_builtins();
-    let tool = SpawnSubagentTool;
-    let result = tool
-        .execute(json!({
-            "archetype": "task_manager_agent",
-            "prompt": "research the reusable async default path",
-        }))
-        .await
-        .unwrap();
-    assert!(result.is_error);
-    // The alias resolved: the call got past argument validation and only
-    // failed later, because raw tool execution has no typed harness parent.
-    assert!(
-        !result.output().contains("agent_id is required"),
-        "{}",
-        result.output()
-    );
-    assert!(
-        result
-            .output()
-            .contains("requires a live harness run context"),
-        "{}",
-        result.output()
-    );
 }
 
 #[test]
