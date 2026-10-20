@@ -399,12 +399,13 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
     rmSync(fixture.root, { recursive: true, force: true });
   }
 
-  for (const kind of ["dirty", "symlink", "rename", "gitlink"]) {
+  for (const kind of ["dirty-untracked", "dirty-tracked", "symlink", "rename", "gitlink"]) {
     const f = sourceParityFixture();
     try {
-      if (kind === "dirty") {
-        writeFileSync(join(f.root, "production.rs"), "untracked production input\n");
-        assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: f.candidateCommit, proof: f.parity }).ok, false);
+      if (kind === "dirty-untracked" || kind === "dirty-tracked") {
+        const path = kind === "dirty-tracked" ? "src/lib.rs" : "production.rs";
+        writeFileSync(join(f.root, path), "uncommitted production input\n");
+        assert.equal(validateTestOnlySourceParity({ repoPath: f.root, version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }], actualHead: f.candidateCommit, proof: f.parity }).ok, false, `${kind} module changes must fail closed`);
         continue;
       }
       if (kind === "symlink") {
