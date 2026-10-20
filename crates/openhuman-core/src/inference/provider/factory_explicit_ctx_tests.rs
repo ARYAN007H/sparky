@@ -4,7 +4,9 @@ use super::*;
 async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
+    use crate::inference::registry::{
+        register_catalog_in, CatalogEntry, ChatModelEntry, ProviderModelHooks,
+    };
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
@@ -144,6 +146,28 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
         }
     }
 
+    fn catalog(name: &'static str) -> CatalogEntry {
+        CatalogEntry {
+            list: Arc::new(|_, _| {
+                Box::pin(async {
+                    Err("model listing is not used by this test".to_string())
+                })
+            }),
+            limits: Some(Arc::new(move |model, _| {
+                Some(tinyinference_llm::model::discover::DiscoveryRequest {
+                    endpoint: format!("https://{name}.example.test/v1"),
+                    model: model.to_string(),
+                    listing_url: None,
+                    probe_single_model: false,
+                    headers: Vec::new(),
+                    pinned_providers: Vec::new(),
+                    ollama_native: None,
+                    timeout: std::time::Duration::from_secs(1),
+                })
+            })),
+        }
+    }
+
     async fn response(model: Arc<dyn tinyinference_llm::model::ChatModel<()>>) -> String {
         model
             .invoke(&(), ModelRequest::new(vec![Message::user("fixture")]))
@@ -162,6 +186,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             provider,
             entry("context-a-hosted-slug"),
         );
+        register_catalog_in(&a_extensions, provider, catalog("context-a-catalog"));
         register_hosted_cloud_provider_policy_in(
             &a_extensions,
             Arc::new(|slug| slug == "p_hosted"),
@@ -176,6 +201,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             provider,
             entry("context-b-hosted-slug"),
         );
+        register_catalog_in(&b_extensions, provider, catalog("context-b-catalog"));
         register_hosted_cloud_provider_policy_in(
             &b_extensions,
             Arc::new(move |slug| ambient_owns_auth && slug == "p_hosted"),
@@ -197,6 +223,15 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
         });
 
         let observed = CoreContext::scope(context_b, async {
+            let resolved = dispatch.resolved().expect("bound dispatch context");
+            let request = crate::inference::provider::factory::model_limits_request_for(
+                "chat",
+                "openhuman",
+                "fixture/model-v1",
+                &config,
+                Some(resolved.extensions()),
+            )
+            .expect("explicit context catalog supplies limits");
             let one_shot = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
                 .map(|(_, model)| model)
                 .unwrap_or_else(|error| format!("ERR: {error}"));
@@ -231,7 +266,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
                 Some(model) => response(model).await,
                 None => "ERR: explicit turn construction failed".to_string(),
             };
-            (one_shot, role_turn, string_turn)
+            (one_shot, role_turn, string_turn, request.endpoint)
         })
         .await;
         outcomes.push(observed);
@@ -243,12 +278,14 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             (
                 "context-a-hosted-slug".to_string(),
                 "context-a-hosted-slug".to_string(),
-                "context-a-hosted-slug".to_string()
+                "context-a-hosted-slug".to_string(),
+                "https://context-a-catalog.example.test/v1".to_string()
             ),
             (
                 "context-a-hosted-slug".to_string(),
                 "context-a-hosted-slug".to_string(),
-                "context-a-hosted-slug".to_string()
+                "context-a-hosted-slug".to_string(),
+                "https://context-a-catalog.example.test/v1".to_string()
             )
         ]
     );
