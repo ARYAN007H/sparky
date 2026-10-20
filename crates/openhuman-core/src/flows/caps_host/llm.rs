@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
+use super::prompt::build_completion_messages;
 use super::*;
 use crate::config::Config;
 use crate::inference::provider::{
