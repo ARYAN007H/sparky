@@ -80,6 +80,23 @@ pub(crate) fn seed_new_workspace(config: &mut Config) {
 /// so a partial run leaves the gate unchanged and the next launch
 /// retries from the same starting version.
 pub async fn run_pending(config: &mut Config) {
+    // Provider-owned normalization is independent of the schema version. It
+    // must still run when an unhosted core already advanced the generic schema,
+    // so a later hosted boot can repair provider-specific legacy values.
+    if !config.recovered_from_corruption {
+        let before_normalization = config.clone();
+        if crate::inference::registry::normalize_config(config) {
+            if let Err(err) = config.save().await {
+                *config = before_normalization;
+                log::warn!(
+                    "[migrations] provider config normalization ran but config.save failed: \
+                     {err:#} — restored the in-memory config; it will retry on next launch"
+                );
+                return;
+            }
+        }
+    }
+
     if config.schema_version >= CURRENT_SCHEMA_VERSION {
         log::debug!(
             "[migrations] schema_version={} already at current={} — nothing to do",
