@@ -169,5 +169,10 @@ fn hosted_tier_context_windows_retain_the_legacy_alias_metadata() {
     ] {
         assert_eq!(super::context_window(model), Some(expected), "{model}");
     }
-    assert_eq!(super::context_window("chat"), None);
+    assert_eq!(super::context_window("chat"), Some(1_000_000));
+    assert!(is_raw_model("chat"));
+    assert_eq!(
+        resolve_model("chat", &Config::default(), Some("chat")).as_deref(),
+        Some("chat")
+    );
 }

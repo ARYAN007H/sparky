@@ -94,7 +94,8 @@ pub(crate) fn supports_vision(model: &str) -> bool {
 
 pub(crate) fn context_window(model: &str) -> Option<u64> {
     let model = model.trim();
-    if model == MODEL_MANAGED_DEFAULT
+    if model == "chat"
+        || model == MODEL_MANAGED_DEFAULT
         || matches!(
             role_for_model(model).as_deref(),
             Some("chat" | "summarization")

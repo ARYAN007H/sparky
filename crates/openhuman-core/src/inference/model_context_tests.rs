@@ -1,7 +1,6 @@
 use super::*;
 #[test]
 fn generic_model_window_patterns_retain_conservative_estimates() {
-    assert_eq!(context_window_for_model("chat"), Some(1_000_000));
     assert_eq!(context_window_for_model("gemma-3n-e2b"), Some(8_192));
     assert_eq!(context_window_for_model("custom-mini:1b"), Some(8_192));
     assert_eq!(context_window_for_model("llama3:1b"), Some(8_192));
