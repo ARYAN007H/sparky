@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PersistedTurnState } from '../../types/turnState';
 import { toThreadMessageLike } from '../../providers/assistantUiMessages';
+import type { PersistedTurnState } from '../../types/turnState';
 import reducer, {
   beginInferenceTurn,
   bumpInferenceHeartbeatForThread,
@@ -1388,20 +1388,8 @@ describe('subagent event reducers (Phase 3)', () => {
         setToolTimelineForThread({
           threadId: 't1',
           entries: [
-            {
-              id: 'spawn-original',
-              name: 'spawn_subagent',
-              round: 0,
-              seq: 0,
-              status: 'success',
-            },
-            {
-              id: 'spawn-resume',
-              name: 'spawn_subagent',
-              round: 0,
-              seq: 1,
-              status: 'running',
-            },
+            { id: 'spawn-original', name: 'spawn_subagent', round: 0, seq: 0, status: 'success' },
+            { id: 'spawn-resume', name: 'spawn_subagent', round: 0, seq: 1, status: 'running' },
           ],
         })
       ),
@@ -1434,10 +1422,7 @@ describe('subagent event reducers (Phase 3)', () => {
 
     const activity = state.toolTimelineByThread.t1.find(entry => entry.id === rowId)!;
     expect(activity).toMatchObject({ status: 'running' });
-    expect(activity.subagent).toMatchObject({
-      status: 'running',
-      parentCallId: 'spawn-resume',
-    });
+    expect(activity.subagent).toMatchObject({ status: 'running', parentCallId: 'spawn-resume' });
     expect(activity.subagent?.awaitingQuestion).toBeUndefined();
     const rendered = toThreadMessageLike(
       {
@@ -1452,7 +1437,11 @@ describe('subagent event reducers (Phase 3)', () => {
     );
     expect(rendered.content).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: 'tool-call', toolCallId: 'spawn-resume', toolName: 'task' }),
+        expect.objectContaining({
+          type: 'tool-call',
+          toolCallId: 'spawn-resume',
+          toolName: 'task',
+        }),
       ])
     );
   });

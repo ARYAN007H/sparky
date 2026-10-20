@@ -2139,16 +2139,8 @@ const chatRuntimeSlice = createSlice({
         output?: string;
       }>
     ) => {
-      const {
-        threadId,
-        rowId,
-        taskId,
-        success,
-        iterations,
-        elapsedMs,
-        outputChars,
-        output,
-      } = action.payload;
+      const { threadId, rowId, taskId, success, iterations, elapsedMs, outputChars, output } =
+        action.payload;
       // Settle a still-in-flight row: `running`, or `awaiting_user` (a subagent
       // paused for input that then completes must not stay stuck at
       // awaiting_user). Already-terminal rows are left as-is.
