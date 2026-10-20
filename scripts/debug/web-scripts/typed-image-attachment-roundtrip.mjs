@@ -214,13 +214,13 @@ export default async function typedImageAttachmentRoundtrip({
   await page.getByText(REPLY, { exact: false }).waitFor({ timeout: 30_000 });
   const restoredMessage = await page.evaluate(
     ({ id, rowId }) => {
-    const messages =
-      window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId?.[
-        id
-      ] ?? [];
-    return messages.find(
+      const messages =
+        window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId?.[
+          id
+        ] ?? [];
+      return messages.find(
         (message) => message.sender === "user" && message.id === rowId,
-    );
+      );
     },
     { id: threadId, rowId: persisted.id },
   );
@@ -228,7 +228,9 @@ export default async function typedImageAttachmentRoundtrip({
     throw new Error(
       "reloaded conversation did not restore the marker-free user text",
     );
-  if (/[(?:ATTACHMENT|IMAGE|FILE):/i.test(restoredMessage.content))
+  if (["[ATTACHMENT:", "[IMAGE:", "[FILE:"].some((marker) =>
+    restoredMessage.content.includes(marker),
+  ))
     throw new Error("reloaded user text contains a staging marker");
   if (
     JSON.stringify(restoredMessage?.attachments) !==
