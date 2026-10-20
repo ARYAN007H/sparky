@@ -120,12 +120,14 @@ async fn native_runner_checkouts_serialize_and_cancel_waiters_cleanly() {
     let second = NativeHost {
         shared: Arc::clone(&second_shared),
     };
-    let second_request = request(&dispatch, &session, &profile, "native-cancelled");
-    let waiting = tokio::spawn(async move { second.checkout(&second_request).await });
-    tokio::task::yield_now().await;
+    let other_session = format!("native-runner-other-session-{}", uuid::Uuid::new_v4());
+    let second_request = request(&dispatch, &other_session, &profile, "native-cancelled");
+    let mut waiting = tokio::spawn(async move { second.checkout(&second_request).await });
     assert!(
-        !waiting.is_finished(),
-        "a second runner instance waits on the checked-out durable session"
+        tokio::time::timeout(std::time::Duration::from_millis(50), &mut waiting)
+            .await
+            .is_err(),
+        "a distinct session in the same profile waits for the active profile turn"
     );
     waiting.abort();
     assert!(
@@ -137,7 +139,7 @@ async fn native_runner_checkouts_serialize_and_cancel_waiters_cleanly() {
     );
 
     first_shared.record_delivery("native-first", true);
-    let third_request = request(&dispatch, &session, &profile, "native-third");
+    let third_request = request(&dispatch, &other_session, &profile, "native-third");
     let third = NativeHost {
         shared: Arc::clone(&second_shared),
     };
@@ -146,8 +148,8 @@ async fn native_runner_checkouts_serialize_and_cancel_waiters_cleanly() {
         third.checkout(&third_request),
     )
     .await
-    .expect("terminal delivery releases the session/profile guards")
-    .expect("a later runner can check out the session");
-    assert_eq!(third_session.session_id, session);
+    .expect("terminal delivery releases the profile guard")
+    .expect("a later runner can check out a different session in the profile");
+    assert_eq!(third_session.session_id, other_session);
     second_shared.record_delivery("native-third", true);
 }
