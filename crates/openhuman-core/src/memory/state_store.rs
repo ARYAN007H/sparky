@@ -21,7 +21,7 @@ use crate::storage::state_kv::StateKv;
 
 const OWNER: &str = "memory";
 const NS: &str = "state";
-const QUEUE_MIGRATION: &str = "pending_deletions_scope_migration_v1";
+const QUEUE_MIGRATION_PREFIX: &str = "pending_deletions_scope_migration_v1";
 
 /// The legacy file of state value `name` in `workspace_dir`.
 #[must_use]
@@ -127,13 +127,26 @@ fn legacy_queue_scopes(workspace_dir: &Path) -> Vec<crate::storage::Scope> {
     // workspace that the profile-layout helper cannot identify. Only inspect
     // that task's own scope, and when the path did identify a profile require
     // it to match; never enumerate other tenants on a shared backend.
-    if let Ok(tenant) = crate::core::runtime::DispatchCtx::ambient().tenant() {
+    let dispatch = crate::core::runtime::DispatchCtx::ambient();
+    let active_workspace = dispatch
+        .resolved()
+        .and_then(|context| context.workspace_dir().ok());
+    let active_matches = active_workspace
+        .as_deref()
+        .and_then(|active| stable_workspace_identity(active).ok())
+        .zip(stable_workspace_identity(workspace_dir).ok())
+        .is_some_and(|(active, requested)| active == requested);
+    if active_matches {
+        if let Ok(tenant) = dispatch.tenant() {
         match (tenant.profile, tenant.agent) {
             (Some(profile), _) if known_profile.as_ref().is_none_or(|known| known == &profile) => {
                 scopes.push(crate::storage::scope_for_profile(&profile));
             }
-            (None, Some(agent)) => scopes.push(crate::storage::scope_for_agent(&agent)),
+            (None, Some(agent)) if known_profile.is_none() => {
+                scopes.push(crate::storage::scope_for_agent(&agent));
+            }
             _ => {}
+        }
         }
     }
 
@@ -142,24 +155,36 @@ fn legacy_queue_scopes(workspace_dir: &Path) -> Vec<crate::storage::Scope> {
     scopes
 }
 
+fn queue_migration_marker(scope: &crate::storage::Scope) -> String {
+    let digest = sha2::Sha256::digest(scope.as_str().as_bytes());
+    let suffix = digest
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    format!("{QUEUE_MIGRATION_PREFIX}_{suffix}")
+}
+
 fn migrate_existing_queue_scopes(
     workspace_dir: &Path,
     backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
     target_scope: &crate::storage::Scope,
     target: &StateKv,
 ) -> Result<()> {
-    if target.get::<String>(QUEUE_MIGRATION)?.as_deref() == Some("complete") {
-        return Ok(());
-    }
-    target.insert_if_absent(QUEUE_MIGRATION, &"in_progress")?;
-
     for source_scope in legacy_queue_scopes(workspace_dir) {
         if &source_scope == target_scope {
             continue;
         }
+        let marker = queue_migration_marker(&source_scope);
+        if target.get::<String>(&marker)?.as_deref() == Some("complete") {
+            continue;
+        }
+        target.insert_if_absent(&marker, &"in_progress")?;
         let source = StateKv::on_backend(backend, &source_scope, OWNER, NS)?;
-        let Some(previous) = source.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
+        let Some(previous) =
+            source.get::<Vec<super::deletion::PendingDeletion>>("pending_deletions")?
         else {
+            target.put(&marker, &"complete")?;
             continue;
         };
         let transferred = previous.clone();
@@ -185,8 +210,9 @@ fn migrate_existing_queue_scopes(
                 ((), changed)
             },
         )?;
+        target.put(&marker, &"complete")?;
     }
-    target.put(QUEUE_MIGRATION, &"complete")
+    Ok(())
 }
 
 /// A workspace-owned state value in a deterministic local module scope. Use

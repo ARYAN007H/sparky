@@ -69,23 +69,6 @@ impl StateKv {
         Ok(Self { repo, owner, ns })
     }
 
-    /// The state of `workspace_dir` in an explicit scope on that workspace's
-    /// configured backend.
-    ///
-    /// # Errors
-    ///
-    /// When the backend cannot be opened or refuses `scope`.
-    pub fn open_in_scope(
-        workspace_dir: &Path,
-        scope: &Scope,
-        owner: &'static str,
-        ns: &'static str,
-    ) -> Result<Self> {
-        let backend = super::local::backend_for(workspace_dir)?;
-        let repo = Repo::on(&backend, scope, "storage::state_kv", collections)?;
-        Ok(Self { repo, owner, ns })
-    }
-
     /// The state for an explicit backend and scope, for importers that must
     /// keep data on the backend they are migrating rather than reopen a URL.
     pub(crate) fn on_backend(
