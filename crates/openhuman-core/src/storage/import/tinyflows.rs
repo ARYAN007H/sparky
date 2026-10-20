@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 
 use super::{marker_spec, marker_step, Outcome, Report, MARKER_OWNER};
 use crate::config::Config;
@@ -98,6 +98,24 @@ pub(super) fn marked(
         Ok(Outcome::Imported { found, written })
     })?;
     Ok(claimed.unwrap_or(Outcome::InProgress))
+}
+
+/// Counts the schedule reader's legacy records and logs safe problem details.
+fn counts(domain: &str, report: &tinyflows_import::ImportReport) -> (usize, usize, usize) {
+    for problem in report.problems() {
+        tracing::warn!(
+            target: "openhuman::storage_import",
+            domain,
+            problem = %problem,
+            "[storage::import] a legacy record was skipped"
+        );
+    }
+    let found = report
+        .kinds()
+        .map(|(_, tally)| tally.written + tally.existing + tally.invalid)
+        .sum();
+    let skipped = report.kinds().map(|(_, tally)| tally.invalid).sum();
+    (found, report.total_written(), skipped)
 }
 
 #[cfg(feature = "flows")]
