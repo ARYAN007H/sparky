@@ -266,13 +266,19 @@ export default async function typedImageAttachmentRoundtrip({
       { rpcUrl, token: authorization, threadId },
     ),
   );
-  const editedUserRow = editedMessages?.messages?.find(
-    (message) => message.sender === "user" && message.content === EDITED_TEXT,
-  );
+  const editedUserRows =
+    editedMessages?.messages?.filter(
+      (message) => message.sender === "user" && message.content === EDITED_TEXT,
+    ) ?? [];
+  const editedUserRow = editedUserRows[0];
   const editedRef = editedUserRow?.attachments?.[0];
   if (
-    !editedUserRow ||
-    editedUserRow.id === persisted.id ||
+    editedUserRows.length !== 1 ||
+    editedMessages.messages.some(
+      (message) =>
+        (message.sender === "user" && message.content === USER_TEXT) ||
+        (message.sender !== "user" && message.content === REPLY),
+    ) ||
     editedUserRow.content.includes("[ATTACHMENT:") ||
     editedRef?.kind !== "image" ||
     editedRef.media?.opaqueId === reference.media.opaqueId ||
@@ -323,17 +329,25 @@ export default async function typedImageAttachmentRoundtrip({
         window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId?.[
           id
         ] ?? [];
-      return messages.find(
-        (message) => message.sender === "user" && message.content === content,
-      );
+      return {
+        row: messages.find(
+          (message) => message.sender === "user" && message.content === content,
+        ),
+        staleOriginal: messages.some(
+          (message) =>
+            (message.sender === "user" && message.content === "Describe the attached image briefly.") ||
+            (message.sender !== "user" && message.content === "The image is attached."),
+        ),
+      };
     },
     { id: threadId, content: EDITED_TEXT },
   );
   if (
-    restoredEdit?.id !== editedUserRow.id ||
-    restoredEdit?.content !== EDITED_TEXT ||
-    /\[(?:ATTACHMENT|IMAGE|FILE):/i.test(restoredEdit?.content ?? "") ||
-    restoredEdit?.attachments?.[0]?.media?.opaqueId !== editedRef.media.opaqueId
+    !restoredEdit.row ||
+    restoredEdit.staleOriginal ||
+    restoredEdit.row.content !== EDITED_TEXT ||
+    /\[(?:ATTACHMENT|IMAGE|FILE):/i.test(restoredEdit.row.content ?? "") ||
+    restoredEdit.row.attachments?.[0]?.media?.opaqueId !== editedRef.media.opaqueId
   )
     throw new Error("edited image row did not reload with clean text and fresh opaque reference");
   log(
