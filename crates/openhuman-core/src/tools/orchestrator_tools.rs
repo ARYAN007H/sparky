@@ -37,8 +37,6 @@ use crate::integrations::composio::ComposioActionTool;
 use crate::integrations::ConnectedIntegration;
 use tinyagents_definition::SubagentEntry;
 
-use crate::agent::orchestration::tools::ArchetypeDelegationTool;
-use crate::agent::orchestration::tools::DelegationTarget;
 use tinytools::Tool;
 
 /// Synthesise the delegation tool list for an agent based on its
@@ -69,7 +67,7 @@ use tinytools::Tool;
 /// before this module existed.
 pub fn collect_orchestrator_tools(
     definition: &AgentDefinition,
-    registry: &AgentDefinitionRegistry,
+    _registry: &AgentDefinitionRegistry,
     connected_integrations: &[ConnectedIntegration],
 ) -> Vec<Box<dyn Tool>> {
     let mut tools: Vec<Box<dyn Tool>> = Vec::new();
@@ -77,51 +75,10 @@ pub fn collect_orchestrator_tools(
     for entry in &definition.subagents {
         match entry {
             SubagentEntry::AgentId(agent_id) => {
-                // Runtime-only sub-agents — the LLM must never see a
-                // `delegate_*` tool for these because they're dispatched
-                // directly by the runtime, not by an explicit LLM tool
-                // call. Issue #574 introduced `summarizer` as the first
-                // such sub-agent; future runtime-only agents should
-                // join this filter.
-                if agent_id == "summarizer" {
-                    log::debug!(
-                        "[orchestrator_tools] skipping runtime-only sub-agent '{}' \
-                         (no delegation tool synthesised)",
-                        agent_id
-                    );
-                    continue;
-                }
-                let Some(target) = registry.get(agent_id) else {
-                    log::warn!(
-                        "[orchestrator_tools] subagent '{}' referenced by '{}' is not in the registry — skipping",
-                        agent_id,
-                        definition.id
-                    );
-                    continue;
-                };
-                let tool_name = target
-                    .delegate_name
-                    .clone()
-                    .unwrap_or_else(|| format!("delegate_{}", target.id));
                 log::debug!(
-                    "[orchestrator_tools] registering archetype delegation tool: {} -> {}",
-                    tool_name,
-                    target.id
+                    "[orchestrator_tools] agent '{}' is routed through spawn_subagent(agent_id)",
+                    agent_id
                 );
-                // The description is the target's `when_to_use` verbatim.
-                //
-                // It used to be prefixed with "Use only when direct
-                // response/direct tools are insufficient. " — 13 tokens
-                // repeated once per delegate tool, ~250 per turn on the Master
-                // Agent, restating a rule its prompt already carries as
-                // "**Direct-first always**". A parent whose prompt does not
-                // state that rule should gain it there, once, rather than
-                // paying for it on every delegate schema on every turn.
-                tools.push(Box::new(ArchetypeDelegationTool {
-                    tool_name,
-                    agent_id: DelegationTarget(target.id.clone()),
-                    tool_description: target.when_to_use.clone(),
-                }));
             }
             SubagentEntry::Skills(wildcard) => {
                 if !wildcard.matches_all() {
