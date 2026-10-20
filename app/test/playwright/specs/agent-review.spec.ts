@@ -13,8 +13,11 @@ async function attachCheckpoint(page: Page, testInfo: TestInfo, name: string): P
   });
   const response = await fetch(`${MOCK_ADMIN_BASE}/__admin/requests`);
   expect(response.ok, 'mock request log is available for the checkpoint').toBe(true);
-  const requests = (await response.json()) as Array<Record<string, unknown>>;
-  const safeRequests = requests.map((request) => {
+  const payload: unknown = await response.json();
+  expect(payload && typeof payload === 'object' && 'data' in payload).toBe(true);
+  const requests = (payload as { data: unknown }).data;
+  expect(Array.isArray(requests), 'mock request log contains a data array').toBe(true);
+  const safeRequests = (requests as Array<Record<string, unknown>>).map((request) => {
     const safe = { ...request };
     for (const key of Object.keys(safe)) {
       if (/authorization|token|credential|secret/i.test(key)) safe[key] = '[redacted]';
