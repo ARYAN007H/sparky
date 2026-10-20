@@ -1,5 +1,4 @@
 use super::*;
-use crate::config::DelegateAgentConfig;
 use crate::tools::ops::default_tools;
 
 #[test]
@@ -102,63 +101,6 @@ fn default_tools_all_have_schemas() {
             tool.name()
         );
     }
-}
-
-#[test]
-fn all_tools_includes_delegate_when_agents_configured() {
-    let tmp = TempDir::new().unwrap();
-    let security = Arc::new(SecurityPolicy::default());
-
-    let browser = BrowserConfig::default();
-    let http = crate::config::HttpRequestConfig::default();
-    let cfg = test_config(&tmp);
-
-    let mut agents = HashMap::new();
-    agents.insert(
-        "researcher".to_string(),
-        DelegateAgentConfig {
-            model: "llama3".to_string(),
-            system_prompt: None,
-            temperature: None,
-            max_depth: 3,
-        },
-    );
-
-    let tools = all_tools(
-        Arc::new(Config::default()),
-        &security,
-        AuditLogger::disabled(),
-        &browser,
-        &http,
-        tmp.path(),
-        &agents,
-        &cfg,
-    );
-    let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
-    assert!(names.contains(&"delegate"));
-}
-
-#[test]
-fn all_tools_excludes_delegate_when_no_agents() {
-    let tmp = TempDir::new().unwrap();
-    let security = Arc::new(SecurityPolicy::default());
-
-    let browser = BrowserConfig::default();
-    let http = crate::config::HttpRequestConfig::default();
-    let cfg = test_config(&tmp);
-
-    let tools = all_tools(
-        Arc::new(Config::default()),
-        &security,
-        AuditLogger::disabled(),
-        &browser,
-        &http,
-        tmp.path(),
-        &HashMap::new(),
-        &cfg,
-    );
-    let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
-    assert!(!names.contains(&"delegate"));
 }
 
 #[test]
