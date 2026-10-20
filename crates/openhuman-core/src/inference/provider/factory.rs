@@ -45,8 +45,7 @@ pub(crate) use turn_model::{
     create_turn_chat_model_with_native_tools_and_route,
 };
 
-// Factory-internal helpers shared across the submodules (and their tests)
-// through `use super::*`.
+// Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
 use chat_model::{unresolved_chat_model_error_for, with_default_temperature};
 #[cfg(test)]
