@@ -294,7 +294,7 @@ pub mod tool_sources {
 pub mod artifact_publisher {
     pub use openhuman_core::artifacts::{
         register_artifact_publisher, register_artifact_publisher_in, unregister_artifact_publisher,
-        ArtifactPublisherFactory,
+        ArtifactPublisherBinder, ArtifactPublisherFactory,
     };
     // tinyhumans file-storage publisher: the protected-path guard it re-checks
     // before upload, and the store its tests save artifacts into.

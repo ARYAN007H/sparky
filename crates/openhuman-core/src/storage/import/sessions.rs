@@ -100,11 +100,13 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
                 report.members,
                 report.tasks,
                 report.tool_effects,
-                report.entries,
             ] {
                 found += counts.read;
                 written += counts.imported;
             }
+            // The new owner report exposes the final full-text rebuild count
+            // separately from per-family source import counts.
+            written += report.fts_rows;
         }
 
         if raw.is_dir() {

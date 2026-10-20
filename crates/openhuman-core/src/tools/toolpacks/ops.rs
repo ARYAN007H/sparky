@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Weak};
 
 use super::registry;
-use tinyagents_harness::tool::packs::{PackRegistryHandle, UseSkillTool, USE_SKILL};
+use tinyagents_harness_tools::skills::{PackRegistryHandle, UseSkillTool, USE_SKILL};
 use tinytools::Tool;
 
 /// Append `use_skill` to a freshly built registry.
@@ -68,7 +68,7 @@ fn for_each_pack_tool(
             continue;
         }
         if let Some(handle) = crate::tools::host_extensions::pack_registry_handle(tool.as_ref()) {
-            edit(handle);
+            edit(&handle);
             bound += 1;
         }
     }

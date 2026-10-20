@@ -134,7 +134,7 @@ fn on_belt(def: &AgentDefinition, tool: &str) -> bool {
 /// spawn and continuation tools.
 fn can_call(def: &AgentDefinition, tool: &str, universe: &BTreeSet<String>) -> bool {
     use crate::tools::toolpacks::ops::is_withheld_from;
-    if tool == tinyagents_harness::tool::packs::USE_SKILL {
+    if tool == tinyagents_harness_tools::skills::USE_SKILL {
         return universe
             .iter()
             .any(|n| on_belt(def, n) && is_withheld_from(&def.id, n));

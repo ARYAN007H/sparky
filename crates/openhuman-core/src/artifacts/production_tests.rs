@@ -89,15 +89,43 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     );
     // The version holds its own copy; the files folder shows the newest.
     let file = record.latest().unwrap().file.clone().unwrap();
-    let kept = crate::artifacts::tiny_store::version_files_dir(&workspace)
-        .join(&id)
-        .join("v1.pptx");
-    assert_eq!(std::path::Path::new(&file.path), kept.as_path());
+    assert_eq!(file.key, format!("artifacts/files/{id}/v1.pptx"));
+    let file_store = production.file_store.as_ref().unwrap();
+    assert_eq!(file_store.read(&file.key).await.unwrap(), b"deck-v1");
     assert_eq!(
         files_in(&files),
         vec!["quarterly-deck.pptx"],
         "no second copy"
     );
+}
+
+#[tokio::test]
+async fn missing_storage_binding_rejects_production_before_reserving_a_card_or_file() {
+    let (workspace, files) = temp_dirs();
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let started = Production::start_with_scoped_storage(
+        &ctx,
+        &workspace,
+        FileRoots::new(&files),
+        ArtifactKind::File,
+        "Quarterly Deck",
+        "pptx",
+        Some("call-missing-storage"),
+        None,
+        None,
+        None,
+    )
+    .await;
+
+    assert!(
+        started.is_err(),
+        "production requires tenant-scoped storage"
+    );
+    assert!(files_in(&files).is_empty(), "no output file was reserved");
+    let (cards, _) = super::super::store::list_artifacts(&workspace, 0, 20, None)
+        .await
+        .unwrap();
+    assert!(cards.is_empty(), "no legacy card was created");
 }
 
 #[tokio::test]
@@ -120,9 +148,18 @@ async fn a_revision_reuses_the_id_and_file_and_keeps_the_history() {
         b"deck-v2!"
     );
     // Each version still holds what it was.
-    let bytes_of = |n: u32| std::fs::read(&record.version(n).unwrap().file.clone().unwrap().path);
-    assert_eq!(bytes_of(1).unwrap(), b"deck-v1");
-    assert_eq!(bytes_of(2).unwrap(), b"deck-v2!");
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let (_, file_store) = super::super::tiny_store::artifacts_service_with_file_store(
+        &workspace,
+        FileRoots::new(&files),
+        None,
+        None,
+        &ctx,
+    );
+    let file_store = file_store.unwrap();
+    let key_of = |n: u32| record.version(n).unwrap().file.clone().unwrap().key;
+    assert_eq!(file_store.read(&key_of(1)).await.unwrap(), b"deck-v1");
+    assert_eq!(file_store.read(&key_of(2)).await.unwrap(), b"deck-v2!");
 }
 
 #[tokio::test]

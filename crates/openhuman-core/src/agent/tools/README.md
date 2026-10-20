@@ -10,7 +10,7 @@ crate should construct them directly.
 
 | Tool | File | Wire name (if different) |
 | --- | --- | --- |
-| `AskClarificationTool` | `tinyagents_harness::tools` | `ask_user_clarification` |
+| `AskClarificationTool` | `tinyagents_harness_tools` | `ask_user_clarification` |
 | `PlanExitTool` | [`plan_exit.rs`](./plan_exit.rs) | `plan_exit` |
 | `RememberPreferenceTool` | `remember_preference.rs` | `remember_preference` |
 | `SavePreferenceTool` | `save_preference.rs` | `save_preference` |
@@ -50,7 +50,7 @@ instead of registering them as disabled.
 - `crate::agent::orchestration` for the sub-agent spawn tools, which sit next
   to these conceptually but live separately because they carry more
   lifecycle state.
-- `tinyagents_graph::todos` for the todo store and tool behavior.
+- `tinyagents_harness_tools::todos` for the todo store and tool behavior.
 
 ## Further reading
 

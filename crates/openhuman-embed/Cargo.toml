@@ -78,6 +78,7 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus" }
 # conversations in its own database, and the in-memory provider; same path as
 # the core's so one copy resolves.
 tinyagents-hooks = { workspace = true }
+tinyagents-harness-tools = { workspace = true, default-features = false, features = ["todos"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }

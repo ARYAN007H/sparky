@@ -2,10 +2,10 @@
 
 use tinyagents_harness::ids::TaskId;
 use tinyagents_harness::run_queue::QueueLane;
-use tinyagents_orchestration::subagent::{steer_detached, SteerAccess, SteerError};
+use tinyagents_orchestration::steering::{steer_detached, SteerAccess, SteerError};
 
 use super::cancel::now_ms;
-use super::registry::{control_admits, owner_key, registry};
+use super::registry::{control_admits, owner_key, registry, RunningSubagentMetadata};
 
 /// Inject an instruction into a detached sub-agent owned by `parent_session`.
 pub async fn steer(
@@ -22,7 +22,7 @@ pub async fn steer(
         SteerAccess::Owner(&owner),
         text,
         lane,
-        |metadata, lane, text| async move {
+        |metadata: RunningSubagentMetadata, lane: QueueLane, text: String| async move {
             metadata
                 .run_queue
                 .push(
@@ -44,7 +44,7 @@ pub async fn steer(
     .await?;
     tracing::info!(
         task_id,
-        lane = tinyagents_orchestration::subagent::queue_lane_name(lane),
+        lane = tinyagents_orchestration::steering::queue_lane_name(lane),
         ?route,
         "[running_subagents] steered detached task"
     );
@@ -75,7 +75,7 @@ pub(crate) async fn steer_control(
         SteerAccess::Trusted,
         text,
         lane,
-        |metadata, lane, text| async move {
+        |metadata: RunningSubagentMetadata, lane: QueueLane, text: String| async move {
             metadata
                 .run_queue
                 .push(
@@ -97,7 +97,7 @@ pub(crate) async fn steer_control(
     .await?;
     tracing::info!(
         task_id,
-        lane = tinyagents_orchestration::subagent::queue_lane_name(lane),
+        lane = tinyagents_orchestration::steering::queue_lane_name(lane),
         ?route,
         "[running_subagents] control-steered detached task"
     );

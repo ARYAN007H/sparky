@@ -302,7 +302,7 @@ all consumers import the owner directly, not that behavior is dropped.
 | `pformat.rs` | Delete | Import `tinytools-agent` directly. |
 | `progress.rs`, `progress_sink.rs` | Keep adapter | UI contract/sink mapping remain; task-local delivery becomes explicit `RunContext` data. |
 | `schemas.rs` | Keep | OpenHuman RPC controllers. |
-| `task_board.rs` | Delete facade | Call `tinyagents_graph::todos` directly; keep only product migrations at their owning startup module. |
+| `task_board.rs` | Delete facade | Call `tinyagents_harness_tools::todos` directly; keep only product migrations at their owning startup module. |
 | `task_session.rs` | Delete | It existed solely for the removed autonomous task-board dispatcher. |
 | `tool_policy.rs` | Keep policy | Product restrictions/approval facts; invoke through `SecurityGate`/canonical tool declarations. |
 | `turn_origin.rs`, `turn_workspace.rs` | Keep types/delete scopes | Product origin/workspace rules remain, but task-local accessors are replaced by explicit run context. |

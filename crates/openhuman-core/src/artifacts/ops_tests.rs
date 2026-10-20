@@ -17,7 +17,15 @@ fn test_config(tmp: &TempDir) -> Config {
 async fn list_empty() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let outcome = ai_list_artifacts(&config, None, None, None).await.unwrap();
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 0);
     assert_eq!(value["artifacts"].as_array().unwrap().len(), 0);
@@ -60,7 +68,15 @@ async fn list_without_thread_filter_returns_all_threads() {
         .unwrap();
     }
 
-    let outcome = ai_list_artifacts(&config, None, None, None).await.unwrap();
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 3, "unfiltered list returns every artifact");
 }
@@ -102,9 +118,15 @@ async fn list_with_thread_filter_returns_only_matching_thread() {
         .unwrap();
     }
 
-    let outcome = ai_list_artifacts(&config, None, None, Some("thread-a"))
-        .await
-        .unwrap();
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        Some("thread-a"),
+    )
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 2, "only two artifacts belong to thread-a");
     let ids: Vec<&str> = value["artifacts"]
@@ -153,9 +175,15 @@ async fn list_with_thread_filter_unknown_thread_returns_zero() {
     )
     .await
     .unwrap();
-    let outcome = ai_list_artifacts(&config, None, None, Some("thread-missing"))
-        .await
-        .unwrap();
+    let outcome = ai_list_artifacts(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+        Some("thread-missing"),
+    )
+    .await
+    .unwrap();
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["total"], 0);
     assert_eq!(value["artifacts"].as_array().unwrap().len(), 0);
@@ -167,7 +195,9 @@ async fn list_with_thread_filter_unknown_thread_returns_zero() {
 async fn get_missing_id_error() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = ai_get_artifact(&config, "").await.unwrap_err();
+    let err = ai_get_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, "")
+        .await
+        .unwrap_err();
     assert!(err.contains("must not be empty"), "unexpected error: {err}");
 }
 
@@ -177,7 +207,9 @@ async fn get_missing_id_error() {
 async fn delete_missing_id_error() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = ai_delete_artifact(&config, "").await.unwrap_err();
+    let err = ai_delete_artifact(&crate::core::runtime::DispatchCtx::ambient(), &config, "")
+        .await
+        .unwrap_err();
     assert!(err.contains("must not be empty"), "unexpected error: {err}");
 }
 
@@ -422,11 +454,15 @@ async fn get_returns_the_files_folder_path() {
         .await
         .unwrap();
 
-    let value = ai_get_artifact(&config, &meta.id)
-        .await
-        .unwrap()
-        .into_cli_compatible_json()
-        .unwrap();
+    let value = ai_get_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &meta.id,
+    )
+    .await
+    .unwrap()
+    .into_cli_compatible_json()
+    .unwrap();
 
     assert_eq!(
         value["absolute_path"],
@@ -457,7 +493,13 @@ async fn get_reports_a_ready_file_removed_outside_openhuman() {
         .unwrap();
     std::fs::remove_file(&path).unwrap();
 
-    let err = ai_get_artifact(&config, &meta.id).await.unwrap_err();
+    let err = ai_get_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &meta.id,
+    )
+    .await
+    .unwrap_err();
     assert!(err.contains("file missing"), "{err}");
 }
 
@@ -494,10 +536,22 @@ async fn get_and_delete_refuse_a_record_rooted_outside_the_files_folder() {
     .await
     .unwrap();
 
-    let err = ai_get_artifact(&config, "claims-home").await.unwrap_err();
+    let err = ai_get_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "claims-home",
+    )
+    .await
+    .unwrap_err();
     assert!(err.contains("not a files folder"), "{err}");
 
-    ai_delete_artifact(&config, "claims-home").await.unwrap();
+    ai_delete_artifact(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "claims-home",
+    )
+    .await
+    .unwrap();
     assert!(
         private.exists(),
         "the file outside the files folder is left alone"
@@ -508,7 +562,8 @@ async fn get_and_delete_refuse_a_record_rooted_outside_the_files_folder() {
 async fn sharing_without_cloud_storage_is_refused_with_a_reason() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = ai_share_artifact(&config, "a-1", None, false)
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let err = ai_share_artifact(&config, "a-1", None, false, &ctx)
         .await
         .unwrap_err();
     assert!(err.contains("sign in"), "{err}");

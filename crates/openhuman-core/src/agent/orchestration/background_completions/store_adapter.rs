@@ -33,9 +33,11 @@ pub(in crate::agent::orchestration) fn open_driver_store(
     workspace_dir: &Path,
 ) -> anyhow::Result<Arc<dyn CompletionStore>> {
     with_storage_context(ctx, || {
+        // Preserve the `background_completions` domain scope used by the
+        // previous document-backed adapter. The owner API now needs the
+        // backend and exact scope so it can provide its own fenced store.
         let opened = crate::storage::local::open("background_completions", workspace_dir)?;
-        let scoped = opened.scoped()?;
-        let store = DriverCompletionStore::new(Arc::clone(scoped.documents()))
+        let store = DriverCompletionStore::new(opened.backend, opened.scope)
             .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
         Ok(Arc::new(store) as Arc<dyn CompletionStore>)
     })

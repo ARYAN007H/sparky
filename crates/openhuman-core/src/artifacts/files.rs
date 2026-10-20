@@ -167,7 +167,7 @@ pub(crate) async fn reserve_file(
             Err(e) => {
                 return Err(format!(
                     "[artifacts] failed to reserve {candidate:?} for id={id}: {e}"
-                ))
+                ));
             }
         }
     }

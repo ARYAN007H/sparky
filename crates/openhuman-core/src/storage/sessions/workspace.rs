@@ -21,7 +21,7 @@ use super::tenant_router::TenantSessionStores;
 use tinyagents_harness::multimodal::BlobAttachmentStash;
 use tinyagents_session::port::{AgentStores, SessionStoreProvider, TurnStates};
 use tinyagents_session::run_ledger::{LedgerError, LedgerResult, RunLedgerStore};
-use tinystoragedrivers::{BlobStore, DocumentStore, MemoryStorage, StorageBackend};
+use tinystoragedrivers::{BlobStore, DocumentStore, MemoryStorage, ScopedStorage, StorageBackend};
 
 /// One fallback provider and the backend it was built over.
 struct Fallback {
@@ -64,6 +64,19 @@ pub fn release_workspace(workspace_dir: &Path) {
 /// degrades to a session that is not kept rather than to no session at all.
 pub fn provider_for_workspace(workspace_dir: &Path) -> Arc<dyn SessionStoreProvider> {
     match super::installed() {
+        Some(installed) => installed,
+        None => fallback_provider(workspace_dir),
+    }
+}
+
+/// The provider selected by `context` for `workspace_dir`, else the workspace
+/// fallback. This preserves agent-local host overrides when work carries an
+/// explicit dispatch context rather than the ambient task context.
+pub fn provider_for_workspace_in(
+    workspace_dir: &Path,
+    context: &crate::core::runtime::DispatchCtx,
+) -> Arc<dyn SessionStoreProvider> {
+    match super::installed_in(context) {
         Some(installed) => installed,
         None => fallback_provider(workspace_dir),
     }
@@ -198,6 +211,63 @@ pub fn artifact_blobs_for(workspace_dir: &Path) -> Option<Arc<dyn BlobStore>> {
     let (key, scoped) = tenant_scope_for(workspace_dir, "artifacts")?;
     log::debug!("[session_store] artifact blobs bound agent={key}");
     Some(Arc::clone(scoped.blobs()))
+}
+
+/// The artifact ports for the tenant carried by `context` on the workspace's
+/// storage backend. Unlike [`artifact_blobs_for`], this does not consult the
+/// ambient dispatch context, so a tool that was moved to a detached task keeps
+/// using the profile that authorized the call.
+#[must_use]
+pub fn artifact_scoped_for_in(
+    workspace_dir: &Path,
+    context: &crate::core::runtime::DispatchCtx,
+) -> Option<ScopedStorage> {
+    let tenant = match context.tenant() {
+        Ok(tenant) => tenant,
+        Err(no_tenant) => {
+            log::warn!("[session_store] no tenant for artifact scope: {no_tenant}");
+            return None;
+        }
+    };
+    // Match the storage domain's established scope for this tenant. Session
+    // keys encode a default agent even when the storage scope is local, so do
+    // not derive artifact scope from the session key.
+    let scope = match crate::storage::scope_from(
+        tenant.profile.as_deref(),
+        tenant.agent.as_deref(),
+        crate::core::runtime::mode::is_saas(),
+    ) {
+        Ok(scope) => scope,
+        Err(error) => {
+            log::warn!("[session_store] no artifact storage scope: {error}");
+            return None;
+        }
+    };
+    let backend = match context.resolved() {
+        Some(core) => crate::core::runtime::CoreContext::sync_scope(core, || {
+            crate::storage::local::backend_for(workspace_dir)
+        }),
+        // Outside SaaS, an unresolved context represents the single-user
+        // default tenant validated above. The backend slot is process-global.
+        None => crate::storage::local::backend_for(workspace_dir),
+    };
+    let backend = match backend {
+        Ok(backend) => backend,
+        Err(error) => {
+            log::warn!("[session_store] no storage backend for artifacts: {error:#}");
+            return None;
+        }
+    };
+    match backend.for_scope(&scope) {
+        Ok(scoped) => Some(scoped),
+        Err(error) => {
+            log::warn!(
+                "[session_store] artifact scope refused scope={}: {error}",
+                scope.as_str()
+            );
+            None
+        }
+    }
 }
 
 /// The calling tenant's scoped storage on `workspace_dir`'s backend. `what`

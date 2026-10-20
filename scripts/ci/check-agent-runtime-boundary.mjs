@@ -42,7 +42,7 @@ const embedContractExports = new Map(
         "pub use tinytools::ToolPolicy;",
         "pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};",
         // Persisted codecs added to the public session-store API in #7462.
-        "pub use tinyagents_graph::todos::TodoList;",
+        "pub use tinyagents_harness_tools::todos::TodoList;",
         "pub use tinyagents_harness::events::{AgentEvent, HarnessRunStatus};",
         "pub use tinyagents_harness::ids::ExecutionStatus;",
         "pub use tinyagents_harness::observability::AgentObservation;",

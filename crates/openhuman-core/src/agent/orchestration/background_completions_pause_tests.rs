@@ -134,12 +134,10 @@ fn delivered_pause_leaves_the_task_key_free_for_a_later_delivery() {
     );
     let pause_notice = BackgroundCompletionFormatter.format_batch(&pause_batch);
     assert!(pause_notice.contains("<background_agent_needs_input id=\"sub-sequential\""));
-    assert_eq!(
-        router
-            .mark_delivered(&[pause_batch[0].task_id.as_str()])
-            .unwrap(),
-        1
-    );
+    let pause_receipt = pause_batch[0]
+        .receipt()
+        .expect("claimed pause has a settlement receipt");
+    assert_eq!(router.mark_delivered(&[pause_receipt]).unwrap(), 1);
 
     record(
         w,
@@ -156,12 +154,10 @@ fn delivered_pause_leaves_the_task_key_free_for_a_later_delivery() {
     assert_eq!(completion_batch[0].result.text, "finished after answer");
     let completion_notice = BackgroundCompletionFormatter.format_batch(&completion_batch);
     assert!(completion_notice.contains("<background_agent_result id=\"sub-sequential\""));
-    assert_eq!(
-        router
-            .mark_delivered(&[completion_batch[0].task_id.as_str()])
-            .unwrap(),
-        1
-    );
+    let completion_receipt = completion_batch[0]
+        .receipt()
+        .expect("claimed completion has a settlement receipt");
+    assert_eq!(router.mark_delivered(&[completion_receipt]).unwrap(), 1);
     assert!(router
         .claim_pending("thread-sequential", usize::MAX)
         .unwrap()

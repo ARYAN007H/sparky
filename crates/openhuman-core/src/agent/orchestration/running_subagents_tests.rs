@@ -1,5 +1,5 @@
 use super::*;
-use tinyagents_orchestration::subagent::SteerError;
+use tinyagents_orchestration::steering::SteerError;
 
 /// The context these tests dispatch under: the calling task's own.
 fn cx() -> crate::core::runtime::DispatchCtx {
@@ -116,6 +116,54 @@ fn register_test_with_thread(
     )
     .expect("fixture registration admitted");
     tx
+}
+
+#[tokio::test]
+async fn late_registration_rejects_a_parent_generation_reopened_after_spawn() {
+    let _guard = test_guard_async().await;
+    let ctx = cx();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let thread_id = "late-register-old-generation";
+    let old_epoch = crate::agent::orchestration::background_completions::CompletionTarget::new(
+        ctx.clone(),
+        workspace.path().to_path_buf(),
+        "late-register-parent".into(),
+        Some(thread_id.into()),
+    )
+    .expect("initial spawn admitted")
+    .parent_epoch()
+    .unwrap();
+    let router = crate::agent::orchestration::background_completions::router_for_workspace_ctx(
+        &ctx,
+        workspace.path(),
+    );
+    router
+        .cancel_parent(thread_id)
+        .expect("stop old generation");
+    router.resume_parent(thread_id);
+    assert!(!router
+        .parent_generation_admitted(thread_id, old_epoch)
+        .unwrap());
+
+    let child = tokio::spawn(std::future::pending::<()>());
+    let (_status_tx, status_rx) = status_channel();
+    let result = register_with_parent_epoch(
+        &ctx,
+        "late-register-old-task".into(),
+        "researcher".into(),
+        "late-register-parent".into(),
+        None,
+        None,
+        workspace.path().to_path_buf(),
+        Some(thread_id.into()),
+        Some(old_epoch),
+        run_queue(),
+        child.abort_handle(),
+        status_rx,
+    );
+    assert!(matches!(result, Err(RegistrationError::ParentLifecycle(_))));
+    assert!(child.await.unwrap_err().is_cancelled());
+    assert!(cancel_by_task(&ctx, "late-register-old-task").is_none());
 }
 
 #[tokio::test]
@@ -348,6 +396,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
                 worker_thread_id: None,
                 task_id: "task-cold-1".into(),
                 lifecycle_key: None,
+                parent_epoch: None,
             },
             None,
         )

@@ -23,6 +23,9 @@ pub(crate) struct CancelledSubagent {
     pub(crate) subagent_session_id: Option<String>,
     pub(crate) workspace_dir: PathBuf,
     pub(crate) parent_thread_id: Option<String>,
+    /// Admission generation captured for this child, if it originated in a
+    /// thread. Completion after a later stop/resume must retain this epoch.
+    pub(crate) parent_epoch: Option<u64>,
     /// How the run had already ended when the cancel arrived, if it had. A
     /// finished entry stays registered until `sweep_terminal`, so a late
     /// "Cancel" still finds it; the caller must not rewrite that outcome as a
@@ -90,6 +93,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
             subagent_session_id: metadata.subagent_session_id,
             workspace_dir: metadata.workspace_dir,
             parent_thread_id: metadata.parent_thread_id,
+            parent_epoch: metadata.parent_epoch,
             already_finished,
             driver_pause: None,
             driver_managed: false,
@@ -108,7 +112,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         workspace_dir.clone(),
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
     let selected = crate::agent::orchestration::subagent_sessions::cancel_driver_job_by_task(
         &store,
@@ -117,6 +121,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         task_id,
         reason,
     )?;
+    let parent_epoch = selected.as_ref().and_then(|selected| selected.parent_epoch);
     let driver_pause = selected
         .as_ref()
         .filter(|selected| selected.was_paused)
@@ -127,6 +132,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         subagent_session_id: Some(selected.subagent_session_id),
         workspace_dir: selected.workspace_dir,
         parent_thread_id: selected.parent_thread_id,
+        parent_epoch,
         already_finished: selected.already_finished,
         driver_pause,
         driver_managed: true,
@@ -218,7 +224,7 @@ pub(crate) fn stop_for_thread(
     if let Some(core_context) = ctx.resolved() {
         if let Ok(workspace_dir) = core_context.workspace_dir() {
             let jobs = crate::core::runtime::slot_for::<
-                tinyagents_orchestration::subagent::SubAgentJobRegistry,
+                tinyagents_harness_tools::subagents::SubAgentJobRegistry,
             >(ctx);
             let driver_stopped =
                 crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(

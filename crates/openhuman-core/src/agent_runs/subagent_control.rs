@@ -16,7 +16,7 @@
 
 use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
-use tinyagents_orchestration::subagent::SteerError;
+use tinyagents_orchestration::steering::SteerError;
 
 use crate::agent::orchestration::running_subagents::CancelledSubagent;
 use crate::agent::orchestration::{background_completions, running_subagents, subagent_sessions};
@@ -160,7 +160,13 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // A paused job has already returned from that hook, so this
                     // handler settles and reports that one terminal transition.
                     if let Some(paused) = meta.driver_pause.as_ref() {
-                        settle_paused_driver_cancel(&ctx, paused, reason.as_deref()).await?;
+                        settle_paused_driver_cancel(
+                            &ctx,
+                            paused,
+                            meta.parent_epoch,
+                            reason.as_deref(),
+                        )
+                        .await?;
                     }
                     (true, None)
                 } else {
@@ -174,7 +180,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // The thread is still alive (unlike the delete path), so we
                     // record a completion that flows through the same idle-gated
                     // delivery and surfaces the cancellation in chat.
-                    background_completions::record_completion(
+                    background_completions::record_outcome_with_parent_epoch(
                         &ctx,
                         &meta.workspace_dir,
                         &meta.parent_session,
@@ -182,6 +188,8 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                         meta.agent_id.clone(),
                         summary,
                         meta.parent_thread_id.clone(),
+                        meta.parent_epoch,
+                        background_completions::BackgroundAgentOutcome::Completed,
                     )
                     .await;
                     if let Some(subagent_session_id) = meta.subagent_session_id.as_deref() {
@@ -220,6 +228,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 async fn settle_paused_driver_cancel(
     ctx: &DispatchCtx,
     paused: &subagent_sessions::DriverTaskCancellation,
+    parent_epoch: Option<u64>,
     reason: Option<&str>,
 ) -> Result<bool, String> {
     let store = subagent_sessions::SubagentSessionStore::new(paused.workspace_dir.clone());
@@ -230,14 +239,22 @@ async fn settle_paused_driver_cancel(
             Some(reason) => format!("cancelled by user. Reason: {reason}"),
             None => "cancelled by user".to_string(),
         };
-        background_completions::record_failure(
+        let parent_epoch = paused
+            .parent_thread_id
+            .as_ref()
+            .map(|_| parent_epoch.unwrap_or(0));
+        background_completions::record_outcome_with_parent_epoch(
             ctx,
             &paused.workspace_dir,
             &paused.parent_session,
             &paused.task_id,
             &paused.agent_id,
-            &error,
+            format!(
+                "[SUBAGENT_FAILED] the async sub-agent errored before producing a result: {error}"
+            ),
             paused.parent_thread_id.clone(),
+            parent_epoch,
+            background_completions::BackgroundAgentOutcome::Failed,
         )
         .await;
     }
@@ -270,7 +287,6 @@ fn handle_subagent_steer(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             Err(err) => {
                 let reason = match err {
                     SteerError::Unknown => "unknown",
-                    SteerError::AlreadyDone => "already_done",
                     // SaaS user controls check the captured worker profile,
                     // independently of the caller-supplied task ID.
                     SteerError::NotOwned => "not_owned",

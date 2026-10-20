@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use tinyagents_tasks::CompletionRouter;
+use tinyagents_tasks::{CompletionReceipt, CompletionRouter};
 
 use crate::core::runtime::tenant;
 use crate::core::runtime::DispatchCtx;
@@ -15,7 +15,7 @@ pub(super) struct DeliverySlot {
     /// [`tenant::profile_key_in`] of the thread id.
     pub(super) key: String,
     router: Arc<CompletionRouter>,
-    held: Vec<String>,
+    held: Vec<CompletionReceipt>,
 }
 
 impl DeliverySlot {
@@ -37,8 +37,8 @@ impl DeliverySlot {
         })
     }
 
-    pub(super) fn hold(&mut self, task_ids: &[String]) {
-        self.held = task_ids.to_vec();
+    pub(super) fn hold(&mut self, receipts: &[CompletionReceipt]) {
+        self.held = receipts.to_vec();
     }
 }
 

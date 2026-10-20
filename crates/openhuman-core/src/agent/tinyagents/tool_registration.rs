@@ -7,11 +7,11 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tinyagents_graph::goals::GoalToolKind;
-use tinyagents_harness::tool::packs::{PackSelection, UseSkillDispatch, USE_SKILL};
 use tinyagents_harness::tool::{
     CanonicalSharedToolAdapter, ToolDispatch, ToolExecScope, ToolExecution, ToolExecutionContext,
 };
+use tinyagents_harness_tools::goals::GoalToolKind;
+use tinyagents_harness_tools::skills::{PackSelection, UseSkillDispatch, USE_SKILL};
 use tinyagents_registry::{CapabilityRegistry, ComponentKind, RegistryDiagnostic};
 use tinyagents_runtime::turn_driver::{SharedToolSet, ToolSetBuilder};
 use tinyagents_runtime::{project_descriptors, ToolAdmission};
@@ -346,7 +346,7 @@ fn dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
             return typed_dispatch_for(name, adapter, delegation_target);
         }
         let selector: Arc<
-            tinyagents_harness::tool::packs::PackDispatchSelector<(), OpenHumanRunContext>,
+            tinyagents_harness_tools::skills::PackDispatchSelector<(), OpenHumanRunContext>,
         > = Arc::new(select_packed_tool_dispatch);
         Some(Arc::new(UseSkillDispatch::new(adapter, selector)))
     })
@@ -371,7 +371,7 @@ fn subagent_control_dispatches(
     tool_sets: &[SharedToolSet],
     run_context: &OpenHumanRunContext,
 ) -> std::collections::HashMap<String, RegisteredToolDispatch> {
-    use tinyagents_orchestration::subagent::{
+    use tinyagents_harness_tools::subagents::{
         SubAgentJobAction, SubAgentJobRegistry, SubAgentJobsTool, SubAgentMessageTool,
     };
 
@@ -644,7 +644,7 @@ pub(crate) fn capability_diagnostics(
 
     let diagnostics = registry.diagnostics();
     tracing::debug!(
-        models = registry.to_model_registry().names().len(),
+        models = registry.names(ComponentKind::Model).len(),
         tools = registry.names(ComponentKind::Tool).len(),
         agents = runtime_agent_count + builtin_supplement_count,
         diagnostics = diagnostics.len(),

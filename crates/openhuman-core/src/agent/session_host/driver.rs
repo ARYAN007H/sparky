@@ -1,8 +1,7 @@
 //! OpenHuman's model-and-harness implementation of the neutral session driver.
 //!
-//! This adapter deliberately has no transcript, prefix, or generic history
-//! state. `tinyagents_runtime::Session` owns those and hands this type the
-//! complete immutable model history and tool declaration snapshot per call.
+//! This adapter holds no transcript, prefix, or generic history; its owning
+//! `tinyagents_runtime::Session` supplies the complete immutable history and tool snapshot per call.
 
 mod grounded_close;
 use crate::agent::tinyagents::SupplementalTrace;
@@ -165,7 +164,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             messages = crate::agent::multimodal::rehydrate_image_placeholders(&messages).await;
         }
 
-        // Runtime's `ToolSnapshot` remains the model declaration and final
+        // Harness `ToolSnapshot` remains the model declaration and final
         // allowlist. The actual executable instances must be supplied by the
         // request hook as well: falling back to a long-lived driver's tool
         // registry would let revoked or hidden tools execute under stale
@@ -517,6 +516,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             interrupted: outcome.early_exit_tool.is_some() || outcome.hit_cap,
             // `None` lets the runtime derive the outcome from `interrupted`.
             outcome: None,
+            tool_outcomes: outcome.tool_outcomes.clone(),
         })
     }
 }
@@ -653,6 +653,7 @@ fn driver_error_with_snapshot(
             partial: Some(TranscriptPartial::new(display)),
             interrupted: true,
             outcome: terminal.clone(),
+            tool_outcomes: guard.tool_outcomes.clone(),
         }),
         outcome: terminal,
     }
@@ -716,6 +717,7 @@ fn driver_cancelled_with_snapshot(
             partial: None,
             interrupted: true,
             outcome: None,
+            tool_outcomes: guard.tool_outcomes.clone(),
         }),
         outcome: None,
     }

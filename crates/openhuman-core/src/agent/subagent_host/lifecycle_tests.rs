@@ -258,6 +258,7 @@ async fn legacy_durable_session_resolves_its_key_only_from_owned_checkpoint() {
             worker_thread_id: None,
             task_id: "task".into(),
             lifecycle_key: None,
+            parent_epoch: None,
         },
         None,
     )
@@ -315,6 +316,7 @@ async fn tiny_session_port_recovers_legacy_key_from_owned_pause_and_hides_foreig
             worker_thread_id: None,
             task_id: "task".into(),
             lifecycle_key: None,
+            parent_epoch: None,
         },
         None,
     )

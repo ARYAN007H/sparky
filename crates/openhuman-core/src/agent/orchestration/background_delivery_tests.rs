@@ -401,7 +401,7 @@ async fn a_malicious_summary_cannot_forge_or_escape_the_persisted_envelope() {
 #[tokio::test]
 async fn a_pending_completion_survives_a_restart_and_is_delivered() {
     // The user-approved goal: a result that finished but was never delivered
-    // (the process died first) reaches its thread after the restart.
+    // (the process died before claiming it) reaches its thread after restart.
     let _g = test_guard().await;
     let ws = workspace();
     let w = ws.path();
@@ -413,17 +413,11 @@ async fn a_pending_completion_survives_a_restart_and_is_delivered() {
         "thread-restart",
     )
     .await;
-    // The first delivery attempt is claimed and then the process "dies": the
-    // lease is in memory only.
-    let router = router_for_workspace(w);
     assert_eq!(
-        router
-            .claim_pending("thread-restart", usize::MAX)
-            .unwrap()
-            .len(),
-        1
+        pending_ids(w, "thread-restart"),
+        ["sub-1"],
+        "the undelivered result is durable before the restart"
     );
-    drop(router);
 
     forget_workspace_for_test(w);
     let threads = background_completions::recover_pending_threads(&cx(), w);

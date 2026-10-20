@@ -233,7 +233,7 @@ pub(crate) async fn delete_artifact(
                     Err(e) => {
                         return Err(format!(
                             "[artifacts] failed to delete file for id={artifact_id}: {e}"
-                        ))
+                        ));
                     }
                 },
                 Err(e) => log::warn!("[artifacts] delete_artifact: leaving file in place: {e}"),

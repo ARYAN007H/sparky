@@ -8,7 +8,7 @@ use super::*;
 pub fn cancel_driver_jobs_for_thread(
     store: &SubagentSessionStore,
     workspace_dir: &Path,
-    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    jobs: &tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     thread_id: &str,
 ) -> Vec<String> {
     let sessions = match store.load() {
@@ -66,7 +66,7 @@ pub fn cancel_driver_jobs_for_thread(
 pub fn cancel_driver_job_for_observed_session(
     store: &SubagentSessionStore,
     checkpoint_dir: &Path,
-    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    jobs: &tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     session: &DurableSubagentSession,
     parent_session: &str,
     parent_thread_id: Option<&str>,
@@ -118,6 +118,7 @@ pub struct DriverTaskCancellation {
     pub subagent_session_id: String,
     pub workspace_dir: std::path::PathBuf,
     pub parent_thread_id: Option<String>,
+    pub parent_epoch: Option<u64>,
     pub already_finished: Option<tinyagents_orchestration::subagent::FinishedOutcome>,
     pub was_paused: bool,
     pub lifecycle_key: Option<tinyagents_orchestration::subagent::SubagentTaskKey>,
@@ -126,7 +127,7 @@ pub struct DriverTaskCancellation {
 pub fn cancel_driver_job_by_task(
     store: &SubagentSessionStore,
     checkpoint_dir: &Path,
-    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    jobs: &tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     task_id: &str,
     reason: Option<&str>,
 ) -> Result<Option<DriverTaskCancellation>, String> {
@@ -245,6 +246,7 @@ pub fn cancel_driver_job_by_task(
         subagent_session_id: session.subagent_session_id,
         workspace_dir: store.workspace_dir.clone(),
         parent_thread_id: session.parent_thread_id,
+        parent_epoch: session.parent_epoch,
         already_finished,
         was_paused,
         lifecycle_key,

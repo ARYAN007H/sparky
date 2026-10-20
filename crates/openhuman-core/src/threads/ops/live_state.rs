@@ -7,7 +7,7 @@
 //! that already had one in flight.
 
 use super::support::{envelope, workspace_dir};
-use crate::agent::goals::goal_to_value;
+use crate::agent::goals::{goal_store, goal_to_value};
 use crate::core::Outcome;
 use crate::threads::ApiEnvelope;
 
@@ -30,7 +30,7 @@ pub struct ThreadGoalGetResponse {
 /// thread has never written one.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ThreadTodosGetResponse {
-    pub todos: Vec<tinyagents_graph::todos::TodoItem>,
+    pub todos: Vec<tinyagents_harness_tools::todos::TodoItem>,
 }
 
 /// `threads.goal_get` — read a thread's current goal without waiting for the
@@ -44,10 +44,14 @@ pub async fn goal_get(
     if thread_id.is_empty() {
         return Err("thread_id is required".to_string());
     }
-    let goal = crate::agent::goals::runtime::load_for_thread(&dir, Some(thread_id))
-        .await
-        .as_ref()
-        .map(goal_to_value);
+    let context = crate::core::runtime::DispatchCtx::ambient();
+    let goal = match goal_store(&dir, &context).get(thread_id).await {
+        Ok(goal) => goal.as_ref().map(goal_to_value),
+        Err(error) => {
+            log::debug!("[threads] goal_get thread_id={thread_id} failed: {error}");
+            None
+        }
+    };
     Ok(envelope(ThreadGoalGetResponse { goal }, None, None))
 }
 
@@ -62,7 +66,7 @@ pub async fn todos_get(
         return Err("thread_id is required".to_string());
     }
     let store = crate::storage::sessions::stores_or_ephemeral(&dir).kv;
-    let todos = match tinyagents_graph::todos::store::list(&store, thread_id).await {
+    let todos = match tinyagents_harness_tools::todos::store::list(&store, thread_id).await {
         Ok(snapshot) => snapshot.items,
         Err(e) => {
             log::debug!("[threads] todos_get thread_id={thread_id} list failed: {e}");

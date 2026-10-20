@@ -99,13 +99,9 @@ fn leave_undelivered_result(root: &std::path::Path, user: &str) {
         Ok(openhuman_core::storage::open(&url).await?)
     })
     .expect("open the profile's database");
-    let scoped = backend
-        .for_scope(&openhuman_core::storage::scope_for_profile(id.as_str()))
-        .expect("the profile's scope");
-    let store: Arc<dyn CompletionStore> = Arc::new(
-        DriverCompletionStore::new(Arc::clone(scoped.documents()))
-            .expect("open the completion queue"),
-    );
+    let scope = openhuman_core::storage::scope_for_profile(id.as_str());
+    let store: Arc<dyn CompletionStore> =
+        Arc::new(DriverCompletionStore::new(backend, scope).expect("open the completion queue"));
     let record = CompletionRecord::new(
         "task-delivery-recovery-1",
         THREAD,
@@ -114,7 +110,20 @@ fn leave_undelivered_result(root: &std::path::Path, user: &str) {
         CompletionResult::text(RESULT),
     )
     .with_notify_mode(NotifyMode::Followup);
-    store.put(&record).expect("write the pending record");
+    let gate = store
+        .acquire_parent_gate(
+            THREAD,
+            "delivery-recovery-fixture",
+            std::time::Duration::from_secs(30),
+        )
+        .expect("acquire the parent's completion gate")
+        .expect("the completion gate is free");
+    store
+        .put_fenced(&record, THREAD, &gate)
+        .expect("write the pending record under the parent gate");
+    assert!(store
+        .release_parent_gate(THREAD, &gate)
+        .expect("release the fixture's parent gate"));
 }
 
 #[test]

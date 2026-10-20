@@ -187,6 +187,7 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
             task_title: "Research task".into(),
             current_task_id: Some("live-task".into()),
             lifecycle_key: None,
+            parent_epoch: None,
             status: DurableSubagentStatus::Idle,
             reusable: true,
             latest_history: None,
@@ -297,6 +298,7 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         task_title: "Research task".into(),
         current_task_id: Some(format!("task-{id}")),
         lifecycle_key: None,
+        parent_epoch: None,
         status: DurableSubagentStatus::Idle,
         reusable: true,
         latest_history: None,
@@ -430,7 +432,7 @@ async fn memory_live_context_dispatch_cancels_with_parent_without_creating_a_chi
         .with_cancellation(cancellation.clone())
         .into_tinyagents(RunConfig::new("memory-live-context-cancel"));
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&parent.data.dispatch_ctx());
     assert!(jobs.list().is_empty(), "fresh parent has no child jobs");
 

@@ -67,15 +67,13 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 FieldSchema {
                     name: "limit",
                     ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
-                    comment:
-                        "Maximum number of artifacts to return; defaults to 50, capped at 200.",
+                    comment: "Maximum number of artifacts to return; defaults to 50, capped at 200.",
                     required: false,
                 },
                 FieldSchema {
                     name: "thread_id",
                     ty: TypeSchema::Option(Box::new(TypeSchema::String)),
-                    comment:
-                        "When set, return only artifacts whose meta.json was written for this \
+                    comment: "When set, return only artifacts whose meta.json was written for this \
                          chat thread (#3226). Lets ChatFilesPanel repopulate from disk on a \
                          fresh redux slice / new device. Absent (or null) returns all artifacts.",
                     required: false,
@@ -431,8 +429,14 @@ fn handle_list_artifacts(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             .transpose()?;
         let thread_id = read_optional_string(&params, "thread_id")?;
         to_json(
-            crate::artifacts::ops::ai_list_artifacts(&config, offset, limit, thread_id.as_deref())
-                .await?,
+            crate::artifacts::ops::ai_list_artifacts(
+                &ctx,
+                &config,
+                offset,
+                limit,
+                thread_id.as_deref(),
+            )
+            .await?,
         )
     })
 }
@@ -441,7 +445,7 @@ fn handle_get_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(crate::artifacts::ops::ai_get_artifact(&config, artifact_id.trim()).await?)
+        to_json(crate::artifacts::ops::ai_get_artifact(&ctx, &config, artifact_id.trim()).await?)
     })
 }
 
@@ -451,8 +455,13 @@ fn handle_save_artifact_version(ctx: DispatchCtx, params: Map<String, Value>) ->
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
         let body = read_required::<String>(&params, "body")?;
         to_json(
-            crate::artifacts::ops::ai_save_artifact_version(&config, artifact_id.trim(), &body)
-                .await?,
+            crate::artifacts::ops::ai_save_artifact_version(
+                &config,
+                artifact_id.trim(),
+                &body,
+                &ctx,
+            )
+            .await?,
         )
     })
 }
@@ -461,7 +470,7 @@ fn handle_read_artifact_body(ctx: DispatchCtx, params: Map<String, Value>) -> Co
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        let body = crate::artifacts::preview::read_body(&config, artifact_id.trim()).await?;
+        let body = crate::artifacts::preview::read_body(&config, artifact_id.trim(), &ctx).await?;
         to_json(Outcome::new(body, vec![]))
     })
 }
@@ -480,12 +489,18 @@ fn handle_share_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
                 return Err(format!(
                     "invalid 'public': expected bool, got {}",
                     type_name(other)
-                ))
+                ));
             }
         };
         to_json(
-            crate::artifacts::ops::ai_share_artifact(&config, artifact_id.trim(), version, public)
-                .await?,
+            crate::artifacts::ops::ai_share_artifact(
+                &config,
+                artifact_id.trim(),
+                version,
+                public,
+                &ctx,
+            )
+            .await?,
         )
     })
 }
@@ -494,7 +509,7 @@ fn handle_delete_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(crate::artifacts::ops::ai_delete_artifact(&config, artifact_id.trim()).await?)
+        to_json(crate::artifacts::ops::ai_delete_artifact(&ctx, &config, artifact_id.trim()).await?)
     })
 }
 

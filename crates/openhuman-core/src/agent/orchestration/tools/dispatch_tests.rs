@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use tinytools::Tool;
 
-use tinyagents_harness::tools::AskClarificationTool;
+use tinyagents_harness_tools::AskClarificationTool;
 
 struct DelegationRegistrationTool {
     name: &'static str,

@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use tiny_artifacts::{ArtifactKind, Artifacts, Author, Content};
 
 use super::files::FileRoots;
-use super::tiny_store::{artifacts_service, legacy_kind_for_extension};
+use super::tiny_store::legacy_kind_for_extension;
 use super::types::ArtifactKind as LegacyArtifactKind;
 use crate::security::approval::ApprovalChatContext;
 
@@ -34,9 +34,11 @@ pub const SAVED_NOT_SHOWN: &str = "saved-not-shown:";
 /// A file being produced as an artifact.
 pub struct Production {
     artifacts: Artifacts,
+    ctx: crate::core::runtime::DispatchCtx,
     workspace_dir: PathBuf,
     files: FileRoots,
     chat: Option<ApprovalChatContext>,
+    file_store: Option<std::sync::Arc<dyn tiny_artifacts::FileStore>>,
     id: String,
     path: PathBuf,
     /// Whether this adds a version to an artifact that already has one: its
@@ -74,30 +76,96 @@ impl Production {
         revise: Option<&str>,
         chat: Option<&ApprovalChatContext>,
     ) -> Result<Self, String> {
+        Self::start_in(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            workspace_dir,
+            files,
+            kind,
+            title,
+            extension,
+            tool_call_id,
+            revise,
+            chat,
+        )
+        .await
+    }
+
+    /// Start production using the explicit dispatch scope of the producing turn.
+    pub async fn start_in(
+        ctx: &crate::core::runtime::DispatchCtx,
+        workspace_dir: &Path,
+        files: FileRoots,
+        kind: ArtifactKind,
+        title: &str,
+        extension: &str,
+        tool_call_id: Option<&str>,
+        revise: Option<&str>,
+        chat: Option<&ApprovalChatContext>,
+    ) -> Result<Self, String> {
+        let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
+        Self::start_with_scoped_storage(
+            ctx,
+            workspace_dir,
+            files,
+            kind,
+            title,
+            extension,
+            tool_call_id,
+            revise,
+            chat,
+            scoped,
+        )
+        .await
+    }
+
+    async fn start_with_scoped_storage(
+        ctx: &crate::core::runtime::DispatchCtx,
+        workspace_dir: &Path,
+        files: FileRoots,
+        kind: ArtifactKind,
+        title: &str,
+        extension: &str,
+        tool_call_id: Option<&str>,
+        revise: Option<&str>,
+        chat: Option<&ApprovalChatContext>,
+        scoped: Option<crate::storage::ScopedStorage>,
+    ) -> Result<Self, String> {
         let legacy_kind = if kind == ArtifactKind::Image {
             LegacyArtifactKind::Image
         } else {
             legacy_kind_for_extension(&extension.to_ascii_lowercase())
         };
         let target = revise.filter(|id| !id.trim().is_empty());
-        let (meta, path) = super::store::create_artifact_regenerating(
+        let (artifacts, file_store) = super::tiny_store::build_artifacts_service_with_scope(
             workspace_dir,
             files.clone(),
-            legacy_kind,
-            title,
-            extension,
-            tool_call_id,
-            target,
+            None,
             chat,
-        )
-        .await?;
-
-        let artifacts = artifacts_service(workspace_dir, files.clone(), None, chat);
+            ctx,
+            scoped,
+            None,
+        );
+        let file_store =
+            file_store.ok_or_else(|| "artifact tenant storage is unavailable".to_string())?;
+        let (meta, path) = ctx
+            .enter(super::store::create_artifact_regenerating(
+                workspace_dir,
+                files.clone(),
+                legacy_kind,
+                title,
+                extension,
+                tool_call_id,
+                target,
+                chat,
+            ))
+            .await?;
         let mut production = Self {
             artifacts,
+            ctx: ctx.clone(),
             workspace_dir: workspace_dir.to_path_buf(),
             files,
             chat: chat.cloned(),
+            file_store: Some(file_store),
             id: meta.id.clone(),
             path,
             revision: false,
@@ -239,7 +307,10 @@ impl Production {
         let bridge = super::tiny_store::LegacyUiBridge::new(
             &self.workspace_dir,
             self.files.clone(),
+            super::tiny_store::guarded_roots(self.files.trusted().to_vec()),
+            self.file_store.clone(),
             self.chat.as_ref(),
+            &self.ctx,
         );
         if let Err(err) = bridge.show_newest(&record).await {
             tracing::warn!(
@@ -254,14 +325,16 @@ impl Production {
 
     /// Fail the card directly (when the record could not take the change).
     async fn fail_card(&self, reason: &str) {
-        let _ = super::store::fail_artifact(
-            &self.workspace_dir,
-            self.files.clone(),
-            &self.id,
-            reason,
-            self.chat.as_ref(),
-        )
-        .await;
+        let _ = self
+            .ctx
+            .enter(super::store::fail_artifact(
+                &self.workspace_dir,
+                self.files.clone(),
+                &self.id,
+                reason,
+                self.chat.as_ref(),
+            ))
+            .await;
     }
 }
 

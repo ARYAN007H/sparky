@@ -49,7 +49,7 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
     assert!(provider.saw(SPAWN_SUBAGENT_CANARY));
     assert!(provider.saw("parent supplied context"));
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
     assert!(
         jobs.list().iter().any(|job| {
@@ -170,7 +170,7 @@ async fn archetype_delegation_tool_runs_child_agent_e2e() {
     assert!(provider.saw(ARCHETYPE_DELEGATION_CANARY));
 
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
     let completed = jobs.list();
     assert!(
@@ -330,6 +330,7 @@ async fn continue_subagent_resumes_idle_durable_session_e2e() {
             worker_thread_id: None,
             task_id: "sub-earlier-task".into(),
             lifecycle_key: None,
+            parent_epoch: None,
         },
         None,
     )

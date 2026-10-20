@@ -52,6 +52,9 @@ pub(crate) struct RunningSubagentMetadata {
     /// `None` for a headless spawn with no originating thread. Used to abort the
     /// sub-agent when its parent thread is deleted (see [`super::cancel::cancel_for_thread`]).
     pub(crate) parent_thread_id: Option<String>,
+    /// Parent lifecycle generation admitted when this child was registered.
+    /// Its eventual cancellation record must not be attached to a later turn.
+    pub(crate) parent_epoch: Option<u64>,
     pub(crate) run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
 }
 
@@ -71,6 +74,8 @@ pub(crate) enum RegistrationError {
     Scope,
     #[error("detached task registration failed: {0}")]
     Registry(#[source] tinyagents_harness::error::TinyAgentsError),
+    #[error("parent lifecycle admission failed: {0}")]
+    ParentLifecycle(#[source] anyhow::Error),
 }
 
 /// Check the actual caller before any reusable-session or worker-thread write.
@@ -183,6 +188,59 @@ pub(crate) fn register(
     abort: AbortHandle,
     status: watch::Receiver<DetachedSubagentStatus>,
 ) -> Result<(), RegistrationError> {
+    if let Err(error) = admit_spawn(ctx, &workspace_dir) {
+        abort.abort();
+        return Err(error);
+    }
+    let parent_epoch = match parent_thread_id.as_deref() {
+        Some(thread_id) => {
+            match crate::agent::orchestration::background_completions::CompletionTarget::new(
+                ctx.clone(),
+                workspace_dir.clone(),
+                parent_session.clone(),
+                Some(thread_id.to_owned()),
+            ) {
+                Ok(target) => target.parent_epoch(),
+                Err(error) => {
+                    abort.abort();
+                    return Err(RegistrationError::ParentLifecycle(error));
+                }
+            }
+        }
+        None => None,
+    };
+    register_with_parent_epoch(
+        ctx,
+        task_id,
+        agent_id,
+        parent_session,
+        session_parent_prefix,
+        subagent_session_id,
+        workspace_dir,
+        parent_thread_id,
+        parent_epoch,
+        run_queue,
+        abort,
+        status,
+    )
+}
+
+/// Test-only lower-level hook for exercising registration after a previously
+/// captured spawn generation has gone stale.
+pub(crate) fn register_with_parent_epoch(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: String,
+    agent_id: String,
+    parent_session: String,
+    session_parent_prefix: Option<String>,
+    subagent_session_id: Option<String>,
+    workspace_dir: PathBuf,
+    parent_thread_id: Option<String>,
+    parent_epoch: Option<u64>,
+    run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
+    abort: AbortHandle,
+    status: watch::Receiver<DetachedSubagentStatus>,
+) -> Result<(), RegistrationError> {
     let profile = match admit_spawn(ctx, &workspace_dir) {
         Ok(profile) => profile,
         Err(error) => {
@@ -218,10 +276,46 @@ pub(crate) fn register(
                 task_id,
                 thread_id
             );
+            return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+                "parent thread is stopped or deleted"
+            )));
         }
         // First spawn in a workspace this process has not scanned: redeliver any
         // completions a previous process finished there but never delivered.
         crate::agent::orchestration::background_delivery::recover_on_boot(ctx, &workspace_dir);
+    }
+
+    if let Some(thread_id) = parent_thread_id.as_deref() {
+        let Some(parent_epoch) = parent_epoch else {
+            abort.abort();
+            return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+                "parent admission generation was not captured at spawn"
+            )));
+        };
+        let router = crate::agent::orchestration::background_completions::router_for_workspace_ctx(
+            ctx,
+            &workspace_dir,
+        );
+        match router.parent_generation_admitted(thread_id, parent_epoch) {
+            Ok(true) => {}
+            Ok(false) => {
+                let _ = router.tombstone(&task_id);
+                abort.abort();
+                return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+                    "parent admission generation is no longer current"
+                )));
+            }
+            Err(error) => {
+                let _ = router.tombstone(&task_id);
+                abort.abort();
+                return Err(RegistrationError::ParentLifecycle(error.into()));
+            }
+        }
+    } else if parent_epoch.is_some() {
+        abort.abort();
+        return Err(RegistrationError::ParentLifecycle(anyhow::anyhow!(
+            "threadless child cannot carry a parent admission generation"
+        )));
     }
 
     let metadata = RunningSubagentMetadata {
@@ -231,6 +325,7 @@ pub(crate) fn register(
         subagent_session_id: subagent_session_id.clone(),
         workspace_dir: workspace_dir.clone(),
         parent_thread_id: parent_thread_id.clone(),
+        parent_epoch,
         run_queue,
     };
     registry()

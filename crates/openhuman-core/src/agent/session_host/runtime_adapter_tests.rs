@@ -1,10 +1,11 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use tinyagents_harness::tool::ToolSnapshot;
 use tinyagents_runtime::{
     DriverFailure, DriverOutcome, DriverRequest, PrefixSnapshot, ResumeMode, SessionBuilder,
-    SessionDriver, SessionTerminal, SessionTurnRequest, ToolSnapshot, TranscriptCodec,
-    TranscriptTurnOptions, TurnOptions,
+    SessionDriver, SessionTerminal, SessionTurnRequest, TranscriptCodec, TranscriptTurnOptions,
+    TurnOptions,
 };
 use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::TranscriptMeta;
@@ -37,6 +38,7 @@ impl SessionDriver<OpenHumanRunContext> for RecordingDriver {
             partial: None,
             interrupted: false,
             outcome: None,
+            tool_outcomes: Vec::new(),
         })
     }
 }
@@ -286,7 +288,7 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
     );
     crate::core::runtime::CoreContext::scope(core, async {
         let goal_store = crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv;
-        tinyagents_graph::goals::store::set(
+        tinyagents_harness_tools::goals::store::set(
             &goal_store,
             "receipt-goal",
             "finish migration",
@@ -295,7 +297,7 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
         .await
         .unwrap();
         assert!(
-            tinyagents_graph::goals::store::get(&goal_store, "receipt-goal")
+            tinyagents_harness_tools::goals::store::get(&goal_store, "receipt-goal")
                 .await
                 .unwrap()
                 .is_some(),
@@ -317,9 +319,15 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
             },
         };
         sidecar.subagents.push(child);
-        account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
+        account_committed_turn_against_goal(
+            workspace.path(),
+            &crate::core::runtime::DispatchCtx::ambient(),
+            Some("receipt-goal"),
+            &sidecar,
+        )
+        .await;
 
-        let goal = tinyagents_graph::goals::store::get(&goal_store, "receipt-goal")
+        let goal = tinyagents_harness_tools::goals::store::get(&goal_store, "receipt-goal")
             .await
             .unwrap()
             .unwrap();
@@ -329,7 +337,7 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
         );
         assert_eq!(
             goal.status,
-            tinyagents_graph::goals::ThreadGoalStatus::BudgetLimited,
+            tinyagents_harness_tools::goals::ThreadGoalStatus::BudgetLimited,
             "receipt-backed accounting advances continuation/budget state"
         );
     })

@@ -10,7 +10,7 @@ async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
     let directory = tempfile::tempdir().unwrap();
     let workspace = directory.path();
     let store = SubagentSessionStore::new(workspace.to_path_buf());
-    let jobs = tinyagents_orchestration::subagent::SubAgentJobRegistry::default();
+    let jobs = tinyagents_harness_tools::subagents::SubAgentJobRegistry::default();
     let persistence = OpenHumanPersistence::new(workspace.join(".openhuman/subagent_checkpoints"));
 
     for (task_id, terminal, expected) in [
@@ -50,6 +50,7 @@ async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
                 worker_thread_id: None,
                 task_id: task_id.into(),
                 lifecycle_key: Some(key.clone()),
+                parent_epoch: None,
             },
             None,
         )

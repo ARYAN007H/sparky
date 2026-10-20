@@ -22,7 +22,7 @@ use serde_json::json;
 
 use openhuman_core::tools::host_extensions::pack_registry_handle;
 use openhuman_core::tools::toolpacks::registry::{CATALOG, PACKS};
-use tinyagents_harness::tool::packs::{PackRegistryHandle, UseSkillTool};
+use tinyagents_harness_tools::skills::{PackRegistryHandle, UseSkillTool};
 use tinytools::Tool;
 
 /// A production pack tool's registry handle survives the round trip through

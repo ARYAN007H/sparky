@@ -6,6 +6,7 @@
 //!
 //! * [`versioned_store`] — the records, in the configured storage backend
 //!   ([`super::version_documents::DocumentArtifactStore`]);
+//! * the acting tenant's scoped blob store as TinyArtifacts' file store;
 //! * [`LegacyUiBridge`] — the observer that shows each artifact in the
 //!   desktop UI;
 //! * the folders file artifacts may point into: the agent's working folder
@@ -29,12 +30,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tiny_artifacts::{
-    ArtifactEvent, ArtifactEventKind, ArtifactKind, ArtifactObserver, ArtifactRecord, Artifacts,
-    Author, Content,
+    ArtifactEvent, ArtifactEventKind, ArtifactKind, ArtifactObserver, ArtifactRecord,
+    ArtifactStore, Artifacts, Author, Content, FileRef, FileStore, FsFileStore,
 };
 
 use super::files::FileRoots;
-use super::types::ArtifactKind as LegacyArtifactKind;
+use super::types::{ArtifactKind as LegacyArtifactKind, ArtifactMeta};
 use crate::security::approval::ApprovalChatContext;
 use crate::tools::per_call::PerCallTool;
 
@@ -91,6 +92,97 @@ pub fn versioned_store(workspace_dir: &Path) -> super::version_documents::Docume
     super::version_documents::DocumentArtifactStore::new(workspace_dir)
 }
 
+/// Imports version records written by earlier OpenHuman builds, whose file
+/// references held host paths, through the owner's guarded legacy importer.
+struct LegacyFileImportStore {
+    records: Arc<dyn ArtifactStore>,
+    files: Arc<dyn FileStore>,
+    roots: tiny_artifacts::FileRoots,
+}
+
+/// Refuses all versioned-record operations when a tenant storage binding
+/// could not be resolved, rather than substituting ambient workspace data.
+struct UnavailableArtifactStore;
+
+#[async_trait]
+impl ArtifactStore for UnavailableArtifactStore {
+    async fn list(&self) -> anyhow::Result<Vec<ArtifactRecord>> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+
+    async fn get(&self, _id: &str) -> anyhow::Result<Option<ArtifactRecord>> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+
+    async fn upsert(&self, _artifact: &ArtifactRecord) -> anyhow::Result<()> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+
+    async fn delete(&self, _id: &str) -> anyhow::Result<bool> {
+        anyhow::bail!("artifact tenant storage is unavailable")
+    }
+}
+
+impl LegacyFileImportStore {
+    async fn import_record(&self, mut record: ArtifactRecord) -> anyhow::Result<ArtifactRecord> {
+        if !record.kind.holds_file() {
+            return Ok(record);
+        }
+        let mut changed = false;
+        for version in &mut record.versions {
+            let legacy = version.file.clone().unwrap_or_else(|| FileRef {
+                key: version.body.clone(),
+                size_bytes: 0,
+                media_type: None,
+            });
+            if legacy.key.starts_with("artifacts/files/") {
+                continue;
+            }
+            let ext = Path::new(&legacy.key)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("bin");
+            let key = format!("artifacts/files/{}/v{}.{}", record.id, version.version, ext);
+            let imported =
+                tiny_artifacts::import_legacy_file(self.files.as_ref(), &self.roots, &legacy, &key)
+                    .await?;
+            version.body = imported.key.clone();
+            version.file = Some(imported);
+            changed = true;
+        }
+        if changed {
+            self.records.upsert(&record).await?;
+        }
+        Ok(record)
+    }
+}
+
+#[async_trait]
+impl ArtifactStore for LegacyFileImportStore {
+    async fn list(&self) -> anyhow::Result<Vec<ArtifactRecord>> {
+        let mut imported = Vec::new();
+        for record in self.records.list().await? {
+            imported.push(self.import_record(record).await?);
+        }
+        Ok(imported)
+    }
+
+    async fn get(&self, id: &str) -> anyhow::Result<Option<ArtifactRecord>> {
+        match self.records.get(id).await? {
+            Some(record) => self.import_record(record).await.map(Some),
+            None => Ok(None),
+        }
+    }
+
+    async fn upsert(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
+        self.records.upsert(record).await
+    }
+
+    async fn delete(&self, id: &str) -> anyhow::Result<bool> {
+        self.records.delete(id).await
+    }
+}
+
 /// Where an earlier build kept versioned records, one `<id>.json` each.
 pub fn legacy_versioned_dir(workspace_dir: &Path) -> PathBuf {
     workspace_dir.join("artifacts").join(VERSIONED_SUBDIR)
@@ -100,7 +192,10 @@ pub fn legacy_versioned_dir(workspace_dir: &Path) -> PathBuf {
 pub struct LegacyUiBridge {
     workspace_dir: PathBuf,
     files: FileRoots,
+    source_roots: tiny_artifacts::FileRoots,
+    file_store: Option<Arc<dyn FileStore>>,
     chat: Option<ApprovalChatContext>,
+    ctx: crate::core::runtime::DispatchCtx,
 }
 
 impl LegacyUiBridge {
@@ -109,12 +204,18 @@ impl LegacyUiBridge {
     pub fn new(
         workspace_dir: impl Into<PathBuf>,
         files: FileRoots,
+        source_roots: tiny_artifacts::FileRoots,
+        file_store: Option<Arc<dyn FileStore>>,
         chat: Option<&ApprovalChatContext>,
+        ctx: &crate::core::runtime::DispatchCtx,
     ) -> Self {
         Self {
             workspace_dir: workspace_dir.into(),
             files,
+            source_roots,
+            file_store,
             chat: chat.cloned(),
+            ctx: ctx.clone(),
         }
     }
 
@@ -122,6 +223,10 @@ impl LegacyUiBridge {
     /// mark it ready: the content for text kinds, a copy of the file for file
     /// kinds (unless the file already is the one the artifact owns).
     pub(crate) async fn show_newest(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
+        self.ctx.enter(self.show_newest_in_scope(record)).await
+    }
+
+    async fn show_newest_in_scope(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
         let (Some(latest), Some((legacy_kind, ext))) = (record.latest(), legacy_shape(record))
         else {
             return Ok(());
@@ -131,20 +236,23 @@ impl LegacyUiBridge {
         // ready. Re-reserving would flash the card back to "generating".
         if let Some(file) = latest.file.as_ref() {
             if let Ok(meta) = super::store::get_artifact(&self.workspace_dir, &record.id).await {
-                let owned = meta.file.as_deref().map(Path::new).filter(|owned| {
-                    owned
+                let owned_has_extension = meta.file.as_deref().is_some_and(|owned| {
+                    Path::new(owned)
                         .extension()
                         .and_then(|e| e.to_str())
                         .map(str::to_ascii_lowercase)
                         == Some(ext.clone())
                 });
-                if let Some(owned) = owned {
-                    let source = Path::new(&file.path);
-                    let size = if same_file(owned, source) {
-                        tokio::fs::metadata(source).await?.len()
-                    } else {
-                        tokio::fs::copy(source, owned).await?
-                    };
+                if owned_has_extension {
+                    let destination = self.resolve_visible_destination(&meta).await?;
+                    let file_store = self
+                        .file_store
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("artifact file storage is unavailable"))?;
+                    let bytes = file_store.read(&file.key).await?;
+                    let size = self
+                        .write_visible_file(&destination, &bytes, file.media_type.as_deref())
+                        .await?;
                     super::store::finalize_artifact(
                         &self.workspace_dir,
                         &record.id,
@@ -169,15 +277,25 @@ impl LegacyUiBridge {
         )
         .await
         .map_err(anyhow::Error::msg)?;
+        let destination = self.resolve_visible_destination(&meta).await?;
         let size = if record.holds_file() {
-            let source = latest
-                .file
-                .as_ref()
-                .map_or_else(|| PathBuf::from(&latest.body), |f| PathBuf::from(&f.path));
-            if same_file(&source, &dest) {
-                tokio::fs::metadata(&dest).await?.len()
+            if let Some(file) = latest.file.as_ref() {
+                let file_store = self
+                    .file_store
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("artifact file storage is unavailable"))?;
+                let bytes = file_store.read(&file.key).await?;
+                self.write_visible_file(&destination, &bytes, file.media_type.as_deref())
+                    .await?
             } else {
-                tokio::fs::copy(&source, &dest).await?
+                let source = self.source_roots.resolve(&latest.body).await?;
+                if same_file(&source.path, &destination) {
+                    tokio::fs::metadata(&destination).await?.len()
+                } else {
+                    let bytes = tokio::fs::read(&source.path).await?;
+                    self.write_visible_file(&destination, &bytes, source.media_type.as_deref())
+                        .await?
+                }
             }
         } else {
             tokio::fs::write(&dest, latest.body.as_bytes()).await?;
@@ -188,21 +306,43 @@ impl LegacyUiBridge {
             .map_err(anyhow::Error::msg)?;
         Ok(())
     }
-}
 
-fn same_file(a: &Path, b: &Path) -> bool {
-    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
-        (Ok(a), Ok(b)) => a == b,
-        _ => false,
+    async fn resolve_visible_destination(&self, meta: &ArtifactMeta) -> anyhow::Result<PathBuf> {
+        let path = super::files::resolve_file(&self.workspace_dir, meta, &self.files)
+            .await
+            .map_err(anyhow::Error::msg)?;
+        let raw = path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("artifact presentation path is not valid UTF-8"))?;
+        let resolved = super::tiny_store::guarded_roots(self.files.trusted().to_vec())
+            .resolve(raw)
+            .await?;
+        Ok(resolved.path)
     }
-}
 
-#[async_trait]
-impl ArtifactObserver for LegacyUiBridge {
-    async fn on_event(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
+    async fn write_visible_file(
+        &self,
+        destination: &Path,
+        bytes: &[u8],
+        media_type: Option<&str>,
+    ) -> anyhow::Result<u64> {
+        let root = destination
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("artifact presentation file has no parent"))?;
+        let name = destination
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| anyhow::anyhow!("artifact presentation file has no valid name"))?;
+        let metadata = FsFileStore::new(root)
+            .overwrite_existing(name, bytes, media_type)
+            .await?;
+        Ok(metadata.size_bytes)
+    }
+
+    async fn on_event_in_scope(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
         let id = &event.record.id;
         match event.kind {
-            ArtifactEventKind::Ready => self.show_newest(&event.record).await,
+            ArtifactEventKind::Ready => self.show_newest_in_scope(&event.record).await,
             ArtifactEventKind::Failed => {
                 let reason = event.record.error.as_deref().unwrap_or("failed");
                 // Only an artifact the UI already shows has a row to fail.
@@ -232,6 +372,20 @@ impl ArtifactObserver for LegacyUiBridge {
             // when the first version lands.
             ArtifactEventKind::Pending => Ok(()),
         }
+    }
+}
+
+fn same_file(a: &Path, b: &Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
+#[async_trait]
+impl ArtifactObserver for LegacyUiBridge {
+    async fn on_event(&self, event: &ArtifactEvent) -> anyhow::Result<()> {
+        self.ctx.enter(self.on_event_in_scope(event)).await
     }
 }
 
@@ -299,17 +453,102 @@ pub fn artifacts_service(
     files: FileRoots,
     action_dir: Option<&Path>,
     chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Artifacts {
-    let roots = file_roots(workspace_dir, &files, action_dir);
-    Artifacts::new(Arc::new(versioned_store(workspace_dir)))
-        .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files, chat)))
-        .with_file_roots(guarded_roots(roots))
-        .with_version_files(version_files_dir(workspace_dir))
+    build_artifacts_service(workspace_dir, files, action_dir, chat, ctx, None).0
 }
 
-/// Where each file version keeps its own copy:
-/// `<workspace>/artifacts/versioned/files/<id>/v<N>.<ext>`. The visible file
-/// in the files folder shows the newest version.
+/// Build an artifact service and bind an optional publisher to the exact
+/// tenant-scoped file store used by that service.
+pub fn artifacts_service_with_publisher(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
+    publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
+) -> Artifacts {
+    build_artifacts_service(workspace_dir, files, action_dir, chat, ctx, publisher).0
+}
+
+pub(crate) fn artifacts_service_with_file_store(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> (Artifacts, Option<Arc<dyn FileStore>>) {
+    build_artifacts_service(workspace_dir, files, action_dir, chat, ctx, None)
+}
+
+fn build_artifacts_service(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
+    publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
+) -> (Artifacts, Option<Arc<dyn FileStore>>) {
+    let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
+    build_artifacts_service_with_scope(
+        workspace_dir,
+        files,
+        action_dir,
+        chat,
+        ctx,
+        scoped,
+        publisher,
+    )
+}
+
+pub(super) fn build_artifacts_service_with_scope(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
+    scoped: Option<crate::storage::ScopedStorage>,
+    publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
+) -> (Artifacts, Option<Arc<dyn FileStore>>) {
+    let roots = file_roots(workspace_dir, &files, action_dir);
+    let file_store = scoped
+        .as_ref()
+        .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(scoped)) as Arc<dyn FileStore>);
+    let mut records: Arc<dyn ArtifactStore> = match scoped.as_ref() {
+        Some(scoped) => Arc::new(super::version_documents::DocumentArtifactStore::over(
+            workspace_dir,
+            scoped,
+        )),
+        None => Arc::new(UnavailableArtifactStore),
+    };
+    if let Some(store) = file_store.as_ref() {
+        records = Arc::new(LegacyFileImportStore {
+            records,
+            files: store.clone(),
+            roots: guarded_roots(roots.clone()),
+        });
+    }
+    let mut artifacts = Artifacts::new(records)
+        .with_observer(Arc::new(LegacyUiBridge::new(
+            workspace_dir,
+            files,
+            guarded_roots(roots.clone()),
+            file_store.clone(),
+            chat,
+            ctx,
+        )))
+        .with_file_roots(guarded_roots(roots));
+    if let Some(file_store) = file_store.as_ref() {
+        if let Some(publisher) = publisher {
+            artifacts = artifacts.with_publisher(publisher(file_store.clone()));
+        }
+        artifacts = artifacts.with_file_store(file_store.clone());
+    }
+    (artifacts, file_store)
+}
+
+/// Legacy workspace folder that earlier builds used for per-version file
+/// copies. New file bytes live in the acting tenant's scoped blob store.
 pub fn version_files_dir(workspace_dir: &Path) -> PathBuf {
     workspace_dir
         .join("artifacts")
@@ -327,53 +566,65 @@ pub fn version_files_dir(workspace_dir: &Path) -> PathBuf {
 /// around a service whose UI bridge carries that call's chat routing
 /// ([`PerCallTool`]); the card then reaches the chat the agent is answering.
 pub fn registered_tools(
-    workspace_dir: &Path,
+    config: crate::config::Config,
     files: FileRoots,
     action_dir: &Path,
-    publisher: Option<Arc<dyn tiny_artifacts::ArtifactPublisher>>,
+    publisher_available: bool,
 ) -> Vec<Box<dyn tinytools::Tool>> {
-    let can_publish = publisher.is_some();
+    let can_publish = publisher_available;
     let service = {
-        let workspace_dir = workspace_dir.to_path_buf();
+        let workspace_dir = config.workspace_dir.clone();
         let action_dir = action_dir.to_path_buf();
-        Arc::new(move |chat: Option<&ApprovalChatContext>| {
-            let mut service =
-                artifacts_service(&workspace_dir, files.clone(), Some(&action_dir), chat);
-            if let Some(publisher) = &publisher {
-                service = service.with_publisher(publisher.clone());
-            }
-            Arc::new(service)
-        })
+        let publisher_config = config.clone();
+        Arc::new(
+            move |chat: Option<&ApprovalChatContext>, ctx: &crate::core::runtime::DispatchCtx| {
+                let publisher = super::artifact_publisher_in(&publisher_config, ctx);
+                Arc::new(artifacts_service_with_publisher(
+                    &workspace_dir,
+                    files.clone(),
+                    Some(&action_dir),
+                    chat,
+                    ctx,
+                    publisher.as_ref(),
+                ))
+            },
+        )
     };
     let author = Author::agent(AGENT_AUTHOR_ID);
     let mut tools: Vec<Box<dyn tinytools::Tool>> = Vec::new();
     {
         let (service, author) = (service.clone(), author.clone());
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::CreateArtifactTool::new(service(chat), author.clone())
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::CreateArtifactTool::new(service(chat, ctx), author.clone())
         })));
     }
-    tools.push(Box::new(tiny_artifacts::ReadArtifactTool::new(service(
-        None,
-    ))));
-    {
-        let (service, author) = (service.clone(), author.clone());
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::UpdateArtifactTool::new(service(chat), author.clone())
-        })));
-    }
-    tools.push(Box::new(tiny_artifacts::ListArtifactsTool::new(service(
-        None,
-    ))));
     {
         let service = service.clone();
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::DeleteArtifactTool::new(service(chat))
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::ReadArtifactTool::new(service(chat, ctx))
+        })));
+    }
+    {
+        let (service, author) = (service.clone(), author.clone());
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::UpdateArtifactTool::new(service(chat, ctx), author.clone())
+        })));
+    }
+    {
+        let service = service.clone();
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::ListArtifactsTool::new(service(chat, ctx))
+        })));
+    }
+    {
+        let service = service.clone();
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::DeleteArtifactTool::new(service(chat, ctx))
         })));
     }
     if can_publish {
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::ShareArtifactTool::new(service(chat))
+        tools.push(Box::new(PerCallTool::new(move |chat, ctx| {
+            tiny_artifacts::ShareArtifactTool::new(service(chat, ctx))
         })));
     }
     tools
@@ -396,8 +647,9 @@ pub async fn save_operator_version(
     files: FileRoots,
     id: &str,
     body: &str,
+    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<SavedVersion, String> {
-    let saved = artifacts_service(workspace_dir, files, None, None)
+    let saved = artifacts_service(workspace_dir, files, None, None, ctx)
         .revise(
             id,
             Content::Text(body.to_string()),

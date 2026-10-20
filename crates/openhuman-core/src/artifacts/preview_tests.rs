@@ -1,20 +1,16 @@
 use std::path::Path;
 
-use tiny_artifacts::{ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactVersion, FileRef};
+use tiny_artifacts::{
+    ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactVersion, FileRef, FileStore,
+};
 
 use super::*;
 
-fn file_record(path: &Path) -> ArtifactRecord {
-    let mut version = ArtifactVersion::new(
-        1,
-        path.display().to_string(),
-        ArtifactAuthor::Agent,
-        "agent",
-        1,
-    );
+fn file_record(key: &str, size_bytes: u64) -> ArtifactRecord {
+    let mut version = ArtifactVersion::new(1, key, ArtifactAuthor::Agent, "agent", 1);
     version.file = Some(FileRef {
-        path: path.display().to_string(),
-        size_bytes: std::fs::metadata(path).map(|m| m.len()).unwrap_or(0),
+        key: key.to_string(),
+        size_bytes,
         media_type: None,
     });
     let mut record = ArtifactRecord::pending("f-1", "Report", ArtifactKind::File, 1);
@@ -22,8 +18,8 @@ fn file_record(path: &Path) -> ArtifactRecord {
     record
 }
 
-fn roots(dir: &Path) -> tiny_artifacts::FileRoots {
-    tiny_artifacts::FileRoots::new([dir.to_path_buf()])
+fn file_store(dir: &Path) -> std::sync::Arc<dyn FileStore> {
+    std::sync::Arc::new(tiny_artifacts::FsFileStore::new(dir))
 }
 
 #[tokio::test]
@@ -37,8 +33,7 @@ async fn a_text_kind_shows_its_newest_version() {
         "operator",
         2,
     ));
-    let dir = tempfile::tempdir().unwrap();
-    let body = body_of(&record, &roots(dir.path()), &DocumentConverter::none()).await;
+    let body = body_of(&record, None, None, &DocumentConverter::none()).await;
     assert_eq!(body.kind, "markdown");
     assert_eq!(body.version, 2);
     assert_eq!(body.body, "# v2");
@@ -46,69 +41,66 @@ async fn a_text_kind_shows_its_newest_version() {
 }
 
 #[tokio::test]
-async fn a_text_file_inside_the_roots_is_read() {
+async fn a_text_file_is_read_from_the_scoped_file_store() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("notes.txt");
-    std::fs::write(&file, "plain notes").unwrap();
-    let body = body_of(
-        &file_record(&file),
-        &roots(dir.path()),
-        &DocumentConverter::none(),
-    )
-    .await;
+    let files = file_store(dir.path());
+    files
+        .put("artifacts/files/f-1/v1.txt", b"plain notes", None)
+        .await
+        .unwrap();
+    let record = file_record("artifacts/files/f-1/v1.txt", 11);
+    let body = body_of(&record, Some(&files), None, &DocumentConverter::none()).await;
     assert_eq!(body.kind, "file");
     assert_eq!(body.body, "plain notes");
     assert!(body.is_text);
 }
 
 #[tokio::test]
-async fn a_file_outside_the_roots_is_not_opened() {
-    let dir = tempfile::tempdir().unwrap();
+async fn a_blob_file_is_not_read_without_its_store() {
     let elsewhere = tempfile::tempdir().unwrap();
-    let secret = elsewhere.path().join("secret.txt");
-    std::fs::write(&secret, "do not read").unwrap();
-    let body = body_of(
-        &file_record(&secret),
-        &roots(dir.path()),
-        &DocumentConverter::none(),
-    )
-    .await;
+    let files = file_store(elsewhere.path());
+    files
+        .put("artifacts/files/f-1/v1.txt", b"do not read", None)
+        .await
+        .unwrap();
+    let record = file_record("artifacts/files/f-1/v1.txt", 11);
+    let body = body_of(&record, None, None, &DocumentConverter::none()).await;
     // Shown as a file: its path, never its content.
     assert!(!body.is_text);
-    assert_eq!(body.body, secret.display().to_string());
+    assert_eq!(body.body, "v1.txt");
 }
 
 #[tokio::test]
 async fn a_file_over_the_preview_limit_is_not_read() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("big.txt");
-    std::fs::File::create(&file)
-        .unwrap()
-        .set_len(PREVIEW_MAX_BYTES + 1)
+    let files = file_store(dir.path());
+    let bytes = vec![b'a'; (PREVIEW_MAX_BYTES + 1) as usize];
+    files
+        .put("artifacts/files/f-1/v1.txt", &bytes, None)
+        .await
         .unwrap();
-    let body = body_of(
-        &file_record(&file),
-        &roots(dir.path()),
-        &DocumentConverter::none(),
-    )
-    .await;
+    let record = file_record("artifacts/files/f-1/v1.txt", bytes.len() as u64);
+    let body = body_of(&record, Some(&files), None, &DocumentConverter::none()).await;
     assert!(!body.is_text);
-    assert_eq!(body.body, file.display().to_string());
+    assert_eq!(body.body, "v1.txt");
 }
 
 #[tokio::test]
 async fn a_binary_file_with_no_converter_shows_as_a_file() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("report.docx");
-    std::fs::write(&file, b"PK\x03\x04\x00\x00binary").unwrap();
-    let body = body_of(
-        &file_record(&file),
-        &roots(dir.path()),
-        &DocumentConverter::none(),
-    )
-    .await;
+    let files = file_store(dir.path());
+    files
+        .put(
+            "artifacts/files/f-1/v1.docx",
+            b"PK\x03\x04\x00\x00binary",
+            None,
+        )
+        .await
+        .unwrap();
+    let record = file_record("artifacts/files/f-1/v1.docx", 10);
+    let body = body_of(&record, Some(&files), None, &DocumentConverter::none()).await;
     assert!(!body.is_text && !body.converted);
-    assert_eq!(body.body, file.display().to_string());
+    assert_eq!(body.body, "v1.docx");
 }
 
 fn config_in(workspace: &Path) -> crate::config::Config {
@@ -124,46 +116,68 @@ fn config_in(workspace: &Path) -> crate::config::Config {
 async fn ids_that_name_another_file_are_refused() {
     let workspace = tempfile::tempdir().unwrap();
     let config = config_in(workspace.path());
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
     for id in ["../x", "a/b", "..", ".hidden"] {
-        assert!(read_body(&config, id).await.is_err(), "{id:?}");
+        assert!(read_body(&config, id, &ctx).await.is_err(), "{id:?}");
     }
 }
 
 #[tokio::test]
 async fn an_unknown_artifact_is_not_found() {
     let workspace = tempfile::tempdir().unwrap();
-    let err = read_body(&config_in(workspace.path()), "missing")
+    let ctx = crate::core::runtime::DispatchCtx::process_default();
+    let err = read_body(&config_in(workspace.path()), "missing", &ctx)
         .await
         .unwrap_err();
     assert!(err.contains("not found"), "{err}");
 }
 
 #[tokio::test]
-async fn an_artifact_made_before_versioning_opens_from_its_legacy_record() {
+async fn a_legacy_preview_reads_its_record_from_the_carried_profile() {
     use crate::artifacts::store::{create_artifact, finalize_artifact};
     use crate::artifacts::types::ArtifactKind as LegacyKind;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
     let workspace = tempfile::tempdir().unwrap();
     let config = config_in(workspace.path());
     let files = config.files_dir();
     std::fs::create_dir_all(&files).unwrap();
-    // Only the legacy record: no versioned one.
-    let (meta, path) = create_artifact(
-        workspace.path(),
-        files.clone(),
-        LegacyKind::Document,
-        "Old notes",
-        "md",
-        None,
-    )
-    .await
-    .unwrap();
-    std::fs::write(&path, "# from before").unwrap();
-    finalize_artifact(workspace.path(), &meta.id, 13, None)
+    let context_for = |profile: &'static str| {
+        let overlay = ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::kernel(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile(profile);
+        CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
+    };
+    let core_a = context_for("preview-a");
+    let core_b = context_for("preview-b");
+    let ctx_a = DispatchCtx::new(core_a.clone());
+    // Only profile A has the legacy record; there is no versioned record.
+    let meta = CoreContext::scope(core_a, async {
+        let (meta, path) = create_artifact(
+            workspace.path(),
+            files.clone(),
+            LegacyKind::Document,
+            "Old notes",
+            "md",
+            None,
+        )
         .await
         .unwrap();
+        std::fs::write(&path, "# from before").unwrap();
+        finalize_artifact(workspace.path(), &meta.id, 13, None)
+            .await
+            .unwrap();
+        meta
+    })
+    .await;
 
-    let body = read_body(&config, &meta.id).await.unwrap();
+    let body = CoreContext::scope(core_b, async {
+        read_body(&config, &meta.id, &ctx_a).await.unwrap()
+    })
+    .await;
     assert_eq!(body.title, "Old notes");
     assert_eq!(body.kind, "file");
     assert_eq!(body.body, "# from before");
