@@ -8,7 +8,6 @@ async fn cached_probe_serves_definitive_negative_results() {
     use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelHooks};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
-    use tinyinference_llm::model::ChatModel;
 
     let tmp = TempDir::new().unwrap();
     let mut config = Config {

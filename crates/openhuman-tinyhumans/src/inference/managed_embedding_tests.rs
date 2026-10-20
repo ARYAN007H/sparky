@@ -3,7 +3,7 @@ use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::AuthService;
 use std::collections::HashMap;
 use tinyinference_embeddings::{
-    CloudEmbeddingModel, DEFAULT_CLOUD_DIMENSIONS, DEFAULT_CLOUD_MODEL,
+    CloudEmbeddingModel, EmbeddingModel, DEFAULT_CLOUD_DIMENSIONS, DEFAULT_CLOUD_MODEL,
 };
 
 fn test_config(tmp: &tempfile::TempDir) -> Config {

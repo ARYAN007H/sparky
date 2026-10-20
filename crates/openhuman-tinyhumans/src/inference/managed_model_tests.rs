@@ -98,25 +98,40 @@ fn managed_bearer_refusal_redacts_foreign_endpoint_details() {
         secrets_encrypt: false,
         ..ManagedOptions::default()
     };
-    let endpoint = "https://synthetic-user:SYNTHETIC_PASSWORD@foreign.example/private/SYNTHETIC_PATH?token=SYNTHETIC_QUERY";
-
-    let error = options
-        .resolve_bearer(endpoint)
-        .expect_err("foreign endpoint must remain rejected");
-    let diagnostic = error.to_string();
-    for marker in [
-        "synthetic-user",
-        "SYNTHETIC_PASSWORD",
-        "SYNTHETIC_PATH",
-        "SYNTHETIC_QUERY",
-        "SYNTHETIC_BEARER_MARKER",
+    for (endpoint, markers) in [
+        (
+            "https://synthetic-user:SYNTHETIC_PASSWORD@foreign.example/private/SYNTHETIC_PATH?token=SYNTHETIC_QUERY#SYNTHETIC_FRAGMENT",
+            [
+                "synthetic-user",
+                "SYNTHETIC_PASSWORD",
+                "SYNTHETIC_PATH",
+                "SYNTHETIC_QUERY",
+                "SYNTHETIC_FRAGMENT",
+            ],
+        ),
+        (
+            "https://foreign.example/private/SYNTHETIC_PATH?token=SYNTHETIC_QUERY#SYNTHETIC_FRAGMENT",
+            [
+                "unused-userinfo",
+                "unused-password",
+                "SYNTHETIC_PATH",
+                "SYNTHETIC_QUERY",
+                "SYNTHETIC_FRAGMENT",
+            ],
+        ),
     ] {
-        assert!(
-            !diagnostic.contains(marker),
-            "refusal diagnostic exposed {marker}: {diagnostic}"
-        );
+        let error = options
+            .resolve_bearer(endpoint)
+            .expect_err("foreign endpoint must remain rejected");
+        let diagnostic = error.to_string();
+        for marker in markers.into_iter().chain(["SYNTHETIC_BEARER_MARKER"]) {
+            assert!(
+                !diagnostic.contains(marker),
+                "refusal diagnostic exposed {marker}: {diagnostic}"
+            );
+        }
+        assert!(diagnostic.contains("refusing to send"), "{diagnostic}");
     }
-    assert!(diagnostic.contains("refusing to send"), "{diagnostic}");
 }
 
 async fn unauthorized_chat_response() -> axum::response::Response {
