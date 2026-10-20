@@ -49,13 +49,10 @@ crate-type = ["rlib"]
 # which hosts connect at boot and which plugs in through the core's generic
 # registries. `scripts/assert-shed.sh` / `cargo tree -i tinyhumans-sdk`
 # must stay empty for this package.
-# The tinyflows module's bus contract (`tinyflows_bus::schedule`): the job,
-# run, schedule and delivery records of the `cron::` domain, the member names
-# and the callback vocabulary. Unconditional: the cron scheduler is not behind
-# the `flows` gate. The scheduler runtime, job store and schedule maths run in
-# the `tinyflows` module; core links only this contract (never
-# `tinyflows-schedule` or `tinyflows-drivers`' `schedule` store). It depends on
-# serde/chrono alone, like every `*-bus` crate.
+# The TinyFlows module's schedule, catalog, authoring, runs and portability
+# contracts. Unconditional because cron and module callbacks remain available
+# without the OpenHuman `flows` surface; engine and catalog implementations are
+# reached only through the loaded module's bus endpoints.
 tinyflows-bus = { path = "../../vendor/tinyflows/crates/tinyflows-bus" }
 # Reads the stores tinyflows hosts used before storage moved onto the ports
 # (`flows.db`, `jobs.db`, `checkpoints.db`, drafts). Only its pure SQLite readers
@@ -484,6 +481,9 @@ tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 # behavioural suite every engine must pass. Memory unit tests bind it as the
 # engine instead of talking to CortexDB.
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["conformance"] }
+# Test-only parser/AST fixtures and the engine's mock capability bundle. The
+# production host exchanges normalized graph JSON over `tinyflows-bus`.
+tinyflows = { path = "../../vendor/tinyflows/crates/tinyflows", features = ["mock"] }
 # The document catalog's `*_for_test` fixtures, which the flows store forwards
 # in test builds.
 tinyflows-drivers = { path = "../../vendor/tinyflows/crates/tinyflows-drivers", default-features = false, features = ["test-fixtures"] }
@@ -710,18 +710,18 @@ web3 = [
 # surface gate. There are no controllers / stores / subscribers tagged `Media`
 # (agent tools only), and `openhuman::image` is currently unwired scaffold.
 media = ["tinyagents-harness/media"]
-# Flows domains: the `flows::` automation surface (saved tinyflows graphs —
-# create/run/schedule + the workflow_builder / flow_discovery agents), the
-# `tinyflows::` adapter seam, and the `rhai_workflows::` language-workflow tool.
+# Flows domains: the `flows::` automation surface (saved graphs — create/run/
+# schedule plus the workflow_builder / flow_discovery agents), and the
+# `rhai_workflows::` language-workflow tool. Production graphs remain JSON over
+# `tinyflows-bus`; the engine is test-only.
 # Default-ON — the desktop app always ships with Workflows. Slim / headless
 # builds opt out via `--no-default-features --features "<list without flows>"`,
-# which drops `tinyflows` + its `jaq-core`/`jaq-std`/`jaq-json` JSON-query stack
-# (the `rhai` scripting engine no longer rides along: tinyagents dropped its
-# `repl`/`rlm` features, and nothing here referenced them). Composes with the
-# runtime `DomainSet::flows` flag (#4796): the feature narrows the compile-time
-# surface, `DomainSet` gates it at runtime.
+# which drops the flows controllers, builders, and flow/checkpoint legacy
+# readers. The schedule reader remains enabled for cron without flows. Composes
+# with the runtime `DomainSet::flows` flag (#4796): the feature narrows the
+# compile-time surface, `DomainSet` gates it at runtime.
 # NOTE: this gate does NOT drop `tinyagents` itself — 26+ domains consume it.
-flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "tinyflows-import/flow-read", "tinyflows-import/checkpoint-read"]
+flows = ["modules", "tinyflows-import/flow-read", "tinyflows-import/checkpoint-read"]
 # Skills domains: `openhuman::skills` (metadata/discovery/install),
 # `openhuman::skill_runtime` (SKILL.md execution + the skill_executor agent),
 # and `openhuman::skill_registry` (remote catalogs + the skill_setup agent).

@@ -4,6 +4,7 @@ use tinyflows_bus::{GraphValidation, ImportGraphResult, ValidateGraphRequest};
 
 // The refusal code remains stable on OpenHuman's test surface.
 #[cfg(test)]
+#[cfg(test)]
 pub(crate) use tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN;
 
 pub(super) async fn validate_over_bus(
