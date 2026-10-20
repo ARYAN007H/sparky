@@ -16,12 +16,10 @@ use crate::security::credentials::channel_credential_provider;
 use tinychannels_bus::controllers::{
     all_channel_controller_schemas, channel_controller_schema, ChannelAuthMode,
     ChannelConnectRequest as ConnectParams, ChannelCreateThreadRequest as CreateThreadParams,
-    ChannelDisconnectRequest as DisconnectParams,
-    ChannelListThreadsRequest as ListThreadsParams,
+    ChannelDisconnectRequest as DisconnectParams, ChannelListThreadsRequest as ListThreadsParams,
     ChannelSendMessageRequest as SendMessageParams,
-    ChannelSendReactionRequest as SendReactionParams,
-    ChannelStatusRequest as StatusParams, ChannelTestRequest as TestParams,
-    ChannelUpdateThreadRequest as UpdateThreadParams,
+    ChannelSendReactionRequest as SendReactionParams, ChannelStatusRequest as StatusParams,
+    ChannelTestRequest as TestParams, ChannelUpdateThreadRequest as UpdateThreadParams,
     DiscordCheckPermissionsRequest as DiscordCheckPermissionsParams,
     DiscordListChannelsRequest as DiscordListChannelsParams,
 };
