@@ -111,8 +111,7 @@ model is missing.
   host_runtime::global(config)  ---- OnceCell ---->  LocalAiService (probe state)
          |
          +-- ops/runtime_ops.rs   status, summarize, prompt, vision, transcribe, tts
-         +-- ops/agent_chat.rs    agent_chat, agent_chat_simple, agent_chat_for
-         +-- ops/turn_guards.rs   prompt-injection gate, cwd grant, turn origin
+         +-- ops/agent_chat_simple.rs lightweight provider-only chat
          +-- service/speech.rs    transcribe / tts bindings used by crate::voice
 ```
 
@@ -123,7 +122,7 @@ whisper.cpp is retired; speech-to-text goes through the engine configured in
 bindings call `crate::voice::create_stt_provider` for it. Local TTS uses a Piper binary the user
 installed (`PIPER_BIN` or `PATH`).
 
-`agent_chat_for` in [`host_runtime/ops/agent_chat.rs`](./host_runtime/ops/agent_chat.rs) is the native agent-turn entry used by
+`agent_chat_for` in [`agent_runs/agent_chat/session_turn.rs`](../agent_runs/agent_chat/session_turn.rs) is the native agent-turn entry used by
 `openhuman-rpc` and `openhuman-embed`. It runs the turn under the agent's own `CoreContext`,
 resumes the thread's session with `ResumeMode::Session`, and is boxed on purpose so other crates
 do not each instantiate its state machine.
@@ -226,8 +225,8 @@ picks the provider the same way a provider string does.
 - `BYOK_INCOMPLETE_SENTINEL` (`provider/factory.rs`) marks a BYOK route with missing pieces.
 - `OpenHumanBackendModel` (`openhuman-tinyhumans`, `src/inference/managed_model.rs`) is the managed backend model, registered through `registry.rs`.
 - `host_runtime::global` ([`host_runtime/core.rs`](./host_runtime/core.rs)) returns the `LocalAiService` singleton.
-- `agent_chat_for` and `agent_chat_reply_for` (`host_runtime/ops/agent_chat.rs`) run an agent turn
-  natively. `INFERENCE_AGENT_CHAT` (`schemas.rs`) is the wire method name hosts reference.
+- `agent_chat_for` and `agent_chat_reply_for` (`agent_runs/agent_chat/session_turn.rs`) run an agent turn
+  natively. `INFERENCE_AGENT_CHAT` (`agent_runs::INFERENCE_AGENT_CHAT`) is the wire method name hosts reference.
 - `context_window_for_model` (`model_context.rs`) and `resolve_context_window`
   (`context_window.rs`) answer window sizes.
 - `api_error` ([`provider/http_error.rs`](./provider/http_error.rs)) is the single entry for turning a failed
@@ -251,8 +250,8 @@ All controllers are pushed into the registry in [`core/all.rs`](../core/all.rs) 
 - Claude Code: `claude_code_status`, `claude_code_auth_status`, `claude_code_settings`,
   `claude_code_set_full_access`.
 
-`inference.*` from [`host_runtime/schemas.rs`](./host_runtime/schemas.rs): `agent_chat`, `agent_chat_simple`, `transcribe`,
-`transcribe_bytes`, `tts`, `test_connection`.
+`inference.*` from [`agent_runs/agent_chat/controllers.rs`](../agent_runs/agent_chat/controllers.rs): `agent_chat`, `agent_chat_simple`.
+`inference.*` from [`host_runtime/schemas.rs`](./host_runtime/schemas.rs): `transcribe`, `transcribe_bytes`, `tts`, `test_connection`.
 
 `embeddings.*` from [`embedding_host/schemas.rs`](./embedding_host/schemas.rs): `get_settings`, `update_settings`, `set_api_key`,
 `clear_api_key`, `embed`, `test_connection`.

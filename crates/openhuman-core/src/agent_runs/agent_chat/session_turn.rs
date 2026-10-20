@@ -1,11 +1,11 @@
-//! Agent chat turns: the full tool-using turn and the simple no-tools variant.
+//! Agent chat turns with the full tool-using harness.
 
+use super::envelope::AgentChatReply;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 use crate::core::Outcome;
-use crate::inference::provider as providers;
 
-use super::turn_guards::{
+use super::guards::{
     effective_agent_chat_origin, enforce_user_prompt_or_reject, grant_turn_cwd,
     normalize_model_override, resolve_turn_cwd,
 };
@@ -97,51 +97,6 @@ pub struct AgentChatEnv {
             tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
         >,
     >,
-}
-
-/// The log line every successful agent chat turn carries.
-const AGENT_CHAT_COMPLETED_LOG: &str = "agent chat completed";
-
-/// What one agent chat turn produced: its reply and whether it stopped at the
-/// tool-iteration cap rather than finishing.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AgentChatReply {
-    /// The reply text. When `hit_cap` is set this is the turn's checkpoint.
-    pub text: String,
-    /// The turn paused at its iteration cap (see
-    /// [`OpenHumanSessionHost::last_turn_hit_cap`]).
-    pub hit_cap: bool,
-}
-
-impl AgentChatReply {
-    /// The historical `Outcome<String>` shape, for library callers.
-    pub fn into_outcome(self) -> Outcome<String> {
-        Outcome::single_log(self.text, AGENT_CHAT_COMPLETED_LOG)
-    }
-
-    /// The `inference.agent_chat` wire shape: the historical
-    /// `{"result": <text>, "logs": [...]}` envelope plus `hit_cap`, and, when
-    /// the turn was capped, `checkpoint` (the same text, named for what it is).
-    ///
-    /// Additive on purpose: existing clients keep reading the reply from
-    /// `result` (directly or through `unwrap_rpc`), and a headless caller can
-    /// now tell a capped turn from a finished one and continue it (#6958).
-    pub fn into_rpc_json(self) -> Result<serde_json::Value, String> {
-        let hit_cap = self.hit_cap;
-        let checkpoint = hit_cap.then(|| self.text.clone());
-        let mut value = self.into_outcome().into_cli_compatible_json()?;
-        let serde_json::Value::Object(map) = &mut value else {
-            return Err("agent chat envelope is not a JSON object".to_string());
-        };
-        map.insert("hit_cap".to_string(), serde_json::Value::Bool(hit_cap));
-        if let Some(checkpoint) = checkpoint {
-            map.insert(
-                "checkpoint".to_string(),
-                serde_json::Value::String(checkpoint),
-            );
-        }
-        Ok(value)
-    }
 }
 
 /// Which session [`agent_chat_for`] builds the turn on.
@@ -474,42 +429,22 @@ pub async fn agent_chat_reply_for(
         agent.set_thread_id(Some(id));
         log::debug!("[inference] agent_chat bound session for thread_id={id}");
     }
-    // Host attachments, staged where the provider will look for them: the
-    // turn's root when it has one, the configured `action_dir` otherwise.
-    // Their references lead the message, so the model reads the files first
-    // and the caption after, as an upload with a caption reads.
-    let staged_message;
-    let message = match target {
+    // Host attachments are staged where the provider will look for them: the
+    // turn root, or the configured action directory when no root was supplied.
+    let staged_message = match target {
         AgentChatTarget::Definition { attachments, .. } if !attachments.is_empty() => {
-            let staging_config = match turn_cwd.as_ref() {
-                Some(root) => {
-                    let mut scoped = config.clone();
-                    scoped.action_dir = root.clone();
-                    scoped
-                }
-                None => config.clone(),
-            };
-            let scope = crate::attachments::AttachmentAccessScope {
-                external_channel: false,
-                workspace: turn_cwd.clone(),
-            };
-            let references = crate::attachments::host::stage_host(
+            super::attachments::stage_host_attachments(
                 attachments,
                 turn_session_id.unwrap_or("direct"),
-                &staging_config,
-                &scope,
+                config,
+                turn_cwd.clone(),
+                message,
             )
-            .await
-            .map_err(|e| e.to_string())?;
-            log::debug!(
-                "[inference] agent_chat staged {} host attachment(s)",
-                attachments.len()
-            );
-            staged_message = format!("{references}{message}");
-            staged_message.as_str()
+            .await?
         }
-        _ => message,
+        _ => message.to_string(),
     };
+    let message = staged_message.as_str();
     if let AgentChatTarget::Definition {
         untrusted_input: true,
         ..
@@ -626,74 +561,6 @@ pub async fn agent_chat_reply_for(
     Ok(AgentChatReply { text, hit_cap })
 }
 
-/// A simplified chat interface that does not update the base configuration.
-pub async fn agent_chat_simple(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-    message: &str,
-    model_override: Option<String>,
-    temperature: Option<f64>,
-    thread_id: Option<String>,
-) -> Result<Outcome<String>, String> {
-    enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat_simple")?;
-
-    let mut effective = config.clone();
-    // TAURI-RUST-RS: see `normalize_model_override` for the rationale.
-    if let Some(model) = normalize_model_override(model_override) {
-        effective.default_model = Some(model);
-    }
-    if let Some(temp) = temperature {
-        effective.default_temperature = temp;
-    }
-
-    let default_model = effective
-        .default_model
-        .clone()
-        .unwrap_or_else(|| crate::config::DEFAULT_MODEL.to_string());
-
-    let (model, resolved_model): (
-        std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
-        String,
-    ) = if providers::factory::resolves_to_managed_backend("chat", &effective) {
-        let (backend, resolved_model) =
-            providers::factory::make_openhuman_backend_model_for_thread(
-                "chat",
-                &effective,
-                &default_model,
-                true,
-                thread_id.as_deref(),
-                &crate::security::egress::EgressLedger::none(),
-            )
-            .map_err(|e| e.to_string())?;
-        (backend, resolved_model)
-    } else {
-        providers::create_chat_model_with_model_id_in(
-            ctx,
-            "chat",
-            &effective,
-            effective.default_temperature,
-        )
-        .map_err(|e| e.to_string())?
-    };
-    tracing::debug!(
-        requested_model = %default_model,
-        resolved_model = %resolved_model,
-        temperature = effective.default_temperature,
-        "[inference] agent_chat_simple invoking crate-native chat model"
-    );
-    let run = model.invoke(
-        &(),
-        tinyinference_llm::model::ModelRequest::new(vec![
-            tinyinference_llm::message::Message::user(message.to_string()),
-        ])
-        .with_model(default_model.clone())
-        .with_temperature(effective.default_temperature),
-    );
-    let response = run.await.map_err(|e| e.to_string())?.text();
-
-    Ok(Outcome::single_log(response, "agent simple chat completed"))
-}
-
 #[cfg(test)]
-#[path = "agent_chat_tests.rs"]
+#[path = "session_turn_tests.rs"]
 mod tests;

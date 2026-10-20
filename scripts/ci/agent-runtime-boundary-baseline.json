@@ -183,9 +183,9 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/host_runtime/ops/agent_chat.rs",
-    "line": 591,
-    "text": "let run = crate::agent::turn_origin::with_origin(",
+    "path": "crates/openhuman-core/src/agent_runs/agent_chat/session_turn.rs",
+    "line": 526,
+    "text": "let run = crate::security::turn_origin::with_origin(",
     "occurrence": 1
   },
   {
