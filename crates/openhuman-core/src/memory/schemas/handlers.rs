@@ -123,7 +123,7 @@ pub(super) fn engine_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             return Err(engine_set_save_error(error));
         }
         engine::invalidate();
-        finish::<Value>(Ok(ops::engine_get(&config).await))
+        finish(Ok(ops::engine_get(&config).await))
     })
 }
 
