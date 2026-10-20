@@ -154,17 +154,6 @@ impl ControllerEntry {
         matches!(self.handler, EntryHandler::Bound(_))
     }
 
-    #[cfg(test)]
-    pub(super) fn legacy_controller(&self) -> Option<RegisteredController> {
-        match &self.handler {
-            EntryHandler::Legacy(handler) => Some(RegisteredController {
-                schema: self.schema.clone(),
-                handler: *handler,
-            }),
-            EntryHandler::Bound(_) => None,
-        }
-    }
-
     pub fn invoke(&self, ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
         match &self.handler {
             EntryHandler::Legacy(handler) => handler(ctx, params),
