@@ -308,7 +308,8 @@ test('host boundary audit ignores writer features unified only by unrelated work
       const manifestPath = cargoArgs[cargoArgs.indexOf('--manifest-path') + 1];
       if (cargoArgs[0] === 'tree') {
         const packageName = cargoArgs[cargoArgs.indexOf('-p') + 1];
-        const links = packageName === 'openhuman-cli' && cargoArgs.includes('--all-features');
+        const links = packageName === 'openhuman-cli' && cargoArgs.includes('--features') &&
+          cargoArgs[cargoArgs.indexOf('--features') + 1].split(',').includes('linked-modules');
         const tinyflowsBus = resolve(harnessRoot, 'vendor/tinyflows/crates/tinyflows-bus');
         return [
           `0${packageName} v0.0.0`,
@@ -323,6 +324,20 @@ test('host boundary audit ignores writer features unified only by unrelated work
         ].join('\n');
       }
       if (cargoArgs.includes('--no-deps')) {
+        if (resolve(manifestPath) === resolve(harnessRoot, 'Cargo.toml')) {
+          return JSON.stringify({
+            packages: [{
+              name: 'openhuman-cli',
+              manifest_path: resolve(harnessRoot, 'crates/openhuman-cli/Cargo.toml'),
+              features: {
+                default: ['read'],
+                read: [],
+                linked-modules: [],
+                flow-write: [],
+              },
+            }],
+          });
+        }
         contractBeingProbed = manifestToContract.get(resolve(manifestPath));
         assert.ok(contractBeingProbed, `unexpected manifest ${manifestPath}`);
         return JSON.stringify({

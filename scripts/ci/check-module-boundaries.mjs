@@ -210,6 +210,7 @@ export function treeGraph(output) {
   const nodes = new Map();
   const byDisplay = new Map();
   const stack = [];
+  let root;
   for (const [index, line] of output.trimEnd().split('\n').entries()) {
     const match = /^(\d+)(.+)$/.exec(line);
     if (!match) throw new Error(`unrecognized Cargo tree line ${index + 1}`);
@@ -220,6 +221,10 @@ export function treeGraph(output) {
     if (depth > stack.length) throw new Error(`Cargo tree skipped a depth at line ${index + 1}`);
     const parent = depth === 0 ? null : stack[depth - 1];
     if (depth > 0 && !parent) throw new Error(`Cargo tree has no parent at line ${index + 1}`);
+    if (depth === 0) {
+      if (root !== undefined) throw new Error('Cargo tree contains more than one root');
+      root = display;
+    }
     stack.length = depth;
 
     let id = byDisplay.get(display);
@@ -242,10 +247,10 @@ export function treeGraph(output) {
     }
     stack[depth] = id;
   }
-  return { packages: [...packages.values()], resolve: { nodes: [...nodes.values()] } };
+  return { packages: [...packages.values()], resolve: { nodes: [...nodes.values()] }, root };
 }
 
-function hostTree(root, manifest, packageName, allFeatures, execute) {
+function hostTree(root, manifest, packageName, features, execute) {
   const args = [
     '--manifest-path', join(root, manifest),
     '--locked',
@@ -254,8 +259,38 @@ function hostTree(root, manifest, packageName, allFeatures, execute) {
     '--prefix', 'depth',
     '--format', '{p}',
   ];
-  if (allFeatures) args.push('--all-features');
-  return treeGraph(cargoText(root, 'tree', args, execute));
+  if (features === 'all') args.push('--all-features');
+  else if (features === 'default') { /* Cargo's default feature set. */ }
+  else if (Array.isArray(features)) {
+    args.push('--no-default-features', '--features', features.join(','));
+  } else throw new Error(`unsupported feature selection for ${packageName}`);
+  const tree = treeGraph(cargoText(root, 'tree', args, execute));
+  if (parseTreePackage(tree.root).name !== packageName) {
+    throw new Error(`Cargo tree for ${packageName} was rooted at ${tree.root}`);
+  }
+  return tree;
+}
+
+function cliFeatures(root, execute) {
+  const manifest = resolve(root, 'Cargo.toml');
+  const listing = metadata(root, ['--manifest-path', manifest, '--no-deps'], execute);
+  const pkg = listing.packages.find(item => item.name === 'openhuman-cli');
+  if (!pkg || !pkg.features || !Object.hasOwn(pkg.features, 'linked-modules')) {
+    throw new Error('openhuman-cli must declare its isolated linked-modules feature');
+  }
+  return Object.keys(pkg.features).filter(feature => feature !== 'default' && feature !== 'linked-modules');
+}
+
+function linkedCliTree(root, execute) {
+  const tree = treeGraph(cargoText(root, 'tree', [
+    '--manifest-path', join(root, 'Cargo.toml'), '--locked', '-p', 'openhuman-cli',
+    '-e', 'normal,build', '--prefix', 'depth', '--format', '{p}',
+    '--no-default-features', '--features', 'linked-modules',
+  ], execute));
+  if (parseTreePackage(tree.root).name !== 'openhuman-cli') {
+    throw new Error(`linked-modules probe was not rooted at openhuman-cli: ${tree.root}`);
+  }
+  return tree;
 }
 
 /** Resolve only this contract's selected features, without module/host unification. */
@@ -283,22 +318,24 @@ export function run(root, strict = false, execute = execFileSync) {
     }
   }
   const results = [];
-  for (const [manifest, packageName] of [
-    ['Cargo.toml', 'openhuman'],
-    ['Cargo.toml', 'openhuman-cli'],
-    ['Cargo.toml', 'openhuman-tui'],
-    ['crates/openhuman-app/Cargo.toml', 'openhuman-app'],
+  for (const [manifest, packageName, features] of [
+    ['Cargo.toml', 'openhuman', 'all'],
+    ['Cargo.toml', 'openhuman-cli', cliFeatures(root, execute)],
+    ['Cargo.toml', 'openhuman-tui', 'all'],
+    ['crates/openhuman-app/Cargo.toml', 'openhuman-app', 'all'],
   ]) {
-    const tree = hostTree(root, manifest, packageName, true, execute);
+    const tree = hostTree(root, manifest, packageName, features, execute);
     results.push(auditGraph(tree, [packageName], policy));
   }
-  // With default features, neither core nor the TUI nor the CLI reaches the
-  // optional linked-modules bridge. The all-feature host audits above allow
-  // that bridge only as a direct CLI edge, never through a wrapper.
+  // The linked-modules CLI feature is local-only, never shipped. Audit its
+  // separately rooted graph for a direct CLI edge; do not let its feature
+  // unification contaminate the CLI's shipping feature graph above.
+  results.push(auditGraph(linkedCliTree(root, execute), ['openhuman-cli'], policy));
+  // Default-feature graphs also guard against accidental bridge activation.
   for (const packageName of ['openhuman-cli', 'openhuman-tui', 'openhuman']) {
     results.push({
       violations: bridgeReach(
-        hostTree(root, 'Cargo.toml', packageName, false, execute),
+        hostTree(root, 'Cargo.toml', packageName, 'default', execute),
         [packageName],
         policy,
       ),
