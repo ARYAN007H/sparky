@@ -18,12 +18,12 @@ pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
                 req(
                     "kind",
                     TypeSchema::String,
-                    "folder | file | link | github | rss | composio.",
+                    "folder | file | link | github | rss.",
                 ),
                 req(
                     "target",
                     TypeSchema::String,
-                    "Path, URL, owner/repo, feed URL or Composio toolkit.",
+                    "Path, URL, owner/repo or feed URL.",
                 ),
                 opt(
                     "label",
