@@ -61,7 +61,11 @@ impl RunModeStore<PlanExitScope> for OpenHumanRunModes {
         crate::threads::run_mode::handle_for_thread(&scope.context, thread_id)
     }
 
-    fn get_mode(&self, scope: &PlanExitScope, thread_id: &str) -> tinyagents_harness::middleware::RunMode {
+    fn get_mode(
+        &self,
+        scope: &PlanExitScope,
+        thread_id: &str,
+    ) -> tinyagents_harness::middleware::RunMode {
         crate::threads::run_mode::get_mode(&scope.context, thread_id)
     }
 

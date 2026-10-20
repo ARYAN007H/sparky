@@ -301,6 +301,60 @@ async fn agent_surface_bridges_thread_goal_updated() {
     assert_eq!(ev.goal, Some(goal));
 }
 
+/// Goal resume and committed-turn accounting use the same observed owner store
+/// as model-facing goal tools, so both lifecycle paths reach the existing
+/// thread-scoped socket event.
+#[tokio::test]
+async fn goal_resume_and_account_updates_reach_the_web_channel() {
+    crate::core::bus::init().await.expect("bus init");
+    register_agent_surface_subscriber();
+    let mut web_rx = subscribe_web_channel_events();
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let context = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(workspace.path().to_path_buf()),
+    );
+    crate::core::runtime::CoreContext::scope(context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let store = crate::agent::goals::goal_store(workspace.path(), &dispatch);
+        let thread_id = "goal-observer-resume-account";
+
+        store
+            .set(thread_id, "resume this goal", None)
+            .await
+            .expect("set goal");
+        let _ = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+        store.pause(thread_id).await.expect("pause goal");
+        let _ = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+
+        let prepared = store.prepare_turn(thread_id).await.expect("prepare turn");
+        assert_eq!(
+            prepared.goal.as_ref().map(|goal| goal.status),
+            Some(tinyagents_harness_tools::goals::ThreadGoalStatus::Active)
+        );
+        let resumed = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+        assert_eq!(
+            resumed.goal.as_ref().and_then(|goal| goal.get("status")),
+            Some(&serde_json::json!("active"))
+        );
+
+        store
+            .account_turn(thread_id, 2, 1, std::time::Duration::from_secs(1))
+            .await
+            .expect("account turn");
+        let accounted = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+        assert_eq!(
+            accounted
+                .goal
+                .as_ref()
+                .and_then(|goal| goal.get("tokensUsed")),
+            Some(&serde_json::json!(3))
+        );
+    })
+    .await;
+}
+
 /// `ThreadGoalCleared` bridges to `thread_goal_cleared`.
 #[tokio::test]
 async fn agent_surface_bridges_thread_goal_cleared() {

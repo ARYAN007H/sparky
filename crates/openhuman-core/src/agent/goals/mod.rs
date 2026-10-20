@@ -38,7 +38,10 @@ pub fn goal_store(
     }
 
     let kv = crate::storage::sessions::stores_or_ephemeral(workspace_dir).kv;
-    let store = Arc::new(GoalStore::with_observer(kv, Arc::new(OpenHumanGoalObserver)));
+    let store = Arc::new(GoalStore::with_observer(
+        kv,
+        Arc::new(OpenHumanGoalObserver),
+    ));
     stores.insert(workspace_dir.to_path_buf(), Arc::downgrade(&store));
     store
 }

@@ -10,6 +10,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tinyagents_harness::context::{RunConfig, RunContext};
+use tinyagents_harness::tool::ToolSnapshot;
 use tinyagents_orchestration::subagent::{
     ArtifactReference, PreparedSubagent, SubagentCapabilities, SubagentDriver, SubagentError,
     SubagentExecution, SubagentExecutor, SubagentIncomplete, SubagentOutcome, SubagentOutcomeKind,
@@ -17,7 +18,6 @@ use tinyagents_orchestration::subagent::{
     SubagentPersistenceDisposition, SubagentPlanner, SubagentRequest, SubagentResume,
     SubagentRunResult, SubagentTaskKey, SubagentTerminalPersistenceDisposition,
 };
-use tinyagents_harness::tool::ToolSnapshot;
 use tinyinference_llm::{
     message::Message,
     usage::{ChargedAmount, Usage, UsageTotals},
