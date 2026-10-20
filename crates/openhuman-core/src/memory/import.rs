@@ -278,7 +278,9 @@ async fn launch(
     paused: Option<PauseCheck>,
 ) -> std::result::Result<LaunchOutcome, LaunchError> {
     if mode == Mode::Import && !consent {
-        return Err(LaunchError::Other(import_error(&ImportError::ConsentRequired)));
+        return Err(LaunchError::Other(import_error(
+            &ImportError::ConsentRequired,
+        )));
     }
     let workspace = config.workspace_dir.clone();
     let Some(guard) = run_slots::reserve(&IMPORT, &workspace, &[&BACKFILL, &MIGRATION]) else {
@@ -299,7 +301,9 @@ async fn launch(
         };
         return Err(LaunchError::SlotBusy(reason));
     };
-    let bound = engine::resolve(config).engine().map_err(LaunchError::Other)?;
+    let bound = engine::resolve(config)
+        .engine()
+        .map_err(LaunchError::Other)?;
     let driver = importer(config, bound.engine, consent, paused);
     let begin = {
         let driver = driver.clone();

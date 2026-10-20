@@ -10,7 +10,10 @@ fn corrupt_legacy_source_state_is_skipped_and_left_in_place() {
     std::fs::write(&file, corrupt).unwrap();
 
     assert!(load(tmp.path()).is_empty());
-    assert!(file.exists(), "the read-only legacy load must not move the file");
+    assert!(
+        file.exists(),
+        "the read-only legacy load must not move the file"
+    );
     assert_eq!(std::fs::read(file).unwrap(), corrupt);
 }
 

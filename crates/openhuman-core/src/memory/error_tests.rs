@@ -194,7 +194,6 @@ fn typed_insufficient_credits_maps_without_parsing_engine_text() {
     assert!(error.expected_user_state);
 }
 
-
 #[test]
 fn upstream_unavailable_is_transient_not_account_wide() {
     use tinymemory_api::Error as E;
