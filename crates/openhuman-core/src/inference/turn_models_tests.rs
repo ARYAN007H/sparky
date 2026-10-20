@@ -21,7 +21,13 @@ fn scoped_model_entry(
         probe: None,
         models: Some(ProviderModelHooks {
             default_model: Arc::new(move || Some(name.to_string())),
-            role_for_model: Arc::new(|model| model.strip_prefix("hint:").map(str::to_string)),
+            role_for_model: Arc::new(move |model| {
+                if model == "fixture-role" {
+                    Some(if supports_vision { "reasoning" } else { "coding" }.to_string())
+                } else {
+                    model.strip_prefix("hint:").map(str::to_string)
+                }
+            }),
             is_alias: Arc::new(|model| model.starts_with("hint:")),
             is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
             supports_vision: Arc::new(move |_| supports_vision),
@@ -73,6 +79,24 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
             .primary
             .profile()
             .is_some_and(|profile| profile.modalities.image_in));
+        let extensions = context_a.extensions();
+        assert_eq!(
+            crate::inference::registry::provider_model_role_for(
+                Some(extensions),
+                provider,
+                "fixture-role"
+            )
+            .as_deref(),
+            Some("reasoning")
+        );
+        assert_eq!(
+            crate::inference::registry::provider_model_context_window_for(
+                Some(extensions),
+                provider,
+                "context-a-model"
+            ),
+            Some(131_072)
+        );
     })
     .await;
 }
