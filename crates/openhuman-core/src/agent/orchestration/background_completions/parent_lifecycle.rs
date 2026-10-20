@@ -114,8 +114,8 @@ pub(crate) fn finish_stop_for_thread(ctx: &DispatchCtx, thread_id: &str, task_id
 /// Reopen a thread's completion gate for a newly accepted user turn.
 ///
 /// The Stop gate deliberately outlives registry cancellation, because a detached
-/// child may be between `tokio::spawn` and `running_subagents::register` when
-/// Stop is pressed. New task ids remain distinct from the stopped generation.
+/// child may be between driver admission and durable owner-row persistence
+/// when Stop is pressed. New task ids remain distinct from the stopped generation.
 /// Only a thread this process stopped or cancelled pays for the durable resume
 /// marker, so an ordinary chat message writes nothing.
 pub(crate) fn resume_stopped_thread(ctx: &DispatchCtx, thread_id: &str) {
