@@ -17,10 +17,7 @@ import type { TodoItem as TodoItemWire } from '../types/threadWire.generated';
 export type CoreTodoStatus = TodoItemWire['status'];
 
 /** One todo item as the core sends it — wire shape, not the element's shape. */
-export type ThreadTodoItemView = Omit<TodoItemWire, 'reason'> & {
-  /** Why the step was cancelled; only on a `cancelled` item. */
-  reason?: NonNullable<TodoItemWire['reason']>;
-};
+export type ThreadTodoItemView = TodoItemWire;
 
 export interface ThreadTodosState {
   byThread: Record<string, ThreadTodoItemView[]>;
