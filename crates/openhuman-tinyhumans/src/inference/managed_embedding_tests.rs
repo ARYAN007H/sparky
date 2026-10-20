@@ -101,7 +101,10 @@ async fn api_key_is_refused_over_plaintext_non_loopback() {
     )
     .unwrap();
     let provider = build_cloud_model(
-        Some("http://embeddings.example.test".into()),
+        Some(
+            "http://embeddings.example.test/private/SYNTHETIC_PATH?token=SYNTHETIC_QUERY#SYNTHETIC_FRAGMENT"
+                .into(),
+        ),
         state.path().to_path_buf(),
         false,
         "m",
@@ -114,6 +117,14 @@ async fn api_key_is_refused_over_plaintext_non_loopback() {
             .contains("refusing to send the TinyHumans API key"),
         "{err}"
     );
+    for marker in [
+        "SYNTHETIC_PATH",
+        "SYNTHETIC_QUERY",
+        "SYNTHETIC_FRAGMENT",
+        "tiny_test_emb",
+    ] {
+        assert!(!err.to_string().contains(marker), "{err}");
+    }
 }
 
 /// Drains `rx` until the cloud-embedding disclosure for `marker` arrives.

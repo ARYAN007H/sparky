@@ -134,6 +134,21 @@ fn managed_bearer_refusal_redacts_foreign_endpoint_details() {
     }
 }
 
+#[test]
+fn managed_endpoint_diagnostic_is_origin_only_or_a_constant_fallback() {
+    assert_eq!(
+        endpoint_origin_for_log(
+            "https://synthetic-user:SYNTHETIC_PASSWORD@foreign.example/private/SYNTHETIC_PATH?token=SYNTHETIC_QUERY#SYNTHETIC_FRAGMENT"
+        ),
+        "https://foreign.example"
+    );
+    assert_eq!(
+        endpoint_origin_for_log("data:text/plain,SYNTHETIC_PATH"),
+        "<invalid endpoint>"
+    );
+    assert_eq!(endpoint_origin_for_log("not a url"), "<invalid endpoint>");
+}
+
 async fn unauthorized_chat_response() -> axum::response::Response {
     use axum::response::IntoResponse;
     (
