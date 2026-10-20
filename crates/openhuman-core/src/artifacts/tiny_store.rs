@@ -104,10 +104,15 @@ impl LegacyFileImportStore {
     async fn import_record(&self, mut record: ArtifactRecord) -> anyhow::Result<ArtifactRecord> {
         let mut changed = false;
         for version in &mut record.versions {
-            let Some(legacy) = version.file.clone() else {
+            if !record.kind.holds_file() {
                 continue;
-            };
-            if !Path::new(&legacy.key).is_absolute() {
+            }
+            let legacy = version.file.clone().unwrap_or_else(|| FileRef {
+                key: version.body.clone(),
+                size_bytes: 0,
+                media_type: None,
+            });
+            if legacy.key.starts_with("artifacts/files/") {
                 continue;
             }
             let ext = Path::new(&legacy.key)

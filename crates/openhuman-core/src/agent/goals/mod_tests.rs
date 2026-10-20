@@ -116,6 +116,29 @@ async fn goal_tool_with_context_uses_the_business_goal_store() {
             .expect("goal was persisted");
         assert_eq!(stored.objective, "persist through the host store");
 
+        let complete = tools
+            .iter_mut()
+            .find(|tool| tool.name() == "goal_complete")
+            .expect("goal_complete tool");
+        let result = complete
+            .execute_with_context(
+                serde_json::json!({}),
+                ToolCallOptions::default(),
+                Some(&thread),
+            )
+            .await
+            .expect("execute explicit goal_complete");
+        assert!(!result.is_error, "{}", result.output());
+        let completed = goal_store(workspace.path(), &dispatch)
+            .get("goal-tool-business-store")
+            .await
+            .expect("read completed business goal")
+            .expect("completed goal remains stored");
+        assert_eq!(
+            completed.status,
+            tinyagents_harness_tools::goals::ThreadGoalStatus::Complete
+        );
+
         let no_thread = set
             .execute(serde_json::json!({ "objective": "no thread" }))
             .await
