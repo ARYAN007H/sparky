@@ -25,13 +25,6 @@ use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
 
-pub(crate) async fn process_channel_message(
-    ctx: Arc<ChannelRuntimeContext>,
-    msg: traits::ChannelMessage,
-) {
-    process_channel_runtime_message(ctx, RuntimeChannelMessage::from(msg)).await;
-}
-
 pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
     runtime_msg: RuntimeChannelMessage,

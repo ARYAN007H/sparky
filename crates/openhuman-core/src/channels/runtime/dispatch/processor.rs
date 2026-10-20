@@ -86,7 +86,11 @@ impl From<ChannelMessage> for RuntimeChannelMessage {
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
 pub(crate) use reset::reset_durable_channel_session;
-pub(crate) use turn::{process_channel_message, process_channel_runtime_message};
+pub(crate) use turn::process_channel_runtime_message;
+
+pub(crate) async fn process_channel_message(ctx: Arc<ChannelRuntimeContext>, msg: ChannelMessage) {
+    process_channel_runtime_message(ctx, RuntimeChannelMessage::from(msg)).await;
+}
 
 /// Run every inbound message through the agent pipeline, at most
 /// `max_in_flight_messages` at a time, until `rx` closes.
