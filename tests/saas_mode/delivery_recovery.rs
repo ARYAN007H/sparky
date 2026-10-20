@@ -110,7 +110,16 @@ fn leave_undelivered_result(root: &std::path::Path, user: &str) {
         CompletionResult::text(RESULT),
     )
     .with_notify_mode(NotifyMode::Followup);
-    store.put(&record).expect("write the pending record");
+    let gate = store
+        .acquire_parent_gate(THREAD, "delivery-recovery-fixture", std::time::Duration::from_secs(30))
+        .expect("acquire the parent's completion gate")
+        .expect("the completion gate is free");
+    store
+        .put_fenced(&record, THREAD, &gate)
+        .expect("write the pending record under the parent gate");
+    assert!(store
+        .release_parent_gate(THREAD, &gate)
+        .expect("release the fixture's parent gate"));
 }
 
 #[test]
