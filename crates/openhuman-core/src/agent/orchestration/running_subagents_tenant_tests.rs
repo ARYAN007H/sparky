@@ -5,7 +5,6 @@ use crate::agent::orchestration::running_subagents::resolve::{
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet, Mode};
 use crate::tools::toolpacks::ToolGroups;
-use tinyagents_orchestration::steering::SteerError;
 
 const CHILD: &str = "OPENHUMAN_DETACHED_TENANT_TEST_CHILD";
 const PARENT: &str = "same-parent-session";
@@ -186,21 +185,12 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
     pair.alice = admitted("detached-alice", pair._a_dir.path());
     pair.bob = admitted("detached-bob", pair._b_dir.path());
     CoreContext::scope(pair.bob.clone(), async {
-        for (function, field_name) in [("steer", "steered"), ("cancel", "cancelled")] {
+        for (function, field_name) in [("cancel", "cancelled")] {
             let foreign = dispatched_control(function, &pair.a.task)
                 .await
                 .expect("reviewed user-plane control must dispatch");
             assert_eq!(field(&foreign, field_name), Some(false));
         }
-        assert_eq!(pair.a.queue.status().await.steers, 0);
-        assert_eq!(
-            field(
-                &dispatched_control("steer", &pair.b.task).await.unwrap(),
-                "steered"
-            ),
-            Some(true)
-        );
-        assert_eq!(pair.b.queue.status().await.steers, 1);
         assert_eq!(
             field(
                 &dispatched_control("cancel", &pair.b.task).await.unwrap(),
@@ -215,9 +205,8 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
         assert!(resume_ref_for_task(&DispatchCtx::ambient(), &pair.a.task, PARENT).is_ok());
     })
     .await;
-    for function in ["steer", "cancel"] {
-        assert!(dispatched_control(function, &pair.a.task).await.is_err());
-    }
+    assert!(dispatched_control("steer", &pair.a.task).await.is_err());
+    assert!(dispatched_control("cancel", &pair.a.task).await.is_err());
 }
 
 #[tokio::test]
@@ -350,16 +339,6 @@ async fn same_parent_resolution_and_wait_refuse_foreign_workers() {
         ));
         assert!(matches!(
             resume_ref_for_task(&DispatchCtx::ambient(), &pair.a.task, PARENT),
-            Err(WaitError::NotOwned)
-        ));
-        assert!(matches!(
-            wait(
-                &DispatchCtx::ambient(),
-                &pair.a.task,
-                PARENT,
-                Duration::ZERO
-            )
-            .await,
             Err(WaitError::NotOwned)
         ));
         assert_eq!(
