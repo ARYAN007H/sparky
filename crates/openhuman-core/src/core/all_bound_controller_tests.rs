@@ -394,6 +394,19 @@ fn production_registry_binds_computer_status_to_its_declared_parser() {
             .decode_params(params)
             .expect("bound decoder accepts independent example");
     }
+
+    // Runtime parsing intentionally keeps its permissive false default for
+    // non-boolean inputs; these maps are parser cases, not schema examples.
+    for example in [
+        json!({"load":null}),
+        json!({"load":"true"}),
+        json!({"load":1}),
+    ] {
+        let params = example.as_object().expect("parser case object").clone();
+        entry
+            .decode_params(params)
+            .expect("actual bound parser preserves permissive false defaults");
+    }
 }
 
 #[test]
