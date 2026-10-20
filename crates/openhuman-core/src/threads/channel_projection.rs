@@ -118,7 +118,7 @@ pub(crate) fn bind_message(
     provider_message_id: &str,
     openhuman_thread_id: &str,
 ) -> Result<(), String> {
-    let result = (|| -> Result<()> {
+    let result = async {
         if openhuman_thread_id.is_empty() {
             return Err(anyhow!("OpenHuman thread ID must be non-empty"));
         }
@@ -126,7 +126,8 @@ pub(crate) fn bind_message(
         let key = binding_key(tenant_key, channel, conversation, provider_message_id)?;
         let repo = repo_for(ctx, &tenant)?;
         bind_in(&repo, key, openhuman_thread_id)
-    })();
+    }
+    .await;
     result.map_err(|error| format!("{LOG_PREFIX} bind: {error:#}"))
 }
 
