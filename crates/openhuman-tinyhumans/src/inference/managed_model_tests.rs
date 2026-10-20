@@ -78,10 +78,106 @@ fn managed_bearer_keeps_the_stored_key_transport_guard() {
             .expect("loopback is a valid local test endpoint"),
         "test-managed-key"
     );
+    let plaintext = options
+        .resolve_bearer("http://api.example.test/openai/v1")
+        .expect_err("a plaintext remote endpoint must not receive the stored key");
+    assert!(plaintext.to_string().contains("http://api.example.test"));
     let error = options
         .resolve_bearer("https://api.example.test/openai/v1")
         .expect_err("a foreign HTTPS origin must not receive the stored key");
     assert!(error.to_string().contains("unmanaged or insecure"));
+}
+
+fn seed_app_session(dir: &std::path::Path, expires_at: Option<&str>) {
+    use openhuman_embed::__host::security::credentials::{
+        AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
+        session_support::SESSION_EXPIRES_AT_META,
+    };
+    let mut metadata = std::collections::HashMap::new();
+    if let Some(expires_at) = expires_at {
+        metadata.insert(SESSION_EXPIRES_AT_META.to_string(), expires_at.to_string());
+    }
+    AuthService::new(dir, false)
+        .store_provider_token(
+            APP_SESSION_PROVIDER,
+            DEFAULT_AUTH_PROFILE_NAME,
+            "test.session.jwt",
+            metadata,
+            true,
+        )
+        .expect("seed app-session token");
+}
+
+fn managed_options_at(dir: &std::path::Path) -> ManagedOptions {
+    ManagedOptions {
+        openhuman_dir: Some(dir.to_path_buf()),
+        secrets_encrypt: false,
+        ..ManagedOptions::default()
+    }
+}
+
+#[test]
+fn managed_bearer_fast_fails_an_expired_app_session() {
+    let tmp = tempfile::TempDir::new().expect("temporary credentials");
+    let past = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+    seed_app_session(tmp.path(), Some(&past));
+
+    let error = managed_options_at(tmp.path())
+        .resolve_bearer("http://127.0.0.1:9/openai/v1")
+        .expect_err("expired session should fail locally before transport");
+    let message = error.to_string();
+    assert!(message.contains("SESSION_EXPIRED"), "{message}");
+    assert!(
+        openhuman_embed::__host::core::observability::is_session_expired_message(&message),
+        "expired managed session must retain its host classification: {message}"
+    );
+}
+
+#[test]
+fn managed_bearer_resolves_a_future_expiry_app_session() {
+    let tmp = tempfile::TempDir::new().expect("temporary credentials");
+    let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+    seed_app_session(tmp.path(), Some(&future));
+
+    assert_eq!(
+        managed_options_at(tmp.path())
+            .resolve_bearer("http://127.0.0.1:9/openai/v1")
+            .expect("a future expiry is valid"),
+        "test.session.jwt"
+    );
+}
+
+#[test]
+fn managed_bearer_keeps_exp_less_offline_app_sessions() {
+    let tmp = tempfile::TempDir::new().expect("temporary credentials");
+    seed_app_session(tmp.path(), None);
+
+    assert_eq!(
+        managed_options_at(tmp.path())
+            .resolve_bearer("http://127.0.0.1:9/openai/v1")
+            .expect("an exp-less offline session resolves by presence"),
+        "test.session.jwt"
+    );
+}
+
+#[test]
+fn managed_api_key_precedes_an_expired_app_session() {
+    let tmp = tempfile::TempDir::new().expect("temporary credentials");
+    let past = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+    seed_app_session(tmp.path(), Some(&past));
+    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+        tmp.path(),
+        false,
+        "managed-api-key",
+    )
+    .expect("store API key");
+
+    assert_eq!(
+        managed_options_at(tmp.path())
+            .resolve_bearer("https://api.tinyhumans.ai/openai/v1")
+            .expect("the configured API key takes precedence"),
+        "managed-api-key"
+    );
 }
 
 #[test]
