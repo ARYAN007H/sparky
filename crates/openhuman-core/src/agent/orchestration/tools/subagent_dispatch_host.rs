@@ -456,9 +456,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     // parent turn's ledger, so it stays silent: omission adds
                                     // nothing, which is the status quo. See the field's docs.
                                     usage: None,
-                                    worktree_path: None,
-                                    changed_files: Vec::new(),
-                                    dirty_status: None,
                                     stop: None,
                                 })
                                 .await;
@@ -525,9 +522,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     // parent turn's ledger, so it stays silent: omission adds
                                     // nothing, which is the status quo. See the field's docs.
                                     usage: None,
-                                    worktree_path: None,
-                                    changed_files: Vec::new(),
-                                    dirty_status: None,
                                     stop: incomplete_stop(reason, outcome.failure_cause.clone()),
                                 })
                                 .await;

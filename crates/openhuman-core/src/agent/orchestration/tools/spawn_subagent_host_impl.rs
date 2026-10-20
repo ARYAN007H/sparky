@@ -391,9 +391,6 @@ impl SpawnSubagentTool {
                                         // ledger, so `chat_done` already carries its tokens AND its
                                         // cost. Populating here would double both. See the field's docs.
                                         usage: None,
-                                        worktree_path: None,
-                                        changed_files: Vec::new(),
-                                        dirty_status: None,
                                         stop: None,
                                     })
                                     .await;
@@ -471,9 +468,6 @@ impl SpawnSubagentTool {
                                         // ledger, so `chat_done` already carries its tokens AND its
                                         // cost. Populating here would double both. See the field's docs.
                                         usage: None,
-                                        worktree_path: None,
-                                        changed_files: Vec::new(),
-                                        dirty_status: None,
                                         stop: incomplete_stop(
                                             reason,
                                             outcome.failure_cause.clone(),

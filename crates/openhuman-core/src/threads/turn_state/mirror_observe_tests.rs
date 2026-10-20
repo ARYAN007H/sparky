@@ -529,9 +529,6 @@ fn subagent_lifecycle_records_and_clears_active() {
         output_chars: 80,
         usage: None,
         output: String::new(),
-        worktree_path: None,
-        changed_files: Vec::new(),
-        dirty_status: None,
         stop: None,
     });
     let s = m.snapshot();
@@ -721,9 +718,6 @@ fn subagent_completed_persists_capped_output_on_the_activity() {
         output_chars: 11,
         usage: None,
         output: "final answer".into(),
-        worktree_path: None,
-        changed_files: Vec::new(),
-        dirty_status: None,
         stop: None,
     });
 

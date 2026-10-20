@@ -113,9 +113,6 @@ pub(super) fn make_completion(
                                             // spend never reached the parent turn's
                                             // ledger or `chat_done`. See the field docs.
                                             usage: Some(outcome.usage),
-                                            worktree_path: None,
-                                            changed_files: Vec::new(),
-                                            dirty_status: None,
                                             stop: None,
                                         })
                                         .await;
@@ -182,9 +179,6 @@ pub(super) fn make_completion(
                                             // spend never reached the parent turn's
                                             // ledger or `chat_done`. See the field docs.
                                             usage: Some(outcome.usage),
-                                            worktree_path: None,
-                                            changed_files: Vec::new(),
-                                            dirty_status: None,
                                             stop: incomplete_stop(
                                                 reason,
                                                 outcome.failure_cause.clone(),
