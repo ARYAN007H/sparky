@@ -361,18 +361,12 @@ fi
 # Run every root-workspace Rust support crate rather than only crates named by
 # changed paths. Product features are forwarded to the embedding facade; the
 # remaining crates do not expose that feature vocabulary.
-if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
-  suite "openhuman-embed" llvm_cov --no-report --no-fail-fast \
-    "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_EMBED}"
-else
+if [ "${OH_COV_RUNNER:-cargo}" != "nextest" ]; then
   suite "openhuman-embed" llvm_cov_embed --no-report --no-fail-fast -p openhuman-embed --all-targets
 fi
 suite "openhuman-rpc" llvm_cov_package --no-report --no-fail-fast -p openhuman-rpc --all-targets \
   --features storage-sqlite
-if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
-  suite "openhuman-tinyhumans" llvm_cov --no-report --no-fail-fast \
-    "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_TINYHUMANS}"
-else
+if [ "${OH_COV_RUNNER:-cargo}" != "nextest" ]; then
   suite "openhuman-tinyhumans" llvm_cov_product_facade --no-report --no-fail-fast -p openhuman-tinyhumans --all-targets
 fi
 if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
