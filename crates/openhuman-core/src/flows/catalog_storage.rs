@@ -22,7 +22,7 @@ use tinyflows_bus::catalog::{
 };
 use tinystoragedrivers::{
     Capability, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, Scope,
-    StorageBackend, StorageError, Versioned, WriteOptions,
+    StorageError, Versioned, WriteOptions,
 };
 
 use crate::config::Config;

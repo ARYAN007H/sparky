@@ -8,8 +8,6 @@ use tinyflows_bus::runs::{self, RunEvent};
 use tinyflows_catalog::{types::FlowRunTrigger, Flow};
 
 use crate::config::Config;
-use crate::modules::tinyflows as module;
-
 use super::{projection, RunBindings};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
