@@ -165,7 +165,7 @@ test.describe('Settings - Advanced Config', () => {
     // The About description copy also contains "software updates"; match the
     // section label exactly to avoid a strict-mode violation.
     await expect(page.getByText('Resources', { exact: true })).toBeVisible();
-    await expect(page.getByText('Check for updates')).toBeVisible();
+    await expect(page.getByTestId('about-check-updates')).toBeVisible();
 
     // /settings/llm now redirects to the Connections page (LLM moved there).
     await gotoSettingsRoute(page, '/settings/llm');
