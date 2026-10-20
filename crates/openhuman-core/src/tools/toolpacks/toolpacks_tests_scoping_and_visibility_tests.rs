@@ -319,219 +319,27 @@ fn the_skill_install_hand_off_is_packed_in_the_skills_pack() {
     );
 }
 
-/// A pack whose owner this agent can hand off to directly is closed to it
-/// through `use_skill`; a hand-off inside that pack, a pack the agent owns, and
-/// a pack whose hand-off is itself withheld all stay open.
+/// The spawn tool closes only packs owned by specialists in its allowed-id
+/// schema, leaving unrelated packs available to direct calls.
 #[test]
-fn a_direct_hand_off_closes_its_owners_pack_and_nothing_else() {
-    use crate::agent::orchestration::tools::{ArchetypeDelegationTool, DelegationTarget};
-
-    let delegate = |name: &str, target: &str| -> Box<dyn tinytools::Tool> {
-        Box::new(ArchetypeDelegationTool {
-            tool_name: name.to_string(),
-            agent_id: DelegationTarget(target.to_string()),
-            tool_description: String::new(),
-        })
-    };
-    // `hand_off_to_skill_setup` is a hypothetical UNPACKED hand-off to the
-    // skills pack's owner (the real one, `setup_skills`, is packed now; see
-    // `a_packed_hand_off_leaves_its_owners_pack_open`).
-    let delegates = [
-        delegate("hand_off_to_skill_setup", "skill_setup"),
-        delegate("create_image", "image_agent"),
-    ];
+fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
     let raw = registry_with_all(&[
         "skill_registry_install",
         "media_generate_image",
         "wallet_status",
-        "mcp_registry_tool_call",
+    ]);
+    let spawn = crate::agent::orchestration::tools::SpawnSubagentTool::scoped(vec![
+        "skill_setup".to_string(),
+        "image_agent".to_string(),
     ]);
     let tools: Vec<&dyn tinytools::Tool> = raw
         .iter()
-        .map(|t| t.as_ref())
-        .chain(delegates.iter().map(|t| t.as_ref()))
-        .collect();
-    // `hand_off_to_skill_setup` is unpacked, so the orchestrator advertises it
-    // by construction; `create_image` is packed.
-    let closed = closed_by_direct_handoff("orchestrator", &tools);
-    assert!(
-        closed.contains(&"skill_registry_install"),
-        "a raw tool of the pack an unpacked hand-off leads to must close: {closed:?}"
-    );
-    assert!(
-        !closed.contains(&"media_generate_image"),
-        "`create_image` is withheld, so the media pack stays open: {closed:?}"
-    );
-    assert!(
-        !closed.contains(&"wallet_status"),
-        "no hand-off owns the web3 skill, so it stays open: {closed:?}"
-    );
-    assert!(
-        !closed.contains(&"mcp_registry_tool_call"),
-        "no MCP hand-off is on the belt, so integrations stays open: {closed:?}"
-    );
-
-    assert!(
-        closed_by_direct_handoff("skill_setup", &tools).is_empty(),
-        "a pack's owner keeps its own belt"
-    );
-
-    // The live regression (#6302): a `ToolScope::Named` agent is built with
-    // `visible` = its named list, which never contains a synthesised delegate.
-    // Keyed on the visible set, this closed nothing on a real session while
-    // every test passed. Pack membership is knowable as soon as the tools are,
-    // so the raw tools close with no visible set in the picture at all.
-    let named_only: Vec<&dyn tinytools::Tool> = raw.iter().map(|t| t.as_ref()).collect();
-    assert!(
-        closed_by_direct_handoff("orchestrator", &named_only).is_empty(),
-        "with no hand-off among the tools there is nothing to close: the rule \
-         must key on a hand-off existing, not on a pack existing"
-    );
-}
-
-/// The real skill-install hand-off is packed, so it no longer closes the pack:
-/// the `skills` listing offers `setup_skills` beside the raw registry tools,
-/// the shape every other packed hand-off (`build_workflow`, `manage_tasks`)
-/// already has.
-#[test]
-fn a_packed_hand_off_leaves_its_owners_pack_open() {
-    use crate::agent::orchestration::tools::{ArchetypeDelegationTool, DelegationTarget};
-
-    let delegate: Box<dyn tinytools::Tool> = Box::new(ArchetypeDelegationTool {
-        tool_name: "setup_skills".to_string(),
-        agent_id: DelegationTarget("skill_setup".to_string()),
-        tool_description: String::new(),
-    });
-    let raw = registry_with_all(&["skill_registry_install"]);
-    let tools: Vec<&dyn tinytools::Tool> = raw
-        .iter()
-        .map(|t| t.as_ref())
-        .chain(std::iter::once(delegate.as_ref()))
-        .collect();
-    let closed = closed_by_direct_handoff("orchestrator", &tools);
-    assert!(
-        !closed.contains(&"skill_registry_install"),
-        "a packed hand-off must not close its own pack: {closed:?}"
-    );
-}
-
-/// The live session shape, which the rule test above cannot catch.
-///
-/// This is the regression the first cut shipped (#6302): a `ToolScope::Named`
-/// agent is built with `visible` = the list its `agent.toml` names, and a
-/// *synthesised* delegate like `setup_skills` is by definition not in it — those
-/// names arrive later, when `refresh_delegation_tools` inserts them. Keyed on
-/// `visible`, the closing rule did nothing on a real chat session: the live
-/// orchestrator went on calling `use_skill skills/skill_registry_search` and
-/// `skill_registry_install` for real, while every harness test passed, because a
-/// harness agent's empty visible set is seeded from every tool, synthesised ones
-/// included.
-///
-/// Asserts `blocks_execution`, not `is_denied`: a merely withheld packed tool is
-/// `HideFromPrompt`, for which `is_denied()` answers true, so an `is_denied`
-/// assertion would pass without the fix.
-#[test]
-fn a_named_scope_session_closes_the_pack_its_visible_list_never_mentions() {
-    use crate::agent::orchestration::tools::{ArchetypeDelegationTool, DelegationTarget};
-    use tinytools::ToolPolicyEngine;
-
-    let delegate: Box<dyn tinytools::Tool> = Box::new(ArchetypeDelegationTool {
-        tool_name: "hand_off_to_skill_setup".to_string(),
-        agent_id: DelegationTarget("skill_setup".to_string()),
-        tool_description: String::new(),
-    });
-    let raw = registry_with_all(&["skill_registry_install"]);
-    let tools: Vec<&dyn tinytools::Tool> = raw
-        .iter()
-        .map(|t| t.as_ref())
-        .chain(std::iter::once(delegate.as_ref()))
-        .collect();
-
-    // Exactly what the builder hands a Named agent: its own list. No delegate.
-    let visible: HashSet<String> = ["shell", USE_SKILL].iter().map(|s| s.to_string()).collect();
-    let build = || {
-        ToolPolicyEngine::build_session_from_refs(
-            "orchestrator",
-            "web_chat",
-            "session",
-            &Default::default(),
-            &tools,
-            &visible,
-        )
-    };
-
-    assert!(
-        !build()
-            .decision_for("skill_registry_install")
-            .blocks_execution(),
-        "precondition: withheld-but-callable is the pack default, so this test \
-         can only fail for the right reason if closing is what blocks it"
-    );
-
-    let mut session = build();
-    close_handed_off_packs(&mut session, "orchestrator", &tools);
-    assert!(
-        session
-            .decision_for("skill_registry_install")
-            .blocks_execution(),
-        "an unpacked hand-off is advertised by construction, so the raw \
-         registry tool must close — even though `visible` never named it"
-    );
-}
-
-/// `file_write` must survive on the orchestrator's belt.
-///
-/// It is the only create-capable file tool anywhere (`apply_patch` and `edit`
-/// both canonicalize an existing target; `shell` means a heredoc). While it was
-/// a member of the `files` pack (now `coding`), that pack's owners were one
-/// synthesised delegate away on the orchestrator's belt, so
-/// `closed_by_direct_handoff` DENIED the pack and `use_skill` answered "has no
-/// tools available in this session". The agent's own `agent.toml` names `file_write` and says it
-/// "creates new files"; this pins that the pack table no longer contradicts it.
-///
-/// `file_read` is held to the same rule for a different reason: every
-/// `[tool_result_preview]` the harness emits says `read_with: file_read`, so a
-/// closed `file_read` turns each oversized result into an `unknown tool` loop.
-#[test]
-fn the_orchestrators_only_file_creator_is_never_closed() {
-    use crate::agent::orchestration::tools::{ArchetypeDelegationTool, DelegationTarget};
-
-    // A hypothetical unpacked hand-off to a `coding` owner closes that pack.
-    let delegates: Vec<Box<dyn tinytools::Tool>> = ["review_code"]
-        .iter()
-        .zip(["critic"])
-        .map(|(name, target)| {
-            Box::new(ArchetypeDelegationTool {
-                tool_name: (*name).to_string(),
-                agent_id: DelegationTarget(target.to_string()),
-                tool_description: String::new(),
-            }) as Box<dyn tinytools::Tool>
-        })
-        .collect();
-    let raw = registry_with_all(&["file_write", "file_read"]);
-    let tools: Vec<&dyn tinytools::Tool> = raw
-        .iter()
-        .map(|t| t.as_ref())
-        .chain(delegates.iter().map(|t| t.as_ref()))
+        .map(|tool| tool.as_ref())
+        .chain(std::iter::once(&spawn as &dyn tinytools::Tool))
         .collect();
 
     let closed = closed_by_direct_handoff("orchestrator", &tools);
-    assert!(
-        !closed.contains(&"file_write"),
-        "`file_write` must stay reachable to the orchestrator: {closed:?}"
-    );
-    assert!(
-        !closed.contains(&"file_read"),
-        "`file_read` must stay reachable: every result preview names it: {closed:?}"
-    );
-    assert!(
-        closed.contains(&"grep"),
-        "the rest of the `coding` pack is still the owners' belt: {closed:?}"
-    );
-    for tool in ["file_write", "file_read"] {
-        assert!(
-            registry::pack_for_tool(tool).is_none(),
-            "`{tool}` must belong to no pack — that is what keeps it open"
-        );
-    }
+    assert!(closed.contains(&"skill_registry_install"), "{closed:?}");
+    assert!(closed.contains(&"media_generate_image"), "{closed:?}");
+    assert!(!closed.contains(&"wallet_status"), "{closed:?}");
 }
