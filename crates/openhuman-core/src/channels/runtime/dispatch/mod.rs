@@ -12,6 +12,7 @@
 
 mod helpers;
 pub(crate) mod host_agent;
+mod native_runner;
 mod processor;
 mod routing;
 

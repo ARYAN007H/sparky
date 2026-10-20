@@ -93,7 +93,9 @@ pub(super) fn spawn_native_progress(
     })
 }
 
-fn delivery_succeeded(result: &tinychannels_bus::module_progressive::ProgressiveResult) -> bool {
+pub(crate) fn delivery_succeeded(
+    result: &tinychannels_bus::module_progressive::ProgressiveResult,
+) -> bool {
     use tinychannels_bus::module_progressive::ProgressiveResult;
     match result {
         ProgressiveResult::Updated => true,
@@ -140,7 +142,7 @@ fn delivery_unsupported_count(
     }
 }
 
-fn output_event(progress: AgentProgress) -> Option<ChannelOutputEvent> {
+pub(crate) fn output_event(progress: AgentProgress) -> Option<ChannelOutputEvent> {
     match progress {
         AgentProgress::TextDelta { delta, iteration } => Some(ChannelOutputEvent::TextDelta {
             text: delta,
