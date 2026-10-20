@@ -132,9 +132,10 @@ fn database_totals(report: &LegacyDatabaseReport) -> (usize, usize) {
         report.tool_effects,
     ]
     .into_iter()
-    .fold((0, 0), |(found, written), ImportCounts { read, imported, .. }| {
-        (found + read, written + imported)
-    })
+    .fold(
+        (0, 0),
+        |(found, written), ImportCounts { read, imported, .. }| (found + read, written + imported),
+    )
 }
 
 /// The agent definitions a stem may belong to, by the component their ids
