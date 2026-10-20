@@ -46,7 +46,7 @@ async fn an_empty_model_does_not_erase_the_attribution() {
     gate.acquire(&CallEstimate::new("   ", 1, 1))
         .await
         .expect("grants");
-    assert_eq!(gate.attributed_model(), "pinned-model");
+    assert_eq!(gate.attributed_model(), Some("pinned-model".to_string()));
 }
 
 #[tokio::test]
