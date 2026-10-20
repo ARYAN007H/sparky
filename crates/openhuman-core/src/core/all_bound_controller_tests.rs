@@ -307,10 +307,12 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
 
     let entries: Vec<_> = registry()
         .iter()
-        .chain(internal_registry())
         .filter(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get")
         .collect();
-    assert_eq!(entries.len(), 1, "registry_get has one raw registry entry");
+    assert_eq!(entries.len(), 1, "registry_get has one public raw entry");
+    assert!(!internal_registry()
+        .iter()
+        .any(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get"));
     let grouped = entries[0];
     assert_eq!(grouped.group, DomainGroup::Mcp);
     let entry = &grouped.controller;
@@ -360,16 +362,18 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
 fn production_registry_binds_computer_status_to_its_declared_parser() {
     use serde_json::json;
 
-    let entries: Vec<_> = registry()
+    let entries: Vec<_> = internal_registry()
         .iter()
-        .chain(internal_registry())
         .filter(|grouped| grouped.controller.schema.method_name() == "modules.computer_status")
         .collect();
     assert_eq!(
         entries.len(),
         1,
-        "computer_status has one raw registry entry"
+        "computer_status has one internal raw registry entry"
     );
+    assert!(!registry()
+        .iter()
+        .any(|grouped| grouped.controller.schema.method_name() == "modules.computer_status"));
     let grouped = entries[0];
     assert_eq!(grouped.group, DomainGroup::Modules);
     let entry = &grouped.controller;

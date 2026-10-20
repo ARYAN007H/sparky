@@ -108,6 +108,12 @@ fn registry_get_shared_parser_preserves_value_and_validation_errors() {
         super::handlers::parse_registry_get(&valid).unwrap(),
         "example/server"
     );
+    let padded = Map::from_iter([("qualified_name".into(), json!(" example/server "))]);
+    assert_eq!(
+        super::handlers::parse_registry_get(&padded).unwrap(),
+        " example/server ",
+        "registry parser preserves the qualified name for downstream operation validation"
+    );
     assert!(super::handlers::parse_registry_get(&Map::new())
         .unwrap_err()
         .contains("missing required param 'qualified_name'"));
