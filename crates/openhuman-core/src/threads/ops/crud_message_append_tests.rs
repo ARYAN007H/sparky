@@ -351,7 +351,7 @@ async fn append_cannot_forge_private_attachment_storage_metadata() {
     let stored = crate::threads::store::get_messages(
         &crate::core::runtime::DispatchCtx::ambient(),
         config.workspace_dir.clone(),
-        "uploads".to_string(),
+        "uploads",
     )
     .unwrap();
     assert!(stored[0]
@@ -512,7 +512,7 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     left.expect("concurrent metadata update one");
     right.expect("concurrent metadata update two");
     let current =
-        conversations::blocking::get_messages(ctx.clone(), config.workspace_dir.clone(), "uploads")
+        conversations::blocking::get_messages(ctx.clone(), config.workspace_dir.clone(), "uploads".to_string())
             .await
             .unwrap()
             .into_iter()
