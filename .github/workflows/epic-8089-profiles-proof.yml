@@ -279,6 +279,43 @@ jobs:
           test "$control_exit" -eq 0
           grep -Fq 'test result: ok. 1 passed; 0 failed;' "$control_log"
 
+      - name: Run the full Rust layout gate on the frozen baseline
+        if: matrix.case == 'baseline'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/build-tmp target/profiles-proof
+          export TMPDIR="$GITHUB_WORKSPACE/target/build-tmp"
+          schema=target/profiles-proof/storage-schema.json
+          schema_stderr=target/profiles-proof/storage-schema.stderr
+          printf 'storage_schema_command=TMPDIR=%s CARGO_BUILD_JOBS=1 bash scripts/ci-cancel-aware.sh cargo run --locked -p openhuman-cli --example storage_schema_dump --features web3\n' "$TMPDIR" >> target/profiles-proof/receipt.txt
+          set +e
+          bash scripts/ci-cancel-aware.sh cargo run --locked -p openhuman-cli --example storage_schema_dump --features web3 > "$schema" 2> "$schema_stderr"
+          schema_exit=$?
+          set -e
+          printf 'storage_schema_exit=%s\n' "$schema_exit" >> target/profiles-proof/receipt.txt
+          if [ "$schema_exit" -ne 0 ]; then
+            cat "$schema_stderr"
+            exit "$schema_exit"
+          fi
+          layout_log=target/profiles-proof/rust-layout.log
+          printf 'layout_command=TMPDIR=%s CARGO_BUILD_JOBS=1 bash scripts/ci-cancel-aware.sh pnpm rust:layout\n' "$TMPDIR" >> target/profiles-proof/receipt.txt
+          set +e
+          bash scripts/ci-cancel-aware.sh pnpm rust:layout > "$layout_log" 2>&1
+          layout_exit=$?
+          set -e
+          printf 'rust_layout_exit=%s\n' "$layout_exit" >> target/profiles-proof/receipt.txt
+          if [ "$layout_exit" -ne 0 ]; then
+            cat "$layout_log"
+            exit "$layout_exit"
+          fi
+          node scripts/ci/check-storage-schema.mjs --schema "$schema" > target/profiles-proof/storage-schema-check.log 2>&1
+          git diff --exit-code --ignore-submodules=none
+          test "$(git write-tree)" = '${{ matrix.expected_tree }}'
+          test "$(git rev-parse :crates/openhuman-core/src/profiles/schemas.rs)" = '${{ matrix.expected_schema_blob }}'
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+          printf 'post_layout_status=%s\n' "$(git status --porcelain=v1 --ignore-submodules=none)" >> target/profiles-proof/receipt.txt
+
       - name: Upload proof receipts and logs
         if: always()
         uses: actions/upload-artifact@v7
