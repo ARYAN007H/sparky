@@ -516,11 +516,11 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
         config.workspace_dir.clone(),
         "uploads".to_string(),
     )
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|message| message.id == saved.id)
-            .unwrap();
+    .await
+    .unwrap()
+    .into_iter()
+    .find(|message| message.id == saved.id)
+    .unwrap();
     assert_eq!(current.extra_metadata["pinned"], true);
     assert_eq!(current.extra_metadata["seen"], true);
     assert_eq!(current.extra_metadata["reactionSummary"]["heart"], 1);

@@ -88,7 +88,11 @@ fn typed_media_is_valid_chat_input_without_caption_text() {
         parts: vec![image.clone()],
     };
     assert!(submission_has_content("", Some(&stored), None));
-    assert!(submission_has_content("  ", None, Some(std::slice::from_ref(&image))));
+    assert!(submission_has_content(
+        "  ",
+        None,
+        Some(std::slice::from_ref(&image))
+    ));
     assert!(!submission_has_content("  ", None, None));
     assert!(!submission_has_content(
         "",
