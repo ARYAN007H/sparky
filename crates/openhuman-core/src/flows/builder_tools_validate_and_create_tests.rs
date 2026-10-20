@@ -129,7 +129,7 @@ async fn edit_workflow_does_not_persist_an_incompatible_saved_child_reference() 
     let child = crate::flows::store::create_flow(
         &config,
         "Legacy unsafe child".to_string(),
-        child_graph,
+        serde_json::to_value(child_graph).unwrap(),
         false,
         false,
     )
