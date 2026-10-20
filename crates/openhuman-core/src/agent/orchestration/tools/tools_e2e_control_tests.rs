@@ -65,18 +65,20 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     );
     let accepted = crate::core::runtime::CoreContext::scope(
         Arc::clone(&core),
-        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "wait for the thread stop",
-                "model": "test-model",
-                "task_key": "stop detached child"
-            }),
-            None,
-            live.data.child(),
-            crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
-                .expect("detached parent"),
-        )),
+        Box::pin(
+            SpawnSubagentTool::new().execute_with_live_parent_context(
+                json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": "wait for the thread stop",
+                    "model": "test-model",
+                    "task_key": "stop detached child"
+                }),
+                None,
+                live.data.child(),
+                crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
+                    .expect("detached parent"),
+            ),
+        ),
     )
     .await
     .expect("spawn child");
@@ -94,7 +96,10 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         .expect("driver child reached provider gate")
         .expect("provider start");
     let dispatch = live.data.dispatch_ctx();
-    assert!(dispatch.resolved().is_some(), "stop uses the live core context");
+    assert!(
+        dispatch.resolved().is_some(),
+        "stop uses the live core context"
+    );
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&dispatch);
@@ -115,11 +120,9 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
         workspace.path().to_path_buf(),
     );
-    let before_scoped = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&core),
-        || store.load(),
-    )
-    .expect("load live durable row");
+    let before_scoped =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
+            .expect("load live durable row");
     let before_scoped = serde_json::to_string(&before_scoped).expect("encode live row");
 
     let scoped = crate::core::runtime::CoreContext::scope(
@@ -139,11 +142,9 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         jobs.get(job.id.as_str()).unwrap().status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Running
     );
-    let after_scoped = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&core),
-        || store.load(),
-    )
-    .expect("scoped cancel leaves durable row readable");
+    let after_scoped =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
+            .expect("scoped cancel leaves durable row readable");
     assert_eq!(
         serde_json::to_string(&after_scoped).expect("encode row after scoped cancel"),
         before_scoped,
@@ -172,11 +173,9 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     })
     .await
     .expect("driver child cancellation settles");
-    let stopped_snapshot = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&core),
-        || store.load(),
-    )
-    .expect("stopped durable row readable");
+    let stopped_snapshot =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
+            .expect("stopped durable row readable");
     let stopped_snapshot = serde_json::to_string(&stopped_snapshot).expect("encode stopped row");
 
     let repeated = crate::core::runtime::CoreContext::scope(
@@ -186,11 +185,9 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     .await
     .expect("repeated stop");
     assert_eq!(repeated.value["subagents_cancelled"], serde_json::json!(0));
-    let after_repeat = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&core),
-        || store.load(),
-    )
-    .expect("repeated stop leaves durable row readable");
+    let after_repeat =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
+            .expect("repeated stop leaves durable row readable");
     assert_eq!(
         serde_json::to_string(&after_repeat).expect("encode repeated stop row"),
         stopped_snapshot,
@@ -217,8 +214,12 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
     config.components.juice = false;
     let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), crate::tools::toolpacks::ToolGroups::none())
-            .definitions(definitions),
+        ContextOverlay::new(
+            config,
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
     );
     let thread_id = "completed-cancel-parent-thread";
     let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
@@ -231,21 +232,23 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
     );
     let result = CoreContext::scope(
         Arc::clone(&core),
-        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "Investigate completed-cancel-canary",
-                "model": "test-model",
-                "task_key": "completed child late cancel"
-            }),
-            None,
-            live.data.child(),
-            crate::agent::subagent_host::detached_subagent_parent(
-                &live,
-                "completed-cancel-child",
-            )
-            .expect("detached parent"),
-        )),
+        Box::pin(
+            SpawnSubagentTool::new().execute_with_live_parent_context(
+                json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": "Investigate completed-cancel-canary",
+                    "model": "test-model",
+                    "task_key": "completed child late cancel"
+                }),
+                None,
+                live.data.child(),
+                crate::agent::subagent_host::detached_subagent_parent(
+                    &live,
+                    "completed-cancel-child",
+                )
+                .expect("detached parent"),
+            ),
+        ),
     )
     .await
     .expect("spawn tool execution");

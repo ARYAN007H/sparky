@@ -352,3 +352,6 @@ mod continuation_tests;
 
 #[path = "tools_e2e_paused_cancel_tests.rs"]
 mod paused_cancel_tests;
+
+#[path = "tools_e2e_control_tests.rs"]
+mod control_tests;
