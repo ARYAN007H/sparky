@@ -182,7 +182,7 @@ fn stored_media(input: &MediaReference, file: &Attachment) -> MediaReference {
     media.url = None;
     media.local_cache_path = None;
     media.content_type = Some(file.mime.clone());
-    media.file_name = Some(file.name.clone());
+    media.file_name = input.file_name.clone().or_else(|| Some(file.name.clone()));
     media.size_bytes = Some(file.size_bytes as u64);
     media
 }
