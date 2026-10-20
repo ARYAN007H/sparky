@@ -488,9 +488,16 @@ async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_te
     assert_eq!(relay.sent().len(), 1, "one provider terminal is published");
 
     while let Ok(event) = web_events.try_recv() {
-        assert_ne!(event.context().request_id, request_id, "no duplicate output");
+        assert_ne!(
+            event.context().request_id,
+            request_id,
+            "no duplicate output"
+        );
     }
-    reply.close().await.expect("hosted projection runtime closes");
+    reply
+        .close()
+        .await
+        .expect("hosted projection runtime closes");
 }
 
 async fn run_hosted_compiled_turn(
