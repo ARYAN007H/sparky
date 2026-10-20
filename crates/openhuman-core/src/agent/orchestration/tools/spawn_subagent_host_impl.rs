@@ -13,7 +13,7 @@ impl Tool for SpawnSubagentTool {
          workers at once (e.g. \"a separate worker for each X\", a council \
          of opinions, or \"fan out over N items\"), issue separate async \
          sub-agent requests and collect their results. \
-         workers concurrently, which serializes the whole request. See the Delegation \
+         See the Delegation \
          Guide in the system prompt for available agent_ids and when to \
          use each."
     }
