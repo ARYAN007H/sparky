@@ -240,7 +240,7 @@ export function describeToolCall(input: DescribeToolCallInput): ToolCallPresenta
     if (agent) return agent;
   }
   if (
-    (baseName === 'spawn_subagent' || baseName === 'spawn_async_subagent') &&
+    (baseName === 'spawn_subagent' || baseName === 'spawn_subagent') &&
     typeof args.agent_id === 'string'
   ) {
     const agent = agentPresentation(args.agent_id, baseName, args, tense, serverDetail);

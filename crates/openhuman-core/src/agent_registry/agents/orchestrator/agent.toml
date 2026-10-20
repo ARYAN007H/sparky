@@ -219,7 +219,7 @@ named = [
     "storage_list_files",
     "storage_get_link",
     # Sub-agent surface, deliberately three tools (#5701). A sub-agent is
-    # always async: `spawn_async_subagent` returns a task id immediately and
+    # always async: `spawn_subagent` returns a task id immediately and
     # the runner delivers the result back on an idle system turn via
     # `orchestration::background_delivery`. Nothing has to block for it, so
     # the collection surface that used to sit here — `wait`, `wait_loop`,
@@ -230,7 +230,7 @@ named = [
     # were fleet-management affordances for a fleet the model no longer
     # enumerates; a worker that needs different instructions is cheaper to
     # respawn, and idle sessions are reaped against the registry cap anyway.
-    "spawn_async_subagent",
+    "spawn_subagent",
     # Fleet awareness. Re-enumerates the workers this parent has in flight
     # (running / awaiting_user / completed-uncollected / failed) plus reusable
     # durable sessions — the recovery move when the `[async_subagent_ref]`

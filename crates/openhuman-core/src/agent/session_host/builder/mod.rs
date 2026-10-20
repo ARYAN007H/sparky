@@ -149,12 +149,12 @@ pub(super) fn visible_tool_specs_for_policy(
         })
         .cloned()
         .filter_map(|mut spec| {
-            if spec.name == "spawn_async_subagent" {
+            if spec.name == "spawn_subagent" {
                 // Same narrowing for the spawn enum: advertise only the ids
                 // this agent's `[subagents]` allowlist lets `execute` dispatch.
                 let allowed = allowed_subagent_ids_for(&tool_policy.profile.agent_id);
                 if !allowed.is_empty() {
-                    crate::agent::orchestration::tools::scope_spawn_async_subagent_spec(
+                    crate::agent::orchestration::tools::scope_spawn_subagent_spec(
                         Arc::make_mut(&mut spec),
                         &allowed,
                     );

@@ -1,7 +1,7 @@
-// Argument decoding for `spawn_async_subagent`.
+// Argument decoding for `spawn_subagent`.
 //
-// Textually included into `spawn_async_subagent_surface.rs` beside
-// `spawn_async_subagent_host_impl.rs`, so it shares that module's imports. Split
+// Textually included into `spawn_subagent_surface.rs` beside
+// `spawn_subagent_host_impl.rs`, so it shares that module's imports. Split
 // out because the execute fragment had grown to 847 lines against the layout
 // gate's pin, and this prologue is the one phase of that function that is a
 // pure function of `args` — every other phase closes over the run context, the
@@ -14,7 +14,7 @@
 // widening another module's surface. That is left as follow-up rather than
 // forced through here.
 
-/// The `spawn_async_subagent` arguments, decoded and normalised.
+/// The `spawn_subagent` arguments, decoded and normalised.
 ///
 /// Trimmed, with blank strings treated as absent, exactly as the inline code
 /// did — `task_title` keeps its default and `task_key` is normalised through

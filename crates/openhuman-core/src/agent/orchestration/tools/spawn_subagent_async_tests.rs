@@ -125,7 +125,7 @@ impl ToolRunContext for ThreadContext {
 
 #[test]
 fn parameters_schema_advertises_fire_and_forget_fields() {
-    let tool = SpawnAsyncSubagentTool::new();
+    let tool = SpawnSubagentTool::new();
     let schema = tool.parameters_schema();
     let required = schema
         .get("required")
@@ -472,7 +472,7 @@ fn attach_workflow_proposal_without_proposal_returns_summary_unchanged() {
 
 #[tokio::test]
 async fn missing_agent_id_returns_error() {
-    let tool = SpawnAsyncSubagentTool::new();
+    let tool = SpawnSubagentTool::new();
     let result = tool.execute(json!({ "prompt": "do work" })).await.unwrap();
     assert!(result.is_error);
     assert!(result.output().contains("agent_id"));
@@ -480,7 +480,7 @@ async fn missing_agent_id_returns_error() {
 
 #[tokio::test]
 async fn missing_prompt_returns_error() {
-    let tool = SpawnAsyncSubagentTool::new();
+    let tool = SpawnSubagentTool::new();
     let result = tool
         .execute(json!({ "agent_id": "archivist" }))
         .await
@@ -490,7 +490,7 @@ async fn missing_prompt_returns_error() {
 }
 
 /// B40 / Gap 4: a delegating agent (e.g. the orchestrator) calling
-/// `spawn_async_subagent` directly from a thread-less context (flow
+/// `spawn_subagent` directly from a thread-less context (flow
 /// `agent` node, CLI, cron) must get a clear, actionable error instead of
 /// silently accepting the spawn and later dropping its result in
 /// `background_delivery`'s "headless batch" path. Sets up a real parent
@@ -504,7 +504,7 @@ async fn errors_clearly_when_no_parent_thread_for_delivery() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
 
-    let result = SpawnAsyncSubagentTool::new()
+    let result = SpawnSubagentTool::new()
         .execute_under_parent(
             json!({
                 "agent_id": "task_manager_agent",
@@ -550,7 +550,7 @@ async fn guard_does_not_fire_when_parent_thread_is_bound() {
     let workspace = tempfile::TempDir::new().expect("workspace");
 
     let thread = ThreadContext("t-parent");
-    let result = SpawnAsyncSubagentTool::new()
+    let result = SpawnSubagentTool::new()
         .execute_under_parent(
             json!({
                 "agent_id": "task_manager_agent",
@@ -606,7 +606,7 @@ fn parent_context(workspace_dir: &Path) -> ParentExecutionContext {
 /// parent may dispatch, sorted and deduplicated, and says so.
 #[test]
 fn scoped_instance_advertises_exactly_the_allowlist() {
-    let tool = SpawnAsyncSubagentTool::scoped(vec![
+    let tool = SpawnSubagentTool::scoped(vec![
         "workflow_builder".to_string(),
         "agent_memory".to_string(),
         "workflow_builder".to_string(),

@@ -222,7 +222,7 @@ describe('chatRuntimeSlice', () => {
   });
 
   /**
-   * A detached `spawn_async_subagent` child outlives the turn that spawned it.
+   * A detached `spawn_subagent` child outlives the turn that spawned it.
    * Settling it on the parent's `completed` snapshot made the Background tasks
    * panel report "none running" — and the row read "Cancelled" — while the
    * sub-agent was still making tool calls. Its own `subagent_completed` event

@@ -79,7 +79,7 @@ fn render_installed_skills_empty_is_omitted() {
 #[test]
 fn prompt_routes_result_gating_tasks_to_synchronous_delegation() {
     // Regression for #4681: a "critique it before you finalize" task was
-    // dispatched via fire-and-forget `spawn_async_subagent`, so the turn
+    // dispatched via fire-and-forget `spawn_subagent`, so the turn
     // finalized before the critique ran. The orchestrator prompt must
     // explicitly route result-gating work to a synchronous/awaited path.
     assert!(
@@ -87,13 +87,13 @@ fn prompt_routes_result_gating_tasks_to_synchronous_delegation() {
         "orchestrator prompt must carry the result-gating delegation rule"
     );
     // The only primitive that returns inside the turn is a blocking
-    // `delegate_*` specialist. `spawn_async_subagent` has no `blocking`
+    // `delegate_*` specialist. `spawn_subagent` has no `blocking`
     // parameter, and the prompt used to claim it did; make sure that claim
     // never comes back.
     for line in ARCHETYPE.lines() {
         assert!(
-            !(line.contains("spawn_async_subagent") && line.contains("blocking: true")),
-            "spawn_async_subagent has no `blocking` argument: {line}"
+            !(line.contains("spawn_subagent") && line.contains("blocking: true")),
+            "spawn_subagent has no `blocking` argument: {line}"
         );
     }
 }

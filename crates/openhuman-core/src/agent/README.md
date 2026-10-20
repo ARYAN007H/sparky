@@ -178,7 +178,7 @@ its `AgentStores`. See [session_host/README.md](session_host/README.md).
 
 A parent agent delegates by calling a tool. `spawn_subagent`
 ([`orchestration/tools/spawn_subagent.rs`](./orchestration/tools/spawn_subagent.rs)) and its siblings
-(`spawn_async_subagent`, `continue_subagent`,
+(`spawn_subagent`, `continue_subagent`,
 `steer_subagent`, `wait_subagent`, `close_subagent`) look up the
 target `AgentDefinition` and call `subagent_host::run_subagent_with_parent`.
 

@@ -261,7 +261,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                  (result will be delivered as a follow-up turn)",
                 definition.id
             );
-            // Box the forwarded future: `SpawnAsyncSubagentTool`'s
+            // Box the forwarded future: `SpawnSubagentTool`'s
             // `execute_with_context` future is large, and embedding it inline
             // in every delegation tool's future (which itself nests inside
             // agent-turn futures) overflows the test-thread stack on deep
@@ -271,7 +271,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                     live_parent,
                     "async-subagent",
                 )?;
-                super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
+                super::spawn_subagent::SpawnSubagentTool::new()
                     .execute_with_live_parent_context(
                         async_args,
                         tool_context,

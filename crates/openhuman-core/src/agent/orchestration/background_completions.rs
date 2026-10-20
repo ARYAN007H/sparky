@@ -1,5 +1,5 @@
 //! Host adapter over the harness `CompletionRouter` for finished detached
-//! background sub-agents (`spawn_async_subagent`).
+//! background sub-agents (`spawn_subagent`).
 //!
 //! The queue itself is the harness's: `tinyagents_tasks::CompletionRouter`
 //! deduplicates by task id, holds tombstones (collected inline, stopped,
@@ -211,7 +211,7 @@ pub(crate) async fn record_outcome_with_parent_epoch(
     let task_id = task_id.into();
     let Some(thread_id) = parent_thread_id else {
         // Delivery is thread-addressed; a headless spawn has nowhere to land
-        // the result. (`spawn_async_subagent` refuses to start one.)
+        // the result. (`spawn_subagent` refuses to start one.)
         log::warn!("[background_completions] dropping headless completion task_id={task_id}");
         return;
     };

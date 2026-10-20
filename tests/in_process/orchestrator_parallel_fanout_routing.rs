@@ -11,7 +11,7 @@
 //! #5757 (`02d81f6cf`) retired `spawn_parallel_agents` along with five other
 //! sub-agent tools, cutting the surface from 11 tools to 3. A dedicated fan-out
 //! tool was judged "a second way to say spawn again" now that
-//! `spawn_async_subagent` is always async: it returns a task id immediately, so
+//! `spawn_subagent` is always async: it returns a task id immediately, so
 //! N spawns issued together are already N workers running concurrently. The
 //! retirement is pinned both ways in `agents/loader.rs` — three tools required,
 //! six asserted absent — so it is deliberate and enforced, not drift.
@@ -29,12 +29,12 @@ fn prompt_routes_fanout_to_concurrent_async_spawns() {
     let prompt = ORCHESTRATOR_PROMPT.to_lowercase();
 
     // The fan-out guidance must exist and name the primitive that actually
-    // runs concurrently. Post-#5757 that is `spawn_async_subagent`; the
+    // runs concurrently. Post-#5757 that is `spawn_subagent`; the
     // assertion is deliberately on the *current* tool rather than on whichever
     // name happened to be right in 2026, because a prompt naming a retired
     // tool is the failure this file is meant to catch.
     assert!(
-        ORCHESTRATOR_PROMPT.contains("spawn_async_subagent"),
+        ORCHESTRATOR_PROMPT.contains("spawn_subagent"),
         "orchestrator prompt must name the concurrent spawn primitive (#4754, #5757)"
     );
 
@@ -91,7 +91,7 @@ fn prompt_does_not_teach_a_retired_subagent_tool() {
 // re-anchor it to. `spawn_subagent` survives in exactly one agent —
 // `trigger_reactor/agent.toml` — and that agent's tool list is
 // `spawn_subagent` alone: no `spawn_parallel_agents`, and no
-// `spawn_async_subagent` either. So the redirect is dangling for its only
+// `spawn_subagent` either. So the redirect is dangling for its only
 // caller, and pointing it at the new tool would leave it just as dangling.
 //
 // The underlying defect is in `src/`, not in a test: `spawn_subagent`'s

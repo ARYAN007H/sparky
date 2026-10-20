@@ -11,7 +11,7 @@ and UI-facing projections.
 - Host adapters that dispatch work through `agent::subagent_host::run_subagent`.
 - Background sub-agent task tracking, cancellation, steering, completion
   delivery, and run-ledger projection.
-- Manual cancellation and steering for detached `spawn_async_subagent` runs.
+- Manual cancellation and steering for detached `spawn_subagent` runs.
 - The shared root `ParentExecutionContext` builder used by background tasks.
 
 ## Key files
@@ -34,7 +34,7 @@ and UI-facing projections.
 
 ## Tools
 
-The module exposes `spawn_subagent`, `spawn_async_subagent`,
+The module exposes `spawn_subagent`, `spawn_subagent`,
 `steer_subagent`, `continue_subagent`,
 `close_subagent`, `wait_subagent`, and `list_subagents`.
 Archetype delegates provide focused synchronous calls over the live sub-agent host.

@@ -79,7 +79,7 @@ impl ContinueSubagentTool {
     /// Accepts either the transient `task_id` (`sub-…`) or the durable
     /// `subagent_session_id` in the tool's `task_id` argument — the ambient
     /// `[active_subagents]` roster advertises both. The resume routes through
-    /// `spawn_async_subagent` pinned to the session's `task_key`, so the
+    /// `spawn_subagent` pinned to the session's `task_key`, so the
     /// reusable-session machinery reattaches: a `running` worker is steered,
     /// an `idle` one is relaunched seeded with its persisted `latest_history`
     /// plus the new message, and the finished result is delivered back into
@@ -157,7 +157,7 @@ impl ContinueSubagentTool {
         }
         let detached_parent =
             crate::agent::subagent_host::detached_subagent_parent(live_parent, "async-subagent")?;
-        super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
+        super::spawn_subagent::SpawnSubagentTool::new()
             .execute_with_live_parent_context(
                 async_args,
                 tool_context,

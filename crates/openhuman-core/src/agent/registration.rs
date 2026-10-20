@@ -1,7 +1,7 @@
 //! Registration of agent dialogue and delegation tools.
 
 use super::orchestration::tools::{
-    CloseSubagentTool, ContinueSubagentTool, ListSubagentsTool, SpawnAsyncSubagentTool,
+    CloseSubagentTool, ContinueSubagentTool, ListSubagentsTool, SpawnSubagentTool,
     SpawnSubagentTool, SteerSubagentTool, WaitSubagentTool,
 };
 use super::tools::{PlanExitTool, TodoTool};
@@ -23,7 +23,7 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         // returns a single text result. See
         // `agent::subagent_host` for the dispatch path.
         Box::new(SpawnSubagentTool::new()),
-        Box::new(SpawnAsyncSubagentTool::new()),
+        Box::new(SpawnSubagentTool::new()),
         // Interactive clarification early-exit. Sub-agents pause on this tool
         // (checkpoint → `AwaitingUser`, see `subagent_host`) and
         // the orchestrator resumes them via `continue_subagent` (#4291).

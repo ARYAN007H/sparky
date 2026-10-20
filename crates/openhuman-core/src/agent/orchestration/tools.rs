@@ -1,7 +1,7 @@
 //! Declares OpenHuman's product orchestration surfaces over TinyAgents.
 //!
 //! Tools, by role:
-//! - **Spawn**: `spawn_subagent` and `spawn_async_subagent`.
+//! - **Spawn**: `spawn_subagent` and `spawn_subagent`.
 //! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
 //!   `wait_subagent`, `list_subagents`.
 //! - **Delegation**: `ArchetypeDelegationTool`.
@@ -22,8 +22,8 @@ pub(crate) mod awaiting_user;
 mod continue_subagent;
 #[path = "tools/subagent_dispatch_host.rs"]
 mod dispatch;
-#[path = "tools/spawn_async_subagent_surface.rs"]
-mod spawn_async_subagent;
+#[path = "tools/spawn_subagent_surface.rs"]
+mod spawn_subagent;
 #[path = "tools/spawn_subagent_surface.rs"]
 mod spawn_subagent;
 #[path = "tools/subagent_abort_report.rs"]
@@ -61,7 +61,7 @@ pub(crate) fn live_parent_run_context(
 pub use archetype_delegation::{ArchetypeDelegationTool, DelegationTarget};
 pub(crate) use continue_subagent::ContinueSubagentDispatch;
 pub use continue_subagent::ContinueSubagentTool;
-pub(crate) use spawn_async_subagent::SpawnAsyncSubagentDispatch;
-pub use spawn_async_subagent::{scope_spawn_async_subagent_spec, SpawnAsyncSubagentTool};
+pub(crate) use spawn_subagent::SpawnSubagentDispatch;
+pub use spawn_subagent::{scope_spawn_subagent_spec, SpawnSubagentTool};
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;
 pub use spawn_subagent::SpawnSubagentTool;

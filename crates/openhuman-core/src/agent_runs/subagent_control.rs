@@ -1,5 +1,5 @@
 //! Controller schema + JSON-RPC dispatcher for user-driven control of detached
-//! background sub-agents (`spawn_async_subagent`).
+//! background sub-agents (`spawn_subagent`).
 //!
 //! Exposes `openhuman.subagent_cancel`: the frontend "Cancel" affordance in the
 //! background-tasks drawer calls this to abort a still-running detached

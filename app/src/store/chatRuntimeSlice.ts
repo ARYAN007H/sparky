@@ -119,7 +119,7 @@ export interface SubagentActivity {
    */
   spawnEventId?: string;
   /**
-   * Provider-assigned id of the `spawn_subagent`/`spawn_async_subagent`/
+   * Provider-assigned id of the `spawn_subagent`/`spawn_subagent`/
    * `delegate_*` tool call that started this delegation
    * (`SubagentProgressDetail.parent_call_id` on the `subagent_spawned`
    * event). When present, `assistantUiMessages.ts` renders this activity's
@@ -361,7 +361,7 @@ export function findPendingDelegationContext(
     const entry = entries[i];
     if (entry.status !== 'running' || entry.round !== round) continue;
     if (
-      ['spawn_subagent', 'spawn_async_subagent'].includes(entry.name) ||
+      ['spawn_subagent', 'spawn_subagent'].includes(entry.name) ||
       entry.name.startsWith('delegate_')
     ) {
       return {
@@ -1392,7 +1392,7 @@ export function toolTimelineFromPersisted(
  * intact preserves the truthful "was waiting for the user" history — and the
  * pulse is already stopped by the row-level `cancelled` above.
  *
- * A detached sub-agent (`spawn_async_subagent`, `mode === 'async'`) is the
+ * A detached sub-agent (`spawn_subagent`, `mode === 'async'`) is the
  * exception, and the parent's snapshot is never allowed to settle it. It is a
  * fire-and-forget task that deliberately outlives the turn that spawned it, so
  * the parent's lifecycle says nothing about whether the child is alive — and

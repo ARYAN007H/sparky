@@ -275,7 +275,7 @@ pub async fn with_inherited_origin<F: std::future::Future>(
 /// scoped **right now** into a future that will run on another task.
 ///
 /// A `tokio::task_local` does not cross `tokio::spawn`: a detached sub-agent
-/// (`spawn_async_subagent`, the orchestration `spawn_agent` task) starts on a
+/// (`spawn_subagent`, the orchestration `spawn_agent` task) starts on a
 /// fresh task where [`current`] is `None`, so every external-effect tool it
 /// calls reaches the approval gate as [`AgentTurnOrigin::Unknown`] and is
 /// refused — even though the parent turn that delegated the work was properly

@@ -1,6 +1,6 @@
 //! Registry of in-flight async sub-agents that can be **steered** mid-run.
 //!
-//! `spawn_async_subagent` runs a child as a detached `tokio` task. On its own
+//! `spawn_subagent` runs a child as a detached `tokio` task. On its own
 //! that task is opaque: the parent gets a `task_id` back but has no channel into
 //! the running loop and no way to collect the result inline. This registry
 //! closes both gaps.

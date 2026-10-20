@@ -81,10 +81,10 @@ fn the_three_spec_views_share_their_leaf_schemas() {
         }
         // Same exception, same reason: the spawn enum is narrowed to this
         // agent's `[subagents]` allowlist, so it is a per-session copy.
-        if spec.name == "spawn_async_subagent" {
+        if spec.name == "spawn_subagent" {
             assert!(
                 !shared,
-                "`spawn_async_subagent` must be scoped into its own allocation"
+                "`spawn_subagent` must be scoped into its own allocation"
             );
             let ids = spec
                 .parameters
@@ -117,7 +117,7 @@ fn the_three_spec_views_share_their_leaf_schemas() {
     );
     assert!(
         saw_scoped_spawn,
-        "the orchestrator advertises `spawn_async_subagent`, so its enum must have been narrowed"
+        "the orchestrator advertises `spawn_subagent`, so its enum must have been narrowed"
     );
 }
 

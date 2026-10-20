@@ -7,7 +7,7 @@
 // synchronous alternative (`spawn_subagent` with `blocking: true`, or a `delegate_*`
 // tool). Both of those self-heal to blocking dispatch in this situation rather than
 // reaching this guard — see the `has_delivery_thread` checks in `spawn_subagent_surface.rs` and
-// `subagent_dispatch_host.rs::dispatch_subagent`. Only a *direct* `spawn_async_subagent` call lands
+// `subagent_dispatch_host.rs::dispatch_subagent`. Only a *direct* `spawn_subagent` call lands
 // here.
 fn refuse_missing_delivery_thread(
     parent_thread_id: Option<&str>,
@@ -16,14 +16,14 @@ fn refuse_missing_delivery_thread(
 ) -> Option<ToolResult> {
     if parent_thread_id.is_none() {
         log::warn!(
-            "[spawn_async_subagent] refusing fire-and-forget spawn with no delivery thread \
+            "[spawn_subagent] refusing fire-and-forget spawn with no delivery thread \
                  parent={} requested={} — directing caller to synchronous delegation (flow node / \
                  CLI / cron context, background result would be discarded)",
             parent_agent_id,
             requested_agent_id
         );
         return Some(ToolResult::error(
-            "spawn_async_subagent: no parent chat thread available to deliver the result \
+            "spawn_subagent: no parent chat thread available to deliver the result \
                  into (this looks like a flow node, CLI, or cron run rather than an interactive \
                  chat turn). Fire-and-forget delegation has nowhere to land its result here and \
                  the sub-agent's work would be silently discarded. Use synchronous delegation \
@@ -63,20 +63,20 @@ fn accepted_spawn_result(
     let payload_json = match serde_json::to_string(&payload) {
         Ok(serialized) => {
             log::debug!(
-                "[spawn_async_subagent] serialized async reference payload bytes={}",
+                "[spawn_subagent] serialized async reference payload bytes={}",
                 serialized.len()
             );
             serialized
         }
         Err(error) => {
             log::debug!(
-                "[spawn_async_subagent] failed to serialize async reference payload: {}",
+                "[spawn_subagent] failed to serialize async reference payload: {}",
                 error
             );
             "{}".to_string()
         }
     };
-    log::debug!("[spawn_async_subagent] formatting accepted response");
+    log::debug!("[spawn_subagent] formatting accepted response");
     ToolResult::success(format_async_subagent_accepted(
         payload["agent_id"].as_str().unwrap_or("subagent"),
         &payload_json,
@@ -87,12 +87,12 @@ fn accepted_spawn_result(
 fn refuse_empty_spawn_args(agent_id: &str, prompt: &str) -> Option<ToolResult> {
     if agent_id.is_empty() {
         return Some(ToolResult::error(
-            "spawn_async_subagent: `agent_id` is required",
+            "spawn_subagent: `agent_id` is required",
         ));
     }
     if prompt.is_empty() {
         return Some(ToolResult::error(
-            "spawn_async_subagent: `prompt` is required",
+            "spawn_subagent: `prompt` is required",
         ));
     }
     None

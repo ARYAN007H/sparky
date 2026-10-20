@@ -268,7 +268,7 @@ async fn legacy_archetype_alias_is_normalized_to_agent_id() {
 
 /// B40: with no chat thread bound, async-by-default delegation has nowhere
 /// to deliver a result, so `spawn_subagent` must self-heal to blocking
-/// dispatch rather than forwarding into `spawn_async_subagent`'s
+/// dispatch rather than forwarding into `spawn_subagent`'s
 /// thread-less guard — otherwise the guard's own advice ("use
 /// `spawn_subagent`") would loop straight back into the guard. Asserted
 /// via which tool owns the downstream error.
@@ -285,7 +285,7 @@ async fn async_default_self_heals_to_blocking_without_delivery_thread() {
 
     let out = result.output();
     assert!(
-        !out.contains("spawn_async_subagent"),
+        !out.contains("spawn_subagent"),
         "thread-less spawn_subagent must not route into the async tool: {out}"
     );
     assert!(

@@ -350,7 +350,7 @@ async fn invoke_driver_tool_with_request(
     let request_task_id = task_id.clone();
     let request_continuation = continuation;
     let dispatcher = DriverSubAgentTool::new(
-        "spawn_async_subagent",
+        "spawn_subagent",
         "Host-prepared asynchronous subagent invocation.",
         bundle.driver.clone(),
         move |_state: &(), parent, args, _call_id| {

@@ -230,7 +230,7 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
     }
     use crate::agent::harness::fork_context::ParentExecutionContext;
     use crate::agent::orchestration::subagent_sessions::SubagentSessionStore;
-    use crate::agent::orchestration::tools::{SpawnAsyncSubagentDispatch, SpawnAsyncSubagentTool};
+    use crate::agent::orchestration::tools::{SpawnSubagentDispatch, SpawnSubagentTool};
     use tinyagents_harness::tool::ToolDispatch;
     let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::tempdir().unwrap();
@@ -272,7 +272,7 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
             tinyagents_harness::context::RunConfig::new("scope-refusal")
                 .with_thread("scope-refusal-parent"),
         );
-    let result = SpawnAsyncSubagentDispatch::new(Arc::new(SpawnAsyncSubagentTool::new()))
+    let result = SpawnSubagentDispatch::new(Arc::new(SpawnSubagentTool::new()))
         .execute(
             &(),
             tinyagents_harness::ids::CallId::new("scope-refusal-spawn"),

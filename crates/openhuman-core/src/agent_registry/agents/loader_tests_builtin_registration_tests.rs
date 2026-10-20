@@ -259,7 +259,7 @@ fn master_agent_has_coding_hint_and_named_tools() {
             // system turn, so there is nothing to collect and nothing to
             // block on.
             for required in [
-                "spawn_async_subagent",
+                "spawn_subagent",
                 "list_subagents",
                 "continue_subagent",
             ] {
