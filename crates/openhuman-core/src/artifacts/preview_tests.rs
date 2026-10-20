@@ -46,7 +46,7 @@ async fn a_text_kind_shows_its_newest_version() {
 }
 
 #[tokio::test]
-async fn a_text_file_inside_the_roots_is_read() {
+async fn a_text_file_is_read_from_the_scoped_file_store() {
     let dir = tempfile::tempdir().unwrap();
     let files = file_store(dir.path());
     files.put("artifacts/files/f-1/v1.txt", b"plain notes", None).await.unwrap();
@@ -64,8 +64,7 @@ async fn a_text_file_inside_the_roots_is_read() {
 }
 
 #[tokio::test]
-async fn a_file_outside_the_roots_is_not_opened() {
-    let dir = tempfile::tempdir().unwrap();
+async fn a_blob_file_is_not_read_without_its_store() {
     let elsewhere = tempfile::tempdir().unwrap();
     let files = file_store(elsewhere.path());
     files.put("artifacts/files/f-1/v1.txt", b"do not read", None).await.unwrap();
