@@ -118,8 +118,8 @@ fn unregistering_a_source_removes_its_tools() {
 fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     // The pre-refactor catalogue built a host's media / file-storage tools
     // right after the search tools (before hosting, web3 and image_info) and
-    // its place / market-data tools right after the delegation tool, ahead of
-    // the Composio tools; the order is a prompt-cache input.
+    // its place / market-data tools right after image_info, ahead of the
+    // Composio tools; the order is a prompt-cache input.
     let tmp = TempDir::new().unwrap();
     let anchor_tools = |names: &[&str]| -> Vec<Box<dyn Tool>> {
         names
@@ -172,8 +172,8 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     // hosting/web3, and follow the built-ins that precede the search tools.
     assert!(pos("file_read") < pos("anchor_fake_search_a"));
     assert!(pos("anchor_fake_search_b") < pos("image_info"));
-    // End sources, and sources with an unknown anchor, trail every built-in
-    // and keep registration order.
+    // The post-image-info anchor precedes Composio, while end sources and
+    // sources with an unknown anchor trail every built-in.
     assert!(pos("image_info") < pos("anchor_fake_delegate"));
     assert!(pos("anchor_fake_delegate") < pos("anchor_fake_end"));
     assert!(pos("anchor_fake_end") < pos("anchor_fake_unknown"));

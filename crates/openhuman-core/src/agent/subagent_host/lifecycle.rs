@@ -294,7 +294,7 @@ async fn invoke_async_spawn_driver_tool(
     invoke_driver_tool_with_request(
         parent,
         HostRequest {
-            invocation: HostInvocation::Agent(definition),
+            invocation: definition,
             options,
         },
         input,
@@ -622,7 +622,7 @@ impl OpenHumanSubagentHost {
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
-            invocation: HostInvocation::Agent(self.definition),
+            invocation: self.definition,
             options: self.options,
         };
         let driver = OpenHumanDriverBundle::with_in_flight_for(

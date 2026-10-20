@@ -222,3 +222,48 @@ fn str_at<'a>(value: &'a Value, pointer: &str) -> &'a str {
         .unwrap_or_else(|| panic!("expected a string at {pointer} in {value}"))
 }
 
+// ── subagent: cancel / steer ────────────────────────────────────────────────
+
+/// The background-tasks drawer's Cancel and steer controls. Both answer
+/// **structurally** for a task that is not running rather than erroring — the
+/// drawer's row may be stale, and a stale row must not raise. `steer` goes
+/// further and says *why* it did nothing.
+#[tokio::test]
+async fn subagent_steer_honours_and_defaults_the_queue_mode() {
+    let _lock = env_lock_async().await;
+    let h = setup().await;
+
+    let collect = h
+        .ok(
+            3504,
+            "openhuman.subagent_steer",
+            json!({
+                "taskId": "sub-not-running",
+                "message": "note this for later",
+                "mode": "collect",
+            }),
+        )
+        .await;
+    assert_eq!(
+        collect.get("mode").and_then(Value::as_str),
+        Some("collect"),
+        "an explicit queue mode is honoured and echoed: {collect}"
+    );
+
+    // An unrecognised mode falls back to steer rather than erroring.
+    let bogus_mode = h
+        .ok(
+            3505,
+            "openhuman.subagent_steer",
+            json!({ "taskId": "sub-not-running", "message": "hi", "mode": "teleport" }),
+        )
+        .await;
+    assert_eq!(
+        bogus_mode.get("mode").and_then(Value::as_str),
+        Some("steer"),
+        "an unknown mode degrades to the default: {bogus_mode}"
+    );
+
+    h.join.abort();
+}
+

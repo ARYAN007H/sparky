@@ -433,13 +433,6 @@ pub fn all_tools_with_runtime(
         Some(crate::tools::sources::ANCHOR_AFTER_SEARCH),
     ));
 
-    // Keep the hosted-tool placement stable for registered sources that still
-    // use the former post-delegate slot.
-    tools.extend(crate::tools::sources::build_registered_tool_sources(
-        &source_ctx,
-        Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),
-    ));
-
     // Hosting tools — deploy a workspace directory through the compiled
     // TinyHosts module. Registered only once a credential
     // actually resolves (`[hosting].api_key`, else the provider's environment
@@ -471,6 +464,13 @@ pub fn all_tools_with_runtime(
 
     // Image metadata is always available for user-provided images.
     tools.push(Box::new(ImageInfoTool::new(security.clone())));
+
+    // Keep hosted tools using the former post-delegate slot in their stable
+    // catalogue position after image metadata and before Composio.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),
+    ));
 
     let composio_tools = crate::integrations::composio::all_composio_agent_tools(root_config);
     if composio_tools.is_empty() {

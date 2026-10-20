@@ -80,7 +80,7 @@ fn deserialize_params_and_helpers_cover_success_and_failure_paths() {
 
 
 #[tokio::test]
-async fn registry_snapshot_omits_retired_graphs_and_keeps_delegation() {
+async fn registry_snapshot_omits_retired_graphs() {
     let result = handle_registry_snapshot(DispatchCtx::process_default(), Map::new())
         .await
         .expect("registry snapshot is available");
@@ -92,7 +92,10 @@ async fn registry_snapshot_omits_retired_graphs_and_keeps_delegation() {
         .iter()
         .filter_map(|component| component.get("id").and_then(Value::as_str))
         .collect();
-    assert!(ids.contains(&"delegation"), "snapshot ids: {ids:?}");
+    assert!(
+        !ids.contains(&"delegation"),
+        "snapshot includes the retired delegation graph: {ids:?}"
+    );
     assert!(
         !ids.iter().any(|id| id.starts_with("agent_teams:")),
         "snapshot includes a retired team graph: {ids:?}"
