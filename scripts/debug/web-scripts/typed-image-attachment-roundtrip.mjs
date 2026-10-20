@@ -36,6 +36,17 @@ function findStoredBytes(root, expected) {
   return null;
 }
 
+function hasSourceAuthority(value) {
+  if (Array.isArray(value)) return value.some(hasSourceAuthority);
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) =>
+    (["path", "url", "localCachePath"].includes(key) &&
+      typeof child === "string" &&
+      child.length > 0) ||
+      hasSourceAuthority(child),
+  );
+}
+
 export default async function typedImageAttachmentRoundtrip({
   page,
   mock,
@@ -184,11 +195,12 @@ export default async function typedImageAttachmentRoundtrip({
   )
     throw new Error("chat turn did not carry the persisted opaque media ref");
   if (
-    JSON.stringify(chatRequest.params.attachments).match(
-      /data:|base64|"(?:path|url)"\s*:/i,
-    )
+    /data:[^\s\"]+|base64,/i.test(JSON.stringify(chatRequest.params.attachments)) ||
+    hasSourceAuthority(chatRequest.params.attachments)
   )
-    throw new Error("chat turn sent source bytes or a filesystem/network path");
+    throw new Error(
+      `chat turn sent source bytes or a filesystem/network path: ${JSON.stringify(chatRequest.params.attachments)}`,
+    );
 
   const inferenceRequest = mock
     .requests()

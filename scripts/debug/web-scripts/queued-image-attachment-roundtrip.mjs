@@ -38,6 +38,17 @@ function findStoredBytes(root, expected) {
   return null;
 }
 
+function hasSourceAuthority(value) {
+  if (Array.isArray(value)) return value.some(hasSourceAuthority);
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) =>
+    (["path", "url", "localCachePath"].includes(key) &&
+      typeof child === "string" &&
+      child.length > 0) ||
+      hasSourceAuthority(child),
+  );
+}
+
 async function waitUntil(predicate, label, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -206,9 +217,8 @@ export default async function queuedImageAttachmentRoundtrip({
     );
   }
   if (
-    JSON.stringify(pending.attachments).match(
-      /data:|base64|"(?:path|url|localCachePath)"\s*:/i,
-    )
+    /data:[^\s\"]+|base64,/i.test(JSON.stringify(pending.attachments)) ||
+    hasSourceAuthority(pending.attachments)
   ) {
     throw new Error("queued UI state retained upload bytes or a source path");
   }
