@@ -169,14 +169,9 @@ where
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
-    let history_len = durable_channel_history_len(
-        ctx,
-        &current,
-        &msg.channel,
-        sender_key,
-        durable_session_key.as_deref(),
-    )
-    .await;
+    let history_len =
+        durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
+            .await;
     let client = super::context::module_client(ctx).await;
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
@@ -291,7 +286,6 @@ async fn durable_channel_history_len(
     ctx: &ChannelRuntimeContext,
     route: &ChannelRouteSelection,
     channel: &str,
-    history_key: &str,
     session_key: Option<&str>,
 ) -> usize {
     let Some(session_key) = session_key else {
