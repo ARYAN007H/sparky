@@ -258,3 +258,142 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
         .await
         .expect("module runtime should shut down");
 }
+
+#[tokio::test]
+async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
+    let _env_lock = EnvVarGuard::locked_async().await;
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    let client = crate::channels::module_fixture::client().await;
+    let relay = Arc::new(crate::channels::providers::relay::RelayChannel::new(
+        "telegram",
+        "relay-fixture-client",
+        "channel:telegram/sender-7/chat-42",
+        "relay-fixture-request",
+        "provider-message-9",
+    ));
+    let channel = tinychannels_bus::ChannelRef {
+        id: "telegram".into(),
+        account_id: Some("tenant-profile:7:telegram".into()),
+    };
+    let conversation = tinychannels_bus::ConversationRef {
+        kind: tinychannels_bus::ConversationKind::Group,
+        id: "chat-42".into(),
+        parent_id: Some("chat-parent".into()),
+        thread_id: Some("topic-3".into()),
+        topic_id: Some("topic-3".into()),
+        ..Default::default()
+    };
+    let callback = crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
+        Arc::clone(&relay),
+        channel.clone(),
+        conversation.clone(),
+        "relay-turn-1".into(),
+    );
+    let runtime = ChannelRuntimeLease::open(client, callback)
+        .await
+        .expect("host callback runtime should attach to the compiled module");
+
+    // The module accepts the hosted callback route without a locally
+    // configured Telegram account, but a mismatched address is rejected by
+    // the callback captured for this trusted tenant/conversation.
+    let mut wrong_account = channel.clone();
+    wrong_account.account_id = Some("tenant-profile:8:telegram".into());
+    let rejected = run_hosted_compiled_turn(
+        runtime.object(),
+        wrong_account,
+        conversation.clone(),
+        "relay-turn-1",
+        "must not escape the captured account",
+    )
+    .await;
+    assert!(!crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(
+        &rejected
+    ));
+    assert!(relay.sent().is_empty());
+
+    let mut wrong_conversation = conversation.clone();
+    wrong_conversation.id = "chat-43".into();
+    let rejected = run_hosted_compiled_turn(
+        runtime.object(),
+        channel.clone(),
+        wrong_conversation,
+        "relay-turn-1",
+        "must not escape the captured conversation",
+    )
+    .await;
+    assert!(!crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(
+        &rejected
+    ));
+    assert!(relay.sent().is_empty());
+
+    let delivered = run_hosted_compiled_turn(
+        runtime.object(),
+        channel.clone(),
+        conversation.clone(),
+        "relay-turn-1",
+        "typed hosted relay reply",
+    )
+    .await;
+    let ProgressiveResult::DeliveryOutcome { outcome } = delivered else {
+        panic!("compiled hosted send should return its typed receipt: {delivered:?}");
+    };
+    assert!(outcome.error.is_none());
+    assert_eq!(outcome.receipt.idempotency_key.as_deref().is_some(), true);
+    assert_eq!(outcome.receipt.channel.as_ref(), Some(&channel));
+    assert_eq!(outcome.receipt.conversation.as_ref(), Some(&conversation));
+    assert_eq!(outcome.receipt.thread_id.as_deref(), Some("topic-3"));
+    assert_eq!(
+        relay.sent(),
+        vec!["typed hosted relay reply".to_owned()]
+    );
+    runtime
+        .close()
+        .await
+        .expect("hosted module runtime should close after the turn");
+}
+
+async fn run_hosted_compiled_turn(
+    object: &tinybus::module::ModuleObjectClient,
+    channel: tinychannels_bus::ChannelRef,
+    conversation: tinychannels_bus::ConversationRef,
+    turn_id: &str,
+    text: &str,
+) -> ProgressiveResult {
+    let opened: ProgressiveResult = object
+        .call_confidential(
+            tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
+            (ProgressiveCommand::OpenHostedOutput {
+                channel,
+                conversation,
+                turn_id: turn_id.into(),
+                lifetime_ms: 30_000,
+            },),
+        )
+        .await
+        .expect("compiled module should open a hosted output handle");
+    let ProgressiveResult::Opened { handle } = opened else {
+        panic!("expected compiled module hosted output handle: {opened:?}");
+    };
+    let result: ProgressiveResult = object
+        .call_confidential(
+            tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
+            (ProgressiveCommand::FeedOutput {
+                handle: handle.clone(),
+                events: vec![ChannelOutputEvent::FinalMessage {
+                    text: text.into(),
+                    parts: vec![],
+                    receipt: None,
+                }],
+            },),
+        )
+        .await
+        .expect("compiled module should return the typed callback outcome");
+    object
+        .call_confidential::<ProgressiveResult>(
+            tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
+            (ProgressiveCommand::Close { handle },),
+        )
+        .await
+        .expect("compiled module hosted output should close");
+    result
+}
