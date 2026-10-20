@@ -61,7 +61,7 @@ test.describe('Agent review - canonical shell + privacy flow', () => {
     await expect(page.getByTestId('settings-privacy-panel')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Product Analytics' })).toBeVisible();
     await expect(page.getByText('Share Product Analytics and Diagnostics')).toBeVisible();
-    await expect(page.getByRole('switch').first()).toBeVisible();
+    await expect(page.getByTestId('privacy-analytics-toggle')).toBeVisible();
     await attachCheckpoint(page, testInfo, '02-privacy-panel');
   });
 });
