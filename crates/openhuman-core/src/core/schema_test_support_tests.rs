@@ -117,10 +117,15 @@ fn contract_rejects_removed_or_required_optional_declarations() {
                 .expect("independent optional field is present")
                 .required = true;
         }
+        let expected_error = if remove {
+            "optional inputs mismatch"
+        } else {
+            "required inputs mismatch"
+        };
         assert!(
             verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
                 .unwrap_err()
-                .contains("optional inputs mismatch")
+                .contains(expected_error)
         );
     }
 }
