@@ -39,9 +39,10 @@ async function readOnboardingCompleted(): Promise<boolean> {
  * onboarding screen to wait for. Callers assert the landing instead.
  */
 async function signInThroughOnboarding(page: Page, userId: string): Promise<void> {
+  // The helper already waits for a false onboarding flag to complete and land
+  // in chat. Re-entering Welcome after that would start completion a second
+  // time, and its delayed navigation can pull the user away from Settings.
   await signInViaBypassUser(page, userId, { onboardingCompleted: false });
-  await page.goto('/#/onboarding/welcome');
-  await waitForAppReady(page);
 }
 
 async function expectLandedInChat(page: Page): Promise<void> {
