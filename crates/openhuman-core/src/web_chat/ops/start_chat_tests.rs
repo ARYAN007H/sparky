@@ -76,6 +76,31 @@ fn plain_string_conversions_build_other_variant() {
     assert!(matches!(from_borrowed, StartChatError::Other(ref m) if m == "message is required"));
 }
 
+#[test]
+fn typed_media_is_valid_chat_input_without_caption_text() {
+    let image = tinychannels_bus::ContentPart::Image {
+        media: tinychannels_bus::MediaReference::default(),
+        caption: None,
+        alt_text: None,
+    };
+    let stored = crate::agent::queued_turn::StoredAttachmentInput {
+        persisted_message_id: "user:row-1".into(),
+        parts: vec![image.clone()],
+    };
+    assert!(submission_has_content("", Some(&stored), None));
+    assert!(submission_has_content(
+        "  ",
+        None,
+        Some(std::slice::from_ref(&image))
+    ));
+    assert!(!submission_has_content("  ", None, None));
+    assert!(!submission_has_content(
+        "",
+        Some(&crate::agent::queued_turn::StoredAttachmentInput::default()),
+        Some(&[]),
+    ));
+}
+
 #[tokio::test]
 async fn voice_note_turn_id_is_bound_to_its_exact_user_row_before_admission() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};

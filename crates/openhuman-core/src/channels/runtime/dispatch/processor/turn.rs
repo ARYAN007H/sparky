@@ -23,7 +23,6 @@ use super::super::helpers::{
 };
 use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
-use super::reset_durable_channel_session;
 use super::RuntimeChannelMessage;
 
 pub(crate) async fn process_channel_message(
@@ -86,6 +85,11 @@ pub(crate) async fn process_channel_runtime_message(
     let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
+    let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
+        channel: envelope.channel.clone(),
+        conversation: envelope.conversation.clone(),
+        session_key: canonical_session_key.clone(),
+    };
     crate::channels::host::voice::record_inbound_envelope(&envelope);
     let native_target = if let Some(target) = progressive_target {
         Some(target)
@@ -122,7 +126,7 @@ pub(crate) async fn process_channel_runtime_message(
         reply_target: msg.reply_target.clone(),
         content: msg.content.clone(),
         thread_ts: msg.thread_ts.clone(),
-        inbound_envelope: Some(envelope),
+        inbound_envelope: Some(envelope.clone()),
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 
@@ -136,16 +140,17 @@ pub(crate) async fn process_channel_runtime_message(
         &msg,
         target_channel.as_ref(),
         &history_key,
+        Some(remote_reset_scope),
+        Some(session_key.clone()),
+        &msg,
         || async move {
-            reset_durable_channel_session(
-                &reset_context,
-                &reset_message,
-                &reset_session_key,
-                &reset_history_key,
+            super::reset::reset_command(
+                reset_context,
+                reset_message,
+                reset_session_key,
+                reset_history_key,
             )
             .await
-            .map(|_| ())
-            .map_err(|error| error.to_string())
         },
     )
     .await
@@ -304,7 +309,7 @@ pub(crate) async fn process_channel_runtime_message(
             .is_some_and(|ch| ch.supports_draft_updates());
 
     // Set up streaming channel if supported
-    let (progress_tx, progress_rx) = if use_streaming {
+    let (_progress_tx, progress_rx) = if use_streaming {
         let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(64);
         (Some(tx), Some(rx))
     } else {
@@ -508,7 +513,7 @@ pub(crate) async fn process_channel_runtime_message(
                 &route,
                 &enriched_message,
                 active_turn_model_source,
-                progress_tx,
+                _progress_tx,
                 turn_origin,
                 approval,
             )

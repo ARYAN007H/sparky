@@ -286,6 +286,7 @@ impl ChannelHostCallbacks {
                             context.as_ref(),
                             tenant,
                             cancellation,
+                            None,
                             request,
                         ) => result.map(ChannelBackendResult::RemoteControl),
                     }

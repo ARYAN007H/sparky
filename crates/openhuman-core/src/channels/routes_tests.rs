@@ -58,7 +58,7 @@ impl Channel for RecordingChannel {
     }
 }
 
-fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
+pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
             "ok",
@@ -118,6 +118,7 @@ async fn module_route_help_response(
             model: "gpt-5".into(),
         },
         history_len: 0,
+        session_scope: None,
         providers,
     };
     let response: ChannelControlResult = crate::channels::module_fixture::client()
@@ -259,6 +260,7 @@ async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_tab
         let callback = RouteCallbacks::new(
             runtime_context(PathBuf::from("/tmp/channel-callback")),
             cancellation.clone(),
+            None,
         );
         assert!(Arc::ptr_eq(
             callback.core_context.as_ref().unwrap(),
@@ -374,6 +376,9 @@ async fn clear_history_command_uses_reset_callback_and_persists_route_override()
         &msg,
         Some(&channel),
         &conversation_history_key(&msg),
+        None,
+        None,
+        &msg,
         move || async move {
             callback_flag.store(true, std::sync::atomic::Ordering::SeqCst);
             Ok(())
