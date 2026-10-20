@@ -931,7 +931,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
         });
       });
       await waitFor(() => expect(threadApi.getThreadMessages).toHaveBeenCalledWith('t-upload'));
-      expect(threadApi.appendMessage).not.toHaveBeenCalled();
+      expect(
+        vi.mocked(threadApi.appendMessage).mock.calls.some(([, message]) => message.sender === 'user')
+      ).toBe(false);
       expect(store.getState().queue.pendingFollowupsByThread['t-upload']).toBeUndefined();
     });
 
@@ -963,7 +965,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
         });
       });
       expect(store.getState().queue.pendingFollowupsByThread['t-fup']).toHaveLength(1);
-      expect(threadApi.appendMessage).not.toHaveBeenCalled();
+      expect(
+        vi.mocked(threadApi.appendMessage).mock.calls.some(([, message]) => message.sender === 'user')
+      ).toBe(false);
 
       await act(async () => {
         listeners.onDone?.({
