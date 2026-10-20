@@ -1,12 +1,10 @@
 # cron
 
-The cron domain runs scheduled jobs. It owns the background scheduler loop that
-fires due jobs, the three ways a job can run (a shell command, an agent turn, or
-a hand-off to another domain), the delivery layer that routes a run's output to
-the right place, and the `cron.*` RPC controllers and agent tools that create
-and manage jobs. The scheduler is spawned as a core background service; agents
-reach it through the `cron` and `schedule` tools, and the desktop UI through
-the `cron` RPC namespace.
+The cron domain exposes the `cron.*` RPC controllers and agent tools that
+create and manage scheduled jobs. The core service drives scheduler dispatch,
+publishes health transitions, and supplies the host job handlers and delivery
+callbacks. Agents reach it through the `cron` and `schedule` tools, and the
+desktop UI through the `cron` RPC namespace.
 
 Scheduling itself is not in core. The `tinyflows` loadable module owns the
 scheduler runtime (poll pass, process-wide run claims, retry with backoff,
@@ -16,9 +14,12 @@ agent-job cadence floor). Core reaches it only through the `tinyflows-bus`
 contract (`tinyflows_bus::schedule`, v6), and keeps what is policy and what is
 pluggable: the callbacks the module runs jobs through, the document port it
 persists through, the job-kind handler registry, delivery, the operator limits
-and the RPC and tool surface. Core links neither `tinyflows-schedule` nor
-`tinyflows-drivers`' schedule store (`cargo tree -p openhuman -e normal -i
-tinyflows-schedule` is empty).
+and the RPC and tool surface. The core's normal dependency graph excludes the
+TinyFlows engine, catalog, copilot, drivers, and schedule implementation; the
+pure `tinyflows-import` readers remain for legacy data.
+
+Check this boundary with
+`scripts/assert-shed.sh default tinyflows tinyflows-catalog tinyflows-copilot tinyflows-drivers tinyflows-schedule`.
 
 ## How it works
 

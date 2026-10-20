@@ -3,7 +3,7 @@ use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec}
 
 pub(crate) const TINYFLOWS: ModuleRecord = ModuleRecord {
     id: "tinyflows",
-    description: "Scheduled jobs and workflow authoring through TinyFlows",
+    description: "Scheduled jobs, workflow Catalog/Runs execution, and authoring through TinyFlows",
     bus_name: tinyflows_bus::BUS_NAME,
     object_path: tinyflows_bus::OBJECT_PATH,
     version: "0.8.28",
