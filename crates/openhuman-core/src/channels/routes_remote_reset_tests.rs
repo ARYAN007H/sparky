@@ -254,7 +254,26 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     .await
     .expect("captured tenant reset succeeds");
     assert!(matches!(cleared, RemoteHostResult::Completed));
-    assert!(session_messages(&alice_core, workspace, &alice_session).is_empty());
+    let alice_after = session_messages(&alice_core, workspace, &alice_session);
+    assert!(
+        alice_after.is_empty(),
+        "reset should empty Alice's actual session: agent={}, session={alice_session:?}, \
+         head={:?}, messages={alice_after:?}, history_len={}",
+        alice_agent.definition.id,
+        crate::agent::session_store::transcripts_or_files_in(
+            &alice_core,
+            alice_agent.definition.id.as_str(),
+            workspace,
+        )
+        .head_generation(&alice_session),
+        super::durable_channel_history_len(
+            &alice_runtime,
+            &alice_route,
+            "telegram",
+            Some(&alice_key),
+        )
+        .await,
+    );
     assert_eq!(
         super::durable_channel_history_len(
             &alice_runtime,
