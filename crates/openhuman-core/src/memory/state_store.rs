@@ -96,7 +96,10 @@ fn workspace_scope(workspace_dir: &Path) -> Result<crate::storage::Scope> {
         .take(12)
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
-    crate::storage::scope_for_module(None, &format!("memory-workspace-{suffix}"))
+    Ok(crate::storage::scope_for_module(
+        None,
+        &format!("memory-workspace-{suffix}"),
+    )?)
 }
 
 fn open_workspace_quarantining<T: DeserializeOwned>(

@@ -117,13 +117,13 @@ pub(super) fn engine_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
         let params = parse::<EngineSetParams>(params)?;
         let mut config = load(&ctx).await?;
         if let Err(error) = ops::apply_engine_set(&mut config, &params) {
-            return finish(Err(error));
+            return finish::<Value>(Err(error));
         }
         if let Err(error) = config.save().await {
             return Err(engine_set_save_error(error));
         }
         engine::invalidate();
-        finish(Ok(ops::engine_get(&config).await))
+        finish::<Value>(Ok(ops::engine_get(&config).await))
     })
 }
 
