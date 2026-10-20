@@ -2004,6 +2004,9 @@ const chatRuntimeSlice = createSlice({
             existing.subagent.status = 'running';
             existing.subagent.awaitingQuestion = undefined;
             existing.subagent.spawnEventId = spawnEventId;
+            // Reattach the resumed task card to the newest parent call so the
+            // completed spawn from its earlier turn does not claim this work.
+            if (parentCallId) existing.subagent.parentCallId = parentCallId;
           }
         }
         return;
