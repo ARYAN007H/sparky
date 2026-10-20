@@ -200,6 +200,7 @@ export interface ThreadWireTypes {
   runEvent: RunEvent;
   runEventList: RunEventListResponse;
   runTelemetry: RunTelemetry;
+  startedChatAck: StartedChatAck;
   thread: ConversationThreadSummary;
   threadDelete: DeleteConversationThreadResponse;
   threadMessages: ConversationMessagesResponse;
@@ -721,6 +722,15 @@ export interface RunEventListResponse {
    */
   count: number;
   events: RunEvent[];
+}
+/**
+ * Typed acknowledgement returned when a web chat message starts immediately.
+ */
+export interface StartedChatAck {
+  accepted: boolean;
+  client_id: string;
+  request_id: string;
+  thread_id: string;
 }
 /**
  * Summary information for a workspace-backed conversation thread.
