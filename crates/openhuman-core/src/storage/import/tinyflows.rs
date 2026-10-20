@@ -271,20 +271,23 @@ fn catalog_migration_ready(
         .is_some_and(|entry| entry.outcome.is_ok())
 }
 
+/// Async on purpose: [`ensure_flow_scope_ready`] runs on the storage blocking
+/// bridge, and the synchronous `Repo` helpers would re-enter it ("a future
+/// running on the blocking bridge called back into it").
 #[cfg(feature = "flows")]
-fn flow_import_marker_done(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<bool> {
-    let markers = Repo::on(
-        backend,
-        &crate::storage::tenant_scope(None),
-        "storage::import",
-        marker_spec,
-    )?;
+async fn flow_import_marker_done(
+    backend: &Arc<dyn StorageBackend>,
+    config: &Config,
+) -> Result<bool> {
+    let scoped = backend
+        .for_scope(&crate::storage::tenant_scope(None))
+        .context("[storage::import] open the marker scope")?;
     let step = marker_step(FLOWS_DOMAIN, &config.workspace_dir);
-    import_state::is_done(&markers, MARKER_OWNER, &step)
+    Ok(import_state::done(&scoped, MARKER_OWNER, &step).await?)
 }
 
 #[cfg(feature = "flows")]
-pub(crate) fn legacy_flow_import_pending(
+pub(crate) async fn legacy_flow_import_pending(
     backend: &Arc<dyn StorageBackend>,
     config: &Config,
     scope: &Scope,
@@ -292,7 +295,7 @@ pub(crate) fn legacy_flow_import_pending(
     if scope != &Scope::local() || !flow_sources_present(&config.workspace_dir.join("flows")) {
         return Ok(false);
     }
-    Ok(!flow_import_marker_done(backend, config)?)
+    Ok(!flow_import_marker_done(backend, config).await?)
 }
 
 /// Make the acting scope safe for workflow calls, retrying a failed Catalog
@@ -320,6 +323,7 @@ pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Res
     }
     if !fallback
         && legacy_flow_import_pending(&backend, config, &scope)
+            .await
             .map_err(|error| format!("check the legacy flow import marker: {error:#}"))?
     {
         return Err(

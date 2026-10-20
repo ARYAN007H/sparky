@@ -384,12 +384,15 @@ fn an_invalid_flow_record_keeps_the_import_open_for_retry() {
             panic!("retry should remain incomplete without new writes: {first:?} / {retry:?}")
         }
     }
-    assert!(legacy_flow_import_pending(&backend, &config, &Scope::local()).unwrap());
+    assert!(legacy_flow_import_pending(&backend, &config, &Scope::local())
+        .await
+        .unwrap());
     assert!(!legacy_flow_import_pending(
         &backend,
         &config,
         &crate::storage::scope_for_profile("another-profile"),
     )
+    .await
     .unwrap());
     assert_eq!(tree(dir.path()), before, "the legacy files were modified");
 }
@@ -454,7 +457,7 @@ async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files(
         Some(json!({"seen": true}))
     );
     assert!(
-        flow_import_marker_done(&backend, &config).is_ok_and(|done| !done),
+        flow_import_marker_done(&backend, &config).await.is_ok_and(|done| !done),
         "the unbooted local fallback must not run the workspace-file importer"
     );
     assert_eq!(tree(&legacy_dir), legacy_files_before);
