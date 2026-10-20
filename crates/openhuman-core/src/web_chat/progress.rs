@@ -11,7 +11,6 @@
 
 use std::time::Instant;
 
-use serde_json::json;
 use tinyagents_session::port::TurnStates;
 use tinyagents_session::turn_state::TurnStateMirror;
 use tinychannels_bus::web::{
@@ -78,7 +77,6 @@ pub(crate) struct ProgressProjection {
     pending_narration: String,
     timing: TurnTimingState,
     cost_throttle: TurnCostThrottle,
-    events_seen: u64,
     ledger: Ledger,
     turn_state: Option<TurnStateMirror>,
     span_collector: Option<SpanCollector>,
@@ -115,6 +113,12 @@ impl ProgressProjection {
             &ids.request_id,
         )
         .unzip();
+        let ledger = for_turn(
+            &config.workspace_dir,
+            &ids.client_id,
+            &ids.thread_id,
+            &ids.request_id,
+        );
         Self {
             surface: Surface::new(ctx, ids.clone(), config.clone()).await,
             turn_state: Some(TurnStateMirror::new(
@@ -132,12 +136,7 @@ impl ProgressProjection {
             pending_narration: String::new(),
             timing: TurnTimingState::default(),
             cost_throttle: TurnCostThrottle::default(),
-            ledger: for_turn(
-                &config.workspace_dir,
-                &ids.client_id,
-                &ids.thread_id,
-                &ids.request_id,
-            ),
+            ledger,
             span_collector,
             journal_trace_ctx,
             timing_snapshot: None,
@@ -189,13 +188,23 @@ impl ProgressProjection {
 
     /// Project one event of the turn, in order.
     pub(crate) async fn on_event(&mut self, event: AgentProgress) {
-        let ledger_context = self.ledger.observe(&event).await;
         if let Some(mirror) = self.turn_state.as_mut() {
             mirror.observe(&event);
         }
         if let Some(collector) = self.span_collector.as_mut() {
             collector.record(&event, unix_epoch_ms());
         }
+        if let AgentProgress::ToolCallStarted { iteration, .. } = &event {
+            if self.timing.tool_call(self.elapsed_ms()) {
+                log::info!(
+                    "[web_channel][bridge] time-to-first-visible kind=tool_call first_tool_ms={} round={iteration} request_id={}",
+                    self.elapsed_ms(),
+                    self.ids.request_id
+                );
+            }
+            self.flush_interim_narration(*iteration).await;
+        }
+        let ledger_context = self.ledger.observe(&event).await;
         match event {
             AgentProgress::TurnStarted => {
                 self.turn_active = true;
@@ -219,17 +228,6 @@ impl ProgressProjection {
                 display_label,
                 display_detail,
             } => {
-                if self.timing.tool_call(self.elapsed_ms()) {
-                    log::info!(
-                        "[web_channel][bridge] time-to-first-visible kind=tool_call first_tool_ms={} round={iteration} tool={tool_name} request_id={}",
-                        self.elapsed_ms(),
-                        self.ids.request_id
-                    );
-                }
-                // The parent's leading narration for this round is complete
-                // once it calls a tool: persist it interleaved with the tool
-                // activity.
-                self.flush_interim_narration(iteration).await;
                 log::debug!(
                     "[web_channel][bridge] tool_call round={iteration} tool={tool_name} call_id={call_id} request_id={}",
                     self.ids.request_id
