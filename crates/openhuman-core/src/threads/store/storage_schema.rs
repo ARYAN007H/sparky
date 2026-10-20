@@ -5,6 +5,9 @@
 //! | v1 | v2 | scope |
 //! |---|---|---|
 //! | `threads_transcript_keys` (id = thread id) | `threads.transcript_keys` (id `Key::of([thread_id])`) | tenant |
+//! | — | `threads.channel_messages` | tenant |
+//! | — | `threads.staged_attachments` | agent |
+//! | — | `threads.reply_viseme_timelines` | agent |
 //!
 //! The importer marker `threads_import` is not a collection any more: the
 //! legacy JSONL import is a `tsd.migrations` entry
