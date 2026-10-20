@@ -26,7 +26,11 @@ pub async fn threads_list(
     ctx: &DispatchCtx,
     _request: EmptyRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadsListResponse>>, String> {
-    let dir = workspace_dir().await?;
+    let dir = ctx
+        .load_config()
+        .await
+        .map_err(|error| format!("load config: {error}"))?
+        .workspace_dir;
     let threads = conversations::blocking::list_threads(ctx.clone(), dir)
         .await?
         .into_iter()
