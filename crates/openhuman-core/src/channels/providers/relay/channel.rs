@@ -92,7 +92,7 @@ impl RelayChannel {
         idempotency_key: &str,
         parts: &[tinychannels_bus::OutboundContentPart],
         text: &str,
-    ) -> tinychannels_bus::channel::ChannelSendOutcome {
+    ) {
         self.sent
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -120,17 +120,6 @@ impl RelayChannel {
             })),
         });
 
-        tinychannels_bus::channel::ChannelSendOutcome {
-            receipt: tinychannels_bus::channel::MessageReceipt {
-                idempotency_key: Some(idempotency_key.to_owned()),
-                channel: Some(channel.clone()),
-                conversation: Some(conversation.clone()),
-                thread_id: conversation.thread_id.clone(),
-                reply_to_id: Some(self.reply_to.clone()),
-                ..Default::default()
-            },
-            error: None,
-        }
     }
 }
 
