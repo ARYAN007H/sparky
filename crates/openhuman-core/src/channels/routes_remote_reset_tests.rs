@@ -196,7 +196,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     )
     .await
     .expect("captured tenant reset succeeds");
-    assert_eq!(cleared, RemoteHostResult::Completed);
+    assert!(matches!(cleared, RemoteHostResult::Completed));
     assert!(session_messages(&alice_core, workspace, &alice_session).is_empty());
     assert_eq!(
         session_messages(&bob_core, workspace, &bob_session),
