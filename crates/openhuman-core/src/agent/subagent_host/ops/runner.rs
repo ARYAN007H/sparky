@@ -282,28 +282,9 @@ pub(crate) async fn run_subagent_direct_with_native_context(
         // The child carrier projects the definition's sandbox mode to every
         // tool through HostOperationContext.
         //
-        // When the worker opted into git-worktree isolation, its isolated
-        // checkout is carried on the `WorkspaceDescriptor` prepared below and
-        // threaded onto the run's tinyagents `RunContext`
-        // (`TurnSpec::run` → `RunContext::with_workspace`).
-        // Every tool call then receives it via
-        // `ToolExecutionContext::from_run_context`, so acting tools (shell, git)
-        // resolve their CWD to that worktree (`effective_action_dir_for_context`)
-        // instead of the shared `Config.action_dir` — no task-local override
-        // needed. When no descriptor is prepared (the default / non-isolated
-        // path), tools fall through to `security.action_dir` and behaviour is
-        // unchanged.
         let mut parent_for_subagent = parent.clone();
-        parent_for_subagent.workspace_descriptor =
-            workspace_descriptor_for_subagent(definition, &options, &parent, &task_id);
-        if let Some(descriptor) = parent_for_subagent.workspace_descriptor.as_ref() {
-            tracing::debug!(
-                agent_id = %definition.id,
-                task_id = %task_id,
-                worktree = %descriptor.root.display(),
-                policy_id = %descriptor.policy_id,
-                "[subagent_host] worktree-isolated worker: descriptor will route acting-tool CWD"
-            );
+        if options.workspace_descriptor.is_some() {
+            parent_for_subagent.workspace_descriptor = options.workspace_descriptor.clone();
         }
         let run_result = Box::pin(with_run_depth(RunDepth { depth: attempted_depth, max_depth }, async {
             with_file_state_agent_id(task_id.clone(), async {
@@ -382,30 +363,6 @@ pub(crate) async fn run_subagent_direct_with_native_context(
         Ok(outcome)
     })
     .await
-}
-
-fn workspace_descriptor_for_subagent(
-    definition: &AgentDefinition,
-    options: &SubagentRunOptions,
-    parent: &ParentExecutionContext,
-    task_id: &str,
-) -> Option<WorkspaceDescriptor> {
-    if let Some(descriptor) = options.workspace_descriptor.clone() {
-        return Some(descriptor);
-    }
-    if let Some(descriptor) = parent.workspace_descriptor.clone() {
-        return Some(descriptor);
-    }
-    let root = options.worktree_action_dir.clone()?;
-    let sandbox = match definition.sandbox_mode {
-        AgentSandboxMode::Sandboxed => TinyagentsSandboxMode::Required,
-        AgentSandboxMode::None | AgentSandboxMode::ReadOnly => TinyagentsSandboxMode::Inherit,
-    };
-    Some(
-        WorkspaceDescriptor::new(root)
-            .with_policy_id(format!("openhuman.worktree:{task_id}"))
-            .with_sandbox(sandbox),
-    )
 }
 
 /// One spawn's snapshot of the host config, loaded once by [`run_subagent`].
@@ -613,15 +570,11 @@ async fn run_typed_mode(
         subagent_prompt_protocol(parent.tool_call_format, &filtered_specs);
     // Load AGENTS.md instruction layers once, at prompt-build time, when the
     // config gate is on. The global layer comes from the workspace dir; the
-    // project layer comes from the sub-agent's `worktree_action_dir` override
-    // when present (git-worktree isolation), otherwise the global config
-    // `action_dir`. Loading here (not per turn) keeps the sub-agent system
+    // project layer comes from the global config `action_dir`. Loading here
+    // (not per turn) keeps the sub-agent system
     // prompt byte-stable for prefix caching.
     let agents_md = if parent.agent_config.agents_md_enabled {
-        let local_dir = options
-            .worktree_action_dir
-            .clone()
-            .or_else(|| config.as_ref().ok().map(|c| c.action_dir.clone()));
+        let local_dir = config.as_ref().ok().map(|c| c.action_dir.clone());
         match local_dir {
             Some(dir) => crate::agent::prompts::load_agents_md_layers(&parent.workspace_dir, &dir),
             None => {
