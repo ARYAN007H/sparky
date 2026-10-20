@@ -1,13 +1,13 @@
 ---
 description: >-
-  How to run the end-to-end suites: the WDIO and tauri-driver harness, a spec
-  locally or in Docker, the environment variables, and which lanes run in CI.
+  How to run end-to-end suites: Playwright against the standalone core, WDIO
+  through the native Wry host, local scripts, environment variables and CI lanes.
 icon: vials
 ---
 
 # E2E testing
 
-End-to-end coverage runs through a Rust mock-backend suite, Playwright in a real browser, and WebDriverIO (WDIO) through the desktop Wry host. Each assertion has one owner: Playwright owns browser-rendered behavior; WDIO owns behavior that requires the native process, window, operating system or Tauri IPC. Only the supported Linux desktop harness runs in CI. macOS and Windows desktop jobs remain disabled until native drivers are available.
+End-to-end coverage uses the Rust mock backend, Playwright in a real browser, and WebDriverIO (WDIO) through the desktop Wry host. Each assertion has one owner: Playwright owns browser-rendered behavior; WDIO owns behavior that requires the native process, window, operating system or Tauri IPC. Only the supported Linux desktop harness runs in CI. macOS and Windows desktop jobs remain disabled until native drivers are available.
 
 ## Overview
 
@@ -29,7 +29,7 @@ Linux CI drives the debug binary under Xvfb through `tauri-driver`. macOS and Wi
 # Build the E2E app
 pnpm --filter openhuman-app test:e2e:build
 
-# Run every spec in one shared tauri-driver session
+# Run one native spec through the tauri-driver session
 pnpm --filter openhuman-app test:e2e:session
 
 # Run all native flows in the four CI suite groups
@@ -184,7 +184,7 @@ on every push to it, and carries three E2E lanes:
 
 Playwright builds its web bundle and standalone core once, then uploads the same artifact to all four lanes. Each of the 64 ordinary Playwright shards starts its own core and workspace. The nine isolated cases (Connections aliases, Connections deep links, and seven Skills search/install cases) also each start their own core and workspace. CI Full requires every Playwright lane and the final gate checks the matrix result. Manual Playwright uses the same artifact and scheduler.
 
-The desktop lane calls the reusable workflow with `run_linux: true`, `run_macos: false` and `run_windows: false`, so only the Linux harness runs. Linux uses four fresh WDIO sessions: `foundation` (`auth,navigation,system`), `chat` (`chat,skills,journeys`), `connections` (`providers,provider-web,connectors`), and `settings` (`settings,notifications`). The reusable workflow applies the same group definitions to its macOS and Windows full-suite jobs, but those jobs are currently disabled.
+The desktop lane calls the reusable workflow with `run_linux: true`, `run_macos: false` and `run_windows: false`, so only the Linux harness runs. Linux uses four fresh WDIO sessions: `foundation` (`auth,navigation,system`), `chat` (`chat,skills,journeys`), `connections` (`providers,provider-web,connectors`), and `settings` (`settings,notifications,payments,webhooks`). The reusable workflow applies the same group definitions to its macOS and Windows full-suite jobs, but those jobs are currently disabled.
 
 macOS and Windows desktop E2E therefore have no scheduled coverage on any branch. `.github/workflows/e2e.yml` is a manual dispatch whose `run_macos` and `run_windows` inputs also default to `false`. The older Chromium-based driver depended on CEF/CDP and is unavailable under Wry; do not describe those jobs as active coverage.
 

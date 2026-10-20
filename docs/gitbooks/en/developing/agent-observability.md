@@ -43,7 +43,6 @@ The script prints the resolved artifact directory at the end.
 | ---------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Helper           | `app/test/playwright/specs/agent-review.spec.ts` | Attaches screenshots, page source and mock request logs |
 | Playwright owner | `app/test/playwright/specs/agent-review.spec.ts` | Shell readiness and privacy-panel labels/toggle |
-| Native owner     | `app/test/e2e/specs/agent-review.spec.ts` | No longer scheduled; remove after artifact migration passes |
 | Stable selectors | `chat-message-input`, `settings-privacy-panel`, `privacy-analytics-toggle` | Agent-reliable readiness anchors |
 
 ## Environment overrides
