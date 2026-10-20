@@ -244,6 +244,21 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
       noteId: item.extraMetadata.voiceNote.noteId,
     }));
   log(
+    `threads_transcript_get message correlation: ${JSON.stringify(
+      transcriptValue?.items
+        ?.filter(
+          (item) =>
+            item.kind === "userMessage" || item.kind === "assistantMessage",
+        )
+        .map((item) => ({
+          kind: item.kind,
+          content: item.content,
+          requestId: item.requestId,
+          extraMetadata: item.extraMetadata,
+        })),
+    )}`,
+  );
+  log(
     `threads_transcript_get voice rows: ${JSON.stringify(projectedVoiceNotes)}`,
   );
   if (
