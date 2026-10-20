@@ -74,6 +74,7 @@ async fn process_channel_message_executes_native_tool_calls() {
 
 #[tokio::test]
 async fn process_channel_message_handles_models_command_without_llm_call() {
+    crate::channels::register_hosted_route_test_policy();
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(TelegramRecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
