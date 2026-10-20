@@ -10,7 +10,9 @@
 //! `tinyinference_providers::is_budget_message`) lives upstream in
 //! `tinyinference`; deciding *which class an error is* stays in the callers.
 
+mod chat_error_catalog;
 mod halt;
+mod localized;
 mod table;
 
 #[cfg(test)]
@@ -19,4 +21,9 @@ pub(crate) use halt::{
     recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
     terminal_inference_failure_kind, terminal_inference_halt_summary, user_actionable_escalation,
 };
+pub(crate) use localized::{render_channel_failure, supported_channel_locale};
 pub(crate) use table::{failure_copy, FailureClass};
+
+#[cfg(test)]
+#[path = "localized_tests.rs"]
+mod localized_tests;

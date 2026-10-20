@@ -74,6 +74,20 @@ fn the_runners_guard_failures_classify_as_a_graceful_turn_timeout() {
 }
 
 #[test]
+fn web_runner_classifier_keeps_structured_copy_metadata() {
+    let failure = WebFailures.classify_failure("429 Too Many Requests: Retry-After: 12");
+    assert_eq!(failure.class, "rate_limited");
+    assert_eq!(failure.copy_key.as_deref(), Some("chat_error.rate_limited"));
+    assert_eq!(
+        failure
+            .copy_params
+            .as_ref()
+            .and_then(|params| params.get("retry_after_secs")),
+        Some(&serde_json::json!(12))
+    );
+}
+
+#[test]
 fn a_guard_failure_reports_the_window_that_fired() {
     let req = request("window", QueueDisposition::Interrupt);
     assert!(host_error(RUNNER_DEADLINE, Some(&req)).contains("42s"));
@@ -135,6 +149,39 @@ async fn a_failed_turn_announces_a_classified_chat_error() {
     assert!(matches!(error.wire_event(), WebChannelEvent::ChatError {
         error_type: Some(error_type), error_retryable: Some(true), copy_key: Some(_), ..
     } if error_type == "turn_timeout"));
+}
+
+#[tokio::test]
+async fn classified_failure_event_preserves_runner_copy_and_queued_prefix() {
+    let mut rx = crate::web_chat::subscribe_web_channel_events();
+    let (_shared, sink) = events();
+    let req = request("events-structured-failure", QueueDisposition::Followup);
+    let classification = FailureClassification {
+        class: "auth_error".into(),
+        message: "queued turn was not run: localized by the runner".into(),
+        copy_key: Some("chat_error.auth_error".into()),
+        copy_params: Some(serde_json::json!({"detail": "sanitized detail"})),
+    };
+
+    sink.classified_failure(
+        &req,
+        TerminalEvent::Failed {
+            request_id: req.request_id.clone(),
+            message: "stale classifier message".into(),
+            class: "rate_limited".into(),
+            error: "429 Too Many Requests: Retry-After: 12".into(),
+        },
+        classification,
+    )
+    .await;
+
+    let error = events_for(&mut rx, &req.request_id, 1).await.remove(0);
+    assert!(matches!(error.wire_event(), WebChannelEvent::ChatError {
+        message: Some(message), error_type: Some(error_type), copy_key: Some(copy_key), copy_params: Some(params), ..
+    } if message == "queued turn was not run: localized by the runner"
+        && error_type == "auth_error"
+        && copy_key == "chat_error.auth_error"
+        && params["detail"] == "sanitized detail"));
 }
 
 #[tokio::test]

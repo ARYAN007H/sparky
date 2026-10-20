@@ -1,5 +1,129 @@
 use super::*;
 
+#[test]
+fn native_failure_classifier_preserves_localizable_error_metadata() {
+    let failure = NativeFailures.classify_failure("429 Too Many Requests: Retry-After: 12");
+
+    assert_eq!(failure.class, "rate_limited");
+    assert_eq!(failure.copy_key.as_deref(), Some("chat_error.rate_limited"));
+    assert_eq!(
+        failure
+            .copy_params
+            .as_ref()
+            .and_then(|params| params.get("retry_after_secs")),
+        Some(&serde_json::json!(12))
+    );
+}
+
+#[test]
+fn native_failure_event_copy_uses_configured_locale_and_keeps_queued_context() {
+    let mut config = crate::config::Config::default();
+    config.channels_locale = Some("zh-CN".to_owned());
+    let failure = FailureClassification {
+        class: "rate_limited".to_owned(),
+        message: "queued turn was not run: Your AI provider is rate-limiting requests. Retry in 12 seconds.".to_owned(),
+        copy_key: Some("chat_error.rate_limited".to_owned()),
+        copy_params: Some(serde_json::json!({"retry_after_secs": 12})),
+    };
+
+    let rendered = render_classified_native_failure(Some(&config), &failure.message, &failure);
+
+    assert!(rendered.starts_with("queued turn was not run: "));
+    assert!(rendered.contains("你的 AI 提供商"));
+    assert!(rendered.contains("12"));
+    assert!(!rendered.contains("Your AI provider"));
+}
+
+#[tokio::test]
+async fn native_sink_uses_dispatch_locale_and_rejects_unknown_copy_metadata() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    async fn delivered_message(
+        config: crate::config::Config,
+        request_id: &str,
+        failure: FailureClassification,
+    ) -> String {
+        let profile = format!("native-locale-{request_id}");
+        let core = CoreContext::for_test(DomainSet::full(), None).derive_with(
+            ContextOverlay::new(config, DomainSet::full(), Default::default())
+                .profile(profile.clone()),
+        );
+        let dispatch = DispatchCtx::new(core);
+        let shared = Arc::new(NativeShared::default());
+        shared.begin_delivery_wait(request_id);
+        let request = TurnRequest {
+            scope: ScopeKey {
+                agent_id: "orchestrator".into(),
+                profile_id: Some(profile),
+            },
+            thread_id: format!("thread-{request_id}"),
+            request_id: request_id.into(),
+            text: "hello".into(),
+            payload: QueuedPayload {
+                ctx: Some(dispatch),
+                ..Default::default()
+            },
+            host_authored: false,
+            disposition: QueueDisposition::Followup,
+            deadline: None,
+            idle_timeout: None,
+        };
+        NativeEvents {
+            shared: Arc::clone(&shared),
+        }
+        .classified_failure(
+            &request,
+            TerminalEvent::Failed {
+                request_id: request_id.into(),
+                message: "stale message".into(),
+                class: failure.class.clone(),
+                error: "classifier input".into(),
+            },
+            failure,
+        )
+        .await;
+        shared
+            .with(request_id, |slot| slot.failure_message.clone())
+            .expect("native sink captures its rendered terminal copy")
+    }
+
+    let mut spanish = crate::config::Config::default();
+    spanish.channels_locale = Some("es".into());
+    let translated = delivered_message(
+        spanish,
+        "spanish",
+        FailureClassification {
+            class: "rate_limited".into(),
+            message: "queued turn was not run: English rate limit copy".into(),
+            copy_key: Some("chat_error.rate_limited".into()),
+            copy_params: Some(serde_json::json!({"retry_after_secs": 12})),
+        },
+    )
+    .await;
+    assert!(translated.starts_with("queued turn was not run: "));
+    assert!(translated.contains("Tu proveedor de IA"));
+    assert!(translated.contains("12"));
+    assert!(!translated.contains("English rate limit copy"));
+
+    let mut unsupported = crate::config::Config::default();
+    unsupported.channels_locale = Some("ar-EG".into());
+    let fallback = delivered_message(
+        unsupported,
+        "fallback",
+        FailureClassification {
+            class: "future_class".into(),
+            message: "safe English fallback".into(),
+            copy_key: Some("chat_error.unrecognized".into()),
+            copy_params: Some(serde_json::json!({
+                "retry_after_secs": {"unexpected": "secret"},
+                "detail": ["untrusted"]
+            })),
+        },
+    )
+    .await;
+    assert_eq!(fallback, "safe English fallback");
+}
+
 #[tokio::test]
 async fn queued_terminal_delivery_does_not_leave_a_completion_entry() {
     let shared = NativeShared::default();
