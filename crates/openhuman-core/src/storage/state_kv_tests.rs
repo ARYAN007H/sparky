@@ -9,7 +9,7 @@ static COUNTED_B_DESERIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
 struct CountedA;
 
 impl<'de> serde::Deserialize<'de> for CountedA {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -22,7 +22,7 @@ impl<'de> serde::Deserialize<'de> for CountedA {
 struct CountedB;
 
 impl<'de> serde::Deserialize<'de> for CountedB {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -204,14 +204,16 @@ fn typed_quarantine_validation_is_cached_per_backend_scope_name_and_type() {
     std::fs::write(&first_legacy, r#"{"ok":true}"#).unwrap();
     std::fs::write(&second_legacy, r#"{"ok":true}"#).unwrap();
 
-    let backend: std::sync::Arc<dyn StorageBackend> =
-        std::sync::Arc::new(MemoryStorage::new());
+    let backend: std::sync::Arc<dyn StorageBackend> = std::sync::Arc::new(MemoryStorage::new());
     let local = StateKv::on_backend(&backend, &Scope::local(), "test_owner", "state").unwrap();
     local
         .import_file_quarantining::<CountedA>("first", &first_legacy)
         .unwrap();
     let first_count = COUNTED_A_DESERIALIZATIONS.load(Ordering::SeqCst);
-    assert!(first_count > 0, "the legacy value was validated on first import");
+    assert!(
+        first_count > 0,
+        "the legacy value was validated on first import"
+    );
 
     local
         .import_file_quarantining::<CountedA>("first", &first_legacy)
