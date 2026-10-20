@@ -197,7 +197,7 @@ test.describe('Recovery phrase — the replace gate', () => {
     await expect(confirmReplace(page)).toHaveCount(0);
   });
 
-  test('"I already have a recovery phrase" opens import, and importing nothing changes nothing', async ({
+  test('the Import Existing Wallet path opens import, and importing nothing changes nothing', async ({
     page,
   }) => {
     const before = await walletState();
@@ -206,8 +206,6 @@ test.describe('Recovery phrase — the replace gate', () => {
     await importWalletMenuItem(page).click();
     await expect(confirmReplace(page)).toBeVisible();
     await confirmReplace(page).click();
-    await expect(importInstead(page)).toBeVisible();
-    await importInstead(page).click();
 
     // Import mode: word slots, and no generated phrase to copy. The slots are
     // addressed by their aria-label — they carry no id
