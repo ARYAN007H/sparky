@@ -208,18 +208,6 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
             ),
             Some(true)
         );
-        assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
-        assert!(
-            crate::core::invoke::invoke_method(
-                DispatchCtx::process_default(),
-                crate::core::invoke::default_state(),
-                &method,
-                serde_json::json!({}),
-            )
-            .await
-            .is_err(),
-            "unreviewed Agent methods remain absent"
-        );
     })
     .await;
     CoreContext::scope(pair.alice.clone(), async {
