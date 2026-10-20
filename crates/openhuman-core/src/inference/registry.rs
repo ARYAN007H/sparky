@@ -98,6 +98,8 @@ pub struct ProviderModelHooks {
     pub context_window: Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>,
     /// Provider default pricing as (model id, input USD/1M, output USD/1M).
     pub default_pricing: Arc<dyn Fn() -> Option<(String, f64, f64)> + Send + Sync>,
+    /// Applies a provider-specific request hint without exposing its wire key.
+    pub without_reasoning: Arc<dyn Fn(tinyinference_llm::model::ModelRequest) -> tinyinference_llm::model::ModelRequest + Send + Sync>,
 }
 
 /// A provider-neutral semantic category for a backend error.
@@ -250,6 +252,16 @@ pub fn resolve_provider_model(
 pub fn provider_model_context_window(provider_id: &str, model: &str) -> Option<u64> {
     let hooks = provider_model_hooks(provider_id)?;
     (hooks.context_window)(model)
+}
+
+/// Applies a provider-specific no-reasoning hint when the provider is installed.
+pub fn provider_request_without_reasoning(
+    provider_id: &str,
+    request: tinyinference_llm::model::ModelRequest,
+) -> tinyinference_llm::model::ModelRequest {
+    provider_model_hooks(provider_id)
+        .map(|hooks| (hooks.without_reasoning)(request))
+        .unwrap_or(request)
 }
 
 /// Registers a generic config normalizer, such as a provider-owned migration
