@@ -244,16 +244,12 @@ pub(crate) fn classify_error(message: String) -> ArmError {
     if is_prompt_guard_rejection(&message) {
         return ArmError::SafetyFlagged(err);
     }
-    let failure = tinyinference_llm::failure::classify_provider_failure_with(
-        None,
-        None,
-        &message,
-        |value| {
+    let failure =
+        tinyinference_llm::failure::classify_provider_failure_with(None, None, &message, |value| {
             crate::core::observability::is_session_expired_message(value)
                 || tinyinference_llm::failure::is_context_window_exceeded_message(value)
                 || tinyinference_llm::failure::body_indicates_quota_exhausted(value)
-        },
-    );
+        });
     // Keep the harness's detailed failover reason mapping while using the
     // provider-neutral classifier to distinguish retryable and exhausted
     // rate limits and preserve terminal account/context failures.

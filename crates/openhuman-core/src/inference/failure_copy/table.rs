@@ -4,7 +4,7 @@
 //! TinyInference's defaults through `FailureCopyProvider`.
 
 use tinyinference_llm::failure::copy::{
-    FailureCopy, FailureCopyClass, FailureCopyProvider, failure_copy_with,
+    failure_copy_with, FailureCopy, FailureCopyClass, FailureCopyProvider,
 };
 
 /// A failure class the chat surface renders copy for. Several classifier arms

@@ -14,8 +14,8 @@ use tinyinference_llm::failure::http::{
     classify_and_report_http_failure, ErrorReporter, ProviderHttpFailure, ProviderHttpFailureFacts,
 };
 use tinyinference_llm::failure::{
-    demote_decision, DemotionKind, local_provider_no_model_loaded_user_message,
-    ollama_cloud_internal_500_user_message, should_report_provider_http_status,
+    demote_decision, local_provider_no_model_loaded_user_message,
+    ollama_cloud_internal_500_user_message, should_report_provider_http_status, DemotionKind,
 };
 
 /// Whether a non-2xx provider status is worth a per-attempt Sentry report.
@@ -164,17 +164,31 @@ impl ErrorReporter for HostErrorReporter<'_> {
             match decision.expect("matched demotion") {
                 DemotionKind::BudgetExhausted => demote("budget", "budget-exhausted 400", false),
                 DemotionKind::NoModelLoaded => demote(
-                    "provider_user_state", "local_provider_no_model_loaded", false),
+                    "provider_user_state",
+                    "local_provider_no_model_loaded",
+                    false,
+                ),
                 DemotionKind::CustomUpstreamBadRequest => demote(
-                    "provider_user_state", "custom_openai_upstream_bad_request", false),
+                    "provider_user_state",
+                    "custom_openai_upstream_bad_request",
+                    false,
+                ),
                 DemotionKind::AccessPolicyDenied => demote(
-                    "provider_access_policy", "provider access-policy 403", false),
+                    "provider_access_policy",
+                    "provider access-policy 403",
+                    false,
+                ),
                 DemotionKind::ConfigurationRejected => demote(
-                    "provider_config_rejection", "provider config-rejection", false),
-                DemotionKind::ContextWindowExceeded => demote(
-                    "context_window_exceeded", "context-window exceeded", true),
-                DemotionKind::QuotaExhausted => demote(
-                    "quota_exhausted", "provider monthly-quota exhausted", false),
+                    "provider_config_rejection",
+                    "provider config-rejection",
+                    false,
+                ),
+                DemotionKind::ContextWindowExceeded => {
+                    demote("context_window_exceeded", "context-window exceeded", true)
+                }
+                DemotionKind::QuotaExhausted => {
+                    demote("quota_exhausted", "provider monthly-quota exhausted", false)
+                }
                 _ => unreachable!("only precedence-preserving decisions enter this arm"),
             }
         } else if self.backend_error_code_owned {
@@ -184,14 +198,24 @@ impl ErrorReporter for HostErrorReporter<'_> {
                 DemotionKind::ApiKeyRejected => {
                     log_byo_provider_auth_failure(operation, provider, model, status_code)
                 }
-                DemotionKind::OAuthSessionExpired => demote(
-                    "provider_user_state", "openai_oauth_session_expired", false),
+                DemotionKind::OAuthSessionExpired => {
+                    demote("provider_user_state", "openai_oauth_session_expired", false)
+                }
                 DemotionKind::InsufficientCredits => demote(
-                    "insufficient_credits", "provider insufficient-credits 402", false),
+                    "insufficient_credits",
+                    "provider insufficient-credits 402",
+                    false,
+                ),
                 DemotionKind::OllamaCloudInternalError => demote(
-                    "ollama_cloud_internal_500", "Ollama Cloud hosted-inference 500", false),
+                    "ollama_cloud_internal_500",
+                    "Ollama Cloud hosted-inference 500",
+                    false,
+                ),
                 DemotionKind::ModerationRejected => demote(
-                    "external_moderation_rejection", "external content-moderation rejection", false),
+                    "external_moderation_rejection",
+                    "external content-moderation rejection",
+                    false,
+                ),
                 _ => unreachable!("earlier decisions were handled above"),
             }
         } else if should_report_provider_http_status(status) {

@@ -399,7 +399,7 @@ fn provider_http_policy_uses_registered_error_ownership_metadata() {
 
 #[test]
 fn demotion_decision_keeps_quota_ahead_of_backend_owned_error_code() {
-    use tinyinference_llm::failure::{DemotionKind, demote_decision};
+    use tinyinference_llm::failure::{demote_decision, DemotionKind};
     let facts = tinyinference_llm::failure::http::classify_http_failure(
         "fixture-byo-provider",
         StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
@@ -413,7 +413,7 @@ fn demotion_decision_keeps_quota_ahead_of_backend_owned_error_code() {
 
 #[test]
 fn managed_unknown_model_remains_user_configuration_state() {
-    use tinyinference_llm::failure::{DemotionKind, demote_decision};
+    use tinyinference_llm::failure::{demote_decision, DemotionKind};
     let facts = tinyinference_llm::failure::http::classify_http_failure(
         "openhuman",
         StatusCode::BAD_REQUEST.as_u16(),
