@@ -262,7 +262,7 @@ fn resolve_model_for_hint_maps_every_managed_hint_to_the_default_model() {
         "hint:vision",
     ] {
         assert_eq!(
-            resolve_model_for_hint(hint, &config),
+            crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, hint, &config),
             "openrouter/deepseek/deepseek-v4-flash",
             "{hint} must resolve to the managed default"
         );
@@ -277,34 +277,34 @@ fn resolve_model_for_hint_uses_the_pinned_managed_default() {
     let mut config = Config::default();
     config.default_model = Some("openrouter/deepseek/deepseek-v4-pro".to_string());
     assert_eq!(
-        resolve_model_for_hint("hint:chat", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:chat", &config),
         "openrouter/deepseek/deepseek-v4-pro"
     );
     assert_eq!(
-        resolve_model_for_hint("hint:reasoning", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config),
         "openrouter/deepseek/deepseek-v4-pro"
     );
     assert_eq!(
-        resolve_model_for_hint("hint:coding", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:coding", &config),
         "openrouter/deepseek/deepseek-v4-pro"
     );
 
     // A retired tier slug or a hint in `default_model` is not a pin.
     config.default_model = Some("chat-v1".to_string());
     assert_eq!(
-        resolve_model_for_hint("hint:chat", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:chat", &config),
         "openrouter/deepseek/deepseek-v4-flash"
     );
     config.default_model = Some("hint:reasoning".to_string());
     assert_eq!(
-        resolve_model_for_hint("hint:chat", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:chat", &config),
         "openrouter/deepseek/deepseek-v4-flash"
     );
 
     // A BYOK chat route carries its own model and ignores the managed pin.
     config.default_model = Some("openrouter/deepseek/deepseek-v4-pro".to_string());
     config.chat_provider = Some("openai:gpt-4o".to_string());
-    assert_eq!(resolve_model_for_hint("hint:chat", &config), "gpt-4o");
+    assert_eq!(crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:chat", &config), "gpt-4o");
 }
 
 /// Retired tier slugs are aliases of their role: on the managed backend they
@@ -315,27 +315,27 @@ fn resolve_model_for_hint_treats_retired_tier_slugs_as_role_aliases() {
     let config = Config::default();
     for slug in ["reasoning-v1", "agentic-v1", "coding-v1", "chat-v1"] {
         assert_eq!(
-            resolve_model_for_hint(slug, &config),
+            crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, slug, &config),
             "openrouter/deepseek/deepseek-v4-flash",
             "{slug} must resolve through its role"
         );
     }
     assert_eq!(
-        resolve_model_for_hint("openrouter/deepseek/deepseek-v4-pro", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "openrouter/deepseek/deepseek-v4-pro", &config),
         "openrouter/deepseek/deepseek-v4-pro"
     );
-    assert_eq!(resolve_model_for_hint("gpt-4o", &config), "gpt-4o");
+    assert_eq!(crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "gpt-4o", &config), "gpt-4o");
 }
 
 #[test]
 fn resolve_model_for_hint_extracts_model_from_byok_provider() {
     let mut config = Config::default();
     config.reasoning_provider = Some("openai:gpt-4o".to_string());
-    assert_eq!(resolve_model_for_hint("hint:reasoning", &config), "gpt-4o");
+    assert_eq!(crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config), "gpt-4o");
 
     config.chat_provider = Some("anthropic:claude-sonnet-4-20250514".to_string());
     assert_eq!(
-        resolve_model_for_hint("hint:chat", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:chat", &config),
         "claude-sonnet-4-20250514"
     );
 }
@@ -345,19 +345,19 @@ fn resolve_model_for_hint_falls_through_openhuman_and_cloud_sentinels() {
     let mut config = Config::default();
     config.reasoning_provider = Some("openhuman".to_string());
     assert_eq!(
-        resolve_model_for_hint("hint:reasoning", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config),
         "openrouter/deepseek/deepseek-v4-flash"
     );
 
     config.reasoning_provider = Some("cloud".to_string());
     assert_eq!(
-        resolve_model_for_hint("hint:reasoning", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config),
         "openrouter/deepseek/deepseek-v4-flash"
     );
 
     config.reasoning_provider = Some("".to_string());
     assert_eq!(
-        resolve_model_for_hint("hint:reasoning", &config),
+        crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning", &config),
         "openrouter/deepseek/deepseek-v4-flash"
     );
 }
@@ -365,7 +365,7 @@ fn resolve_model_for_hint_falls_through_openhuman_and_cloud_sentinels() {
 #[test]
 fn resolve_model_for_hint_handles_unknown_hint_passthrough() {
     let config = Config::default();
-    let result = resolve_model_for_hint("hint:unknown_tier", &config);
+    let result = crate::inference::provider_model::resolve_provider_model_hint(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:unknown_tier", &config);
     assert_eq!(result, "hint:unknown_tier");
 }
 
@@ -375,29 +375,29 @@ fn resolve_model_for_hint_handles_unknown_hint_passthrough() {
 fn role_for_model_tier_maps_tier_names_to_roles() {
     // The demo flow pins these two tiers on its agent nodes; they must route to
     // the reasoning and chat workloads respectively.
-    assert_eq!(role_for_model_tier("reasoning-v1"), "reasoning");
-    assert_eq!(role_for_model_tier("chat-v1"), "chat");
-    assert_eq!(role_for_model_tier("agentic-v1"), "agentic");
-    assert_eq!(role_for_model_tier("burst-v1"), "burst");
-    assert_eq!(role_for_model_tier("coding-v1"), "coding");
-    assert_eq!(role_for_model_tier("vision-v1"), "vision");
-    assert_eq!(role_for_model_tier("summarization-v1"), "summarization");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "reasoning-v1"), "reasoning");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "chat-v1"), "chat");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "agentic-v1"), "agentic");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "burst-v1"), "burst");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "coding-v1"), "coding");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "vision-v1"), "vision");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "summarization-v1"), "summarization");
     // The quick reasoning tier shares the chat workload for its model.
-    assert_eq!(role_for_model_tier("reasoning-quick-v1"), "chat");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "reasoning-quick-v1"), "chat");
 }
 
 #[test]
 fn role_for_model_tier_normalises_hint_aliases() {
-    assert_eq!(role_for_model_tier("hint:reasoning"), "reasoning");
-    assert_eq!(role_for_model_tier("hint:chat"), "chat");
-    assert_eq!(role_for_model_tier("hint:coding"), "coding");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:reasoning"), "reasoning");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:chat"), "chat");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:coding"), "coding");
 }
 
 #[test]
 fn role_for_model_tier_unknown_falls_back_to_chat() {
-    assert_eq!(role_for_model_tier("gpt-4o"), "chat");
-    assert_eq!(role_for_model_tier("hint:unknown_tier"), "chat");
-    assert_eq!(role_for_model_tier(""), "chat");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "gpt-4o"), "chat");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, "hint:unknown_tier"), "chat");
+    assert_eq!(crate::inference::provider_model::role_for_provider_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN, ""), "chat");
 }
 
 #[test]
