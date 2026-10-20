@@ -306,9 +306,9 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         "must not escape the captured account",
     )
     .await;
-    assert!(!crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(
-        &rejected
-    ));
+    assert!(
+        !crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(&rejected)
+    );
     assert!(relay.sent().is_empty());
 
     let mut wrong_conversation = conversation.clone();
@@ -321,9 +321,9 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         "must not escape the captured conversation",
     )
     .await;
-    assert!(!crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(
-        &rejected
-    ));
+    assert!(
+        !crate::channels::runtime::dispatch::processor::progressive::delivery_succeeded(&rejected)
+    );
     assert!(relay.sent().is_empty());
 
     let delivered = run_hosted_compiled_turn(
@@ -338,14 +338,11 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         panic!("compiled hosted send should return its typed receipt: {delivered:?}");
     };
     assert!(outcome.error.is_none());
-    assert_eq!(outcome.receipt.idempotency_key.as_deref().is_some(), true);
+    assert!(outcome.receipt.idempotency_key.as_deref().is_some());
     assert_eq!(outcome.receipt.channel.as_ref(), Some(&channel));
     assert_eq!(outcome.receipt.conversation.as_ref(), Some(&conversation));
     assert_eq!(outcome.receipt.thread_id.as_deref(), Some("topic-3"));
-    assert_eq!(
-        relay.sent(),
-        vec!["typed hosted relay reply".to_owned()]
-    );
+    assert_eq!(relay.sent(), vec!["typed hosted relay reply".to_owned()]);
     runtime
         .close()
         .await

@@ -42,12 +42,13 @@ impl NativeProgressiveTarget {
                 .await?
             }
             ProgressiveTargetKind::HostedRelay { client, channel } => {
-                let callback = crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
-                    Arc::clone(channel),
-                    self.channel.clone(),
-                    self.conversation.clone(),
-                    turn_id.to_owned(),
-                );
+                let callback =
+                    crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
+                        Arc::clone(channel),
+                        self.channel.clone(),
+                        self.conversation.clone(),
+                        turn_id.to_owned(),
+                    );
                 let runtime = crate::modules::channel_runtime::ChannelRuntimeLease::open(
                     client.clone(),
                     callback,

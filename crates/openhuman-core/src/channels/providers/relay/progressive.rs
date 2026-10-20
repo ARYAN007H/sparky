@@ -125,7 +125,9 @@ impl RelayProgressiveTransport {
         request: ChannelBackendRequest,
     ) -> tinybus::Result<ChannelBackendResult> {
         let ChannelBackendRequest::ProgressiveTransport(request) = request else {
-            return Err(Error::failed("hosted relay callback capability unavailable"));
+            return Err(Error::failed(
+                "hosted relay callback capability unavailable",
+            ));
         };
         Ok(ChannelBackendResult::ProgressiveTransport(Box::new(
             self.dispatch(*request).await?,
