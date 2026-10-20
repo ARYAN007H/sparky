@@ -49,19 +49,11 @@ fn retired_withheld_specialist_block_is_empty() {
 
 /// The generated intro must not carry the source's line-continuation padding.
 #[test]
-fn the_generated_block_has_no_stray_whitespace_runs() {
+fn the_retired_generated_block_emits_no_text() {
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin agent definitions must load");
-    let visible: HashSet<String> = ["file_read".to_string()].into_iter().collect();
-    let mut ctx = ctx_with(&[]);
-    ctx.agent_id = "orchestrator";
-    ctx.visible_tool_names = &visible;
-    let block = render_withheld_specialists(&ctx);
-    assert!(!block.is_empty(), "expected a rendered block");
-    assert!(
-        !block.contains("  "),
-        "the block carries doubled spaces from the source literal:\n{block}"
-    );
+    let ctx = ctx_with(&[]);
+    assert!(render_withheld_specialists(&ctx).is_empty());
 }
 
 #[test]
