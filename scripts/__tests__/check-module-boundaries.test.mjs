@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { auditGraph, bridgeReach, graph, isImplementation, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
+import { auditGraph, bridgeReach, graph, isImplementation, run, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
 
 const policy = JSON.parse(readFileSync(new URL('../ci/module-boundaries.json', import.meta.url), 'utf8'));
 const strict = { ...policy, exceptions: [] };
@@ -198,4 +199,93 @@ test('without linked-modules no host reaches the bridge; with it, the CLI does',
   // A dev edge is not a shipped edge.
   const dev = metadata({ 'openhuman-cli': [['openhuman-modules-linked', 'dev']], 'openhuman-modules-linked': [] });
   assert.deepEqual(bridgeReach(dev, ['openhuman-cli'], policy), []);
+});
+
+test('host boundary audit ignores writer features unified only by unrelated workspace dev fixtures', () => {
+  const root = resolve(new URL('../..', import.meta.url).pathname);
+  const harnessRoot = mkdtempSync(join(root, 'target', 'module-boundaries-host-isolation-'));
+  try {
+    mkdirSync(join(harnessRoot, 'scripts', 'ci'), { recursive: true });
+    writeFileSync(join(harnessRoot, 'scripts', 'ci', 'module-boundaries.json'), JSON.stringify(policy));
+
+    // Workspace-wide metadata sees an opt-in test writer on tinyflows-import
+    // as part of openhuman's unified normal feature graph, despite the core's
+    // own scoped normal tree containing only the read-only importer.
+    const unified = metadata({
+      openhuman: [['tinyflows-import']],
+      'tinyflows-import': [
+        ['tinyflows'],
+        ['tinyflows-catalog'],
+        ['tinyflows-drivers'],
+        ['tinyflows-schedule'],
+      ],
+    });
+    const scoped = metadata({
+      openhuman: [['tinyflows-import']],
+      'tinyflows-import': [['tinyflows-bus']],
+    });
+    const app = metadata({ 'openhuman-app': [['openhuman-rpc']] });
+    const defaults = metadata({
+      'openhuman-cli': [['openhuman-rpc']],
+      'openhuman-tui': [['openhuman-rpc']],
+      openhuman: [],
+    });
+    const manifestToContract = new Map(policy.contracts.map(item => [
+      resolve(harnessRoot, item.manifest), item.name,
+    ]));
+    let contractBeingProbed;
+
+    const fakeExecFileSync = (_file, args) => {
+      assert.equal(args[1], 'cargo');
+      const cargoArgs = args.slice(2);
+      const manifestPath = cargoArgs[cargoArgs.indexOf('--manifest-path') + 1];
+      if (cargoArgs[0] === 'tree') {
+        const packageName = cargoArgs[cargoArgs.indexOf('-p') + 1];
+        const links = packageName === 'openhuman-cli' && cargoArgs.includes('--all-features');
+        return [
+          `0${packageName} v0.0.0`,
+          ...(links ? [
+            '1openhuman-modules-linked v0.0.0',
+            '2tinydocs-module v0.0.0',
+            '3tinydocs v0.0.0',
+          ] : packageName === 'openhuman' ? [
+            '1tinyflows-import v0.1.0',
+            '2tinyflows-bus v0.1.0',
+          ] : []),
+        ].join('\n');
+      }
+      if (cargoArgs.includes('--no-deps')) {
+        contractBeingProbed = manifestToContract.get(resolve(manifestPath));
+        assert.ok(contractBeingProbed, `unexpected manifest ${manifestPath}`);
+        return JSON.stringify({
+          packages: [{
+            id: `${contractBeingProbed} 0.0.0`,
+            name: contractBeingProbed,
+            manifest_path: manifestPath,
+            features: {},
+          }],
+        });
+      }
+      if (manifestPath.includes('target/module-boundaries/')) {
+        const exceptionPackages = policy.exceptions
+          .filter(item => item.scope === contractBeingProbed)
+          .map(item => [item.package]);
+        const contractMetadata = metadata({
+          [contractBeingProbed]: exceptionPackages,
+        });
+        return JSON.stringify(contractMetadata);
+      }
+      if (manifestPath.endsWith('crates/openhuman-app/Cargo.toml')) {
+        return JSON.stringify(app);
+      }
+      return JSON.stringify(cargoArgs.includes('--all-features') ? unified : defaults);
+    };
+
+    // A scoped host graph should pass. The existing workspace metadata probe
+    // instead observes the unrelated dev fixture's flow-write feature and
+    // reports implementation packages along the normal host path.
+    assert.equal(run(harnessRoot, false, fakeExecFileSync), true);
+  } finally {
+    rmSync(harnessRoot, { recursive: true, force: true });
+  }
 });
