@@ -18,7 +18,7 @@ async fn flows_resume_with_no_recorded_run_for_thread_id_errors_clearly() {
     )
     .await
     .expect_err("must error when no run is recorded for this thread_id");
-    assert!(err.contains("no paused run to resume"));
+    assert!(err.contains("flow run does not exist in this owner scope"));
 }
 
 // ── run history (flows_list_runs / flows_get_run) ────────────────────────
@@ -604,7 +604,10 @@ async fn flows_cancel_run_cancels_a_parked_pending_approval_run() {
     let run_row = flows_get_run(&config, &thread_id).await.unwrap();
     assert_eq!(run_row.value.status, "cancelled");
     assert!(run_row.value.pending_approvals.is_empty());
-    assert_eq!(run_row.value.error.as_deref(), Some("run cancelled"));
+    assert_eq!(
+        run_row.value.error.as_deref(),
+        Some("parked run cancelled")
+    );
 
     let reloaded = flows_get(&config, &created.value.id).await.unwrap();
     assert_eq!(reloaded.value.last_status.as_deref(), Some("cancelled"));
@@ -620,7 +623,10 @@ async fn flows_cancel_run_cancels_a_parked_pending_approval_run() {
     )
     .await
     .expect_err("a cancelled run must not be resumable");
-    assert!(err.contains("not pending approval") || err.contains("no paused run"));
+    assert!(
+        err.contains("flow run is not parked for approval (status: cancelled)"),
+        "{err}"
+    );
 }
 
 #[tokio::test]

@@ -23,7 +23,7 @@ async fn create_parked_run(config: &Config, name: &str) -> (Flow, String, Vec<St
 }
 
 #[tokio::test]
-async fn flows_resume_rejects_a_stale_graph_without_mutating_the_parked_run_summary() {
+async fn flows_resume_rejects_a_stale_graph_and_settles_the_parked_run() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let (flow, run_id, pending) = create_parked_run(&config, "stale-graph").await;
@@ -57,9 +57,20 @@ async fn flows_resume_rejects_a_stale_graph_without_mutating_the_parked_run_summ
     );
 
     let after_run = flows_get_run(&config, &run_id).await.unwrap().value;
-    assert_eq!(after_run.status, before_run.status);
+    assert_eq!(before_run.status, "pending_approval");
+    assert_eq!(after_run.status, "cancelled");
+    assert!(after_run.pending_approvals.is_empty());
+    assert_eq!(
+        after_run.error.as_deref(),
+        Some("workflow graph changed after the run parked; refusing resume")
+    );
+    assert!(
+        !after_run.steps.iter().any(|step| step.node_id == "downstream"),
+        "the stale approval must not execute the replacement graph: {after_run:?}"
+    );
     let after_flow = flows_get(&config, &flow.id).await.unwrap().value;
-    assert_eq!(after_flow.last_status, before_flow.last_status);
+    assert_eq!(before_flow.last_status.as_deref(), Some("pending_approval"));
+    assert_eq!(after_flow.last_status.as_deref(), Some("cancelled"));
 }
 
 #[tokio::test]

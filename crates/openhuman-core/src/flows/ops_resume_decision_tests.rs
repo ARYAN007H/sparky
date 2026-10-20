@@ -1,15 +1,10 @@
 use super::*;
 
-// ── flows_resume host-side approval guard (issue B2 finding #3) ──────────
+// ── TinyFlows-owned resume decision validation ──────────────────────────
 //
-// tinyflows 0.2's `resume_with_checkpointer` treats the resume call itself
-// as approval of whatever gate paused the run — its `approvals` argument is
-// advisory, not enforced by the crate. Live testing confirmed
-// `flows_resume(..., approvals: [])` on a paused run still completed it.
-// These tests exercise the host-side guard added in `flows::ops::flows_resume`
-// that requires `approvals` to actually name a currently-pending gate,
-// straight from the persisted `flow_runs` row, before ever calling into the
-// engine.
+// Resume decisions are checked against the persisted run's pending gate ids
+// before the owner module admits the continuation. Invalid decisions must
+// leave the parked row and flow summary untouched.
 
 #[tokio::test]
 async fn flows_resume_with_empty_approvals_is_rejected_and_does_not_complete_the_run() {
@@ -42,7 +37,7 @@ async fn flows_resume_with_empty_approvals_is_rejected_and_does_not_complete_the
     .await
     .expect_err("an empty approvals list must not silently approve the pending gate");
     assert!(
-        err.contains("no pending approval matches"),
+        err.contains("resume decisions do not name a currently pending gate"),
         "expected a clear approval-mismatch error, got: {err}"
     );
 
@@ -90,7 +85,7 @@ async fn flows_resume_with_mismatched_approvals_is_rejected() {
     )
     .await
     .expect_err("approvals naming no actually-pending gate must be rejected");
-    assert!(err.contains("no pending approval matches"));
+    assert!(err.contains("resume decisions do not name a currently pending gate"));
 }
 
 #[tokio::test]
@@ -190,7 +185,7 @@ async fn flows_resume_denying_a_gate_routes_to_its_error_port() {
 }
 
 #[tokio::test]
-async fn flows_resume_returns_failed_step_output_when_denial_has_no_error_port() {
+async fn flows_resume_fails_and_persists_the_run_when_denial_has_no_error_port() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     // `approval_gated_graph()` has only a `main` edge out of the gate — no
@@ -211,7 +206,7 @@ async fn flows_resume_returns_failed_step_output_when_denial_has_no_error_port()
     .unwrap();
     let thread_id = run.value["thread_id"].as_str().unwrap().to_string();
 
-    let resumed = flows_resume(
+    let error = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
@@ -220,18 +215,18 @@ async fn flows_resume_returns_failed_step_output_when_denial_has_no_error_port()
         vec!["gate".to_string()],
     )
     .await
-    .expect("step-level failure still has a successful engine outcome");
-    assert_eq!(resumed.value["pending_approvals"], json!([]));
-    assert_eq!(resumed.value["thread_id"], json!(thread_id));
+    .expect_err("denial without an error port must fail the resumed engine run");
     assert!(
-        resumed.value["output"].is_object(),
-        "a failed step outcome must preserve the engine output in the legacy RPC response"
+        error.contains("approval gate 'gate' was denied and has no `error` port"),
+        "{error}"
     );
 
     let reloaded = flows_get(&config, &created.value.id).await.unwrap();
     assert_eq!(reloaded.value.last_status.as_deref(), Some("failed"));
     let run_row = flows_get_run(&config, &thread_id).await.unwrap();
     assert_eq!(run_row.value.status, "failed");
+    assert!(run_row.value.pending_approvals.is_empty());
+    assert_eq!(run_row.value.error.as_deref(), Some(error.as_str()));
 }
 
 #[tokio::test]
@@ -304,7 +299,7 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
     .await
     .expect_err("resuming an already-completed run must be a clear error, not a silent no-op");
     assert!(
-        err.contains("not pending approval") || err.contains("no paused run"),
+        err.contains("flow run is not parked for approval (status: completed)"),
         "expected a clear non-paused-run error, got: {err}"
     );
 }
