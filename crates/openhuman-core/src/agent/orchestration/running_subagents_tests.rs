@@ -6,7 +6,6 @@ fn cx() -> crate::core::runtime::DispatchCtx {
     crate::core::runtime::DispatchCtx::ambient()
 }
 
-use crate::agent::orchestration::fleet_tools::FleetToolSet;
 use crate::agent::orchestration::running_subagents::resolve::resume_ref_for_task;
 use crate::agent::orchestration::running_subagents::resolve::task_id_for_session;
 use crate::agent::orchestration::running_subagents::roster::snapshot_for_parent;
@@ -321,11 +320,10 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
         &cx(),
         "fleet-parent",
         &test_workspace(),
-        &FleetToolSet::all(),
     )
     .expect("block present");
     assert!(block.contains("[active_subagents]"));
-    assert!(block.contains("use wait_subagent to collect"));
+    assert!(block.contains("reuse its task_key with spawn_subagent"));
     assert!(block.contains("You have 2 sub-agent worker(s)"));
     assert!(block.contains("session=subsess-a"));
     assert!(block.contains("session=subsess-b · task=task-fleet-b · status=awaiting_user"));
@@ -336,19 +334,14 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
         &cx(),
         "nobody-here",
         &test_workspace(),
-        &FleetToolSet::all()
     )
     .is_none());
 
     // The shipped orchestrator has no wait/steer/close tools (#5701): the
     // guidance must not name them and must say results arrive on their own.
     {
-        use crate::agent_registry::host_definition::AgentDefinitionRegistry;
-        let registry = AgentDefinitionRegistry::builtins_only();
-        let def = registry.get("orchestrator").expect("built-in orchestrator");
-        let fleet = FleetToolSet::from_scope(&def.tools, &def.disallowed_tools);
         let block =
-            active_subagents_context_block(&cx(), "fleet-parent", &test_workspace(), &fleet)
+            active_subagents_context_block(&cx(), "fleet-parent", &test_workspace())
                 .expect("block present");
         for name in [
             "wait_subagent",
@@ -361,9 +354,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
                 "{name} named for a parent without it:\n{block}"
             );
         }
-        assert!(block.contains("delivered to you automatically"));
-        assert!(block.contains("continue_subagent"));
-        assert!(block.contains("list_subagents"));
+        assert!(block.contains("delivered automatically"));
     }
 
     // Durable-store fallback: a session persisted by an EARLIER turn /
@@ -414,8 +405,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
             &cx(),
             "cold-parent",
             durable_ws.path(),
-            &FleetToolSet::all(),
-        )
+            )
         .expect("durable-only roster present");
         assert!(block.contains(&format!("session={}", session.subagent_session_id)));
         assert!(block.contains("status=idle"));
@@ -425,8 +415,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
             &cx(),
             "unrelated-parent",
             durable_ws.path(),
-            &FleetToolSet::all()
-        )
+            )
         .is_none());
     }
 
