@@ -45,6 +45,7 @@ fn request(id: &str, content: &str, sender: &str) -> AppendConversationMessageRe
         message: ConversationMessageRecord {
             id: id.into(),
             content: content.into(),
+            attachments: vec![],
             message_type: "text".into(),
             extra_metadata: json!({"attachmentNames":["image.png"], "attachmentKinds":["image"],
                 "attachmentDataUris":["data:image/png;base64,iVBORw0KGgo="], "attachmentData":"bytes",
@@ -350,11 +351,35 @@ async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
         saved.content, "look",
         "modern typed image uploads must not persist a staging marker"
     );
-    let (text, files) = crate::agent::attachments::parse(&saved.content);
-    assert_eq!(text.trim(), "look");
-    assert_eq!(files.len(), 1);
+    assert_eq!(saved.content, "look");
+    assert_eq!(saved.attachments.len(), 1);
+    assert!(saved.extra_metadata.get("__openhumanStoredAttachments").is_none());
+    let opaque_id = match &saved.attachments[0] {
+        ContentPart::Image { media, .. } => {
+            assert!(media.path.is_none());
+            assert!(media.url.is_none());
+            assert_eq!(media.content_type.as_deref(), Some("image/png"));
+            media.opaque_id.as_deref().expect("opaque attachment id")
+        }
+        other => panic!("expected image attachment, got {other:?}"),
+    };
+    let stored = crate::threads::store::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir.clone(),
+        "uploads",
+    )
+    .unwrap()
+    .into_iter()
+    .find(|message| message.id == "typed")
+    .unwrap();
+    let entries = stored.extra_metadata["__openhumanStoredAttachments"]
+        .as_array()
+        .unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["part"]["media"]["opaqueId"], opaque_id);
+    let path = entries[0]["path"].as_str().unwrap();
     assert_eq!(
-        tokio::fs::read(config.action_dir.join(&files[0].path))
+        tokio::fs::read(config.action_dir.join(path))
             .await
             .unwrap(),
         b"\x89PNG\r\n\x1a\n"

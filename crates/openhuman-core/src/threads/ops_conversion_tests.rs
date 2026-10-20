@@ -148,6 +148,7 @@ fn record_to_message_preserves_null_extra_metadata() {
     let rec = ConversationMessageRecord {
         id: "m-2".into(),
         content: "x".into(),
+        attachments: vec![],
         message_type: "text".into(),
         extra_metadata: Value::Null,
         sender: "agent".into(),
@@ -193,6 +194,7 @@ async fn message_append_returns_typed_not_found_for_stale_thread() {
             message: ConversationMessageRecord {
                 id: "msg-1".to_string(),
                 content: "hello".to_string(),
+                attachments: vec![],
                 message_type: "text".to_string(),
                 extra_metadata: Value::Null,
                 sender: "user".to_string(),
