@@ -153,20 +153,20 @@ pub async fn flows_validate(
     }
     if report.graph.is_none() {
         let error = "TinyFlows validation returned no graph".to_string();
-            return Outcome::single_log(
-                FlowValidation {
-                    valid: false,
-                    errors: vec![error.clone()],
-                    error_details: vec![FlowValidationError {
-                        code: "unparseable_graph".into(),
-                        message: error,
-                        node_id: None,
-                        field: None,
-                    }],
-                    warnings: Vec::new(),
-                },
-                "flow validation failed",
-            );
+        return Outcome::single_log(
+            FlowValidation {
+                valid: false,
+                errors: vec![error.clone()],
+                error_details: vec![FlowValidationError {
+                    code: "unparseable_graph".into(),
+                    message: error,
+                    node_id: None,
+                    field: None,
+                }],
+                warnings: Vec::new(),
+            },
+            "flow validation failed",
+        );
     }
     let warnings = report.warnings;
     Outcome::single_log(

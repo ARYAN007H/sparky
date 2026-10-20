@@ -128,7 +128,11 @@ fn describe(config: &Config, flow: &tinyflows_bus::catalog::Workflow) -> String 
 /// the record carries. See the module docs: inventing a purpose from node
 /// internals would read as authoritative and frequently be wrong.
 fn describe_shape(flow: &tinyflows_bus::catalog::Workflow, trigger: String) -> String {
-    let steps = flow.graph.get("nodes").and_then(serde_json::Value::as_array).map_or(0, Vec::len)
+    let steps = flow
+        .graph
+        .get("nodes")
+        .and_then(serde_json::Value::as_array)
+        .map_or(0, Vec::len)
         // The trigger is not a step the user thinks about.
         .saturating_sub(1);
     let mut out = format!(

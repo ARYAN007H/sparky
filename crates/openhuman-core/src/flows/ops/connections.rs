@@ -276,8 +276,8 @@ pub async fn compute_required_connections(
         }
     }
     // An app_event trigger names its toolkit directly.
-    if let Some(trigger) = crate::flows::host_gates::nodes(graph)
-        .find(|node| node.kind == "trigger")
+    if let Some(trigger) =
+        crate::flows::host_gates::nodes(graph).find(|node| node.kind == "trigger")
     {
         if let Some(tk) = trigger.config.get("toolkit").and_then(Value::as_str) {
             push(tk.to_string());

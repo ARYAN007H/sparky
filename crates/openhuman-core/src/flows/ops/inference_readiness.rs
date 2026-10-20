@@ -8,10 +8,7 @@ pub(super) struct InferenceReadinessEvaluation {
 
 /// Resolve the effective inference workload for an agent node. This remains
 /// beside the graph adapter because it depends on TinyFlows node configuration.
-pub(super) async fn agent_node_role(
-    config: &Config,
-    node_config: &Value,
-) -> &'static str {
+pub(super) async fn agent_node_role(config: &Config, node_config: &Value) -> &'static str {
     if let Some(agent_ref) = node_config
         .get("agent_ref")
         .and_then(Value::as_str)
@@ -140,10 +137,11 @@ pub(super) async fn evaluate_inference_readiness(
     graph: &Value,
 ) -> Option<InferenceReadinessEvaluation> {
     let mut roles = Vec::new();
-    for node in crate::flows::host_gates::nodes(graph)
-        .filter(|node| node.kind == "agent")
-    {
-        roles.push((node.id.to_owned(), agent_node_role(config, node.config).await));
+    for node in crate::flows::host_gates::nodes(graph).filter(|node| node.kind == "agent") {
+        roles.push((
+            node.id.to_owned(),
+            agent_node_role(config, node.config).await,
+        ));
     }
     let evaluation = crate::inference::readiness::evaluate(ctx, config, &roles).await?;
     let message = format_evaluation(&evaluation);

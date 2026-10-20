@@ -69,8 +69,7 @@ pub async fn flows_list_all_runs(
         .await?
         .storage();
     let request = wire::ListAllRunsRequest { storage, limit };
-    let runs: Vec<FlowRun> =
-        catalog_call(config, wire::members::LIST_ALL_RUNS, request).await?;
+    let runs: Vec<FlowRun> = catalog_call(config, wire::members::LIST_ALL_RUNS, request).await?;
     let count = runs.len();
     Ok(Outcome::single_log(
         runs,

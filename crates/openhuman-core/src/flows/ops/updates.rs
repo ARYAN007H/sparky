@@ -135,12 +135,7 @@ async fn flows_update_inner(
         // Metadata-only updates preserve access to legacy graphs written by
         // older versions, even when the current engine no longer accepts them.
         None => {
-            validate_and_migrate_graph(
-                ctx,
-                config,
-                existing.graph.clone(),
-            )
-            .await?;
+            validate_and_migrate_graph(ctx, config, existing.graph.clone()).await?;
             existing.graph.clone()
         }
     };

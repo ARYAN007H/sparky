@@ -38,12 +38,7 @@ pub async fn compute_approval_manifest(
     config: &Config,
     graph: &Value,
 ) -> Result<Vec<Value>, String> {
-    compute_approval_manifest_json(
-        ctx,
-        config,
-        graph.clone(),
-    )
-    .await
+    compute_approval_manifest_json(ctx, config, graph.clone()).await
 }
 
 async fn compute_approval_manifest_json(

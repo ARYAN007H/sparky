@@ -158,7 +158,7 @@ pub(crate) async fn load_engine_compatible_flow_graph(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: &str,
-    ) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, String> {
     let graph = load_flow_graph(config, id)?;
     if let Some(graph) = graph.as_ref() {
         ensure_config_aware_engine_compatible(ctx, config, graph)

@@ -25,11 +25,7 @@ pub fn create_draft(
         graph,
         origin,
     };
-    store::call_catalog::<FlowDraft, _>(
-        config,
-        catalog::members::CREATE_DRAFT,
-        (request,),
-    )
+    store::call_catalog::<FlowDraft, _>(config, catalog::members::CREATE_DRAFT, (request,))
 }
 
 /// Read one module-owned draft.
