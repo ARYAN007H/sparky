@@ -437,7 +437,9 @@ fn all_tools_default_registry_contains_expected_baseline_surface() {
         "image_info",
     ];
     assert_contains_all(&names, &expected);
-    assert!(!names.iter().any(|name| matches!(name.as_str(), "wait" | "wait_loop")));
+    assert!(!names
+        .iter()
+        .any(|name| matches!(name.as_str(), "wait" | "wait_loop")));
 }
 #[test]
 fn all_tools_default_registry_has_no_duplicate_tool_names() {
