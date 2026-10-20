@@ -3,6 +3,7 @@
 // The pure logic is covered directly; the two CLIs are driven end-to-end against
 // the real tree, including the two commits that actually shipped a regression.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   mkdtempSync,
@@ -207,7 +208,7 @@ function sourceParityFixture() {
   git(["config", "user.email", "pin-check@example.test"]);
   git(["config", "user.name", "Pin Check"]);
   mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "src/lib.rs"), '#[cfg(test)] #[path = "tests.rs"] mod tests;\npub fn value() -> u8 { 1 }\n');
+  writeFileSync(join(root, "src/lib.rs"), '#[cfg(test)]\n#[path = "tests.rs"]\nmod tests;\npub fn value() -> u8 { 1 }\n');
   writeFileSync(join(root, "src/tests.rs"), "#[test] fn works() {}\n");
   writeFileSync(join(root, "Cargo.toml"), "[package]\nname = \"fixture\"\nversion = \"1.0.0\"\n");
   git(["add", "."]);
@@ -231,7 +232,20 @@ function sourceParityFixture() {
       candidateBlob: execFileSync("git", ["rev-parse", `${candidateCommit}:src/tests.rs`], { cwd: root, encoding: "utf8" }).trim(),
     },
     unchangedTreeSha256: "",
+    binding: {
+      modulePath: "src/lib.rs",
+      moduleBlob: execFileSync("git", ["rev-parse", `${candidateCommit}:src/lib.rs`], { cwd: root, encoding: "utf8" }).trim(),
+      testPath: "src/tests.rs",
+    },
   };
+  const canonicalTree = execFileSync("git", ["ls-tree", "-r", "--full-tree", releaseCommit], { cwd: root, encoding: "utf8" })
+    .split("\0").filter(Boolean).map((entry) => {
+      const match = entry.match(/^([0-7]{6}) (blob|commit) ([0-9a-f]{40})\t([\s\S]+)$/);
+      if (match[4] === "src/tests.rs") return null;
+      return `${match[1]} ${match[2]} ${match[3]}\t${match[4]}\n`;
+    }).filter(Boolean).sort().join("");
+  parity.unchangedTreeSha256 = createHash("sha256").update(canonicalTree).digest("hex");
+  parity.assetsSha256 = createHash("sha256").update(JSON.stringify({ version: "1.0.0", assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }] })).digest("hex");
   return { root, git, releaseCommit, candidateCommit, parity };
 }
 const provider = {

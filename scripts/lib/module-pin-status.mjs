@@ -50,8 +50,9 @@ export function classifyStatus({
   actual,
   wantedIsAncestor = null,
   exemption,
+  sourceParityContext,
 }) {
-  const strict = classifyPin({ id, version, submodulePath, actual, exemption });
+  const strict = classifyPin({ id, version, submodulePath, actual, exemption, sourceParityContext });
   if (strict.kind === "exempt") {
     return {
       id,

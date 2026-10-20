@@ -95,6 +95,11 @@ export function collectStatuses(root = DEFAULT_ROOT) {
       actual,
       wantedIsAncestor,
       exemption: byId.get(rec.id),
+      sourceParityContext: {
+        repoPath: dir,
+        assets: rec.assets,
+        actualHead: git(["rev-parse", "HEAD"], dir),
+      },
     });
   });
 }

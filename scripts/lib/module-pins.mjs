@@ -5,6 +5,8 @@
 // See scripts/ci/check-module-pins.mjs for what the gate is for.
 
 import { posix } from "node:path";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 
 /**
  * Read a Rust module and the source fragments it brings in with `include!`.
@@ -97,7 +99,7 @@ export function parseRecords(src) {
  * pins now agree". A stale exemption is not harmless: it is a standing licence
  * for the next real drift on that record to pass unnoticed.
  */
-export function classifyPin({ id, version, submodulePath, actual, exemption }) {
+export function classifyPin({ id, version, submodulePath, actual, exemption, sourceParityContext }) {
   const wanted = `v${version}`;
   if (actual === wanted) {
     if (exemption) {
@@ -143,6 +145,20 @@ export function classifyPin({ id, version, submodulePath, actual, exemption }) {
           `    intended, update \`expect\` and the reason in module-pin-exemptions.json.`,
       };
     }
+    if (exemption.sourceParity) {
+      const proof = validateTestOnlySourceParity({
+        ...sourceParityContext,
+        version,
+        proof: exemption.sourceParity,
+      });
+      if (!proof.ok) {
+        return {
+          ok: false,
+          kind: "invalid-source-parity",
+          message: `"${id}" source-parity exemption is invalid: ${proof.message}`,
+        };
+      }
+    }
     return { ok: true, kind: "exempt", reason: exemption.reason };
   }
   return {
@@ -157,6 +173,104 @@ export function classifyPin({ id, version, submodulePath, actual, exemption }) {
       `    re-pin to a release that already exists), or — if the two are meant to differ —\n` +
       `    declare it in scripts/ci/module-pin-exemptions.json with a reason.`,
   };
+}
+
+/**
+ * Verify one reviewed, exact source-parity attestation for a test-only commit.
+ * This deliberately proves a named Git pair and a named test file; it does not
+ * infer Rust test-only semantics for arbitrary diffs.
+ */
+export function validateTestOnlySourceParity({
+  repoPath,
+  version,
+  assets,
+  actualHead,
+  proof,
+  runGit = (args) => execFileSync("git", args, { cwd: repoPath, encoding: "utf8" }).trim(),
+}) {
+  try {
+    const required = [
+      "tag",
+      "releaseCommit",
+      "candidateCommit",
+      "assetsSha256",
+      "testFile",
+      "unchangedTreeSha256",
+      "binding",
+    ];
+    if (!proof || Object.keys(proof).sort().join(",") !== required.sort().join(",")) {
+      throw new Error("proof fields are missing or unknown");
+    }
+    if (!/^v\d+\.\d+\.\d+$/.test(proof.tag) || proof.tag !== `v${version}`) {
+      throw new Error("release tag does not match the registry version");
+    }
+    for (const [name, sha] of [
+      ["releaseCommit", proof.releaseCommit],
+      ["candidateCommit", proof.candidateCommit],
+    ]) {
+      if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`${name} must be a full commit SHA`);
+    }
+    if (actualHead !== proof.candidateCommit) throw new Error("HEAD is not the exact attested candidate commit");
+    if (runGit(["rev-parse", "HEAD"]) !== proof.candidateCommit) throw new Error("checked-out HEAD differs from attested candidate");
+    if (runGit(["status", "--porcelain", "--untracked-files=all"])) throw new Error("module worktree is dirty");
+    if (runGit(["rev-parse", `refs/tags/${proof.tag}^{commit}`]) !== proof.releaseCommit) throw new Error("release tag does not resolve to the attested release commit");
+    runGit(["merge-base", "--is-ancestor", proof.releaseCommit, proof.candidateCommit]);
+
+    const assetPayload = JSON.stringify({
+      version,
+      assets: [...assets]
+        .map(({ hostKey, archive, sha256 }) => ({ hostKey, archive, sha256 }))
+        .sort((a, b) => a.hostKey.localeCompare(b.hostKey)),
+    });
+    if (sha256(assetPayload) !== proof.assetsSha256) throw new Error("registry version or artifact asset map changed");
+    if (!/^[0-9a-f]{64}$/.test(proof.assetsSha256)) throw new Error("asset-map digest is malformed");
+    if (!/^[0-9a-f]{64}$/.test(proof.unchangedTreeSha256)) throw new Error("unchanged-tree digest is malformed");
+
+    const file = proof.testFile;
+    if (!file || Object.keys(file).sort().join(",") !== "candidateBlob,candidateMode,path,releaseBlob,releaseMode") {
+      throw new Error("test-file proof fields are missing or unknown");
+    }
+    if (file.path !== proof.binding.testPath || !/^[A-Za-z0-9_./-]+\.rs$/.test(file.path)) throw new Error("test path does not match the attested binding");
+    if (file.releaseMode !== "100644" || file.candidateMode !== "100644") throw new Error("attested test file must remain a regular non-executable file");
+    if (![file.releaseBlob, file.candidateBlob].every((sha) => /^[0-9a-f]{40}$/.test(sha)) || file.releaseBlob === file.candidateBlob) throw new Error("test-file blob pair is malformed or unchanged");
+    const entries = (ref) => runGit(["ls-tree", "-r", "--full-tree", "-z", ref])
+      .split("\0")
+      .filter(Boolean)
+      .map((entry) => {
+        const match = entry.match(/^([0-7]{6}) (blob|commit) ([0-9a-f]{40})\t([\s\S]+)$/);
+        if (!match) throw new Error(`unsupported tree entry in ${ref}`);
+        return { mode: match[1], type: match[2], oid: match[3], path: match[4] };
+      });
+    const releaseEntries = entries(proof.releaseCommit);
+    const candidateEntries = entries(proof.candidateCommit);
+    const select = (items) => items.find((item) => item.path === file.path);
+    const releaseFile = select(releaseEntries);
+    const candidateFile = select(candidateEntries);
+    if (!releaseFile || !candidateFile || releaseFile.mode !== file.releaseMode || candidateFile.mode !== file.candidateMode || releaseFile.type !== "blob" || candidateFile.type !== "blob" || releaseFile.oid !== file.releaseBlob || candidateFile.oid !== file.candidateBlob) {
+      throw new Error("attested test file path, mode, or blob does not match the Git trees");
+    }
+    const treeHash = (items) => sha256(items.filter((item) => item.path !== file.path)
+      .map(({ mode, type, oid, path }) => `${mode} ${type} ${oid}\t${path}\n`)
+      .sort().join(""));
+    const releaseTreeHash = treeHash(releaseEntries);
+    const candidateTreeHash = treeHash(candidateEntries);
+    if (releaseTreeHash !== proof.unchangedTreeSha256 || candidateTreeHash !== proof.unchangedTreeSha256) throw new Error("other source, manifest, lock, build input, or gitlink differs from the release tree");
+
+    const binding = proof.binding;
+    if (!binding || Object.keys(binding).sort().join(",") !== "moduleBlob,modulePath,testPath" || !/^[0-9a-f]{40}$/.test(binding.moduleBlob)) throw new Error("module binding proof is malformed");
+    const moduleEntry = candidateEntries.find((item) => item.path === binding.modulePath);
+    if (!moduleEntry || moduleEntry.type !== "blob" || moduleEntry.mode !== "100644" || moduleEntry.oid !== binding.moduleBlob) throw new Error("test module declaration source differs from the attested blob");
+    const moduleSource = runGit(["show", `${proof.candidateCommit}:${binding.modulePath}`]);
+    const declaration = `#[cfg(test)]\n#[path = "${file.path.split("/").at(-1)}"]\nmod tests;`;
+    if (!moduleSource.includes(declaration)) throw new Error("the exact cfg(test) sibling module binding is absent");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 /**
