@@ -325,9 +325,10 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           // ex63: `docs:check` runs the storage schema dump and the embed
           // capability report through cargo. Without the shared build target
           // and rustEnv they compiled the core again in the plain target,
-          // incremental and with full debuginfo, which Tinymold does not
-          // cache (315 s in EX63 run 39371566398). With them the dump is the
-          // storage-schema check's build and the report the embed examples'.
+          // incremental and with full debuginfo, so none of the shared build
+          // applied (315 s in EX63 run 39371566398). With them the dump is
+          // the storage-schema check's build and the report the embed
+          // examples'.
           ...(ex63
             ? {
                 env: {
