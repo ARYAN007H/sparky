@@ -68,6 +68,24 @@ fn every_known_wire_token_maps_to_its_provider_neutral_kind() {
 }
 
 #[test]
+fn owner_and_legacy_managed_provider_labels_keep_error_codes_provider_owned() {
+    let error = r#"OpenHuman API error: {"errorCode":"RATE_LIMITED"}"#;
+    assert_eq!(
+        classify(Some("tinyhumans"), error).kind,
+        Some(BackendErrorKind::RateLimited)
+    );
+    assert_eq!(
+        classify(Some("OpenHuman"), error).kind,
+        Some(BackendErrorKind::RateLimited)
+    );
+    assert_eq!(
+        classify(Some("custom_openai"), error).kind,
+        None,
+        "an arbitrary provider must not inherit managed-backend ownership"
+    );
+}
+
+#[test]
 fn extraction_is_case_insensitive_on_key_and_normalises_value() {
     let body = r#"{"ErrorCode":"rate_limited"}"#;
     assert_eq!(
