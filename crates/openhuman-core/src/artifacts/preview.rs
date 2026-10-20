@@ -76,15 +76,13 @@ pub async fn read_body(
         }
     };
     let converter = DocumentConverter::for_config(config);
-    let display_path = super::store::get_artifact(&config.workspace_dir, id)
-        .await
-        .ok()
-        .and_then(|meta| async {
-            super::files::resolve_file(&config.workspace_dir, &meta, &files)
-                .await
-                .ok()
-        }.await)
-        .map(|path| path.to_string_lossy().into_owned());
+    let display_path = match super::store::get_artifact(&config.workspace_dir, id).await {
+        Ok(meta) => super::files::resolve_file(&config.workspace_dir, &meta, &files)
+            .await
+            .ok()
+            .map(|path| path.to_string_lossy().into_owned()),
+        Err(_) => None,
+    };
     Ok(body_of(
         &record,
         file_store.as_ref(),
