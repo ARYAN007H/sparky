@@ -132,7 +132,7 @@ impl Tool for OpenHumanGoalTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        self.metadata.execute(args).await
+        self.for_context(None).execute(args).await
     }
 
     async fn execute_with_context(
