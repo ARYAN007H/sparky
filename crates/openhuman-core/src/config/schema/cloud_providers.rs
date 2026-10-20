@@ -2,7 +2,7 @@
 //!
 //! Each entry in `Config::cloud_providers` represents one configured LLM
 //! backend. Providers are keyed by a user-chosen `slug` (e.g. `"openai"`,
-//! `"my-deepseek"`). The factory in `inference::provider::factory`
+//! `"my-deepseek"`). Inference routing in `config::ops::primary_cloud`
 //! resolves workload-to-provider strings against this list at runtime using
 //! the grammar `"<slug>:<model>"`.
 //!
@@ -202,6 +202,20 @@ pub enum AuthStyle {
 }
 
 impl AuthStyle {
+    /// Parse the RPC compatibility spellings for a provider authentication style.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.to_ascii_lowercase().as_str() {
+            "bearer" => Ok(Self::Bearer),
+            "anthropic" => Ok(Self::Anthropic),
+            "openhuman_jwt" | "openhumanjwt" => Ok(Self::OpenhumanJwt),
+            "none" => Ok(Self::None),
+            other => Err(format!(
+                "unknown auth_style '{}'; valid: bearer, anthropic, openhuman_jwt, none",
+                other
+            )),
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Bearer => "bearer",

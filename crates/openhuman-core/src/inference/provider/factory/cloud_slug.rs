@@ -2,6 +2,7 @@
 //! abstract-tier remapping, credentials, codex routing) and the crate-native builders.
 
 use super::*;
+use crate::config::ops::resolve_primary_cloud_provider_string;
 #[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_backend_session_active;
 #[cfg(not(test))]

@@ -1,9 +1,17 @@
-//! `primary_cloud` / legacy `inference_url` resolution: which cloud entry an
-//! unset (or `"cloud"`) route falls through to, and the BYOK fail-closed sentinel.
+//! Primary cloud-provider selection and legacy direct-inference compatibility.
 
-use super::*;
+use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+use crate::config::Config;
+use crate::inference::provider::factory::{BYOK_INCOMPLETE_SENTINEL, PROVIDER_OPENHUMAN};
 
-pub(super) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
+/// Keep endpoint paths out of config diagnostics while using TinyInference's
+/// shared sanitizer for URL credentials, query values and invalid inputs.
+fn redact_inference_origin_for_log(endpoint: &str) -> String {
+    let origin = url::Url::parse(endpoint.trim()).map(|url| url.origin().ascii_serialization());
+    tinyinference_core::sanitize::redact_url(origin.as_deref().unwrap_or(endpoint))
+}
+
+pub(crate) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
     let primary = config
         .primary_cloud
         .as_deref()
@@ -19,9 +27,11 @@ pub(super) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
         // silently routing through the managed backend.
         if has_custom_inference_intent(config) {
             log::debug!(
-                "[providers][chat-factory] BYOK intent detected (host={}) \
+                "[providers][chat-factory] BYOK intent detected (endpoint={}) \
                  but no matching cloud_providers entry found; returning fail-closed sentinel",
-                redact_inference_url(config.inference_url.as_deref())
+                redact_inference_origin_for_log(
+                    config.inference_url.as_deref().unwrap_or_default()
+                )
             );
             return BYOK_INCOMPLETE_SENTINEL.to_string();
         }
@@ -37,9 +47,9 @@ pub(super) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
     legacy_custom_inference_provider_string(config).unwrap_or_else(|| {
         if has_custom_inference_intent(config) {
             log::debug!(
-                "[providers][chat-factory] BYOK intent detected (host={}) \
+                "[providers][chat-factory] BYOK intent detected (endpoint={}) \
                  with no primary_cloud and no matching provider entry; returning fail-closed sentinel",
-                redact_inference_url(config.inference_url.as_deref())
+                redact_inference_origin_for_log(config.inference_url.as_deref().unwrap_or_default())
             );
             BYOK_INCOMPLETE_SENTINEL.to_string()
         } else {
@@ -48,39 +58,10 @@ pub(super) fn resolve_primary_cloud_provider_string(config: &Config) -> String {
     })
 }
 
-/// Extract the host portion of an inference URL for safe logging.
-///
-/// Returns the host (e.g. `"api.example.com"`) so log lines are grep-friendly
-/// without exposing tokens or credentials that may appear in query-string or
-/// path components of a bearer-auth URL (e.g. `"https://host/v1?key=…"`).
-/// Falls back to `"<redacted>"` when the URL cannot be parsed or is absent.
-pub(super) fn redact_inference_url(url: Option<&str>) -> &str {
-    url.and_then(|u| {
-        // Minimal host extraction: find the authority after "://".
-        let after_scheme = u.find("://").map(|i| &u[i + 3..])?;
-        // Authority ends at '/', '?', '#', or end-of-string.
-        let host_end = after_scheme
-            .find(['/', '?', '#'])
-            .unwrap_or(after_scheme.len());
-        let authority = &after_scheme[..host_end];
-        // Strip optional "user:pass@" and port.
-        let host = authority
-            .rfind('@')
-            .map_or(authority, |i| &authority[i + 1..]);
-        let host = host.rfind(':').map_or(host, |i| &host[..i]);
-        if host.is_empty() {
-            None
-        } else {
-            Some(host)
-        }
-    })
-    .unwrap_or("<redacted>")
-}
-
 /// Return `true` when the config contains a non-openhuman `inference_url`,
 /// indicating the user intends custom/BYOK routing rather than the managed
 /// backend.
-pub(super) fn has_custom_inference_intent(config: &Config) -> bool {
+fn has_custom_inference_intent(config: &Config) -> bool {
     config
         .inference_url
         .as_deref()
@@ -89,7 +70,7 @@ pub(super) fn has_custom_inference_intent(config: &Config) -> bool {
         .is_some_and(|url| !looks_like_openhuman_backend(config, url))
 }
 
-pub(super) fn legacy_custom_inference_provider_string(config: &Config) -> Option<String> {
+fn legacy_custom_inference_provider_string(config: &Config) -> Option<String> {
     let inference_url = config
         .inference_url
         .as_deref()
@@ -119,7 +100,7 @@ pub(super) fn legacy_custom_inference_provider_string(config: &Config) -> Option
 /// for direct endpoint routing, so it is scoped to this single provider. The
 /// `lookup_key_for_slug` fallback uses this to avoid leaking the global key to
 /// any other provider slug whose auth-profile lookup returned empty.
-pub(super) fn legacy_inference_slug(config: &Config) -> Option<&str> {
+pub(crate) fn legacy_inference_slug(config: &Config) -> Option<&str> {
     let inference_url = config
         .inference_url
         .as_deref()
@@ -141,10 +122,7 @@ pub(super) fn legacy_inference_slug(config: &Config) -> Option<&str> {
         .map(|entry| entry.slug.as_str())
 }
 
-pub(super) fn cloud_entry_provider_string(
-    entry: &crate::config::schema::cloud_providers::CloudProviderCreds,
-    config: &Config,
-) -> String {
+fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> String {
     if is_openhuman_cloud_entry(config, entry) {
         return PROVIDER_OPENHUMAN.to_string();
     }
@@ -166,22 +144,23 @@ pub(super) fn cloud_entry_provider_string(
     format!("{}:{model}", entry.slug)
 }
 
-pub(super) fn is_openhuman_cloud_entry(
-    config: &Config,
-    entry: &crate::config::schema::cloud_providers::CloudProviderCreds,
-) -> bool {
+fn is_openhuman_cloud_entry(config: &Config, entry: &CloudProviderCreds) -> bool {
     entry.slug == PROVIDER_OPENHUMAN
         || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
         || looks_like_openhuman_backend(config, &entry.endpoint)
 }
 
-pub(super) fn normalize_endpoint_for_compare(url: &str) -> String {
+fn normalize_endpoint_for_compare(url: &str) -> String {
     url.trim().trim_end_matches('/').to_ascii_lowercase()
 }
 
 /// Whether `url` names one of the managed hosts the installed host resolved
 /// onto the config (`resolved_endpoints.managed_hosts`). With no host
 /// registered nothing is managed, so every endpoint is a custom one.
-pub(super) fn looks_like_openhuman_backend(config: &Config, url: &str) -> bool {
+fn looks_like_openhuman_backend(config: &Config, url: &str) -> bool {
     config.resolved_endpoints.is_managed_host(url)
 }
+
+#[cfg(test)]
+#[path = "primary_cloud_tests.rs"]
+mod tests;
