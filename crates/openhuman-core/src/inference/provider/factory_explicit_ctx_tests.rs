@@ -123,7 +123,9 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
         ChatModelEntry {
             build: Arc::new(move |_| {
                 Ok((
-                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![name])),
+                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+                        name,
+                    ])),
                     name.to_string(),
                 ))
             }),
@@ -142,9 +144,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
         }
     }
 
-    async fn response(
-        model: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
-    ) -> String {
+    async fn response(model: Arc<dyn tinyinference_llm::model::ChatModel<()>>) -> String {
         model
             .invoke(&(), ModelRequest::new(vec![Message::user("fixture")]))
             .await
