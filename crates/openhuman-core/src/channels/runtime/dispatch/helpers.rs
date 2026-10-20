@@ -62,7 +62,7 @@ pub(super) fn spawn_draft_updater(
     channel: Arc<dyn Channel>,
     reply_target: String,
     draft_id: String,
-) -> tokio_util::task::AbortOnDropHandle<tokio::task::JoinHandle<()>> {
+) -> tokio_util::task::AbortOnDropHandle<()> {
     tokio_util::task::AbortOnDropHandle::new(tokio::spawn(async move {
         let mut accumulated = String::new();
         let mut last_thinking_update = None;
