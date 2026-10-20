@@ -68,7 +68,10 @@ async fn prewarm_flow_authoring_in_parent(
     tokio::time::timeout(Duration::from_secs(60), async {
         loop {
             let discovered = openhuman_core::skills::load_workflow_metadata_for(ctx, config);
-            if discovered.iter().any(|skill| skill.id() == "flow-authoring") {
+            if discovered
+                .iter()
+                .any(|skill| skill.id() == "flow-authoring")
+            {
                 return;
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
@@ -206,12 +209,8 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         for path in [&config_path, &local_config_path] {
             std::fs::write(path, &disabled_text).expect("disable module in active CLI config");
         }
-        let ordinary_prompt = dump_published_prompt(
-            "orchestrator",
-            temp.path(),
-            &workspace,
-            module_search_path,
-        );
+        let ordinary_prompt =
+            dump_published_prompt("orchestrator", temp.path(), &workspace, module_search_path);
         assert!(ordinary_prompt["system_prompt"]
             .as_str()
             .expect("ordinary prompt text")
@@ -222,7 +221,12 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         for path in [&config_path, &local_config_path] {
             std::fs::write(path, &enabled_config).expect("re-enable module in CLI config");
         }
-        dump_published_prompt("workflow_builder", temp.path(), &workspace, module_search_path);
+        dump_published_prompt(
+            "workflow_builder",
+            temp.path(),
+            &workspace,
+            module_search_path,
+        );
         prewarm_flow_authoring_in_parent(&ctx, &config).await;
         let reenabled = openhuman_core::skills::load_workflow_metadata_for(&ctx, &config);
         assert!(
