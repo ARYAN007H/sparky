@@ -61,24 +61,23 @@ fn register_backend_classifier_fixture(message: &str, classification: BackendErr
     static FIXTURES: OnceLock<Arc<Mutex<HashMap<String, BackendErrorClassification>>>> =
         OnceLock::new();
     let fixtures = Arc::clone(FIXTURES.get_or_init(|| {
-        let fixtures = Arc::new(Mutex::new(HashMap::new()));
-        let classifier_fixtures = Arc::clone(&fixtures);
-        register_backend_error_classifier(Arc::new(move |_provider, error| {
-            classifier_fixtures
-                .lock()
-                .expect("classifier fixture lock")
-                .get(error)
-                .cloned()
-                .unwrap_or(BackendErrorClassification {
-                    provider_owned: false,
-                    backend_owned: false,
-                    reportable: true,
-                    token: None,
-                    kind: None,
-                    malformed_bad_request: false,
-                })
-        }));
-        fixtures
+        Arc::new(Mutex::new(HashMap::new()))
+    }));
+    let classifier_fixtures = Arc::clone(&fixtures);
+    register_backend_error_classifier(Arc::new(move |_provider, error| {
+        classifier_fixtures
+            .lock()
+            .expect("classifier fixture lock")
+            .get(error)
+            .cloned()
+            .unwrap_or(BackendErrorClassification {
+                provider_owned: false,
+                backend_owned: false,
+                reportable: true,
+                token: None,
+                kind: None,
+                malformed_bad_request: false,
+            })
     }));
     fixtures
         .lock()
