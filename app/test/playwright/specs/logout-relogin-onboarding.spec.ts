@@ -39,16 +39,10 @@ async function readOnboardingCompleted(): Promise<boolean> {
  * onboarding screen to wait for. Callers assert the landing instead.
  */
 async function signInThroughOnboarding(page: Page, userId: string): Promise<void> {
-  const payload = Buffer.from(
-    JSON.stringify({ sub: userId, userId, exp: Math.floor(Date.now() / 1000) + 3600 })
-  ).toString('base64url');
-  await callCoreRpc('openhuman.auth_store_session', {
-    token: `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.${payload}.sig`,
-    userId,
-    user: { _id: userId, id: userId, displayName: 'Playwright User' },
-  });
-  await page.goto('/#/onboarding/welcome');
-  await waitForAppReady(page);
+  // The helper already waits for a false onboarding flag to complete and land
+  // in chat. Re-entering Welcome after that would start completion a second
+  // time, and its delayed navigation can pull the user away from Settings.
+  await signInViaBypassUser(page, userId, { onboardingCompleted: false });
 }
 
 async function expectLandedInChat(page: Page): Promise<void> {
