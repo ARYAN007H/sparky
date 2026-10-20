@@ -103,7 +103,7 @@ fn bound_controller_runs_gate_before_parser() {
     assert_eq!(CALLS.load(Ordering::SeqCst), 3);
 }
 
-fn run_value_after_gate(_ctx: DispatchCtx, (), parsed: Parsed) -> ControllerFuture {
+fn run_value_after_gate(_ctx: DispatchCtx, _gate: (), parsed: Parsed) -> ControllerFuture {
     run_value(DispatchCtx::unbound(), parsed)
 }
 
