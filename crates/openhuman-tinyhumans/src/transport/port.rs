@@ -99,10 +99,7 @@ pub trait BackendTransport: Send + Sync + 'static {
     /// The default keeps transports without memory support source-compatible;
     /// OpenHuman core falls back to its safe backend-credential resolver when
     /// this returns `None`.
-    fn memory_bearer_source(
-        &self,
-        _config: Arc<Config>,
-    ) -> Option<Arc<dyn BearerSource>> {
+    fn memory_bearer_source(&self, _config: Arc<Config>) -> Option<Arc<dyn BearerSource>> {
         None
     }
 
