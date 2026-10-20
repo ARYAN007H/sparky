@@ -541,7 +541,6 @@ async fn flows_run_rejects_a_missing_required_input_without_creating_a_run_row()
     )
     .await
     .expect_err("a missing required input must fail the call");
-    eprintln!("missing-input flow error: {err}");
     assert!(
         err.contains("repo"),
         "the error must name the offending input, got: {err}"
