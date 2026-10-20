@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn raw_profiles_operator_registry_matches_its_independent_contract() {
