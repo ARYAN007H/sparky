@@ -60,7 +60,7 @@ pub(super) fn attach_flow_progress_bridge(
     agent: &mut crate::agent::OpenHumanSessionHost,
     target: &FlowStreamTarget,
     source: &str,
-    _config: &Config,
+    config: &Config,
 ) {
     let (progress_tx, progress_rx) = tokio::sync::mpsc::channel(64);
     agent.set_on_progress(Some(progress_tx));
@@ -98,7 +98,7 @@ pub(super) async fn finalize_flow_stream(
     target: &FlowStreamTarget,
     result: &Result<String, String>,
     prompt: &str,
-    config: &Config,
+    _config: &Config,
 ) {
     match result {
         Ok(text) => {
