@@ -219,8 +219,8 @@ fn refusals_name_only_tools_on_every_listing_belt() {
         })
         .collect();
     assert!(
-        belts.iter().any(|(id, _)| id == "planner"),
-        "fixture: the planner lists MCP tools, got {:?}",
+        belts.iter().any(|(id, _)| id == "orchestrator"),
+        "fixture: the orchestrator lists MCP tools, got {:?}",
         belts.iter().map(|(id, _)| id).collect::<Vec<_>>()
     );
     for (id, belt) in &belts {
