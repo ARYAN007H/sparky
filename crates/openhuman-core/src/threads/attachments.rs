@@ -268,18 +268,39 @@ pub(crate) async fn restage_persisted_parts(
 
     let mut resolved = resolve_persisted_parts(ctx, thread_id, persisted_message_id, requested)
         .await?;
+    let config = ctx
+        .load_config()
+        .await
+        .map_err(|error| format!("stored attachment configuration unavailable: {error}"))?;
+    let workspace = crate::agent::attachments::thread_action_dir(
+        ctx,
+        &config,
+        &config.workspace_dir,
+        Some(thread_id),
+    )
+    .await
+    .map_err(|error| format!("stored attachment workspace unavailable: {error}"))?;
+    let scope = crate::agent::attachments::AttachmentAccessScope {
+        external_channel: false,
+        workspace: Some(workspace),
+    };
     for part in &mut resolved {
         let media = opaque_media_mut(part)
             .ok_or_else(|| "stored attachment has an unsupported kind".to_string())?;
-        let path = media
+        let relative_path = media
             .path
             .take()
             .ok_or_else(|| "stored attachment path is unavailable".to_string())?;
         let mime = media
             .content_type
             .as_deref()
-            .filter(|mime| !mime.is_empty() && !mime.contains(['\r', '\n', ']']))
+            .filter(|mime| {
+                !mime.is_empty() && !mime.chars().any(|ch| matches!(ch, '\r' | '\n' | ']'))
+            })
             .ok_or_else(|| "stored attachment content type is unavailable".to_string())?;
+        let path = crate::agent::attachments::resolve_path(&config, &relative_path, &scope)
+            .await
+            .map_err(|error| format!("resolve validated stored attachment: {error}"))?;
         let bytes = tokio::fs::read(&path)
             .await
             .map_err(|error| format!("read validated stored attachment: {error}"))?;
