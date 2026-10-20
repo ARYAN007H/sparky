@@ -60,7 +60,6 @@ export async function voiceNoteContentPart(
   return {
     kind: 'voice_note',
     voiceNote: {
-      codec: contentType,
       durationMs,
       waveform,
       pushToTalk: false,
@@ -68,7 +67,6 @@ export async function voiceNoteContentPart(
         opaqueId: noteId,
         kind: 'audio',
         contentType,
-        codec: contentType,
         durationMs,
         sizeBytes: blob.size,
       },
