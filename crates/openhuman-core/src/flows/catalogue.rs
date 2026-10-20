@@ -146,15 +146,15 @@ fn describe_shape(flow: &tinyflows_catalog::types::Flow, trigger: String) -> Str
 
 #[cfg(test)]
 fn entry_for(flow: tinyflows_catalog::types::Flow) -> Workflow {
-    let trigger = flow
-        .graph
-        .trigger()
-        .and_then(|node| node.config.get("trigger_kind"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("manual")
-        .to_string();
-    let description = describe_shape(&flow, trigger);
-    entry_with_description(flow, description)
+    let tmp = tempfile::TempDir::new().expect("isolated workspace");
+    let config = Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        ..Config::default()
+    };
+    std::fs::create_dir_all(&config.workspace_dir).expect("create isolated workspace");
+    entry_for_with_config(&config, flow)
 }
 
 #[cfg(test)]
