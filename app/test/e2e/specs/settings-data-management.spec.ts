@@ -2,10 +2,9 @@
 /**
  * Settings → Data Management (capability 13.5).
  *
- * Rewritten to follow the cron-jobs-flow pattern. The "Full State Reset"
- * test intentionally runs LAST — it logs the user out, so anything that
- * follows would need its own resetApp() pass. We keep this spec
- * self-contained so the suite ordering doesn't matter.
+ * The "Full State Reset" test intentionally runs LAST — it logs the user
+ * out, so anything that follows would need its own resetApp() pass. We keep
+ * this spec self-contained so the suite ordering doesn't matter.
  *
  * Covers:
  *   - 13.5.1 Clear App Data confirmation dialog + Cancel
@@ -16,7 +15,14 @@ import path from 'node:path';
 
 import { waitForApp } from '../helpers/app-helpers';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { clickTestId, clickText, textExists, waitForText } from '../helpers/element-helpers';
+import {
+  clickSelector,
+  clickTestId,
+  clickText,
+  textExists,
+  waitForTestId,
+  waitForText,
+} from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
@@ -81,15 +87,13 @@ describe('Settings - Data Management', function () {
     await clickTestId('settings-nav-logout-and-clear', 15_000);
 
     await waitForText('This will sign you out', 5_000);
-    const confirmations = await browser.$$('button*=Clear App Data');
-    expect(confirmations.length).toBeGreaterThan(1);
-    await confirmations[confirmations.length - 1].click();
+    await clickSelector('[data-slot="alert-dialog-action"]');
     await browser.waitUntil(async () => await textExists('Welcome to OpenHuman'), {
       timeout: 30_000,
       interval: 250,
       timeoutMsg: 'clear-data reset did not reload the signed-out Welcome screen',
     });
-    expect(await browser.$('[data-testid="welcome-cta-tinyhumans"]').isExisting()).toBe(true);
+    await waitForTestId('welcome-cta-tinyhumans');
     expect(fs.existsSync(sentinelPath)).toBe(false);
 
     const auth = await callOpenhumanRpc('openhuman.auth_get_state', {});
