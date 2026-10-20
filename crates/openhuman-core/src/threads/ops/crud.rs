@@ -442,6 +442,10 @@ pub(super) async fn message_append_with_config(
 #[path = "crud_message_append_tests.rs"]
 mod message_append_tests;
 
+#[cfg(test)]
+#[path = "crud_queued_attachment_tests.rs"]
+mod queued_attachment_tests;
+
 /// Updates labels for a conversation thread.
 ///
 /// An empty `labels` vec is valid and clears all labels from the thread,
