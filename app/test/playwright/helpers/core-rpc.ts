@@ -52,9 +52,9 @@ export async function callCoreRpc<T>(
   return payload.result;
 }
 
-async function resetCoreForWebUser(userId: string): Promise<void> {
+async function resetCoreForWebUser(userId: string, onboardingCompleted = true): Promise<void> {
   await callCoreRpc('openhuman.auth_clear_session', {});
-  await callCoreRpc('openhuman.config_set_onboarding_completed', { value: true });
+  await callCoreRpc('openhuman.config_set_onboarding_completed', { value: onboardingCompleted });
   await callCoreRpc('openhuman.auth_store_session', {
     token: buildBypassJwt(userId),
     userId,
@@ -171,9 +171,9 @@ export async function signInViaCallbackToken(page: Page, token: string): Promise
 export async function signInViaBypassUser(
   page: Page,
   userId: string,
-  options: { waitForInitialThread?: boolean } = {}
+  options: { waitForInitialThread?: boolean; onboardingCompleted?: boolean } = {}
 ): Promise<void> {
-  await resetCoreForWebUser(userId);
+  await resetCoreForWebUser(userId, options.onboardingCompleted ?? true);
   await applyBrowserCoreModeInPage(page);
   await page.goto('/#/home');
   await waitForAuthenticatedSnapshot(page);
