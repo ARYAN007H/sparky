@@ -44,7 +44,6 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
 #[test]
 fn nothing_registered_resolves_no_provider() {
     let _guard = crate::inference::inference_test_guard();
-    let _bare = crate::inference::registry_test_support::without_managed_provider();
     assert!(chat_model(PROVIDER_OPENHUMAN).is_none());
     assert!(embedding(PROVIDER_OPENHUMAN).is_none());
     assert!(catalog(PROVIDER_OPENHUMAN).is_none());
@@ -175,7 +174,6 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
 #[test]
 fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable() {
     let _guard = crate::inference::inference_test_guard();
-    let _bare = crate::inference::registry_test_support::without_managed_provider();
     let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
     let error = make_openhuman_backend_model_for_thread(
         "chat",
