@@ -374,6 +374,7 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
         row.current_task_id.as_deref() == Some(task_id.as_str())
             && row.parent_session == "completed-cancel-parent-session"
     }));
+    let before_snapshot = serde_json::to_string(&before).expect("encode completed rows");
     let controller = crate::agent_runs::all_subagent_control_registered_controllers()
         .into_iter()
         .find(|controller| controller.schema.function == "cancel")
@@ -385,9 +386,10 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
         .expect("late cancel handler");
     assert_eq!(output["cancelled"], serde_json::json!(false));
     assert_eq!(output["outcome"], serde_json::json!("completed"));
-    let after = CoreContext::sync_scope(Arc::clone(&core), || store.load())
+    let after_snapshot = CoreContext::sync_scope(Arc::clone(&core), || store.load())
+        .map(|rows| serde_json::to_string(&rows).expect("encode rows after cancel"))
         .expect("load row after cancel");
-    assert_eq!(after, before, "late cancel must not rewrite completed state");
+    assert_eq!(after_snapshot, before_snapshot, "late cancel must not rewrite completed state");
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
