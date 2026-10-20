@@ -60,7 +60,7 @@ async fn no_workspace_means_nothing_to_import() {
 }
 
 fn dbg_docs(p: &std::path::Path) {
-    let c = rusqlite::Connection::open(p).unwrap();
+    let c = crate::storage::rusqlite::Connection::open(p).unwrap();
     let cols: Vec<String> = c.prepare("PRAGMA table_info(docs)").unwrap().query_map([], |r| r.get::<_, String>(1)).unwrap().map(|x| x.unwrap()).collect();
     eprintln!("DBGCOLS {cols:?}");
     let col = if cols.iter().any(|x| x == "collection") { "collection" } else { &cols[0] };
