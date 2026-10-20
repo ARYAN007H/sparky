@@ -34,6 +34,7 @@ pub const SAVED_NOT_SHOWN: &str = "saved-not-shown:";
 /// A file being produced as an artifact.
 pub struct Production {
     artifacts: Artifacts,
+    ctx: crate::core::runtime::DispatchCtx,
     workspace_dir: PathBuf,
     files: FileRoots,
     chat: Option<ApprovalChatContext>,
@@ -135,18 +136,6 @@ impl Production {
             legacy_kind_for_extension(&extension.to_ascii_lowercase())
         };
         let target = revise.filter(|id| !id.trim().is_empty());
-        let (meta, path) = super::store::create_artifact_regenerating(
-            workspace_dir,
-            files.clone(),
-            legacy_kind,
-            title,
-            extension,
-            tool_call_id,
-            target,
-            chat,
-        )
-        .await?;
-
         let (artifacts, file_store) = super::tiny_store::build_artifacts_service_with_scope(
             workspace_dir,
             files.clone(),
@@ -155,12 +144,27 @@ impl Production {
             scoped,
             None,
         );
+        let file_store = file_store
+            .ok_or_else(|| "artifact tenant storage is unavailable".to_string())?;
+        let (meta, path) = ctx
+            .enter(super::store::create_artifact_regenerating(
+                workspace_dir,
+                files.clone(),
+                legacy_kind,
+                title,
+                extension,
+                tool_call_id,
+                target,
+                chat,
+            ))
+            .await?;
         let mut production = Self {
             artifacts,
+            ctx: ctx.clone(),
             workspace_dir: workspace_dir.to_path_buf(),
             files,
             chat: chat.cloned(),
-            file_store,
+            file_store: Some(file_store),
             id: meta.id.clone(),
             path,
             revision: false,
@@ -304,6 +308,7 @@ impl Production {
             self.files.clone(),
             self.file_store.clone(),
             self.chat.as_ref(),
+            &self.ctx,
         );
         if let Err(err) = bridge.show_newest(&record).await {
             tracing::warn!(
@@ -318,14 +323,16 @@ impl Production {
 
     /// Fail the card directly (when the record could not take the change).
     async fn fail_card(&self, reason: &str) {
-        let _ = super::store::fail_artifact(
-            &self.workspace_dir,
-            self.files.clone(),
-            &self.id,
-            reason,
-            self.chat.as_ref(),
-        )
-        .await;
+        let _ = self
+            .ctx
+            .enter(super::store::fail_artifact(
+                &self.workspace_dir,
+                self.files.clone(),
+                &self.id,
+                reason,
+                self.chat.as_ref(),
+            ))
+            .await;
     }
 }
 
