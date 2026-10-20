@@ -128,7 +128,11 @@ fn merged_grants_are_deduplicated() {
     let mut into = vec!["/a".to_string()];
     merge(
         &mut into,
-        &[PathBuf::from("/a"), PathBuf::from("/b"), PathBuf::from("/b")],
+        &[
+            PathBuf::from("/a"),
+            PathBuf::from("/b"),
+            PathBuf::from("/b"),
+        ],
     );
     assert_eq!(into, vec!["/a".to_string(), "/b".to_string()]);
 }
