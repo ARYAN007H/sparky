@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tinyagents_graph::goals::GoalToolKind;
+use tinyagents_harness_tools::goals::GoalToolKind;
 use tinyagents_harness::tool::packs::{PackSelection, UseSkillDispatch, USE_SKILL};
 use tinyagents_harness::tool::{
     CanonicalSharedToolAdapter, ToolDispatch, ToolExecScope, ToolExecution, ToolExecutionContext,
@@ -644,7 +644,7 @@ pub(crate) fn capability_diagnostics(
 
     let diagnostics = registry.diagnostics();
     tracing::debug!(
-        models = registry.to_model_registry().names().len(),
+        models = registry.names(ComponentKind::Model).len(),
         tools = registry.names(ComponentKind::Tool).len(),
         agents = runtime_agent_count + builtin_supplement_count,
         diagnostics = diagnostics.len(),
