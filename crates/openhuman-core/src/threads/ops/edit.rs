@@ -99,9 +99,9 @@ pub async fn edit_message(
             "voice notes must be sent through channel.web_chat".into(),
         ));
     }
-    // Validate typed uploads before cancellation or truncation. The folded
-    // marker form is deliberately discarded: modern edits persist opaque refs
-    // on the replacement row and give those refs to the trusted runner.
+    // Stage and validate uploads before cancellation or truncation. The folded
+    // marker form is deliberately discarded: edits reuse these scoped opaque
+    // refs when the replacement row is persisted below.
     crate::agent::attachments::parts::fold_into_message(&request.content, &request.attachments)
         .map_err(|e| ThreadsError::Message(e.to_string()))?;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
@@ -110,6 +110,13 @@ pub async fn edit_message(
     let store = transcript_store(ctx, &thread_id)
         .await
         .map_err(ThreadsError::Message)?;
+    let staged_parts = if request.attachments.is_empty() {
+        Vec::new()
+    } else {
+        crate::threads::attachments::stage_queued_parts(ctx, &thread_id, &request.attachments)
+            .await
+            .map_err(ThreadsError::Message)?
+    };
 
     crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
         .await
@@ -141,7 +148,7 @@ pub async fn edit_message(
 
     crate::web_chat::invalidate_thread_sessions(ctx, &thread_id).await;
 
-    let new_request_id = if request.attachments.is_empty() {
+    let new_request_id = if staged_parts.is_empty() {
         crate::web_chat::start_chat(
             ctx,
             &client_id,
@@ -161,28 +168,15 @@ pub async fn edit_message(
                 "edited attachment messages require text".into(),
             ));
         }
-        let appended = super::message_append(
+        let row = super::persist_queued_user_message(
             ctx,
-            crate::threads::AppendConversationMessageRequest {
-                thread_id: thread_id.clone(),
-                message: crate::threads::ConversationMessageRecord {
-                    id: request.message_id.clone(),
-                    content: request.content.clone(),
-                    attachments: Vec::new(),
-                    message_type: "text".into(),
-                    extra_metadata: json!({}),
-                    sender: "user".into(),
-                    created_at: chrono::Utc::now().to_rfc3339(),
-                },
-                attachments: request.attachments,
-            },
+            &thread_id,
+            &request.message_id,
+            &request.content,
+            &staged_parts,
         )
         .await
-        .map_err(|error| ThreadsError::Message(error.to_string()))?;
-        let row = appended
-            .value
-            .data
-            .ok_or_else(|| ThreadsError::Message("edited message append returned no row".into()))?;
+        .map_err(ThreadsError::Message)?;
         let started = crate::web_chat::channel_web_chat_with_stored_attachments(
             ctx,
             &client_id,
