@@ -3,7 +3,6 @@ use crate::config::Config;
 use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
 use serde_json::{json, Value};
 use tempfile::TempDir;
-use tinyflows::model::WorkflowGraph;
 use tinyflows_catalog::FlowConnection;
 
 fn test_config(tmp: &TempDir) -> Config {
@@ -17,11 +16,11 @@ fn test_config(tmp: &TempDir) -> Config {
     config
 }
 
-fn graph(value: Value) -> WorkflowGraph {
+fn graph(value: Value) -> Value {
     let graph = tinyflows::migrate::deserialize_graph(value).expect("test graph deserializes");
     tinyflows::validate::validate(&graph).expect("test graph is structurally valid");
     tinyflows::compat::ensure_compatible(&graph).expect("test graph is compatible");
-    graph
+    serde_json::to_value(graph).expect("validated graph serializes")
 }
 
 fn seeded_alias_contract() -> ToolContract {
@@ -97,7 +96,7 @@ fn ws3_transcript_connections() -> Vec<FlowConnection> {
     ]
 }
 
-fn ws3_tool_call_graph(slug: &str, connection_ref: Option<&str>) -> WorkflowGraph {
+fn ws3_tool_call_graph(slug: &str, connection_ref: Option<&str>) -> Value {
     let mut config = json!({ "slug": slug, "args": {} });
     if let Some(connection_ref) = connection_ref {
         config["connection_ref"] = json!(connection_ref);
@@ -111,7 +110,7 @@ fn ws3_tool_call_graph(slug: &str, connection_ref: Option<&str>) -> WorkflowGrap
     }))
 }
 
-fn upload_graph(path: Value) -> WorkflowGraph {
+fn upload_graph(path: Value) -> Value {
     graph(json!({
         "nodes": [
             {"id":"t","kind":"trigger","name":"Manual"},
