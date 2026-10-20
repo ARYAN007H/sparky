@@ -37,7 +37,7 @@ pub(crate) fn schemas(function: &str) -> ControllerSchema {
                     name: "created_at",
                     ty: TypeSchema::String,
                     comment: "RFC3339 timestamp for first thread creation.",
-                    required: false,
+                    required: true,
                 },
                 FieldSchema {
                     name: "labels",
