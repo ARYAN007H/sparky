@@ -1044,7 +1044,7 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
       reasoning_effort: params.reasoningEffort ?? undefined,
     },
   });
-  const result = unwrapChatAck(response);
+  const result = response;
 
   // Keep accepting the legacy scalar while consuming the authoritative started
   // and queued acknowledgement shapes returned by current cores.
