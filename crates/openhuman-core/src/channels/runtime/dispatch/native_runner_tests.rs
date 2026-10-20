@@ -196,6 +196,7 @@ async fn native_runner_checkouts_serialize_and_cancel_waiters_cleanly() {
             approval: Default::default(),
             relay_thread: None,
             imported_history: Vec::new(),
+            legacy_history: None,
             native_target: None,
         });
         TurnRequest {
