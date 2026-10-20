@@ -38,7 +38,7 @@ async function waitUntil(predicate, label, timeoutMs = 10_000) {
     if (value) return value;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw new Error(\`timed out waiting for \${label}\`);
+  throw new Error(`timed out waiting for \${label}`);
 }
 
 export default async function queuedImageAttachmentRoundtrip({
@@ -168,7 +168,7 @@ export default async function queuedImageAttachmentRoundtrip({
     JSON.stringify(ack.queued_attachments) !== JSON.stringify(pending.attachments)
   ) {
     throw new Error(
-      \`queued ACK does not match sanitized UI state: \${JSON.stringify(ack)}\`,
+      `queued ACK does not match sanitized UI state: \${JSON.stringify(ack)}`,
     );
   }
   if (
@@ -248,9 +248,9 @@ export default async function queuedImageAttachmentRoundtrip({
     throw new Error(`queued image produced ${userRows.length} persisted user rows, expected one`);
   }
   const persisted = userRows[0];
-  if (persisted.id !== \`user:\${pending.requestId}\`) {
+  if (persisted.id !== `user:\${pending.requestId}`) {
     throw new Error(
-      \`queued row ID \${persisted.id} does not match request-key ownership\`,
+      `queued row ID \${persisted.id} does not match request-key ownership`,
     );
   }
   if (/\\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(persisted.content)) {
