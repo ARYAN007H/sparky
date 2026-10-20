@@ -16,6 +16,7 @@ import {
   ChatApprovalDecidedEvent,
   ChatApprovalRequestEvent,
   ChatCancelledEvent,
+  ChatChannelEventEvent,
   ChatDoneEvent,
   ChatErrorEvent,
   ChatInferenceHeartbeatEvent,
@@ -112,6 +113,7 @@ export function segmentText(event: ChatSegmentEvent): string {
 export interface ChatEventListeners {
   onInferenceStart?: (event: ChatInferenceStartEvent) => void;
   onInferenceHeartbeat?: (event: ChatInferenceHeartbeatEvent) => void;
+  onChannelEvent?: (event: ChatChannelEventEvent) => void;
   onIterationStart?: (event: ChatIterationStartEvent) => void;
   onToolCall?: (event: ChatToolCallEvent) => void;
   onToolResult?: (event: ChatToolResultEvent) => void;
@@ -164,6 +166,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
   const EVENTS = {
     inferenceStart: 'inference_start',
     inferenceHeartbeat: 'inference_heartbeat',
+    channelEvent: 'channel_event',
     iterationStart: 'iteration_start',
     toolCall: 'tool_call',
     toolResult: 'tool_result',
@@ -221,6 +224,15 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     };
     socket.on(EVENTS.inferenceHeartbeat, cb);
     handlers.push([EVENTS.inferenceHeartbeat, cb]);
+  }
+
+  if (listeners.onChannelEvent) {
+    const cb = (payload: unknown) => {
+      const event = payload as ChatChannelEventEvent;
+      listeners.onChannelEvent?.(event);
+    };
+    socket.on(EVENTS.channelEvent, cb);
+    handlers.push([EVENTS.channelEvent, cb]);
   }
 
   if (listeners.onIterationStart) {

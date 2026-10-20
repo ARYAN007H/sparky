@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 
 import { extractWorkflowProposalFromMessages } from '../lib/workflows/workflowProposal';
 import { threadApi } from '../services/api/threadApi';
-import type { ContentPart } from '../services/chatWire';
+import type { ChatChannelEventEvent, ContentPart } from '../services/chatWire';
 import { isThreadNotFoundCoreRpcError } from '../services/coreRpcClient';
 import type { Thread, ThreadMessage } from '../types/thread';
 import { IS_DEV } from '../utils/config';
@@ -32,6 +32,8 @@ interface ThreadState {
    */
   welcomeThreadId: string | null;
   messagesByThreadId: Record<string, ThreadMessage[]>;
+  /** Live provider receipts/reactions keyed by exact persisted thread/message IDs. */
+  channelActivityByThreadId: Record<string, Record<string, ChannelActivity>>;
   messages: ThreadMessage[];
   isLoadingThreads: boolean;
   isLoadingMessages: boolean;
@@ -61,6 +63,11 @@ interface ThreadState {
   createThreadRequestId: string | null;
 }
 
+interface ChannelActivity {
+  reactions: Array<{ actorId: string; value: string; customEmojiId?: string }>;
+  readReceipts: Array<{ actorId: string; timestamp?: number }>;
+}
+
 const initialState: ThreadState = {
   threads: [],
   selectedThreadId: null,
@@ -68,6 +75,7 @@ const initialState: ThreadState = {
   activeThreadIds: {},
   welcomeThreadId: null,
   messagesByThreadId: {},
+  channelActivityByThreadId: {},
   messages: [],
   isLoadingThreads: false,
   isLoadingMessages: false,
@@ -479,6 +487,60 @@ const threadSlice = createSlice({
   name: 'thread',
   initialState,
   reducers: {
+    applyChannelEvent(state, action: PayloadAction<ChatChannelEventEvent>) {
+      const event = action.payload;
+      const rowId = event.openhuman_message_id;
+      if (!rowId || !event.thread_id) return;
+      const thread = (state.channelActivityByThreadId[event.thread_id] ??= {});
+      const activity = (thread[rowId] ??= { reactions: [], readReceipts: [] });
+      const providerEvent = event.channel_event;
+      if (providerEvent.type === 'reaction_added') {
+        const reaction = {
+          actorId: providerEvent.actor.id,
+          value: providerEvent.reaction.value,
+          ...(providerEvent.reaction.customEmojiId
+            ? { customEmojiId: providerEvent.reaction.customEmojiId }
+            : {}),
+        };
+        if (
+          !activity.reactions.some(
+            item =>
+              item.actorId === reaction.actorId &&
+              item.value === reaction.value &&
+              item.customEmojiId === reaction.customEmojiId
+          )
+        ) {
+          activity.reactions.push(reaction);
+        }
+      } else if (providerEvent.type === 'reaction_removed') {
+        activity.reactions = activity.reactions.filter(
+          item =>
+            item.actorId !== providerEvent.actor.id ||
+            item.value !== providerEvent.reaction.value ||
+            item.customEmojiId !== providerEvent.reaction.customEmojiId
+        );
+      } else if (providerEvent.type === 'read_receipt') {
+        const receipt = {
+          actorId: providerEvent.actor?.id ?? '',
+          ...(providerEvent.timestamp == null ? {} : { timestamp: providerEvent.timestamp }),
+        };
+        const prior = activity.readReceipts.findIndex(item => item.actorId === receipt.actorId);
+        if (prior >= 0) activity.readReceipts[prior] = receipt;
+        else activity.readReceipts.push(receipt);
+      }
+      const updateMessage = (message: ThreadMessage) => {
+        if (message.id !== rowId) return;
+        message.extraMetadata = {
+          ...message.extraMetadata,
+          channelActivity: {
+            reactions: activity.reactions,
+            readReceipts: activity.readReceipts,
+          },
+        };
+      };
+      state.messagesByThreadId[event.thread_id]?.forEach(updateMessage);
+      if (state.selectedThreadId === event.thread_id) state.messages.forEach(updateMessage);
+    },
     /**
      * Dismiss the "couldn't start a new chat" surface (#5156) — the user has
      * seen it and moved on (typed into the composer, navigated away).
