@@ -21,11 +21,7 @@
  */
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
 import { buildBypassJwt, triggerAuthDeepLink, triggerDeepLink } from '../helpers/deep-link-helpers';
-import {
-  hasAppChrome,
-  waitForWebView,
-  waitForWindowVisible,
-} from '../helpers/element-helpers';
+import { hasAppChrome, waitForWebView, waitForWindowVisible } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { waitForHomePage, walkOnboarding } from '../helpers/shared-flows';
 import {

@@ -32,10 +32,7 @@ test.describe('Webhooks ingress surface (stub-level)', () => {
     expect(logs.result.logs).toEqual([]);
     expect(logs.logs[0]).toContain('webhooks.list_logs returned 0');
 
-    let register: {
-      result: { registrations: unknown[] };
-      logs: string[];
-    };
+    let register: { result: { registrations: unknown[] }; logs: string[] };
     try {
       register = await callCoreRpc('openhuman.webhooks_register_echo', {
         tunnel_uuid: tunnelUuid,
@@ -59,13 +56,11 @@ test.describe('Webhooks ingress surface (stub-level)', () => {
     expect(clear.result.cleared).toBe(0);
     expect(clear.logs[0]).toContain('webhooks.clear_logs removed 0');
 
-    const unregister = await callCoreRpc<{
-      result: { registrations: unknown[] };
-      logs: string[];
-    }>('openhuman.webhooks_unregister_echo', { tunnel_uuid: tunnelUuid });
-    expect(unregister.result.registrations).toEqual([]);
-    expect(unregister.logs[0]).toContain(
-      `webhooks.unregister_echo removed tunnel ${tunnelUuid}`
+    const unregister = await callCoreRpc<{ result: { registrations: unknown[] }; logs: string[] }>(
+      'openhuman.webhooks_unregister_echo',
+      { tunnel_uuid: tunnelUuid }
     );
+    expect(unregister.result.registrations).toEqual([]);
+    expect(unregister.logs[0]).toContain(`webhooks.unregister_echo removed tunnel ${tunnelUuid}`);
   });
 });

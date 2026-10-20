@@ -1,11 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 
+import { inFlightThreadKey } from '../helpers/chat-transcript';
 import {
   bootAuthenticatedPage,
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
-import { inFlightThreadKey } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-error-recovery';

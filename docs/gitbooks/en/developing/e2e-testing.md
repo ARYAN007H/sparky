@@ -13,9 +13,9 @@ End-to-end coverage uses the Rust mock backend, Playwright in a real browser, an
 
 Desktop E2E tests use WebDriverIO (WDIO) to drive the app through a single `tauri-driver` (WebDriver) session against its native Wry/WebKit webview:
 
-| Platform  | Driver                         | Port | App format   | Selectors |
-| --------- | ------------------------------ | ---- | ------------ | --------- |
-| Linux     | tauri-driver + WebKitWebDriver | 4444 | Debug binary | CSS / DOM |
+| Platform | Driver                         | Port | App format   | Selectors |
+| -------- | ------------------------------ | ---- | ------------ | --------- |
+| Linux    | tauri-driver + WebKitWebDriver | 4444 | Debug binary | CSS / DOM |
 
 Linux CI drives the debug binary under Xvfb through `tauri-driver`. macOS and Windows have no automated desktop E2E coverage yet. The Chromium-based driver they used is gone, and a native driver (Appium Mac2 on macOS, WinAppDriver on Windows) would have to replace it. `pnpm --filter openhuman-app test:e2e:build` still produces a `.app` bundle on macOS for manual testing, but there is no supported automated session there.
 
@@ -177,11 +177,11 @@ runs on a pull request to `main`.
 on every push to it. Its final gate requires the Playwright matrix, native
 desktop suite and Rust E2E:
 
-| Lane | Job | Platform |
-| --- | --- | --- |
-| Rust mock backend | `rust-e2e` | Linux |
-| Playwright web | `playwright-e2e` | Four Linux jobs, 16 ordinary shards per job plus round-robin special cases |
-| Desktop | `e2e-desktop`, via `e2e-reusable.yml` | Four Linux suite groups |
+| Lane              | Job                                   | Platform                                                                   |
+| ----------------- | ------------------------------------- | -------------------------------------------------------------------------- |
+| Rust mock backend | `rust-e2e`                            | Linux                                                                      |
+| Playwright web    | `playwright-e2e`                      | Four Linux jobs, 16 ordinary shards per job plus round-robin special cases |
+| Desktop           | `e2e-desktop`, via `e2e-reusable.yml` | Four Linux suite groups                                                    |
 
 Playwright builds its web bundle and standalone core once, then uploads the same artifact to all four lanes. Each of the 64 ordinary Playwright shards starts its own core and workspace. The nine isolated cases (Connections aliases, Connections deep links, and seven Skills search/install cases) also each start their own core and workspace. Every lane is required; the scheduler continues through assigned units to collect failures and exits nonzero if any unit fails. The final gate checks the Playwright matrix result. Manual Playwright uses the same artifact and scheduler.
 
@@ -202,13 +202,13 @@ desktop test. Keep shared element actions in
 Five files intentionally exist in both runner directories because each side
 proves a different contract:
 
-| File | Native WDIO assertion | Playwright assertion |
-| --- | --- | --- |
-| `smoke.spec.ts` | Live Wry window, app chrome and normal embedded-core startup | Browser root/chrome, standalone core bootstrap URL/token and RPC |
-| `login-flow.spec.ts` | Desktop window and deep-link token handling, including invalid, expired or bypass cases | Browser callback entry, token/profile outcome, browser bypass and onboarding |
-| `auth-access-control.spec.ts` | Desktop reauthentication and native auth-expiry event delivery | Account/billing/logout/revocation UI and authoritative auth state |
-| `notifications.spec.ts` | OS permission state and real notification plugin calls | Rendered notification title/body and System Events/empty Alerts UI |
-| `settings-data-management.spec.ts` | Reset IPC, user-data wipe and embedded-core restart | Clear-data confirmation and cancellation UI |
+| File                               | Native WDIO assertion                                                                   | Playwright assertion                                                         |
+| ---------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `smoke.spec.ts`                    | Live Wry window, app chrome and normal embedded-core startup                            | Browser root/chrome, standalone core bootstrap URL/token and RPC             |
+| `login-flow.spec.ts`               | Desktop window and deep-link token handling, including invalid, expired or bypass cases | Browser callback entry, token/profile outcome, browser bypass and onboarding |
+| `auth-access-control.spec.ts`      | Desktop reauthentication and native auth-expiry event delivery                          | Account/billing/logout/revocation UI and authoritative auth state            |
+| `notifications.spec.ts`            | OS permission state and real notification plugin calls                                  | Rendered notification title/body and System Events/empty Alerts UI           |
+| `settings-data-management.spec.ts` | Reset IPC, user-data wipe and embedded-core restart                                     | Clear-data confirmation and cancellation UI                                  |
 
 The executable guard `pnpm e2e:ownership:check` rejects every other duplicate,
 stale exception or missing file. Before adding a spec, decide which runtime owns
