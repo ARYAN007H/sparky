@@ -284,12 +284,14 @@ pub async fn ai_save_artifact_version(
     config: &Config,
     artifact_id: &str,
     body: &str,
+    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<Outcome<Value>, String> {
     let saved = super::tiny_store::save_operator_version(
         &config.workspace_dir,
         super::files::FileRoots::from_config(config),
         artifact_id,
         body,
+        ctx,
     )
     .await?;
     log::debug!(
@@ -312,6 +314,7 @@ pub async fn ai_share_artifact(
     artifact_id: &str,
     version: Option<u32>,
     public: bool,
+    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<Outcome<Value>, String> {
     let publisher = super::artifact_publisher(config)
         .ok_or_else(|| "sign in to share artifacts".to_string())?;
@@ -320,6 +323,7 @@ pub async fn ai_share_artifact(
         super::files::FileRoots::from_config(config),
         None,
         None,
+        ctx,
     )
     .with_publisher(publisher);
     let options = tiny_artifacts::PublishOptions {
