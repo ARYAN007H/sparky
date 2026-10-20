@@ -64,6 +64,8 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
             .with_thread(thread_id),
         host,
     );
+    let detached = crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
+        .expect("detached parent");
     let accepted = crate::core::runtime::CoreContext::scope(
         Arc::clone(&core),
         Box::pin(
@@ -76,8 +78,7 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
                 }),
                 None,
                 live.data.child(),
-                crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
-                    .expect("detached parent"),
+                detached.clone(),
             ),
         ),
     )
@@ -92,8 +93,6 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .and_then(|value| value["task_id"].as_str().map(str::to_owned))
         .expect("accepted child includes its task ID");
-    let detached = crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
-        .expect("detached parent");
     let lifecycle_key = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
         &detached,
         task_id.clone(),

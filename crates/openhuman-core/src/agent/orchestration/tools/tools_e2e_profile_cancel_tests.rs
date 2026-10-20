@@ -125,7 +125,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
                 }),
                 None,
                 live.data.child(),
-                detached,
+                detached.clone(),
             ),
     )
     .await
@@ -139,6 +139,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .and_then(|value| value["task_id"].as_str().map(str::to_owned))
         .expect("accepted child includes public task ID");
+    let lifecycle_key = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
+        &detached,
+        task_id.clone(),
+        None,
+    );
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
         .expect("child reached the scripted provider gate")
@@ -152,20 +157,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         "shared-profile-parent-session",
         Some(thread_id),
     );
-    let parent_scope = tinyagents_orchestration::subagent::ParentJobScope::new(
-        tinytools::WorkspaceDescriptor::new(&workspace),
-        thread_id,
-    );
+    let alice_job_id = alice_jobs
+        .driver_job_for_key(&lifecycle_key, &alice_owner)
+        .expect("Alice owns a live child job for this lifecycle key");
     let alice_job = alice_jobs
-        .list_for_parent_scope(&alice_owner, &parent_scope)
-        .expect("read Alice's owner-scoped driver jobs")
-        .into_iter()
-        .find(|job| {
-            job.extensions
-                .get("task_id")
-                .and_then(serde_json::Value::as_str)
-                == Some(task_id.as_str())
-        })
+        .get(alice_job_id.as_str())
         .expect("real child is registered in Alice's scoped driver registry");
     assert_eq!(alice_job.status, SubAgentJobStatus::Running);
 
