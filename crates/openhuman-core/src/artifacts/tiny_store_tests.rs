@@ -265,7 +265,7 @@ impl tiny_artifacts::ArtifactPublisher for NoopPublisher {
 #[test]
 fn share_artifact_is_offered_only_with_a_publisher() {
     let (workspace, files) = temp_dirs();
-    let names = |publisher: Option<std::sync::Arc<dyn tiny_artifacts::ArtifactPublisher>>| {
+    let names = |publisher: Option<super::super::publisher_slot::ArtifactPublisherBinder>| {
         registered_tools(&workspace, FileRoots::new(&files), &workspace, publisher)
             .iter()
             .map(|t| t.name().to_string())
@@ -277,7 +277,9 @@ fn share_artifact_is_offered_only_with_a_publisher() {
         "{without:?}"
     );
     assert!(without.contains(&"delete_artifact".to_string()));
-    let with = names(Some(std::sync::Arc::new(NoopPublisher)));
+    let binder: super::super::publisher_slot::ArtifactPublisherBinder =
+        std::sync::Arc::new(|_files| std::sync::Arc::new(NoopPublisher));
+    let with = names(Some(binder));
     assert!(with.contains(&"share_artifact".to_string()), "{with:?}");
 }
 

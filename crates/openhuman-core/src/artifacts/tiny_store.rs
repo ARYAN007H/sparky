@@ -466,7 +466,7 @@ pub fn registered_tools(
     workspace_dir: &Path,
     files: FileRoots,
     action_dir: &Path,
-    publisher: Option<Arc<dyn tiny_artifacts::ArtifactPublisher>>,
+    publisher: Option<super::publisher_slot::ArtifactPublisherBinder>,
 ) -> Vec<Box<dyn tinytools::Tool>> {
     let can_publish = publisher.is_some();
     let service = {
