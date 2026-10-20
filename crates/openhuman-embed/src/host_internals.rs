@@ -293,8 +293,8 @@ pub mod tool_sources {
 /// The artifact publisher slot: the service that shares an artifact version.
 pub mod artifact_publisher {
     pub use openhuman_core::artifacts::{
-        ArtifactPublisherFactory, register_artifact_publisher, register_artifact_publisher_in,
-        unregister_artifact_publisher,
+        ArtifactPublisherBinder, ArtifactPublisherFactory, register_artifact_publisher,
+        register_artifact_publisher_in, unregister_artifact_publisher,
     };
     // tinyhumans file-storage publisher: the protected-path guard it re-checks
     // before upload, and the store its tests save artifacts into.

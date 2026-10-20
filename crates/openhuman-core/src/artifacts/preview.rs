@@ -51,14 +51,13 @@ pub async fn read_body(
     ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<ArtifactBody, String> {
     let files = super::files::FileRoots::from_config(config);
-    let artifacts = super::tiny_store::artifacts_service(
+    let (artifacts, file_store) = super::tiny_store::artifacts_service_with_file_store(
         &config.workspace_dir,
         files.clone(),
         Some(&config.action_dir),
         None,
         ctx,
     );
-    let file_store = super::tiny_store::file_store_for(&config.workspace_dir, ctx);
     let versioned = artifacts.get(id).await.map_err(|e| e.to_string())?;
     let record = match versioned {
         Some(record) => record,

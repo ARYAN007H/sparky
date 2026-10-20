@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use tiny_artifacts::{ArtifactKind, Artifacts, Author, Content};
 
 use super::files::FileRoots;
-use super::tiny_store::{artifacts_service, legacy_kind_for_extension};
+use super::tiny_store::legacy_kind_for_extension;
 use super::types::ArtifactKind as LegacyArtifactKind;
 use crate::security::approval::ApprovalChatContext;
 
@@ -37,7 +37,6 @@ pub struct Production {
     workspace_dir: PathBuf,
     files: FileRoots,
     chat: Option<ApprovalChatContext>,
-    ctx: crate::core::runtime::DispatchCtx,
     file_store: Option<std::sync::Arc<dyn tiny_artifacts::FileStore>>,
     id: String,
     path: PathBuf,
@@ -133,7 +132,6 @@ impl Production {
             workspace_dir: workspace_dir.to_path_buf(),
             files,
             chat: chat.cloned(),
-            ctx: ctx.clone(),
             file_store,
             id: meta.id.clone(),
             path,
