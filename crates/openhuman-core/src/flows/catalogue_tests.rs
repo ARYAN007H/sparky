@@ -211,11 +211,19 @@ fn entries_are_sorted_by_name_so_the_prompt_prefix_is_stable() {
     // unrelated to the conversation.
     let tmp = TempDir::new().unwrap();
     let config = store_config(&tmp);
+    let graph = WorkflowGraph {
+        nodes: vec![node(
+            "trigger",
+            NodeKind::Trigger,
+            serde_json::json!({ "trigger_kind": "manual" }),
+        )],
+        ..Default::default()
+    };
     for name in ["Zebra", "Alpha", "Mango"] {
         super::super::store::create_flow(
             &config,
             name.to_string(),
-            WorkflowGraph::default(),
+            graph.clone(),
             false,
             true,
         )
