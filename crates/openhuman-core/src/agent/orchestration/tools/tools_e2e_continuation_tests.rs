@@ -217,8 +217,7 @@ fn core_backed_live_parent(
     parent: crate::agent::harness::ParentExecutionContext,
     session_id: &str,
     thread_id: &str,
-) -> tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>
-{
+) -> tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext> {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
 
@@ -317,7 +316,12 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         .nth(1)
         .and_then(|value| value.split("\n[/async_subagent_ref]").next())
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
-        .unwrap_or_else(|| panic!("accepted envelope carries task reference: {}", paused.output()));
+        .unwrap_or_else(|| {
+            panic!(
+                "accepted envelope carries task reference: {}",
+                paused.output()
+            )
+        });
     let task_id = paused_ref["task_id"]
         .as_str()
         .expect("accepted task id")
@@ -400,6 +404,20 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
             .cloned()
     };
     assert_eq!(response_field(&cancelled, "cancelled"), Some(json!(true)));
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    task_id: event_task_id,
+                    ..
+                }) if event_task_id == task_id => break,
+                Some(_) => {}
+                None => panic!("parent progress stream closed before cancellation settled"),
+            }
+        }
+    })
+    .await
+    .expect("failure projection follows cancelled child settlement");
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert!(matches!(
         jobs.get(paused_job.id.as_str())
@@ -435,8 +453,8 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         )),
         repeated_params,
     )
-        .await
-        .expect("repeated cancel RPC result");
+    .await
+    .expect("repeated cancel RPC result");
     assert_eq!(response_field(&repeated, "cancelled"), Some(json!(false)));
     assert_eq!(response_field(&repeated, "outcome"), Some(json!("unknown")));
     forget_workspace_for_test(workspace.path());
