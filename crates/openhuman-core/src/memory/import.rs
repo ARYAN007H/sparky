@@ -111,7 +111,7 @@ pub async fn scan(
     let counts = ctx
         .spawn_blocking(move || tinymemory_integrations::import::count_legacy(&workspace_dir))
         .await
-    .map_err(|error| Error::Engine(format!("import scan failed: {error}")))?;
+        .map_err(|error| Error::Engine(format!("import scan failed: {error}")))?;
     let counts = counts.map(|counts: LegacyImportCounts| ImportCounts {
         documents: counts.documents,
         conversations: counts.conversations,
