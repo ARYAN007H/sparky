@@ -368,6 +368,16 @@ async fn migrate_owner_stores(
     let mut reports = Vec::new();
 
     for scope in scopes {
+        // A module's own scope (`.../module:<id>`) holds that module's
+        // documents; the catalog and schedule owners never live there, so
+        // migrating them in it would leave their markers behind and make a
+        // second import change the database.
+        if matches!(
+            scope.parsed().map(|parsed| parsed.principal),
+            Ok(Some(tinystoragedrivers::scope::Principal::Module(_)))
+        ) {
+            continue;
+        }
         #[cfg(feature = "flows")]
         {
             let catalog = migrate_catalog_storage(&backend, &config, &scope).await;
