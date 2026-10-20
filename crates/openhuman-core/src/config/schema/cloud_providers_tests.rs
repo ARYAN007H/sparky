@@ -116,8 +116,12 @@ fn is_builtin_cloud_slug_matches_presets_only() {
 }
 
 #[test]
-fn only_openai_builtin_exposes_responses_api() {
+fn builtin_responses_capabilities_follow_provider_catalog() {
     assert!(builtin_cloud_supports_responses_api("openai"));
+    // The merged provider catalog documents these OpenAI-compatible gateways
+    // as supporting /responses too. Preserve that upstream protocol contract.
+    assert!(builtin_cloud_supports_responses_api("openrouter"));
+    assert!(builtin_cloud_supports_responses_api("xai"));
     for slug in ["deepseek", "groq", "mistral", "fireworks", "together"] {
         assert!(
             !builtin_cloud_supports_responses_api(slug),
