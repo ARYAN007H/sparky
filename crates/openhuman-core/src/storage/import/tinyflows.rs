@@ -81,7 +81,11 @@ pub(super) fn marked(
                 skipped,
                 "[storage::import] legacy records were skipped; the import stays open for retry"
             );
-            return Ok(Outcome::Imported { found, written });
+            return Ok(Outcome::Incomplete {
+                found,
+                written,
+                skipped,
+            });
         }
         import_state::set_done(&markers, MARKER_OWNER, &step)?;
         Ok(Outcome::Imported { found, written })
@@ -298,6 +302,18 @@ pub(super) fn finish(domain: &'static str, outcome: Result<Outcome>) -> Report {
             found,
             written,
             "[storage::import] imported the legacy store; the files were not modified"
+        ),
+        Ok(Outcome::Incomplete {
+            found,
+            written,
+            skipped,
+        }) => tracing::warn!(
+            target: "openhuman::storage_import",
+            domain,
+            found,
+            written,
+            skipped,
+            "[storage::import] some legacy records were skipped; the import remains open for retry"
         ),
         Ok(Outcome::AlreadyDone) => tracing::debug!(
             target: "openhuman::storage_import",
