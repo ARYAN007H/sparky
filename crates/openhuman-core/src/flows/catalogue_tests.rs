@@ -220,14 +220,8 @@ fn entries_are_sorted_by_name_so_the_prompt_prefix_is_stable() {
         ..Default::default()
     };
     for name in ["Zebra", "Alpha", "Mango"] {
-        super::super::store::create_flow(
-            &config,
-            name.to_string(),
-            graph.clone(),
-            false,
-            true,
-        )
-        .expect("flow saves");
+        super::super::store::create_flow(&config, name.to_string(), graph.clone(), false, true)
+            .expect("flow saves");
     }
     let names: Vec<String> = flow_entries(&config).into_iter().map(|e| e.name).collect();
     assert_eq!(names, vec!["Alpha", "Mango", "Zebra"]);
