@@ -388,7 +388,10 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         )
         .await
         .unwrap();
-    assert!(matches!(delete, CatalogStorageReply::Value { .. }));
+    assert!(matches!(
+        delete,
+        CatalogStorageReply::Value { ref value } if value == &json!(2)
+    ));
     let foreign = first
         .documents()
         .get("graph.threads", "other/bob-thread")
@@ -398,6 +401,23 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         foreign.is_some(),
         "flow deletion leaves the other namespace intact"
     );
+
+    let reinserted: CatalogStorageReply = proxy
+        .call(
+            catalog::storage::PUT,
+            &(DocPutRequest {
+                collection: "graph.threads".into(),
+                id: "flows/delete-me".into(),
+                doc: json!({"ns":"flows","thread":"delete-me","next":1}),
+                precondition: CatalogDocumentPrecondition::Absent,
+                schema: 0,
+                expires_ms: None,
+                created_ms: None,
+            },),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(reinserted, CatalogStorageReply::Value { .. }));
 
     let forbidden_get: CatalogStorageReply = proxy
         .call(
