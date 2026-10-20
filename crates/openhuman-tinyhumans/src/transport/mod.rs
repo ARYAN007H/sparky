@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::memory::{CallbackBearerSource, MemoryError};
 use openhuman_embed::__host::memory_engines::BearerSource;
 use openhuman_embed::__host::security::credentials::session_support::{
