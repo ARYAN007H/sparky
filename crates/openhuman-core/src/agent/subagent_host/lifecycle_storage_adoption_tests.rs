@@ -205,7 +205,7 @@ async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
     };
     let mut definition = crate::agent_registry::host_definition::AgentDefinition::default();
     definition.id = "same-agent".into();
-    definition.system_prompt = crate::agent_registry::host_definition::PromptSource::Inline(
+    definition.system_prompt = tinyagents_definition::PromptSource::Inline(
         "You are a test worker.".into(),
     );
     definition.max_iterations = 2;
