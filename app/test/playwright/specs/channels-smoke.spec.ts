@@ -35,10 +35,9 @@ async function telegramConnected(): Promise<boolean> {
       (entry.auth_mode ?? entry.authMode) === 'bot_token'
   );
   expect(telegram, 'channels_status includes Telegram').toBeDefined();
-  expect(typeof telegram?.connected, 'Telegram status includes a boolean connected field').toBe(
-    'boolean'
-  );
-  return telegram!.connected;
+  const connected = telegram?.connected;
+  expect(typeof connected, 'Telegram status includes a boolean connected field').toBe('boolean');
+  return connected as boolean;
 }
 
 test.describe('Channels Smoke', () => {
