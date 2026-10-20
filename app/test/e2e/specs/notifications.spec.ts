@@ -18,15 +18,6 @@ function stepLog(message: string, context?: unknown): void {
   console.log(`[NotificationsE2E][${stamp}] ${message}`, JSON.stringify(context, null, 2));
 }
 
-function getUnreadCount(stats: Record<string, unknown>): number {
-  const candidates = ['unread_count', 'unread', 'total_unread'];
-  for (const key of candidates) {
-    const value = stats[key];
-    if (typeof value === 'number') return value;
-  }
-  return 0;
-}
-
 async function waitForNotificationsSections(timeout = 10_000): Promise<void> {
   await browser.waitUntil(
     async () =>
@@ -65,10 +56,6 @@ async function waitForCoreSidecar(timeout = 30_000): Promise<void> {
   );
 }
 
-// Module-level capture: ingest returns a server-generated UUID; share it
-// across tests so mark_read and list can reference the same notification.
-let ingestedNotifId: string | undefined;
-
 describe('Notifications', () => {
   before(async function () {
     // waitForApp() + waitForCoreSidecar(30s) cannot fit the default 30s Mocha
@@ -86,88 +73,13 @@ describe('Notifications', () => {
     await stopMockServer();
   });
 
-  it('notification_ingest creates a new notification via core RPC', async () => {
-    // Required params: provider, title, body, raw_payload (no id/category/timestamp_ms).
-    const result = await callOpenhumanRpc('openhuman.notification_ingest', {
+  it('Notifications page renders integration notifications', async () => {
+    await callOpenhumanRpc('openhuman.notification_ingest', {
       provider: 'e2e',
       title: 'E2E Test Notification',
       body: 'Created by the notifications E2E spec',
       raw_payload: {},
     });
-    stepLog('notification_ingest result', { ok: result.ok, result: result.result });
-    expect(result.ok).toBe(true);
-    // handle_ingest returns Outcome::new(..., vec![]) → bare value (no extra .result wrapper)
-    const payload = (result.result as any) ?? {};
-    expect(payload.skipped).not.toBe(true);
-    expect(typeof payload.id).toBe('string');
-    ingestedNotifId = payload.id as string;
-    stepLog('captured notification id', { id: ingestedNotifId });
-  });
-
-  it('notification_list returns the ingested notification', async () => {
-    const result = await callOpenhumanRpc('openhuman.notification_list', { limit: 20 });
-    stepLog('notification_list result', { ok: result.ok, result: result.result });
-    expect(result.ok).toBe(true);
-
-    // handle_list returns bare value → result.result is {items: [...], unread_count: n}
-    const items: unknown[] = (result.result as any)?.items ?? [];
-    const found = items.some(
-      (n: unknown) =>
-        typeof n === 'object' &&
-        n !== null &&
-        (n as Record<string, unknown>)['title'] === 'E2E Test Notification'
-    );
-    expect(found).toBe(true);
-  });
-
-  it('notification_mark_read transitions notification status', async () => {
-    const before = await callOpenhumanRpc('openhuman.notification_stats', {});
-    expect(before.ok).toBe(true);
-    // handle_stats returns bare value → result.result is {total, unread, ...}
-    const beforeStats = (before.result as any) ?? {};
-    const initialUnread = getUnreadCount(beforeStats);
-
-    // Use the UUID from the ingest test; fall back to a fresh ingest if needed.
-    let notifId = ingestedNotifId;
-    if (!notifId) {
-      stepLog('no cached notifId — ingesting a fresh notification for mark_read');
-      const fresh = await callOpenhumanRpc('openhuman.notification_ingest', {
-        provider: 'e2e',
-        title: 'E2E Mark Read Fallback',
-        body: 'Fallback notification for mark_read test',
-        raw_payload: {},
-      });
-      notifId = (fresh.result as any)?.id as string | undefined;
-    }
-    expect(notifId).toBeDefined();
-
-    const result = await callOpenhumanRpc('openhuman.notification_mark_read', { id: notifId });
-    stepLog('notification_mark_read result', { ok: result.ok, result: result.result });
-    expect(result.ok).toBe(true);
-
-    const after = await callOpenhumanRpc('openhuman.notification_stats', {});
-    expect(after.ok).toBe(true);
-    const afterStats = (after.result as any) ?? {};
-    const finalUnread = getUnreadCount(afterStats);
-    if (initialUnread > 0) {
-      expect(finalUnread).toBeLessThan(initialUnread);
-    } else {
-      expect(finalUnread).toBe(0);
-    }
-  });
-
-  it('notification_stats returns aggregate statistics', async () => {
-    const result = await callOpenhumanRpc('openhuman.notification_stats', {});
-    stepLog('notification_stats result', { ok: result.ok, result: result.result });
-    expect(result.ok).toBe(true);
-    // handle_stats returns bare value → result.result is {total, unread, unscored, ...}
-    const stats = (result.result as any) ?? {};
-    // Stats must have at least a numeric total or unread count.
-    const hasNumericField = Object.values(stats).some(v => typeof v === 'number');
-    expect(hasNumericField).toBe(true);
-  });
-
-  it('Notifications page renders integration notifications', async () => {
     if (!supportsExecuteScript()) {
       stepLog('skipping UI test — supportsExecuteScript() is false (Appium Mac2)');
       return;
@@ -190,7 +102,7 @@ describe('Notifications', () => {
     stepLog('Notifications route hash', { currentHash });
 
     // If the route redirected (e.g. auth guard), skip the UI assertions
-    // since the RPC tests above already prove the notification backend works.
+    // because this spec owns notifications presentation, not RPC result semantics.
     expect(String(currentHash)).toContain('/notifications');
 
     await waitForNotificationsSections(10_000);

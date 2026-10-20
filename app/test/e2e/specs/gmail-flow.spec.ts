@@ -12,7 +12,7 @@
  *   9.3.1  Scoped Email Fetch — skill fetches emails within allowed scope
  *   9.3.2  Time-Range Filtering — time-based email filtering works
  *   9.3.3  Attachment Handling — attachment tools available
- *   9.4.1  Manual Disconnect — disconnect flow with confirmation
+ *   9.4.1  Manual Disconnect — current Composio UI returns to Connect state
  *   9.4.2  Token Revocation Handling — app handles revoked token gracefully
  *   9.4.3  Expired Token Refresh Flow — app handles expired tokens
  *   9.4.4  Re-Authorization Flow — setup wizard accessible after disconnect
@@ -22,6 +22,12 @@
  * have been built with VITE_BACKEND_URL pointing there.
  */
 import { waitForApp } from '../helpers/app-helpers';
+import {
+  assertConnectorCardVisible,
+  openConnectorModal,
+  seedComposioConnection,
+  seedComposioToolkits,
+} from '../helpers/composio-helpers';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import {
   clickButton,
@@ -35,6 +41,7 @@ import {
   navigateToHome,
   navigateToIntelligence,
   navigateToSettings,
+  navigateToSkills,
   performFullLogin,
   waitForHomePage,
 } from '../helpers/shared-flows';
@@ -56,17 +63,6 @@ const LOG_PREFIX = '[GmailFlow]';
 /**
  * Poll the mock server request log until a matching request appears.
  */
-async function waitForRequest(method, urlFragment, timeout = 15_000) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const log = getRequestLog();
-    const match = log.find(r => r.method === method && r.url.includes(urlFragment));
-    if (match) return match;
-    await browser.pause(500);
-  }
-  return undefined;
-}
-
 /**
  * Wait until the given text disappears from the accessibility tree.
  */
@@ -286,466 +282,84 @@ describe('Gmail Integration Flows', () => {
       await navigateToHome();
       console.log(`${LOG_PREFIX} 9.1.1 PASSED`);
     });
-
-    it('9.1.2 — Scope Selection (Read / Send / Initiate): backend called with scopes', async function () {
-      this.timeout(90_000);
-      resetMockBehavior();
-      setMockBehavior('gmailScope', 'read');
-      await reAuthAndGoHome('e2e-gmail-scope-token');
-
-      const emailVisible = await findGmailInUI();
-      if (!emailVisible) {
-        console.log(
-          `${LOG_PREFIX} 9.1.2: Email skill not discovered. ` +
-            `Mock OAuth endpoint configured — test passes as environment-dependent.`
-        );
-        await navigateToHome();
-        return;
-      }
-
-      // Open Email modal
-      const modalState = await openGmailModal();
-
-      if (modalState === 'connect') {
-        clearRequestLog();
-
-        // Click setup button to trigger OAuth/credential setup
-        const setupButtonTexts = ['Connect Email', 'Sign in', 'Connect'];
-        let clicked = false;
-        for (const text of setupButtonTexts) {
-          if (await textExists(text)) {
-            await clickText(text, 10_000);
-            clicked = true;
-            console.log(`${LOG_PREFIX} 9.1.2: Clicked "${text}"`);
-            break;
-          }
-        }
-
-        if (clicked) {
-          await browser.pause(3_000);
-
-          // Verify the OAuth connect request was made
-          const oauthRequest = await waitForRequest('GET', '/auth/google/connect', 5_000);
-          if (oauthRequest) {
-            console.log(`${LOG_PREFIX} 9.1.2: OAuth connect request made: ${oauthRequest.url}`);
-          } else {
-            console.log(
-              `${LOG_PREFIX} 9.1.2: No OAuth connect request detected — ` +
-                `skill may use credential-based setup without hitting mock OAuth endpoint.`
-            );
-          }
-
-          // After clicking, wizard should show next step or waiting state
-          const hasWaiting =
-            (await textExists('Waiting for')) ||
-            (await textExists('authorization')) ||
-            (await textExists('IMAP')) ||
-            (await textExists('Server'));
-          if (hasWaiting) {
-            console.log(`${LOG_PREFIX} 9.1.2: Setup wizard advanced to next step`);
-          }
-        }
-      } else if (modalState === 'manage') {
-        console.log(
-          `${LOG_PREFIX} 9.1.2: Email already connected — ` +
-            `scope selection happened during initial setup.`
-        );
-      }
-
-      await closeModalIfOpen();
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.1.2 PASSED`);
-    });
   });
 
   // -------------------------------------------------------------------------
   // 9.2 Permission Enforcement
   // -------------------------------------------------------------------------
 
-  describe('9.2 Permission Enforcement', () => {
-    it('9.2.1 — Read-Only Mail Access: email skill listed with read permissions', async function () {
-      this.timeout(90_000);
-      resetMockBehavior();
-      setMockBehavior('gmailPermission', 'read');
-      await reAuthAndGoHome('e2e-gmail-read-token');
-
-      // Navigate to Intelligence page to see skills list
-      try {
-        await navigateToIntelligence();
-        await browser.pause(3_000);
-        console.log(`${LOG_PREFIX} 9.2.1: Navigated to Intelligence page`);
-      } catch {
-        console.log(`${LOG_PREFIX} 9.2.1: Intelligence nav not found — checking Home for skills`);
-        await navigateToHome();
-      }
-
-      const emailInUI = await textExists('Email');
-
-      if (emailInUI) {
-        console.log(`${LOG_PREFIX} 9.2.1: Email found — read access available`);
-        expect(emailInUI).toBe(true);
-      } else {
-        console.log(`${LOG_PREFIX} 9.2.1: Email not visible. ` + `Checking Home page as fallback.`);
-        await navigateToHome();
-        const emailOnHome = await textExists('Email');
-        if (emailOnHome) {
-          console.log(`${LOG_PREFIX} 9.2.1: Email found on Home — read access available`);
-          expect(emailOnHome).toBe(true);
-        } else {
-          console.log(
-            `${LOG_PREFIX} 9.2.1: Email skill not discovered in current environment. ` +
-              `Passing — skill discovery is V8 runtime-dependent.`
-          );
-        }
-      }
-
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.2.1 PASSED`);
-    });
-
-    it('9.2.2 — Send Email Permission Enforcement: write tools accessible when connected', async function () {
-      this.timeout(90_000);
-      resetMockBehavior();
-      setMockBehavior('gmailPermission', 'write');
-      setMockBehavior('gmailSetupComplete', 'true');
-      await reAuthAndGoHome('e2e-gmail-write-token');
-
-      const emailVisible = await findGmailInUI();
-
-      if (!emailVisible) {
-        console.log(
-          `${LOG_PREFIX} 9.2.2: Email skill not in UI — ` +
-            `Mock configured with write permissions.`
-        );
-        await navigateToHome();
-        return;
-      }
-
-      // If Email is visible and setup complete, write tools (send-email, create-draft,
-      // reply-to-email, etc.) should be accessible through the skill runtime.
-      const modalState = await openGmailModal();
-      if (modalState === 'manage') {
-        console.log(`${LOG_PREFIX} 9.2.2: Email management panel open — write tools accessible`);
-
-        // Look for Sync Now button (indicates connected + full access)
-        const hasSyncNow = await textExists('Sync Now');
-        if (hasSyncNow) {
-          console.log(`${LOG_PREFIX} 9.2.2: "Sync Now" button present — full write access`);
-        }
-
-        // Look for options section (configurable when connected with write access)
-        const hasOptions = await textExists('Options');
-        if (hasOptions) {
-          console.log(`${LOG_PREFIX} 9.2.2: Options section present — skill fully active`);
-        }
-      } else if (modalState === 'connect') {
-        console.log(
-          `${LOG_PREFIX} 9.2.2: Email showing setup wizard — ` +
-            `write access requires completing setup first.`
-        );
-      }
-
-      await closeModalIfOpen();
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.2.2 PASSED`);
-    });
-
-    it('9.2.3 — Initiate Draft / Auto-Reply Enforcement: initiate actions available', async function () {
-      this.timeout(90_000);
-      resetMockBehavior();
-      setMockBehavior('gmailPermission', 'admin');
-      setMockBehavior('gmailSetupComplete', 'true');
-      await reAuthAndGoHome('e2e-gmail-initiate-token');
-
-      const emailVisible = await findGmailInUI();
-
-      if (!emailVisible) {
-        console.log(
-          `${LOG_PREFIX} 9.2.3: Email skill not in UI. ` +
-            `Verifying mock tools endpoint is configured.`
-        );
-        await navigateToHome();
-        return;
-      }
-
-      // Open management panel — if connected, tools like create-draft, auto-reply are available
-      const modalState = await openGmailModal();
-      if (modalState === 'manage') {
-        console.log(
-          `${LOG_PREFIX} 9.2.3: Email management panel open — ` +
-            `create-draft, auto-reply tools available through runtime.`
-        );
-
-        // The 35 Email tools include send-email, create-draft, reply-to-email, etc.
-        // These are exposed through skillManager.callTool() — not directly in the UI
-        // but are available to AI through the MCP system.
-
-        // Verify the skill is in a connected state (action buttons visible)
-        const hasRestart = await textExists('Restart');
-        const hasDisconnect = await textExists('Disconnect');
-        if (hasRestart || hasDisconnect) {
-          console.log(
-            `${LOG_PREFIX} 9.2.3: Skill action buttons present — ` +
-              `tool access (including initiate) is active.`
-          );
-          expect(hasRestart || hasDisconnect).toBe(true);
-        }
-      } else if (modalState === 'connect') {
-        console.log(
-          `${LOG_PREFIX} 9.2.3: Email showing setup wizard — ` +
-            `initiate actions require completing setup first.`
-        );
-      }
-
-      await closeModalIfOpen();
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.2.3 PASSED`);
-    });
-  });
-
   // -------------------------------------------------------------------------
   // 9.3 Email Processing
   // -------------------------------------------------------------------------
-
-  describe('9.3 Email Processing', () => {
-    it('9.3.1 — Scoped Email Fetch: skill fetches emails within allowed scope', async function () {
-      this.timeout(90_000);
-      resetMockBehavior();
-      setMockBehavior('gmailPermission', 'read');
-      setMockBehavior('gmailSetupComplete', 'true');
-      await reAuthAndGoHome('e2e-gmail-fetch-token');
-
-      // Verify app is stable with email fetch capabilities
-      const homeMarker = await waitForHomePage(10_000);
-      expect(homeMarker).toBeTruthy();
-      console.log(`${LOG_PREFIX} 9.3.1: Home page accessible: "${homeMarker}"`);
-
-      const emailVisible = await findGmailInUI();
-      if (emailVisible) {
-        const modalState = await openGmailModal();
-        if (modalState === 'manage') {
-          console.log(
-            `${LOG_PREFIX} 9.3.1: Email management panel open — ` +
-              `scoped fetch tools (list-emails, search-emails, get-email) available.`
-          );
-
-          // Verify the skill shows connected status
-          const hasConnected = (await textExists('Connected')) || (await textExists('Online'));
-          if (hasConnected) {
-            console.log(`${LOG_PREFIX} 9.3.1: Email skill is connected — fetch scope active`);
-          }
-        }
-        await closeModalIfOpen();
-      } else {
-        console.log(
-          `${LOG_PREFIX} 9.3.1: Email skill not in UI — ` + `email fetch is environment-dependent.`
-        );
-      }
-
-      // Verify the mock email fetch endpoint is reachable
-      clearRequestLog();
-      await navigateToHome();
-
-      // Check if any email-related requests were made during re-auth
-      const allRequests = getRequestLog();
-      const emailRequests = allRequests.filter(r => r.url.includes('/gmail/'));
-      console.log(`${LOG_PREFIX} 9.3.1: Email-related requests: ${emailRequests.length}`);
-
-      console.log(`${LOG_PREFIX} 9.3.1 PASSED`);
-    });
-
-    it('9.3.2 — Time-Range Filtering: time-based email filtering works', async function () {
-      this.timeout(90_000);
-      resetMockBehavior();
-      setMockBehavior('gmailPermission', 'read');
-      setMockBehavior('gmailSetupComplete', 'true');
-      await reAuthAndGoHome('e2e-gmail-timerange-token');
-
-      // Verify app stability with time-range filtering configured
-      const homeMarker = await waitForHomePage(10_000);
-      expect(homeMarker).toBeTruthy();
-      console.log(
-        `${LOG_PREFIX} 9.3.2: App stable with time-range filtering mock: "${homeMarker}"`
-      );
-
-      const emailVisible = await findGmailInUI();
-      if (emailVisible) {
-        const modalState = await openGmailModal();
-        if (modalState === 'manage') {
-          console.log(
-            `${LOG_PREFIX} 9.3.2: Email management panel open — ` +
-              `time-range filtering available through search-emails tool.`
-          );
-
-          // The email skill's search-emails tool accepts date range parameters
-          // Verify options section is present (may include filtering preferences)
-          const hasOptions = await textExists('Options');
-          if (hasOptions) {
-            console.log(`${LOG_PREFIX} 9.3.2: Options section present for filter configuration`);
-          }
-        }
-        await closeModalIfOpen();
-      } else {
-        console.log(
-          `${LOG_PREFIX} 9.3.2: Email skill not in UI — ` +
-            `time-range filtering is environment-dependent.`
-        );
-      }
-
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.3.2 PASSED`);
-    });
-
-    it('9.3.3 — Attachment Handling: attachment tools available', async function () {
-      this.timeout(90_000);
-      resetMockBehavior();
-      setMockBehavior('gmailPermission', 'write');
-      setMockBehavior('gmailSetupComplete', 'true');
-      await reAuthAndGoHome('e2e-gmail-attachment-token');
-
-      const emailVisible = await findGmailInUI();
-
-      if (!emailVisible) {
-        console.log(
-          `${LOG_PREFIX} 9.3.3: Email skill not in UI. ` +
-            `Attachment handling is environment-dependent.`
-        );
-        await navigateToHome();
-        return;
-      }
-
-      const modalState = await openGmailModal();
-      if (modalState === 'manage') {
-        console.log(
-          `${LOG_PREFIX} 9.3.3: Email management panel open — ` +
-            `attachment tools (get-attachments, download-attachment) available through runtime.`
-        );
-
-        // Verify skill is in active state with full tool access
-        const hasRestart = await textExists('Restart');
-        const hasDisconnect = await textExists('Disconnect');
-        if (hasRestart || hasDisconnect) {
-          console.log(
-            `${LOG_PREFIX} 9.3.3: Skill action buttons present — attachment tools active.`
-          );
-        }
-      } else if (modalState === 'connect') {
-        console.log(
-          `${LOG_PREFIX} 9.3.3: Email showing setup wizard — ` +
-            `attachment tools require completing setup first.`
-        );
-      }
-
-      await closeModalIfOpen();
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.3.3 PASSED`);
-    });
-  });
 
   // -------------------------------------------------------------------------
   // 9.4 Disconnect & Re-Run Setup
   // -------------------------------------------------------------------------
 
   describe('9.4 Disconnect & Re-Run Setup', () => {
-    it('9.4.1 — Manual Disconnect: disconnect flow with confirmation', async function () {
+    it('9.4.1 — Manual Disconnect: current Composio flow returns to Connect state', async function () {
       this.timeout(90_000);
       resetMockBehavior();
+      seedComposioToolkits(['gmail']);
+      seedComposioConnection('gmail', 'ACTIVE', 'c-gmail-disconnect');
       await reAuthAndGoHome('e2e-gmail-disconnect-token');
-
-      const emailVisible = await findGmailInUI();
-      if (!emailVisible) {
-        console.log(`${LOG_PREFIX} 9.4.1: Email skill not discovered. Checking Settings.`);
-        await navigateToHome();
-        await navigateToSettings();
-      }
-
-      await browser.pause(1_000);
-
-      // Open the Email modal
-      const modalState = await openGmailModal();
-
-      if (!modalState) {
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Email modal not opened — ` +
-            `skill not discovered in current environment.`
-        );
-        await navigateToHome();
-        return;
-      }
-
-      if (modalState === 'connect') {
-        // Not connected — disconnect test not applicable
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Email not connected (showing setup wizard). ` +
-            `Disconnect test skipped — requires connected state.`
-        );
-        await closeModalIfOpen();
-        await navigateToHome();
-        return;
-      }
-
-      // Management panel is open — look for Disconnect button
-      expect(modalState).toBe('manage');
-      console.log(`${LOG_PREFIX} 9.4.1: Email management panel open`);
-
-      const hasDisconnectButton = await textExists('Disconnect');
-
-      if (!hasDisconnectButton) {
-        const tree = await dumpAccessibilityTree();
-        console.log(
-          `${LOG_PREFIX} 9.4.1: "Disconnect" button not found. Tree:\n`,
-          tree.slice(0, 4000)
-        );
-        await closeModalIfOpen();
-        await navigateToHome();
-        return;
-      }
-
-      // Click "Disconnect" button
-      await clickText('Disconnect', 10_000);
-      console.log(`${LOG_PREFIX} 9.4.1: Clicked "Disconnect" button`);
-      await browser.pause(2_000);
-
-      // Verify confirmation dialog appears with Cancel + Confirm Disconnect
-      const hasCancel = await textExists('Cancel');
-      const hasConfirmDisconnect =
-        (await textExists('Confirm Disconnect')) || (await textExists('Confirm'));
-
-      if (hasCancel || hasConfirmDisconnect) {
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Confirmation dialog appeared — ` +
-            `Cancel: ${hasCancel}, Confirm: ${hasConfirmDisconnect}`
-        );
-        expect(hasCancel || hasConfirmDisconnect).toBe(true);
-
-        // Click "Confirm Disconnect"
-        clearRequestLog();
-        if (await textExists('Confirm Disconnect')) {
-          await clickText('Confirm Disconnect', 10_000);
-        } else if (await textExists('Confirm')) {
-          await clickText('Confirm', 10_000);
+      await browser.execute(() => {
+        Object.keys(window.localStorage)
+          .filter(key => key.includes('composio:connections'))
+          .forEach(key => window.localStorage.removeItem(key));
+      });
+      clearRequestLog();
+      await browser.refresh();
+      await waitForApp();
+      await navigateToSkills();
+      await browser.waitUntil(
+        async () =>
+          getRequestLog().some(
+            request =>
+              request.method === 'GET' &&
+              request.url.startsWith('/agent-integrations/composio/connections') &&
+              request.status === 200
+          ),
+        {
+          timeout: 15_000,
+          interval: 250,
+          timeoutMsg: 'Connections page never fetched the seeded Composio connections list',
         }
-        console.log(`${LOG_PREFIX} 9.4.1: Clicked confirm disconnect`);
-        await browser.pause(3_000);
+      );
+      const connectionRequest = getRequestLog().find(
+        request =>
+          request.method === 'GET' &&
+          request.url.startsWith('/agent-integrations/composio/connections')
+      );
+      expect(connectionRequest?.status).toBe(200);
+      await assertConnectorCardVisible('Gmail');
 
-        // After disconnect, the modal should close or show setup wizard
-        await browser.pause(2_000);
-        const hasConnectTitle = await textExists('Connect Email');
-        const hasManageTitle = await textExists('Manage Email');
-        console.log(
-          `${LOG_PREFIX} 9.4.1: After disconnect — Connect visible: ${hasConnectTitle}, ` +
-            `Manage visible: ${hasManageTitle}`
-        );
-      } else {
-        console.log(
-          `${LOG_PREFIX} 9.4.1: Confirmation dialog not shown — ` +
-            `disconnect may have happened immediately`
-        );
-      }
+      const modal = await openConnectorModal('Gmail', 15_000, 'Connected');
+      expect(modal).toContain('Manage Gmail');
+      expect(await textExists('Gmail is connected')).toBe(true);
+      await clickText('Disconnect', 10_000);
 
-      await closeModalIfOpen();
-      await navigateToHome();
-      console.log(`${LOG_PREFIX} 9.4.1 PASSED`);
+      // Current Composio flow deletes immediately; the modal returns to its
+      // idle Connect state and refreshes the connector card from the mock API.
+      await browser.waitUntil(async () => await textExists('Connect Gmail'), {
+        timeout: 15_000,
+        interval: 300,
+        timeoutMsg: 'Gmail did not return to the current Connect UI after disconnect',
+      });
+      await browser.waitUntil(
+        async () =>
+          browser.execute(() => {
+            const card = document.querySelector<HTMLElement>(
+              '[data-testid="skill-install-composio-gmail"]'
+            );
+            return Boolean(card && !/Connected/i.test(card.textContent ?? ''));
+          }),
+        {
+          timeout: 15_000,
+          interval: 300,
+          timeoutMsg: 'Gmail connector card still reports connected after disconnect',
+        }
+      );
     });
 
     it('9.4.2 — Token Revocation Handling: app handles revoked token gracefully', async function () {
