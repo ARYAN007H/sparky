@@ -35,15 +35,15 @@ use std::time::Duration;
 /// Prevents `ApprovalGate` from writing `./approval/approval.db` into the repo root.
 static GATE_WORKSPACE: OnceLock<tempfile::TempDir> = OnceLock::new();
 
-use axum::http::{header::AUTHORIZATION, HeaderMap, StatusCode, Uri};
+use axum::http::{HeaderMap, StatusCode, Uri, header::AUTHORIZATION};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tempfile::tempdir;
 
 use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
-use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
+use openhuman_core::core::auth::{CORE_TOKEN_ENV_VAR, init_rpc_token};
 use openhuman_rpc::server::build_core_http_router;
 
 const TEST_RPC_TOKEN: &str = "json-rpc-e2e-local-token";
@@ -862,6 +862,103 @@ where
 }
 
 // ─── Task 2: Multi-turn state persistence ────────────────────────────────────
+
+/// A released TinySearch module calls the managed Gemini route and returns its
+/// grounded answer to the following model request through the host tool seam.
+#[test]
+fn managed_tinysearch_answer_reaches_followup_model_request() {
+    run_on_agent_stack(
+        "managed_tinysearch_answer_reaches_followup_model_request",
+        managed_tinysearch_answer_reaches_followup_model_request_inner,
+    );
+}
+
+async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
+    let _lock = env_lock();
+    let artifact = openhuman_core::modules::local_artifact("tinysearch")
+        .expect("the pinned TinySearch release must be staged on OPENHUMAN_MODULE_PATH");
+    assert!(
+        artifact.is_file(),
+        "TinySearch artifact missing: {artifact:?}"
+    );
+    let pinned = openhuman_core::modules::registry::find("tinysearch")
+        .expect("TinySearch is registered in the module asset registry");
+    assert_eq!(pinned.version, "0.5.1", "use the pinned module release");
+    assert!(
+        std::env::var_os("OPENHUMAN_MODULE_SOURCE").is_none()
+            && std::env::var_os("OPENHUMAN_MODULE_SOURCE_DIR").is_none(),
+        "this integration test must load the pinned module artifact, not a linked/source override"
+    );
+
+    const QUERY: &str = "What color is the fixture's named answer?";
+    const ANSWER: &str = "The fixture's distinct grounded answer is cerulean.";
+    reset_script(vec![
+        tool_call_completion("web_answer_tool", json!({ "query": QUERY })),
+        text_completion("I received the grounded answer and its source."),
+    ]);
+    let stack = boot_stack_with_config(
+        "[search]\nenabled = true\n\n[search.providers.gemini]\nenabled = true\nroute = \"managed\"\n\n[search.roles]\nanswer = [\"gemini\"]\n",
+    )
+    .await;
+    let mut events = spawn_sse_collector(format!(
+        "{}/events?client_id=tinysearch-managed-wire",
+        stack.rpc_base
+    ))
+    .await;
+    let request_id = send_web_chat(
+        &stack.rpc_base,
+        8_233,
+        "tinysearch-managed-wire",
+        "thread-tinysearch-managed-wire",
+        "Find the fixture's named answer and tell me what it says.",
+    )
+    .await;
+    let done =
+        wait_for_terminal_request(&mut events, Duration::from_secs(120), Some(&request_id)).await;
+    assert_eq!(
+        done.get("event").and_then(Value::as_str),
+        Some("chat_done"),
+        "the module-backed answer turn must finish: {done}"
+    );
+
+    let managed_requests = with_captured_managed_gemini(|requests| requests.clone());
+    assert_eq!(
+        managed_requests.len(),
+        1,
+        "TinySearch must call managed Gemini once"
+    );
+    let managed_request = &managed_requests[0];
+    let request_text = managed_request
+        .pointer("/contents/0/parts/0/text")
+        .and_then(Value::as_str)
+        .expect("managed Gemini request has a text prompt");
+    assert!(
+        request_text.contains(QUERY),
+        "the module must forward the requested query to managed Gemini: {managed_request}"
+    );
+    assert_eq!(
+        managed_request.get("tools"),
+        Some(&json!([{ "googleSearch": {} }])),
+        "grounded answers must request Gemini search grounding"
+    );
+
+    let completions = with_captured(|requests| requests.clone());
+    assert_eq!(
+        completions.len(),
+        2,
+        "the tool result must reach a follow-up model turn"
+    );
+    let delivered = tool_result_text(&completions[1..], "web_answer_tool")
+        .expect("the next model request must contain web_answer_tool's result");
+    assert!(
+        delivered.contains(ANSWER),
+        "the host must forward TinySearch's grounded answer: {delivered}"
+    );
+    assert!(
+        delivered.contains("https://fixture.invalid/source"),
+        "the host must forward TinySearch's grounded source: {delivered}"
+    );
+}
 
 /// Turn 2's upstream request must include turn 1's user message and assistant
 /// reply — proves transcript/history persistence across turns on one thread.
@@ -2605,8 +2702,8 @@ async fn streaming_tool_call_accumulation() {
     use openhuman_core::progress::AgentProgress;
     use std::sync::Mutex;
     use streaming_support::{
-        agent_with_s, native_tool_response_s, text_response_s, workspace_s, EchoTool,
-        ScriptedProvider,
+        EchoTool, ScriptedProvider, agent_with_s, native_tool_response_s, text_response_s,
+        workspace_s,
     };
     use tinyinference_llm::model::{ModelProfile, ModelStreamItem};
     use tinyinference_llm::tool::ToolDelta;
