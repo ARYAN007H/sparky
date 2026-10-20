@@ -435,11 +435,11 @@ fn build_artifacts_service(
             chat,
         )))
         .with_file_roots(guarded_roots(roots));
-    if let Some(file_store) = file_store {
+    if let Some(file_store) = file_store.as_ref() {
         if let Some(publisher) = publisher {
             artifacts = artifacts.with_publisher(publisher(file_store.clone()));
         }
-        artifacts = artifacts.with_file_store(file_store);
+        artifacts = artifacts.with_file_store(file_store.clone());
     }
     (artifacts, file_store)
 }
