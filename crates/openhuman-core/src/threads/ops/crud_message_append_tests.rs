@@ -564,12 +564,12 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
     )
     .await
     .unwrap();
-    let first =
-        persist_queued_user_message(&ctx, "uploads", "request-1", "queued follow-up", &staged)
-            .await
-            .unwrap();
+    let first = persist_queued_user_message(&ctx, "uploads", "request-1", "", &staged)
+        .await
+        .unwrap();
     assert_eq!(first.id, "user:request-1");
     assert_eq!(first.sender, "user");
+    assert!(first.content.is_empty());
     assert_eq!(first.attachments, staged);
     let resolved = crate::threads::attachments::resolve_persisted_parts(
         &ctx,
@@ -588,10 +588,9 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
         b"\x89PNG\r\n\x1a\n"
     );
 
-    let retry =
-        persist_queued_user_message(&ctx, "uploads", "request-1", "queued follow-up", &staged)
-            .await
-            .unwrap();
+    let retry = persist_queued_user_message(&ctx, "uploads", "request-1", "", &staged)
+        .await
+        .unwrap();
     assert_eq!(retry.id, first.id);
 
     let conflicting_retry =
