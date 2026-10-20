@@ -188,13 +188,13 @@ fn errors_keep_their_wire_codes_across_the_module_boundary() {
         Error::InsufficientCredits("hosted refusal without a code marker".into()),
         Error::Engine("x".into()),
     ] {
-        let back = from_module(to_module(error.clone()));
+        let back = from_module(to_module(error.clone().into()));
         assert_eq!(back.code(), error.code(), "{error:?}");
         assert_eq!(back.is_account_wide(), error.is_account_wide(), "{error:?}");
     }
 
     let credit_error = Error::InsufficientCredits("hosted refusal without a code marker".into());
-    let back = from_module(to_module(credit_error));
-    assert!(matches!(back, Error::InsufficientCredits(_)));
+    let back = from_module(to_module(credit_error.into()));
+    assert!(matches!(back, MemoryError::InsufficientCredits(_)));
     assert!(back.is_account_wide());
 }

@@ -1,6 +1,6 @@
 use super::super::tier::{escalated_origin_for_nested_harness, escalated_origin_for_prompt};
 use super::*;
-use crate::config::schema::tools::HttpRequestConfig;
+use crate::config::HttpRequestConfig;
 use crate::security::GateDecision;
 use serde_json::json;
 use std::sync::Arc;
