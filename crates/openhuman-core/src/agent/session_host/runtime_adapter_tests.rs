@@ -318,7 +318,13 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
             },
         };
         sidecar.subagents.push(child);
-        account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
+        account_committed_turn_against_goal(
+            workspace.path(),
+            &crate::core::runtime::DispatchCtx::ambient(),
+            Some("receipt-goal"),
+            &sidecar,
+        )
+        .await;
 
         let goal = tinyagents_harness_tools::goals::store::get(&goal_store, "receipt-goal")
             .await
