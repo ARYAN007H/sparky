@@ -5,7 +5,6 @@
 //! otherwise long histories produce upstream `400 Bad Request` errors when usage
 //! metadata is not yet available.
 
-use crate::config::{legacy_tier_role, MODEL_MANAGED_DEFAULT};
 
 /// Conservative default for OpenHuman abstract tier models (tokens).
 const TIER_LARGE_CONTEXT: u64 = 200_000;
@@ -52,7 +51,10 @@ pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
         return None;
     }
 
-    if let Some(window) = tier_context_window(normalized) {
+    if let Some(window) = crate::inference::registry::provider_model_context_window(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        normalized,
+    ) {
         return Some(window);
     }
 
@@ -76,30 +78,6 @@ pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
     }
 
     None
-}
-
-fn tier_context_window(model: &str) -> Option<u64> {
-    if model == MODEL_MANAGED_DEFAULT {
-        return Some(TIER_FLASH_CONTEXT);
-    }
-    // Role aliases and retired tier slugs: the windows the roles ran on before
-    // every managed role collapsed onto the default model. Kept so an alias a
-    // caller still holds budgets the way it used to.
-    let role = model
-        .strip_prefix("hint:")
-        .or_else(|| legacy_tier_role(model))
-        .unwrap_or("");
-    match role {
-        "reasoning" => Some(TIER_REASONING_CONTEXT),
-        "agentic" | "coding" => Some(TIER_LARGE_CONTEXT),
-        "burst" => Some(TIER_STANDARD_CONTEXT),
-        "chat" | "summarization" => Some(TIER_FLASH_CONTEXT),
-        _ if model == "chat" => Some(TIER_FLASH_CONTEXT),
-        _ if model.starts_with("gemma") || model.contains(":1b") || model.contains("270m") => {
-            Some(TIER_LOCAL_CONTEXT)
-        }
-        _ => None,
-    }
 }
 
 /// Whether the model resolved for a chat hint/agent/profile accepts image input
@@ -131,14 +109,15 @@ pub fn model_vision_enabled(model: &str, config: &crate::config::Config) -> bool
 /// Whether a resolved model accepts image input. The single predicate shared by
 /// the chat UI resolve and the server-side session/sub-agent gates.
 ///
-/// - **Managed models and role aliases** consult the core-owned map
-///   ([`crate::inference::provider::factory::oh_tier_supports_vision`]) —
-///   the remote backend does not advertise per-model capability. The managed
-///   default model and the `vision` / `reasoning` aliases are vision-capable.
+/// - **Hosted models and role aliases** consult the registered provider's
+///   capability hook; the backend does not advertise per-model capability.
 /// - **Custom/BYOK models** consult the user-set `model_registry.vision` flag
 ///   ([`model_vision_enabled`]).
 pub fn model_supports_vision(model: &str, config: &crate::config::Config) -> bool {
-    crate::inference::provider::factory::oh_tier_supports_vision(model)
+    crate::inference::registry::provider_model_supports_vision(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        model,
+    )
         || model_vision_enabled(model, config)
 }
 
