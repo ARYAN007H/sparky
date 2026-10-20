@@ -215,7 +215,10 @@ export interface ThreadWireTypes {
   agentRun: AgentRun;
   agentRunGet: RunLedgerGetWireResponse;
   agentRunList: AgentRunListResponse;
+  artifactFailedPayload: ArtifactFailedPayload;
   artifactKind: ArtifactKind;
+  artifactPendingPayload: ArtifactPendingPayload;
+  artifactReadyPayload: ArtifactReadyPayload;
   clearTurnState: ClearTurnStateResponse;
   getTurnState: GetTurnStateResponse;
   listTurnStates: ListTurnStatesResponse;
@@ -360,6 +363,40 @@ export interface AgentRunListResponse {
    */
   count: number;
   runs: AgentRun[];
+}
+/**
+ * Artifact fields carried inside `WebChannelEvent.args` when generation
+ * failed. The producer truncates `error` before publishing this payload.
+ */
+export interface ArtifactFailedPayload {
+  artifact_id: string;
+  error: string;
+  kind: string;
+  title: string;
+  workspace_dir: string;
+}
+/**
+ * Artifact fields carried inside the generic `WebChannelEvent.args` payload
+ * when an artifact has been reserved and generation is in progress.
+ */
+export interface ArtifactPendingPayload {
+  artifact_id: string;
+  kind: string;
+  path: string;
+  title: string;
+  workspace_dir: string;
+}
+/**
+ * Artifact fields carried inside `WebChannelEvent.args` after a file is
+ * available for download.
+ */
+export interface ArtifactReadyPayload {
+  artifact_id: string;
+  kind: string;
+  path: string;
+  size_bytes: number;
+  title: string;
+  workspace_dir: string;
 }
 /**
  * Response payload for `openhuman.threads_turn_state_clear`.
