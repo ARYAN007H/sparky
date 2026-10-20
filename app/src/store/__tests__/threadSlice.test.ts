@@ -12,6 +12,7 @@ import threadReducer, {
   clearSelectedThread,
   clearStaleThread,
   clearThreadInferenceActive,
+  deleteThread,
   generateThreadTitleIfNeeded,
   loadThreadMessages,
   loadThreads,
@@ -85,6 +86,15 @@ describe('threadSlice synchronous reducers', () => {
     expect(state.messages).toEqual([]);
     expect(state.isLoadingThreads).toBe(false);
     expect(state.isLoadingMessages).toBe(false);
+  });
+
+  it('deletes a thread from legacy persisted state without channel activity', () => {
+    const current = threadReducer(undefined, { type: '@@test/init' });
+    const legacyState = { ...current, channelActivityByThreadId: undefined } as unknown as typeof current;
+
+    expect(() =>
+      threadReducer(legacyState, deleteThread.fulfilled({ threadId: 't-legacy' }, 'request-1', 't-legacy'))
+    ).not.toThrow();
   });
 
   it('applies provider reactions only to the exact OpenHuman row and persists read state in metadata', async () => {
