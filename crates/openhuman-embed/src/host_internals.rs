@@ -369,7 +369,7 @@ pub mod inference_registry {
         provider_request_without_reasoning, resolve_provider_model,
         unregister_backend_error_classifier, unregister_catalog,
         unregister_chat_model, unregister_embedding, BackendErrorClassification,
-        BackendErrorCodeClassifier, BackendErrorKind, BoxFuture, CatalogEntry, CatalogLimits,
+        BackendErrorClassifier, BackendErrorKind, BoxFuture, CatalogEntry, CatalogLimits,
         CatalogListing, CatalogRequest, ChatModelEntry, ChatModelFactory, ChatModelRequest,
         ConfigNormalizer, EmbeddingFactory, EmbeddingRequest, ProviderModelHooks, ReadinessProbe,
     };

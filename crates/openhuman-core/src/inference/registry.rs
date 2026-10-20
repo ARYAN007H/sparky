@@ -135,14 +135,14 @@ pub struct BackendErrorClassification {
 
 /// Classifies a provider's backend error. `provider` is present at a typed
 /// provider boundary and absent for flattened, string-only host call sites.
-pub type BackendErrorCodeClassifier =
+pub type BackendErrorClassifier =
     Arc<dyn Fn(Option<&str>, &str) -> BackendErrorClassification + Send + Sync>;
 
-static BACKEND_ERROR_CLASSIFIER: HookSlot<BackendErrorCodeClassifier> =
+static BACKEND_ERROR_CLASSIFIER: HookSlot<BackendErrorClassifier> =
     HookSlot::new("inference::backend_error_classifier");
 
 /// Registers a backend error classifier process-wide.
-pub fn register_backend_error_classifier(classifier: BackendErrorCodeClassifier) {
+pub fn register_backend_error_classifier(classifier: BackendErrorClassifier) {
     BACKEND_ERROR_CLASSIFIER.register("default", classifier);
 }
 
@@ -154,7 +154,7 @@ pub fn unregister_backend_error_classifier() -> bool {
 /// Registers a backend error classifier for a CoreContext.
 pub fn register_backend_error_classifier_in(
     extensions: &Extensions,
-    classifier: BackendErrorCodeClassifier,
+    classifier: BackendErrorClassifier,
 ) {
     BACKEND_ERROR_CLASSIFIER.register_in(extensions, "default", classifier);
 }
