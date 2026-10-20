@@ -140,8 +140,9 @@ fn current_thread_sync_fallback_does_not_deadlock_on_async_backend_initializatio
         let (release_tx, release_rx) = tokio::sync::oneshot::channel();
         super::install_test_backend_open_gate(started_tx, release_rx);
 
-        let asynchronous =
-            tokio::spawn(async move { backend_for_async(&workspace_for_async).unwrap() });
+        let asynchronous = tokio::spawn(async move {
+            backend_for_async(&workspace_for_async).await.unwrap()
+        });
         started_rx
             .await
             .expect("async initialization claimed the workspace cell");
