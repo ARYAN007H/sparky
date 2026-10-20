@@ -103,7 +103,7 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
             "citation schema is missing {field}: {citation_schema}"
         );
     }
-    let ack = &schema["$defs"]["QueuedChatAck"];
+    let ack = resolve_schema(&schema, &properties["queuedChatAck"]);
     for field in [
         "queued",
         "queue_mode",
@@ -125,7 +125,7 @@ fn started_chat_ack_schema_requires_every_serialized_field() {
     let schema: serde_json::Value =
         serde_json::from_str(&thread_wire_schema_json().expect("schema serializes"))
             .expect("schema is JSON");
-    let ack = &schema["$defs"]["StartedChatAck"];
+    let ack = resolve_schema(&schema, &properties["startedChatAck"]);
     for field in ["accepted", "client_id", "thread_id", "request_id"] {
         assert!(
             ack["required"].as_array().unwrap().contains(&field.into()),

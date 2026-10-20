@@ -11,9 +11,10 @@
  *   (`skip_serializing_if`), so `null` never arrives; consumers read absence.
  * - fields the core always sets for an event are made required (see each alias).
  *
- * The only hand-written shapes are the typed views of fields the schema leaves
- * as open JSON (`goal`, `todos`, `copy_params`, `citations`, tool `args`). Each
- * is marked "open JSON in the schema" below.
+ * Owner-defined records and enum values are imported from the generated thread
+ * schema. Hand-written types below are consumer projections of open event JSON
+ * or flattened host events; their validation/transformations are documented at
+ * the projection boundary.
  */
 import type { ChatErrorCopyParams } from '../lib/chatErrorCopy';
 import type {
