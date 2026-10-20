@@ -27,7 +27,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tinystoragedrivers::{
-    CollectionSpec, DocumentStore, ErrorKind, Key, Kv, ScopedStorage, StorageError,
+    CollectionSpec, DocumentStore, ErrorKind, Key, Kv, Scope, ScopedStorage, StorageError,
 };
 
 use super::documents::Repo;
@@ -66,6 +66,23 @@ impl StateKv {
     /// When the backend cannot be opened or the scope cannot be resolved.
     pub fn open(workspace_dir: &Path, owner: &'static str, ns: &'static str) -> Result<Self> {
         let repo = Repo::current_for(workspace_dir, "storage::state_kv", collections)?;
+        Ok(Self { repo, owner, ns })
+    }
+
+    /// The state of `workspace_dir` in an explicit scope on that workspace's
+    /// configured backend.
+    ///
+    /// # Errors
+    ///
+    /// When the backend cannot be opened or refuses `scope`.
+    pub fn open_in_scope(
+        workspace_dir: &Path,
+        scope: &Scope,
+        owner: &'static str,
+        ns: &'static str,
+    ) -> Result<Self> {
+        let backend = super::local::backend_for(workspace_dir)?;
+        let repo = Repo::on(&backend, scope, "storage::state_kv", collections)?;
         Ok(Self { repo, owner, ns })
     }
 

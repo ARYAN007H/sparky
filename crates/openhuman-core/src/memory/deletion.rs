@@ -38,7 +38,7 @@ struct FileStore {
 
 impl ListStore<PendingDeletion> for FileStore {
     fn load(&self) -> std::result::Result<Vec<PendingDeletion>, StoreError> {
-        match super::state_store::load(&self.workspace_dir, STATE) {
+        match super::state_store::load_workspace(&self.workspace_dir, STATE) {
             Ok(Some(pending)) => Ok(pending),
             Ok(None) => Ok(Vec::new()),
             Err(error) => {
@@ -50,10 +50,14 @@ impl ListStore<PendingDeletion> for FileStore {
 
     fn save(&self, all: &[PendingDeletion]) -> std::result::Result<(), StoreError> {
         if all.is_empty() {
-            return super::state_store::remove(&self.workspace_dir, STATE)
+            return super::state_store::remove_workspace::<Vec<PendingDeletion>>(
+                &self.workspace_dir,
+                STATE,
+            )
                 .map_err(|error| StoreError(error.to_string()));
         }
-        super::state_store::save(&self.workspace_dir, STATE, &all)
+        let all = all.to_vec();
+        super::state_store::save_workspace(&self.workspace_dir, STATE, &all)
             .map_err(|error| StoreError(error.to_string()))
     }
 }

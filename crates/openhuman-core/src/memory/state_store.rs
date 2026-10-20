@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use sha2::Digest;
 
 use crate::storage::state_kv::StateKv;
 
@@ -35,6 +36,54 @@ fn open_quarantining<T: DeserializeOwned>(workspace_dir: &Path, name: &str) -> R
     let kv = StateKv::open(workspace_dir, OWNER, NS)?;
     kv.import_file_quarantining::<T>(name, &legacy_path(workspace_dir, name))?;
     Ok(kv)
+}
+
+fn workspace_scope(workspace_dir: &Path) -> Result<crate::storage::Scope> {
+    let path = std::fs::canonicalize(workspace_dir).unwrap_or_else(|_| workspace_dir.to_path_buf());
+    let digest = sha2::Sha256::digest(path.to_string_lossy().as_bytes());
+    let suffix = digest
+        .iter()
+        .take(12)
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    crate::storage::scope_for_module(None, &format!("memory-workspace-{suffix}"))
+}
+
+fn open_workspace_quarantining<T: DeserializeOwned>(
+    workspace_dir: &Path,
+    name: &str,
+) -> Result<StateKv> {
+    let scope = workspace_scope(workspace_dir)?;
+    let kv = StateKv::open_in_scope(workspace_dir, &scope, OWNER, NS)?;
+    kv.import_file_quarantining::<T>(name, &legacy_path(workspace_dir, name))?;
+    Ok(kv)
+}
+
+/// A workspace-owned state value in a deterministic local module scope. Use
+/// this for queues that must remain readable after the ambient profile scope
+/// has ended, while remaining isolated from other workspaces on shared storage.
+pub(crate) fn load_workspace<T: DeserializeOwned + Send + 'static>(
+    workspace_dir: &Path,
+    name: &str,
+) -> Result<Option<T>> {
+    open_workspace_quarantining::<T>(workspace_dir, name)?.get(name)
+}
+
+/// Stores a workspace-owned state value in its deterministic local module scope.
+pub(crate) fn save_workspace<T>(workspace_dir: &Path, name: &str, value: &T) -> Result<()>
+where
+    T: Serialize + DeserializeOwned + Send + 'static,
+{
+    open_workspace_quarantining::<T>(workspace_dir, name)?.put(name, value)
+}
+
+/// Removes a workspace-owned state value from its deterministic local module scope.
+pub(crate) fn remove_workspace<T: DeserializeOwned + Send + 'static>(
+    workspace_dir: &Path,
+    name: &str,
+) -> Result<()> {
+    open_workspace_quarantining::<T>(workspace_dir, name)?.delete(name)?;
+    Ok(())
 }
 
 /// [`open`] for a value a damaged legacy file must not reset.
