@@ -486,7 +486,7 @@ fn configured_openhuman_jwt_slug_routes_to_managed_chat_model() {
             .expect("configured OpenhumanJwt slug should be recognized")
             .expect("managed model should build");
 
-    assert_eq!(model_id, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(model_id, "openrouter/deepseek/deepseek-v4-flash");
 
     // A concrete catalog id is forwarded verbatim.
     config.chat_provider = Some("openhuman:openrouter/deepseek/deepseek-v4-pro".to_string());
@@ -685,7 +685,7 @@ fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
     .expect("configured OpenhumanJwt slug should be recognized")
     .expect("managed model should build");
 
-    assert_eq!(model_id, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(model_id, "openrouter/deepseek/deepseek-v4-flash");
 }
 
 #[test]

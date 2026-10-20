@@ -39,7 +39,7 @@ fn cost_config_default_pricing_has_known_models() {
     let c = CostConfig::default();
     assert!(
         c.prices
-            .contains_key(crate::config::schema::types::MODEL_MANAGED_DEFAULT),
+            .contains_key("openrouter/deepseek/deepseek-v4-flash"),
         "default pricing must cover the managed default model; got {:?}",
         c.prices.keys().collect::<Vec<_>>()
     );

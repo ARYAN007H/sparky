@@ -24,7 +24,7 @@ fn build_remote_provider_managed_uses_backend_id_and_default_model() {
     let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
-    assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-flash");
     assert!(!resolved.used_local, "used_local is always false");
 }
 
@@ -37,7 +37,7 @@ fn build_remote_provider_managed_follows_the_pinned_default_model() {
     let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
-    assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-flash");
 
     config.default_model = Some("openrouter/deepseek/deepseek-v4-pro".to_string());
     let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
@@ -56,7 +56,7 @@ fn build_remote_provider_falls_back_to_managed_when_chat_local() {
     let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
-    assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-flash");
     assert!(!resolved.used_local, "triage never goes local");
 }
 
@@ -81,7 +81,7 @@ fn build_remote_provider_forces_managed_for_local_cli_routes() {
         );
         assert_eq!(
             resolved.model,
-            crate::config::MODEL_MANAGED_DEFAULT,
+            "openrouter/deepseek/deepseek-v4-flash",
             "route {route} must run the managed default"
         );
         assert!(!resolved.used_local);
@@ -121,7 +121,7 @@ fn build_remote_provider_falls_back_when_byok_build_fails() {
     let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
-    assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-flash");
     assert!(!resolved.used_local);
 }
 

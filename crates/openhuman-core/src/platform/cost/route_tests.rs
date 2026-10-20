@@ -33,13 +33,13 @@ fn decorations_do_not_promote_a_byok_model_to_managed() {
     }
 }
 
-use crate::config::{LEGACY_TIER_MODELS, MODEL_MANAGED_DEFAULT};
+use crate::config::{["chat-v1", "reasoning-v1", "agentic-v1", "burst-v1", "coding-v1", "vision-v1", "summarization-v1"], "openrouter/deepseek/deepseek-v4-flash"};
 
 /// The managed default is an `openrouter/...` passthrough id and bills as
 /// managed like every other catalog model the backend serves.
 #[test]
 fn managed_default_model_is_managed() {
-    assert_eq!(route_for_model(MODEL_MANAGED_DEFAULT), CostRoute::Managed);
+    assert_eq!(route_for_model("openrouter/deepseek/deepseek-v4-flash"), CostRoute::Managed);
 }
 
 #[test]
@@ -57,13 +57,13 @@ fn managed_tier_slugs_are_managed() {
 /// record carrying any of them still counts toward the managed budget.
 #[test]
 fn managed_tier_slugs_stay_in_sync() {
-    for tier in LEGACY_TIER_MODELS {
+    for tier in ["chat-v1", "reasoning-v1", "agentic-v1", "burst-v1", "coding-v1", "vision-v1", "summarization-v1"] {
         assert!(
             MANAGED_MODEL_SLUGS.contains(&tier),
             "retired tier {tier} is not classified as managed"
         );
     }
-    assert_eq!(MANAGED_MODEL_SLUGS.len(), LEGACY_TIER_MODELS.len());
+    assert_eq!(MANAGED_MODEL_SLUGS.len(), ["chat-v1", "reasoning-v1", "agentic-v1", "burst-v1", "coding-v1", "vision-v1", "summarization-v1"].len());
 }
 
 #[test]

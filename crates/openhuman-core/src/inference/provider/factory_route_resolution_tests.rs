@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::config::MODEL_MANAGED_DEFAULT;
+use "openrouter/deepseek/deepseek-v4-flash";
 
 use crate::inference::provider::factory::access_gates::local_only_violation;
 /// When the provider string includes a model id the factory should build
@@ -264,7 +264,7 @@ fn resolve_model_for_hint_maps_every_managed_hint_to_the_default_model() {
     ] {
         assert_eq!(
             resolve_model_for_hint(hint, &config),
-            MODEL_MANAGED_DEFAULT,
+            "openrouter/deepseek/deepseek-v4-flash",
             "{hint} must resolve to the managed default"
         );
     }
@@ -294,12 +294,12 @@ fn resolve_model_for_hint_uses_the_pinned_managed_default() {
     config.default_model = Some("chat-v1".to_string());
     assert_eq!(
         resolve_model_for_hint("hint:chat", &config),
-        MODEL_MANAGED_DEFAULT
+        "openrouter/deepseek/deepseek-v4-flash"
     );
     config.default_model = Some("hint:reasoning".to_string());
     assert_eq!(
         resolve_model_for_hint("hint:chat", &config),
-        MODEL_MANAGED_DEFAULT
+        "openrouter/deepseek/deepseek-v4-flash"
     );
 
     // A BYOK chat route carries its own model and ignores the managed pin.
@@ -317,7 +317,7 @@ fn resolve_model_for_hint_treats_retired_tier_slugs_as_role_aliases() {
     for slug in ["reasoning-v1", "agentic-v1", "coding-v1", "chat-v1"] {
         assert_eq!(
             resolve_model_for_hint(slug, &config),
-            MODEL_MANAGED_DEFAULT,
+            "openrouter/deepseek/deepseek-v4-flash",
             "{slug} must resolve through its role"
         );
     }
@@ -347,19 +347,19 @@ fn resolve_model_for_hint_falls_through_openhuman_and_cloud_sentinels() {
     config.reasoning_provider = Some("openhuman".to_string());
     assert_eq!(
         resolve_model_for_hint("hint:reasoning", &config),
-        MODEL_MANAGED_DEFAULT
+        "openrouter/deepseek/deepseek-v4-flash"
     );
 
     config.reasoning_provider = Some("cloud".to_string());
     assert_eq!(
         resolve_model_for_hint("hint:reasoning", &config),
-        MODEL_MANAGED_DEFAULT
+        "openrouter/deepseek/deepseek-v4-flash"
     );
 
     config.reasoning_provider = Some("".to_string());
     assert_eq!(
         resolve_model_for_hint("hint:reasoning", &config),
-        MODEL_MANAGED_DEFAULT
+        "openrouter/deepseek/deepseek-v4-flash"
     );
 }
 

@@ -131,12 +131,12 @@ fn o1_o3_segment_match_does_not_overmatch() {
 /// docs to be revisited, instead of only the two `true` arms being covered.
 #[test]
 fn oh_tier_vision_map_is_exhaustively_pinned() {
-    use crate::config::MODEL_MANAGED_DEFAULT;
+    use "openrouter/deepseek/deepseek-v4-flash";
     use crate::inference::provider::factory::oh_tier_supports_vision;
 
     for tier in [
         // The managed default (DeepSeek V4 Flash) takes images.
-        MODEL_MANAGED_DEFAULT,
+        "openrouter/deepseek/deepseek-v4-flash",
         "reasoning-v1",
         "hint:reasoning",
         "vision-v1",
