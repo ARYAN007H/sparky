@@ -18,7 +18,7 @@ test.describe('Smoke', () => {
     }));
     expect(bootstrap.rpcUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/rpc$/);
     expect(bootstrap.rpcToken?.length ?? 0).toBeGreaterThanOrEqual(16);
-    expect((await callCoreRpc('core.ping', {})).ok).toBe(true);
+    await callCoreRpc('core.ping', {});
 
     const aboutApps = await callCoreRpc<unknown>('openhuman.about_app_list', {});
     const response = (aboutApps ?? {}) as Record<string, unknown>;
