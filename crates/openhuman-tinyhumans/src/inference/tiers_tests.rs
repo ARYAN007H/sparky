@@ -9,7 +9,9 @@ fn hosted_normalizer_rewrites_legacy_tiers_and_preserves_concrete_pins() {
         "pinned".to_string(),
         openhuman_embed::__host::config::schema::DelegateAgentConfig {
             model: "vendor/model-id".to_string(),
-            ..Default::default()
+            system_prompt: None,
+            temperature: None,
+            max_depth: 3,
         },
     );
 
