@@ -384,48 +384,8 @@ else
   log "skipping openhuman-tui (OH_COV_TUI=${OH_COV_TUI})"
 fi
 
-if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
-  # Every integration target in one parallel run, one process per test: the
-  # raw_coverage modules and the JSON-RPC tests are then isolated from each
-  # other without the per-module and serial invocations below. Cargo skips a
-  # target whose required-features are not in the product set; `kind(test)`
-  # keeps the run to the integration targets, as the loop below runs them.
-  mkdir -p ci-out/nextest
-  expected_targets="${PWD}/ci-out/nextest/cli-expected-targets.txt"
-  : >"${expected_targets}"
-  while IFS= read -r target; do
-    [ -n "${target}" ] || continue
-    if target_features_satisfied "${target}" && target_expected_in_coverage "${target}"; then
-      printf '%s\n' "${target}" >>"${expected_targets}"
-    fi
-  done < <(integration_test_targets)
-  expected_inventory=""
-  if [ -s "${expected_targets}" ]; then
-    expected_inventory="${PWD}/ci-out/nextest/cli-inventory.json"
-    # Listing executes no tests. cargo-llvm-cov supplies the same wrapper and
-    # instrumentation environment, but show-env leaves Cargo on the plain
-    # target dir while `cargo llvm-cov nextest` builds in its llvm-cov-target
-    # subdir. Without the explicit --target-dir the listing re-instrumented
-    # the whole graph a second time (578 crates, +53 GB on the EX63 scratch
-    # disk in run 39315551099, which then filled it). Listing also launches
-    # each instrumented binary; keep those profiles out of the report.
-    cli_inventory() (
-      inventory_env="$(bash scripts/ci-cancel-aware.sh cargo llvm-cov show-env --sh)" || exit $?
-      eval "${inventory_env}"
-      inventory_profiles="${PWD}/ci-out/nextest/cli-inventory-profraw"
-      export LLVM_PROFILE_FILE="${inventory_profiles}/list-%p.profraw"
-      bash scripts/ci-cancel-aware.sh cargo nextest list --message-format json --features "${CORE_PRODUCT_FEATURES}" \
-        --target-dir "${CARGO_LLVM_COV_TARGET_DIR}/llvm-cov-target" \
-        "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_CLI_TESTS}" >"${expected_inventory}"
-      rm -rf "${inventory_profiles}"
-    )
-    suite "openhuman-cli test inventory" cli_inventory
-  fi
-  NEXTEST_EXPECTED_TARGETS="${expected_targets}" \
-  NEXTEST_EXPECTED_INVENTORY="${expected_inventory}" \
-  suite "openhuman-cli integration tests (nextest)" llvm_cov \
-    --no-report --no-fail-fast "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_CLI_TESTS}"
-else
+if [ "${OH_COV_RUNNER:-cargo}" != "nextest" ]; then
+  # The nextest runner ran the integration targets with the product suites.
   while IFS= read -r target; do
     [ -n "${target}" ] || continue
     log "running integration target: ${target}"
