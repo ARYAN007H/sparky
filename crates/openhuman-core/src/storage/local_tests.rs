@@ -64,3 +64,26 @@ fn forgetting_a_workspace_reopens_the_same_data() {
         "a restart keeps the data"
     );
 }
+
+#[tokio::test]
+async fn concurrent_sync_and_async_open_share_one_workspace_backend() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = dir.path().to_path_buf();
+    let sync_workspace = workspace.clone();
+
+    let (sync, asynchronous) = tokio::join!(
+        tokio::task::spawn_blocking(move || backend_for(&sync_workspace)),
+        backend_for_async(&workspace),
+    );
+    let sync = sync.unwrap().unwrap();
+    let asynchronous = asynchronous.unwrap();
+
+    assert!(
+        Arc::ptr_eq(&sync, &asynchronous),
+        "sync and async initializers must share the cached backend"
+    );
+    assert!(
+        Arc::ptr_eq(&sync, &backend_for(dir.path()).unwrap()),
+        "later sync opens must reuse the initialized backend"
+    );
+}

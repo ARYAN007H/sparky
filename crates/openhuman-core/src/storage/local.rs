@@ -48,8 +48,46 @@ impl Opened {
 
 /// Default backends this process opened for workspaces with nothing
 /// installed, by workspace directory.
-static WORKSPACES: LazyLock<Mutex<HashMap<PathBuf, Arc<dyn StorageBackend>>>> =
+type WorkspaceBackend = Arc<tokio::sync::OnceCell<Arc<dyn StorageBackend>>>;
+
+static WORKSPACES: LazyLock<Mutex<HashMap<PathBuf, WorkspaceBackend>>> =
     LazyLock::new(Mutex::default);
+
+fn workspace_backend(workspace_dir: &Path) -> WorkspaceBackend {
+    let mut opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
+    Arc::clone(
+        opened
+            .entry(workspace_dir.to_path_buf())
+            .or_insert_with(|| Arc::new(tokio::sync::OnceCell::new())),
+    )
+}
+
+async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageBackend>> {
+    let url = super::config::default_url(&workspace_dir);
+    super::config::prepare_default_dir(&workspace_dir).with_context(|| {
+        format!(
+            "create the storage directory for {}",
+            workspace_dir.display()
+        )
+    })?;
+    tracing::debug!(
+        target: "openhuman::storage",
+        workspace = %workspace_dir.display(),
+        "[storage::local] opening the workspace default backend (none installed)"
+    );
+    super::open(&url)
+        .await
+        .with_context(|| format!("open the default storage for {}", workspace_dir.display()))
+}
+
+async fn initialized_backend(
+    cell: WorkspaceBackend,
+    workspace_dir: PathBuf,
+) -> Result<Arc<dyn StorageBackend>> {
+    cell.get_or_try_init(|| async move { open_default_backend(workspace_dir).await })
+        .await
+        .map(Arc::clone)
+}
 
 /// The backend for `workspace_dir`: the installed one, else the workspace's
 /// own default, opened on first use.
@@ -62,29 +100,9 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = installed() {
         return Ok(backend);
     }
-    let mut opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
-    if let Some(backend) = opened.get(workspace_dir) {
-        return Ok(Arc::clone(backend));
-    }
-    let url = super::config::default_url(workspace_dir);
-    super::config::prepare_default_dir(workspace_dir).with_context(|| {
-        format!(
-            "create the storage directory for {}",
-            workspace_dir.display()
-        )
-    })?;
-    tracing::debug!(
-        target: "openhuman::storage",
-        workspace = %workspace_dir.display(),
-        "[storage::local] opening the workspace default backend (none installed)"
-    );
-    let backend = super::block_on_anyhow({
-        let url = url.clone();
-        async move { Ok(super::open(&url).await?) }
-    })
-    .with_context(|| format!("open the default storage for {}", workspace_dir.display()))?;
-    opened.insert(workspace_dir.to_path_buf(), Arc::clone(&backend));
-    Ok(backend)
+    let cell = workspace_backend(workspace_dir);
+    let workspace_dir = workspace_dir.to_path_buf();
+    super::block_on_anyhow(async move { initialized_backend(cell, workspace_dir).await })
 }
 
 /// Async counterpart to [`backend_for`] for boot and module-proxy paths that
@@ -94,31 +112,8 @@ pub async fn backend_for_async(workspace_dir: &Path) -> Result<Arc<dyn StorageBa
     if let Some(backend) = installed() {
         return Ok(backend);
     }
-    {
-        let opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(backend) = opened.get(workspace_dir) {
-            return Ok(Arc::clone(backend));
-        }
-    }
-    let url = super::config::default_url(workspace_dir);
-    super::config::prepare_default_dir(workspace_dir).with_context(|| {
-        format!(
-            "create the storage directory for {}",
-            workspace_dir.display()
-        )
-    })?;
-    tracing::debug!(
-        target: "openhuman::storage",
-        workspace = %workspace_dir.display(),
-        "[storage::local] asynchronously opening the workspace default backend (none installed)"
-    );
-    let backend = super::open(&url)
-        .await
-        .with_context(|| format!("open the default storage for {}", workspace_dir.display()))?;
-    let mut opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
-    Ok(Arc::clone(
-        opened.entry(workspace_dir.to_path_buf()).or_insert(backend),
-    ))
+    let cell = workspace_backend(workspace_dir);
+    initialized_backend(cell, workspace_dir.to_path_buf()).await
 }
 
 /// The storage a store uses for this call: [`backend_for`] `workspace_dir`
