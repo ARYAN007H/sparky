@@ -2,7 +2,7 @@
 //! `LocalOnly` enforcement, the backend-session requirement, and egress disclosure.
 
 use super::*;
-use tinyinference_providers::route::ProviderRoute;
+use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// Human-readable label for an *external* provider string, used in the
 /// LocalOnly privacy-mode block message so the user knows what was refused.
@@ -21,11 +21,15 @@ pub(super) fn external_provider_label(provider: &str) -> String {
         return "Claude Code CLI".to_string();
     }
     // A concrete external route exposes just its provider slug.
-    ProviderRoute::parse(p)
-        .filter(ProviderRoute::is_external)
-        .map(|route| route.provider.trim().to_string())
-        .filter(|slug| !slug.is_empty())
-        .unwrap_or_else(|| p.to_string())
+    if let Some(route) = ProviderRoute::parse(p) {
+        if route.is_external()
+            && let RouteKind::Cloud { slug } = route.kind()
+            && !slug.trim().is_empty()
+        {
+            return slug.trim().to_string();
+        }
+    }
+    p.to_string()
 }
 
 /// Privacy Mode (#4435) pure decision: under `mode`, is constructing chat
