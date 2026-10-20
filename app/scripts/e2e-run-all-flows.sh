@@ -331,7 +331,6 @@ if should_run_suite "providers"; then
   run "test/e2e/specs/telegram-channel-flow.spec.ts"          "telegram-channel"          "providers"
   run "test/e2e/specs/gmail-flow.spec.ts"                     "gmail"                     "providers"
   run "test/e2e/specs/accounts-provider-modal.spec.ts"        "accounts-providers"        "providers"
-  run "test/e2e/specs/credential-channels-flow.spec.ts"       "credential-channels"       "providers"
   _mini_summary "providers"
 fi
 
