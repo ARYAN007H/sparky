@@ -49,13 +49,6 @@ test.describe('Guided tour gates', () => {
       );
       console.log(`[tour-event] ${JSON.stringify(args)}`);
     });
-    // The Channels tab loads its real definitions asynchronously. Resolve the
-    // same visible tour anchor before starting the tour so this assertion
-    // measures the seven-step route, not first-use module cold-start latency.
-    await page.goto('/#/connections?tab=channels');
-    await expect(page.locator('[data-walkthrough="skills-channels"]')).toBeVisible();
-    await page.goto('/#/chat');
-    await waitForAppReady(page);
     await armWalkthrough(page);
 
     const steps = [
