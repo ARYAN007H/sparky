@@ -24,7 +24,7 @@ async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
             if let Some(release) = release_rx.lock().await.take() {
                 let _ = release.await;
             }
-            runs_tx.send(request.trigger.as_str()).unwrap();
+            runs_tx.send(request.trigger).unwrap();
         }
     };
     let sub = FlowTriggerSubscriber::with_runner(test_config(&tmp), 1, runner);
@@ -34,7 +34,10 @@ async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
     started_rx.await.unwrap();
     sub.dispatch_test_schedule(&ctx, "f1").await;
     release_tx.send(()).unwrap();
-    assert_eq!(runs_rx.recv().await, Some("schedule"));
+    assert_eq!(
+        runs_rx.recv().await,
+        Some(tinyflows_bus::runs::FlowRunTrigger::Schedule)
+    );
     assert!(
         runs_rx.try_recv().is_err(),
         "a busy schedule tick must be dropped"

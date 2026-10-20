@@ -74,7 +74,7 @@ async fn update_records_revisions_and_rollback_restores() {
         .await
         .unwrap()
         .value;
-    assert_eq!(rolled.graph.nodes.len(), 1);
+    assert_eq!(rolled.graph["nodes"].as_array().unwrap().len(), 1);
 
     // Rollback is itself undoable — it snapshotted the pre-rollback (2-node) graph.
     let history2 = flows_get_history(&config, &flow.id, 20).unwrap().value;

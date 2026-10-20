@@ -306,16 +306,24 @@ async fn harness_readiness_uses_runtime_role_and_node_override() {
         ],
         "edges": [{"from_node": "t", "to_node": "a"}]
     }));
-    let node = g.nodes.iter_mut().find(|n| n.id == "a").unwrap();
-    assert_eq!(agent_node_role(&config, node).await, "coding");
+    let node = g["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|node| node["id"] == "a")
+        .unwrap();
+    assert_eq!(agent_node_role(&config, &node["config"]).await, "coding");
     config.default_model = Some("hint:reasoning".into());
-    assert_eq!(agent_node_role(&config, node).await, "reasoning");
-    node.config["model"] = json!("chat-v1");
-    assert_eq!(agent_node_role(&config, node).await, "chat");
-    node.config["model"] = json!("hint:summarization");
-    assert_eq!(agent_node_role(&config, node).await, "summarization");
-    node.config["model"] = json!("custom-model-id");
-    assert_eq!(agent_node_role(&config, node).await, "chat");
+    assert_eq!(agent_node_role(&config, &node["config"]).await, "reasoning");
+    node["config"]["model"] = json!("chat-v1");
+    assert_eq!(agent_node_role(&config, &node["config"]).await, "chat");
+    node["config"]["model"] = json!("hint:summarization");
+    assert_eq!(
+        agent_node_role(&config, &node["config"]).await,
+        "summarization"
+    );
+    node["config"]["model"] = json!("custom-model-id");
+    assert_eq!(agent_node_role(&config, &node["config"]).await, "chat");
 }
 
 #[tokio::test]

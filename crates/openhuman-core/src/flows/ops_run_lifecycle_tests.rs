@@ -154,7 +154,7 @@ async fn flows_update_replaces_name_and_graph() {
     .unwrap();
 
     assert_eq!(updated.value.name, "renamed");
-    assert_eq!(updated.value.graph.name, "renamed-graph");
+    assert_eq!(updated.value.graph["name"], "renamed-graph");
 }
 
 #[tokio::test]

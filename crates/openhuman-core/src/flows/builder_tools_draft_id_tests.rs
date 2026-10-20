@@ -200,7 +200,7 @@ async fn save_workflow_by_draft_id_persists_the_draft_graph_onto_the_flow() {
 
     // The draft's graph really landed on the flow.
     let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
-    assert_eq!(saved.graph.nodes.len(), 2);
+    assert_eq!(saved.graph["nodes"].as_array().unwrap().len(), 2);
 }
 
 #[tokio::test]

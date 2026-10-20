@@ -138,7 +138,7 @@ async fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
     .await
     .expect("valid native graph imports")
     .value;
-    assert_eq!(result.graph.name, "constant import");
+    assert_eq!(result.graph["name"], "constant import");
     assert_eq!(
         crate::modules::state_of("tinyflows"),
         crate::modules::ModuleState::Ready,
