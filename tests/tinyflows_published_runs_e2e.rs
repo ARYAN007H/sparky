@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use axum::http::header::AUTHORIZATION;
 use env_guard::EnvVarGuard;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[path = "support/storage_drivers.rs"]
 #[macro_use]
@@ -36,7 +36,13 @@ fn write_config(home: &Path, module: &Path) {
     }
 }
 
-async fn rpc(addr: std::net::SocketAddr, token: &str, id: u64, method: &str, params: Value) -> Value {
+async fn rpc(
+    addr: std::net::SocketAddr,
+    token: &str,
+    id: u64,
+    method: &str,
+    params: Value,
+) -> Value {
     let response = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -51,7 +57,13 @@ async fn rpc(addr: std::net::SocketAddr, token: &str, id: u64, method: &str, par
     response.json().await.expect("decode RPC response")
 }
 
-async fn ok(addr: std::net::SocketAddr, token: &str, id: u64, method: &str, params: Value) -> Value {
+async fn ok(
+    addr: std::net::SocketAddr,
+    token: &str,
+    id: u64,
+    method: &str,
+    params: Value,
+) -> Value {
     let response = rpc(addr, token, id, method, params).await;
     assert!(response.get("error").is_none(), "{method}: {response}");
     let result = &response["result"];
@@ -147,7 +159,10 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         json!({ "name": "Published approval flow", "graph": approval_gated_parser_graph() }),
     )
     .await;
-    let approval_flow_id = approval_flow["id"].as_str().expect("approval flow id").to_owned();
+    let approval_flow_id = approval_flow["id"]
+        .as_str()
+        .expect("approval flow id")
+        .to_owned();
     let approval_parked = ok(
         addr,
         TEST_TOKEN,
@@ -156,8 +171,16 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         json!({ "id": approval_flow_id, "input": { "item": "approved" } }),
     )
     .await;
-    let approval_run_id = approval_parked["thread_id"].as_str().expect("approval run id");
-    assert!(approval_parked["pending_approvals"].as_array().unwrap().iter().any(|v| v == "gate"));
+    let approval_run_id = approval_parked["thread_id"]
+        .as_str()
+        .expect("approval run id");
+    assert!(
+        approval_parked["pending_approvals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "gate")
+    );
     let approved = ok(
         addr,
         TEST_TOKEN,
@@ -185,8 +208,17 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         json!({ "id": flow_id, "input": { "item": "scoped" } }),
     )
     .await;
-    let run_id = parked["thread_id"].as_str().expect("parked run id").to_owned();
-    assert!(parked["pending_approvals"].as_array().unwrap().iter().any(|v| v == "request"));
+    let run_id = parked["thread_id"]
+        .as_str()
+        .expect("parked run id")
+        .to_owned();
+    assert!(
+        parked["pending_approvals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "request")
+    );
 
     // Resume reaches the real host CapsHost callback. The captured read-only
     // policy denies Network before the deliberately closed loopback endpoint is
@@ -209,10 +241,22 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         json!({ "run_id": run_id }),
     )
     .await;
-    assert_eq!(terminal["status"], "failed", "host policy must stop the request: {terminal}");
-    let failure = terminal["error"].as_str().unwrap_or_default().to_lowercase();
-    assert!(failure.contains("read-only") || failure.contains("network"), "{terminal}");
-    assert!(terminal["steps"].as_array().is_some(), "module persisted run steps: {terminal}");
+    assert_eq!(
+        terminal["status"], "failed",
+        "host policy must stop the request: {terminal}"
+    );
+    let failure = terminal["error"]
+        .as_str()
+        .unwrap_or_default()
+        .to_lowercase();
+    assert!(
+        failure.contains("read-only") || failure.contains("network"),
+        "{terminal}"
+    );
+    assert!(
+        terminal["steps"].as_array().is_some(),
+        "module persisted run steps: {terminal}"
+    );
     assert_eq!(
         published_tinyflows::verify_v0_8_27_module(&module),
         digest,

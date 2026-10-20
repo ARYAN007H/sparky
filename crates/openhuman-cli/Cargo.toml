@@ -98,6 +98,13 @@ path = "../../tests/tinyflows_published_prompt_e2e.rs"
 required-features = ["flows"]
 
 [[test]]
+# Runs the checksum-verified published TinyFlows module through host Runs,
+# CapsHost, and scoped CatalogStorage adapters.
+name = "tinyflows_published_runs_e2e"
+path = "../../tests/tinyflows_published_runs_e2e.rs"
+required-features = ["flows"]
+
+[[test]]
 # Reproduction of the removed spend cap: needs its own process because the
 # global CostTracker is a `OnceCell`, so a shared `--lib` process makes the
 # spend state order-dependent.
