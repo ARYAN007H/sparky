@@ -117,15 +117,39 @@ fn open_workspace_quarantining_on<T: DeserializeOwned>(
     let kv = StateKv::on_backend(backend, scope, OWNER, NS)?;
     kv.import_file_quarantining::<T>(name, &legacy_path(workspace_dir, name))?;
     if name == "pending_deletions" {
-        migrate_existing_queue_scopes(workspace_dir, backend, scope, &kv)?;
+        migrate_existing_queue_scopes(
+            workspace_dir,
+            backend,
+            scope,
+            &kv,
+            active_workspace_matches(workspace_dir),
+        )?;
     }
     Ok(kv)
 }
 
-fn legacy_queue_scopes(workspace_dir: &Path) -> Vec<crate::storage::Scope> {
+fn active_workspace_matches(workspace_dir: &Path) -> bool {
+    let dispatch = crate::core::runtime::DispatchCtx::ambient();
+    let active_workspace = dispatch
+        .resolved()
+        .and_then(|context| context.workspace_dir().ok());
+    active_workspace
+        .as_deref()
+        .and_then(|active| stable_workspace_identity(active).ok())
+        .zip(stable_workspace_identity(workspace_dir).ok())
+        .is_some_and(|(active, requested)| active == requested)
+}
+
+fn legacy_queue_scopes(
+    workspace_dir: &Path,
+    include_local: bool,
+) -> Vec<crate::storage::Scope> {
     let known_profile = profile_layout_for_workspace(workspace_dir)
         .and_then(|profile| profile.dir.file_name()?.to_str().map(str::to_owned));
-    let mut scopes = vec![crate::storage::Scope::local()];
+    let mut scopes = Vec::new();
+    if include_local {
+        scopes.push(crate::storage::Scope::local());
+    }
     if let Some(profile) = &known_profile {
         scopes.push(crate::storage::scope_for_profile(profile));
     }
@@ -135,15 +159,7 @@ fn legacy_queue_scopes(workspace_dir: &Path) -> Vec<crate::storage::Scope> {
     // that task's own scope, and when the path did identify a profile require
     // it to match; never enumerate other tenants on a shared backend.
     let dispatch = crate::core::runtime::DispatchCtx::ambient();
-    let active_workspace = dispatch
-        .resolved()
-        .and_then(|context| context.workspace_dir().ok());
-    let active_matches = active_workspace
-        .as_deref()
-        .and_then(|active| stable_workspace_identity(active).ok())
-        .zip(stable_workspace_identity(workspace_dir).ok())
-        .is_some_and(|(active, requested)| active == requested);
-    if active_matches {
+    if active_workspace_matches(workspace_dir) {
         if let Ok(tenant) = dispatch.tenant() {
             match (tenant.profile, tenant.agent) {
                 (Some(profile), _)
@@ -179,13 +195,14 @@ fn migrate_existing_queue_scopes(
     backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
     target_scope: &crate::storage::Scope,
     target: &StateKv,
+    include_local: bool,
 ) -> Result<()> {
     // The per-source marker records that migration has run, but each queue
     // access still checks the eligible source value. A concurrently running
     // older host may append after a pass; the next access must see that owed
     // work. Once removed, a normally drained value is absent from the source,
     // so it cannot be resurrected after a restart.
-    for source_scope in legacy_queue_scopes(workspace_dir) {
+    for source_scope in legacy_queue_scopes(workspace_dir, include_local) {
         if &source_scope == target_scope {
             continue;
         }
@@ -308,7 +325,7 @@ pub(crate) fn import_all(
             names.push(name);
         }
     }
-    migrate_existing_queue_scopes(workspace_dir, backend, &queue_scope, &queue_kv)?;
+    migrate_existing_queue_scopes(workspace_dir, backend, &queue_scope, &queue_kv, true)?;
     names.sort();
     Ok(names)
 }
