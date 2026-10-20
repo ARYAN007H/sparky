@@ -451,6 +451,10 @@ fn expected_kind_demotes_every_backend_owned_error_code() {
     // re-demote into a suppressed bucket.
     let payload = "OpenHuman API error (413 Payload Too Large): \
          {\"error\":{\"errorCode\":\"PAYLOAD_TOO_LARGE\",\"message\":\"request entity too large\"}}";
+    register_backend_classifier_fixture(
+        payload,
+        reportable_fixture(BackendErrorKind::PayloadTooLarge, false),
+    );
     assert_eq!(
         expected_error_kind(payload),
         None,
@@ -462,6 +466,10 @@ fn expected_kind_demotes_every_backend_owned_error_code() {
     // suppressed `ContextWindowExceeded` bucket (CodeRabbit).
     let context = "OpenHuman API error (400 Bad Request): \
          {\"error\":{\"errorCode\":\"CONTEXT_LENGTH_EXCEEDED\",\"message\":\"This model's maximum context length is 128000 tokens, however you requested more\"}}";
+    register_backend_classifier_fixture(
+        context,
+        reportable_fixture(BackendErrorKind::ContextLengthExceeded, false),
+    );
     assert_eq!(
         expected_error_kind(context),
         None,
@@ -485,6 +493,10 @@ fn expected_kind_lets_malformed_bad_request_page() {
     // classify it as expected, so capture proceeds.
     let body = "OpenHuman API error (400 Bad Request): \
          {\"error\":{\"errorCode\":\"BAD_REQUEST\",\"malformed\":true}}";
+    register_backend_classifier_fixture(
+        body,
+        reportable_fixture(BackendErrorKind::BadRequest, true),
+    );
     assert_eq!(expected_error_kind(body), None);
 }
 
