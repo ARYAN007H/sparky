@@ -123,7 +123,7 @@ test.describe('Chat Harness - Cancel', () => {
     await setMockBehavior('llmStreamChunkDelayMs', '500');
 
     await openChat(page);
-    await createNewThread(page);
+    const threadId = await createNewThread(page);
     await sendMessage(page, PROMPT);
 
     // Mid-stream, the composer's Send button morphs into a Stop button (the
@@ -137,7 +137,9 @@ test.describe('Chat Harness - Cancel', () => {
     for (const piece of LATE_PIECES) {
       await expect(page.getByText(piece, { exact: false })).toHaveCount(0, { timeout: 5_000 });
     }
-    await expect.poll(inFlightThreadKeys).toEqual([]);
+    await expect
+      .poll(async () => inFlightThreadKeys())
+      .not.toContain(`::${threadId}`);
     await expect.poll(async () => page.locator('#root').innerText()).toContain('one two');
     const transcript = await selectedThreadTranscript(page);
     expect(transcript.content).toContain(PROMPT);

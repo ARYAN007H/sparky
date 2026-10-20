@@ -6,6 +6,7 @@ import {
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
+import { selectedThreadTranscript } from '../helpers/chat-transcript';
 
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-chat-conversation-history';
@@ -215,5 +216,10 @@ test.describe('Chat Conversation History', () => {
     expect(modelContext).toContain(SECOND_PROMPT);
 
     await expect(page.getByText(TURN_TWO_CANARY)).toBeVisible();
+    const transcript = await selectedThreadTranscript(page);
+    expect(transcript.content).toContain(FIRST_PROMPT);
+    expect(transcript.content).toContain(FIRST_RESPONSE);
+    expect(transcript.content).toContain(SECOND_PROMPT);
+    expect(transcript.content).toContain(TURN_TWO_CANARY);
   });
 });
