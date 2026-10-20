@@ -421,7 +421,7 @@ impl OpenHumanSessionHost {
         ) {
             // Host-only: no delegation; the host's names join an empty belt.
             _ if host_only => (Vec::new(), Some(super::host_only::empty_belt())),
-            (Some(def), Some(reg)) => {
+            (Some(def), Some(_reg)) => {
                 let synthed = if should_synthesize_delegation_tools(def) {
                     tools::orchestrator_tools::collect_orchestrator_tools(
                         def,
