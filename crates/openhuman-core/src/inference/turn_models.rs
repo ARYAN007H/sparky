@@ -507,7 +507,12 @@ impl TurnModelSource {
                         .with_attachment_config(source.config.clone())
                         .build(model, temperature, context_window, thread_id)?;
                     for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
-                        let role = crate::inference::provider_model::role_for_provider_model(
+                        let resolved_context = source_ctx.resolved();
+                        let extensions = resolved_context
+                            .as_deref()
+                            .map(crate::core::runtime::CoreContext::extensions);
+                        let role = crate::inference::provider_model::role_for_provider_model_for(
+                            extensions,
                             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
                             tier,
                         );
@@ -676,7 +681,12 @@ impl TurnModelSource {
                     )
                 });
             if managed {
-                return crate::inference::provider::factory::make_openhuman_backend_model_for_thread(
+                let resolved_context = cn.ctx().resolved();
+                let extensions = resolved_context
+                    .as_deref()
+                    .map(crate::core::runtime::CoreContext::extensions);
+                return crate::inference::provider::factory::make_openhuman_backend_model_for_thread_in(
+                    extensions,
                     &cn.role,
                     &cn.config,
                     Some(model),
