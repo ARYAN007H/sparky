@@ -111,7 +111,7 @@ pub mod config {
     pub use openhuman_core::config::{
         active_workspace_dir, active_workspace_dir_cached, active_workspace_snapshot,
         build_runtime_proxy_client_with_timeouts, load_config_with_timeout, workspace_handle,
-        Config, PrivacyMode, WORKLOAD_ROLES,
+        Config, PrivacyMode,
     };
 
     pub mod app_env {

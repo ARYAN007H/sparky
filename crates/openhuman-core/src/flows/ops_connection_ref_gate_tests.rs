@@ -12,8 +12,7 @@ async fn cached_probe_inference_readiness_caches_a_negative_result() {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::inference::registry::{
-        register_chat_model, unregister_chat_model, BackendErrorClassification, ChatModelEntry,
-        ProviderModelHooks,
+        register_chat_model, unregister_chat_model, ChatModelEntry, ProviderModelHooks,
     };
     use async_trait::async_trait;
     use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
