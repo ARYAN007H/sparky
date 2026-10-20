@@ -4,19 +4,23 @@ use super::*;
 async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     const CHILD: &str = "OPENHUMAN_SAAS_SUBAGENT_CANCEL_SCOPE_CHILD";
     if std::env::var_os(CHILD).is_none() {
+        let module_path = module_path!().trim_start_matches("openhuman_core::");
+        let test_name = format!(
+            "{module_path}::profile_scope_cannot_cancel_another_profiles_driver_child"
+        );
         let output = std::process::Command::new(
             std::env::current_exe().expect("unit test executable path"),
         )
-        .args([
-            "--exact",
-            "agent::orchestration::tools::tools_e2e_driver_tests::profile_scope_cannot_cancel_another_profiles_driver_child",
-            "--nocapture",
-        ])
+        .arg("--exact")
+        .arg(test_name)
+        .arg("--nocapture")
         .env(CHILD, "1")
         .output()
         .expect("run isolated SaaS-mode driver cancellation case");
         assert!(
-            output.status.success(),
+            output.status.success()
+                && String::from_utf8_lossy(&output.stdout).contains(&test_name)
+                && String::from_utf8_lossy(&output.stdout).contains("1 passed"),
             "isolated SaaS cancellation case failed: stdout={} stderr={}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
@@ -112,20 +116,23 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         )
         .expect("detached child context")
         .with_cancellation(detached_data.cancellation.clone());
-    let accepted = crate::agent::orchestration::tools::SpawnSubagentTool::new()
-        .execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "wait for an owner-scoped cancellation",
-                "model": "test-model",
-                "task_key": "profile-cancel-canary"
-            }),
-            None,
-            live.data.child(),
-            detached,
-        )
-        .await
-        .expect("spawn tool execution");
+    let accepted = CoreContext::scope(
+        Arc::clone(&alice),
+        crate::agent::orchestration::tools::SpawnSubagentTool::new()
+            .execute_with_live_parent_context(
+                json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": "wait for an owner-scoped cancellation",
+                    "model": "test-model",
+                    "task_key": "profile-cancel-canary"
+                }),
+                None,
+                live.data.child(),
+                detached,
+            ),
+    )
+    .await
+    .expect("spawn tool execution");
     assert!(!accepted.is_error, "{}", accepted.output());
     let task_id = accepted
         .output()
@@ -156,8 +163,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     assert_eq!(alice_job.status, SubAgentJobStatus::Running);
 
     let store = SubagentSessionStore::new(workspace.clone());
-    let row_before = store
-        .load()
+    let row_before = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
         .expect("durable child row readable")
         .into_iter()
         .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
@@ -174,12 +180,15 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         bob_job_registry.list().is_empty(),
         "Bob resolves the same workspace/session/thread but uses Bob's scoped registry"
     );
-    let foreign_cancel = crate::agent::orchestration::running_subagents::cancel_by_task_with_workspace_reason(
-        &bob_ctx,
-        &task_id,
-        Some(&workspace),
-        Some("foreign profile cancellation"),
-    )
+    let foreign_cancel = CoreContext::scope(Arc::clone(&bob), async {
+        crate::agent::orchestration::running_subagents::cancel_by_task_with_workspace_reason(
+            &bob_ctx,
+            &task_id,
+            Some(&workspace),
+            Some("foreign profile cancellation"),
+        )
+    })
+    .await
     .expect("foreign profile cancellation lookup");
     assert!(foreign_cancel.is_none(), "Bob cannot cancel Alice's child");
     assert_eq!(
@@ -190,14 +199,14 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         SubAgentJobStatus::Running,
         "foreign cancellation leaves the owner job running"
     );
-    let after_bob = store
-        .load()
+    let after_bob = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
         .expect("durable child row remains readable")
         .into_iter()
         .find(|row| row.subagent_session_id == row_before.subagent_session_id)
         .expect("foreign attempt keeps Alice's durable row");
     assert_eq!(after_bob.status, DurableSubagentStatus::Running);
     assert_eq!(after_bob.current_task_id, row_before.current_task_id);
+    assert_eq!(after_bob.latest_error, row_before.latest_error);
     assert_eq!(
         crate::agent::orchestration::background_completions::pending_for_ctx(
             &bob_ctx,
@@ -219,14 +228,14 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .is_none(),
         "SaaS cancellation without a profile fails closed"
     );
-    let after_unbound = store
-        .load()
+    let after_unbound = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
         .expect("unbound attempt leaves durable child row readable")
         .into_iter()
         .find(|row| row.subagent_session_id == row_before.subagent_session_id)
         .expect("unbound attempt keeps Alice's durable row");
     assert_eq!(after_unbound.status, DurableSubagentStatus::Running);
     assert_eq!(after_unbound.current_task_id, row_before.current_task_id);
+    assert_eq!(after_unbound.latest_error, row_before.latest_error);
     assert!(
         crate::agent::orchestration::background_completions::pending_for_ctx(
             &alice_ctx,
@@ -237,12 +246,15 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         "neither rejected control attempt emits an Alice completion"
     );
 
-    let owner_cancel = crate::agent::orchestration::running_subagents::cancel_by_task_with_workspace_reason(
-        &alice_ctx,
-        &task_id,
-        Some(&workspace),
-        Some("owner requested stop"),
-    )
+    let owner_cancel = CoreContext::scope(Arc::clone(&alice), async {
+        crate::agent::orchestration::running_subagents::cancel_by_task_with_workspace_reason(
+            &alice_ctx,
+            &task_id,
+            Some(&workspace),
+            Some("owner requested stop"),
+        )
+    })
+    .await
     .expect("owner cancellation lookup");
     assert!(owner_cancel.is_some(), "Alice can cancel her own child");
     let terminal = tokio::time::timeout(

@@ -22,24 +22,51 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
         SPAWN_SUBAGENT_CANARY,
         "spawn-subagent-child-answer",
     )]));
-
-    let live = super::live_parent_run_context(
-        "spawn-subagent-e2e",
-        parent_context(workspace.path(), provider.clone(), vec![]),
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(16);
+    let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    parent.on_progress = Some(progress_tx);
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.components.juice = false;
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    )
+    .derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config,
+            crate::core::runtime::DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
+    );
+    let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    let live = tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new("spawn-subagent-e2e"),
+        host,
     );
     // Boxed: the inline spawn future is too large for a test thread's stack.
-    let result = Box::pin(
-        SpawnSubagentTool::new().execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": format!("Investigate {SPAWN_SUBAGENT_CANARY}"),
-                "context": "parent supplied context",
-                "model": "test-model",
-            }),
-            None,
-            live.data.child(),
-            crate::agent::subagent_host::detached_subagent_parent(&live, "spawn-subagent-child")
+    let result = crate::core::runtime::CoreContext::scope(
+        Arc::clone(&core),
+        Box::pin(
+            SpawnSubagentTool::new().execute_with_live_parent_context(
+                json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": format!("Investigate {SPAWN_SUBAGENT_CANARY}"),
+                    "context": "parent supplied context",
+                    "model": "test-model",
+                }),
+                None,
+                live.data.child(),
+                crate::agent::subagent_host::detached_subagent_parent(
+                    &live,
+                    "spawn-subagent-child",
+                )
                 .expect("detached parent"),
+            ),
         ),
     )
     .await
@@ -59,6 +86,27 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .expect("accepted async envelope contains the child task reference");
     let task_id = task_ref["task_id"].as_str().expect("public task id");
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    task_id: event_task_id,
+                    ..
+                }) if event_task_id == task_id => break,
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    task_id: event_task_id,
+                    error,
+                    ..
+                }) if event_task_id == task_id => {
+                    panic!("scripted child failed before completing: {error}")
+                }
+                Some(_) => {}
+                None => panic!("parent progress stream closed before child completion"),
+            }
+        }
+    })
+    .await
+    .expect("matching completion progress follows durable settlement");
     assert!(provider.saw(SPAWN_SUBAGENT_CANARY));
     assert!(provider.saw("parent supplied context"));
     let jobs = crate::core::runtime::slot_for::<
@@ -80,7 +128,7 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
             job.id.as_str(),
             crate::agent::tinyagents::tool_registration::subagent_owner_key(
                 workspace.path(),
-                "spawn-subagent-e2e",
+                "tools-e2e-session",
                 None,
             ),
         ),
