@@ -162,6 +162,10 @@ fn hosted_presets_and_classification_are_context_scoped() {
         assert_eq!(presets[0].label, "Tenant Hosted");
         assert_eq!(presets[0].endpoint, "https://tenant.example/v1");
         assert!(presets.iter().any(|preset| preset.slug == "openai"));
+        assert!(super::builtin_presets().host_is_builtin_cloud_provider("tenant.example"));
+        assert!(super::builtin_presets().endpoint_host_is_chat_completions_only(
+            "https://tenant.example/v1"
+        ));
         assert!(super::builtin_cloud_provider("tenant-hosted").is_some());
         assert!(super::is_hosted_cloud_identity("tenant-hosted"));
         assert!(!super::is_hosted_auth_style(AuthStyle::Bearer));
@@ -172,19 +176,16 @@ fn hosted_presets_and_classification_are_context_scoped() {
     assert!(!super::is_hosted_auth_style(AuthStyle::OpenhumanJwt));
 }
 
-/// Drift guard (TAURI-RUST-5EN): couple the capability helper to the
-/// preset list so adding a new built-in that wrongly claims the Responses
-/// API — or renaming `openai` — fails CI rather than silently re-enabling
-/// the guaranteed-404 `/responses` fallback. OpenAI's first-party endpoint
-/// is the only built-in that serves `/v1/responses`.
+/// Drift guard: keep the host catalog aligned with the generic provider
+/// catalog's documented Responses API support.
 #[test]
 fn responses_api_capability_is_coupled_to_the_preset_list() {
     for provider in builtin_cloud_providers().iter() {
-        let expected = provider.slug == "openai";
+        let expected = matches!(provider.slug, "openai" | "openrouter" | "xai");
         assert_eq!(
             builtin_presets().builtin_cloud_supports_responses_api(provider.slug),
             expected,
-            "built-in {} Responses-API capability drifted from the openai-only invariant",
+            "built-in {} Responses-API capability drifted from the provider catalog",
             provider.slug
         );
     }
