@@ -1,8 +1,10 @@
 use super::*;
+use crate::storage::documents::compare_and_swap;
+use tinystoragedrivers::CollectionSpec;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct StagedAttachment {
+pub(super) \1 StagedAttachment {
     tenant: crate::core::runtime::Tenant,
     thread_id: String,
     attachment: StoredAttachment,
@@ -13,7 +15,7 @@ struct StagedAttachment {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-struct StagedAttachmentClaim {
+pub(super) \1 StagedAttachmentClaim {
     tenant: crate::core::runtime::Tenant,
     thread_id: String,
     message_id: String,
@@ -22,25 +24,25 @@ struct StagedAttachmentClaim {
     canceled: bool,
 }
 
-const STAGED_DOMAIN: &str = "threads::attachments";
-const STAGED_COLLECTION: &str = "staged_thread_attachments";
-const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+pub(super) \1 STAGED_DOMAIN: &str = "threads::attachments";
+pub(super) \1 STAGED_COLLECTION: &str = "staged_thread_attachments";
+pub(super) \1 STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
-const STAGED_DOMAIN: &str = "threads::attachments";
-const STAGED_COLLECTION: &str = "staged_thread_attachments";
-const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+pub(super) \1 STAGED_DOMAIN: &str = "threads::attachments";
+pub(super) \1 STAGED_COLLECTION: &str = "staged_thread_attachments";
+pub(super) \1 STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
-fn staged_doc_id(opaque_id: &str) -> Result<String, String> {
+pub(super) \1 staged_doc_id(opaque_id: &str) -> Result<String, String> {
     let uuid = uuid::Uuid::parse_str(opaque_id)
         .map_err(|_| "staged attachment reference is invalid".to_string())?;
     Ok(uuid.simple().to_string())
 }
 
-fn staged_collections() -> Vec<CollectionSpec> {
+pub(super) \1 staged_collections() -> Vec<CollectionSpec> {
     vec![CollectionSpec::new(STAGED_COLLECTION)]
 }
 
-fn staged_repo(
+pub(super) \1 staged_repo(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace: &std::path::Path,
 ) -> Result<Repo, String> {
@@ -57,7 +59,7 @@ fn staged_repo(
         .map_err(|error| format!("open staged attachment collection: {error}"))
 }
 
-fn get_staged_record(repo: &Repo, id: &str) -> Result<Option<StagedAttachment>, String> {
+pub(super) \1 get_staged_record(repo: &Repo, id: &str) -> Result<Option<StagedAttachment>, String> {
     let id = id.to_string();
     repo.run(|docs| async move {
         let Some(stored) = docs.get(STAGED_COLLECTION, &id).await? else {
@@ -70,7 +72,7 @@ fn get_staged_record(repo: &Repo, id: &str) -> Result<Option<StagedAttachment>, 
     .map_err(|error| error.to_string())
 }
 
-async fn read_staged_entries(
+pub(super) \1 read_staged_entries(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     requested: &[ContentPart],
@@ -128,7 +130,7 @@ pub(crate) async fn bind_staged_refs(
     ))
 }
 
-async fn claim_staged_refs(
+pub(super) \1 claim_staged_refs(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     config: &crate::config::Config,
@@ -157,7 +159,7 @@ async fn claim_staged_refs(
     Ok(())
 }
 
-fn claim_staged_record(
+pub(super) \1 claim_staged_record(
     repo: &Repo,
     tenant: &crate::core::runtime::Tenant,
     thread_id: &str,
@@ -327,7 +329,7 @@ pub(crate) async fn resolve_staged_parts(
     Ok(resolved)
 }
 
-async fn validate_staged_files(
+pub(super) \1 validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     config: &crate::config::Config,
@@ -397,7 +399,7 @@ pub(crate) async fn discard_staged_parts(
     discard_staged_entries(ctx, thread_id, &config, entries).await
 }
 
-async fn discard_staged_entries(
+pub(super) \1 discard_staged_entries(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     config: &crate::config::Config,
@@ -445,7 +447,7 @@ async fn discard_staged_entries(
     Ok(())
 }
 
-fn cancel_staged_record(
+pub(super) \1 cancel_staged_record(
     repo: &Repo,
     tenant: &crate::core::runtime::Tenant,
     thread_id: &str,
@@ -548,7 +550,7 @@ pub(crate) async fn consume_staged_parts(
     Ok(())
 }
 
-fn opaque_media(part: &ContentPart) -> Option<&MediaReference> {
+pub(super) \1 opaque_media(part: &ContentPart) -> Option<&MediaReference> {
     match part {
         ContentPart::Image { media, .. }
         | ContentPart::Audio { media, .. }
