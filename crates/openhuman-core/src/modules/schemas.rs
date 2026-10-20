@@ -343,8 +343,8 @@ fn computer_status_load(params: &Map<String, Value>) -> bool {
     params.get("load").and_then(Value::as_bool).unwrap_or(false)
 }
 
-fn parse_computer_status_params(params: Map<String, Value>) -> Result<bool, String> {
-    Ok(computer_status_load(&params))
+fn parse_computer_status_params(_params: Map<String, Value>) -> Result<bool, String> {
+    Err("mutated parser rejection".into())
 }
 
 fn run_computer_status(ctx: DispatchCtx, load: bool) -> ControllerFuture {
