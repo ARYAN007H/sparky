@@ -38,6 +38,7 @@ fn trusted_turn(session_key: &str) -> Arc<super::super::turn_host::TrustedAgentT
         imported_history: vec![tinyagents_session::transcript::TranscriptMessage::user(
             "trusted imported row",
         )],
+        native_reply: None,
     })
 }
 
