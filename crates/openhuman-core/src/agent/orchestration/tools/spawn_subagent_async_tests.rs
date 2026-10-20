@@ -6,10 +6,8 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
-use tinytools::{ToolCallOptions, ToolRunContext};
+use tinytools::ToolCallOptions;
 use tinytools_agent::dialect::ToolCallFormat;
-
-struct ThreadContext(&'static str);
 
 #[tokio::test]
 async fn late_registration_refusal_aborts_the_worker_and_settles_its_durable_session() {
