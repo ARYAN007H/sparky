@@ -56,7 +56,6 @@ fn meta(agent: &str, agent_type: &str) -> TranscriptMeta {
         session_id: None,
         parent_session_id: None,
         prefix_reset: false,
-        prefix_reset: false,
     }
 }
 
