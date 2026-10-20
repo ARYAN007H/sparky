@@ -4,6 +4,8 @@
 mod env_guard;
 #[path = "support/published_tinyflows.rs"]
 mod published_tinyflows;
+#[path = "support/tinyhumans_boot.rs"]
+mod tinyhumans_boot;
 
 use env_guard::EnvVarGuard;
 use std::path::Path;
@@ -150,6 +152,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
                 .await
                 .expect("load the same scoped Config used by the prompt dump");
         let ctx = openhuman_core::core::runtime::DispatchCtx::host_default();
+        tinyhumans_boot::boot();
         prewarm_flow_authoring_in_parent(&ctx, &config).await;
         assert!(openhuman_core::modules::runtime::is_module_serving(
             "tinyflows"
