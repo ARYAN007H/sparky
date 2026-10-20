@@ -1218,8 +1218,10 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
             &capture_root.join("captures/before/requests"),
         ));
         assert!(
-        before.len() == batches[0].len() * 2
-            && before.chunks_exact(batches[0].len()).all(|batch| batch == batches[0]),
+            before.len() == batches[0].len() * 2
+                && before
+                    .chunks_exact(batches[0].len())
+                    .all(|batch| batch == batches[0]),
             "before baseline batches were not two identical captures"
         );
         let after = capture_request_bodies(&capture_request_files(&request_dir));
