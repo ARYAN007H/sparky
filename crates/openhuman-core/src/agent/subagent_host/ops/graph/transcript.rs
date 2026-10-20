@@ -172,6 +172,7 @@ pub(super) fn persist_subagent_transcript(
         charged_amount_usd: usage.cost.known_usd,
         thread_id: thread_id.map(str::to_owned),
         task_id: Some(task_id.to_string()),
+        prefix_reset: false,
     };
     let handle = match transcripts.open_stem(transcript_stem, meta.clone()) {
         Ok(handle) => handle,

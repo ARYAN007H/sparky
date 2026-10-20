@@ -50,7 +50,7 @@ pub struct ClearTurnStateRequest {
 }
 
 /// Response payload for `openhuman.threads_turn_state_clear`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ClearTurnStateResponse {
     pub cleared: bool,
