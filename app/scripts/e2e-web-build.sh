@@ -75,4 +75,4 @@ echo "Building standalone openhuman-core for web E2E into ${E2E_WEB_CORE_TARGET_
 # The web suite exercises the shipped desktop surface, so compile the same
 # explicit product gates that the Tauri shell and product CI lanes forward.
 PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
-CARGO_TARGET_DIR="$E2E_WEB_CORE_TARGET_DIR" bash "$REPO_ROOT/scripts/ci-cancel-aware.sh" "$CARGO_BIN" build --manifest-path "$REPO_ROOT/Cargo.toml" --bin openhuman-core --features "$PRODUCT_FEATURES"
+bash "$REPO_ROOT/scripts/ci-cancel-aware.sh" "$CARGO_BIN" build --manifest-path "$REPO_ROOT/Cargo.toml" --target-dir "$E2E_WEB_CORE_TARGET_DIR" --bin openhuman-core --features "$PRODUCT_FEATURES"
