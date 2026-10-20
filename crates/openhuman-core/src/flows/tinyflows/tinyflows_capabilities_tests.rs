@@ -437,15 +437,12 @@ async fn preflight_invoker_gates_the_mock_tool_path() {
 }
 
 #[test]
-fn harness_model_default_override_normalises_tiers_to_hint_roles() {
-    // Bare managed tiers → the `hint:<role>` form the session builder routes on
-    // (a bare tier would otherwise fall through to the chat workload).
-    assert_eq!(
-        harness_model_default_override("reasoning-v1"),
-        "hint:reasoning"
-    );
-    assert_eq!(harness_model_default_override("chat-v1"), "hint:chat");
-    // `hint:*` aliases pass through their role.
+fn harness_model_default_override_preserves_unowned_model_ids() {
+    // Bare hosted model aliases are interpreted only when TinyHumans has
+    // registered its provider policy. Bare core preserves arbitrary IDs.
+    assert_eq!(harness_model_default_override("reasoning-v1"), "reasoning-v1");
+    assert_eq!(harness_model_default_override("chat-v1"), "chat-v1");
+    // Generic `hint:*` routing markers keep their role.
     assert_eq!(
         harness_model_default_override("hint:reasoning"),
         "hint:reasoning"
