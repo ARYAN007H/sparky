@@ -87,6 +87,40 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     Ok(backend)
 }
 
+/// Async counterpart to [`backend_for`] for boot and module-proxy paths that
+/// already run inside a future. It avoids re-entering the blocking bridge when
+/// opening a workspace's default backend.
+pub async fn backend_for_async(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
+    if let Some(backend) = installed() {
+        return Ok(backend);
+    }
+    {
+        let opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(backend) = opened.get(workspace_dir) {
+            return Ok(Arc::clone(backend));
+        }
+    }
+    let url = super::config::default_url(workspace_dir);
+    super::config::prepare_default_dir(workspace_dir).with_context(|| {
+        format!(
+            "create the storage directory for {}",
+            workspace_dir.display()
+        )
+    })?;
+    tracing::debug!(
+        target: "openhuman::storage",
+        workspace = %workspace_dir.display(),
+        "[storage::local] asynchronously opening the workspace default backend (none installed)"
+    );
+    let backend = super::open(&url)
+        .await
+        .with_context(|| format!("open the default storage for {}", workspace_dir.display()))?;
+    let mut opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
+    Ok(Arc::clone(
+        opened.entry(workspace_dir.to_path_buf()).or_insert(backend),
+    ))
+}
+
 /// The storage a store uses for this call: [`backend_for`] `workspace_dir`
 /// under the acting scope ([`current_scope`]).
 ///

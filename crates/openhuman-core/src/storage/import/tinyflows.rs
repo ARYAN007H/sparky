@@ -307,7 +307,8 @@ pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Res
         Some(backend) => backend,
         // The workspace-local fallback owns storage preparation and module
         // migrations, but intentionally does not import legacy domain files.
-        None => crate::storage::local::backend_for(&config.workspace_dir)
+        None => crate::storage::local::backend_for_async(&config.workspace_dir)
+            .await
             .map_err(|error| format!("open the fallback storage: {error:#}"))?,
     };
     if !catalog_migration_ready(&backend, config, &scope) {
