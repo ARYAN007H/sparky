@@ -79,7 +79,9 @@ async fn goal_tool_with_context_uses_the_business_goal_store() {
             .expect("goal was persisted");
         assert_eq!(stored.objective, "persist through the host store");
 
-        let no_thread = set.execute(serde_json::json!({ "objective": "no thread" })).await
+        let no_thread = set
+            .execute(serde_json::json!({ "objective": "no thread" }))
+            .await
             .expect("execute without a thread");
         assert!(no_thread.is_error);
         assert!(goal_store(workspace.path(), &dispatch)
@@ -96,10 +98,7 @@ async fn goal_store_uses_the_explicit_dispatch_context_provider() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 
-    fn context_for(
-        agent: &str,
-        provider: Arc<dyn SessionStoreProvider>,
-    ) -> Arc<CoreContext> {
+    fn context_for(agent: &str, provider: Arc<dyn SessionStoreProvider>) -> Arc<CoreContext> {
         let mut overrides = crate::agent::host_overrides::HostOverrides::default();
         overrides.session_store = Some(provider);
         let overlay = ContextOverlay::new(

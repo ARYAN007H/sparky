@@ -358,7 +358,10 @@ async fn goal_resume_and_account_updates_reach_the_web_channel() {
             std::time::Duration::from_secs(1),
         )
         .await;
-        assert!(matches!(web_rx.try_recv(), Err(broadcast::error::TryRecvError::Empty)));
+        assert!(matches!(
+            web_rx.try_recv(),
+            Err(broadcast::error::TryRecvError::Empty)
+        ));
         crate::agent::goals::account_turn(
             workspace.path(),
             &dispatch,
