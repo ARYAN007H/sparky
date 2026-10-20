@@ -11,6 +11,7 @@ mod purge;
 mod queued_attachments;
 mod search;
 mod support;
+mod thread_delete;
 mod title_generation;
 mod transcript;
 mod turn_state_ops;
