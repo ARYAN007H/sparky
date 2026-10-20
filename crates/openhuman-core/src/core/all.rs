@@ -301,7 +301,7 @@ pub fn register_controller_extension(ext: ControllerExtension) -> Result<(), Str
     for controller in ext.controllers {
         merged.push(GroupedController {
             group: ext.group,
-            controller,
+            controller: ControllerEntry::legacy(controller),
         });
     }
     // Validate the union so an extension cannot shadow a built-in or internal
@@ -728,10 +728,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::platform::update::all_update_registered_controllers(),
     );
     // Conversation thread and message management
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Threads,
-        crate::threads::all_threads_registered_controllers(),
+        crate::threads::schemas::registry::all_controller_entries(),
     );
     // TokenJuice content-router debug controllers (detect / compress / cache_stats / retrieve).
     // Classified Inference: TokenJuice is the token-compression content router,
@@ -818,12 +818,12 @@ fn build_internal_only_controllers() -> Vec<GroupedController> {
 }
 
 /// Returns registered controllers filtered by the ambient [`crate::core::runtime::DomainSet`].
-pub fn all_registered_controllers() -> Vec<RegisteredController> {
+pub fn all_registered_controllers() -> Vec<ControllerEntry> {
     let view = registry_view();
     registered_controllers(&view)
 }
 
-fn registered_controllers(view: &RegistryView) -> Vec<RegisteredController> {
+fn registered_controllers(view: &RegistryView) -> Vec<ControllerEntry> {
     let found = view
         .iter()
         .filter(|g| visible(g))
