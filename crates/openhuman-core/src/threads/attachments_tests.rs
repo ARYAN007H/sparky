@@ -59,6 +59,27 @@ fn public_projection_hides_paths_but_keeps_opaque_attachment_refs() {
     assert_eq!(metadata, json!({"keep": true}));
 }
 
+#[test]
+fn staged_image_reference_preserves_uploaded_file_name() {
+    let part = image(MediaReference {
+        file_name: Some("queued-roundtrip.png".into()),
+        content_type: Some("image/png".into()),
+        ..Default::default()
+    });
+    let staged = Attachment {
+        path: "uploads/thread/attachment".into(),
+        name: "attachment".into(),
+        mime: "image/png".into(),
+        size_bytes: 68,
+    };
+
+    let result = from_staged_parts(&[part], &[staged]).unwrap();
+    let ContentPart::Image { media, .. } = &result[0].0 else {
+        panic!("staged image changed kind");
+    };
+    assert_eq!(media.file_name.as_deref(), Some("queued-roundtrip.png"));
+}
+
 fn claim(message_id: &str, part: ContentPart, canceled: bool) -> StagedAttachmentClaim {
     StagedAttachmentClaim {
         tenant: crate::core::runtime::Tenant::default(),
