@@ -332,8 +332,6 @@ fn every_pack_declares_the_tools_it_is_named_for() {
         (
             "media",
             &[
-                "create_image",
-                "create_video",
                 "media_generate_image",
                 "media_generate_video",
                 "media_list_models",
