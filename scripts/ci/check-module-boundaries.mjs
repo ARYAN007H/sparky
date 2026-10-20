@@ -93,7 +93,18 @@ export function auditGraph(metadata, roots, policy, contract = null) {
           if (contract) continue;
         }
       }
-      for (const next of edges(id)) queue.push([...path, next]);
+      for (const next of edges(id)) {
+        if (!contract && packages.get(next).name === policy.linkedHost?.package) {
+          const parent = packages.get(id).name;
+          if (path.length === 1 && policy.linkedHost.allowedParents.includes(parent)) continue;
+          violations.push({
+            scope: 'hosts', package: policy.linkedHost.package,
+            path: [...path, next].map(item => packages.get(item).name),
+          });
+          continue;
+        }
+        queue.push([...path, next]);
+      }
     }
   }
   return { violations, exceptions };
