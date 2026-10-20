@@ -34,6 +34,10 @@ test("local Linux E2E shards cover every CI suite", () => {
   );
 
   const ciShards = [];
+  const allWorkflowShards = Array.from(
+    workflow.matchAll(/^\s*- \{ name: ([\w-]+), suites: "([^"]+)" \}$/gm),
+    ([, name, suites]) => ({ name, suites }),
+  );
   const seen = new Set();
   for (const [, name, suites] of workflow.matchAll(
     /^\s*- \{ name: ([\w-]+), suites: "([^"]+)" \}$/gm,
@@ -45,12 +49,17 @@ test("local Linux E2E shards cover every CI suite", () => {
   }
 
   assert.deepEqual(localShards, ciShards);
-  assert.deepEqual(localShards, [
+  const expectedShards = [
     { name: "foundation", suites: "auth,navigation,system" },
     { name: "chat", suites: "chat,skills,journeys" },
     { name: "connections", suites: "providers,provider-web,connectors" },
     { name: "settings", suites: "settings,notifications" },
-  ]);
+  ];
+  assert.deepEqual(localShards, expectedShards);
+  assert.equal(allWorkflowShards.length, expectedShards.length * 3, "three OS matrices each have four groups");
+  for (let index = 0; index < allWorkflowShards.length; index += expectedShards.length) {
+    assert.deepEqual(allWorkflowShards.slice(index, index + expectedShards.length), expectedShards);
+  }
 
   const scheduled = Array.from(
     flowRunner.matchAll(/^\s*run "(test\/e2e\/specs\/[^\"]+)"\s+"[^\"]+"\s+"([^\"]+)"/gm),
