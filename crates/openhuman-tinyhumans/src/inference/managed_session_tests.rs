@@ -14,7 +14,10 @@ fn the_offline_local_session_cannot_authenticate_managed_inference() {
     )
     .expect_err("a local session has no managed bearer");
 
-    assert_eq!(error.to_string(), LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE);
+    assert_eq!(
+        error.to_string(),
+        LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE
+    );
     assert!(
         !openhuman_embed::__host::core::observability::is_session_expired_message(
             &error.to_string()

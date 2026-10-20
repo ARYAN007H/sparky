@@ -50,7 +50,9 @@ impl ManagedOptions {
                      endpoint: {endpoint} — use the managed backend or loopback for local testing"
                 );
             }
-            log::debug!("[providers][openhuman-backend] authenticating managed inference with api-key");
+            log::debug!(
+                "[providers][openhuman-backend] authenticating managed inference with api-key"
+            );
             return Ok(key);
         }
         resolve_session_bearer(
@@ -131,4 +133,3 @@ fn managed_inference_http_client() -> reqwest::Client {
         })
         .clone()
 }
-

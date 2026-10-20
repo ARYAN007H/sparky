@@ -1,6 +1,6 @@
 use super::*;
-use tinyinference_llm::model::{ChatModel, ModelRequest};
 use tinyinference_llm::message::Message;
+use tinyinference_llm::model::{ChatModel, ModelRequest};
 
 #[test]
 fn managed_model_preserves_the_openhuman_response_cache_identity() {
@@ -146,9 +146,10 @@ async fn owner_typed_managed_auth_callback_publishes_session_expiry() {
     let mut source = None;
     loop {
         match events.try_recv() {
-            Ok(DomainEvent::SessionExpired { source: value, reason })
-                if reason.contains("HOST_AUTH_CALLBACK_MARKER") =>
-            {
+            Ok(DomainEvent::SessionExpired {
+                source: value,
+                reason,
+            }) if reason.contains("HOST_AUTH_CALLBACK_MARKER") => {
                 source = Some(value);
                 break;
             }

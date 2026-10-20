@@ -7,7 +7,9 @@ use std::sync::Arc;
 use openhuman_embed::__host::egress::{emit_external_transfer, enforce_egress, EgressDescriptor};
 use openhuman_embed::__host::inference_registry::EmbeddingRequest;
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
-use tinyinference_embeddings::{BearerResolver, CloudEmbeddingModel, EmbeddingEgressGuard, EmbeddingModel};
+use tinyinference_embeddings::{
+    BearerResolver, CloudEmbeddingModel, EmbeddingEgressGuard, EmbeddingModel,
+};
 
 use super::managed_session::resolve_session_bearer;
 use crate::backend::url::effective_api_url;
@@ -87,7 +89,13 @@ impl ManagedEmbeddingModel {
         let model = model.to_string();
         let base_url = base_url;
         Self {
-            inner: cloud_model(&base_url, &model, dimensions, Arc::clone(&bearer), chat.as_ref()),
+            inner: cloud_model(
+                &base_url,
+                &model,
+                dimensions,
+                Arc::clone(&bearer),
+                chat.as_ref(),
+            ),
             base_url,
             model,
             dimensions,

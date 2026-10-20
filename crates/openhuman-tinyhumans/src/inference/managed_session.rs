@@ -3,7 +3,9 @@
 //! rejected session.
 
 use tinyinference_llm::model::ProviderError;
-use tinyinference_llm::providers::tinyhumans::{TinyHumansAuthFailure, TinyHumansAuthFailureKind, TinyHumansOperation};
+use tinyinference_llm::providers::tinyhumans::{
+    TinyHumansAuthFailure, TinyHumansAuthFailureKind, TinyHumansOperation,
+};
 
 /// Resolve the persisted app-session token for a managed inference caller.
 /// Both chat and embeddings use this path so signed-out state, expiry checks,
@@ -94,10 +96,7 @@ fn maybe_publish_local_session_expiry(operation: &str) {
 /// Publish expiry only from TinyInference's explicit managed-endpoint
 /// provenance. The provider label is a wire diagnostic and is not an auth
 /// ownership signal.
-pub(super) fn publish_managed_auth_failure(
-    error: &ProviderError,
-    context: TinyHumansAuthFailure,
-) {
+pub(super) fn publish_managed_auth_failure(error: &ProviderError, context: TinyHumansAuthFailure) {
     let status = match context.kind() {
         TinyHumansAuthFailureKind::Unauthorized => 401,
         TinyHumansAuthFailureKind::Forbidden => 403,
