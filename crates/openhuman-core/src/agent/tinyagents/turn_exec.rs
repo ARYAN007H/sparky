@@ -18,7 +18,8 @@ use tinyagents_harness::turn_policy::effective_max_iterations;
 use tinyagents_runtime::turn_driver::{
     SubagentScope as DriverSubagentScope, TurnControls, TurnDriver, TurnScope,
 };
-use tinyagents_runtime::{DriverRequest, ToolSnapshot};
+use tinyagents_runtime::DriverRequest;
+use tinyagents_harness::tool::ToolSnapshot;
 
 use crate::agent::harness::tool_result_artifacts::TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE;
 use crate::agent::tinyagents::host::OpenHumanRunContext;

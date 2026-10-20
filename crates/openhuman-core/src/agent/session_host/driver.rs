@@ -165,7 +165,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             messages = crate::agent::multimodal::rehydrate_image_placeholders(&messages).await;
         }
 
-        // Runtime's `ToolSnapshot` remains the model declaration and final
+        // Harness `ToolSnapshot` remains the model declaration and final
         // allowlist. The actual executable instances must be supplied by the
         // request hook as well: falling back to a long-lived driver's tool
         // registry would let revoked or hidden tools execute under stale

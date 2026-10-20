@@ -21,6 +21,6 @@ pub(crate) mod plan_exit;
 mod todo;
 
 pub use plan_exit::PlanExitTool;
-pub const PLAN_EXIT_MARKER: &str = tinyagents_harness::tool::plan_exit::PLAN_EXIT_MARKER;
+pub const PLAN_EXIT_MARKER: &str = tinyagents_harness_tools::PLAN_EXIT_MARKER;
 pub use todo::TodoTool;
 pub(crate) use todo::TodoToolDispatch;
