@@ -112,7 +112,7 @@ fn collect_queue_rejects_typed_media_before_it_can_be_accepted_and_dropped() {
 #[tokio::test]
 async fn voice_note_turn_id_is_bound_to_its_exact_user_row_before_admission() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-    use crate::threads::store::{ConversationMessage, CreateConversationThread, blocking};
+    use crate::threads::store::{blocking, ConversationMessage, CreateConversationThread};
     use crate::tools::toolpacks::ToolGroups;
     use serde_json::json;
 

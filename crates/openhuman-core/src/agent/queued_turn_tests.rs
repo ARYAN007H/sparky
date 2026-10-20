@@ -186,7 +186,10 @@ fn requeue_adopts_context_but_never_predecessor_message_or_attachment_state() {
 
     RequeuePayload::adopt(&mut next, &running);
 
-    assert!(next.trusted_turn.is_some(), "trusted channel context is inherited");
+    assert!(
+        next.trusted_turn.is_some(),
+        "trusted channel context is inherited"
+    );
     assert!(!next.deferred_user_message);
     assert!(next.pending_attachments.is_none());
     assert!(next.stored_attachments.is_none());
