@@ -89,13 +89,11 @@ fn tool_rules_reach_the_core_definition() {
         .into_core("narrow")
         .unwrap();
     assert_eq!(def.tool_rules, Some(rules));
-    assert!(
-        AgentDefinitionSpec::new()
-            .into_core("open")
-            .unwrap()
-            .tool_rules
-            .is_none()
-    );
+    assert!(AgentDefinitionSpec::new()
+        .into_core("open")
+        .unwrap()
+        .tool_rules
+        .is_none());
 }
 
 #[test]
@@ -126,12 +124,10 @@ fn template_overrides_are_independent_and_keep_restrictions() {
     assert_eq!(first.temperature, 0.3);
     assert_eq!(second.temperature, 0.8);
     assert_eq!(second.max_iterations, 7);
-    assert!(
-        AgentDefinitionSpec::new()
-            .tools(ToolScopeSpec::Wildcard)
-            .inherit(template)
-            .is_err()
-    );
+    assert!(AgentDefinitionSpec::new()
+        .tools(ToolScopeSpec::Wildcard)
+        .inherit(template)
+        .is_err());
 }
 #[test]
 fn base_can_be_named_or_custom_and_unknown_names_are_typed() {

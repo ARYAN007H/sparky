@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tinyagents_harness::store::SchemaAdmission;
-use tinyagents_session::DriverSessionStores;
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
+use tinyagents_session::DriverSessionStores;
 use tinystoragedrivers::{Blocking, Scope, StorageBackend, StorageError};
 
 /// Session stores over one backend, routed to a per-tenant provider.

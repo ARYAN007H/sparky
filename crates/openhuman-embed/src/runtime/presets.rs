@@ -24,8 +24,8 @@ use openhuman_core::core::runtime::{DomainSet, ServiceSet, TokenSource};
 use openhuman_core::core::types::HostKind;
 use openhuman_core::tools::toolpacks::ToolGroups;
 
-use super::RuntimeBuilder;
 use super::builder::ConfigSource;
+use super::RuntimeBuilder;
 use crate::harness::Workspace;
 
 impl RuntimeBuilder {

@@ -39,7 +39,13 @@ fn module_items_are_the_owners_module_scoped_declarations() {
 #[test]
 fn tiny_artifacts_blob_namespace_composes_with_host_artifact_collections() {
     let registry = registry().expect("the owners compose");
-    assert_eq!(registry.owners().filter(|owner| *owner == "artifacts").count(), 1);
+    assert_eq!(
+        registry
+            .owners()
+            .filter(|owner| *owner == "artifacts")
+            .count(),
+        1
+    );
 
     let artifacts = owner_schemas()
         .into_iter()

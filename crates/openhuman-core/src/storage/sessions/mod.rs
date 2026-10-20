@@ -23,14 +23,14 @@ mod rebound;
 mod tenant_router;
 mod workspace;
 
-pub use rebound::{ReboundSessionStores, StoreRegistry, rebind_all};
+pub use rebound::{rebind_all, ReboundSessionStores, StoreRegistry};
 pub use tenant_router::TenantSessionStores;
 pub use workspace::{
-    WorkspaceSessionStores, artifact_blobs_for, artifact_scoped_for_in, attachment_stash_for,
-    current_documents_for, default_turn_states_for, ledger_for, provider_for_workspace,
-    provider_for_workspace_in, release_workspace, release_workspace_defaults, require_ledger,
-    session_scope, status_store_for, stores_for, stores_or_ephemeral, turn_states_for, with_ledger,
-    with_ledger_async,
+    artifact_blobs_for, artifact_scoped_for_in, attachment_stash_for, current_documents_for,
+    default_turn_states_for, ledger_for, provider_for_workspace, provider_for_workspace_in,
+    release_workspace, release_workspace_defaults, require_ledger, session_scope, status_store_for,
+    stores_for, stores_or_ephemeral, turn_states_for, with_ledger, with_ledger_async,
+    WorkspaceSessionStores,
 };
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =

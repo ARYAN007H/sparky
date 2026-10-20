@@ -13,7 +13,7 @@
 //! perspective.
 
 use super::types::GeneratePresentationInput;
-use super::types::{MAX_BULLETS_PER_SLIDE, MAX_SLIDES, MAX_TEXT_CHARS, PresentationError};
+use super::types::{PresentationError, MAX_BULLETS_PER_SLIDE, MAX_SLIDES, MAX_TEXT_CHARS};
 use super::*;
 
 use std::path::Path;
@@ -222,7 +222,7 @@ async fn execute_happy_path_returns_artifact_metadata() {
 
 /// Canonical 1×1 PNG, written to disk to exercise the File source path.
 fn png_1x1() -> Vec<u8> {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
     STANDARD
         .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
         .unwrap()

@@ -8,6 +8,6 @@
 //! during core boot. Native OS providers belong to `openhuman-rpc::keyring`.
 
 pub use openhuman_core::security::secret_storage::{
-    EncryptedFileBackend, MemoryBackend, SecretBackend, SecretStorageError, install_secret_backend,
-    installed_secret_backend,
+    install_secret_backend, installed_secret_backend, EncryptedFileBackend, MemoryBackend,
+    SecretBackend, SecretStorageError,
 };

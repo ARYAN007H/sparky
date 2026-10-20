@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tokio::sync::{Notify, watch};
+use tokio::sync::{watch, Notify};
 
 use crate::CoreError;
 

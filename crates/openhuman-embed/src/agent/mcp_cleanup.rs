@@ -1,7 +1,7 @@
 //! Retiring one captured agent owner before its id or home is reusable.
 use super::*;
 use crate::runtime::PendingCleanup;
-use std::sync::{Weak, atomic::Ordering};
+use std::sync::{atomic::Ordering, Weak};
 
 pub(crate) fn finish_removal(
     registry: &crate::runtime::AgentMap,

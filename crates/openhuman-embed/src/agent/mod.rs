@@ -38,9 +38,9 @@ use openhuman_core::agent_registry::host_definition::AgentDefinition;
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::{CoreContext, CoreRuntime};
 
-use crate::CoreError;
 use crate::harness::{Access, Provider};
 use crate::turn::{Turn, TurnOutcome, TurnTarget};
+use crate::CoreError;
 
 /// Error from instantiating or driving an [`Agent`].
 #[derive(Debug, thiserror::Error)]
