@@ -14,10 +14,11 @@
 //! Only the records move. A file version's bytes stay in a file
 //! (`ArtifactVersion::file`), as the legacy card's do.
 //!
-//! The first call of a process imports the records an earlier build kept as
-//! `<workspace>/artifacts/versioned/<id>.json` (once per backend instance,
-//! scope and workspace). Only absent records are written, so the import never
-//! overwrites a newer one and is safe to repeat; deleting an artifact removes
+//! An explicit artifact call imports the records an earlier build kept as
+//! `<workspace>/artifacts/versioned/<id>.json` through its supplied scope.
+//! Imports write only absent records, so they never overwrite a newer one and
+//! are safe to repeat. The compatibility constructor uses the current scope
+//! and retains its once-per-backend optimization; deleting an artifact removes
 //! its legacy file first, so a restart does not bring it back.
 
 use std::path::{Path, PathBuf};
