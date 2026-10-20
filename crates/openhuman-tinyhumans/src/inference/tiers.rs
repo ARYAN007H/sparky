@@ -146,11 +146,8 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
         changed |= rewrite(&mut route.model);
     }
     if config.cloud_providers.is_empty() {
-        if let Some(preset) =
-            openhuman_embed::__host::config::schema::cloud_providers::builtin_cloud_provider(
-                "openhuman",
-            )
         {
+            let preset = crate::hosted_config::openhuman_preset();
             let id = openhuman_embed::__host::config::schema::cloud_providers::generate_provider_id(
                 "openhuman",
             );

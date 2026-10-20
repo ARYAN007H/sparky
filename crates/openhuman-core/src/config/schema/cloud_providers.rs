@@ -15,7 +15,8 @@ use std::sync::Arc;
 
 use crate::core::slots::HookSlot;
 use tinyinference_providers::builtin::{
-    BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
+    BuiltinAuthStyle, BuiltinCloudProvider as UpstreamBuiltinCloudProvider, BuiltinPresets,
+    BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
 };
 
 static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
@@ -113,18 +114,58 @@ impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
 /// Every built-in preset: host-provided entries followed by the
 /// provider-neutral catalog from `tinyinference-providers`.
 pub fn builtin_cloud_providers() -> Vec<BuiltinCloudProvider> {
-    HOSTED_PRESETS
+    let hosted = HOSTED_PRESETS
         .entries_context_first()
         .into_iter()
         .map(|(_, preset)| preset)
-        .chain(UPSTREAM_BUILTINS.iter().map(BuiltinCloudProvider::from))
-        .collect()
+        .collect::<Vec<_>>();
+    // Keep the product's managed entry first for settings presentation. The
+    // owner catalog itself remains generic-first for exact-slug lookup.
+    hosted
+        .into_iter()
+        .chain(
+            UPSTREAM_BUILTINS
+                .iter()
+                .filter(|preset| !hosted_has_slug(preset.slug))
+                .map(BuiltinCloudProvider::from),
+        )
+        .collect::<Vec<_>>()
+}
+
+fn hosted_has_slug(slug: &str) -> bool {
+    HOSTED_PRESETS
+        .entries_context_first()
+        .iter()
+        .any(|(_, preset)| preset.slug == slug)
+}
+
+fn provider_presets(hosted: &[BuiltinCloudProvider]) -> BuiltinPresets {
+    BuiltinPresets::new(hosted.iter().map(|preset| UpstreamBuiltinCloudProvider {
+        slug: preset.slug,
+        label: preset.label,
+        endpoint: preset.endpoint,
+        // Only route/catalog metadata is consumed from this generic catalog;
+        // persisted OpenhumanJwt remains in the host's schema and is never
+        // converted into runtime bearer authentication.
+        auth_style: match preset.auth_style {
+            AuthStyle::Anthropic => BuiltinAuthStyle::Anthropic,
+            AuthStyle::Bearer | AuthStyle::OpenhumanJwt | AuthStyle::None => BuiltinAuthStyle::Bearer,
+        },
+    }))
 }
 
 pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
-    builtin_cloud_providers()
+    let hosted = HOSTED_PRESETS
+        .entries_context_first()
         .into_iter()
-        .find(|provider| provider.slug == type_str)
+        .map(|(_, preset)| preset)
+        .collect::<Vec<_>>();
+    if let Some(preset) = hosted.iter().find(|preset| preset.slug == type_str) {
+        return Some(*preset);
+    }
+    BuiltinPresets::default()
+        .builtin_cloud_provider(type_str)
+        .map(BuiltinCloudProvider::from)
 }
 
 /// Whether `slug` matches a built-in cloud provider preset.
@@ -154,37 +195,19 @@ pub fn is_builtin_cloud_slug(slug: &str) -> bool {
 /// a genuine OpenAI proxy that does support `/responses`, so the factory keeps
 /// the fallback for those.
 pub fn builtin_cloud_supports_responses_api(slug: &str) -> bool {
-    matches!(slug, "openai")
+    let hosted = HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
+        .collect::<Vec<_>>();
+    provider_presets(&hosted).builtin_cloud_supports_responses_api(slug)
 }
 
 /// Extract the lowercased authority host from an endpoint URL, dropping the
 /// scheme, any userinfo, the port, and the path. Returns `None` when no host
 /// can be parsed. Tolerant of a missing scheme and of IPv6 literals.
 pub fn endpoint_host(endpoint: &str) -> Option<String> {
-    let s = endpoint.trim();
-    // Drop the scheme (`https://…`); tolerate a bare `host/path` form.
-    let after_scheme = s.split_once("://").map(|(_, rest)| rest).unwrap_or(s);
-    // The authority ends at the first path / query / fragment delimiter.
-    let authority = after_scheme
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or(after_scheme);
-    // Strip any `user:pass@` userinfo prefix.
-    let host_port = authority
-        .rsplit_once('@')
-        .map(|(_, host)| host)
-        .unwrap_or(authority);
-    // Strip the port, handling bracketed IPv6 literals (`[::1]:8080`).
-    let host = if let Some(rest) = host_port.strip_prefix('[') {
-        rest.split_once(']').map(|(h, _)| h).unwrap_or(rest)
-    } else {
-        host_port
-            .rsplit_once(':')
-            .map(|(h, _)| h)
-            .unwrap_or(host_port)
-    };
-    let host = host.trim().to_ascii_lowercase();
-    (!host.is_empty()).then_some(host)
+    tinyinference_providers::builtin::endpoint_host(endpoint)
 }
 
 /// Whether `host` is the authority host of any built-in cloud **inference**
@@ -206,13 +229,12 @@ pub fn endpoint_host(endpoint: &str) -> Option<String> {
 /// fall back to the default backend chain — the cloud analogue of the local-AI
 /// guard that fixed the Ollama case (OPENHUMAN-TAURI-51/-80/-7Z).
 pub fn host_is_builtin_cloud_provider(host: &str) -> bool {
-    let host = host.trim().to_ascii_lowercase();
-    if host.is_empty() {
-        return false;
-    }
-    builtin_cloud_providers()
-        .iter()
-        .any(|p| endpoint_host(p.endpoint).as_deref() == Some(host.as_str()))
+    let hosted = HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
+        .collect::<Vec<_>>();
+    provider_presets(&hosted).host_is_builtin_cloud_provider(host)
 }
 
 /// Whether an endpoint **host** is a known cloud host that does NOT serve the
@@ -228,20 +250,12 @@ pub fn host_is_builtin_cloud_provider(host: &str) -> bool {
 /// while a genuinely unknown proxy host keeps the permissive fallback so a real
 /// OpenAI proxy still gets `/responses`.
 pub fn endpoint_host_is_chat_completions_only(endpoint: &str) -> bool {
-    let Some(host) = endpoint_host(endpoint) else {
-        return false;
-    };
-    let mut matched_chat_only = false;
-    for provider in builtin_cloud_providers().iter() {
-        if endpoint_host(provider.endpoint).as_deref() == Some(host.as_str()) {
-            if builtin_cloud_supports_responses_api(provider.slug) {
-                // A Responses-capable built-in lives at this host → not chat-only.
-                return false;
-            }
-            matched_chat_only = true;
-        }
-    }
-    matched_chat_only
+    let hosted = HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
+        .collect::<Vec<_>>();
+    provider_presets(&hosted).endpoint_host_is_chat_completions_only(endpoint)
 }
 
 /// Authentication header style for a cloud provider.
