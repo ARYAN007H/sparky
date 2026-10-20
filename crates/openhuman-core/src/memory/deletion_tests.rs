@@ -182,7 +182,7 @@ async fn a_failed_forget_is_kept_for_the_next_drain() {
 }
 
 #[test]
-fn an_unparsable_legacy_queue_is_ignored_and_left_in_place() {
+fn an_unparsable_legacy_queue_is_quarantined_and_retry_queue_remains_usable() {
     let tmp = tempfile::tempdir().unwrap();
     let file = crate::memory::state_store::legacy_path(tmp.path(), "pending_deletions");
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -190,7 +190,12 @@ fn an_unparsable_legacy_queue_is_ignored_and_left_in_place() {
     assert!(pending(tmp.path()).is_empty());
     enqueue(tmp.path(), thread("t"));
     assert_eq!(pending(tmp.path()), vec![thread("t")]);
-    assert_eq!(std::fs::read_to_string(&file).unwrap(), "not json");
+    assert!(!file.exists(), "the corrupt legacy file is removed from the active path");
+    assert_eq!(
+        std::fs::read_to_string(file.with_extension("json.corrupt")).unwrap(),
+        "not json",
+        "quarantine preserves the original bytes"
+    );
 }
 
 #[test]

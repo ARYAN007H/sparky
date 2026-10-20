@@ -1,4 +1,5 @@
 use super::*;
+use crate::storage::StorageBackend;
 use tinymemory_api::{ConsolidateRequest, ItemKind, Namespace, Reach};
 use tinymemory_tools::BackgroundJob;
 

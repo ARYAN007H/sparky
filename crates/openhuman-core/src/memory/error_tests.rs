@@ -79,13 +79,14 @@ fn upstream_errors_keep_the_memory_rpc_wire_codes_and_messages() {
 }
 
 #[test]
-fn upstream_account_wide_classification_includes_credits_and_unavailable() {
+fn upstream_unavailable_is_transient_not_account_wide() {
     use tinymemory_api::Error as E;
 
     assert!(E::Off("disabled".into()).is_account_wide());
     assert!(E::Unauthorized("bad key".into()).is_account_wide());
     assert!(E::InsufficientCredits("top up".into()).is_account_wide());
-    assert!(E::Unavailable("timeout".into()).is_account_wide());
+    assert!(!E::Unavailable("timeout".into()).is_account_wide());
+    assert!(E::Unavailable("timeout".into()).is_transient());
     assert!(!E::InvalidRequest("bad filter".into()).is_account_wide());
     assert!(!E::Conflict("duplicate".into()).is_account_wide());
     assert!(!E::Engine("corrupt index".into()).is_account_wide());

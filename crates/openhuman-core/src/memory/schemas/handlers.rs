@@ -106,11 +106,22 @@ pub(super) fn engine_get(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 }
 
 pub(super) fn engine_set(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<EngineSetParams, _>(ctx, params, |_, mut config, params| async move {
-        ops::apply_engine_set(&mut config, &params)?;
-        save(&config).await?;
+    Box::pin(async move {
+        let params = parse::<EngineSetParams>(params)?;
+        let mut config = load(&ctx).await?;
+        if let Err(error) = ops::apply_engine_set(&mut config, &params) {
+            return finish(Err(error));
+        }
+        if let Err(error) = config.save().await {
+            if let Some(conflict) = crate::config::ops::config_save_conflict(&error, false) {
+                return Err(conflict.encode());
+            }
+            return finish(Err(Error::Engine(format!(
+                "saving config failed: {error:#}"
+            ))));
+        }
         engine::invalidate();
-        Ok(ops::engine_get(&config).await)
+        finish(Ok(ops::engine_get(&config).await))
     })
 }
 
