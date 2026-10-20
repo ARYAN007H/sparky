@@ -510,15 +510,13 @@ const threadSlice = createSlice({
           return [];
         };
         thread[rowId] = {
-          reactions: storedItems((saved as ChannelActivity | undefined)?.reactions).map(
-            item => ({
-              actorId: typeof item.actorId === 'string' ? item.actorId : '',
-              value: typeof item.value === 'string' ? item.value : '',
-              ...(typeof item.customEmojiId === 'string'
-                ? { customEmojiId: item.customEmojiId }
-                : {}),
-            })
-          ),
+          reactions: storedItems((saved as ChannelActivity | undefined)?.reactions).map(item => ({
+            actorId: typeof item.actorId === 'string' ? item.actorId : '',
+            value: typeof item.value === 'string' ? item.value : '',
+            ...(typeof item.customEmojiId === 'string'
+              ? { customEmojiId: item.customEmojiId }
+              : {}),
+          })),
           readReceipts: storedItems((saved as ChannelActivity | undefined)?.readReceipts).map(
             item => ({
               actorId: typeof item.actorId === 'string' ? item.actorId : '',
