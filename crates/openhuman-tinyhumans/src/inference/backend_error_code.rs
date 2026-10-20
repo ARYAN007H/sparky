@@ -112,22 +112,6 @@ pub fn is_managed_backend_envelope(err: &str) -> bool {
         || lower.starts_with(&format!("{label} streaming api error"))
 }
 
-/// Test helper for the historical string-only Sentry ownership predicate.
-/// Production consumers use the registered classification's ownership and
-/// reportability fields instead.
-#[cfg(test)]
-#[cfg(test)]
-pub fn managed_error_skips_sentry(err: &str) -> bool {
-    is_managed_backend_envelope(err) && backend_error_code_skips_sentry(err)
-}
-
-/// Parse a recognised [`BackendErrorCode`] out of a flattened error string.
-#[cfg(test)]
-#[cfg(test)]
-pub fn extract_backend_error_code(err: &str) -> Option<BackendErrorCode> {
-    extract_backend_error_code_token(err).and_then(|t| BackendErrorCode::from_token(&t))
-}
-
 /// Whether the managed backend explicitly flagged this `BAD_REQUEST` as a
 /// **malformed** payload (the client built a request the backend couldn't
 /// parse), as opposed to a user-parameter rejection (an unsupported model /
@@ -150,57 +134,6 @@ pub fn body_flags_malformed(err: &str) -> bool {
     let after_key = &lower[key_idx + KEY.len()..];
     let after_colon = after_key.trim_start_matches(|c: char| c.is_ascii_whitespace() || c == ':');
     after_colon.starts_with("true")
-}
-
-/// Test helper for recognizing a backend-flagged malformed `BAD_REQUEST`.
-#[cfg(test)]
-#[cfg(test)]
-pub fn is_backend_malformed_bad_request(err: &str) -> bool {
-    matches!(
-        extract_backend_error_code(err),
-        Some(BackendErrorCode::BadRequest)
-    ) && body_flags_malformed(err)
-}
-
-/// Test helper for recognizing a reported client-side guard leak.
-///
-/// - `PAYLOAD_TOO_LARGE`: the client gates attachment size up front
-///   (`app/src/lib/attachments.ts` — per-image / per-file byte caps + a
-///   `too_large` reject), so an over-limit request reaching the backend means
-///   the aggregate slipped past those gates.
-/// - `CONTEXT_LENGTH_EXCEEDED`: the client manages context before send (the
-///   context stats state's `context_window`, `crates/openhuman-core/src/agent/context/stats.rs`),
-///   so a backend rejection means that fitting / trimming failed.
-///
-/// The backend does not ops-alert either (they are 4xx, not 500), so if the FE
-/// also suppressed them the guard leak would be invisible to everyone. Display
-/// classification is unchanged — the user still sees the actionable copy.
-#[cfg(test)]
-#[cfg(test)]
-pub fn is_backend_client_guard_leak(err: &str) -> bool {
-    matches!(
-        extract_backend_error_code(err),
-        Some(BackendErrorCode::PayloadTooLarge | BackendErrorCode::ContextLengthExceeded)
-    )
-}
-
-/// Sentry-ownership decision (F2 golden rule): a response carrying any backend
-/// `errorCode` must **not** page the FE — the backend owns it (it already
-/// paged) or it is expected user-state — *except* errors the **client** caused
-/// and so still page:
-/// - a backend-flagged malformed `BAD_REQUEST` (unparseable client payload), and
-/// - a client-guard-leak code (`PAYLOAD_TOO_LARGE` / `CONTEXT_LENGTH_EXCEEDED`)
-///   the client should have caught before sending — see
-///   [`is_backend_client_guard_leak`].
-///
-/// Production consumers use [`BackendErrorClassification`] so ownership is
-/// kept separate from its optional canonical token.
-#[cfg(test)]
-#[cfg(test)]
-pub fn backend_error_code_skips_sentry(err: &str) -> bool {
-    extract_backend_error_code_token(err).is_some()
-        && !is_backend_malformed_bad_request(err)
-        && !is_backend_client_guard_leak(err)
 }
 
 /// Classify an error for the core's generic observability and chat surfaces.
