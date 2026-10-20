@@ -77,6 +77,10 @@ fn classify_string_preserves_long_fractional_and_inline_retry_hints() {
             2_500,
         ),
         ("HTTP 429 Too Many Requests; retry_after 1.5", 1_500),
+        (
+            "HTTP 429 Too Many Requests\nRetry-After: Sat, 01 Jan 2000 00:00:00 GMT",
+            0,
+        ),
     ] {
         match classify_error(message.to_string()) {
             ArmError::Retryable {

@@ -103,7 +103,7 @@ async fn backend_401_publishes_session_expired_through_reporter() {
     install_fixture_backend_classifier();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
-    let marker = "REPORTER_MARKER_SESSION";
+    let marker = "REPORTER_MARKER_SESSION MONTHLY_REQUEST_COUNT quota exceeded";
     let _ = api_error(FIXTURE_BACKEND, response(StatusCode::UNAUTHORIZED, marker)).await;
     let seen = drain_until(&mut rx, |e| match e {
         DomainEvent::SessionExpired { reason, .. } if reason.contains(marker) => Some(()),
