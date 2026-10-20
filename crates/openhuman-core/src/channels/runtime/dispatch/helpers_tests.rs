@@ -107,11 +107,14 @@ async fn typing_task_runs_under_the_handed_context_not_the_active_one() {
     let channel = Arc::new(ProbeTyping(std::sync::Mutex::new(Some(sender))));
     let cancellation = tokio_util::sync::CancellationToken::new();
     // The caller's own scope is Ravi's; the typing task was handed Asha's.
-    let waiter = CoreContext::scope(ravi, async {
+    let (waiter_tx, waiter_rx) = oneshot::channel();
+    CoreContext::scope(ravi, async {
         tokio::task::yield_now().await;
-        spawn_typing_task(&asha, channel, "recipient".into(), cancellation.clone())
+        let waiter = spawn_typing_task(&asha, channel, "recipient".into(), cancellation.clone());
+        let _ = waiter_tx.send(waiter);
     })
     .await;
+    let waiter = waiter_rx.await.unwrap();
     let seen = tokio::time::timeout(std::time::Duration::from_secs(2), receiver)
         .await
         .unwrap()
