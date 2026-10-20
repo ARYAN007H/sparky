@@ -68,7 +68,7 @@ pub(super) fn get_staged_record(repo: &Repo, id: &str) -> Result<Option<StagedAt
     .map_err(|error| error.to_string())
 }
 
-pub(super) fn read_staged_entries(
+pub(super) async fn read_staged_entries(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     requested: &[ContentPart],
@@ -325,7 +325,7 @@ pub(crate) async fn resolve_staged_parts(
     Ok(resolved)
 }
 
-pub(super) fn validate_staged_files(
+pub(super) async fn validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     config: &crate::config::Config,
@@ -395,7 +395,7 @@ pub(crate) async fn discard_staged_parts(
     discard_staged_entries(ctx, thread_id, &config, entries).await
 }
 
-pub(super) fn discard_staged_entries(
+pub(super) async fn discard_staged_entries(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     config: &crate::config::Config,

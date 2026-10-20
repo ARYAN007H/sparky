@@ -1,11 +1,9 @@
 //! Persistence helpers for admitted queued web-chat user messages.
 
 use super::support::message_to_record;
-use crate::core::Outcome;
 use crate::core::runtime::DispatchCtx;
-use crate::threads::ops::support::envelope;
-use crate::threads::store::{self as conversations, ConversationMessage};
-use crate::threads::{AppendConversationMessageRequest, ConversationMessageRecord, ThreadsError};
+use crate::threads::store as conversations;
+use crate::threads::{AppendConversationMessageRequest, ConversationMessageRecord};
 
 /// Persist an admitted queued web user message under its stable request ID.
 ///
