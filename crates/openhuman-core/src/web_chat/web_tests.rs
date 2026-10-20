@@ -11,8 +11,12 @@ use super::{
     TestRunChatTaskBlock, WebChatParams,
 };
 use crate::core::TypeSchema;
+use crate::inference::registry::{
+    register_backend_error_classifier, BackendErrorClassification, BackendErrorKind,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::collections::HashMap;
 use tinyagents_harness::run_queue::QueueLane;
 use tokio::time::{timeout, Duration};
 
@@ -47,6 +51,56 @@ const LMSTUDIO_TEMPLATE_400: &str = "lmstudio returned: Engine protocol predict 
 /// from `inference::provider::http_error::api_error`).
 fn managed_error(status: &str, body: &str) -> String {
     format!("OpenHuman API error ({status}): {body}")
+}
+
+/// Run a web-copy assertion with explicit provider-neutral metadata. Hosted
+/// token/envelope parsing belongs to TinyHumans; core tests inject the semantic
+/// classification that the host registry supplies at runtime.
+fn classify_with_backend_metadata(
+    message: &str,
+    kind: BackendErrorKind,
+    malformed_bad_request: bool,
+) -> ClassifiedError {
+    static FIXTURES: OnceLock<Arc<Mutex<HashMap<String, BackendErrorClassification>>>> =
+        OnceLock::new();
+    let fixtures = Arc::clone(FIXTURES.get_or_init(|| Arc::new(Mutex::new(HashMap::new()))));
+    register_backend_error_classifier(Arc::new(move |_provider, error| {
+        fixtures
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(error)
+            .cloned()
+            .unwrap_or(BackendErrorClassification {
+                provider_owned: false,
+                backend_owned: false,
+                reportable: true,
+                token: None,
+                kind: None,
+                malformed_bad_request: false,
+            })
+    }));
+    FIXTURES
+        .get()
+        .expect("fixture map initialized")
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(
+            message.to_string(),
+            BackendErrorClassification {
+                provider_owned: true,
+                backend_owned: true,
+                reportable: malformed_bad_request
+                    || matches!(
+                        kind,
+                        BackendErrorKind::PayloadTooLarge
+                            | BackendErrorKind::ContextLengthExceeded
+                    ),
+                token: None,
+                kind: Some(kind),
+                malformed_bad_request,
+            },
+        );
+    classify_inference_error(message)
 }
 
 // ── SessionCacheFingerprint (thread-session cache invalidation) ───────
