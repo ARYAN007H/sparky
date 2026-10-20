@@ -13,49 +13,6 @@ type ManagedChatModel = (
     String,
 );
 
-/// The concrete model id a managed route runs on: the pinned default (else
-/// `MODEL_MANAGED_DEFAULT`), unless `model_override` names something.
-///
-/// An override that is itself a managed alias (`hint:coding`, `hint:chat`)
-/// means "this role on the managed backend": the default model. A concrete id
-/// (`openrouter/deepseek/deepseek-v4-pro`) is forwarded verbatim; the backend
-/// is authoritative over its validity (issue #4598).
-pub(super) fn resolve_managed_model(
-    role: &str,
-    config: &Config,
-    model_override: Option<&str>,
-) -> String {
-    // Every managed role runs on one concrete model: the pinned default, else
-    // `MODEL_MANAGED_DEFAULT`. Roles still matter (they picked the *route* that
-    // led here) but there are no per-role tier endpoints any more.
-    let model = managed_default_model(config);
-    log::debug!(
-        "[providers][chat-factory] role={} managed resolves to model={}",
-        role,
-        model
-    );
-    match model_override.map(str::trim).filter(|m| !m.is_empty()) {
-        Some(raw) if is_known_openhuman_tier(raw) => {
-            log::debug!(
-                "[providers][chat-factory] role={} override '{}' is a managed alias; using model={}",
-                role,
-                raw,
-                model
-            );
-            model
-        }
-        Some(raw) => {
-            log::debug!(
-                "[providers][chat-factory] role={} forwarding pinned model '{}' verbatim to the managed backend",
-                role,
-                raw
-            );
-            raw.to_string()
-        }
-        None => model,
-    }
-}
-
 /// The error the managed provider answers with when no chat-model provider is
 /// registered for it.
 pub(crate) fn managed_unavailable_error() -> anyhow::Error {
@@ -84,7 +41,13 @@ pub(super) fn managed_chat_model(
         log::debug!("[providers][chat-factory] role={role} managed provider is not registered");
         return Err(managed_unavailable_error());
     };
-    let model = resolve_managed_model(role, config, model_override);
+    let model = crate::inference::registry::resolve_provider_model(
+        PROVIDER_OPENHUMAN,
+        role,
+        config,
+        model_override,
+    )
+    .ok_or_else(managed_unavailable_error)?;
     log::debug!(
         "[providers][chat-factory] role={role} managed provider served by a registered chat model model={model}"
     );
