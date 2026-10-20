@@ -37,28 +37,29 @@ test.describe('Guided tour gates', () => {
     await waitForAppReady(page);
   });
 
-  test('tour starts from home and can navigate forward to the connections step', async ({
-    page,
-  }) => {
+  test('follows the current seven-step route and ends with its seeded welcome note', async ({ page }) => {
     await armWalkthrough(page);
 
-    const panel = await tooltip(page);
-    await expect(panel).toBeVisible();
-    await expect(page.locator('[data-walkthrough="home-card"]')).toBeVisible();
-
-    await clickTourNext(page);
-    await expect(page.locator('[data-walkthrough="home-cta"]')).toBeVisible();
-
-    await clickTourNext(page);
-    await expect.poll(async () => page.evaluate(() => window.location.hash)).toContain('/chat');
-    await expect(page.locator('[data-walkthrough="chat-agent-panel"]')).toBeVisible();
-
-    // Phase 2: step 4 navigates to /connections (was /skills)
-    await clickTourNext(page);
-    await expect
-      .poll(async () => page.evaluate(() => window.location.hash))
-      .toContain('/connections');
-    await expect(page.locator('[data-walkthrough="skills-grid"]')).toBeVisible();
+    const steps = [
+      { hash: /#\/chat$/, target: 'chat-agent-panel' },
+      { hash: /#\/connections\?tab=composio$/, target: 'skills-grid' },
+      { hash: /#\/connections\?tab=channels$/, target: 'skills-channels' },
+      { hash: /#\/settings$/, target: 'settings-menu' },
+      { hash: /#\/chat$/, target: 'tab-chat' },
+      { hash: /#\/chat$/, target: 'tab-connections' },
+      { hash: /#\/chat$/, target: 'chat-agent-panel' },
+    ];
+    for (let index = 0; index < steps.length; index += 1) {
+      const step = steps[index];
+      await expect(await tooltip(page)).toBeVisible();
+      await expect.poll(() => page.evaluate(() => window.location.hash)).toMatch(step.hash);
+      await expect(page.locator(`[data-walkthrough="${step.target}"]`)).toBeVisible();
+      if (index < steps.length - 1) await clickTourNext(page);
+    }
+    const finalPanel = await tooltip(page);
+    await expect(finalPanel).toContainText("You're all set!");
+    await expect(finalPanel.getByRole('button', { name: /Skip/i })).toHaveCount(0);
+    await expect(page.getByText(/Hey! Welcome to OpenHuman/)).toBeVisible();
   });
 
   test('skip hides the tour and marks walkthrough complete', async ({ page }) => {
@@ -90,7 +91,7 @@ test.describe('Guided tour gates', () => {
 
     const panel = await tooltip(page);
     await expect(panel).toBeVisible();
-    await expect(panel.getByText('1 of 10')).toBeVisible();
-    await expect(page.locator('[data-walkthrough="home-card"]')).toBeVisible();
+    await expect(panel.getByText('1 of 7')).toBeVisible();
+    await expect(page.locator('[data-walkthrough="chat-agent-panel"]')).toBeVisible();
   });
 });
