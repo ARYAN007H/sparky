@@ -186,6 +186,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
                 cancellation,
                 turn_deadline: None,
                 imported_history: trusted.imported_history.clone(),
+                legacy_history: trusted.legacy_history.clone(),
             },
         )
         .await
