@@ -293,7 +293,7 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     // policy denies the harmless code action before an interpreter is invoked;
     // TinyFlows then persists the failed terminal run through the
     // owner-scoped CatalogStorage callback.
-    let resumed = ok(
+    let rejected_resume = rpc(
         addr,
         TEST_TOKEN,
         3,
@@ -301,7 +301,16 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         json!({ "id": flow_id, "thread_id": run_id, "approvals": ["request"] }),
     )
     .await;
-    assert!(resumed["pending_approvals"].as_array().unwrap().is_empty());
+    let denial = rejected_resume["error"]["message"]
+        .as_str()
+        .expect("ReadOnly host denial is surfaced as the resume RPC error");
+    let denial = denial.to_lowercase();
+    assert!(
+        denial.contains("[policy-blocked]")
+            && denial.contains("flows code node is not permitted")
+            && denial.contains("readonly"),
+        "resume must surface the exact host policy denial: {rejected_resume}"
+    );
     let terminal = ok(
         addr,
         TEST_TOKEN,
@@ -321,12 +330,9 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     assert!(
         failure.contains("[policy-blocked]")
             && failure.contains("flows code node is not permitted")
-            && failure.contains("readonly"),
-        "{terminal}"
-    );
-    assert!(
-        terminal["steps"].as_array().is_some(),
-        "module persisted run steps: {terminal}"
+            && failure.contains("readonly")
+            && terminal["steps"].as_array().is_some(),
+        "failed run row must persist the same policy denial and steps: {terminal}"
     );
     assert_eq!(
         published_tinyflows::verify_v0_8_27_module(&module),
