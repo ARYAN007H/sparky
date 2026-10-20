@@ -96,6 +96,30 @@ async fn queued_user_append_reuses_exact_request_row_and_rejects_conflicts() {
 }
 
 #[tokio::test]
+async fn queued_text_only_user_message_is_persisted_idempotently() {
+    let (_temp, config) = setup().await;
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+
+    let first = persist_queued_user_message(&ctx, "uploads", "text-only", "follow-up", &[])
+        .await
+        .unwrap();
+    let retry = persist_queued_user_message(&ctx, "uploads", "text-only", "follow-up", &[])
+        .await
+        .unwrap();
+
+    assert_eq!(first.id, "user:text-only");
+    assert_eq!(retry.id, first.id);
+    assert_eq!(first.sender, "user");
+    assert_eq!(first.content, "follow-up");
+    assert!(first.attachments.is_empty());
+    let rows = conversations::get_messages(&ctx, config.workspace_dir, "uploads").unwrap();
+    assert_eq!(
+        rows.iter().filter(|row| row.id == "user:text-only").count(),
+        1
+    );
+}
+
+#[tokio::test]
 async fn concurrent_queued_attachment_transfer_has_one_exact_owner() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use tinychannels_bus::{ContentPart, MediaReference};
