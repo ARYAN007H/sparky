@@ -31,7 +31,9 @@ fn parse_registry_get_params(params: Map<String, serde_json::Value>) -> Result<S
 
 fn run_registry_get(_ctx: DispatchCtx, config: Config, qualified_name: String) -> ControllerFuture {
     Box::pin(async move {
-        to_json(crate::mcp::registry::ops::mcp_clients_registry_get(&config, qualified_name).await?)
+        params::to_json(
+            crate::mcp::registry::ops::mcp_clients_registry_get(&config, qualified_name).await?,
+        )
     })
 }
 
@@ -42,10 +44,6 @@ pub(crate) fn registry_get_controller_entry() -> ControllerEntry {
         parse_registry_get_params,
         run_registry_get,
     ))
-}
-
-fn to_json(value: impl serde::Serialize) -> Result<serde_json::Value, String> {
-    serde_json::to_value(value).map_err(|error| error.to_string())
 }
 
 // Test-only bridges: `schemas_tests.rs` (kept as-is; not part of the unsplit
