@@ -267,6 +267,22 @@ impl SpawnAsyncSubagentTool {
                 ));
             }
         }
+        // Capture the admitted parent generation before creating a worker
+        // thread, writing a durable running session, or publishing spawn
+        // events. A denied lifecycle admission must leave no phantom child.
+        let completion_target = match crate::agent::orchestration::background_completions::CompletionTarget::new(
+            dispatch.clone(),
+            parent.workspace_dir.clone(),
+            parent_session.clone(),
+            parent_thread_id.clone(),
+        ) {
+            Ok(target) => target,
+            Err(error) => {
+                return Ok(ToolResult::error(format!(
+                    "spawn_async_subagent: parent lifecycle admission failed: {error}"
+                )));
+            }
+        };
         let worker_thread_id = reusable
             .as_ref()
             .and_then(|session| session.worker_thread_id.clone())
@@ -378,13 +394,6 @@ impl SpawnAsyncSubagentTool {
         let background_agent_id = definition.id.clone();
         let background_task_id = task_id.clone();
         let background_parent_session = parent_session.clone();
-        let completion_target =
-            crate::agent::orchestration::background_completions::CompletionTarget::new(
-                dispatch.clone(),
-                parent.workspace_dir.clone(),
-                parent_session.clone(),
-                parent_thread_id.clone(),
-            )?;
         let background_worker_thread_id = worker_thread_id.clone();
         let background_store = store.clone();
         let background_subagent_session_id = durable_session.subagent_session_id.clone();
