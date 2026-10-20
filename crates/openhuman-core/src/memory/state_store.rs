@@ -15,6 +15,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Digest;
 
+use crate::storage::StorageBackend;
 use crate::storage::state_kv::StateKv;
 
 const OWNER: &str = "memory";
@@ -103,10 +104,13 @@ fn open_strict(workspace_dir: &Path, name: &str) -> Result<StateKv> {
 ///
 /// A storage error or an unparsable file.
 pub(crate) fn import_all(
-    scoped: &crate::storage::ScopedStorage,
+    backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
     workspace_dir: &Path,
 ) -> Result<Vec<String>> {
-    let kv = StateKv::over(scoped, OWNER, NS);
+    let local = backend.for_scope(&crate::storage::Scope::local())?;
+    let local_kv = StateKv::over(&local, OWNER, NS);
+    let queue_scope = workspace_scope(workspace_dir)?;
+    let queue_kv = StateKv::on_backend(backend, &queue_scope, OWNER, NS)?;
     let mut names = Vec::new();
     let Ok(entries) = std::fs::read_dir(workspace_dir.join("memory")) else {
         return Ok(names);
@@ -124,7 +128,11 @@ pub(crate) fn import_all(
         if !path.is_file() {
             continue;
         }
-        kv.import_file_strict(&name, &path)?;
+        if name == "pending_deletions" {
+            queue_kv.import_file_strict(&name, &path)?;
+        } else {
+            local_kv.import_file_strict(&name, &path)?;
+        }
         names.push(name);
     }
     names.sort();

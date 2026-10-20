@@ -86,6 +86,18 @@ impl StateKv {
         Ok(Self { repo, owner, ns })
     }
 
+    /// The state for an explicit backend and scope, for importers that must
+    /// keep data on the backend they are migrating rather than reopen a URL.
+    pub(crate) fn on_backend(
+        backend: &Arc<dyn super::StorageBackend>,
+        scope: &Scope,
+        owner: &'static str,
+        ns: &'static str,
+    ) -> Result<Self> {
+        let repo = Repo::on(backend, scope, "storage::state_kv", collections)?;
+        Ok(Self { repo, owner, ns })
+    }
+
     /// The state over an already scoped handle (tests, explicit scopes).
     #[must_use]
     pub fn over(scoped: &ScopedStorage, owner: &'static str, ns: &'static str) -> Self {

@@ -87,6 +87,47 @@ fn workspace_scopes_keep_retry_queues_stable_and_isolated_on_shared_storage() {
 }
 
 #[test]
+fn layout_import_places_legacy_retry_queue_in_its_workspace_scope() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue_file = super::legacy_path(tmp.path(), "pending_deletions");
+    std::fs::create_dir_all(queue_file.parent().unwrap()).unwrap();
+    std::fs::write(
+        &queue_file,
+        serde_json::to_vec(&vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: "thread-legacy".into(),
+        }])
+        .unwrap(),
+    )
+    .unwrap();
+
+    let backend: std::sync::Arc<dyn crate::storage::StorageBackend> =
+        std::sync::Arc::new(crate::storage::MemoryStorage::new());
+    super::import_all(&backend, tmp.path()).unwrap();
+
+    let workspace_scope = super::workspace_scope(tmp.path()).unwrap();
+    let workspace = backend.for_scope(&workspace_scope).unwrap();
+    let queue = crate::storage::state_kv::StateKv::over(&workspace, "memory", "state");
+    assert_eq!(
+        queue
+            .get::<Vec<crate::memory::deletion::PendingDeletion>>("pending_deletions")
+            .unwrap(),
+        Some(vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: "thread-legacy".into(),
+        }])
+    );
+
+    let local = backend.for_scope(&crate::storage::Scope::local()).unwrap();
+    let local_queue = crate::storage::state_kv::StateKv::over(&local, "memory", "state");
+    assert!(
+        local_queue
+            .get::<Vec<crate::memory::deletion::PendingDeletion>>("pending_deletions")
+            .unwrap()
+            .is_none(),
+        "the migration must not strand a duplicate queue in local scope"
+    );
+}
+
+#[test]
 fn state_values_do_not_leak_between_workspaces() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
