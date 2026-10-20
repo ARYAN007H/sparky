@@ -157,33 +157,15 @@ async function openFeedWith(page: Page, items: SeedItem[]): Promise<void> {
     { key: `${user}:persist:notifications`, marker: 'pw:notif-seed-applied', payload: items }
   );
 
-  // A fresh document: the init script above runs first, so the store rehydrates
-  // with the seed instead of the empty blob the previous boot left behind.
-  await page.goto('/#/notifications');
+  // A same-origin hash navigation does not create a new document, so it would
+  // not run the init script above. Reload explicitly to let Redux rehydrate
+  // the seeded blob before the app mounts.
+  await page.reload();
   await waitForAppReady(page);
   await dismissWalkthroughIfPresent(page);
   // Notifications now opens on its Welcome view. Enter the real feed through
   // its user-facing action before asserting the persisted system-event rows.
   await page.getByTestId('notifications-welcome-cta-view').click();
-  console.log(
-    '[notifications seed diagnostic]',
-    JSON.stringify(
-      await page.evaluate(user => {
-        const state = (
-          window as unknown as {
-            __OPENHUMAN_STORE__?: { getState?: () => { notifications?: { items?: unknown[] } } };
-          }
-        ).__OPENHUMAN_STORE__?.getState?.();
-        return {
-          hash: window.location.hash,
-          activeUser: localStorage.getItem('OPENHUMAN_ACTIVE_USER_ID'),
-          expectedUser: user,
-          scoped: localStorage.getItem(`${user}:persist:notifications`),
-          notifications: state?.notifications?.items,
-        };
-      }, user)
-    )
-  );
   await expect(page.getByTestId('system-events-section')).toBeVisible({ timeout: 20_000 });
 }
 
