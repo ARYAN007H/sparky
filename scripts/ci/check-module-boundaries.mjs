@@ -338,7 +338,7 @@ function hostTree(root, manifest, packageName, features, execute) {
   if (features === 'all') args.push('--all-features');
   else if (features === 'default') { /* Cargo's default feature set. */ }
   else if (Array.isArray(features)) {
-    args.push('--no-default-features', '--features', features.join(','));
+    args.push('--features', features.join(','));
   } else throw new Error(`unsupported feature selection for ${packageName}`);
   const tree = treeGraph(cargoText(root, 'tree', args, execute));
   if (parseTreePackage(tree.root).name !== packageName) {
@@ -354,7 +354,7 @@ function cliFeatures(root, execute) {
   if (!pkg || !pkg.features || !Object.hasOwn(pkg.features, 'linked-modules')) {
     throw new Error('openhuman-cli must declare its isolated linked-modules feature');
   }
-  return Object.keys(pkg.features).filter(feature => feature !== 'linked-modules');
+  return Object.keys(pkg.features).filter(feature => feature !== 'default' && feature !== 'linked-modules');
 }
 
 function linkedCliTree(root, execute) {

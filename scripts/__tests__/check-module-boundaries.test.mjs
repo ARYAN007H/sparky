@@ -197,6 +197,7 @@ test('linked bridge closure does not excuse an unrelated implementation edge or 
     ['tinyflows', ['openhuman-cli', 'tinyflows']],
     ['tinyflows-bus', ['openhuman-cli', 'openhuman', 'tinyflows-import', 'tinyflows-bus']],
   ]);
+  assert.throws(() => linkedHostAudit(metadata({ 'openhuman-cli': [] }), 'openhuman-cli', linked), /does not contain openhuman-modules-linked/);
 });
 
 test('deliberate violation: the bridge reached from the app, the TUI, the core or through a wrapper fails', () => {
@@ -337,6 +338,7 @@ test('host boundary audit ignores writer features unified only by unrelated work
       resolve(harnessRoot, item.manifest), item.name,
     ]));
     let contractBeingProbed;
+    let defaultWriterEnabled = false;
 
     const fakeExecFileSync = (_file, args) => {
       assert.equal(args[1], 'cargo');
@@ -349,7 +351,7 @@ test('host boundary audit ignores writer features unified only by unrelated work
           cargoArgs[cargoArgs.indexOf('--features') + 1].split(',').includes('linked-modules');
         if (packageName === 'openhuman-cli' && !links && cargoArgs.includes('--features')) {
           const selected = cargoArgs[cargoArgs.indexOf('--features') + 1].split(',');
-          assert.ok(selected.includes('default'), 'CLI default-only feature edges remain covered');
+          assert.ok(!cargoArgs.includes('--no-default-features'), 'CLI default features remain enabled');
           assert.ok(selected.includes('flow-write'), 'all non-bridge CLI features remain covered');
           assert.ok(!selected.includes('linked-modules'), 'linked-modules is isolated from the shipping graph');
         }
@@ -360,6 +362,8 @@ test('host boundary audit ignores writer features unified only by unrelated work
             '1openhuman-modules-linked v0.0.0',
             '2tinydocs-module v0.0.0',
             '3tinydocs v0.0.0',
+          ] : packageName === 'openhuman-cli' && defaultWriterEnabled && cargoArgs.includes('--features') ? [
+            '1tinyflows v0.8.28',
           ] : packageName === 'openhuman' ? [
             '1tinyflows-import v0.1.0',
             `2tinyflows-bus v0.1.0 (${tinyflowsBus})`,
@@ -411,6 +415,10 @@ test('host boundary audit ignores writer features unified only by unrelated work
     // instead observes the unrelated dev fixture's flow-write feature and
     // reports implementation packages along the normal host path.
     assert.equal(run(harnessRoot, false, fakeExecFileSync), true);
+    // Model an optional dependency activated only by the CLI's default feature.
+    // It must appear in the all-shipping-feature graph and be rejected.
+    defaultWriterEnabled = true;
+    assert.equal(run(harnessRoot, false, fakeExecFileSync), false);
   } finally {
     rmSync(harnessRoot, { recursive: true, force: true });
   }
