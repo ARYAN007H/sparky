@@ -93,6 +93,27 @@ describe('SubagentActivityCard', () => {
     expect(screen.getByText('Delegated to Researcher')).toBeInTheDocument();
   });
 
+  it('keeps the completed result while omitting retired worktree controls', () => {
+    render(
+      <SubagentActivityCard
+        activity={{
+          taskId: 't',
+          agentId: 'researcher',
+          status: 'success',
+          output: 'Research is complete.',
+          worktreePath: '/repo/.claude/worktrees/worker',
+          changedFiles: ['notes.md'],
+          isDirty: true,
+          toolCalls: [],
+        }}
+      />
+    );
+
+    expect(screen.getByText('Research is complete.')).toBeInTheDocument();
+    expect(screen.queryByTestId('worktree-actions')).toBeNull();
+    expect(screen.queryByText(/worker/)).toBeNull();
+  });
+
   it('renders child tool calls (from `toolCalls`) inside the nested transcript once opened', () => {
     render(
       <SubagentActivityCard

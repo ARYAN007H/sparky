@@ -84,6 +84,27 @@ describe('SubagentTaskCard', () => {
     );
   });
 
+  it('keeps a completed task result while omitting retired worktree controls', () => {
+    render(
+      <SubagentTaskCard
+        type="tool-call"
+        toolName="task"
+        toolCallId="sub-1"
+        args={{ progress: { ...activity, status: 'success', worktreePath: '/repo/.claude/worktrees/worker', changedFiles: ['notes.md'], isDirty: true } } as never}
+        argsText="{}"
+        result={undefined}
+        status={{ type: 'complete' }}
+        addResult={() => {}}
+        resume={() => {}}
+        respondToApproval={async () => {}}
+      />
+    );
+
+    expect(screen.getByTestId('assistant-ui-subagent-call')).toHaveAttribute('data-status', 'success');
+    expect(screen.queryByTestId('worktree-actions')).toBeNull();
+    expect(screen.queryByText(/worker/)).toBeNull();
+  });
+
   it('renders the awaiting-user reply box and lets the answer through the composer path', async () => {
     render(
       <SubagentTaskCard
