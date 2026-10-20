@@ -1,0 +1,289 @@
+name: Epic 8089 Profiles adversarial proof
+
+on:
+  push:
+    branches:
+      - epic-8089-228-profiles-proof
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "1"
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+  RUST_MIN_STACK: "33554432"
+
+concurrency:
+  group: profiles-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  profiles-controller-proof:
+    if: github.repository == 'senamakel/openhuman'
+    name: Profiles ${{ matrix.case }} contract proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    container:
+      image: ghcr.io/tinyhumansai/openhuman_ci:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - case: baseline
+            expected_tree: f6edbaac990580da7adaa25d815645c5cc2bdeb4
+            expected_schema_blob: 9fe5cc038664da876b648f3df69868b7f27e87ea
+            expected_runtime_exit: 0
+          - case: schema-required
+            expected_tree: fbb4b509861753eb92ba82aebedb50e64eac4e85
+            expected_schema_blob: 7eb8084dd6f3912367a3f469b598014e711ec1a0
+            expected_runtime_exit: 101
+          - case: parser-wiring
+            expected_tree: fb9fb829da80b630cb0fab0f814893bf44f57ef7
+            expected_schema_blob: 67cf3fce9c94cd0105f427f6f53e41238db30e1d
+            expected_runtime_exit: 101
+    steps:
+      - name: Free disk space on the hosted container
+        run: |
+          rm -rf /__t/* || true
+          df -h /__w || true
+
+      - name: Checkout the frozen Profiles source and recursive pins
+        uses: actions/checkout@v7
+        with:
+          ref: d4e2ccec57d7125b9c378956e91c27cf33053ed4
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Trust container checkout and submodules
+        run: bash scripts/ci/trust-checkout.sh
+
+      - name: Install Rust 1.96.1
+        uses: dtolnay/rust-toolchain@1.96.1
+
+      - name: Assert frozen source baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = d4e2ccec57d7125b9c378956e91c27cf33053ed4
+          test "$(git rev-parse HEAD^{tree})" = f6edbaac990580da7adaa25d815645c5cc2bdeb4
+          test "$(git rev-parse HEAD:crates/openhuman-core/src/profiles/schemas.rs)" = 9fe5cc038664da876b648f3df69868b7f27e87ea
+          test -z "$(git status --porcelain=v1)"
+          mkdir -p target/profiles-proof
+          git submodule status --recursive > target/profiles-proof/submodules.txt
+          if grep -Eq '^[+-U]' target/profiles-proof/submodules.txt; then
+            cat target/profiles-proof/submodules.txt
+            echo "recursive submodules are not at their recorded pins"
+            exit 1
+          fi
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+
+      - name: Apply exactly the selected mutation
+        if: matrix.case != 'baseline'
+        shell: bash
+        env:
+          PROFILES_PROOF_CASE: ${{ matrix.case }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path("crates/openhuman-core/src/profiles/schemas.rs")
+          source = path.read_text()
+          if os.environ["PROFILES_PROOF_CASE"] == "schema-required":
+              old = '''inputs: vec![string_field("user_id", "The gateway's id for the user.")],'''
+              new = '''inputs: vec![FieldSchema { required: false, ..string_field("user_id", "The gateway's id for the user.") }],'''
+          elif os.environ["PROFILES_PROOF_CASE"] == "parser-wiring":
+              old = '''        parse_credential,
+                  run_set_credential,'''
+              new = '''        |_params: Map<String, Value>| -> Result<CredentialParams, String> {
+                      Err("mutation parser failure".to_owned())
+                  },
+                  run_set_credential,'''
+          else:
+              raise SystemExit("unrecognized Profiles proof mutation")
+          if source.count(old) != 1:
+              raise SystemExit("expected one exact source mutation anchor")
+          path.write_text(source.replace(old, new, 1))
+          PY
+
+      - name: Freeze mutation patch and verify complete source tree
+        shell: bash
+        env:
+          EXPECTED_TREE: ${{ matrix.expected_tree }}
+          EXPECTED_SCHEMA_BLOB: ${{ matrix.expected_schema_blob }}
+          PROOF_WORKFLOW_REF: ${{ github.workflow_ref }}
+          PROOF_WORKFLOW_SHA: ${{ github.sha }}
+          PROOF_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          source=crates/openhuman-core/src/profiles/schemas.rs
+          git add -- "$source"
+          actual_tree="$(git write-tree)"
+          actual_blob="$(git rev-parse :"$source")"
+          test "$actual_tree" = "$EXPECTED_TREE"
+          test "$actual_blob" = "$EXPECTED_SCHEMA_BLOB"
+          mkdir -p target/profiles-proof
+          git diff --cached --binary d4e2ccec57d7125b9c378956e91c27cf33053ed4 -- "$source" > target/profiles-proof/mutation.patch
+          git diff --cached d4e2ccec57d7125b9c378956e91c27cf33053ed4 -- "$source" > target/profiles-proof/mutation.diff
+          sha256sum target/profiles-proof/mutation.patch > target/profiles-proof/mutation.patch.sha256
+          {
+            printf 'case=%s\n' '${{ matrix.case }}'
+            printf 'source_head=d4e2ccec57d7125b9c378956e91c27cf33053ed4\n'
+            printf 'baseline_commit=d4e2ccec57d7125b9c378956e91c27cf33053ed4\n'
+            printf 'baseline_tree=f6edbaac990580da7adaa25d815645c5cc2bdeb4\n'
+            printf 'workflow_ref=%s\n' "$PROOF_WORKFLOW_REF"
+            printf 'workflow_sha=%s\n' "$PROOF_WORKFLOW_SHA"
+            printf 'workflow_repository=%s\n' "$PROOF_REPOSITORY"
+            printf 'source_tree=%s\n' "$actual_tree"
+            printf 'schemas_blob=%s\n' "$actual_blob"
+            cat target/profiles-proof/mutation.patch.sha256
+            printf 'features=default,voice,inference\n'
+            printf 'rustc_version=%s\n' "$(rustc --version)"
+            printf 'cargo_version=%s\n' "$(cargo --version)"
+            printf 'host_mem_available_kib=%s\n' "$(awk '/MemAvailable/ {print $2}' /proc/meminfo)"
+            printf 'build_filesystem=%s\n' "$(df -Pk . | tail -n 1)"
+          } > target/profiles-proof/receipt.txt
+          git status --short
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          cache-on-failure: true
+          key: profiles-proof
+
+      - name: Compile the lib-test binary once
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/build-tmp target/profiles-proof
+          export TMPDIR="$GITHUB_WORKSPACE/target/build-tmp"
+          build_json=target/profiles-proof/build.jsonl
+          build_stderr=target/profiles-proof/build.stderr
+          printf 'build_command=RUST_MIN_STACK=33554432 TMPDIR=%s CARGO_BUILD_JOBS=1 bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json\n' "$TMPDIR" >> target/profiles-proof/receipt.txt
+          set +e
+          bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json > "$build_json" 2> "$build_stderr"
+          build_exit=$?
+          set -e
+          printf 'build_exit=%s\n' "$build_exit" >> target/profiles-proof/receipt.txt
+          if [ "$build_exit" -ne 0 ]; then
+            cat "$build_stderr"
+            exit "$build_exit"
+          fi
+          test "$(git write-tree)" = '${{ matrix.expected_tree }}'
+          test "$(git rev-parse :crates/openhuman-core/src/profiles/schemas.rs)" = '${{ matrix.expected_schema_blob }}'
+          git diff --exit-code --ignore-submodules=none
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+          git status --porcelain=v1 --untracked-files=all --ignore-submodules=none > target/profiles-proof/post-build-status.txt
+          status="$(git status --porcelain=v1 --ignore-submodules=none)"
+          if [ '${{ matrix.case }}' = baseline ]; then
+            test -z "$status"
+          else
+            test "$status" = 'M  crates/openhuman-core/src/profiles/schemas.rs'
+          fi
+          git submodule status --recursive > target/profiles-proof/submodules-after-build.txt
+          cmp target/profiles-proof/submodules.txt target/profiles-proof/submodules-after-build.txt
+          python3 - "$build_json" <<'PY'
+          import json
+          import sys
+
+          artifacts = []
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              for line in stream:
+                  try:
+                      message = json.loads(line)
+                  except json.JSONDecodeError:
+                      continue
+                  target = message.get("target", {})
+                  executable = message.get("executable")
+                  if (
+                      message.get("reason") == "compiler-artifact"
+                      and target.get("name") == "openhuman_core"
+                      and target.get("test") is True
+                      and executable
+                  ):
+                      artifacts.append(executable)
+          if len(artifacts) != 1:
+              raise SystemExit(f"expected exactly one openhuman lib-test binary, got {artifacts!r}")
+          with open("target/profiles-proof/test-binary-path", "w", encoding="utf-8") as stream:
+              stream.write(artifacts[0] + "\n")
+          PY
+          source_binary="$(cat target/profiles-proof/test-binary-path)"
+          mkdir -p target/debug/proof-binaries
+          binary=target/debug/proof-binaries/profiles-${{ matrix.case }}
+          cp "$source_binary" "$binary"
+          sha256sum "$binary" > target/profiles-proof/test-binary.sha256
+          "$binary" --list > target/profiles-proof/test-list.txt
+          sha256sum target/profiles-proof/test-list.txt > target/profiles-proof/test-list.sha256
+          printf 'immutable_binary=%s\n' "$binary" >> target/profiles-proof/receipt.txt
+          cat target/profiles-proof/test-binary.sha256 >> target/profiles-proof/receipt.txt
+          printf '%s\n' "$binary --list" > target/profiles-proof/test-list-command.txt
+
+      - name: Run the raw contract from the immutable binary
+        shell: bash
+        env:
+          EXPECTED_RUNTIME_EXIT: ${{ matrix.expected_runtime_exit }}
+          PROFILES_PROOF_CASE: ${{ matrix.case }}
+        run: |
+          set -euo pipefail
+          binary=target/debug/proof-binaries/profiles-${{ matrix.case }}
+          raw_filter=core::all::bound_controller_tests::profiles_controller_tests::raw_profiles_operator_registry_matches_its_independent_contract
+          raw_log=target/profiles-proof/raw-contract.log
+          printf 'raw_command=%s %s --exact --test-threads=1\nexpected_raw_exit=%s\n' "$binary" "$raw_filter" "$EXPECTED_RUNTIME_EXIT" >> target/profiles-proof/receipt.txt
+          set +e
+          "$binary" "$raw_filter" --exact --test-threads=1 > "$raw_log" 2>&1
+          raw_exit=$?
+          set -e
+          printf 'raw_filter=%s\nraw_exit=%s\n' "$raw_filter" "$raw_exit" >> target/profiles-proof/receipt.txt
+          if [ "$raw_exit" -ne "$EXPECTED_RUNTIME_EXIT" ]; then
+            cat "$raw_log"
+            echo "unexpected raw contract exit: $raw_exit"
+            exit 1
+          fi
+          case "$PROFILES_PROOF_CASE" in
+            baseline)
+              grep -Fq 'test result: ok. 1 passed; 0 failed;' "$raw_log"
+              ;;
+            schema-required)
+              grep -Fq 'profiles.provision required inputs mismatch: expected [\"user_id\"], got []' "$raw_log"
+              grep -Fq 'test result: FAILED. 0 passed; 1 failed;' "$raw_log"
+              ;;
+            parser-wiring)
+              grep -Fq 'profiles.set_credential bound decoder rejects example 0: mutation parser failure' "$raw_log"
+              grep -Fq 'mutation parser failure' "$raw_log"
+              grep -Fq 'test result: FAILED. 0 passed; 1 failed;' "$raw_log"
+              ;;
+          esac
+
+      - name: Run the unchanged direct-parser control on the same binary
+        if: matrix.case == 'parser-wiring'
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary=target/debug/proof-binaries/profiles-${{ matrix.case }}
+          control_filter=profiles::schemas::tests::credential_schema_and_parser_keep_field_order_defaults_and_kinds
+          control_log=target/profiles-proof/direct-parser-control.log
+          printf 'direct_parser_control_command=%s %s --exact --test-threads=1\n' "$binary" "$control_filter" >> target/profiles-proof/receipt.txt
+          set +e
+          "$binary" "$control_filter" --exact --test-threads=1 > "$control_log" 2>&1
+          control_exit=$?
+          set -e
+          printf 'direct_parser_control_filter=%s\ndirect_parser_control_exit=%s\n' "$control_filter" "$control_exit" >> target/profiles-proof/receipt.txt
+          test "$control_exit" -eq 0
+          grep -Fq 'test result: ok. 1 passed; 0 failed;' "$control_log"
+
+      - name: Upload proof receipts and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: profiles-proof-${{ matrix.case }}
+          path: target/profiles-proof/
+          if-no-files-found: error
+          retention-days: 30
