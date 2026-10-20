@@ -117,11 +117,11 @@ enum EntryHandler {
 }
 
 impl ControllerEntry {
-    fn legacy(controller: RegisteredController) -> Self {
+    pub(crate) fn legacy(controller: RegisteredController) -> Self {
         Self { schema: controller.schema, handler: EntryHandler::Legacy(controller.handler) }
     }
 
-    fn bound(controller: BoundRegisteredController) -> Self {
+    pub(crate) fn bound(controller: BoundRegisteredController) -> Self {
         Self { schema: controller.schema.clone(), handler: EntryHandler::Bound(controller) }
     }
 
@@ -731,7 +731,7 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push_entries(
         &mut controllers,
         DomainGroup::Threads,
-        crate::threads::schemas::registry::all_controller_entries(),
+        crate::threads::schemas::all_controller_entries(),
     );
     // TokenJuice content-router debug controllers (detect / compress / cache_stats / retrieve).
     // Classified Inference: TokenJuice is the token-compression content router,
