@@ -1,30 +1,23 @@
-# context
+# Agent context defaults
 
-Global context management for agent sessions: system-prompt assembly, per-session context bookkeeping (utilisation stats, budget configuration), and the shared microcompact constants. Agents hold one `ContextManager` per session. This is a **pure logic / state-tracking domain**: no RPC controllers, no agent tools, no event-bus subscribers, no persisted store.
+This module exposes the host's default for how many recent tool results the
+TinyAgents microcompact middleware keeps. Prompt composition belongs to
+[`agent::prompts`](../prompts/README.md), configuration is mapped into turn
+middleware in [`agent::tinyagents`](../tinyagents/README.md), and the harness
+owns transcript reduction and middleware execution.
 
-> **Status (#4249): live history reduction/summarization moved out of this directory.** The in-turn compaction that used to live here (`ContextManager::reduce_before_call`, the `Summarizer` trait, `ProviderSummarizer`, `SegmentRecapSummarizer`, `microcompact.rs`, `pipeline.rs`, `guard.rs`) is gone: see [History](#history-4249). Folding an over-budget transcript into a summary now runs as the vendored `tinyagents_harness::middleware::ContextCompressionMiddleware` (with the seam-owned `ImageAwareMessageTrimMiddleware` as the deterministic backstop) inside `TurnSpec::run` ([`agent/tinyagents/turn_exec.rs`](../tinyagents/turn_exec.rs)), backed by `agent/tinyagents/summarize.rs::ModelSummarizer`. Tool-result body clearing runs in `tinyagents_harness::middleware::MicrocompactMiddleware`. [`stats.rs`](./stats.rs) keeps the data model behind `ContextManager::stats()`.
-
-## Responsibilities
-
-- Maintain prompt-adjacent session state; system-prompt assembly lives in `agent::prompts`, while [`channels_prompt.rs`](./channels_prompt.rs) provides the channel-specific builder.
-- Track context-window utilisation per session (`ContextStatsState`).
-- Expose the configured per-tool-result byte budget and the compaction/microcompact/autocompact toggles the tinyagents turn reads; enforcement lives in [`agent/tinyagents`](../tinyagents/) (`ToolOutputMiddleware`, `MicrocompactMiddleware`, `ContextCompressionMiddleware`) and in [`agent/harness/tool_result_artifacts`](../harness/tool_result_artifacts/).
-- Expose the microcompact placeholder/keep-recent constants consumed by the microcompact middleware.
-
-## Key files
+## Files
 
 | File | Role |
 | --- | --- |
-| [`crates/openhuman-core/src/agent/context/mod.rs`](./mod.rs) | Module docstring, `pub mod` decls, `pub use` re-exports, and the three shared constants (`DEFAULT_TOOL_RESULT_BUDGET_BYTES`, `CLEARED_PLACEHOLDER`, `DEFAULT_KEEP_RECENT_TOOL_RESULTS`). No other logic. |
-| [`crates/openhuman-core/src/agent/context/manager.rs`](./manager.rs) | `ContextManager`: per-session handle agents hold. Owns the default prompt builder, `ContextStatsState`, and the `ContextConfig`-derived knobs. Surfaces `build_system_prompt` / `build_system_prompt_tiered`, `stats()`, the getters the tinyagents turn reads (`tool_result_budget_bytes`, `compaction_enabled`, `autocompact_enabled`, `microcompact_keep_recent`, `autocompact_enabled`, `compaction()` (trigger override and strategy), `prefer_markdown_tool_output`), and the session-memory trigger/mark methods. |
-| `crates/openhuman-core/src/agent/context/stats.rs` | `ContextStatsState`: last provider usage, context-window utilisation, and the shared `SessionMemoryHandle` (`Arc<Mutex<SessionMemoryState>>`). Pure state; issues no LLM calls and does not mutate history. |
-| `crates/openhuman-core/src/agent/context/session_memory.rs` | `SessionMemoryState` / `SessionMemoryConfig`: threshold-gated `should_extract` decision (token growth, tool calls, and turns must all cross) and extraction bookkeeping. Holds `ARCHIVIST_EXTRACTION_PROMPT`. State-tracking only; does not spawn the archivist. |
-| `crates/openhuman-core/src/agent/context/channels_prompt.rs` | Bespoke free functions `build_system_prompt(...)` / `build_system_prompt_with_identity(...)` (plus `PromptIdentityOverride`, `ProjectContextPlacement`, `render_project_context`) for channel runtimes (Discord/Slack/Telegram/…). Byte-stable for prefix-cache hits; injects workspace bootstrap files (`SOUL.md`, `IDENTITY.md`, optional `PROFILE.md`/`MEMORY.md`, with profile overrides for `SOUL.md`/`MEMORY.md`), tools, safety, skills, runtime, and channel-capabilities sections. |
-| [`crates/openhuman-core/src/agent/context/manager_tests.rs`](./manager_tests.rs), [`channels_prompt_tests.rs`](./channels_prompt_tests.rs), `session_memory_tests.rs` | Sibling test files wired via `#[cfg(test)] #[path = "..."] mod tests;` from their source file (the layout check rejects inline test modules). |
+| [`mod.rs`](./mod.rs) | Module documentation and `DEFAULT_KEEP_RECENT_TOOL_RESULTS`. |
 
-## History (#4249)
+There is no per-session `ContextManager` here. The former manager, statistics,
+session-memory state, tool-result budget constant, and cleared-placeholder
+constant were removed as their responsibilities moved to the config schema,
+TinyAgents middleware, and `tinyagents-harness`.
 
-Live history reduction/summarization moved out of this directory into the tinyagents turn path:
+## Consumers
 
 - `pipeline.rs`: removed; live context reduction moved to tinyagents middleware, stats state lives in `stats.rs`.
 - `guard.rs`: removed; the live 0.90 compression threshold is `SUMMARIZE_THRESHOLD_FRACTION` in `agent/tinyagents/summarize.rs`.
@@ -74,7 +67,7 @@ No `store.rs`. State is per-session and in-memory:
 
 - `agent::harness`: the primary consumer: `session/builder/builder_build.rs` constructs the `ContextManager`; `session/turn/core/harness_turn.rs` reads the budget/compaction getters into the tinyagents turn config; `session/turn/session_io/{transcript_persist,background_tasks}.rs` read `stats()`; `fork_context.rs` and [`../subagent_host/`](../subagent_host/) consume prompt types.
 - `agent::tinyagents`: `turn_middleware.rs` reads `CLEARED_PLACEHOLDER` when configuring `MicrocompactMiddleware`; `payload_summarizer.rs` and `host/context_composer.rs` build `PromptContext`s through `agent::prompts`.
-- **`agent::registry::agents/*/prompt.rs`**, `skills/*/agent/*/prompt.rs`: archetype prompt modules pull prompt sections/builder through `agent::prompts`.
+- **`agent_registry::agents/*/prompt.rs`**, `skills/*/agent/*/prompt.rs`: archetype prompt modules pull prompt sections/builder through `agent::prompts`.
 - `channels`: [`channels/system_prompt.rs`](../../channels/system_prompt.rs) (`ChannelSystemPrompt`, used by [`channels/runtime/startup/start_channels.rs`](../../channels/runtime/startup/start_channels.rs)) calls `channels_prompt::build_system_prompt_with_identity`; [`channels/mod.rs`](../../channels/mod.rs) re-exports `build_system_prompt`; the `channels/tests/*` prompt/identity tests call it directly.
 - `agent::triage`, `agent::debug`, `agent::orchestration::tools` (spawn_subagent and friends), `tools::orchestrator_tools`, `integrations::composio`: consume prompt types (`PromptContext`, `PromptSection`, `ToolCallFormat`, `ConnectedIntegration`, …) via `agent::prompts`.
 
@@ -91,3 +84,7 @@ No `store.rs`. State is per-session and in-memory:
 - [Parent module README](../README.md)
 - [Agent harness architecture](../../../../../docs/gitbooks/en/developing/architecture/agent-harness.md)
 - [Smart token compression](../../../../../docs/gitbooks/en/features/token-compression.md)
+The TinyAgents host maps configured context options into harness middleware.
+Channel and agent prompts use `agent::prompts`; live transcript compaction and
+tool-result clearing run in TinyAgents. This module owns no persistence,
+controllers, tools, or event subscribers.

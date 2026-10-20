@@ -1,6 +1,6 @@
 //! Broadcast bus + DomainEvent subscriber for core notifications.
 //!
-//! Mirrors the pattern used by [`overlay::bus`](crate::desktop::overlay::bus)
+//! Provides a broadcast channel for notification events.
 //! — a single `tokio::sync::broadcast` channel wrapped in a `Lazy` static,
 //! plus a [`EventHandler`] implementation that translates relevant
 //! [`DomainEvent`] variants into [`CoreNotificationEvent`] payloads.
@@ -473,9 +473,10 @@ fn translate(event: &DomainEvent) -> Option<CoreNotificationEvent> {
 /// unknown; the bridge never guesses from whichever agent is currently live.
 fn event_owner(event: &DomainEvent) -> Option<String> {
     match event {
-        DomainEvent::CronJobCompleted { tenant, .. } => {
-            tenant.as_ref().and_then(|tenant| tenant.agent.clone())
-        }
+        DomainEvent::CronJobCompleted { job_id, tenant, .. } => tenant
+            .as_ref()
+            .and_then(|tenant| tenant.agent.clone())
+            .or_else(|| crate::cron::completion_owner::take(job_id)),
         _ => None,
     }
 }

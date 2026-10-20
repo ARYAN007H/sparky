@@ -20,7 +20,7 @@ pub(crate) async fn export_run_to_langfuse(
     trigger: FlowRunTrigger,
     observations: &[GraphObservation],
 ) {
-    crate::agent::progress_tracing::export_graph_run_trace(
+    crate::flows::tinyflows::langfuse_export::export_flow_run_trace(
         config,
         flow_name,
         flow_id,

@@ -173,3 +173,7 @@ fn bus_trigger(trigger: FlowRunTrigger) -> runs::FlowRunTrigger {
         FlowRunTrigger::Resume => runs::FlowRunTrigger::Resume,
     }
 }
+
+#[cfg(test)]
+#[path = "projection_tests.rs"]
+mod tests;

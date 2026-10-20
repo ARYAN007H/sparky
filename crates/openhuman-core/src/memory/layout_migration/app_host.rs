@@ -9,23 +9,23 @@ use tinymemory_tools::layout_migration as lm;
 use tinymemory_tools::layout_migration::{Engines, FlowPlacement, LegacyClaim, Placement};
 
 use super::claim::ClaimKey;
-use super::state::FileStateStore;
+use super::state::StateKvMigrationStore;
 use crate::config::{Config, MemoryLayoutMode};
 use crate::memory::engine::{self, CORTEXDB_ENGINE};
-use crate::memory::scope;
-use tinymemory_api::{Error, Result};
+use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::scope::{self, MemoryIdentity};
 
 /// The app's [`lm::LayoutHost`], bound to one account's config.
 pub struct AppHost {
     config: Config,
-    store: FileStateStore,
+    store: StateKvMigrationStore,
 }
 
 impl AppHost {
     /// The host that migrates `config`'s account.
     #[must_use]
     pub fn new(config: Config) -> Self {
-        let store = FileStateStore::new(&config.workspace_dir);
+        let store = StateKvMigrationStore::new(&config.workspace_dir);
         Self { config, store }
     }
 }
@@ -37,27 +37,29 @@ const RECHECK_DELAY: std::time::Duration = std::time::Duration::from_secs(45);
 const RECHECK_DELAY: std::time::Duration = std::time::Duration::from_millis(300);
 
 /// The host's error as the module's: the engine's variants keep their codes.
-pub(super) fn to_module(error: Error) -> lm::Error {
+pub(super) fn to_module(error: MemoryError) -> lm::Error {
     match error {
-        Error::Off(message) => lm::Error::Off(message),
-        Error::InvalidRequest(message) => lm::Error::InvalidRequest(message),
-        Error::NotFound(message) | Error::Config(message) => lm::Error::InvalidRequest(message),
-        Error::Conflict(message) => EngineError::Conflict(message).into(),
-        Error::Unsupported(message) => EngineError::Unsupported(message).into(),
-        Error::Unauthorized(message) => EngineError::Unauthorized(message).into(),
-        Error::Unavailable(message) => EngineError::Unavailable(message).into(),
-        Error::InsufficientCredits(message) => EngineError::InsufficientCredits(message).into(),
-        Error::Engine(message) => EngineError::Engine(message).into(),
+        MemoryError::Off(message) => lm::Error::Off(message),
+        MemoryError::InvalidRequest(message) => lm::Error::InvalidRequest(message),
+        MemoryError::Unsupported(message) => EngineError::Unsupported(message).into(),
+        MemoryError::Unauthorized(message) => EngineError::Unauthorized(message).into(),
+        MemoryError::Unavailable(message) => EngineError::Unavailable(message).into(),
+        // The backend's `[CODE] ` prefix stays on the message, which is how
+        // the module tells an exhausted balance.
+        MemoryError::InsufficientCredits(message) | MemoryError::Engine(message) => {
+            EngineError::Engine(message).into()
+        }
+        MemoryError::ConfigConflict(error) => EngineError::Engine(error.message).into(),
     }
 }
 
 /// The module's error as the host's wire taxonomy.
-pub(super) fn from_module(error: lm::Error) -> Error {
+pub(super) fn from_module(error: lm::Error) -> MemoryError {
     match error {
-        lm::Error::Engine(error) => error,
-        lm::Error::Off(message) => Error::Off(message),
-        lm::Error::InvalidRequest(message) => Error::InvalidRequest(message),
-        lm::Error::State(message) => Error::Engine(message),
+        lm::Error::Engine(error) => error.into(),
+        lm::Error::Off(message) => MemoryError::Off(message),
+        lm::Error::InvalidRequest(message) => MemoryError::InvalidRequest(message),
+        lm::Error::State(message) => MemoryError::Engine(message),
     }
 }
 
@@ -69,7 +71,7 @@ impl lm::LayoutHost for AppHost {
 
     fn engines(&self) -> lm::Result<Engines> {
         let config = &self.config;
-        let bind = || -> Result<Engines> {
+        let bind = || -> MemoryResult<Engines> {
             let root = signed_in_root(config)?;
             Ok(Engines {
                 legacy: engine::bind_with_root(config, None)?.engine,
@@ -84,10 +86,8 @@ impl lm::LayoutHost for AppHost {
         // switch.
         let mut v3 = self.config.clone();
         v3.memory.layout = MemoryLayoutMode::V3;
-        let layout = tinymemory_tools::layout::identity::Identity::root()
-            .resolve(&crate::memory::scope::identity_pins(&v3))
-            .layout;
-        let chat_node = tinymemory_tools::layout::identity::chat_node(&layout);
+        let layout = MemoryIdentity::root().resolve(&v3).layout;
+        let chat_node = scope::chat_node(&layout);
         Ok(Placement {
             layout,
             chat_node,
@@ -97,7 +97,7 @@ impl lm::LayoutHost for AppHost {
     }
 
     fn is_switched(&self) -> bool {
-        self.config.memory.layout == MemoryLayoutMode::V3
+        scope::layout_is_v3(&self.config)
     }
 
     async fn switch(&self) -> lm::Result<()> {

@@ -12,6 +12,7 @@ impl Clone for Config {
     #[inline(never)]
     fn clone(&self) -> Self {
         Self {
+            runtime_state: self.runtime_state.clone(),
             profile_providers: self.profile_providers.clone(),
             workspace_dir: self.workspace_dir.clone(),
             action_dir: self.action_dir.clone(),
@@ -81,6 +82,7 @@ impl Clone for Config {
             cloud_provider_ca_certs: self.cloud_provider_ca_certs.clone(),
             primary_cloud: self.primary_cloud.clone(),
             ephemeral_route: self.ephemeral_route.clone(),
+            resolved_endpoints: self.resolved_endpoints.clone(),
             chat_provider: self.chat_provider.clone(),
             reasoning_provider: self.reasoning_provider.clone(),
             agentic_provider: self.agentic_provider.clone(),
@@ -101,7 +103,6 @@ impl Clone for Config {
             tts_provider: self.tts_provider.clone(),
             integrations: self.integrations.clone(),
             update: self.update.clone(),
-            dictation: self.dictation.clone(),
             onboarding_completed: self.onboarding_completed,
             chat_onboarding_completed: self.chat_onboarding_completed,
             model_registry: self.model_registry.clone(),

@@ -112,10 +112,16 @@ pub async fn migrate(
         match step {
             Step::Import => {
                 legacy::import(target, config).await?;
+                state.credentials = super::credentials::import(target).await?;
             }
             Step::Migrate => {
                 legacy::migrate(target).await?;
-                let scanned = plan::scan(&target.workspace())?;
+                let mut scanned = plan::scan(&target.workspace())?;
+                scanned.entries.extend(plan::scan_credentials(
+                    &target.profile_dir,
+                    &state.credentials,
+                ));
+                scanned.entries.sort_by(|a, b| a.path.cmp(&b.path));
                 state.plan = Some(scanned);
             }
             Step::CopyDb => {
@@ -189,7 +195,19 @@ fn dry_run(target: &Target, resuming: bool) -> Result<DryRun, LayoutError> {
     let state = LayoutState::load(&target.profile_dir)?;
     let scanned = match state.as_ref().and_then(|s| s.plan.clone()) {
         Some(plan) => plan,
-        None => plan::scan(&target.workspace())?,
+        None => {
+            let mut plan = plan::scan(&target.workspace())?;
+            // What the import step would copy into encrypted secrets.
+            // Once Import finished, a resume uses the list it recorded.
+            let candidates = match state.as_ref() {
+                Some(s) if s.has(Step::Import) => s.credentials.clone(),
+                _ => super::credentials::candidates(&target.profile_dir)?,
+            };
+            plan.entries
+                .extend(plan::scan_credentials(&target.profile_dir, &candidates));
+            plan.entries.sort_by(|a, b| a.path.cmp(&b.path));
+            plan
+        }
     };
     let database_bytes = std::fs::metadata(legacy::v1_db(target))
         .ok()
@@ -277,7 +295,7 @@ async fn write_archive(
         let at = if entry.action == Action::Move && std::fs::symlink_metadata(&moved).is_ok() {
             moved
         } else {
-            plan::join(&workspace, &entry.path)
+            plan::locate(&workspace, &target.profile_dir, &entry.path).1
         };
         if std::fs::symlink_metadata(&at).is_ok() {
             sources.push(Source {
@@ -329,7 +347,8 @@ fn finish(target: &Target, state: &LayoutState, plan: &Plan) -> Result<(), Layou
     LayoutVersion::mark_v2(&target.profile_dir)?;
     let workspace = target.workspace();
     for entry in plan.with(Action::Delete) {
-        remove_within(&workspace, &plan::join(&workspace, &entry.path))?;
+        let (base, path) = plan::locate(&workspace, &target.profile_dir, &entry.path);
+        remove_within(&base, &path)?;
     }
     // Directories the deletions emptied.
     let memory = workspace.join("memory");

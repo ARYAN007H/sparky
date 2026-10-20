@@ -386,3 +386,64 @@ async fn harness_readiness_checks_session_for_execution_provider() {
         }
     }
 }
+
+/// The agent-ref gate resolves a custom agent through the context it is handed,
+/// not the one the calling task happens to run under: two tenants' registries
+/// never cross.
+#[tokio::test]
+async fn agent_ref_gate_reads_the_registry_of_the_explicit_context() {
+    use crate::agent_registry::types::{AgentRegistryEntry, AgentRegistrySource};
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+
+    let entry = AgentRegistryEntry {
+        id: "tenant_a_only_agent".to_string(),
+        name: "A".to_string(),
+        description: "registered for tenant A".to_string(),
+        source: AgentRegistrySource::Custom,
+        enabled: true,
+        model: None,
+        system_prompt: None,
+        tool_allowlist: Vec::new(),
+        tool_denylist: Vec::new(),
+        tool_rules: None,
+        subagents: Default::default(),
+        tags: Vec::new(),
+        metadata: Value::Null,
+    };
+    let tmp_a = TempDir::new().unwrap();
+    let tmp_b = TempDir::new().unwrap();
+    let mut config_a = test_config(&tmp_a);
+    config_a.agent_registry.entries.push(entry);
+    let config_b = test_config(&tmp_b);
+    let core_a = CoreContext::for_test_with_config(DomainSet::full(), config_a.clone());
+    let core_b = CoreContext::for_test_with_config(DomainSet::full(), config_b.clone());
+    let ctx_a = DispatchCtx::new(core_a);
+    let ctx_b = DispatchCtx::new(std::sync::Arc::clone(&core_b));
+
+    let g = graph(json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "a", "kind": "agent", "name": "Plan",
+              "config": { "agent_ref": "tenant_a_only_agent", "prompt": "go" } }
+        ],
+        "edges": [ { "from_node": "t", "to_node": "a" } ]
+    }));
+
+    // Both calls run scoped to tenant B, so an ambient read would answer B's
+    // registry for A's call.
+    let (for_a, for_b) = CoreContext::scope(core_b, async {
+        (
+            crate::flows::host_gates::validate_agent_refs(&ctx_a, &config_a, &g).await,
+            crate::flows::host_gates::validate_agent_refs(&ctx_b, &config_b, &g).await,
+        )
+    })
+    .await;
+    assert!(
+        for_a.is_empty(),
+        "tenant A's own agent must resolve: {for_a:?}"
+    );
+    assert!(
+        for_b.iter().any(|e| e.contains("tenant_a_only_agent")),
+        "tenant B must not see tenant A's agent: {for_b:?}"
+    );
+}

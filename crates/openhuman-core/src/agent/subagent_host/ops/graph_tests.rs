@@ -46,7 +46,7 @@ fn read_stem(
 #[test]
 fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
     let workspace = tempfile::tempdir().unwrap();
-    let tree = crate::agent::session_store::transcripts_or_files("tree-key", workspace.path());
+    let tree = crate::storage::sessions::transcripts_or_files("tree-key", workspace.path());
     let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     run_context.transcripts = Some(tree.clone());
     let chosen = super::transcript::subagent_transcripts(&run_context, workspace.path());
@@ -64,7 +64,7 @@ fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
     assert!(
         fallback.ends_with(&format!(
             "/local/agent:{}/transcripts",
-            crate::agent::session_store::DEFAULT_AGENT
+            crate::storage::sessions::DEFAULT_AGENT
         )),
         "{fallback}"
     );
@@ -92,7 +92,7 @@ fn a_detached_subagent_uses_the_store_its_carried_context_selects() {
     assert!(CoreContext::current().is_none());
     let chosen = super::transcript::subagent_transcripts_in(&run_context, workspace.path(), false);
     let expected = provider
-        .for_agent(crate::agent::session_store::DEFAULT_AGENT)
+        .for_agent(crate::storage::sessions::DEFAULT_AGENT)
         .transcripts
         .destination_key();
     assert_eq!(chosen.destination_key(), expected);
@@ -103,8 +103,8 @@ fn a_saas_subagent_without_a_context_or_tree_store_is_kept_in_memory() {
     let workspace = tempfile::tempdir().unwrap();
     let unbound = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     let chosen = super::transcript::subagent_transcripts_in(&unbound, workspace.path(), true);
-    let operator = crate::agent::session_store::transcripts_or_files(
-        crate::agent::session_store::DEFAULT_AGENT,
+    let operator = crate::storage::sessions::transcripts_or_files(
+        crate::storage::sessions::DEFAULT_AGENT,
         workspace.path(),
     );
     assert_ne!(chosen.destination_key(), operator.destination_key());
@@ -117,8 +117,7 @@ fn a_saas_subagent_without_a_context_or_tree_store_is_kept_in_memory() {
 #[test]
 fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() {
     let workspace = tempfile::tempdir().unwrap();
-    let locator =
-        crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
+    let locator = crate::storage::sessions::transcripts_or_files("orchestrator", workspace.path());
     let usage = AggregatedUsage {
         input_tokens: 120,
         output_tokens: 30,
@@ -253,8 +252,7 @@ fn parallel_worker_without_thread_keeps_parent_transcript_affinity() {
 #[tokio::test]
 async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
     let workspace = tempfile::tempdir().expect("workspace");
-    let locator =
-        crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
+    let locator = crate::storage::sessions::transcripts_or_files("orchestrator", workspace.path());
     let mut parent = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     parent.thread_id = Some("parent-thread".to_owned());
     parent.transcripts = Some(locator.clone());
@@ -272,7 +270,7 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
         vec![],
         HashSet::new(),
         2,
-        None,
+        (None, None),
         None,
         "researcher",
         "worker-task",
@@ -287,6 +285,7 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
         "root__worker-thread",
         "test",
         AgentTokenjuiceCompression::Off,
+        None,
         None,
     )
     .await
@@ -307,7 +306,7 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
     allowed.insert("echo".to_string());
     let mut history = vec![TranscriptMessage::user("please echo hi")];
 
-    let (output, iterations, usage, early_exit, hit_cap, _breaker, _failure_cause) =
+    let (output, iterations, usage, early_exit, hit_cap, _breaker, _cause) =
         run_subagent_via_graph(
             crate::agent::tinyagents::TurnModelSource::from_model(provider),
             "mock-model",
@@ -318,7 +317,7 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
             vec![],
             allowed,
             10,
-            None,
+            (None, None),
             None,
             "researcher",
             "task-1",
@@ -336,6 +335,7 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
             // No host config in tests: the graph takes byte-cap-only
             // context defaults instead of reading the developer machine's
             // real config.toml, which is what the old in-graph load did.
+            None,
             None,
         )
         .await
@@ -394,39 +394,39 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
     let parent_tools: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![]);
     let mut history = vec![TranscriptMessage::user("hi")];
 
-    let (output, _iters, _usage, _early, _hit_cap, _breaker, _failure_cause) =
-        run_subagent_via_graph(
-            crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(ThinkingStreamProvider)),
-            "mock-model",
-            0.0,
-            &mut history,
-            parent_tools,
-            vec![],
-            vec![],
-            HashSet::new(),
-            4,
-            None,
-            Some(tx),
-            "researcher",
-            "task-7",
-            false,
-            None,
-            crate::agent::tinyagents::host::OpenHumanRunContext::new(),
-            None,
-            std::env::temp_dir(),
-            None,
-            1024,
-            false,
-            "root-session__scoped_deltas",
-            "mock-channel",
-            AgentTokenjuiceCompression::Off,
-            // No host config in tests: the graph takes byte-cap-only
-            // context defaults instead of reading the developer machine's
-            // real config.toml, which is what the old in-graph load did.
-            None,
-        )
-        .await
-        .expect("child-delta subagent runs");
+    let (output, _iters, _usage, _early, _hit_cap, _breaker, _cause) = run_subagent_via_graph(
+        crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(ThinkingStreamProvider)),
+        "mock-model",
+        0.0,
+        &mut history,
+        parent_tools,
+        vec![],
+        vec![],
+        HashSet::new(),
+        4,
+        (None, None),
+        Some(tx),
+        "researcher",
+        "task-7",
+        false,
+        None,
+        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+        None,
+        std::env::temp_dir(),
+        None,
+        1024,
+        false,
+        "root-session__scoped_deltas",
+        "mock-channel",
+        AgentTokenjuiceCompression::Off,
+        // No host config in tests: the graph takes byte-cap-only
+        // context defaults instead of reading the developer machine's
+        // real config.toml, which is what the old in-graph load did.
+        None,
+        None,
+    )
+    .await
+    .expect("child-delta subagent runs");
 
     assert_eq!(output, "Hello");
 
@@ -531,7 +531,7 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
     allowed.insert("ask_user_clarification".to_string());
     let mut history = vec![TranscriptMessage::user("help me")];
 
-    let (output, iterations, _usage, early_exit, _hit_cap, _breaker, _failure_cause) =
+    let (output, iterations, _usage, early_exit, _hit_cap, _breaker, _cause) =
         run_subagent_via_graph(
             crate::agent::tinyagents::TurnModelSource::from_model(provider.clone()),
             "mock-model",
@@ -542,7 +542,7 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
             vec![],
             allowed,
             10,
-            None,
+            (None, None),
             None,
             "researcher",
             "task-9",
@@ -560,6 +560,7 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
             // No host config in tests: the graph takes byte-cap-only
             // context defaults instead of reading the developer machine's
             // real config.toml, which is what the old in-graph load did.
+            None,
             None,
         )
         .await
@@ -624,7 +625,7 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
     allowed.insert("noop".to_string());
     let mut history = vec![TranscriptMessage::user("do a big task")];
 
-    let (output, iterations, _usage, early_exit, hit_cap, _breaker, _failure_cause) =
+    let (output, iterations, _usage, early_exit, hit_cap, _breaker, _cause) =
         run_subagent_via_graph(
             crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(LoopForeverProvider)),
             "mock-model",
@@ -635,7 +636,7 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
             vec![],
             allowed,
             2,
-            None,
+            (None, None),
             None,
             "researcher",
             "task-cap",
@@ -653,6 +654,7 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
             // No host config in tests: the graph takes byte-cap-only
             // context defaults instead of reading the developer machine's
             // real config.toml, which is what the old in-graph load did.
+            None,
             None,
         )
         .await

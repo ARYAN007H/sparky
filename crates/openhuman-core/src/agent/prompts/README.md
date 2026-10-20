@@ -1,64 +1,48 @@
-# prompts
+# Agent prompt adapters
 
-Owns the bundled prompt assets and the system-prompt rendering pipeline: the
-types every section renders from, the section implementations themselves, the
-builder that assembles them in tier order, and the free `render_*` helpers other
-domains use to compose their own prompts.
+`agent::prompts` owns the bundled identity assets and OpenHuman-specific
+adapters used by agent prompt composition. The portable prompt section API,
+tier assembly, and dialect rendering belong to TinyAgents and TinyTools.
+OpenHuman selects product content and preserves host policy and provider
+message boundaries.
 
-## Public surface (from `mod.rs`)
+## Public surface
 
-- `types::*`: `PromptContext`, `PromptSection` trait, `PromptTier`,
-  `PromptTool`, `ToolCallFormat`, `UserIdentity`, `ConnectedIntegration`,
-  `SubagentRenderOptions`. Pure data, no rendering logic. Also holds the
-  `pub(crate)` cap `BOOTSTRAP_MAX_CHARS` (20K, for
-  [`SOUL.md`](./SOUL.md)/[`IDENTITY.md`](./IDENTITY.md)/[`ROLE.md`](./ROLE.md) and each `AGENTS.md` layer).
-- `render_connected_identities` ([`connected_identities.rs`](./connected_identities.rs)): best-effort,
-  sync render of the `## Connected Identities` block. It reads through the
-  bound memory driver via `block_in_place` and returns empty when there is no
-  multi-thread runtime or the config/driver read fails.
-- `agents_md::{load_agents_md, load_agents_md_layers, AgentsMdContent, AGENTS_MD_FILENAME}`:
-  loads `AGENTS.md` at the global (`workspace_dir`) and local
-  (`action_dir`, or a sub-agent's `worktree_action_dir` override) layers.
-- `builder::{SystemPromptBuilder, TieredPrompt, GLOBAL_STYLE_SUFFIX}`:
-  assembles ordered `PromptSection`s into a final prompt string (or a
-  `TieredPrompt` with cache-breakpoint offsets).
-- `sections::*`: the concrete `PromptSection` structs (`IdentitySection`,
-  `ToolsSection`, `SafetySection`, `UserIdentitySection`, `WorkspaceSection`,
-  `DateTimeSection`, `RuntimeSection`, `AgentsInstructionsSection`,
-  `PersonalityRosterSection`, `ArchetypePromptSection`,
-  `DynamicPromptSection`, `GroundingSection`).
-- Named re-exports from `render_helpers` ([`render_helpers.rs`](./render_helpers.rs) plus the
-  `render_helpers/` submodules `section_renderers.rs`, `subagent.rs`,
-  `workspace_files.rs`): free `render_*` functions (thin wrappers over the
-  section structs), the workspace-file helpers
-  (`inject_workspace_file[_capped]`, `inject_inline_content`,
-  `sync_workspace_file`, `default_workspace_file_content`),
-  `current_datetime_line`, and the sub-agent renderer
-  (`render_subagent_system_prompt[_with_format]`). These let a caller
-  assemble a prompt by calling functions directly instead of going through
-  `SystemPromptBuilder`.
+- `types::*`: `PromptContext`, `PromptTool`, `ToolCallFormat`, `UserIdentity`,
+  `ConnectedIntegration`, `SubagentRenderOptions`, and the 20K
+  `BOOTSTRAP_MAX_CHARS` content cap. Prompt tiers and marker parsing are
+  re-exported from TinyAgents for source compatibility.
+- `agents_md::*`: thin adapters around TinyAgents' layered `AGENTS.md` loader.
+  The adapter applies OpenHuman's path-root policy; the sibling tests cover
+  symlink and FIFO rejection, bounded reads, and layer selection.
+- `SystemPromptBuilder`, `TieredPrompt`, and `GLOBAL_STYLE_SUFFIX`:
+  compatibility exports of the product selector in
+  [`crate::prompts::composition`](../../prompts/composition.rs). It selects
+  OpenHuman content, appends the grounding and workspace style rules, and
+  delegates prompt tier composition to TinyAgents' `PromptComposer`. Stable and
+  Context parts remain merged into the first system message; Volatile parts
+  remain in a second message.
+- `sections::*`: OpenHuman-owned prompt content renderers. The portable section
+  contract and tier assembly are implemented by the owner crate.
+- `render_subagent_system_prompt*`: OpenHuman's narrow subagent prompt adapter.
+  TinyTools renders the protocol for its selected tool-call dialect.
+- Other named exports include workspace file sync/injection helpers,
+  connected identities, and renderer helpers used by product agents.
 
 ## Bundled assets
 
-`IDENTITY.md`, `ROLE.md`, `SOUL.md`, [`STYLE.md`](./STYLE.md) are the bundled copies of the
-master agent's identity, role brief, personality, and writing style. They are
-embedded with `include_str!` in [`render_helpers/workspace_files.rs`](./render_helpers/workspace_files.rs)
-(`default_workspace_file_content`) and, for `STYLE.md`, again in [`builder.rs`](./builder.rs)
-as `GLOBAL_STYLE_SUFFIX`. There are two uses:
+`IDENTITY.md`, `ROLE.md`, `SOUL.md`, and [`STYLE.md`](./STYLE.md) are the
+bundled prompt assets. `sync_workspace_file` seeds a workspace copy, refreshes
+an unmodified copy when bundled content changes, and preserves user edits.
+The product prompt
+composition reads the workspace `STYLE.md`, falling back to the bundled copy
+when the file cannot be read. [`USER.md`](./USER.md) is exposed as an MCP
+resource and is not read by this module.
 
-- Seed and refresh: `sync_workspace_file(workspace_dir, filename)` writes the
-  bundled text to `<workspace_dir>/<filename>` when it is missing and records
-  a hash of the bundled content in a `.<filename>.builtin-hash` sidecar. On
-  later runs the file is left alone unless the bundled default changed (hash
-  mismatch), in which case the disk copy is overwritten, so a user edit
-  survives until the next release that touches that asset. Only absolute
-  `workspace_dir`s are seeded. `IdentitySection` syncs
-  `SOUL.md`/`IDENTITY.md`/`ROLE.md` (`ROLE.md` is injected only when
-  `visible_tool_names` is non-empty, i.e. for the orchestrator); `builder.rs`
-  syncs `STYLE.md` on every build so agents that set `omit_identity` still get
-  the style rules.
-- Compile-time fallback: `GLOBAL_STYLE_SUFFIX` is used when the workspace
-  `STYLE.md` cannot be read.
+Built-in archetype prompts generally live in
+`agent_registry/agents/<name>/prompt.rs`; flow prompts live with their flow
+agents. `PromptSource::Dynamic` functions provide product content, and the
+OpenHuman adapter adds the shared AGENTS.md, grounding, and style content.
 
 [`USER.md`](./USER.md) is different: nothing in this module reads it. It is exposed as the
 `openhuman://prompts/user` MCP resource by [`mcp/server/resources.rs`](../../mcp/server/resources.rs)
@@ -158,3 +142,7 @@ user message via `current_datetime_line`).
 - [Parent module README](../README.md)
 - [Agent harness architecture](../../../../../docs/gitbooks/en/developing/architecture/agent-harness.md)
 - [Personalization and self-learning](../../../../../docs/gitbooks/en/features/personalization.md)
+The session host builds a prompt once for a session. Stable and Context
+content forms the first system message, and Volatile content forms the second.
+Resumed sessions reuse persisted system messages verbatim, preserving their
+provider cache prefix.

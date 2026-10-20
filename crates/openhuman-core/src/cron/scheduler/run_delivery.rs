@@ -48,6 +48,7 @@ pub(crate) fn publish_completion(
     success: bool,
     output: &str,
 ) {
+    crate::cron::completion_owner::note(ctx, &job.id);
     BUS.publish(DomainEvent::CronJobCompleted {
         job_id: job.id.clone(),
         success,

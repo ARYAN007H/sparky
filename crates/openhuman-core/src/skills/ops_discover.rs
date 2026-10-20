@@ -14,8 +14,6 @@ mod scan;
 // `Path`, `Workflow`, `WorkflowScope`, and `precedence` exactly as it did
 // before this module was split into submodules.
 #[cfg(test)]
-#[cfg(test)]
-#[cfg(test)]
 use std::path::Path;
 
 pub use api::{

@@ -22,21 +22,6 @@
 //! path the event is published at, so the broker can filter by domain and never
 //! wake a process for events it did not ask for.
 
-/// Voice-domain events.
-#[non_exhaustive]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum VoiceEvent {
-    /// A PTT session committed a transcript to a thread. Carries only
-    /// length/timing — never the raw text, per the PII-safe logging rule.
-    PttTranscriptCommitted {
-        thread_id: String,
-        session_id: u64,
-        text_len: usize,
-        held_ms: u64,
-        finalized_by_watchdog: bool,
-    },
-}
-
 /// A tool call made while answering a committed turn: name and id only.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ConversationToolCall {
@@ -653,7 +638,7 @@ pub enum DomainEvent {
     // ── Plan review (interactive plan-mode gate) ────────────────────────
     /// An interactive turn parked on a thread-scoped plan the user must
     /// review before execution. Published by
-    /// [`crate::agent::plan_review::gate::PlanReviewGate::request_review`]
+    /// [`crate::plan_review::gate::PlanReviewGate::request_review`]
     /// and bridged to the web channel as a `plan_review_request` socket event.
     PlanReviewRequested {
         /// Unique id correlating the decision back to the parked turn.
@@ -705,7 +690,7 @@ pub enum DomainEvent {
     // ── Artifacts ───────────────────────────────────────────────────────
     /// An artifact transitioned to [`ArtifactStatus::Ready`] — file
     /// is on disk and ready to be downloaded. Published by
-    /// [`crate::agent::artifacts::store::finalize_artifact`].
+    /// [`crate::artifacts::store::finalize_artifact`].
     /// Bridged to the web channel as an `artifact_ready` socket event
     /// when the publishing turn carries an `ApprovalChatContext`
     /// (see [`crate::security::approval::ApprovalChatContext`]).
@@ -774,7 +759,7 @@ pub enum DomainEvent {
     /// An artifact record has been **created** (`ArtifactStatus::Pending`)
     /// but no bytes are on disk yet — the producing tool has only just
     /// reserved the row. Published by
-    /// [`crate::agent::artifacts::store::create_artifact`].
+    /// [`crate::artifacts::store::create_artifact`].
     /// Bridged to the web channel as an `artifact_pending` socket event
     /// so the frontend can render an in-progress / "Generating…" card the
     /// moment the tool dispatches, instead of waiting until the file
@@ -907,12 +892,12 @@ pub enum DomainEvent {
 
     // ── Triage ──────────────────────────────────────────────────────────
     //
-    // Published by `crate::agent::triage` when an external
+    // Published by `crate::triage` when an external
     // trigger (Composio webhook today, cron / webhook / other sources
     // later) has been classified by the trigger-triage agent. The
     // `source` field is a short slug like `"composio"` / `"cron"` so the
     // events stay source-agnostic — any module that calls
-    // `agent::triage::run_triage` will publish these.
+    // `triage::run_triage` will publish these.
     /// A trigger event was evaluated by the triage agent and assigned
     /// one of the four actions (drop / acknowledge / react / escalate).
     TriggerEvaluated {
@@ -1254,10 +1239,6 @@ pub enum DomainEvent {
         tenant: Option<crate::core::runtime::Tenant>,
     },
 
-    // ── Voice ────────────────────────────────────────────────────────────
-    /// A voice domain event (PTT, transcription lifecycle, etc.).
-    Voice(VoiceEvent),
-
     // ── Task sources ─────────────────────────────────────────────────────
     /// A task source completed a fetch pass.
     TaskSourceFetched {
@@ -1307,11 +1288,11 @@ pub enum DomainEvent {
     /// A thread's [`tinyagents_harness::middleware::RunMode`] (Plan vs Build)
     /// changed, via `agent.set_run_mode` or the `plan_exit` tool. Bridged to
     /// the `run_mode_changed` web-channel socket event by
-    /// `crate::agent::tinyagents::run_mode::set_mode`'s caller.
+    /// `crate::threads::run_mode::set_mode`'s caller.
     ThreadRunModeChanged {
         thread_id: String,
         /// `"plan"` or `"build"` — see
-        /// `crate::agent::tinyagents::run_mode::mode_label`.
+        /// `crate::threads::run_mode::mode_label`.
         mode: String,
     },
 }
@@ -1438,8 +1419,6 @@ impl DomainEvent {
             | Self::ThreadGoalCleared { .. }
             | Self::ThreadTodosChanged { .. }
             | Self::ThreadRunModeChanged { .. } => "agent",
-
-            Self::Voice(_) => "voice",
 
             Self::ApprovalRequested { .. }
             | Self::ApprovalDecided { .. }
@@ -1581,7 +1560,6 @@ impl DomainEvent {
             Self::ThreadGoalCleared { .. } => "ThreadGoalCleared",
             Self::ThreadTodosChanged { .. } => "ThreadTodosChanged",
             Self::ThreadRunModeChanged { .. } => "ThreadRunModeChanged",
-            Self::Voice(_) => "Voice",
         }
     }
 

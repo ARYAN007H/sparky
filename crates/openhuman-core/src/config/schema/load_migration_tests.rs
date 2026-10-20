@@ -1,5 +1,49 @@
 use super::*;
 
+use crate::config::SttEngine;
+
+#[tokio::test]
+async fn legacy_always_on_voice_fields_are_ignored_and_dropped_on_save() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config_path = tmp.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"[voice_server]
+stt_engine = "openai"
+always_on_enabled = true
+wake_word = "Hey Tiny"
+vad_onset_threshold = 0.01
+vad_hangover_ms = 800
+vad_min_speech_ms = 300
+vad_max_utterance_secs = 30.0
+"#,
+    )
+    .unwrap();
+
+    let config = load_or_init_for_workspace(tmp.path()).await;
+    assert_eq!(config.voice_server.stt_engine, SttEngine::Openai);
+    config.save().await.unwrap();
+
+    let saved = std::fs::read_to_string(config_path).unwrap();
+    assert!(
+        saved.contains("stt_engine = \"openai\""),
+        "retained voice setting was not loaded and saved:\n{saved}"
+    );
+    for retired in [
+        "always_on_enabled",
+        "wake_word",
+        "vad_onset_threshold",
+        "vad_hangover_ms",
+        "vad_min_speech_ms",
+        "vad_max_utterance_secs",
+    ] {
+        assert!(
+            !saved.contains(retired),
+            "retired voice setting {retired} survived config save:\n{saved}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn load_or_init_recovers_from_non_utf8_using_valid_backup() {
     let tmp = tempfile::tempdir().unwrap();
@@ -295,15 +339,31 @@ fn migrate_legacy_inference_url_moves_external_chat_completions() {
 }
 
 #[test]
-fn migrate_legacy_inference_url_clears_openhuman_backend_form() {
+fn migrate_legacy_inference_url_clears_managed_backend_form() {
     let mut cfg = Config::default();
-    cfg.api_url = Some("https://api.tinyhumans.ai/openai/v1/chat/completions".to_string());
+    cfg.resolved_endpoints.managed_hosts = vec!["api.managed.test".to_string()];
+    cfg.api_url = Some("https://api.managed.test/openai/v1/chat/completions".to_string());
     cfg.inference_url = None;
     migrate_legacy_inference_url(&mut cfg);
-    // The OpenHuman host is the default backend — both fields end up None so
-    // inference flows through the derived default `{backend}/openai/v1/...`.
+    // The managed host is the default backend — both fields end up None so
+    // inference flows through the derived default.
     assert_eq!(cfg.api_url, None);
     assert_eq!(cfg.inference_url, None);
+}
+
+#[test]
+fn migrate_legacy_inference_url_keeps_a_managed_looking_url_without_managed_hosts() {
+    // With no host registered nothing is managed, so the URL is moved as an
+    // external one rather than silently dropped.
+    let mut cfg = Config::default();
+    cfg.api_url = Some("https://api.managed.test/openai/v1/chat/completions".to_string());
+    cfg.inference_url = None;
+    migrate_legacy_inference_url(&mut cfg);
+    assert_eq!(cfg.api_url, None);
+    assert_eq!(
+        cfg.inference_url.as_deref(),
+        Some("https://api.managed.test/openai/v1/chat/completions")
+    );
 }
 
 #[test]
@@ -368,7 +428,7 @@ fn migrate_cloud_provider_slugs_keeps_cloud_on_openhuman_without_legacy_custom()
         id: "p_oh".into(),
         slug: "openhuman".into(),
         label: "OpenHuman".into(),
-        endpoint: "https://api.tinyhumans.ai/v1".into(),
+        endpoint: "https://api.managed.test/v1".into(),
         auth_style: crate::config::schema::AuthStyle::OpenhumanJwt,
         ..Default::default()
     }];

@@ -6,6 +6,8 @@ pub mod cloud_providers;
 pub use cloud_providers::{generate_provider_id, is_slug_reserved, AuthStyle, CloudProviderCreds};
 pub mod ephemeral_route;
 pub use ephemeral_route::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
+pub mod resolved_endpoints;
+pub use resolved_endpoints::ResolvedEndpoints;
 mod agent;
 mod autonomy;
 mod capability_providers;
@@ -21,7 +23,6 @@ mod dashboard;
 mod desktop;
 pub use desktop::DesktopConfig;
 mod defaults;
-mod dictation;
 mod hooks;
 pub use hooks::HooksConfig;
 pub mod components;
@@ -33,7 +34,7 @@ pub use storage::StorageConfig;
 pub mod profile_layout;
 pub use profile_layout::{users_dir, ProfileLayout};
 mod identity_cost;
-mod load;
+pub(crate) mod load;
 pub(crate) use load::config_from_toml_str;
 pub(crate) use load::source::storage_schema::storage_schema as config_storage_schema;
 pub use load::{
@@ -60,7 +61,7 @@ pub mod claude_agent_sdk;
 pub use claude_agent_sdk::ClaudeAgentSdkConfig;
 mod local_ai;
 mod memes;
-mod memory;
+pub(crate) mod memory;
 mod modules;
 mod observability;
 mod privacy;
@@ -91,7 +92,6 @@ pub(crate) use cli_overrides::set_cli_inference_overrides;
 pub use context::{CompactionSettings, CompactionStrategy, ContextConfig};
 pub use cron::CronConfig;
 pub use dashboard::{DashboardConfig, DiagramViewerConfig, EventStreamConfig, ModelHealthConfig};
-pub use dictation::{DictationActivationMode, DictationConfig};
 pub use identity_cost::{
     BudgetAction, BudgetPeriod, BudgetPolicy, BudgetScope, CostConfig, ModelPricing,
 };
@@ -136,7 +136,7 @@ pub use tools::{
 pub use update::{UpdateConfig, UpdateRestartStrategy};
 pub use web_chat_config::WebChatConfig;
 mod voice_server;
-pub use voice_server::{SttEngine, VoiceActivationMode, VoiceServerConfig};
+pub use voice_server::{SttEngine, VoiceServerConfig};
 pub mod voice_live;
 pub mod voice_providers;
 pub use voice_live::LiveVoiceConfig;
@@ -145,4 +145,5 @@ pub use voice_providers::{
     VoiceProviderCreds, BUILTIN_VOICE_PROVIDERS,
 };
 mod types;
+pub(crate) use types::ConfigDocumentSnapshot;
 pub use types::*;

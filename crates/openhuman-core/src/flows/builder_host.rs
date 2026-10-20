@@ -158,7 +158,7 @@ impl FlowsHost {
                         .value)
                 }
                 PortOperation::AgentsList => {
-                    let agents = crate::agent::registry::list_agents(&context, false)
+                    let agents = crate::agent_registry::list_agents(&context, false)
                         .await
                         .map_err(|error| error.to_string())?;
                     wire!(agents

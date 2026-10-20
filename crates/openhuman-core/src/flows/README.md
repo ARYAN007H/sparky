@@ -178,11 +178,11 @@ state as part of its winning run lifecycle operation.
 
 ### Authoring and discovery agents
 
-Two built-in sub-agents live under `../agent/registry/agents/`, each with an
+Two built-in sub-agents live under `../agent_registry/agents/`, each with an
 `agent.toml` and a synchronous `prompt::build`. Their archetype text is fetched
 from the TinyFlows Copilot bus by async host entrypoints, then supplied to the
 renderer. Both are registered by path from the `BUILTINS` slice in
-[`agent/registry/agents/loader.rs`](../agent/registry/agents/loader.rs):
+[`agent_registry/agents/loader.rs`](../agent_registry/agents/loader.rs):
 
 - `workflow_builder` is the authoring copilot. `flows_build` (in
   [`ops/builder.rs`](./ops/builder.rs)) runs one turn of it from a structured request (create,

@@ -15,6 +15,7 @@
 pub(crate) mod bus_host;
 pub mod channel_bridge;
 pub(crate) mod client;
+pub mod completion_owner;
 pub(crate) mod documents_port;
 pub mod handlers;
 pub mod host_delivery;

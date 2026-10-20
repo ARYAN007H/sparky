@@ -30,6 +30,8 @@ use super::state::LayoutError;
 pub const MANIFEST_ENTRY: &str = "MANIFEST.json";
 /// The prefix every archived path carries.
 pub const ROOT: &str = "workspace";
+/// The prefix of profile-level files (beside `config.toml`) in the archive.
+pub const PROFILE_ROOT: &str = "profile";
 const ZSTD_LEVEL: i32 = 3;
 
 /// One archived file.
@@ -145,7 +147,12 @@ fn write_inner(
         files: Vec::new(),
     };
     for source in sources {
-        let root = format!("{ROOT}/{}", source.rel);
+        // A profile-level credential file (`@profile/<name>`) is archived as
+        // `profile/<name>` and restored beside `config.toml`.
+        let root = match source.rel.strip_prefix(super::credentials::PROFILE_PREFIX) {
+            Some(name) => format!("{PROFILE_ROOT}/{name}"),
+            None => format!("{ROOT}/{}", source.rel),
+        };
         for item in WalkDir::new(&source.at)
             .follow_links(false)
             .sort_by_file_name()
@@ -338,9 +345,25 @@ pub fn restore(archive: &Path, profile_dir: &Path) -> Result<Manifest, LayoutErr
         if path == Path::new(MANIFEST_ENTRY) {
             continue;
         }
+        if let Ok(name) = path.strip_prefix(PROFILE_ROOT) {
+            // Only a plain file name directly below `profile/`.
+            let mut parts = name.components();
+            let plain = matches!(
+                (parts.next(), parts.next()),
+                (Some(std::path::Component::Normal(_)), None)
+            );
+            if !plain {
+                return Err(LayoutError::Verify(format!(
+                    "{} escapes the profile directory",
+                    path.display()
+                )));
+            }
+            entry.unpack(profile_dir.join(name))?;
+            continue;
+        }
         if !path.starts_with(ROOT) {
             return Err(LayoutError::Verify(format!(
-                "{} is outside {ROOT}/",
+                "{} is outside {ROOT}/ and {PROFILE_ROOT}/",
                 path.display()
             )));
         }

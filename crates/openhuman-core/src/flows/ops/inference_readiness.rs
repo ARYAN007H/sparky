@@ -19,13 +19,13 @@ pub(super) async fn agent_node_role(
         .map(str::trim)
         .filter(|s| !s.is_empty() && !s.starts_with('='))
     {
-        use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+        use crate::agent_registry::host_definition::AgentDefinitionRegistry;
         if let Err(error) = AgentDefinitionRegistry::init_global(&config.workspace_dir) {
             tracing::debug!(target: "flows", %error,
                 "[flows] readiness: agent definition registry unavailable; using registry fallback");
         }
         let definition = AgentDefinitionRegistry::current().and_then(|r| r.get(agent_ref).cloned());
-        let custom = crate::agent::registry::find_custom_in_config(config, agent_ref);
+        let custom = crate::agent_registry::find_custom_in_config(config, agent_ref);
         if definition.is_some() || custom.is_some() {
             let entry_model = if definition.is_some() {
                 None
