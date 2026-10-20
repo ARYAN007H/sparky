@@ -345,6 +345,12 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run: "node scripts/ci/check-browser-test-skips.mjs",
         },
         {
+          name: "e2e-runner-ownership",
+          when: areas.frontend,
+          needs: ["pnpm-install"],
+          run: "pnpm e2e:ownership:check",
+        },
+        {
           name: "i18n",
           when: areas.i18n,
           needs: ["pnpm-install"],
