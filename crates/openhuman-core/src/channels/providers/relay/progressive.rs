@@ -18,6 +18,7 @@ pub(crate) struct RelayProgressiveTransport {
     channel_ref: tinychannels_bus::ChannelRef,
     conversation: tinychannels_bus::ConversationRef,
     turn_id: String,
+    projection: Arc<crate::web_chat::surface::Surface>,
 }
 
 impl RelayProgressiveTransport {
@@ -26,12 +27,14 @@ impl RelayProgressiveTransport {
         channel_ref: tinychannels_bus::ChannelRef,
         conversation: tinychannels_bus::ConversationRef,
         turn_id: String,
+        projection: Arc<crate::web_chat::surface::Surface>,
     ) -> Self {
         Self {
             channel,
             channel_ref,
             conversation,
             turn_id,
+            projection,
         }
     }
 
@@ -63,6 +66,7 @@ impl RelayProgressiveTransport {
                 turn_id,
                 channel_ref,
                 conversation,
+                event,
                 ..
             } => {
                 self.check_scope(
@@ -71,9 +75,10 @@ impl RelayProgressiveTransport {
                     channel_ref.as_ref(),
                     conversation.as_ref(),
                 )?;
-                // Output events are canonical engine observations. The relay
-                // gateway receives only the typed terminal send below, so an
-                // observer acknowledgement must not publish a duplicate.
+                // Project canonical events through the same compiled web
+                // adapter used by desktop and TUI turns. Provider delivery is
+                // still performed only by the typed terminal send below.
+                self.projection.output(event).await;
                 Ok(ProgressiveTransportResult::Acknowledged)
             }
             ProgressiveTransportRequest::SendTyped {
