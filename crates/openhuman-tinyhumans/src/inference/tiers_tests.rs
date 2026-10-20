@@ -95,6 +95,24 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
 }
 
 #[test]
+fn hosted_normalizer_seeds_its_preset_using_the_configured_api_url_once() {
+    let mut config = Config::default();
+    config.api_url = Some("https://custom.example/api".to_string());
+
+    assert!(normalize_config(&mut config));
+    assert_eq!(config.default_model, None);
+    assert_eq!(config.cloud_providers.len(), 1);
+    let provider = &config.cloud_providers[0];
+    assert_eq!(provider.slug, "openhuman");
+    assert_eq!(provider.endpoint, "https://custom.example/api");
+    let id = provider.id.clone();
+
+    assert!(!normalize_config(&mut config));
+    assert_eq!(config.cloud_providers.len(), 1);
+    assert_eq!(config.cloud_providers[0].id, id);
+}
+
+#[test]
 fn managed_tier_vocabulary_maps_aliases_and_leaves_concrete_ids_raw() {
     for (model, role) in [
         ("reasoning-v1", "reasoning"),
