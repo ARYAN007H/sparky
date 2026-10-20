@@ -21,7 +21,7 @@ use super::tenant_router::TenantSessionStores;
 use tinyagents_harness::multimodal::BlobAttachmentStash;
 use tinyagents_session::port::{AgentStores, SessionStoreProvider, TurnStates};
 use tinyagents_session::run_ledger::{LedgerError, LedgerResult, RunLedgerStore};
-use tinystoragedrivers::{BlobStore, DocumentStore, MemoryStorage, StorageBackend};
+use tinystoragedrivers::{BlobStore, DocumentStore, MemoryStorage, ScopedStorage, StorageBackend};
 
 /// One fallback provider and the backend it was built over.
 struct Fallback {
@@ -211,6 +211,39 @@ pub fn artifact_blobs_for(workspace_dir: &Path) -> Option<Arc<dyn BlobStore>> {
     let (key, scoped) = tenant_scope_for(workspace_dir, "artifacts")?;
     log::debug!("[session_store] artifact blobs bound agent={key}");
     Some(Arc::clone(scoped.blobs()))
+}
+
+/// The artifact ports for the tenant carried by `context` on the workspace's
+/// storage backend. Unlike [`artifact_blobs_for`], this does not consult the
+/// ambient dispatch context, so a tool that was moved to a detached task keeps
+/// using the profile that authorized the call.
+#[must_use]
+pub fn artifact_scoped_for_in(
+    workspace_dir: &Path,
+    context: &crate::core::runtime::DispatchCtx,
+) -> Option<ScopedStorage> {
+    let tenant = match context.tenant() {
+        Ok(tenant) => tenant,
+        Err(no_tenant) => {
+            log::warn!("[session_store] no tenant for artifact scope: {no_tenant}");
+            return None;
+        }
+    };
+    let key = crate::core::runtime::session_key(&tenant);
+    let backend = match crate::storage::local::backend_for(workspace_dir) {
+        Ok(backend) => backend,
+        Err(error) => {
+            log::warn!("[session_store] no storage backend for artifacts: {error:#}");
+            return None;
+        }
+    };
+    match backend.for_scope(&session_scope(&key)) {
+        Ok(scoped) => Some(scoped),
+        Err(error) => {
+            log::warn!("[session_store] artifact scope refused agent={key}: {error}");
+            None
+        }
+    }
 }
 
 /// The calling tenant's scoped storage on `workspace_dir`'s backend. `what`
