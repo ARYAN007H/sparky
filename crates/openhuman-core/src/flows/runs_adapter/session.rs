@@ -5,7 +5,8 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use tinyflows_bus::runs::{self, RunEvent};
-use tinyflows_catalog::{types::FlowRunTrigger, Flow};
+use tinyflows_bus::catalog::Workflow as Flow;
+use tinyflows_bus::runs::FlowRunTrigger;
 
 use super::{projection, RunBindings};
 use crate::config::Config;

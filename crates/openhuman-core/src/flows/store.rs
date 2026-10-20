@@ -12,7 +12,9 @@ use tinyflows_bus::catalog::{
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
     SetEnabledRequest, Workflow, WorkflowRevision,
 };
-use tinyflows_catalog::{Flow, FlowRevision, FlowSuggestion, SuggestionStatus};
+use tinyflows_bus::catalog::{
+    Flow as Flow, FlowRevision, FlowSuggestion, SuggestionStatus,
+};
 
 use crate::config::Config;
 use crate::modules::tinyflows as module;
@@ -35,18 +37,7 @@ where
 }
 
 fn flow_from_wire(workflow: Workflow) -> Result<Flow> {
-    Ok(Flow {
-        id: workflow.id,
-        name: workflow.name,
-        enabled: workflow.enabled,
-        graph: serde_json::from_value(workflow.graph)
-            .map_err(|error| anyhow!("decode workflow graph: {error}"))?,
-        created_at: workflow.created_at,
-        updated_at: workflow.updated_at,
-        last_run_at: workflow.last_run_at,
-        last_status: workflow.last_status,
-        require_approval: workflow.require_approval,
-    })
+    Ok(workflow)
 }
 
 pub(crate) fn roundtrip<T, U>(value: T) -> Result<U>
@@ -85,7 +76,7 @@ pub fn insert_duplicate_flow(config: &Config, source: &Flow, new_name: String) -
 pub fn create_flow(
     config: &Config,
     name: String,
-    graph: tinyflows::model::WorkflowGraph,
+    graph: Value,
     require_approval: bool,
     enabled: bool,
 ) -> Result<Flow> {
@@ -93,7 +84,7 @@ pub fn create_flow(
     let request = PutWorkflowRequest::Create {
         storage,
         name,
-        graph: serde_json::to_value(graph)?,
+        graph,
         require_approval,
     };
     let response: PutWorkflowResponse =
@@ -180,7 +171,7 @@ pub fn update_flow_graph(
     config: &Config,
     id: &str,
     name: String,
-    graph: tinyflows::model::WorkflowGraph,
+    graph: Value,
     require_approval: bool,
     _enabled_override: Option<bool>,
     force_disarm_if_automatic: bool,
@@ -195,9 +186,7 @@ pub fn update_flow_graph(
         storage,
         id: id.to_owned(),
         name,
-        graph: serde_json::to_value(graph).map_err(|error| BusUpdateError::Store {
-            message: error.to_string(),
-        })?,
+        graph,
         require_approval,
         expected_version: expected_updated_at.map(str::to_owned),
         force_disarm_automatic: force_disarm_if_automatic,
@@ -209,11 +198,7 @@ pub fn update_flow_graph(
             }
         })?;
     match response {
-        PutWorkflowResponse::Ok(result) => {
-            flow_from_wire(result.workflow).map_err(|error| BusUpdateError::Store {
-                message: error.to_string(),
-            })
-        }
+        PutWorkflowResponse::Ok(result) => Ok(result.workflow),
         PutWorkflowResponse::Error(error) => Err(error),
     }
 }
