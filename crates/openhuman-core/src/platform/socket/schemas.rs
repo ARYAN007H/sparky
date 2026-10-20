@@ -73,7 +73,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     name: "url",
                     ty: TypeSchema::String,
                     comment: "Backend WebSocket base URL.",
-                    required: true,
+                    required: false,
                 },
                 FieldSchema {
                     name: "token",
