@@ -6,7 +6,7 @@
 //! when a turn is about to execute.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinychannels_bus::{ContentPart, MediaReference};
 use tinystoragedrivers::Precondition;
 
@@ -266,8 +266,8 @@ pub(crate) async fn restage_persisted_parts(
 ) -> Result<Vec<ContentPart>, String> {
     use base64::Engine as _;
 
-    let mut resolved = resolve_persisted_parts(ctx, thread_id, persisted_message_id, requested)
-        .await?;
+    let mut resolved =
+        resolve_persisted_parts(ctx, thread_id, persisted_message_id, requested).await?;
     let config = ctx
         .load_config()
         .await

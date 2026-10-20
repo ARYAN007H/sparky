@@ -161,11 +161,7 @@ async fn editing_an_image_row_restages_only_its_exact_opaque_reference() {
     )
     .await;
     assert!(other_row.is_err());
-    crate::threads::attachments::discard_staged_parts(
-        &ctx,
-        "edit-image-source",
-        &replacement_refs,
-    )
-    .await
-    .unwrap();
+    crate::threads::attachments::discard_staged_parts(&ctx, "edit-image-source", &replacement_refs)
+        .await
+        .unwrap();
 }

@@ -39,19 +39,19 @@
 //!   turn.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use tinyagents_session::transcript::{
     SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage, TranscriptMeta,
     TruncateCut,
 };
 
-use crate::core::Outcome;
 use crate::core::runtime::DispatchCtx;
-use crate::threads::ThreadsError;
+use crate::core::Outcome;
 use crate::threads::store::{self as conversations, reply_run_id, run_reply_message_id};
+use crate::threads::ThreadsError;
 
-use super::support::{TranscriptStore, transcript_store, workspace_dir};
+use super::support::{transcript_store, workspace_dir, TranscriptStore};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -116,9 +116,10 @@ pub async fn edit_message(
     let store = transcript_store(ctx, &thread_id)
         .await
         .map_err(ThreadsError::Message)?;
-    let has_existing_refs = request.attachments.iter().any(|part| {
-        crate::threads::attachments::has_opaque_ref(part)
-    });
+    let has_existing_refs = request
+        .attachments
+        .iter()
+        .any(|part| crate::threads::attachments::has_opaque_ref(part));
     let staged_parts = if request.attachments.is_empty() {
         Vec::new()
     } else if has_existing_refs {
