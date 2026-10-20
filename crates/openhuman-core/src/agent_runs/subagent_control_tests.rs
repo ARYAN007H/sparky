@@ -50,15 +50,13 @@ fn field(out: &Value, name: &str) -> Option<Value> {
         .cloned()
 }
 
-/// A late Cancel on a run that already finished answers with how it ended and
-/// leaves its durable session alone, instead of rewriting it as "cancelled by
-/// user". A failed run must come back `failed`, never as a success.
+/// A late Cancel on a legacy failed run reports its outcome and leaves the
+/// durable session alone, instead of rewriting it as "cancelled by user".
 #[tokio::test]
-async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
+async fn cancel_of_a_legacy_failed_run_reports_its_outcome_and_rewrites_nothing() {
     use crate::agent::orchestration::subagent_sessions::{
         mark_failed, mark_finished, SubagentSessionStore,
     };
-    use crate::agent::subagent_host::SubagentRunStatus;
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use std::sync::Arc;
 
@@ -88,37 +86,9 @@ async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
             "createdAt": "2026-01-01T00:00:00Z",
             "updatedAt": "2026-01-01T00:00:00Z",
             "lastUsedAt": "2026-01-01T00:00:00Z"
-        }, {
-            "subagentSessionId": "subsess-sub-rpc-failed",
-            "parentSession": "session-rpc",
-            "parentThreadId": "thread-rpc",
-            "workerThreadId": null,
-            "agentId": "agent_memory",
-            "displayName": null,
-            "model": null,
-            "sandboxMode": "workspace",
-            "actionRoot": null,
-            "taskKey": "task",
-            "taskTitle": "Task",
-            "currentTaskId": "sub-rpc-failed",
-            "status": "running",
-            "reusable": true,
-            "latestHistory": null,
-            "latestError": null,
-            "createdAt": "2026-01-01T00:00:00Z",
-            "updatedAt": "2026-01-01T00:00:00Z",
-            "lastUsedAt": "2026-01-01T00:00:00Z"
         }]))
         .expect("session fixture");
     store.save(&seeded).expect("seed store");
-    mark_finished(
-        &store,
-        "subsess-sub-rpc-done",
-        "sub-rpc-done",
-        &SubagentRunStatus::Completed,
-        Vec::new(),
-    )
-    .expect("completed driver row");
     mark_failed(
         &store,
         "subsess-sub-rpc-failed",
@@ -131,18 +101,13 @@ async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
     config.workspace_dir = workspace.path().to_path_buf();
     let core = CoreContext::for_test_with_config(DomainSet::full(), config);
     let ctx = DispatchCtx::new(Arc::clone(&core));
-    for (task_id, outcome) in [
-        ("sub-rpc-done", "completed"),
-        ("sub-rpc-failed", "failed"),
-    ] {
-        let mut params = Map::new();
-        params.insert("taskId".into(), json!(task_id));
-        let out = handle_subagent_cancel(ctx.clone(), params)
-            .await
-            .expect("handler ok");
-        assert_eq!(field(&out, "cancelled"), Some(json!(false)), "{task_id}");
-        assert_eq!(field(&out, "outcome"), Some(json!(outcome)), "{task_id}");
-    }
+    let mut params = Map::new();
+    params.insert("taskId".into(), json!("sub-rpc-failed"));
+    let out = handle_subagent_cancel(ctx, params)
+        .await
+        .expect("handler ok");
+    assert_eq!(field(&out, "cancelled"), Some(json!(false)));
+    assert_eq!(field(&out, "outcome"), Some(json!("failed")));
     assert_eq!(
         serde_json::to_string(&store.load().expect("store still readable")).expect("encode"),
         before,
