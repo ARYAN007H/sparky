@@ -125,6 +125,7 @@ fn started_chat_ack_schema_requires_every_serialized_field() {
     let schema: serde_json::Value =
         serde_json::from_str(&thread_wire_schema_json().expect("schema serializes"))
             .expect("schema is JSON");
+    let properties = schema["properties"].as_object().expect("root properties");
     let ack = resolve_schema(&schema, &properties["startedChatAck"]);
     for field in ["accepted", "client_id", "thread_id", "request_id"] {
         assert!(
