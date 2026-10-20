@@ -424,11 +424,12 @@ pub(super) fn unresolved_chat_model_error_for(
     }
 
     if p.is_empty() || p == "cloud" {
-        return unresolved_chat_model_error(
+        return unresolved_chat_model_error_for(
             role,
             &resolve_primary_cloud_provider_string(config),
             config,
             egress,
+            extensions,
         );
     }
 
