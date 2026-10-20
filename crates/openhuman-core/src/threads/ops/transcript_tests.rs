@@ -125,7 +125,7 @@ async fn write_thread(ctx: &DispatchCtx) {
 
 #[tokio::test]
 async fn transcript_projection_includes_voice_metadata_from_persisted_thread_rows() {
-    use crate::threads::store::{blocking, ConversationMessage, CreateConversationThread};
+    use crate::threads::store::{ConversationMessage, CreateConversationThread, blocking};
     use serde_json::json;
 
     let dir = tempfile::tempdir().unwrap();

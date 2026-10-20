@@ -1,9 +1,9 @@
 //! Paginated projection of a thread's settled transcript.
 
 use super::support::{counts, envelope, transcript_store};
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
-use crate::threads::{store as conversations, ApiEnvelope, PaginationMeta};
+use crate::core::runtime::DispatchCtx;
+use crate::threads::{ApiEnvelope, PaginationMeta, store as conversations};
 use tinyagents_session::transcript::view::DisplayItem;
 
 /// Request for [`transcript_get`]: the thread to project, plus newest-first
