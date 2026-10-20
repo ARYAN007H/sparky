@@ -1010,12 +1010,12 @@ function isStartedChatAck(value: unknown): value is StartedChatAck {
 }
 
 function unwrapChatAck(value: unknown): unknown {
-  for (let depth = 0; depth < 4 && isRecord(value); depth += 1) {
-    if (Object.hasOwn(value, 'error')) {
-      throw new Error('Core returned an error while accepting the chat message');
-    }
-    if (!Object.hasOwn(value, 'result') && !Object.hasOwn(value, 'data')) break;
-    value = Object.hasOwn(value, 'result') ? value.result : value.data;
+  if (
+    isRecord(value) &&
+    Object.hasOwn(value, 'result') &&
+    Array.isArray(value.logs)
+  ) {
+    return value.result;
   }
   return value;
 }

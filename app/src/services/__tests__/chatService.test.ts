@@ -406,13 +406,16 @@ describe('chatService.subscribeChatEvents', () => {
     bindMockSocket(socket);
     const attachments = [{ kind: 'image', media: { opaqueId: 'opaque-1' } }];
     mockCallCoreRpc.mockResolvedValue({
-      queued: true,
-      queue_mode: 'followup',
-      client_id: 'socket-1',
-      thread_id: 'thread-1',
-      request_id: 'request-1',
-      queue_depth: 1,
-      queued_attachments: attachments,
+      result: {
+        queued: true,
+        queue_mode: 'followup',
+        client_id: 'socket-1',
+        thread_id: 'thread-1',
+        request_id: 'request-1',
+        queue_depth: 1,
+        queued_attachments: attachments,
+      },
+      logs: ['accepted'],
     });
 
     await expect(
@@ -424,10 +427,13 @@ describe('chatService.subscribeChatEvents', () => {
     const socket = createMockSocket();
     bindMockSocket(socket);
     mockCallCoreRpc.mockResolvedValue({
-      accepted: true,
-      client_id: 'socket-1',
-      thread_id: 'thread-1',
-      request_id: 'request-started',
+      result: {
+        accepted: true,
+        client_id: 'socket-1',
+        thread_id: 'thread-1',
+        request_id: 'request-started',
+      },
+      logs: ['web channel request accepted'],
     });
 
     await expect(chatSendWithAck({ threadId: 'thread-1', message: 'hello' })).resolves.toEqual({
@@ -450,6 +456,13 @@ describe('chatService.subscribeChatEvents', () => {
   it.each([
     { accepted: false, client_id: 'socket-1', thread_id: 'thread-1', request_id: 'request-1' },
     { accepted: true, client_id: 'socket-1', thread_id: 'thread-1', request_id: 42 },
+    {
+      accepted: true,
+      queued: true,
+      client_id: 'socket-1',
+      thread_id: 'thread-1',
+      request_id: 'request-1',
+    },
   ])('rejects malformed started-turn acknowledgements', async response => {
     const socket = createMockSocket();
     bindMockSocket(socket);
