@@ -349,10 +349,8 @@ impl ProgressProjection {
             call_id,
             tool_name,
             success,
-            output_chars,
             elapsed_ms,
             iteration,
-            failure,
             structured,
             ..
         } = &event
