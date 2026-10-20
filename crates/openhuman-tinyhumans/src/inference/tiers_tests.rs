@@ -32,7 +32,7 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
     config.orchestrator.model = Some("reasoning-quick-v1".to_string());
     config.teams.insert(
         "team".to_string(),
-        openhuman_embed::__host::config::schema::TeamConfig {
+        openhuman_embed::__host::config::schema::TeamModelConfig {
             lead_model: Some("chat-v1".to_string()),
             agent_model: Some("burst-v1".to_string()),
             ..Default::default()
@@ -48,23 +48,23 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
         },
     );
     config.model_routes.push(
-        openhuman_embed::__host::config::schema::ModelRoute {
+        openhuman_embed::__host::config::schema::ModelRouteConfig {
+            hint: "summary".to_string(),
             model: "summarization-v1".to_string(),
-            ..Default::default()
         },
     );
     config.model_routes.extend([
-        openhuman_embed::__host::config::schema::ModelRoute {
+        openhuman_embed::__host::config::schema::ModelRouteConfig {
+            hint: "custom".to_string(),
             model: "vendor/pinned".to_string(),
-            ..Default::default()
         },
-        openhuman_embed::__host::config::schema::ModelRoute {
+        openhuman_embed::__host::config::schema::ModelRouteConfig {
+            hint: "unknown".to_string(),
             model: "hint:unknown".to_string(),
-            ..Default::default()
         },
-        openhuman_embed::__host::config::schema::ModelRoute {
+        openhuman_embed::__host::config::schema::ModelRouteConfig {
+            hint: "blank".to_string(),
             model: String::new(),
-            ..Default::default()
         },
     ]);
 
