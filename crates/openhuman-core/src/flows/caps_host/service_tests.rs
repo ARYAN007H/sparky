@@ -123,7 +123,10 @@ async fn agent_run_rejects_an_identity_from_another_bound_run() {
     .await
     .unwrap_err();
 
-    assert!(error.to_string().contains("different workflow run"));
+    assert!(
+        error.to_string().contains("different workflow run"),
+        "unexpected AgentRun validation error: {error}"
+    );
 }
 
 #[tokio::test]
