@@ -214,6 +214,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
                 task_title: "Workspace scoped task".into(),
                 current_task_id: Some("same-raw-task-id".into()),
                 lifecycle_key: Some(task_key),
+                parent_epoch: None,
                 status: DurableSubagentStatus::Running,
                 reusable: true,
                 latest_history: None,
