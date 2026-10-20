@@ -127,7 +127,7 @@ jobs:
         env:
           OPENHUMAN_WORKSPACE: ${{ runner.temp }}/openhuman-playwright-workspace
           OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: "1"
-        run: bash app/scripts/e2e-web-shards.sh --lane=${{ matrix.lane }} --lanes=4
+        run: bash app/scripts/e2e-web-shards.sh --lane=${{ matrix.lane }} --lanes=4 --selection=all
 
       - name: Pack Playwright E2E failure artifacts
         if: failure()
@@ -142,7 +142,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-playwright-failure-logs-${{ github.run_id }}-lane-${{ matrix.lane }}
+          name: e2e-playwright-all-failure-logs-${{ github.run_id }}-lane-${{ matrix.lane }}
           path: .ci/artifacts/openhuman-playwright-failure-logs.tar.gz
           retention-days: 7
           if-no-files-found: ignore
