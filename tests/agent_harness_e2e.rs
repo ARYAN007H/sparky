@@ -484,6 +484,40 @@ async fn serve_on_ephemeral(
     SocketAddr,
     tokio::task::JoinHandle<Result<(), std::io::Error>>,
 ) {
+    ensure_test_rpc_auth();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind");
+    serve_on_listener(app, listener).await
+}
+
+async fn serve_on_address(
+    app: Router,
+    address: SocketAddr,
+) -> (
+    SocketAddr,
+    tokio::task::JoinHandle<Result<(), std::io::Error>>,
+) {
+    ensure_test_rpc_auth();
+    let listener = tokio::net::TcpListener::bind(address)
+        .await
+        .unwrap_or_else(|error| panic!("bind {address}: {error}"));
+    serve_on_listener(app, listener).await
+}
+
+async fn serve_on_listener(
+    app: Router,
+    listener: tokio::net::TcpListener,
+) -> (
+    SocketAddr,
+    tokio::task::JoinHandle<Result<(), std::io::Error>>,
+) {
+    let addr = listener.local_addr().expect("addr");
+    let handle = tokio::spawn(async move { axum::serve(listener, app).await });
+    (addr, handle)
+}
+
+fn ensure_test_rpc_auth() {
     // Mirrors json_rpc_e2e.rs::ensure_test_rpc_auth — init the shared RPC bearer once.
     static AUTH_INIT: OnceLock<()> = OnceLock::new();
     AUTH_INIT.get_or_init(|| {
@@ -492,12 +526,6 @@ async fn serve_on_ephemeral(
         let token_dir = std::env::temp_dir().join("openhuman-agent-harness-e2e-auth");
         init_rpc_token(&token_dir).expect("init rpc auth token for agent_harness_e2e");
     });
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind");
-    let addr = listener.local_addr().expect("addr");
-    let handle = tokio::spawn(async move { axum::serve(listener, app).await });
-    (addr, handle)
 }
 
 async fn post_json_rpc(rpc_base: &str, id: i64, method: &str, params: Value) -> Value {
@@ -693,7 +721,7 @@ struct Stack {
     _vite_guard: EnvVarGuard,
     _tmp: Option<tempfile::TempDir>,
     mock_join: Option<tokio::task::JoinHandle<Result<(), std::io::Error>>>,
-    rpc_join: tokio::task::JoinHandle<Result<(), std::io::Error>>,
+    rpc_join: Option<tokio::task::JoinHandle<Result<(), std::io::Error>>>,
 }
 
 impl Stack {
@@ -701,7 +729,20 @@ impl Stack {
         if let Some(mock_join) = &self.mock_join {
             mock_join.abort();
         }
-        self.rpc_join.abort();
+        if let Some(rpc_join) = &self.rpc_join {
+            rpc_join.abort();
+        }
+    }
+
+    async fn shutdown_and_wait(mut self) {
+        if let Some(mock_join) = self.mock_join.take() {
+            mock_join.abort();
+            let _ = mock_join.await;
+        }
+        if let Some(rpc_join) = self.rpc_join.take() {
+            rpc_join.abort();
+            let _ = rpc_join.await;
+        }
     }
 }
 
@@ -711,7 +752,9 @@ impl Drop for Stack {
         if let Some(mock_join) = &self.mock_join {
             mock_join.abort();
         }
-        self.rpc_join.abort();
+        if let Some(rpc_join) = &self.rpc_join {
+            rpc_join.abort();
+        }
     }
 }
 
@@ -754,6 +797,7 @@ async fn boot_stack_with_options(
     // it every turn fails with `chat_error.inference`.
     tinyhumans_boot::boot();
 
+    let home_is_override = home_override.is_some();
     let tmp = home_override.is_none().then(|| tempdir().expect("tempdir"));
     let home = home_override.unwrap_or_else(|| {
         tmp.as_ref()
@@ -767,7 +811,11 @@ async fn boot_stack_with_options(
 
     let home_guard = EnvVarGuard::set_to_path("HOME", &home);
     let action_dir_guard = EnvVarGuard::set_to_path("OPENHUMAN_ACTION_DIR", &action_dir);
-    let workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &home.join("workspace"));
+    let workspace_guard = if home_is_override {
+        EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &home.join("workspace"))
+    } else {
+        EnvVarGuard::unset("OPENHUMAN_WORKSPACE")
+    };
     let backend_guard = EnvVarGuard::unset("BACKEND_URL");
     let vite_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
 
@@ -814,7 +862,7 @@ async fn boot_stack_with_options(
         _vite_guard: vite_guard,
         _tmp: tmp,
         mock_join,
-        rpc_join,
+        rpc_join: Some(rpc_join),
     }
 }
 
