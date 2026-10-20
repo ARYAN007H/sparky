@@ -551,7 +551,8 @@ pub(crate) async fn discard_staged_parts(
         if let Some(id) = opaque_media(&entry.part).and_then(|media| media.opaque_id.as_deref()) {
             let manifest_path = staged_manifest_path(&config.workspace_dir, id)?;
             let _ = tokio::fs::remove_file(manifest_path).await;
-            let claim_path = staged_manifest_path(&config.workspace_dir, id)?.with_extension("claim.json");
+            let claim_path =
+                staged_manifest_path(&config.workspace_dir, id)?.with_extension("claim.json");
             let _ = tokio::fs::remove_file(claim_path).await;
         }
     }
@@ -581,12 +582,11 @@ pub(crate) async fn consume_staged_parts(
             .ok_or_else(|| "staged attachment reference is missing".to_string())?;
         let path = staged_manifest_path(&config.workspace_dir, id)?;
         let claim_path = path.with_extension("claim.json");
-        let claim: StagedAttachmentClaim = serde_json::from_slice(
-            &tokio::fs::read(&claim_path)
-                .await
-                .map_err(|_| "staged attachment is not bound to a persisted message".to_string())?,
-        )
-        .map_err(|error| format!("staged attachment claim is invalid: {error}"))?;
+        let claim: StagedAttachmentClaim =
+            serde_json::from_slice(&tokio::fs::read(&claim_path).await.map_err(|_| {
+                "staged attachment is not bound to a persisted message".to_string()
+            })?)
+            .map_err(|error| format!("staged attachment claim is invalid: {error}"))?;
         if claim.tenant != tenant
             || claim.thread_id != thread_id
             || claim.message_id != message_id

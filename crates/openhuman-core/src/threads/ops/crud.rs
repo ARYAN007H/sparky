@@ -507,8 +507,8 @@ async fn message_append_with_config(
             &staged_refs,
             &message.id,
         )
-            .await
-            .map_err(ThreadsError::Message)?;
+        .await
+        .map_err(ThreadsError::Message)?;
     }
     Ok(envelope(
         message_to_record(message),
