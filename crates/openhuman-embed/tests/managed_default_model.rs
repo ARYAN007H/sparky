@@ -6,7 +6,7 @@ mod common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend, PointedInference};
 use openhuman_embed::{Access, AgentSpec, Runtime, Workspace};
 use serde_json::Value;
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{method, path_regex};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[test]
@@ -16,7 +16,7 @@ fn registered_provider_default_runs_with_an_unpinned_config() {
             let backend = stub_backend().await;
             let inference = MockServer::start().await;
             Mock::given(method("POST"))
-                .and(path("/v1/chat/completions"))
+                .and(path_regex(r"chat/completions$"))
                 .respond_with(
                     ResponseTemplate::new(200).set_body_json(chat_completion("fixture reply")),
                 )
