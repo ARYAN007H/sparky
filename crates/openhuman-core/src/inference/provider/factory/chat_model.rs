@@ -178,15 +178,29 @@ pub async fn probe_inference_readiness(
         "[flows][inference-probe] role={role} resolves to the managed OpenHuman backend — \
          probing readiness"
     );
-    let Some(probe) =
-        crate::inference::registry::chat_model(PROVIDER_OPENHUMAN).and_then(|entry| entry.probe)
-    else {
+    let Some(entry) = crate::inference::registry::chat_model(PROVIDER_OPENHUMAN) else {
+        log::debug!("[flows][inference-probe] role={role} managed provider was unregistered");
+        return Ok(());
+    };
+    let Some(probe) = entry.probe else {
         // The registered provider has no readiness probe: construction above
         // succeeded, and there is nothing further to ask it.
         log::debug!("[flows][inference-probe] role={role} managed provider registered no probe");
         return Ok(());
     };
-    let model_id = resolve_managed_model(role, config, None);
+    let model_id = entry
+        .models
+        .as_ref()
+        .and_then(|models| (models.resolve_model)(role, config, None))
+        .or_else(|| {
+            config
+                .default_model
+                .as_deref()
+                .map(str::trim)
+                .filter(|model| !model.is_empty())
+                .map(str::to_string)
+        })
+        .ok_or_else(|| format!("provider {PROVIDER_OPENHUMAN} has no model for role {role}"))?;
     let result = probe(role.to_string(), model_id.clone(), config.clone()).await;
     log::debug!(
         "[flows][inference-probe] role={role} model={model_id} probe result: {}",
