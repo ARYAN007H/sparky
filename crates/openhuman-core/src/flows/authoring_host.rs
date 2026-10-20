@@ -226,8 +226,7 @@ impl DraftPromotionCallbacks {
                         .await?
                     }
                 };
-                let workflow: catalog::Workflow = crate::flows::store::roundtrip(outcome.value)
-                    .map_err(|error| error.to_string())?;
+                let workflow: catalog::Workflow = outcome.value;
                 Ok(SavePromotedDraftResponse::Ok(
                     catalog::SavePromotedDraftResult {
                         workflow,
