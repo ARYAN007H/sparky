@@ -60,12 +60,14 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         crate::core::runtime::DomainSet::full(),
         config.clone(),
     )
-    .derive_with(crate::core::runtime::ContextOverlay::new(
-        config,
-        crate::core::runtime::DomainSet::full(),
-        crate::tools::toolpacks::ToolGroups::none(),
-    )
-    .definitions(definitions));
+    .derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config,
+            crate::core::runtime::DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
+    );
     let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
@@ -76,18 +78,20 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     );
     let accepted = crate::core::runtime::CoreContext::scope(
         Arc::clone(&core),
-        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "wait for the thread stop",
-                "model": "test-model",
-                "task_key": "stop detached child"
-            }),
-            None,
-            live.data.child(),
-            crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
-                .expect("detached parent"),
-        )),
+        Box::pin(
+            SpawnSubagentTool::new().execute_with_live_parent_context(
+                json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": "wait for the thread stop",
+                    "model": "test-model",
+                    "task_key": "stop detached child"
+                }),
+                None,
+                live.data.child(),
+                crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
+                    .expect("detached parent"),
+            ),
+        ),
     )
     .await
     .expect("spawn child");
@@ -105,7 +109,10 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         .expect("driver child reached provider gate")
         .expect("provider start");
     let dispatch = live.data.dispatch_ctx();
-    assert!(dispatch.resolved().is_some(), "stop uses the live core context");
+    assert!(
+        dispatch.resolved().is_some(),
+        "stop uses the live core context"
+    );
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&dispatch);
@@ -119,7 +126,10 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
                 == Some(task_id.as_str())
         })
         .expect("driver owns a live child job");
-    assert_eq!(job.status, tinyagents_orchestration::subagent::SubAgentJobStatus::Running);
+    assert_eq!(
+        job.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Running
+    );
 
     let scoped = crate::core::runtime::CoreContext::scope(
         Arc::clone(&core),
@@ -134,7 +144,10 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     .expect("scoped cancel");
     assert_eq!(scoped.value["cancelled"], serde_json::json!(false));
     assert_eq!(scoped.value["subagents_cancelled"], serde_json::json!(0));
-    assert_eq!(jobs.get(job.id.as_str()).unwrap().status, tinyagents_orchestration::subagent::SubAgentJobStatus::Running);
+    assert_eq!(
+        jobs.get(job.id.as_str()).unwrap().status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Running
+    );
 
     let stop = crate::core::runtime::CoreContext::scope(
         Arc::clone(&core),
@@ -310,8 +323,12 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
     config.components.juice = false;
     let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), crate::tools::toolpacks::ToolGroups::none())
-            .definitions(definitions),
+        ContextOverlay::new(
+            config,
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
     );
     let thread_id = "completed-cancel-parent-thread";
     let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
@@ -324,18 +341,23 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
     );
     let result = CoreContext::scope(
         Arc::clone(&core),
-        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "Investigate completed-cancel-canary",
-                "model": "test-model",
-                "task_key": "completed child late cancel"
-            }),
-            None,
-            live.data.child(),
-            crate::agent::subagent_host::detached_subagent_parent(&live, "completed-cancel-child")
+        Box::pin(
+            SpawnSubagentTool::new().execute_with_live_parent_context(
+                json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": "Investigate completed-cancel-canary",
+                    "model": "test-model",
+                    "task_key": "completed child late cancel"
+                }),
+                None,
+                live.data.child(),
+                crate::agent::subagent_host::detached_subagent_parent(
+                    &live,
+                    "completed-cancel-child",
+                )
                 .expect("detached parent"),
-        )),
+            ),
+        ),
     )
     .await
     .expect("spawn tool execution");
@@ -390,7 +412,10 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
     let after_snapshot = CoreContext::sync_scope(Arc::clone(&core), || store.load())
         .map(|rows| serde_json::to_string(&rows).expect("encode rows after cancel"))
         .expect("load row after cancel");
-    assert_eq!(after_snapshot, before_snapshot, "late cancel must not rewrite completed state");
+    assert_eq!(
+        after_snapshot, before_snapshot,
+        "late cancel must not rewrite completed state"
+    );
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
