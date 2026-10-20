@@ -68,8 +68,8 @@ export function openHumanToolEntries(): Record<string, OpenHumanToolEntry> {
      * A sub-agent delegation. Never approval-gated (the orchestrator spawns
      * it directly), so its render skips the gate check every other entry
      * would need and goes straight to `SubagentTaskCard`, over the vendored
-     * `task-card` element — nested `messages` transcript, worktree actions,
-     * and the awaiting-user reply box all live there now (`AssistantUiSubagentCall`
+     * `task-card` element — nested `messages` transcript and the awaiting-user
+     * reply box all live there now (`AssistantUiSubagentCall`
      * / `SubagentDrawer` are deleted).
      */
     task: { type: 'backend', display: 'standalone', render: SubagentTaskCard },
