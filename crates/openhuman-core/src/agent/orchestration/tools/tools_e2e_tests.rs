@@ -13,6 +13,152 @@ use tinytools_agent::dialect::ToolCallFormat;
 
 const SPAWN_SUBAGENT_CANARY: &str = "tool-e2e-spawn-subagent-canary";
 
+struct StopGateModel {
+    started: tokio::sync::mpsc::Sender<()>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+#[async_trait]
+impl ChatModel<()> for StopGateModel {
+    fn profile(&self) -> Option<&ModelProfile> {
+        static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+        Some(PROFILE.get_or_init(|| {
+            let mut profile = ModelProfile::default();
+            profile.tool_calling = true;
+            profile
+        }))
+    }
+
+    async fn invoke(
+        &self,
+        _state: &(),
+        _request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelResponse> {
+        let _ = self.started.send(()).await;
+        self.release.notified().await;
+        Ok(ModelResponse::assistant("released"))
+    }
+}
+
+#[tokio::test]
+async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let thread_id = "stop-detached-subagent-thread";
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let release = Arc::new(tokio::sync::Notify::new());
+    let model = Arc::new(StopGateModel {
+        started: started_tx,
+        release,
+    });
+    let mut parent = parent_context(workspace.path(), model, vec![]);
+    parent.session_id = "stop-detached-subagent-session".into();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.components.juice = false;
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    )
+    .derive_with(crate::core::runtime::ContextOverlay::new(
+        config,
+        crate::core::runtime::DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    )
+    .definitions(definitions));
+    let host = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    let live = tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new("stop-detached-subagent-session")
+            .with_thread(thread_id),
+        host,
+    );
+    let accepted = crate::core::runtime::CoreContext::scope(
+        Arc::clone(&core),
+        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "wait for the thread stop",
+                "model": "test-model",
+                "task_key": "stop detached child"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "stop-child")
+                .expect("detached parent"),
+        )),
+    )
+    .await
+    .expect("spawn child");
+    assert!(!accepted.is_error, "{}", accepted.output());
+    let task_id = accepted
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|value| value["task_id"].as_str().map(str::to_owned))
+        .expect("accepted child includes its task ID");
+    tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
+        .await
+        .expect("driver child reached provider gate")
+        .expect("provider start");
+    let dispatch = live.data.dispatch_ctx();
+    assert!(dispatch.resolved().is_some(), "stop uses the live core context");
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(&dispatch);
+    let job = jobs
+        .list()
+        .into_iter()
+        .find(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str())
+        })
+        .expect("driver owns a live child job");
+    assert_eq!(job.status, tinyagents_orchestration::subagent::SubAgentJobStatus::Running);
+
+    let scoped = crate::core::runtime::CoreContext::scope(
+        Arc::clone(&core),
+        crate::web_chat::channel_web_cancel(
+            &dispatch,
+            "stop-client",
+            thread_id,
+            Some("req-unrelated"),
+        ),
+    )
+    .await
+    .expect("scoped cancel");
+    assert_eq!(scoped.value["cancelled"], serde_json::json!(false));
+    assert_eq!(scoped.value["subagents_cancelled"], serde_json::json!(0));
+    assert_eq!(jobs.get(job.id.as_str()).unwrap().status, tinyagents_orchestration::subagent::SubAgentJobStatus::Running);
+
+    let stop = crate::core::runtime::CoreContext::scope(
+        Arc::clone(&core),
+        crate::web_chat::channel_web_cancel(&dispatch, "stop-client", thread_id, None),
+    )
+    .await
+    .expect("unscoped stop");
+    assert_eq!(stop.value["cancelled"], serde_json::json!(true));
+    assert_eq!(stop.value["request_id"], serde_json::Value::Null);
+    assert_eq!(stop.value["subagents_cancelled"], serde_json::json!(1));
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if jobs.get(job.id.as_str()).is_some_and(|job| {
+                job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled
+            }) {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("driver child cancellation settles");
+}
+
 #[tokio::test]
 async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
     let workspace = tempfile::TempDir::new().expect("workspace");
