@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 const USER_TEXT = "Describe the attached image briefly.";
 const REPLY = "The image is attached.";
+const EDITED_TEXT = "Describe the same attached image with more detail.";
+const EDITED_REPLY = "The same image remains attached after editing.";
 const FILE_NAME = "typed-roundtrip.png";
 const IMAGE_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
@@ -10,8 +12,11 @@ const IMAGE_BYTES = Buffer.from(
 );
 
 function unwrap(value) {
-  for (let depth = 0; depth < 6 && value && !value.message; depth += 1) {
-    value = value.result ?? value.data ?? value.value;
+  for (let depth = 0; depth < 6 && value && typeof value === "object"; depth += 1) {
+    if (value.error) throw new Error(`core RPC failed: ${JSON.stringify(value.error)}`);
+    const wrapper = ["result", "data", "value"].find((key) => key in value);
+    if (!wrapper) break;
+    value = value[wrapper];
   }
   return value;
 }
@@ -201,6 +206,98 @@ export default async function typedImageAttachmentRoundtrip({
     );
   log("mock model request contained typed image bytes and clean user text");
 
+  // Exercise the real edit RPC with the persisted row's opaque refs. The core
+  // must resolve them against that exact user row and restage trusted bytes;
+  // it must not turn the refs into user-controlled paths or markers.
+  mock.set("llmStreamScript", [
+    { text: EDITED_REPLY },
+    { finish: "stop" },
+  ]);
+  const editResponse = unwrap(
+    await page.evaluate(
+      async ({ rpcUrl: url, token, threadId: id, messageId, attachments }) => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { authorization: token, "content-type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "typed-image-edit-roundtrip",
+            method: "openhuman.threads_edit_message",
+            params: {
+              thread_id: id,
+              message_id: messageId,
+              content: "Describe the same attached image with more detail.",
+              attachments,
+            },
+          }),
+        });
+        return response.json();
+      },
+      {
+        rpcUrl,
+        token: authorization,
+        threadId,
+        messageId: persisted.id,
+        attachments: persisted.attachments,
+      },
+    ),
+  );
+  if (typeof editResponse?.request_id !== "string")
+    throw new Error(
+      `edit RPC did not admit the replacement turn: ${JSON.stringify(editResponse)}`,
+    );
+  await page.getByText(EDITED_REPLY, { exact: false }).waitFor({ timeout: 90_000 });
+
+  const editedMessages = unwrap(
+    await page.evaluate(
+      async ({ rpcUrl: url, token, threadId: id }) => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { authorization: token, "content-type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "typed-image-edit-roundtrip-read",
+            method: "openhuman.threads_messages_list",
+            params: { thread_id: id },
+          }),
+        });
+        return response.json();
+      },
+      { rpcUrl, token: authorization, threadId },
+    ),
+  );
+  const editedUserRow = editedMessages?.messages?.find(
+    (message) => message.sender === "user" && message.content === EDITED_TEXT,
+  );
+  const editedRef = editedUserRow?.attachments?.[0];
+  if (
+    !editedUserRow ||
+    editedUserRow.id === persisted.id ||
+    editedUserRow.content.includes("[ATTACHMENT:") ||
+    editedRef?.kind !== "image" ||
+    editedRef.media?.opaqueId === reference.media.opaqueId ||
+    editedRef.media?.path ||
+    editedRef.media?.url
+  )
+    throw new Error(
+      `edited row did not own fresh opaque image refs: ${JSON.stringify(editedUserRow)}`,
+    );
+  const modelRequests = mock
+    .requests()
+    .filter((request) => /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url));
+  const editedModelRequest = modelRequests.at(-1);
+  const editedModelBody = editedModelRequest && JSON.parse(editedModelRequest.body);
+  const editedUserMessages =
+    editedModelBody?.messages?.filter((message) => message.role === "user") ?? [];
+  const editedPrompt = JSON.stringify(editedUserMessages);
+  if (
+    !editedModelRequest ||
+    !editedPrompt.includes(IMAGE_BYTES.toString("base64")) ||
+    /\[(?:ATTACHMENT|IMAGE|FILE):/i.test(editedPrompt)
+  )
+    throw new Error("edited model request did not receive clean text and original image bytes");
+  log("editing preserved image bytes and assigned fresh opaque ownership");
+
   await page.reload();
   await composer.waitFor({ state: "visible", timeout: 30_000 });
   await page.evaluate(
@@ -237,6 +334,23 @@ export default async function typedImageAttachmentRoundtrip({
     JSON.stringify(persisted.attachments)
   )
     throw new Error("reloaded conversation did not restore the opaque image ref");
+  const restoredEdit = await page.evaluate(
+    ({ id, content }) => {
+      const messages =
+        window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId?.[
+          id
+        ] ?? [];
+      return messages.find(
+        (message) => message.sender === "user" && message.content === content,
+      );
+    },
+    { id: threadId, content: EDITED_TEXT },
+  );
+  if (
+    restoredEdit?.id !== editedUserRow.id ||
+    restoredEdit?.attachments?.[0]?.media?.opaqueId !== editedRef.media.opaqueId
+  )
+    throw new Error("edited image row did not reload with its fresh opaque reference");
   log(
     "typed image attachment survived core staging, chat submission and reload",
   );
