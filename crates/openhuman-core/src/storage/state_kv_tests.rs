@@ -114,3 +114,52 @@ fn import_file_records_a_missing_or_corrupt_file_without_failing() {
         .unwrap();
     assert!(kv.get::<u32>("none").unwrap().is_none());
 }
+
+#[test]
+fn typed_import_quarantines_invalid_json_and_wrong_legacy_shapes() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let kv = state(&storage, "local");
+    let cases: [(&str, &[u8]); 2] = [
+        ("malformed", b"{not json"),
+        ("wrong_shape", br#"{"a":"not a number"}"#),
+    ];
+
+    for (name, bytes) in cases {
+        let legacy = dir.path().join(format!("{name}.json"));
+        std::fs::write(&legacy, bytes).unwrap();
+        kv.import_file_quarantining::<BTreeMap<String, u32>>(name, &legacy)
+            .unwrap();
+
+        assert!(!legacy.exists(), "invalid {name} state was quarantined");
+        assert_eq!(
+            std::fs::read(legacy.with_extension("json.corrupt")).unwrap(),
+            bytes,
+            "the raw {name} bytes are preserved"
+        );
+        assert!(kv.get::<BTreeMap<String, u32>>(name).unwrap().is_none());
+    }
+}
+
+#[test]
+fn typed_import_keeps_valid_legacy_file_and_does_not_resurrect_deleted_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let legacy = dir.path().join("valid.json");
+    let bytes = br#"{"a":7}"#;
+    std::fs::write(&legacy, bytes).unwrap();
+    let kv = state(&MemoryStorage::new(), "local");
+
+    kv.import_file_quarantining::<BTreeMap<String, u32>>("valid", &legacy)
+        .unwrap();
+    assert_eq!(
+        kv.get::<BTreeMap<String, u32>>("valid").unwrap().unwrap()["a"],
+        7
+    );
+    assert_eq!(std::fs::read(&legacy).unwrap(), bytes);
+
+    kv.delete("valid").unwrap();
+    kv.import_file_quarantining::<BTreeMap<String, u32>>("valid", &legacy)
+        .unwrap();
+    assert!(kv.get::<BTreeMap<String, u32>>("valid").unwrap().is_none());
+    assert_eq!(std::fs::read(legacy).unwrap(), bytes);
+}
