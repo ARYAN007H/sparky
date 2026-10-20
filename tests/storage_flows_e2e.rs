@@ -130,16 +130,14 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
         .unwrap()
         .value
         .is_empty());
-    let fallback_flow = flows::ops::flows_create(
-        &config,
-        "Fallback".to_string(),
-        graph,
-        false,
-    )
-    .await
-    .unwrap()
-    .value;
-    assert_eq!(flows::ops::flows_list(&config).await.unwrap().value.len(), 1);
+    let fallback_flow = flows::ops::flows_create(&config, "Fallback".to_string(), graph, false)
+        .await
+        .unwrap()
+        .value;
+    assert_eq!(
+        flows::ops::flows_list(&config).await.unwrap().value.len(),
+        1
+    );
     assert_eq!(fallback_flow.name, "Fallback");
     openhuman_core::agent::orchestration::open_delegation_checkpointer(&config).unwrap();
 }
