@@ -375,6 +375,7 @@ impl SpawnSubagentTool {
         let background_dispatch = dispatch.clone();
         let background_agent_id = definition.id.clone();
         let background_task_id = task_id.clone();
+        let background_task_key = task_key.clone();
         let background_parent_session = parent_session.clone();
         let background_worker_thread_id = worker_thread_id.clone();
         let background_store = store.clone();
@@ -405,6 +406,7 @@ impl SpawnSubagentTool {
             background_dispatch,
             background_agent_id,
             background_task_id,
+            background_task_key,
             background_parent_session,
             completion_target,
             completion_worker_thread_id,

@@ -16,6 +16,7 @@ pub(super) fn make_completion(
     background_dispatch: DispatchCtx,
     background_agent_id: String,
     background_task_id: String,
+    background_task_key: String,
     background_parent_session: String,
     completion_target: CompletionTarget,
     completion_worker_thread_id: Option<String>,
@@ -41,6 +42,7 @@ pub(super) fn make_completion(
         let background_dispatch = background_dispatch.clone();
         let background_agent_id = background_agent_id.clone();
         let background_task_id = background_task_id.clone();
+        let background_task_key = background_task_key.clone();
         let background_parent_session = background_parent_session.clone();
         let completion_target = completion_target.clone();
         let background_worker_thread_id = completion_worker_thread_id.clone();
@@ -278,6 +280,7 @@ pub(super) fn make_completion(
                                     completion_target
                                         .awaiting_input(
                                             &outcome.task_id,
+                                            &background_task_key,
                                             &outcome.agent_id,
                                             question,
                                             checkpoint.is_some(),

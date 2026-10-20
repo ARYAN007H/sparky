@@ -147,7 +147,7 @@ pub fn is_withheld_from(agent_id: &str, tool: &str) -> bool {
 /// `spawn_subagent` schema. The schema's agent-id enum is the same allowlist
 /// enforced during execution, so this keeps a single route to each capability.
 pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'static str> {
-    let reachable_owners: HashSet<&str> = tools
+    let reachable_owners: HashSet<String> = tools
         .iter()
         .filter(|tool| tool.name() == "spawn_subagent")
         .filter_map(|tool| {
@@ -157,6 +157,7 @@ pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'st
         })
         .flatten()
         .filter_map(serde_json::Value::as_str)
+        .map(str::to_owned)
         .collect();
     if reachable_owners.is_empty() {
         return Vec::new();

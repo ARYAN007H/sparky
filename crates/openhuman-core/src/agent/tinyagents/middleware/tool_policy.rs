@@ -175,8 +175,8 @@ impl ToolPolicyHostState {
         if self.session.decision_for("spawn_subagent").is_denied() {
             return Vec::new();
         }
-        let allowed = spawn
-            .parameters_schema()
+        let parameters = spawn.parameters_schema();
+        let allowed = parameters
             .pointer("/properties/agent_id/enum")
             .and_then(serde_json::Value::as_array);
         let can_reach_owner = allowed
