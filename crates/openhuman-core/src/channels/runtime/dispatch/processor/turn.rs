@@ -2,7 +2,6 @@
 //! assembly, dispatching the agentic turn over the native bus, and
 //! delivering the draft/final reply.
 
-use crate::agent::bus::AgentTurnResponse;
 use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
 #[cfg(test)]
 use crate::channels::routes::get_or_create_turn_model_source;
@@ -12,7 +11,7 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus as traits;
 use tokio_util::sync::CancellationToken;
@@ -22,7 +21,7 @@ use super::super::helpers::{
     build_channel_context_block, log_worker_join_result, spawn_typing_task,
     REPLY_LOG_TRUNCATE_CHARS,
 };
-use super::super::host_agent::{self, run_host_agent_turn, HostChannelTurn, HostRoute};
+use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 #[cfg(test)]
 use super::bus_turn::dispatch_bus_turn;
