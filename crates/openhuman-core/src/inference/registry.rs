@@ -96,6 +96,8 @@ pub struct ProviderModelHooks {
     pub resolve_model: Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>,
     /// The default model's static context window, if the provider knows it.
     pub context_window: Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>,
+    /// Provider default pricing as (model id, input USD/1M, output USD/1M).
+    pub default_pricing: Arc<dyn Fn() -> Option<(String, f64, f64)> + Send + Sync>,
 }
 
 /// A provider-neutral semantic category for a backend error.
@@ -194,6 +196,53 @@ pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelHoo
 pub fn provider_default_model(provider_id: &str) -> Option<String> {
     let hooks = provider_model_hooks(provider_id)?;
     (hooks.default_model)()
+}
+
+/// Default pricing supplied by the registered provider, if any.
+pub fn provider_default_pricing(provider_id: &str) -> Option<(String, f64, f64)> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.default_pricing)()
+}
+
+/// The workload role assigned to a provider-specific model alias.
+pub fn provider_model_role(provider_id: &str, model: &str) -> Option<String> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.role_for_model)(model)
+}
+
+/// Whether the provider recognizes `model` as an abstract alias.
+pub fn provider_model_is_alias(provider_id: &str, model: &str) -> bool {
+    provider_model_hooks(provider_id)
+        .is_some_and(|hooks| (hooks.is_alias)(model))
+}
+
+/// Whether the provider regards `model` as a concrete id for pass-through.
+pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
+    provider_model_hooks(provider_id)
+        .is_none_or(|hooks| (hooks.is_raw_model)(model))
+}
+
+/// Whether the provider says `model` supports image input.
+pub fn provider_model_supports_vision(provider_id: &str, model: &str) -> bool {
+    provider_model_hooks(provider_id)
+        .is_some_and(|hooks| (hooks.supports_vision)(model))
+}
+
+/// Provider-specific resolution of a role alias, configured default, or pin.
+pub fn resolve_provider_model(
+    provider_id: &str,
+    role: &str,
+    config: &Config,
+    model_override: Option<&str>,
+) -> Option<String> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.resolve_model)(role, config, model_override)
+}
+
+/// The provider's model-specific context window, if known.
+pub fn provider_model_context_window(provider_id: &str, model: &str) -> Option<u64> {
+    let hooks = provider_model_hooks(provider_id)?;
+    (hooks.context_window)(model)
 }
 
 /// Registers a generic config normalizer, such as a provider-owned migration
