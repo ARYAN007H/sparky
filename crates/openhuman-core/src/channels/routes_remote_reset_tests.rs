@@ -1,5 +1,5 @@
 use super::*;
-use crate::channels::routes::tests::{remote_session_scope, runtime_context};
+use crate::channels::routes::tests::runtime_context;
 use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 use std::collections::HashMap;
 use std::path::Path;
@@ -53,15 +53,28 @@ fn transcript_meta(thread_id: &str) -> TranscriptMeta {
     }
 }
 
+fn remote_session_scope() -> tinychannels_bus::module_remote::RemoteSessionScope {
+    tinychannels_bus::module_remote::RemoteSessionScope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram:bot-a".into()),
+        },
+        conversation: tinychannels_bus::ConversationRef {
+            kind: tinychannels_bus::ConversationKind::Group,
+            id: "room-1".into(),
+            topic_id: Some("topic-3".into()),
+            ..Default::default()
+        },
+        session_key: "prepared-session".into(),
+    }
+}
+
 fn seed_session(core: &CoreContext, workspace: &Path, key: &str) -> SessionRef {
     let session = SessionRef::scoped(key, "orchestrator");
-    let history = crate::agent::session_store::transcripts_or_files_in(
-        core,
-        "orchestrator",
-        workspace,
-    )
-    .open_session(&session, transcript_meta(key))
-    .unwrap();
+    let history =
+        crate::agent::session_store::transcripts_or_files_in(core, "orchestrator", workspace)
+            .open_session(&session, transcript_meta(key))
+            .unwrap();
     history
         .append(TranscriptMessage::user("prior tenant turn"))
         .unwrap();
@@ -72,11 +85,8 @@ fn seed_session(core: &CoreContext, workspace: &Path, key: &str) -> SessionRef {
 }
 
 fn session_messages(core: &CoreContext, workspace: &Path, session: &SessionRef) -> Vec<String> {
-    let locator = crate::agent::session_store::transcripts_or_files_in(
-        core,
-        "orchestrator",
-        workspace,
-    );
+    let locator =
+        crate::agent::session_store::transcripts_or_files_in(core, "orchestrator", workspace);
     let head = locator.head_generation(session);
     locator
         .read_session_transcript(&head)
@@ -93,7 +103,10 @@ fn session_messages(core: &CoreContext, workspace: &Path, session: &SessionRef) 
 fn tenant_runtime(
     profile: &str,
     workspace: &Path,
-) -> (Arc<CoreContext>, crate::channels::context::ChannelRuntimeContext) {
+) -> (
+    Arc<CoreContext>,
+    crate::channels::context::ChannelRuntimeContext,
+) {
     let workspace = workspace.to_path_buf();
     let config = crate::config::Config {
         workspace_dir: workspace.clone(),
@@ -162,8 +175,14 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     )
     .await
     .is_err());
-    assert_eq!(session_messages(&alice_core, workspace, &alice_session).len(), 2);
-    assert_eq!(session_messages(&bob_core, workspace, &bob_session).len(), 2);
+    assert_eq!(
+        session_messages(&alice_core, workspace, &alice_session).len(),
+        2
+    );
+    assert_eq!(
+        session_messages(&bob_core, workspace, &bob_session).len(),
+        2
+    );
 
     let cleared = crate::channels::host::remote_control::dispatch_callback(
         &alice_dispatch,

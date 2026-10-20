@@ -1,6 +1,18 @@
 use super::super::host_agent::{self, HostRoute};
 use crate::channels::context::ChannelRuntimeContext;
 
+pub(crate) async fn reset_command(
+    ctx: std::sync::Arc<ChannelRuntimeContext>,
+    message: tinychannels_bus::ChannelMessage,
+    session_key: String,
+    history_key: String,
+) -> Result<(), String> {
+    reset_durable_channel_session(&ctx, &message, &session_key, &history_key)
+        .await
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
 /// Reset the durable session selected for this channel conversation. The
 /// module still owns command parsing; this host adapter resolves trusted agent
 /// authority and serializes the generation transition with turns.

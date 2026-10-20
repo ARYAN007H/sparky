@@ -23,7 +23,6 @@ use super::super::helpers::{
 };
 use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
-use super::reset_durable_channel_session;
 use super::RuntimeChannelMessage;
 
 pub(crate) async fn process_channel_message(
@@ -145,15 +144,13 @@ pub(crate) async fn process_channel_runtime_message(
         Some(session_key.clone()),
         &msg,
         || async move {
-            reset_durable_channel_session(
-                &reset_context,
-                &reset_message,
-                &reset_session_key,
-                &reset_history_key,
+            super::reset::reset_command(
+                reset_context,
+                reset_message,
+                reset_session_key,
+                reset_history_key,
             )
             .await
-            .map(|_| ())
-            .map_err(|error| error.to_string())
         },
     )
     .await
