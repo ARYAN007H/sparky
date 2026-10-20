@@ -240,7 +240,7 @@
   {
     "rule": "ambient-context",
     "path": "crates/openhuman-core/src/core/all.rs",
-    "line": 87,
+    "line": 89,
     "text": "crate::core::runtime::context::CoreContext::current().map(|c| c.domains())",
     "occurrence": 1
   },
@@ -324,21 +324,21 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 446,
+    "line": 445,
     "text": "tokio::spawn(async move {",
     "occurrence": 2
   },
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 503,
+    "line": 502,
     "text": "tokio::spawn(async move {",
     "occurrence": 3
   },
   {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 505,
+    "line": 504,
     "text": "let config = match Config::load_or_init().await {",
     "occurrence": 1
   },
@@ -513,7 +513,7 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 189,
+    "line": 262,
     "text": "tokio::spawn(async move {",
     "occurrence": 1
   },
@@ -589,22 +589,8 @@
   },
   {
     "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/memory/backfill.rs",
-    "line": 248,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/memory/import.rs",
-    "line": 149,
-    "text": "let counts = tokio::task::spawn_blocking(move || count_legacy(&workspace_dir))",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/modules/boot.rs",
-    "line": 102,
+    "line": 130,
     "text": "tokio::spawn(async move {",
     "occurrence": 1
   },
@@ -828,7 +814,7 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/skills/webhooks/bus.rs",
-    "line": 133,
+    "line": 311,
     "text": "tokio::spawn(async move {",
     "occurrence": 1
   },
@@ -870,7 +856,7 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/storage/layout/legacy.rs",
-    "line": 84,
+    "line": 86,
     "text": "let summary = tokio::task::spawn_blocking({",
     "occurrence": 1
   },
