@@ -2,7 +2,9 @@ use super::*;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::AuthService;
 use std::collections::HashMap;
-use tinyinference_embeddings::{CloudEmbeddingModel, DEFAULT_CLOUD_DIMENSIONS, DEFAULT_CLOUD_MODEL};
+use tinyinference_embeddings::{
+    CloudEmbeddingModel, DEFAULT_CLOUD_DIMENSIONS, DEFAULT_CLOUD_MODEL,
+};
 
 fn test_config(tmp: &tempfile::TempDir) -> Config {
     Config {
@@ -21,11 +23,7 @@ fn state_dir_of(config: &Config) -> std::path::PathBuf {
 
 /// Builds the embedder the way the core's managed factory does: through the
 /// registered embedding provider, with the config's credential scope.
-fn build_through_registry(
-    config: &Config,
-    model: &str,
-    dimensions: usize,
-) -> CloudEmbeddingModel {
+fn build_through_registry(config: &Config, model: &str, dimensions: usize) -> CloudEmbeddingModel {
     from_request(&EmbeddingRequest {
         config: Some(config),
         model,

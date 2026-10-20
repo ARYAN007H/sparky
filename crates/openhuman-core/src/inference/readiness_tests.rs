@@ -3,12 +3,10 @@ use tempfile::TempDir;
 
 #[tokio::test]
 async fn cached_probe_serves_definitive_negative_results() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{
-        register_chat_model_in, ChatModelEntry, ProviderModelHooks,
-    };
+    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelHooks};
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use tinyinference_llm::model::ChatModel;
 
@@ -52,7 +50,9 @@ async fn cached_probe_serves_definitive_negative_results() {
         ChatModelEntry {
             build: Arc::new(|_| {
                 Ok((
-                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(["ready"])),
+                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies([
+                        "ready",
+                    ])),
                     "fixture-model".to_string(),
                 ))
             }),
@@ -100,10 +100,6 @@ async fn cached_probe_serves_definitive_negative_results() {
         .to_ascii_lowercase()
         .contains("api key not configured for provider"));
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
-    assert!(
-        cached_probe(&ctx, "summarization", &config)
-            .await
-            .is_err()
-    );
+    assert!(cached_probe(&ctx, "summarization", &config).await.is_err());
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
 }
