@@ -150,14 +150,17 @@ pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'st
     let reachable_owners: HashSet<String> = tools
         .iter()
         .filter(|tool| tool.name() == "spawn_subagent")
-        .filter_map(|tool| {
-            tool.parameters_schema()
+        .flat_map(|tool| {
+            let schema = tool.parameters_schema();
+            schema
                 .pointer("/properties/agent_id/enum")
                 .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
         })
-        .flatten()
-        .filter_map(serde_json::Value::as_str)
-        .map(str::to_owned)
         .collect();
     if reachable_owners.is_empty() {
         return Vec::new();
@@ -169,7 +172,7 @@ pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'st
         .filter(|pack| {
             pack.owners
                 .iter()
-                .any(|owner| reachable_owners.contains(owner))
+                .any(|owner| reachable_owners.contains(*owner))
         })
         .flat_map(|pack| pack.tools.iter().copied())
         .filter(|name| groups.mode_for_tool(name) == super::groups::GroupMode::Withheld)
