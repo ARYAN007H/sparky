@@ -9,10 +9,11 @@ use tinyinference_embeddings::factory::{
 };
 use tinyinference_embeddings::EmbeddingModel;
 
-use super::cloud::{credential_scope, UnavailableEmbeddingModel};
+use super::cloud::UnavailableEmbeddingModel;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
 use crate::inference::registry::EmbeddingRequest;
 use crate::security::approval::ApprovalChatContext;
+use crate::security::credentials::embedding_scope::credential_scope;
 
 fn settings(
     provider: &str,

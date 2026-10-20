@@ -13,6 +13,7 @@ async fn create_chat_model_managed_emits_exactly_one_egress_realpath() {
     use std::time::Duration;
 
     let _guard = crate::inference::inference_test_guard_async().await;
+    super::install_test_managed_provider();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
@@ -59,6 +60,9 @@ async fn create_chat_model_managed_emits_exactly_one_egress_realpath() {
     assert_eq!(
         count, 1,
         "managed inference via create_chat_model_with_model_id must emit EXACTLY ONE egress descriptor (no miss, no double)"
+    );
+    crate::inference::registry::unregister_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
     );
 }
 

@@ -2,7 +2,7 @@
 //!
 //! Each entry in `Config::cloud_providers` represents one configured LLM
 //! backend. Providers are keyed by a user-chosen `slug` (e.g. `"openai"`,
-//! `"my-deepseek"`). The factory in `inference::provider::factory`
+//! `"my-deepseek"`). Inference routing in `config::ops::primary_cloud`
 //! resolves workload-to-provider strings against this list at runtime using
 //! the grammar `"<slug>:<model>"`.
 //!
@@ -11,11 +11,21 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use std::sync::LazyLock;
+use std::sync::Arc;
 
+use crate::core::slots::HookSlot;
 use tinyinference_providers::builtin::{
     BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
 };
+
+static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
+    HookSlot::new("config::hosted_cloud_presets");
+pub type HostedCloudIdentityClassifier = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+pub type HostedAuthStyleClassifier = Arc<dyn Fn(AuthStyle) -> bool + Send + Sync>;
+static HOSTED_CLOUD_IDENTITY: HookSlot<HostedCloudIdentityClassifier> =
+    HookSlot::new("config::hosted_cloud_identity");
+static HOSTED_AUTH_STYLE: HookSlot<HostedAuthStyleClassifier> =
+    HookSlot::new("config::hosted_auth_style");
 
 /// A built-in cloud provider preset in the host's [`AuthStyle`] vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,14 +36,63 @@ pub struct BuiltinCloudProvider {
     pub auth_style: AuthStyle,
 }
 
-/// The managed OpenHuman route. It is the one preset `tinyinference-providers`
-/// deliberately omits: managed gateway policy is host-owned.
-const OPENHUMAN_PRESET: BuiltinCloudProvider = BuiltinCloudProvider {
-    slug: "openhuman",
-    label: "OpenHuman",
-    endpoint: "https://api.openhuman.ai/v1",
-    auth_style: AuthStyle::OpenhumanJwt,
-};
+/// Register an additional cloud preset supplied by a host.
+pub fn register_hosted_cloud_preset(id: impl Into<String>, preset: BuiltinCloudProvider) {
+    HOSTED_PRESETS.register(id, preset);
+}
+
+/// Register a host preset for one runtime context.
+pub fn register_hosted_cloud_preset_in(
+    extensions: &crate::core::slots::Extensions,
+    id: impl Into<String>,
+    preset: BuiltinCloudProvider,
+) {
+    HOSTED_PRESETS.register_in(extensions, id, preset);
+}
+
+/// Register host-owned auth-style classification without making it core
+/// inference policy.
+pub fn register_hosted_cloud_provider_policy(
+    identity: HostedCloudIdentityClassifier,
+    auth_style: HostedAuthStyleClassifier,
+) {
+    HOSTED_CLOUD_IDENTITY.register("default", identity);
+    HOSTED_AUTH_STYLE.register("default", auth_style);
+}
+
+/// Register hosted-provider classification for one runtime context.
+pub fn register_hosted_cloud_provider_policy_in(
+    extensions: &crate::core::slots::Extensions,
+    identity: HostedCloudIdentityClassifier,
+    auth_style: HostedAuthStyleClassifier,
+) {
+    HOSTED_CLOUD_IDENTITY.register_in(extensions, "default", identity);
+    HOSTED_AUTH_STYLE.register_in(extensions, "default", auth_style);
+}
+
+/// Whether the installed host owns this reserved cloud-provider identity.
+pub fn is_hosted_cloud_identity(slug: &str) -> bool {
+    HOSTED_CLOUD_IDENTITY
+        .get("default")
+        .is_some_and(|classify| classify(slug))
+}
+
+/// Whether the installed host owns this passive compatibility auth style.
+pub fn is_hosted_auth_style(style: AuthStyle) -> bool {
+    HOSTED_AUTH_STYLE
+        .get("default")
+        .is_some_and(|classify| classify(style))
+}
+
+/// Whether the selected runtime or process host owns this compatibility auth style.
+pub(crate) fn is_hosted_auth_style_for(
+    extensions: Option<&crate::core::slots::Extensions>,
+    style: AuthStyle,
+) -> bool {
+    HOSTED_AUTH_STYLE
+        .get_for(extensions, "default")
+        .is_some_and(|classify| classify(style))
+}
 
 impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
     for BuiltinCloudProvider
@@ -51,18 +110,20 @@ impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
     }
 }
 
-/// Every built-in preset: the managed OpenHuman route followed by the
-/// provider-neutral catalog from `tinyinference-providers`
-/// ([`UPSTREAM_BUILTINS`]), mapped onto the host's [`AuthStyle`].
-pub static BUILTIN_CLOUD_PROVIDERS: LazyLock<Vec<BuiltinCloudProvider>> = LazyLock::new(|| {
-    std::iter::once(OPENHUMAN_PRESET)
+/// Every built-in preset: host-provided entries followed by the
+/// provider-neutral catalog from `tinyinference-providers`.
+pub fn builtin_cloud_providers() -> Vec<BuiltinCloudProvider> {
+    HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
         .chain(UPSTREAM_BUILTINS.iter().map(BuiltinCloudProvider::from))
         .collect()
-});
+}
 
-pub(crate) fn builtin_cloud_provider(type_str: &str) -> Option<&'static BuiltinCloudProvider> {
-    BUILTIN_CLOUD_PROVIDERS
-        .iter()
+pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
+    builtin_cloud_providers()
+        .into_iter()
         .find(|provider| provider.slug == type_str)
 }
 
@@ -149,7 +210,7 @@ pub fn host_is_builtin_cloud_provider(host: &str) -> bool {
     if host.is_empty() {
         return false;
     }
-    BUILTIN_CLOUD_PROVIDERS
+    builtin_cloud_providers()
         .iter()
         .any(|p| endpoint_host(p.endpoint).as_deref() == Some(host.as_str()))
 }
@@ -171,7 +232,7 @@ pub fn endpoint_host_is_chat_completions_only(endpoint: &str) -> bool {
         return false;
     };
     let mut matched_chat_only = false;
-    for provider in BUILTIN_CLOUD_PROVIDERS.iter() {
+    for provider in builtin_cloud_providers().iter() {
         if endpoint_host(provider.endpoint).as_deref() == Some(host.as_str()) {
             if builtin_cloud_supports_responses_api(provider.slug) {
                 // A Responses-capable built-in lives at this host → not chat-only.
@@ -202,6 +263,20 @@ pub enum AuthStyle {
 }
 
 impl AuthStyle {
+    /// Parse the RPC compatibility spellings for a provider authentication style.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.to_ascii_lowercase().as_str() {
+            "bearer" => Ok(Self::Bearer),
+            "anthropic" => Ok(Self::Anthropic),
+            "openhuman_jwt" | "openhumanjwt" => Ok(Self::OpenhumanJwt),
+            "none" => Ok(Self::None),
+            other => Err(format!(
+                "unknown auth_style '{}'; valid: bearer, anthropic, openhuman_jwt, none",
+                other
+            )),
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Bearer => "bearer",
@@ -270,7 +345,7 @@ impl Default for CloudProviderCreds {
 /// never reaches `make_cloud_provider_by_slug`. When no `cloud_providers`
 /// row exists (config drift, upgrade from a build that only persisted
 /// `config.local_ai.base_url`, flush-vs-probe race),
-/// `inference::provider::ops::list_configured_models`
+/// `inference::provider::models::catalog_listing::list_configured_models`
 /// falls back to a synthetic entry via `synthesize_local_runtime_entry`
 /// (Sentry TAURI-RUST-28Z fix). The same fallback applies to `lmstudio`.
 pub fn is_slug_reserved(s: &str) -> bool {

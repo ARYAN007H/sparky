@@ -301,7 +301,7 @@ fn route_fallback_policy_matches_legacy_chains() {
         // A concrete model id installs no chain — including the managed
         // default, which is the model every managed route resolves to.
         ("gpt-4o", None),
-        (crate::config::MODEL_MANAGED_DEFAULT, None),
+        ("openrouter/deepseek/deepseek-v4-flash", None),
     ];
     for (model, expected) in cases {
         let got = route_fallback_policy(model).map(|p| p.models);

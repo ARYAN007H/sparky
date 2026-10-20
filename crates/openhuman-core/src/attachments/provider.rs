@@ -34,8 +34,15 @@ pub(crate) fn wrap(
         .map(|p| p.modalities)
         .unwrap_or_default();
     if provider == "openhuman" || provider == "managed" {
+        let resolved_context = ctx.resolved();
         profile.modalities.image_in =
-            crate::inference::provider::factory::oh_tier_supports_vision(model);
+            crate::inference::registry::provider_model_supports_vision_for(
+                resolved_context
+                    .as_deref()
+                    .map(crate::core::runtime::CoreContext::extensions),
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                model,
+            );
     }
     let route = if matches!(provider, "openhuman" | "managed") {
         "openhuman".to_string()

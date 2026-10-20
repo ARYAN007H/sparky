@@ -111,7 +111,7 @@ pub mod config {
     pub use openhuman_core::config::{
         active_workspace_dir, active_workspace_dir_cached, active_workspace_snapshot,
         build_runtime_proxy_client_with_timeouts, load_config_with_timeout, workspace_handle,
-        Config, PrivacyMode, MODEL_MANAGED_DEFAULT,
+        Config, PrivacyMode,
     };
 
     pub mod app_env {
@@ -123,17 +123,26 @@ pub mod config {
     pub mod ops {
         pub use openhuman_core::config::ops::{load_config_in, load_config_with_timeout};
     }
+    pub mod migrations {
+        pub use openhuman_core::config::migrations::run_pending;
+    }
     pub mod rpc {
         pub use openhuman_core::config::rpc::load_config_with_timeout;
     }
     pub mod schema {
         // tinyhumans integrations: the Composio routing-mode strings.
         pub use openhuman_core::config::schema::{
-            COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED,
+            DelegateAgentConfig, ModelRouteConfig, TeamModelConfig, COMPOSIO_MODE_BACKEND,
+            COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED,
         };
         pub mod cloud_providers {
             pub use openhuman_core::config::schema::cloud_providers::{
-                endpoint_host, host_is_builtin_cloud_provider,
+                builtin_cloud_provider, endpoint_host, generate_provider_id,
+                host_is_builtin_cloud_provider, is_hosted_auth_style, is_hosted_cloud_identity,
+                register_hosted_cloud_preset, register_hosted_cloud_preset_in,
+                register_hosted_cloud_provider_policy, register_hosted_cloud_provider_policy_in,
+                AuthStyle, BuiltinCloudProvider, CloudProviderCreds, HostedAuthStyleClassifier,
+                HostedCloudIdentityClassifier,
             };
         }
     }
@@ -354,13 +363,19 @@ pub mod wallet_backend {
 /// Model-provider registries: chat models, embeddings, catalogs.
 pub mod inference_registry {
     pub use openhuman_core::inference::provider::factory::PROVIDER_OPENHUMAN;
-    pub use openhuman_core::inference::provider::openhuman_backend_model::REASONING_OFF_METADATA_KEY;
     pub use openhuman_core::inference::registry::{
-        register_catalog, register_catalog_in, register_chat_model, register_chat_model_in,
-        register_embedding, register_embedding_in, unregister_catalog, unregister_chat_model,
-        unregister_embedding, BoxFuture, CatalogEntry, CatalogLimits, CatalogListing,
-        CatalogRequest, ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory,
-        EmbeddingRequest, ReadinessProbe,
+        classify_backend_error, provider_default_model, provider_default_pricing,
+        provider_model_context_window, provider_model_is_alias, provider_model_is_raw,
+        provider_model_role, provider_model_supports_vision, provider_request_without_reasoning,
+        register_backend_error_classifier, register_backend_error_classifier_in, register_catalog,
+        register_catalog_in, register_chat_model, register_chat_model_in,
+        register_config_normalizer, register_config_normalizer_in, register_embedding,
+        register_embedding_in, resolve_provider_model, unregister_backend_error_classifier,
+        unregister_catalog, unregister_chat_model, unregister_embedding,
+        BackendErrorClassification, BackendErrorClassifier, BackendErrorKind, BoxFuture,
+        CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest, ChatModelEntry,
+        ChatModelFactory, ChatModelRequest, ConfigNormalizer, EmbeddingFactory, EmbeddingRequest,
+        ProviderModelHooks, ReadinessProbe,
     };
 }
 

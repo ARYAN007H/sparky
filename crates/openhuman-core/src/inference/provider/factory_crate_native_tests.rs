@@ -93,7 +93,7 @@ fn enforce_local_only_inference_errors_on_external_when_local_only() {
             managed_backend::make_openhuman_backend_model_for_thread(
                 "chat",
                 &Config::default(),
-                route,
+                Some(route),
                 true,
                 Some("privacy-test-thread"),
                 &EgressLedger::none(),
@@ -262,21 +262,18 @@ fn resolves_to_managed_backend_for_default_config_but_not_for_local() {
 #[test]
 fn create_chat_model_routes_managed_backend_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
-    // No test-provider override installed → the managed short-circuit engages.
+    install_test_managed_provider();
     let config = Config::default();
-    let (model, _model_id) = create_chat_model_with_model_id_in(
+    let (_model, model_id) = create_chat_model_with_model_id_in(
         &crate::core::runtime::DispatchCtx::ambient(),
         "chat",
         &config,
         0.7,
     )
     .expect("managed create_chat_model must build");
-    assert_eq!(
-        model
-            .profile()
-            .and_then(|profile| profile.provider.as_deref()),
-        Some("managed"),
-        "managed backend must expose the crate-native managed profile"
+    assert_eq!(model_id, "fixture/managed-default");
+    crate::inference::registry::unregister_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
     );
 }
 
@@ -475,31 +472,28 @@ fn anthropic_auth_cloud_slug_in_text_mode_keeps_the_compat_client() {
 #[test]
 fn configured_openhuman_jwt_slug_routes_to_managed_chat_model() {
     let _guard = crate::inference::inference_test_guard();
+    install_test_managed_provider();
     let mut config = Config::default();
-    config.cloud_providers.push(oh_entry("p_oh"));
-    // A retired tier slug after the managed slug is a role alias: it runs on
-    // the managed default, never reaches the backend verbatim.
-    config.chat_provider = Some("openhuman:reasoning-v1".to_string());
+    config
+        .cloud_providers
+        .push(fixture_managed_entry("p_fixture"));
+    config.chat_provider = Some("fixture-managed:hint:reasoning".to_string());
 
-    let (model, model_id) =
+    let (_model, model_id) =
         try_create_cloud_slug_chat_model("chat", &config, &EgressLedger::none())
-            .expect("configured OpenhumanJwt slug should be recognized")
-            .expect("managed model should build");
+            .expect("registered host policy should recognize this route")
+            .expect("registered model should build");
 
-    assert_eq!(model_id, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(model_id, "fixture/managed-default");
 
     // A concrete catalog id is forwarded verbatim.
-    config.chat_provider = Some("openhuman:openrouter/deepseek/deepseek-v4-pro".to_string());
+    config.chat_provider = Some("fixture-managed:vendor/pinned".to_string());
     let (_, pinned_id) = try_create_cloud_slug_chat_model("chat", &config, &EgressLedger::none())
-        .expect("configured OpenhumanJwt slug should be recognized")
-        .expect("managed model should build");
-    assert_eq!(pinned_id, "openrouter/deepseek/deepseek-v4-pro");
-    assert_eq!(
-        model
-            .profile()
-            .and_then(|profile| profile.provider.as_deref()),
-        Some("managed"),
-        "OpenhumanJwt must use the crate-native managed backend model"
+        .expect("registered host policy should recognize this route")
+        .expect("registered model should build");
+    assert_eq!(pinned_id, "vendor/pinned");
+    crate::inference::registry::unregister_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
     );
 }
 
@@ -510,21 +504,24 @@ async fn openhuman_jwt_slug_discloses_pinned_model() {
     use std::time::Duration;
 
     let _guard = crate::inference::inference_test_guard_async().await;
+    install_test_managed_provider();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
     let marker = "egress-jwt-pinned-marker-v1";
     let mut config = Config::default();
-    config.cloud_providers.push(oh_entry("p_oh"));
-    let provider = format!("openhuman:{marker}");
+    config
+        .cloud_providers
+        .push(fixture_managed_entry("p_fixture"));
+    let provider = format!("fixture-managed:{marker}");
     let _ = try_create_cloud_slug_chat_model_from_string(
         "chat",
         &provider,
         &config,
         &EgressLedger::none(),
     )
-    .expect("configured OpenhumanJwt slug should be recognized")
-    .expect("managed model should build");
+    .expect("registered host policy should recognize this route")
+    .expect("registered model should build");
 
     let sentinel = "egress-jwt-pinned-sentinel-end";
     crate::core::bus::BUS.publish(DomainEvent::ExternalTransferPending {
@@ -554,6 +551,9 @@ async fn openhuman_jwt_slug_discloses_pinned_model() {
     assert_eq!(
         count, 1,
         "JWT construction must disclose its pinned model once"
+    );
+    crate::inference::registry::unregister_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
     );
 }
 
@@ -649,43 +649,50 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
 #[test]
 fn openhuman_jwt_slug_preserves_forced_text_mode() {
     let _guard = crate::inference::inference_test_guard();
+    let native_modes = install_test_managed_provider();
     let mut config = Config::default();
-    config.cloud_providers.push(oh_entry("p_oh"));
+    config
+        .cloud_providers
+        .push(fixture_managed_entry("p_fixture"));
 
-    let (model, _) = try_create_cloud_slug_chat_model_from_string_with_native_tools(
+    let (_model, _) = try_create_cloud_slug_chat_model_from_string_with_native_tools(
         "chat",
-        "openhuman:reasoning-v1",
+        "fixture-managed:hint:reasoning",
         &config,
         false,
         &EgressLedger::none(),
     )
-    .expect("configured OpenhumanJwt slug should be recognized")
-    .expect("managed model should build");
+    .expect("registered host policy should recognize this route")
+    .expect("registered model should build");
 
-    let profile = model
-        .profile()
-        .expect("managed model should expose its effective capabilities");
-    assert!(!profile.tool_calling);
-    assert!(!profile.parallel_tool_calls);
-    assert!(!profile.streaming_tool_chunks);
+    assert_eq!(native_modes.lock().unwrap().as_slice(), [false]);
+    crate::inference::registry::unregister_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+    );
 }
 
 #[test]
 fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
     let _guard = crate::inference::inference_test_guard();
+    install_test_managed_provider();
     let mut config = Config::default();
-    config.cloud_providers.push(oh_entry("p_oh"));
+    config
+        .cloud_providers
+        .push(fixture_managed_entry("p_fixture"));
 
     let (_model, model_id) = try_create_cloud_slug_chat_model_from_string(
         "summarization",
-        "openhuman:",
+        "fixture-managed:",
         &config,
         &EgressLedger::none(),
     )
-    .expect("configured OpenhumanJwt slug should be recognized")
-    .expect("managed model should build");
+    .expect("registered host policy should recognize this route")
+    .expect("registered model should build");
 
-    assert_eq!(model_id, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(model_id, "fixture/managed-default");
+    crate::inference::registry::unregister_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+    );
 }
 
 #[test]
