@@ -45,30 +45,27 @@ const {
   mockUseUsageState,
   mockChatSend,
   mockChatSendWithAck,
-} = vi.hoisted(
-  () => ({
-    mockGetThreads: vi.fn().mockResolvedValue({ threads: [], count: 0 }),
-    mockGetThreadMessages: vi.fn().mockResolvedValue({ messages: [], count: 0 }),
-    mockChatSend: vi.fn().mockResolvedValue(undefined),
-    mockChatSendWithAck: vi.fn().mockResolvedValue({
-      requestId: 'queued-request',
-      queuedAttachments: [],
-    }),
-    mockUseUsageState: vi.fn(() => ({
-      teamUsage: null,
-      currentPlan: null,
-      currentTier: 'FREE' as const,
-      isFreeTier: true,
-      usagePct: 0,
-      isNearLimit: false,
-      isAtLimit: false,
-      isBudgetExhausted: false,
-      shouldShowBudgetCompletedMessage: false,
-      isLoading: false,
-      refresh: vi.fn(),
-    })),
-  })
-);
+} = vi.hoisted(() => ({
+  mockGetThreads: vi.fn().mockResolvedValue({ threads: [], count: 0 }),
+  mockGetThreadMessages: vi.fn().mockResolvedValue({ messages: [], count: 0 }),
+  mockChatSend: vi.fn().mockResolvedValue(undefined),
+  mockChatSendWithAck: vi
+    .fn()
+    .mockResolvedValue({ requestId: 'queued-request', queuedAttachments: [] }),
+  mockUseUsageState: vi.fn(() => ({
+    teamUsage: null,
+    currentPlan: null,
+    currentTier: 'FREE' as const,
+    isFreeTier: true,
+    usagePct: 0,
+    isNearLimit: false,
+    isAtLimit: false,
+    isBudgetExhausted: false,
+    shouldShowBudgetCompletedMessage: false,
+    isLoading: false,
+    refresh: vi.fn(),
+  })),
+}));
 
 vi.mock('../../services/coreRpcClient', () => ({ callCoreRpc: vi.fn().mockResolvedValue({}) }));
 
@@ -501,10 +498,9 @@ describe('composer model routing', () => {
       .mockImplementation(async (_threadId: string, message) => message);
     vi.mocked(callCoreRpc).mockReset().mockResolvedValue({});
     mockChatSend.mockReset().mockResolvedValue(undefined);
-    mockChatSendWithAck.mockReset().mockResolvedValue({
-      requestId: 'queued-request',
-      queuedAttachments: [],
-    });
+    mockChatSendWithAck
+      .mockReset()
+      .mockResolvedValue({ requestId: 'queued-request', queuedAttachments: [] });
   });
 
   it('waits for a successful model clear before sending a normal default turn', async () => {
@@ -642,7 +638,9 @@ describe('composer model routing', () => {
       expect(threadApi.appendMessage).not.toHaveBeenCalled();
       await act(async () => thirdClear.resolve({}));
 
-      await waitFor(() => expect(followup ? mockChatSendWithAck : mockChatSend).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(followup ? mockChatSendWithAck : mockChatSend).toHaveBeenCalledTimes(1)
+      );
       const sent = followup ? mockChatSendWithAck.mock.calls[0][0] : mockChatSend.mock.calls[0][0];
       expect(sent).not.toHaveProperty('model');
       if (followup) {
