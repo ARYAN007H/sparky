@@ -125,7 +125,7 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
     });
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
         "cloud",
-        Some("any-model"),
+        "any-model",
         8,
         "",
         None,
@@ -199,7 +199,7 @@ fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable
     let error = make_openhuman_backend_model_for_thread(
         "chat",
         &Config::default(),
-        "any-model",
+        Some("any-model"),
         true,
         None,
         &EgressLedger::none(),
