@@ -127,6 +127,128 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
     ));
 }
 
+#[tokio::test]
+async fn failed_async_child_is_reported_to_the_parent_without_a_success_result() {
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
+    let mut parent = parent_context(workspace.path(), Arc::new(FailingModel), vec![]);
+    parent.on_progress = Some(progress_tx);
+    let live = super::live_parent_run_context("failed-async-child", parent);
+    let accepted = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "exercise provider failure",
+                "model": "test-model"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "failed-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("the asynchronous spawn request is accepted");
+    assert!(!accepted.is_error, "child failure is delivered asynchronously");
+
+    let failure = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    agent_id, error, ..
+                }) if agent_id == "task_manager_agent" => break error,
+                Some(_) => {}
+                None => panic!("parent progress stream closed before child failure"),
+            }
+        }
+    })
+    .await
+    .expect("asynchronous child failure reaches the parent");
+    assert!(failure.contains("scripted provider outage"), "{failure}");
+    assert!(!failure.contains("completed successfully"), "{failure}");
+}
+
+#[tokio::test]
+async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
+    const STUB_CANARY: &str = "unexecuted-tool-call-stub-canary";
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let provider = Arc::new(ScriptedModel::new(vec![
+        (
+            STUB_CANARY,
+            r#"{"tool_calls":[{"type":"function","function":{"name":"missing","arguments":"{}"}}]}"#,
+        ),
+    ]));
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
+    let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    parent.on_progress = Some(progress_tx);
+    let live = super::live_parent_run_context("stub-async-child", parent);
+    let accepted = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": format!("return {STUB_CANARY}"),
+                "model": "test-model"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "stub-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("the asynchronous spawn request is accepted");
+    assert!(!accepted.is_error, "completion is asynchronous");
+
+    let completed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match progress_rx.recv().await {
+                Some(crate::progress::AgentProgress::SubagentCompleted {
+                    agent_id,
+                    output,
+                    stop,
+                    ..
+                }) if agent_id == "task_manager_agent" => break (output, stop),
+                Some(crate::progress::AgentProgress::SubagentFailed {
+                    agent_id, error, ..
+                }) if agent_id == "task_manager_agent" => {
+                    panic!("stub should be incomplete, not an inference failure: {error}")
+                }
+                Some(_) => {}
+                None => panic!("parent progress stream closed before stub settlement"),
+            }
+        }
+    })
+    .await
+    .expect("the completion guard projects the stub to the parent");
+    assert!(provider.saw(STUB_CANARY));
+    assert!(completed.0.contains("tool_calls"), "{}", completed.0);
+    assert!(completed.1.is_some(), "a stub is incomplete, not successful");
+}
+
+struct FailingModel;
+
+#[async_trait]
+impl ChatModel<()> for FailingModel {
+    fn profile(&self) -> Option<&ModelProfile> {
+        static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+        Some(PROFILE.get_or_init(|| {
+            let mut profile = ModelProfile::default();
+            profile.tool_calling = true;
+            profile
+        }))
+    }
+
+    async fn invoke(
+        &self,
+        _state: &(),
+        _request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelResponse> {
+        Err(tinyinference_llm::Error::Model(
+            "scripted provider outage".into(),
+        ))
+    }
+}
+
 fn parent_context(
     workspace_dir: &Path,
     model: Arc<dyn ChatModel<()>>,
