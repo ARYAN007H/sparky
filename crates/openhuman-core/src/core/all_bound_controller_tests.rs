@@ -573,7 +573,7 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
                 .expect("actual raw registry parser accepts voice example");
         }
 
-        for name in contract.required {
+        for &name in contract.required {
             for remove in [true, false] {
                 let mut broken = entry.schema.clone();
                 if remove {
