@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tinyagents_session::threads::{
