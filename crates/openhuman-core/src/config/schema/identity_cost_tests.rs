@@ -5,7 +5,7 @@ fn cost_config_defaults() {
     let c = CostConfig::default();
     assert!(c.enabled);
     assert_eq!(c.monthly_limit_usd, 100.0);
-    assert!(!c.prices.is_empty());
+    assert!(c.prices.is_empty());
     assert!(c.dashboard.enabled);
     assert_eq!(c.dashboard.currency, "USD");
     assert!((c.dashboard.warn_threshold - 0.8).abs() < f64::EPSILON);

@@ -336,13 +336,11 @@ fn generated_provider_ids_sanitize_and_bound_the_slug_prefix() {
 }
 
 #[test]
-fn builtin_table_is_the_upstream_catalog_plus_the_managed_route() {
+fn builtin_table_is_only_the_upstream_provider_catalog() {
     use tinyinference_providers::builtin::BUILTIN_CLOUD_PROVIDERS as UPSTREAM;
     let host = builtin_cloud_providers();
-    assert_eq!(host.len(), UPSTREAM.len() + 1);
-    assert_eq!(host[0].slug, "openhuman");
-    assert_eq!(host[0].auth_style, AuthStyle::OpenhumanJwt);
-    for (mapped, upstream) in host[1..].iter().zip(UPSTREAM) {
+    assert_eq!(host.len(), UPSTREAM.len());
+    for (mapped, upstream) in host.iter().zip(UPSTREAM) {
         assert_eq!(mapped.slug, upstream.slug);
         assert_eq!(mapped.label, upstream.label);
         assert_eq!(mapped.endpoint, upstream.endpoint);

@@ -120,9 +120,8 @@ fn seed_legacy_custom_provider(config: &mut Config, stats: &mut MigrationStats) 
 }
 
 /// Default `primary_cloud` to the legacy custom inference entry when one was
-/// present; otherwise use the OpenHuman entry. This preserves pre-migration
-/// behavior where a configured `inference_url` handled chat instead of the
-/// hosted OpenHuman budget.
+/// present. Hosted fallback selection belongs to the installed host
+/// normalizer, which can supply its own provider identity and endpoint policy.
 fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
     if config.primary_cloud.is_some() {
         return;
