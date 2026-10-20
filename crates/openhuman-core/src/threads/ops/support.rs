@@ -3,11 +3,11 @@
 //! store-type <-> wire-type conversions every handler needs.
 
 use crate::config::Config;
-use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::context::CoreContext;
-use crate::threads::THREAD_TITLE_LOG_PREFIX;
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store as conversations;
 use crate::threads::store::{ConversationMessage, ConversationThread};
+use crate::threads::THREAD_TITLE_LOG_PREFIX;
 use crate::threads::{ConversationMessageRecord, ConversationThreadSummary};
 use std::path::PathBuf;
 use tinyagents_harness::title::{title_from_user_message, title_log_fingerprint};

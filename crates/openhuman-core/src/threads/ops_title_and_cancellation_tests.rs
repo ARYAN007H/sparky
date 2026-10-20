@@ -61,8 +61,8 @@ async fn thread_update_title_returns_error_for_missing_thread() {
 /// cleanup in one spawned task, so the tail runs regardless of the caller.
 #[tokio::test]
 async fn run_to_completion_runs_the_tail_after_the_caller_is_dropped() {
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     let tail_ran = Arc::new(AtomicBool::new(false));
     let flag = Arc::clone(&tail_ran);
