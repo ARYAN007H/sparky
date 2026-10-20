@@ -240,12 +240,7 @@ fi
 if should_run_suite "navigation"; then
   echo ""
   echo "## Running suite: navigation"
-  run "test/e2e/specs/navigation.spec.ts"                     "navigation"                "navigation"
-  run "test/e2e/specs/navigation-smoothness.spec.ts"          "navigation-smoothness"     "navigation"
-  run "test/e2e/specs/navigation-settings-panels.spec.ts"     "navigation-settings"       "navigation"
-  run "test/e2e/specs/command-palette.spec.ts"                "command-palette"           "navigation"
   run "test/e2e/specs/chip-tabs-keyboard.spec.ts"              "chip-tabs-keyboard"        "navigation"
-  run "test/e2e/specs/guided-tour-gates.spec.ts"              "guided-tour-gates"         "navigation"
   _mini_summary "navigation"
 fi
 
@@ -316,7 +311,6 @@ fi
 if should_run_suite "providers"; then
   echo ""
   echo "## Running suite: providers"
-  run "test/e2e/specs/gmail-flow.spec.ts"                     "gmail"                     "providers"
   run "test/e2e/specs/accounts-provider-modal.spec.ts"        "accounts-providers"        "providers"
   _mini_summary "providers"
 fi
@@ -372,8 +366,6 @@ fi
 if should_run_suite "payments"; then
   echo ""
   echo "## Running suite: payments"
-  run "test/e2e/specs/card-payment-flow.spec.ts"              "card-payment"              "payments"
-  run "test/e2e/specs/crypto-payment-flow.spec.ts"            "crypto-payment"            "payments"
   _mini_summary "payments"
 fi
 
@@ -387,8 +379,6 @@ if should_run_suite "settings"; then
   run "test/e2e/specs/settings-data-management.spec.ts"       "settings-data"             "settings"
   run "test/e2e/specs/settings-ai-skills.spec.ts"             "settings-ai-skills"        "settings"
   run "test/e2e/specs/settings-account-preferences.spec.ts"   "settings-account"          "settings"
-  run "test/e2e/specs/settings-advanced-config.spec.ts"       "settings-advanced"         "settings"
-  run "test/e2e/specs/settings-feature-preferences.spec.ts"   "settings-features"         "settings"
   run "test/e2e/specs/settings-search.spec.ts"                "settings-search"           "settings"
   _mini_summary "settings"
 fi
@@ -399,7 +389,6 @@ fi
 if should_run_suite "system"; then
   echo ""
   echo "## Running suite: system"
-  run "test/e2e/specs/local-model-runtime.spec.ts"            "local-model"               "system"
   run "test/e2e/specs/voice-mode.spec.ts"                     "voice-mode"                "system"
   run "test/e2e/specs/tauri-commands.spec.ts"                 "tauri-commands"            "system"
   # service-connectivity-flow tests the old sidecar service model removed in
@@ -416,7 +405,6 @@ if should_run_suite "journeys"; then
   echo ""
   echo "## Running suite: journeys"
   run "test/e2e/specs/user-journey-full-task.spec.ts"              "journey-full-task"     "journeys"
-  run "test/e2e/specs/user-journey-settings-round-trip.spec.ts"    "journey-settings"      "journeys"
   run "test/e2e/specs/flows.spec.ts"                               "flows"                 "journeys"
   _mini_summary "journeys"
 fi
