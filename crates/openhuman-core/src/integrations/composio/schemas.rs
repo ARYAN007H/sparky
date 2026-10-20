@@ -28,6 +28,7 @@ mod util;
 #[path = "schemas_tests.rs"]
 mod tests;
 
+pub(crate) use registry::all_controller_entries;
 pub use registry::{all_controller_schemas, all_registered_controllers};
 
 pub use definitions::schemas;
