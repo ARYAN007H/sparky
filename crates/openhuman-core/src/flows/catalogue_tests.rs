@@ -63,7 +63,10 @@ fn the_description_names_the_trigger_and_step_count() {
             node(
                 "t",
                 NodeKind::Trigger,
-                serde_json::json!({ "trigger_kind": "schedule" }),
+                serde_json::json!({
+                    "trigger_kind": "schedule",
+                    "schedule": "0 9 * * *"
+                }),
             ),
             node("a", NodeKind::Agent, serde_json::json!({})),
             node("b", NodeKind::Agent, serde_json::json!({})),
@@ -220,14 +223,8 @@ fn entries_are_sorted_by_name_so_the_prompt_prefix_is_stable() {
         ..Default::default()
     };
     for name in ["Zebra", "Alpha", "Mango"] {
-        super::super::store::create_flow(
-            &config,
-            name.to_string(),
-            graph.clone(),
-            false,
-            true,
-        )
-        .expect("flow saves");
+        super::super::store::create_flow(&config, name.to_string(), graph.clone(), false, true)
+            .expect("flow saves");
     }
     let names: Vec<String> = flow_entries(&config).into_iter().map(|e| e.name).collect();
     assert_eq!(names, vec!["Alpha", "Mango", "Zebra"]);
