@@ -374,7 +374,10 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
     .expect("compiled relay output is projected through the web adapter");
     let projected_wire = serde_json::to_value(&projected).expect("projected wire event");
     assert_eq!(projected.context().client_id, "relay-fixture-client");
-    assert_eq!(projected.context().thread_id, "channel:telegram/sender-7/chat-42");
+    assert_eq!(
+        projected.context().thread_id,
+        "channel:telegram/sender-7/chat-42"
+    );
     assert_eq!(projected.context().seq, Some(1));
     assert_eq!(projected_wire["full_response"], "typed hosted relay reply");
 
