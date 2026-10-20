@@ -78,15 +78,15 @@
   },
   {
     "rule": "home-dir",
-    "path": "crates/openhuman-core/src/config/ops/agent.rs",
-    "line": 312,
+    "path": "crates/openhuman-core/src/config/ops/agent_paths.rs",
+    "line": 19,
     "text": "let Some(home) = dirs::home_dir() else {",
     "occurrence": 1
   },
   {
     "rule": "home-dir",
-    "path": "crates/openhuman-core/src/config/ops/agent.rs",
-    "line": 330,
+    "path": "crates/openhuman-core/src/config/ops/agent_paths.rs",
+    "line": 37,
     "text": "if let Some(home) = dirs::home_dir() {",
     "occurrence": 1
   },
@@ -114,8 +114,15 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/config/ops/ui.rs",
-    "line": 366,
+    "line": 342,
     "text": "tokio::task::spawn_blocking(move || {",
+    "occurrence": 1
+  },
+  {
+    "rule": "bare-spawn",
+    "path": "crates/openhuman-core/src/config/schema/load/config_file_read.rs",
+    "line": 93,
+    "text": "match tokio::task::spawn_blocking(move || {",
     "occurrence": 1
   },
   {
@@ -131,13 +138,6 @@
     "line": 83,
     "text": ".map(|u| u.home_dir().to_path_buf())",
     "occurrence": 2
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/config/schema/load/impl_load.rs",
-    "line": 258,
-    "text": "match tokio::task::spawn_blocking(move || {",
-    "occurrence": 1
   },
   {
     "rule": "env-mutation",
@@ -254,14 +254,14 @@
   {
     "rule": "home-dir",
     "path": "crates/openhuman-core/src/core/runtime/context.rs",
-    "line": 217,
+    "line": 218,
     "text": "dirs::home_dir()",
     "occurrence": 1
   },
   {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/core/runtime/context.rs",
-    "line": 242,
+    "line": 248,
     "text": "None => crate::config::Config::load_or_init().await,",
     "occurrence": 1
   },
@@ -681,14 +681,14 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/security/credentials/ops/gated_services.rs",
-    "line": 85,
+    "line": 68,
     "text": "tokio::task::spawn_blocking(move || {",
     "occurrence": 1
   },
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/security/credentials/ops/gated_services.rs",
-    "line": 105,
+    "line": 88,
     "text": "tokio::spawn(async move {",
     "occurrence": 2
   },
@@ -758,7 +758,7 @@
   {
     "rule": "home-dir",
     "path": "crates/openhuman-core/src/skills/ops_discover/api.rs",
-    "line": 72,
+    "line": 47,
     "text": "dirs::home_dir()",
     "occurrence": 1
   },

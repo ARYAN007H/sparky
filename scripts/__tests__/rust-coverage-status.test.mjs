@@ -247,11 +247,12 @@ function runMockedCoverage(exitCode) {
       "bin/cargo",
       `#!/bin/bash
 printf '%s\\n' "$*" >> "$MOCK_CALLS"
-case "$*" in *"-p openhuman --lib --bins"*) [ "${exitCode}" = 0 ] || exit "${exitCode}" ;; esac
+case "$*" in *"-E package(=openhuman)") [ "${exitCode}" = 0 ] || exit "${exitCode}" ;; esac
 node - "$@" <<'JS'
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0] === 'metadata') console.log(JSON.stringify({ packages: [] }));
+if (args[0] === 'llvm-cov' && args[1] === 'show-env') console.log('export CARGO_LLVM_COV_TARGET_DIR=target');
 if (args[0] === 'nextest' && args[1] === 'list') {
   console.log(JSON.stringify({ 'rust-suites': { active: { 'binary-name': 'active', testcases: { active: { ignored: false, 'filter-match': { status: 'matches' } } } } } }));
 }
@@ -298,8 +299,25 @@ test("private coverage executes every package configuration once and reports aft
   assert.ok(selections.every((line) => line.includes("--no-tests=fail")));
   assert.ok(
     selections.some((line) =>
-      line.includes("-p openhuman-cli --tests -E kind(test)"),
+      line.includes("-E package(=openhuman-cli) & kind(test)"),
     ),
+  );
+  // The product-feature suites differ only in their nextest filter, so Cargo
+  // resolves (and builds) the core and its dependencies once for all of them.
+  const unified = selections.filter((line) =>
+    line.includes(
+      "--features channels --no-report --no-fail-fast -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
+    ),
+  );
+  assert.equal(unified.length, 4);
+  assert.deepEqual(
+    unified.map((line) => line.slice(line.indexOf("-E ") + 3)).sort(),
+    [
+      "package(=openhuman)",
+      "package(=openhuman-cli) & kind(test)",
+      "package(=openhuman-embed)",
+      "package(=openhuman-tinyhumans)",
+    ],
   );
   assert.equal(
     calls.filter((line) => line.includes("llvm-cov report")).length,
@@ -338,7 +356,7 @@ test("instrumented CLI inventory is cancellation-aware and reuses llvm-cov's env
   );
 });
 
-test("CLI inventory sends product features only to nextest, preserving instrumentation", () => {
+test("CLI inventory lists llvm-cov's own build instead of instrumenting a second copy", () => {
   const source = fs.readFileSync(runner, "utf8");
   const start = source.indexOf("    cli_inventory() (");
   const end = source.indexOf("\n    )", start);
@@ -348,6 +366,9 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
   const script = [
     "set -euo pipefail",
     'CORE_PRODUCT_FEATURES="channels,modules"',
+    ...source
+      .split("\n")
+      .filter((line) => /^(UNIFIED_PRODUCT_ARGS|FILTER_CLI_TESTS)=/.test(line)),
     "expected_inventory=/dev/null",
     "export CARGO_BUILD_TARGET_DIR=preserved-target",
     `bash() {
@@ -355,10 +376,11 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
         for arg in "$@"; do
           [[ "$arg" != --features ]] || { echo 'show-env rejects --features' >&2; return 64; }
         done
-        printf '%s\\n' 'export INVENTORY_INSTRUMENTED=1' 'export CARGO_TARGET_DIR=instrumented-target'
+        printf '%s\\n' 'export INVENTORY_INSTRUMENTED=1' 'export CARGO_TARGET_DIR=instrumented-target' 'export CARGO_LLVM_COV_TARGET_DIR=cov-target'
       elif [[ "$*" == *"nextest list"* ]]; then
-        [[ "$*" == *"--features channels,modules"* ]] || return 65
+        [[ "$*" == *"--features channels,modules --target-dir cov-target/llvm-cov-target -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E package(=openhuman-cli) & kind(test)"* ]] || return 65
         [[ "$INVENTORY_INSTRUMENTED" == 1 && "$CARGO_TARGET_DIR" == instrumented-target && "$CARGO_BUILD_TARGET_DIR" == preserved-target ]] || return 66
+        [[ "$LLVM_PROFILE_FILE" == */ci-out/nextest/cli-inventory-profraw/* ]] || return 68
       else return 67
       fi
     }`,
@@ -419,4 +441,50 @@ test("coverage inventory exceptions match the source gates and remain required a
     fs.readFileSync(runner, "utf8"),
     /target_features_satisfied "\$\{target\}" && target_expected_in_coverage "\$\{target\}"/,
   );
+});
+
+test("nextest product suites share one Cargo argument set and differ only in their filter", () => {
+  // Join line continuations so each suite call reads as one command.
+  const source = fs.readFileSync(runner, "utf8").replace(/\\\n\s*/g, "");
+  const nextestOnly = (name) => {
+    const pattern = new RegExp(
+      `suite "${name}" llvm_cov --no-report --no-fail-fast "\\$\\{UNIFIED_PRODUCT_ARGS\\[@\\]\\}" -E "\\$\\{(FILTER_[A-Z_]+)\\}"`,
+    );
+    const match = source.match(pattern);
+    assert.ok(match, `${name} must use the unified product arguments`);
+    return match[1];
+  };
+  const filters = [
+    nextestOnly("openhuman lib\\+bins \\(nextest\\)"),
+    nextestOnly("openhuman-embed"),
+    nextestOnly("openhuman-tinyhumans"),
+    nextestOnly("openhuman-cli integration tests \\(nextest\\)"),
+  ];
+  assert.equal(new Set(filters).size, 4, "every suite selects its own tests");
+  // The cli inventory is listed with the same arguments so it reuses the build.
+  assert.match(
+    source,
+    /cargo nextest list .*"\$\{UNIFIED_PRODUCT_ARGS\[@\]\}" -E "\$\{FILTER_CLI_TESTS\}"/,
+  );
+  // One package set, whose cargo resolution unifies the core's features once.
+  const args = source.match(/^UNIFIED_PRODUCT_ARGS=\((.*)\)$/m)[1];
+  assert.equal(
+    args,
+    "-p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets",
+  );
+  // Exact package matches: `package(openhuman)` alone would be a glob of the name.
+  for (const value of [
+    "FILTER_CORE='package(=openhuman)'",
+    "FILTER_EMBED='package(=openhuman-embed)'",
+    "FILTER_TINYHUMANS='package(=openhuman-tinyhumans)'",
+    "FILTER_CLI_TESTS='package(=openhuman-cli) & kind(test)'",
+  ])
+    assert.ok(source.includes(value), value);
+  // The old per-package nextest selections are gone; rpc, tui and the default
+  // feature suites keep their own resolutions.
+  assert.doesNotMatch(source, /-p openhuman-cli --tests/);
+
+  assert.match(source, /suite "openhuman-rpc" llvm_cov_package .*-p openhuman-rpc --all-targets/);
+  assert.match(source, /suite "openhuman-tui" llvm_cov_package .*-p openhuman-tui --all-targets/);
+  assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package .*-p openhuman-embed --all-targets/);
 });
