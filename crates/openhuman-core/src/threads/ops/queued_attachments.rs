@@ -78,7 +78,7 @@ async fn persist_queued_user_message_with_config(
     let outcome = super::crud::message_append_with_config(
         ctx,
         request,
-        &config,
+        config,
         origin.as_ref(),
         &config.workspace_dir,
     )
