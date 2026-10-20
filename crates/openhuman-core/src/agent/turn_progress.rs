@@ -434,3 +434,7 @@ pub(crate) fn sub_delta(
     out.iteration = Some(iteration);
     ChannelOutputEvent::Subagent(Box::new(out))
 }
+
+#[cfg(test)]
+#[path = "turn_progress_tests.rs"]
+mod tests;
