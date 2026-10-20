@@ -247,9 +247,7 @@ impl ChannelHostCallbacks {
         &self,
         request: tinychannels_bus::HostStoreVoiceMediaRequest,
     ) -> Result<tinychannels_bus::HostStoreVoiceMediaResult> {
-        if serde_json::to_vec(&request)
-            .map_or(true, |bytes| bytes.len() > MAX_VOICE_MEDIA_BYTES)
-        {
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_VOICE_MEDIA_BYTES) {
             return Err(Error::failed("voice media callback exceeds its limit"));
         }
         let decoded = base64::Engine::decode(
@@ -262,8 +260,7 @@ impl ChannelHostCallbacks {
         }
         let scope = &request.scope;
         let context = self.context()?;
-        let Some(channel) = context.channels_by_name.get(&scope.configured_instance)
-        else {
+        let Some(channel) = context.channels_by_name.get(&scope.configured_instance) else {
             return Err(Error::failed("voice media account is not configured"));
         };
         if scope.configured_instance.trim().is_empty()

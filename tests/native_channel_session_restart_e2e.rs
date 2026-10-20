@@ -212,9 +212,9 @@ async fn synthesize_voice(
     );
     let audio = base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
-        include_bytes!("../vendor/tinychannels/src/providers/telegram/fixtures/sine-ogg-opus.ogg"),
+        include_bytes!("../vendor/tinyvoice/crates/tinyvoice/tests/fixtures/voice-envelope.wav"),
     );
-    Json(json!({ "audio_base64": audio, "audio_mime": "audio/ogg" }))
+    Json(json!({ "audio_base64": audio, "audio_mime": "audio/wav" }))
 }
 
 async fn chat_completion(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Response {
@@ -805,8 +805,7 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
     );
     assert!(
         model_saw_user_text(&requests[0], "the dictated voice request"),
-        "the model receives the transcript produced by the scoped cloud STT callback; mock request={:?}, file requests={:?}, transcription uploads={}",
-        requests[0],
+        "the model receives the transcript produced by the scoped cloud STT callback; file requests={:?}, transcription uploads={}",
         mocks.state.voice_file_requests.lock().expect("voice file requests"),
         mocks.state.transcription_uploads.lock().expect("STT uploads").len()
     );
@@ -866,7 +865,7 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
             .expect("voice uploads")[0]
             .windows(4)
             .any(|window| window == b"OggS"),
-        "mirror mode uploads encoded Ogg audio through Telegram sendVoice"
+        "TinyVoice converts the WAV TTS response to Ogg before Telegram sendVoice"
     );
     core.stop();
 }
