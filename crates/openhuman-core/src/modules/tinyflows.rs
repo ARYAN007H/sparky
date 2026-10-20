@@ -285,12 +285,13 @@ mod imp {
                     .serve_at(object_path.clone(), object)
                     .await
                     .map_err(|error| error.to_string())?;
-                if announces_caps_host
-                    && let Err(error) =
+                if announces_caps_host {
+                    if let Err(error) =
                         super::caps_manifest::announce_caps_host_v2(&connection).await
-                {
-                    let _ = connection.unserve(&object_path).await;
-                    return Err(error);
+                    {
+                        let _ = connection.unserve(&object_path).await;
+                        return Err(error);
+                    }
                 }
                 Ok(ServedObjectRegistration(path))
             })
