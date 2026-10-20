@@ -274,7 +274,7 @@ async fn edit_rpc_rejects_an_attachment_ref_owned_by_another_row_before_truncati
             thread_id: "edit-image-scope".into(),
             message_id: source.id.clone(),
             content: "replacement text".into(),
-            attachments: other.attachments,
+            attachments: other.attachments.clone(),
             client_id: Some("test-client".into()),
         },
     )
