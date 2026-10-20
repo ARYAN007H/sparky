@@ -264,6 +264,7 @@ pub(crate) async fn run_relay_turn(
             },
             namespace: "main".into(),
             session_policy: Default::default(),
+            preparation_mode: Default::default(),
         },
     )
     .await

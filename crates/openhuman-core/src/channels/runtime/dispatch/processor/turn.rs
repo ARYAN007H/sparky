@@ -59,6 +59,7 @@ pub(crate) async fn process_channel_runtime_message(
                     source,
                     namespace: "main".into(),
                     session_policy: Default::default(),
+                    preparation_mode: Default::default(),
                 },
             )
             .await
