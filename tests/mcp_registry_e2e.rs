@@ -101,6 +101,24 @@ async fn module_tool_call_reports_unknown_tool_as_error() {
 
 #[tokio::test]
 #[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
+async fn disabled_server_environment_update_reports_host_projection() {
+    use std::collections::HashMap;
+
+    let (_tmp, config) = fresh_workspace_config();
+    let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
+    let mut env = HashMap::new();
+    env.insert("API_KEY".to_owned(), "test-only-secret".to_owned());
+
+    let result =
+        openhuman_core::mcp::registry::ops::mcp_clients_update_env(&config, server_id, env)
+            .await
+            .expect("confidential disabled-server update succeeds");
+    assert_eq!(result.value["status"], "disabled");
+    assert_eq!(result.value["env_keys"], json!(["API_KEY"]));
+}
+
+#[tokio::test]
+#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn per_config_lookups_are_isolated_by_workspace() {
     use openhuman_core::mcp::registry::{connections, ops};
 
