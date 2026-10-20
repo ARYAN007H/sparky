@@ -72,6 +72,8 @@ const cancelButton = (page: Page) => page.getByRole('button', { name: 'Cancel' }
 const copyButton = (page: Page) => page.getByRole('button', { name: 'Copy to Clipboard' });
 const createWalletMenuItem = (page: Page) =>
   page.getByRole('menuitem', { name: 'Create a New Wallet' });
+const importWalletMenuItem = (page: Page) =>
+  page.getByRole('menuitem', { name: 'Import an Existing Wallet' });
 
 async function enterReplacementGate(page: Page): Promise<void> {
   await replaceButton(page).click();
@@ -141,7 +143,6 @@ test.describe('Recovery phrase — the replace gate', () => {
     await expect(createWalletMenuItem(page)).toBeVisible();
     await createWalletMenuItem(page).click();
     await expect(confirmReplace(page)).toBeVisible();
-    await expect(importInstead(page)).toBeVisible();
     await expect(cancelButton(page)).toBeVisible();
     // The gate must not have already produced a replacement phrase behind it.
     await expect(copyButton(page)).toHaveCount(0);
@@ -201,7 +202,11 @@ test.describe('Recovery phrase — the replace gate', () => {
   }) => {
     const before = await walletState();
 
-    await enterReplacementGate(page);
+    await replaceButton(page).click();
+    await importWalletMenuItem(page).click();
+    await expect(confirmReplace(page)).toBeVisible();
+    await confirmReplace(page).click();
+    await expect(importInstead(page)).toBeVisible();
     await importInstead(page).click();
 
     // Import mode: word slots, and no generated phrase to copy. The slots are
