@@ -2,7 +2,6 @@
 //! default-temperature wrapper, and the unresolved-route error builder.
 
 use super::*;
-use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::core::runtime::DispatchCtx;
 #[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_session_active;
