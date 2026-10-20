@@ -67,14 +67,12 @@ llvm_cov_embed() {
 }
 
 # The nextest runner builds every product-feature package with ONE Cargo
-# argument set and varies only the nextest filter between suites. Cargo hashes
-# each unit by its resolved feature set, and the core's feature graph differs
-# per selected package set (core alone, embed/tinyhumans, and the cli, which
-# drops the core's `default` alias), so separate `-p` invocations each compile
-# the core and its dependencies again. With the same packages, `--all-targets`
-# and `--features` on every invocation, the first suite builds them once and
-# the rest find them fresh. Suites, reports and execution order are unchanged;
-# each filter selects what the old per-package arguments built and ran:
+# argument set. Cargo hashes each unit by its resolved feature set, and the
+# core's feature graph differs per selected package set (core alone,
+# embed/tinyhumans, and the cli, which drops the core's `default` alias), so
+# separate `-p` invocations each compile the core and its dependencies again.
+# The packages run as one suite whose filter is the union of what the old
+# per-package arguments built and ran:
 #   core        its only target is the lib (`--lib --bins`)
 #   embed       `--all-targets`
 #   tinyhumans  `--all-targets`
@@ -84,6 +82,7 @@ FILTER_CORE='package(=openhuman)'
 FILTER_EMBED='package(=openhuman-embed)'
 FILTER_TINYHUMANS='package(=openhuman-tinyhumans)'
 FILTER_CLI_TESTS='package(=openhuman-cli) & kind(test)'
+FILTER_PRODUCT="${FILTER_CORE} | ${FILTER_EMBED} | ${FILTER_TINYHUMANS} | (${FILTER_CLI_TESTS})"
 
 integration_test_targets() {
   find tests -maxdepth 1 -type f -name '*.rs' -print |
