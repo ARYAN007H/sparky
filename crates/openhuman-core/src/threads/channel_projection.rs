@@ -174,7 +174,7 @@ pub(crate) fn resolve_message(
 /// Persist provider read/reaction state onto the exact OpenHuman message row.
 /// The caller already resolved the provider receipt through the durable,
 /// tenant-scoped binding; no message id is inferred here.
-pub(crate) fn persist_activity(
+pub(crate) async fn persist_activity(
     ctx: &DispatchCtx,
     target: &ProjectedMessageTarget,
     event: &tinychannels_bus::ChannelEvent,
@@ -191,6 +191,7 @@ pub(crate) fn persist_activity(
             workspace.clone(),
             target.thread_id.clone(),
         )
+        .await
         .map_err(|error| anyhow!("read projected thread: {error}"))?;
         let Some(message) = messages.iter().find(|message| message.id == target.row_id) else {
             return Err(anyhow!("bound OpenHuman message row no longer exists"));
@@ -205,6 +206,7 @@ pub(crate) fn persist_activity(
                 extra_metadata: Some(metadata),
             },
         )
+        .await
         .map_err(|error| anyhow!("persist channel activity: {error}"))?;
         Ok(())
     })();

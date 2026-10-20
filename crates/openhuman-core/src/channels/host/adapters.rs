@@ -343,7 +343,7 @@ impl OpenHumanEventSink {
         if domain == "channel" && kind == "channel_event" {
             let event: tinychannels_bus::ChannelEvent = serde_json::from_value(payload)
                 .map_err(|error| anyhow::anyhow!("invalid typed channel event: {error}"))?;
-            if let Some(projected) = project_channel_event(ctx, event)
+            if let Some(projected) = project_channel_event(ctx, event).await
                 .map_err(|error| anyhow::anyhow!("project typed channel event: {error}"))?
             {
                 crate::web_chat::publish_web_channel_event_in(ctx, projected);
@@ -354,7 +354,7 @@ impl OpenHumanEventSink {
     }
 }
 
-fn project_channel_event(
+async fn project_channel_event(
     ctx: &crate::core::runtime::DispatchCtx,
     event: tinychannels_bus::ChannelEvent,
 ) -> Result<Option<crate::web_chat::WebChannelEvent>, String> {
@@ -376,6 +376,7 @@ fn project_channel_event(
         return Ok(None);
     };
 
+    crate::threads::channel_projection::persist_activity(ctx, &target, &event).await?;
     Ok(Some(crate::web_chat::WebChannelEvent::ChannelEvent {
         context: crate::web_chat::event_context(
             "channel-runtime",

@@ -151,3 +151,61 @@ fn sender_scoped_threads_can_share_a_conversation_without_overwriting() {
     );
     assert!(bind_in(&repo, alice, "channel:other").is_err());
 }
+
+#[test]
+fn channel_activity_metadata_applies_reaction_changes_and_read_receipts() {
+    use tinychannels_bus::{ChannelEvent, ChannelEventKind, ChannelReaction, ChannelRef};
+
+    let event = |kind| ChannelEvent {
+        version: 2,
+        event_id: "outer-event-id".into(),
+        source_event_id: None,
+        source_timestamp: None,
+        channel: ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("account".into()),
+        },
+        conversation: None,
+        event: kind,
+    };
+    let reaction = ChannelReaction {
+        value: "🔥".into(),
+        custom_emoji_id: None,
+    };
+    let added = event(ChannelEventKind::ReactionAdded {
+        message_id: "provider-target".into(),
+        provider_message_id: None,
+        actor: tinychannels_bus::SenderRef {
+            id: "alice".into(),
+            ..Default::default()
+        },
+        reaction: reaction.clone(),
+    });
+    let metadata = channel_activity_metadata(&json!({"existing": true}), &added).unwrap();
+    let metadata = channel_activity_metadata(&metadata, &added).unwrap();
+    assert_eq!(metadata["existing"], true);
+    assert_eq!(metadata["channelActivity"]["reactions"].as_array().unwrap().len(), 1);
+
+    let read = event(ChannelEventKind::ReadReceipt {
+        message_id: "provider-target".into(),
+        actor: Some(tinychannels_bus::SenderRef {
+            id: "bob".into(),
+            ..Default::default()
+        }),
+        timestamp: Some(42),
+    });
+    let metadata = channel_activity_metadata(&metadata, &read).unwrap();
+    assert_eq!(metadata["channelActivity"]["readReceipts"][0]["actorId"], "bob");
+
+    let removed = event(ChannelEventKind::ReactionRemoved {
+        message_id: "provider-target".into(),
+        provider_message_id: None,
+        actor: tinychannels_bus::SenderRef {
+            id: "alice".into(),
+            ..Default::default()
+        },
+        reaction,
+    });
+    let metadata = channel_activity_metadata(&metadata, &removed).unwrap();
+    assert!(metadata["channelActivity"]["reactions"].as_array().unwrap().is_empty());
+}
