@@ -344,8 +344,46 @@ fn an_invalid_flow_record_keeps_the_import_open_for_retry() {
         matches!(&first, Outcome::Incomplete { skipped, .. } if *skipped > 0),
         "a skipped flow record must keep the migration incomplete: {first:?}"
     );
+    let catalog = FlowCatalogDocuments::new(documents(&backend, &Scope::local()));
+    let imported_ids = crate::storage::block_on_anyhow(async move {
+        Ok(catalog
+            .list_flows()
+            .await?
+            .0
+            .into_iter()
+            .map(|flow| flow.id)
+            .collect::<Vec<_>>())
+    })
+    .unwrap();
+    assert!(
+        !imported_ids.iter().any(|id| id == "flow-alpha"),
+        "the oversized target flow must not be imported"
+    );
+    assert!(
+        imported_ids.iter().any(|id| id == "flow-beta"),
+        "a valid unrelated flow should still import"
+    );
     let retry = import_flows(&backend, &Scope::local(), &config).unwrap();
-    assert_eq!(retry, first, "retrying must report the same incomplete batch");
+    match (&first, &retry) {
+        (
+            Outcome::Incomplete {
+                found: first_found,
+                skipped: first_skipped,
+                ..
+            },
+            Outcome::Incomplete {
+                found: retry_found,
+                written: 0,
+                skipped: retry_skipped,
+            },
+        ) => {
+            assert_eq!(retry_found, first_found);
+            assert_eq!(retry_skipped, first_skipped);
+        }
+        (first, retry) => {
+            panic!("retry should remain incomplete without new writes: {first:?} / {retry:?}")
+        }
+    }
     assert!(legacy_flow_import_pending(&backend, &config, &Scope::local()).unwrap());
     assert!(!legacy_flow_import_pending(
         &backend,
