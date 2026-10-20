@@ -494,7 +494,10 @@ pub fn clear_cortexdb_key(config: &Config) -> Result<bool> {
 #[must_use]
 pub fn has_key(config: &Config, id: &str) -> bool {
     match id {
-        TINYHUMANS_ENGINE => resolve(config).is_on(),
+        TINYHUMANS_ENGINE => {
+            crate::security::credentials::session_support::resolve_backend_credential(config)
+                .is_ok()
+        }
         CORTEXDB_ENGINE => matches!(read_cortexdb_key(config), Ok(Some(_))),
         _ => false,
     }
