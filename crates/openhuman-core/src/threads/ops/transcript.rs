@@ -112,15 +112,19 @@ async fn attach_voice_note_metadata(
 
         let matching_rows = rows
             .iter()
-            .filter(|row| row.sender == sender && row.content == content)
+            .filter(|row| row.sender == sender)
             .filter(|row| {
                 let row_request_id = row
                     .extra_metadata
                     .get("requestId")
                     .and_then(serde_json::Value::as_str);
                 match (request_id, row_request_id) {
+                    // A request id identifies the exact turn even when the
+                    // transcript decorates the user text with model context.
                     (Some(projected), Some(stored)) => projected == stored,
-                    (None, None) => true,
+                    // Legacy rows have no turn identity, so use exact content
+                    // only when both sides are legacy.
+                    (None, None) => row.content == content,
                     // A modern transcript item cannot fall back to a different
                     // or missing row request id. Legacy rows match only legacy
                     // items, and the unique-content check below stays strict.
