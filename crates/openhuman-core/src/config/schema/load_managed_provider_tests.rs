@@ -6,22 +6,36 @@ use super::*;
 #[tokio::test]
 async fn a_brand_new_workspace_persists_and_reopens_generic_config() {
     let tmp = tempfile::tempdir().unwrap();
+    crate::inference::registry::register_config_normalizer(
+        "fresh-install-test",
+        std::sync::Arc::new(|config| {
+            if !config.cloud_providers.is_empty() {
+                return false;
+            }
+            config.cloud_providers.push(crate::config::schema::CloudProviderCreds {
+                id: "fixture-provider-id".to_string(),
+                slug: "fixture-provider".to_string(),
+                label: "Fixture Provider".to_string(),
+                endpoint: "https://fixture.example/v1".to_string(),
+                auth_style: crate::config::schema::AuthStyle::Bearer,
+                default_model: None,
+            });
+            true
+        }),
+    );
     let first = load_or_init_for_workspace(tmp.path()).await;
     assert!(first.default_model.is_none());
-    assert!(first
-        .cloud_providers
-        .iter()
-        .all(|provider| provider.slug != "openhuman"));
+    assert_eq!(first.cloud_providers.len(), 1);
+    assert_eq!(first.cloud_providers[0].slug, "fixture-provider");
 
     let first_text = tokio::fs::read_to_string(&first.config_path).await.unwrap();
     assert!(first_text.contains("schema_version"));
+    assert!(first_text.contains("slug = \"fixture-provider\""));
 
     let second = load_or_init_for_workspace(tmp.path()).await;
     assert!(second.default_model.is_none());
-    assert!(second
-        .cloud_providers
-        .iter()
-        .all(|provider| provider.slug != "openhuman"));
+    assert_eq!(second.cloud_providers.len(), 1);
+    assert_eq!(second.cloud_providers[0].id, "fixture-provider-id");
 }
 
 #[tokio::test]
