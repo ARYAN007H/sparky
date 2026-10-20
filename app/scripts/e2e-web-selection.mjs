@@ -7,9 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const contractPath = path.join(appRoot, 'scripts/e2e-web-selection-contract.json');
-const allowedDiagnosticPaths = new Set([
-  'test/playwright/specs/aui-tool-result-elements.spec.ts',
-]);
+const allowedDiagnosticPaths = new Set(['test/playwright/specs/aui-tool-result-elements.spec.ts']);
 
 function sortedUnique(paths, label) {
   const sorted = [...paths].sort();
@@ -54,7 +52,8 @@ export function classifySpecFiles(discoveredPaths, contract) {
   }
 
   const overlap = diagnostic.filter(file => owners.includes(file));
-  if (overlap.length) throw new Error(`diagnostic and required owner overlap: ${overlap.join(', ')}`);
+  if (overlap.length)
+    throw new Error(`diagnostic and required owner overlap: ${overlap.join(', ')}`);
   const required = discovered.filter(file => !diagnostic.includes(file));
   if (required.length === 0 || diagnostic.length === 0) {
     throw new Error('required and diagnostic selections must both be non-empty');
@@ -127,9 +126,7 @@ function main(args) {
   }
   const contract = JSON.parse(readFileSync(contractPath, 'utf8'));
   const result = resolveSelection(selection, { contract });
-  process.stdout.write(
-    asJson ? `${JSON.stringify(result)}\n` : `${result.files.join('\n')}\n`
-  );
+  process.stdout.write(asJson ? `${JSON.stringify(result)}\n` : `${result.files.join('\n')}\n`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

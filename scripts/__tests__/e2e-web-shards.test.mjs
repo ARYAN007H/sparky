@@ -99,17 +99,38 @@ test("strict and diagnostic selections partition discovered specs fail-closed", 
 
   assert.equal(diagnostic.files.length, 1);
   assert.match(diagnostic.files[0], /aui-tool-result-elements\.spec\.ts$/);
-  assert.ok(required.files.includes("test/playwright/specs/agent-review.spec.ts"));
-  assert.ok(required.files.includes("test/playwright/specs/command-palette-keyboard.spec.ts"));
-  assert.ok(required.files.includes("test/playwright/specs/skills-search-install.spec.ts"));
-  assert.ok(required.files.includes("test/playwright/specs/connections-tab-deeplinks.spec.ts"));
-  assert.ok(required.files.includes("test/playwright/specs/webhooks-tunnel-flow.spec.ts"));
+  assert.ok(
+    required.files.includes("test/playwright/specs/agent-review.spec.ts"),
+  );
+  assert.ok(
+    required.files.includes(
+      "test/playwright/specs/command-palette-keyboard.spec.ts",
+    ),
+  );
+  assert.ok(
+    required.files.includes(
+      "test/playwright/specs/skills-search-install.spec.ts",
+    ),
+  );
+  assert.ok(
+    required.files.includes(
+      "test/playwright/specs/connections-tab-deeplinks.spec.ts",
+    ),
+  );
+  assert.ok(
+    required.files.includes(
+      "test/playwright/specs/webhooks-tunnel-flow.spec.ts",
+    ),
+  );
   assert.deepEqual(
     [...required.files, ...diagnostic.files].sort(),
     all.files,
     "required and diagnostic must be disjoint and cover all discovered specs",
   );
-  assert.equal(new Set([...required.files, ...diagnostic.files]).size, all.files.length);
+  assert.equal(
+    new Set([...required.files, ...diagnostic.files]).size,
+    all.files.length,
+  );
 });
 
 test("selection classifier rejects unknown diagnostics and protected-owner demotion", () => {
@@ -133,7 +154,9 @@ test("selection classifier rejects unknown diagnostics and protected-owner demot
             "test/playwright/specs/owner.spec.ts",
             "test/playwright/specs/aui-tool-result-elements.spec.ts",
           ],
-          diagnostics: [{ path: "test/playwright/specs/aui-tool-result-elements.spec.ts" }],
+          diagnostics: [
+            { path: "test/playwright/specs/aui-tool-result-elements.spec.ts" },
+          ],
         },
       ),
     /protected browser owners cannot be diagnostic/,
@@ -146,7 +169,10 @@ test("diagnostic source bytes are pinned to their reviewed baseline", () => {
       verifyDiagnosticBytes(
         {
           diagnostics: [
-            { path: "test/playwright/specs/legacy.spec.ts", sha256: "0".repeat(64) },
+            {
+              path: "test/playwright/specs/legacy.spec.ts",
+              sha256: "0".repeat(64),
+            },
           ],
         },
         () => Buffer.from("changed bytes"),
@@ -166,7 +192,10 @@ test("CI Full requires every Playwright lane and manual workflow shares the arti
   );
   const job = full.slice(
     full.indexOf("  playwright-e2e:"),
-    full.indexOf("  # Runs only the exact unchanged AUI", full.indexOf("  playwright-e2e:")),
+    full.indexOf(
+      "  # Runs only the exact unchanged AUI",
+      full.indexOf("  playwright-e2e:"),
+    ),
   );
   assert.match(job, /fail-fast:\s*false/);
   assert.match(job, /lane:\s*\[1, 2, 3, 4\]/);
@@ -185,11 +214,19 @@ test("CI Full requires every Playwright lane and manual workflow shares the arti
   );
   const diagnosticJob = full.slice(
     full.indexOf("  playwright-legacy-diagnostic:"),
-    full.indexOf("  # Full desktop E2E", full.indexOf("  playwright-legacy-diagnostic:")),
+    full.indexOf(
+      "  # Full desktop E2E",
+      full.indexOf("  playwright-legacy-diagnostic:"),
+    ),
   );
   assert.match(diagnosticJob, /continue-on-error:\s*true/);
   assert.match(diagnosticJob, /--selection=diagnostic/);
-  assert.doesNotMatch(full.match(/needs:\s*\[[^\]]*playwright-legacy-diagnostic[^\]]*\]/g)?.join("\n") ?? "", /./);
+  assert.doesNotMatch(
+    full
+      .match(/needs:\s*\[[^\]]*playwright-legacy-diagnostic[^\]]*\]/g)
+      ?.join("\n") ?? "",
+    /./,
+  );
 });
 
 test("required selection forwards every healthy spec and never the diagnostic file", () => {
@@ -221,7 +258,9 @@ test("required selection forwards every healthy spec and never the diagnostic fi
   ]) {
     assert.match(joined, new RegExp(required.replaceAll(".", "\\.")));
   }
-  assert.ok(calls.every((call) => call.includes("/selection-required/lane-4/")));
+  assert.ok(
+    calls.every((call) => call.includes("/selection-required/lane-4/")),
+  );
 });
 
 test("diagnostic selection is one file-atomic unit and propagates failure", () => {
@@ -247,7 +286,10 @@ test("diagnostic selection is one file-atomic unit and propagates failure", () =
   assert.equal(
     fs
       .readFileSync(
-        path.join(workspace, "selection-diagnostic/lane-1/receipts/diagnostic-0.exit"),
+        path.join(
+          workspace,
+          "selection-diagnostic/lane-1/receipts/diagnostic-0.exit",
+        ),
         "utf8",
       )
       .trim(),
@@ -284,7 +326,11 @@ test("failure artifact names are unique across all four Playwright lanes", () =>
   ];
 
   for (const [workflow, source] of workflows) {
-    const matches = [...source.matchAll(/name: (e2e-playwright-[^\r\n]*failure-logs-[^\r\n]+)/g)];
+    const matches = [
+      ...source.matchAll(
+        /name: (e2e-playwright-[^\r\n]*failure-logs-[^\r\n]+)/g,
+      ),
+    ];
     assert.ok(matches.length, `${workflow} must upload its failure artifact`);
     const laneNames = matches.flatMap((match) =>
       Array.from({ length: 4 }, (_, index) =>
@@ -339,18 +385,32 @@ fi
 
   assert.equal(result.status, 1, result.stderr);
   const calls = fs.readFileSync(callLog, "utf8").trim().split("\n");
-  assert.equal(calls.length, 18, "later assigned units still run after failure");
+  assert.equal(
+    calls.length,
+    18,
+    "later assigned units still run after failure",
+  );
   const [, firstOutput] = calls[0].split("|");
   const [, secondOutput] = calls[1].split("|");
   assert.ok(path.isAbsolute(firstOutput));
   assert.ok(fs.existsSync(path.join(firstOutput, "trace.zip")));
   assert.notEqual(firstOutput, secondOutput);
   assert.equal(
-    fs.readFileSync(path.join(workspace, "selection-all/lane-4/receipts/special-3.exit"), "utf8").trim(),
+    fs
+      .readFileSync(
+        path.join(workspace, "selection-all/lane-4/receipts/special-3.exit"),
+        "utf8",
+      )
+      .trim(),
     "1",
   );
   assert.equal(
-    fs.readFileSync(path.join(workspace, "selection-all/lane-4/receipts/special-7.exit"), "utf8").trim(),
+    fs
+      .readFileSync(
+        path.join(workspace, "selection-all/lane-4/receipts/special-7.exit"),
+        "utf8",
+      )
+      .trim(),
     "0",
   );
 });
