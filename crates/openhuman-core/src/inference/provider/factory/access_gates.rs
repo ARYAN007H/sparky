@@ -1,7 +1,13 @@
 //! Access chokepoints every provider constructor runs through: privacy-mode
 //! `LocalOnly` enforcement, the backend-session requirement, and egress disclosure.
 
-use super::*;
+use super::{
+    BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER,
+    PROVIDER_OPENHUMAN,
+};
+use crate::config::Config;
+use crate::security::credentials::AuthService;
+use crate::security::egress::EgressLedger;
 use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// Human-readable label for an *external* provider string, used in the
