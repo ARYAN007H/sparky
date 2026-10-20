@@ -117,6 +117,18 @@ fn synthesize_local_runtime_entry_lmstudio_returns_v1_endpoint_with_no_auth() {
 }
 
 #[test]
+fn synthesize_local_runtime_entry_lmstudio_preserves_configured_v1_base() {
+    let mut config = Config::default();
+    config.local_ai.base_url = Some("http://192.168.1.8:1234/v1/".to_string());
+
+    let entry = synthesize_local_runtime_entry("lmstudio", &config)
+        .expect("lmstudio with custom base_url must still synthesize");
+
+    assert_eq!(entry.endpoint, "http://192.168.1.8:1234/v1");
+    assert_eq!(entry.auth_style, AuthStyle::None);
+}
+
+#[test]
 fn synthesize_local_runtime_entry_returns_none_for_unknown_slug() {
     // Only `ollama` and `lmstudio` are the recognized local-runtime
     // aliases. Every other slug — built-in cloud providers (`openai`,
