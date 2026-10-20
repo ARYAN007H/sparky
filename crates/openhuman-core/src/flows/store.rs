@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tinyflows_bus::catalog::{
     self, DeleteWorkflowResult, FlowUpdateError as BusUpdateError, GetRevisionRequest,
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
-    SetEnabledRequest, Workflow as Flow, WorkflowRevision,
+    PutWorkflowResult, SetEnabledRequest, Workflow as Flow, WorkflowRevision,
 };
 use tinyflows_bus::catalog::{FlowSuggestion, SuggestionStatus};
 
@@ -32,14 +32,6 @@ where
             .await
             .map_err(|error| anyhow!(error))
     })
-}
-
-pub(crate) fn roundtrip<T, U>(value: T) -> Result<U>
-where
-    T: Serialize,
-    U: DeserializeOwned,
-{
-    serde_json::from_value(serde_json::to_value(value)?).map_err(Into::into)
 }
 
 fn put_result(response: PutWorkflowResponse) -> Result<PutWorkflowResult> {
