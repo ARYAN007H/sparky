@@ -19,9 +19,9 @@ use tinystoragedrivers::{CollectionSpec, Result};
 use crate::storage::schema_support::{key_of, owner};
 
 pub(super) const TRANSCRIPT_KEYS: &str = "threads.transcript_keys";
-pub(super) const CHANNEL_MESSAGES: &str = "threads.channel_messages";
-pub(super) const STAGED_ATTACHMENTS: &str = "threads.staged_attachments";
-pub(super) const REPLY_VISEME_TIMELINES: &str = "threads.reply_viseme_timelines";
+pub(crate) const CHANNEL_MESSAGES: &str = "threads.channel_messages";
+pub(crate) const STAGED_ATTACHMENTS: &str = "threads.staged_attachments";
+pub(crate) const REPLY_VISEME_TIMELINES: &str = "threads.reply_viseme_timelines";
 pub(super) const LEGACY_TRANSCRIPT_KEYS: &str = "threads_transcript_keys";
 const SCHEMA: u32 = 2;
 
