@@ -225,10 +225,10 @@ async fn files_made_before_a_folder_change_keep_resolving() {
         &cfg,
         &meta.id,
     )
-        .await
-        .expect("an artifact from the previous folder still resolves")
-        .into_cli_compatible_json()
-        .unwrap();
+    .await
+    .expect("an artifact from the previous folder still resolves")
+    .into_cli_compatible_json()
+    .unwrap();
     assert_eq!(
         value["absolute_path"],
         serde_json::json!(path.to_string_lossy())

@@ -61,11 +61,10 @@ pub fn goal_store(
 /// A lost-scope caller gets isolated state, without permission to publish
 /// goal changes into the host's thread or web-channel event streams.
 fn isolated_goal_store() -> Arc<GoalStore> {
-    Arc::new(GoalStore::with_observer(
+    Arc::new(GoalStore::new(
         tinyagents_session::port::InMemorySessionStores::new()
             .for_agent("ephemeral")
             .kv,
-        Arc::new(OpenHumanGoalObserver),
     ))
 }
 
