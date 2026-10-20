@@ -159,6 +159,9 @@ pub(super) struct ModuleProgressiveReply {
 pub(crate) struct NativeProgressiveReply {
     object: tinybus::module::ModuleObjectClient,
     handle: String,
+    // Hosted relay handles own their callback runtime. Keep that lease alive
+    // until Close is acknowledged or the final reply owner is dropped.
+    runtime: Option<ChannelRuntimeLease>,
 }
 
 impl NativeProgressiveReply {
@@ -182,7 +185,45 @@ impl NativeProgressiveReply {
             .await?;
         match result {
             ProgressiveResult::Opened { handle } if !handle.is_empty() && handle.len() <= 128 => {
-                Ok(Self { object, handle })
+                Ok(Self {
+                    object,
+                    handle,
+                    runtime: None,
+                })
+            }
+            _ => {
+                crate::modules::report::malformed_reply("tinychannels");
+                Err(ModuleCallError::ModuleFault.into())
+            }
+        }
+    }
+
+    pub(crate) async fn open_hosted(
+        runtime: ChannelRuntimeLease,
+        channel: tinychannels_bus::channel::ChannelRef,
+        conversation: tinychannels_bus::channel::ConversationRef,
+        turn_id: String,
+        lifetime: std::time::Duration,
+    ) -> anyhow::Result<Self> {
+        let object = runtime.object().clone();
+        let result: ProgressiveResult = object
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::OpenHostedOutput {
+                    channel,
+                    conversation,
+                    turn_id,
+                    lifetime_ms: lifetime.as_millis().min(u64::MAX as u128) as u64,
+                },),
+            )
+            .await?;
+        match result {
+            ProgressiveResult::Opened { handle } if !handle.is_empty() && handle.len() <= 128 => {
+                Ok(Self {
+                    object,
+                    handle,
+                    runtime: Some(runtime),
+                })
             }
             _ => {
                 crate::modules::report::malformed_reply("tinychannels");
@@ -264,6 +305,9 @@ impl NativeProgressiveReply {
         if result != ProgressiveResult::Closed {
             crate::modules::report::malformed_reply("tinychannels");
             return Err(ModuleCallError::ModuleFault);
+        }
+        if let Some(runtime) = &self.runtime {
+            runtime.close().await?;
         }
         Ok(())
     }
