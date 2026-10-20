@@ -189,19 +189,25 @@ async fn a_detached_lifecycle_write_uses_its_carried_actor_scope() {
         key
     });
     let key = detached.await.unwrap();
+    let alice_dispatch = CoreContext::scope(alice, async {
+        crate::core::runtime::DispatchCtx::ambient()
+    })
+    .await;
     let alice_persistence = super::super::persistence::OpenHumanPersistence::new(checkpoints.clone())
-        .with_dispatch(crate::core::runtime::DispatchCtx::for_core(alice.clone()));
+        .with_dispatch(alice_dispatch);
     let durable = alice_persistence
         .load_terminal(&key)
         .await
         .unwrap()
         .expect("detached lifecycle write committed in its carried actor scope");
     assert_eq!(durable.output, "detached actor result");
-    CoreContext::scope(bob, async {
-        let other = super::super::persistence::OpenHumanPersistence::new(checkpoints);
-        assert!(other.load_terminal(&key).await.unwrap().is_none());
+    let bob_dispatch = CoreContext::scope(bob, async {
+        crate::core::runtime::DispatchCtx::ambient()
     })
     .await;
+    let other = super::super::persistence::OpenHumanPersistence::new(checkpoints)
+        .with_dispatch(bob_dispatch);
+    assert!(other.load_terminal(&key).await.unwrap().is_none());
 }
 
 async fn assert_legacy_owner_terminal(format: &str) {
