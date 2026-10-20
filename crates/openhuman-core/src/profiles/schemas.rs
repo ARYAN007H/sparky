@@ -99,7 +99,7 @@ pub fn profiles_schemas(function: &str) -> ControllerSchema {
             namespace: "profiles",
             function: "provision",
             description: "Create the profile that serves a gateway user, if it does not exist.",
-            inputs: vec![FieldSchema { required: false, ..string_field("user_id", "The gateway's id for the user.") }],
+            inputs: vec![string_field("user_id", "The gateway's id for the user.")],
             outputs: vec![
                 string_field("profile_id", "The user's profile id: the user id itself when it fits the raw charset (raw mode), else h-<sha256 prefix>."),
                 bool_field("created", "False when the profile already existed."),
