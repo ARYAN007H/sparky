@@ -2,6 +2,8 @@
 
 #[path = "tools/awaiting_user.rs"]
 pub(crate) mod awaiting_user;
+#[path = "tools/dispatch_outcomes.rs"]
+mod dispatch;
 #[path = "tools/spawn_subagent_surface.rs"]
 mod spawn_subagent;
 #[path = "tools/subagent_abort_report.rs"]
