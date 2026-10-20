@@ -128,16 +128,16 @@ pub fn is_managed_backend_envelope(err: &str) -> bool {
         || lower.starts_with(&format!("{label} streaming api error"))
 }
 
-/// Managed-backend Sentry-ownership decision for **string-only** call sites:
-/// the error must both be a managed-backend envelope AND carry a backend
-/// `errorCode` the backend owns. Wraps [`backend_error_code_skips_sentry`] with
-/// the [`is_managed_backend_envelope`] gate so a BYO payload that contains an
-/// `errorCode` token can't suppress FE Sentry.
+/// Test helper for the historical string-only Sentry ownership predicate.
+/// Production consumers use the registered classification's ownership and
+/// reportability fields instead.
+#[cfg(test)]
 pub fn managed_error_skips_sentry(err: &str) -> bool {
     is_managed_backend_envelope(err) && backend_error_code_skips_sentry(err)
 }
 
 /// Parse a recognised [`BackendErrorCode`] out of a flattened error string.
+#[cfg(test)]
 pub fn extract_backend_error_code(err: &str) -> Option<BackendErrorCode> {
     extract_backend_error_code_token(err).and_then(|t| BackendErrorCode::from_token(&t))
 }
@@ -166,9 +166,8 @@ pub fn body_flags_malformed(err: &str) -> bool {
     after_colon.starts_with("true")
 }
 
-/// Whether the error is a backend-flagged malformed `BAD_REQUEST` — the single
-/// `errorCode` case the FE *does* page (a client-built payload the backend
-/// rejected as unparseable).
+/// Test helper for recognizing a backend-flagged malformed `BAD_REQUEST`.
+#[cfg(test)]
 pub fn is_backend_malformed_bad_request(err: &str) -> bool {
     matches!(
         extract_backend_error_code(err),
@@ -176,9 +175,7 @@ pub fn is_backend_malformed_bad_request(err: &str) -> bool {
     ) && body_flags_malformed(err)
 }
 
-/// Whether the `errorCode` names a limit the **client enforces before sending**,
-/// so a backend rejection means our pre-send guard leaked — a client-side bug
-/// worth paging, not expected user-state.
+/// Test helper for recognizing a reported client-side guard leak.
 ///
 /// - `PAYLOAD_TOO_LARGE`: the client gates attachment size up front
 ///   (`app/src/lib/attachments.ts` — per-image / per-file byte caps + a
@@ -191,6 +188,7 @@ pub fn is_backend_malformed_bad_request(err: &str) -> bool {
 /// The backend does not ops-alert either (they are 4xx, not 500), so if the FE
 /// also suppressed them the guard leak would be invisible to everyone. Display
 /// classification is unchanged — the user still sees the actionable copy.
+#[cfg(test)]
 pub fn is_backend_client_guard_leak(err: &str) -> bool {
     matches!(
         extract_backend_error_code(err),
@@ -207,9 +205,9 @@ pub fn is_backend_client_guard_leak(err: &str) -> bool {
 ///   the client should have caught before sending — see
 ///   [`is_backend_client_guard_leak`].
 ///
-/// Shared by the provider HTTP layer (`api_error`), the higher-layer re-report
-/// classifier (`observability::expected_error_kind`), and the Sentry
-/// `before_send` defense-in-depth filter so the three layers can't drift.
+/// Production consumers use [`BackendErrorClassification`] so ownership is
+/// kept separate from its optional canonical token.
+#[cfg(test)]
 pub fn backend_error_code_skips_sentry(err: &str) -> bool {
     extract_backend_error_code_token(err).is_some()
         && !is_backend_malformed_bad_request(err)

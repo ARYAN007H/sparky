@@ -1,5 +1,11 @@
 use super::*;
 
+fn normalize_with_hosted_registration(config: &mut Config) -> bool {
+    let _registry = crate::registry_test_lock();
+    crate::register::register_all(&crate::install::InstallOptions::default());
+    super::normalize_config(config)
+}
+
 #[test]
 fn hosted_normalizer_rewrites_legacy_tiers_and_preserves_concrete_pins() {
     let mut config = Config::default();
@@ -15,14 +21,14 @@ fn hosted_normalizer_rewrites_legacy_tiers_and_preserves_concrete_pins() {
         },
     );
 
-    assert!(normalize_config(&mut config));
+    assert!(normalize_with_hosted_registration(&mut config));
     assert_eq!(config.default_model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
     assert_eq!(
         config.orchestrator.model.as_deref(),
         Some("custom/orchestrator-model")
     );
     assert_eq!(config.agents["pinned"].model, "vendor/model-id");
-    assert!(!normalize_config(&mut config));
+    assert!(!normalize_with_hosted_registration(&mut config));
 }
 
 #[test]
@@ -68,7 +74,7 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
         },
     ]);
 
-    assert!(normalize_config(&mut config));
+    assert!(normalize_with_hosted_registration(&mut config));
     assert_eq!(config.default_model.as_deref(), Some(MODEL_MANAGED_DEFAULT));
     assert_eq!(
         config.orchestrator.model.as_deref(),
@@ -87,19 +93,22 @@ fn hosted_normalizer_covers_all_legacy_model_fields_and_preserves_non_tiers() {
     assert_eq!(config.model_routes[1].model, "vendor/pinned");
     assert_eq!(config.model_routes[2].model, "hint:unknown");
     assert_eq!(config.model_routes[3].model, "");
-    assert!(!normalize_config(&mut config));
+    assert!(!normalize_with_hosted_registration(&mut config));
 
     let mut absent = Config::default();
-    assert!(!normalize_config(&mut absent));
+    absent.default_model = None;
+    assert!(normalize_with_hosted_registration(&mut absent));
     assert_eq!(absent.default_model, None);
+    assert!(!normalize_with_hosted_registration(&mut absent));
 }
 
 #[test]
 fn hosted_normalizer_seeds_its_preset_using_the_configured_api_url_once() {
     let mut config = Config::default();
+    config.default_model = None;
     config.api_url = Some("https://custom.example/api".to_string());
 
-    assert!(normalize_config(&mut config));
+    assert!(normalize_with_hosted_registration(&mut config));
     assert_eq!(config.default_model, None);
     assert_eq!(config.cloud_providers.len(), 1);
     let provider = &config.cloud_providers[0];
@@ -107,7 +116,7 @@ fn hosted_normalizer_seeds_its_preset_using_the_configured_api_url_once() {
     assert_eq!(provider.endpoint, "https://custom.example/api");
     let id = provider.id.clone();
 
-    assert!(!normalize_config(&mut config));
+    assert!(!normalize_with_hosted_registration(&mut config));
     assert_eq!(config.cloud_providers.len(), 1);
     assert_eq!(config.cloud_providers[0].id, id);
 }
