@@ -260,22 +260,20 @@ where
             },
         );
     }
-    if clear_history {
-        if reset_history().await.is_err() {
-            tracing::warn!("channel durable history reset failed");
-            if let Some(channel) = target_channel {
-                let copy = crate::web_chat::classify_inference_error(
-                    "OpenHuman session persistence failed while resetting this conversation",
-                );
-                let _ = channel
-                    .send_with_outbound_intent(
-                        &SendMessage::new(copy.message, &msg.reply_target)
-                            .in_thread(msg.thread_ts.clone()),
-                    )
-                    .await;
-            }
-            return true;
+    if clear_history && reset_history().await.is_err() {
+        tracing::warn!("channel durable history reset failed");
+        if let Some(channel) = target_channel {
+            let copy = crate::web_chat::classify_inference_error(
+                "OpenHuman session persistence failed while resetting this conversation",
+            );
+            let _ = channel
+                .send_with_outbound_intent(
+                    &SendMessage::new(copy.message, &msg.reply_target)
+                        .in_thread(msg.thread_ts.clone()),
+                )
+                .await;
         }
+        return true;
     }
     let Some(reply) = reply else {
         return false;
