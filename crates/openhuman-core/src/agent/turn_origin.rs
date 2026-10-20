@@ -62,6 +62,10 @@ pub enum AgentTurnOrigin {
         /// conversation (MCP server callers, triage, voice), so scheduling can tell a
         /// real chat from those.
         history_key: Option<String>,
+        /// Trusted host-derived channel session identity captured from the
+        /// prepared inbound envelope. Absent on non-conversation channel
+        /// origins; legacy history keys remain attribution only.
+        channel_session: Option<tinyflows_bus::schedule::types::ChannelSessionIdentity>,
     },
     /// Internal automation the user explicitly authorized (cron job the
     /// user created, internal background job on local data). `source`

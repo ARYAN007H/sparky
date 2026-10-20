@@ -10,6 +10,7 @@ fn external_origin() -> crate::agent::turn_origin::AgentTurnOrigin {
         reply_target: "test".into(),
         message_id: "test".into(),
         history_key: None,
+        channel_session: None,
     }
 }
 

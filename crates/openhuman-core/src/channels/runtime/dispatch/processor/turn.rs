@@ -430,6 +430,7 @@ pub(crate) async fn process_channel_runtime_message(
         reply_target: msg.reply_target.clone(),
         message_id: msg.id.clone(),
         history_key: Some(history_key.clone()),
+        channel_session: None,
     };
 
     // Sub-issue 2 of #3098: give the agent turn an `ApprovalTurnContext` for

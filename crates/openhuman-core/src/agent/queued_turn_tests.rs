@@ -26,6 +26,7 @@ fn trusted_turn(session_key: &str) -> Arc<super::super::turn_host::TrustedAgentT
             reply_target: "conversation-a".into(),
             message_id: "message-a".into(),
             history_key: Some("legacy-history-a".into()),
+            channel_session: None,
         },
         approval: crate::security::approval::ApprovalTurnContext::chat(
             crate::security::approval::ApprovalChatContext {
