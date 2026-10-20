@@ -27,10 +27,15 @@ fn removing_cron_delivery_moves_past_the_canonical_v2_event_catalog() {
     // The canonical 2.0 catalog already retired the desktop voice event, and
     // 2.1 added inbound-event queues. Removing CronDeliveryRequested from
     // that wire contract requires a new major version beyond both.
-    let major = std::hint::black_box(EVENTS_VERSION.major);
+    let manifest = manifest();
+    let interface = EVENTS_INTERFACE.try_into().unwrap();
+    let advertised = manifest
+        .provided(&interface)
+        .expect("OpenHuman advertises its event catalog");
     assert!(
-        major > 2,
-        "removing CronDeliveryRequested is incompatible with the canonical 2.x catalog; got {EVENTS_VERSION}"
+        advertised.speaks.major > 2,
+        "removing CronDeliveryRequested is incompatible with the canonical 2.x catalog; got {}",
+        advertised.speaks
     );
 }
 

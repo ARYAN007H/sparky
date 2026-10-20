@@ -64,8 +64,7 @@ static BACKEND_OPEN_TEST_GATE: LazyLock<Mutex<Option<BackendOpenTestGate>>> =
     LazyLock::new(Mutex::default);
 
 #[cfg(test)]
-static SYNC_BACKEND_ENTRY_TEST_SIGNAL:
-    LazyLock<Mutex<Option<std::sync::mpsc::Sender<()>>>> =
+static SYNC_BACKEND_ENTRY_TEST_SIGNAL: LazyLock<Mutex<Option<std::sync::mpsc::Sender<()>>>> =
     LazyLock::new(Mutex::default);
 
 #[cfg(test)]
@@ -167,14 +166,19 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
 }
 
 /// Async counterpart to [`backend_for`] for boot and module-proxy paths that
-/// already run inside a future. It avoids re-entering the blocking bridge when
-/// opening a workspace's default backend.
+/// already run inside a future. Cold initialization is delegated to Tokio's
+/// blocking pool so the shared OnceCell initializer is driven by the storage
+/// bridge rather than by the caller's runtime. A synchronous store may wait for
+/// that same initializer, including from a current-thread runtime, without
+/// preventing it from making progress.
 pub async fn backend_for_async(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = installed() {
         return Ok(backend);
     }
-    let cell = workspace_backend(workspace_dir);
-    initialized_backend(cell, workspace_dir.to_path_buf()).await
+    let workspace_dir = workspace_dir.to_path_buf();
+    tokio::task::spawn_blocking(move || backend_for(&workspace_dir))
+        .await
+        .context("join the workspace storage opener")?
 }
 
 /// The storage a store uses for this call: [`backend_for`] `workspace_dir`
