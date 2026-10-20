@@ -66,7 +66,7 @@ describe('SubagentActivityCard', () => {
           status: 'awaiting_user',
           awaitingQuestion: 'Which repo should I use?',
           toolCalls: [],
-        } as unknown as SubagentActivity}
+        }}
       />
     );
     expect(screen.getByTestId('assistant-ui-subagent-call')).toHaveAttribute(
@@ -106,7 +106,7 @@ describe('SubagentActivityCard', () => {
           changedFiles: ['notes.md'],
           isDirty: true,
           toolCalls: [],
-        }}
+        } as unknown as SubagentActivity}
       />
     );
 

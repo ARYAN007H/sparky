@@ -90,9 +90,19 @@ describe('SubagentTaskCard', () => {
         type="tool-call"
         toolName="task"
         toolCallId="sub-1"
-        args={{ progress: { ...activity, status: 'success', worktreePath: '/repo/.claude/worktrees/worker', changedFiles: ['notes.md'], isDirty: true } } as never}
+        args={{} as never}
         argsText="{}"
-        result={undefined}
+        result={{
+          status: 'complete',
+          activity: {
+            ...activity,
+            status: 'success',
+            output: 'Research is complete.',
+            worktreePath: '/repo/.claude/worktrees/worker',
+            changedFiles: ['notes.md'],
+            isDirty: true,
+          },
+        } as never}
         status={{ type: 'complete' }}
         addResult={() => {}}
         resume={() => {}}
@@ -101,6 +111,7 @@ describe('SubagentTaskCard', () => {
     );
 
     expect(screen.getByTestId('assistant-ui-subagent-call')).toHaveAttribute('data-status', 'success');
+    expect(screen.getByText('Research is complete.')).toBeInTheDocument();
     expect(screen.queryByTestId('worktree-actions')).toBeNull();
     expect(screen.queryByText(/worker/)).toBeNull();
   });
