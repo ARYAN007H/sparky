@@ -128,10 +128,7 @@ async fn get_run_with_storage(
         storage,
         id: run_id.to_owned(),
     };
-    let run: Option<WireFlowRun> = catalog_call(config, wire::members::GET_RUN, request).await?;
-    run.map(crate::flows::store::roundtrip)
-        .transpose()
-        .map_err(|error| error.to_string())
+    catalog_call(config, wire::members::GET_RUN, request).await
 }
 
 async fn catalog_call<T, A>(config: &Config, member: &'static str, args: A) -> Result<T, String>
