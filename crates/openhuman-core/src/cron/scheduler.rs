@@ -290,17 +290,18 @@ async fn execute_via_bus(
         wait: true,
     };
     tracing::debug!(job_id = %job.id, %run_id, "[cron:scheduler] RunJobNow");
-    let reply: RunJobReply = proxy
-        .call(members::RUN_JOB_NOW, (request,))
-        .await
-        .map_err(|error| {
-            let message = error.wire_message();
-            if message.contains(ALREADY_RUNNING) {
-                anyhow!("cron job '{}' is already running", job.id)
-            } else {
-                anyhow!(message)
-            }
-        })?;
+    let reply: RunJobReply =
+        proxy
+            .call(members::RUN_JOB_NOW, (request,))
+            .await
+            .map_err(|error| {
+                let message = error.wire_message();
+                if message.contains(ALREADY_RUNNING) {
+                    anyhow!("cron job '{}' is already running", job.id)
+                } else {
+                    anyhow!(message)
+                }
+            })?;
     drop(host);
     match reply {
         RunJobReply::Completed { attempt, .. } => Ok(attempt),
@@ -308,10 +309,9 @@ async fn execute_via_bus(
             tinyflows_bus::schedule::RunJobRefusal::AlreadyRunning => {
                 Err(anyhow!("cron job '{}' is already running", job.id))
             }
-            tinyflows_bus::schedule::RunJobRefusal::DefinitionChanged => Err(anyhow!(
-                "cron job '{}' changed before it could run",
-                job.id
-            )),
+            tinyflows_bus::schedule::RunJobRefusal::DefinitionChanged => {
+                Err(anyhow!("cron job '{}' changed before it could run", job.id))
+            }
         },
         RunJobReply::Accepted { .. } => Err(anyhow!(
             "tinyflows accepted a blocking Run Now request without a terminal result"

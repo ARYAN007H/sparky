@@ -165,7 +165,10 @@ impl SandboxRunner for FlowsHost {
             .await
             .map_err(|error| error.to_string())?;
         let connection = runtime.connection().clone();
-        let path = format!("/ai/tinyhumans/openhuman/FlowSandbox/{}", uuid::Uuid::new_v4());
+        let path = format!(
+            "/ai/tinyhumans/openhuman/FlowSandbox/{}",
+            uuid::Uuid::new_v4()
+        );
         let object_path = ObjectPath::new(&path).map_err(|error| error.to_string())?;
         let served_path = object_path.clone();
         let callback = SandboxToolPreflight {
@@ -173,9 +176,7 @@ impl SandboxRunner for FlowsHost {
         };
         runtime
             .spawn(async move {
-                connection
-                    .request_name(SANDBOX_CALLBACK_BUS)
-                    .await?;
+                connection.request_name(SANDBOX_CALLBACK_BUS).await?;
                 connection.serve_at(served_path, callback).await
             })
             .await
@@ -289,7 +290,6 @@ impl BuilderGates for FlowsHost {
         )
         .await
     }
-
 }
 
 #[async_trait]
