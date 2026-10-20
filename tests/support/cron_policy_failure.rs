@@ -38,8 +38,9 @@ mod policy {
         set_policy(config, job_id, JobPolicy::default())
     }
 }
-/// A job's policy is a field of its job document.
-const JOBS: &str = "cron_jobs";
+/// A job's policy is a field of its job document, in the schedule module's
+/// `cron.jobs` collection (`cron_jobs` is only the retired v1 source).
+const JOBS: &str = "cron.jobs";
 const BACKEND_DETAIL: &str = "mongodb://policy-user:secret@backend/private-payload";
 
 #[derive(Debug, Default)]
