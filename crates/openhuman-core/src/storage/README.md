@@ -98,10 +98,12 @@ it with the core stopped.
 - `driver_is_shared(driver)` / `installed_is_shared()`: whether other
   processes may write the same backend (MongoDB). Boot-time recovery, such
   as the orphaned-run sweep, is skipped on a shared backend.
-- `driver_has_cross_process_cas(driver)`: whether a compare-and-swap on
-  that driver is atomic across processes (MongoDB, SQLite), which a
-  clustered node's leases need. Memory and file drivers coordinate only
-  within one process.
+- `backend_has_cross_process_cas(backend)`: whether the backend reports
+  `Capability::SharedAcrossProcesses` (MongoDB, SQLite), i.e. a
+  compare-and-swap atomic across processes, which a clustered node's leases
+  need. `driver_has_cross_process_cas(driver)` is the same answer from a
+  name, for the boot guard, which judges a URL before opening anything.
+  Memory and file drivers coordinate only within one process.
 - `blob_sweep`: reclaims expired blobs (`StorageBackend::sweep_expired_blobs`)
   for `local`, each known agent scope and each provisioned SaaS profile
   (`u:<id>` plus the blob-owning modules' scopes for it) every hour,
