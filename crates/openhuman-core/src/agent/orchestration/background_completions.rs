@@ -23,8 +23,13 @@
 
 use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, HashSet, VecDeque};
+mod parent_lifecycle;
 mod store_adapter;
 mod thread_index;
+pub(crate) use parent_lifecycle::{
+    clear_all, discard_for_thread, discard_pending_for_thread, finish_stop_for_thread,
+    mark_stopped_task_if_thread_stopped, resume_stopped_thread,
+};
 pub(crate) use store_adapter::router_for_workspace_ctx;
 pub(super) use store_adapter::{
     degrade_to_memory, entry_for_ctx, open_driver_store, router_pool, router_scope_for,

@@ -230,4 +230,3 @@ pub(crate) fn clear_all(ctx: &DispatchCtx, workspace_dir: &Path) -> usize {
     log::debug!("[background_completions] clear_all removed={removed}");
     removed
 }
-
