@@ -22,6 +22,11 @@ enum ProgressiveTargetKind {
     HostedRelay {
         client: tinybus::module::ModuleClient,
         channel: std::sync::Arc<crate::channels::providers::relay::RelayChannel>,
+        ctx: crate::core::runtime::DispatchCtx,
+        config: crate::config::Config,
+        client_id: String,
+        thread_id: String,
+        request_id: String,
     },
 }
 
@@ -42,13 +47,35 @@ impl NativeProgressiveTarget {
                 )
                 .await?
             }
-            ProgressiveTargetKind::HostedRelay { client, channel } => {
+            ProgressiveTargetKind::HostedRelay {
+                client,
+                channel,
+                ctx,
+                config,
+                client_id,
+                thread_id,
+                request_id,
+            } => {
+                let projection = Arc::new(
+                    crate::web_chat::Surface::new(
+                        ctx,
+                        crate::web_chat::TurnIds {
+                            client_id: client_id.clone(),
+                            thread_id: thread_id.clone(),
+                            request_id: request_id.clone(),
+                        },
+                        config.clone(),
+                    )
+                    .await,
+                );
                 let callback =
                     crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
+                        ctx.clone(),
                         Arc::clone(channel),
                         self.channel.clone(),
                         self.conversation.clone(),
                         turn_id.to_owned(),
+                        projection,
                     );
                 let runtime = crate::modules::channel_runtime::ChannelRuntimeLease::open(
                     client.clone(),
@@ -70,15 +97,24 @@ impl NativeProgressiveTarget {
 }
 
 pub(crate) fn hosted_relay_target(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &crate::config::Config,
     channel: std::sync::Arc<crate::channels::providers::relay::RelayChannel>,
     channel_ref: tinychannels_bus::channel::ChannelRef,
     conversation: tinychannels_bus::channel::ConversationRef,
+    client_id: String,
+    thread_id: String,
+    request_id: String,
 ) -> NativeProgressiveTarget {
     NativeProgressiveTarget {
         kind: ProgressiveTargetKind::HostedRelay {
             client: crate::modules::client(config.clone()),
             channel,
+            ctx: ctx.clone(),
+            config: config.clone(),
+            client_id,
+            thread_id,
+            request_id,
         },
         channel: channel_ref,
         conversation,
