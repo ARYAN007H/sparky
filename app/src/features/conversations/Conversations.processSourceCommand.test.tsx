@@ -683,8 +683,8 @@ describe('composer model routing', () => {
     expect(mockChatSend).not.toHaveBeenCalled();
 
     await act(async () => newerClear.resolve({}));
-    await waitFor(() => expect(mockChatSendWithAck).toHaveBeenCalledTimes(1));
-    expect(mockChatSendWithAck.mock.calls[0][0]).not.toHaveProperty('model');
+    await waitFor(() => expect(mockChatSend).toHaveBeenCalledTimes(1));
+    expect(mockChatSend.mock.calls[0][0]).not.toHaveProperty('model');
   });
 
   it('does not wait for selected-model persistence before an explicit-model send', async () => {
