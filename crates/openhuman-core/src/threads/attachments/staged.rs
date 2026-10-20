@@ -70,7 +70,7 @@ pub(super) fn get_staged_record(repo: &Repo, id: &str) -> Result<Option<StagedAt
 
 pub(super) async fn read_staged_entries(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     requested: &[ContentPart],
     config: &crate::config::Config,
 ) -> Result<Vec<StoredAttachment>, String> {
@@ -108,7 +108,7 @@ pub(super) async fn read_staged_entries(
 /// paths in the returned row projection.
 pub(crate) async fn bind_staged_refs(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     config: &crate::config::Config,
     requested: &[ContentPart],
     message_id: &str,
@@ -128,7 +128,7 @@ pub(crate) async fn bind_staged_refs(
 
 pub(super) async fn claim_staged_refs(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     config: &crate::config::Config,
     message_id: &str,
     entries: &[StoredAttachment],
@@ -144,8 +144,8 @@ pub(super) async fn claim_staged_refs(
             .ok_or_else(|| "staged attachment reference is missing".to_string())?;
         let id = staged_doc_id(opaque_id)?;
         let claim = StagedAttachmentClaim {
-            pub(super) tenant: tenant.clone(),
-            pub(super) thread_id: thread_id.to_string(),
+            tenant: tenant.clone(),
+            thread_id: thread_id.to_string(),
             message_id: message_id.to_string(),
             part: entry.part.clone(),
             canceled: false,
@@ -157,11 +157,11 @@ pub(super) async fn claim_staged_refs(
 
 pub(super) fn claim_staged_record(
     repo: &Repo,
-    pub(super) tenant: &crate::core::runtime::Tenant,
-    pub(super) thread_id: &str,
+    tenant: &crate::core::runtime::Tenant,
+    thread_id: &str,
     id: &str,
     part: &ContentPart,
-    pub(super) claim: &StagedAttachmentClaim,
+    claim: &StagedAttachmentClaim,
 ) -> Result<bool, String> {
     let id = id.to_string();
     let tenant = tenant.clone();
@@ -227,7 +227,7 @@ pub(super) fn claim_staged_record(
 /// separate from visible message history until the runner admits the turn.
 pub(crate) async fn stage_queued_parts(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     input: &[ContentPart],
 ) -> Result<Vec<ContentPart>, String> {
     if thread_id.is_empty() || input.is_empty() {
@@ -276,14 +276,14 @@ pub(crate) async fn stage_queued_parts(
             .ok_or_else(|| "staged attachment has no opaque reference".to_string())?;
         let id = staged_doc_id(opaque_id)?;
         let manifest = StagedAttachment {
-            pub(super) tenant: tenant.clone(),
-            pub(super) thread_id: thread_id.to_string(),
-            pub(super) attachment: StoredAttachment {
+            tenant: tenant.clone(),
+            thread_id: thread_id.to_string(),
+            attachment: StoredAttachment {
                 part: attachment.0.clone(),
                 path: attachment.1,
             },
             expires_at,
-            pub(super) claim: None,
+            claim: None,
         };
         let body = serde_json::to_value(&manifest)
             .map_err(|error| format!("serialize queued attachment record: {error}"))?;
@@ -303,7 +303,7 @@ pub(crate) async fn stage_queued_parts(
 /// checks pass.
 pub(crate) async fn resolve_staged_parts(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     requested: &[ContentPart],
 ) -> Result<Vec<ContentPart>, String> {
     if thread_id.is_empty() || requested.is_empty() {
@@ -327,7 +327,7 @@ pub(crate) async fn resolve_staged_parts(
 
 pub(super) async fn validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     config: &crate::config::Config,
     entries: &[StoredAttachment],
 ) -> Result<(), String> {
@@ -384,7 +384,7 @@ pub(super) async fn validate_staged_files(
 /// Remove staged media for a queue entry that was canceled before execution.
 pub(crate) async fn discard_staged_parts(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     requested: &[ContentPart],
 ) -> Result<(), String> {
     let config = ctx
@@ -397,7 +397,7 @@ pub(crate) async fn discard_staged_parts(
 
 pub(super) async fn discard_staged_entries(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     config: &crate::config::Config,
     entries: Vec<StoredAttachment>,
 ) -> Result<(), String> {
@@ -418,8 +418,8 @@ pub(super) async fn discard_staged_entries(
         };
         let id = staged_doc_id(id)?;
         let cancellation = StagedAttachmentClaim {
-            pub(super) tenant: tenant.clone(),
-            pub(super) thread_id: thread_id.to_string(),
+            tenant: tenant.clone(),
+            thread_id: thread_id.to_string(),
             message_id: String::new(),
             part: entry.part.clone(),
             canceled: true,
@@ -445,8 +445,8 @@ pub(super) async fn discard_staged_entries(
 
 pub(super) fn cancel_staged_record(
     repo: &Repo,
-    pub(super) tenant: &crate::core::runtime::Tenant,
-    pub(super) thread_id: &str,
+    tenant: &crate::core::runtime::Tenant,
+    thread_id: &str,
     id: &str,
     part: &ContentPart,
     cancellation: &StagedAttachmentClaim,
@@ -507,7 +507,7 @@ pub(super) fn cancel_staged_record(
 /// that row's private attachment metadata.
 pub(crate) async fn consume_staged_parts(
     ctx: &crate::core::runtime::DispatchCtx,
-    pub(super) thread_id: &str,
+    thread_id: &str,
     requested: &[ContentPart],
     message_id: &str,
 ) -> Result<(), String> {
