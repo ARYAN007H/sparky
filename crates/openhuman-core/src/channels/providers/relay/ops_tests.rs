@@ -262,3 +262,43 @@ async fn invalid_or_repeated_messages_start_no_turn() {
         assert!(text.contains(&thread), "{text}");
     };
 }
+
+#[tokio::test]
+async fn relay_preflight_failure_uses_trusted_channel_locale_without_running_agent() {
+    let agent_runs = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let observed_runs = Arc::clone(&agent_runs);
+    let _bus = mock_agent_run_turn(move |_request: AgentTurnRequest| {
+        observed_runs.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        async { Ok(AgentTurnResponse::new("unexpected answer")) }
+    })
+    .await;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config(&tmp);
+    config.modules.enabled = false;
+    config.channels_locale = Some("es".into());
+    let workspace = config.workspace_dir.clone();
+    let params = params("preflight-error", "hello");
+    let thread_id = params.thread_id();
+    let dispatch = crate::core::runtime::DispatchCtx::ambient();
+    assert_eq!(
+        store::record_inbound(&dispatch, &workspace, &params, &thread_id).await,
+        Ok(Recorded::New)
+    );
+
+    let replies = run_relay_turn(
+        dispatch,
+        config,
+        params,
+        thread_id,
+        "request-preflight-error".into(),
+    )
+    .await;
+
+    assert_eq!(agent_runs.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(
+        replies,
+        vec!["Este chat no está disponible temporalmente. Inténtalo de nuevo más tarde."]
+    );
+    assert!(!replies[0].contains("COMPONENT_DISABLED"));
+}
