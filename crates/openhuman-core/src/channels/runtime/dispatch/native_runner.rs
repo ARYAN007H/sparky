@@ -1,14 +1,17 @@
 //! Native channel adapter for TinyAgents' shared turn lifecycle.
 
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use async_trait::async_trait;
 use tinyagents_harness::{
     run_queue::RunQueue,
     turn_runner::{
         EventSink, FailureClassifier, IngressDecision, IngressPolicy, IngressStage,
-        QueueDisposition, ReplyStore, ScopeKey, Summarizer, TerminalEvent, TurnHost,
-        TurnRequest, TurnResult, TurnRunner, TurnRunnerConfig, TurnSession, TurnSignal,
+        QueueDisposition, ReplyStore, ScopeKey, Summarizer, TerminalEvent, TurnHost, TurnRequest,
+        TurnResult, TurnRunner, TurnRunnerConfig, TurnSession, TurnSignal,
     },
     CancellationToken,
 };
@@ -20,7 +23,15 @@ use crate::{
     core::runtime::DispatchCtx,
 };
 
-type Runner = TurnRunner<NativeHost, NativeIngress, NativeReplies, NativeEvents, NativeFailures, NativeSummarizer, QueuedPayload>;
+type Runner = TurnRunner<
+    NativeHost,
+    NativeIngress,
+    NativeReplies,
+    NativeEvents,
+    NativeFailures,
+    NativeSummarizer,
+    QueuedPayload,
+>;
 
 #[derive(Default)]
 struct NativeSlot {
@@ -277,8 +288,9 @@ impl ReplyStore<QueuedPayload> for NativeReplies {
         _reply_id: &str,
         result: &TurnResult,
     ) -> Result<(), String> {
-        self.shared
-            .with(&request.request_id, |slot| slot.reply = Some(result.reply.clone()));
+        self.shared.with(&request.request_id, |slot| {
+            slot.reply = Some(result.reply.clone())
+        });
         Ok(())
     }
 }
@@ -289,7 +301,11 @@ struct NativeEvents {
 
 #[async_trait]
 impl EventSink<QueuedPayload> for NativeEvents {
-    async fn progress(&self, request: &TurnRequest<QueuedPayload>, event: tinyagents_harness::progress::AgentProgress) {
+    async fn progress(
+        &self,
+        request: &TurnRequest<QueuedPayload>,
+        event: tinyagents_harness::progress::AgentProgress,
+    ) {
         let Some(event) = super::processor::progressive::output_event(event) else {
             return;
         };
@@ -341,11 +357,7 @@ impl EventSink<QueuedPayload> for NativeEvents {
             }
             false
         } else if let (Some(reply), Some(text)) = (reply.as_ref(), text.as_deref()) {
-            super::processor::progressive::finish_native_reply(
-                &Some(Arc::clone(reply)),
-                text,
-            )
-            .await
+            super::processor::progressive::finish_native_reply(&Some(Arc::clone(reply)), text).await
         } else {
             false
         };
