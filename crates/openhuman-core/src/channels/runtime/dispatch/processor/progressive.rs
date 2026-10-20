@@ -10,6 +10,43 @@ pub(super) async fn open_native_reply(
     envelope: &tinychannels_bus::channel::ChannelInboundEnvelope,
     turn_id: &str,
 ) -> anyhow::Result<Option<std::sync::Arc<NativeProgressiveReply>>> {
+    let Some(target) = native_target(ctx, envelope)? else {
+        return Ok(None);
+    };
+    target.open(turn_id).await.map(Some)
+}
+
+/// Captured configured module target for a single inbound conversation.
+/// Opening the progressive handle is deferred until TurnRunner checkout, so a
+/// queued follow-up gets a fresh module handle after it wins admission.
+pub(crate) struct NativeProgressiveTarget {
+    object: tinybus::module::ModuleObjectClient,
+    channel: tinychannels_bus::channel::ChannelRef,
+    conversation: tinychannels_bus::channel::ConversationRef,
+}
+
+impl NativeProgressiveTarget {
+    pub(crate) async fn open(
+        &self,
+        turn_id: &str,
+    ) -> anyhow::Result<std::sync::Arc<NativeProgressiveReply>> {
+        Ok(std::sync::Arc::new(
+            NativeProgressiveReply::open(
+                self.object.clone(),
+                self.channel.clone(),
+                self.conversation.clone(),
+                turn_id.to_owned(),
+                std::time::Duration::from_secs(3_660),
+            )
+            .await?,
+        ))
+    }
+}
+
+pub(crate) fn native_target(
+    ctx: &crate::channels::context::ChannelRuntimeContext,
+    envelope: &tinychannels_bus::channel::ChannelInboundEnvelope,
+) -> anyhow::Result<Option<NativeProgressiveTarget>> {
     #[cfg(test)]
     if ctx.config.is_none() && ctx.module_objects.is_empty() {
         return Ok(None);
@@ -25,15 +62,11 @@ pub(super) async fn open_native_reply(
         .get(account)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("native channel account is not configured"))?;
-    let reply = NativeProgressiveReply::open(
+    Ok(Some(NativeProgressiveTarget {
         object,
-        envelope.channel.clone(),
-        envelope.conversation.clone(),
-        turn_id.to_owned(),
-        std::time::Duration::from_secs(3_660),
-    )
-    .await?;
-    Ok(Some(std::sync::Arc::new(reply)))
+        channel: envelope.channel.clone(),
+        conversation: envelope.conversation.clone(),
+    }))
 }
 
 pub(crate) async fn finish_native_reply(

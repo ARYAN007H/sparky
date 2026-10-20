@@ -27,12 +27,13 @@ struct NativeSlot {
     lease: Option<SessionLease>,
     reply: Option<String>,
     progress_failed: bool,
+    waiting_for_delivery: bool,
+    delivery_succeeded: Option<bool>,
 }
 
 #[derive(Default)]
 struct NativeShared {
     slots: Mutex<HashMap<String, NativeSlot>>,
-    delivery_status: Mutex<HashMap<String, bool>>,
 }
 
 impl NativeShared {
@@ -44,22 +45,44 @@ impl NativeShared {
         f(slots.entry(request_id.to_owned()).or_default())
     }
 
+    fn begin_delivery_wait(&self, request_id: &str) {
+        self.with(request_id, |slot| slot.waiting_for_delivery = true);
+    }
+
     fn record_delivery(&self, request_id: &str, delivered: bool) {
-        self.delivery_status
+        let mut slots = self
+            .slots
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .insert(request_id.to_owned(), delivered);
-        self.slots
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(slot) = slots.get_mut(request_id) {
+            slot.delivery_succeeded = Some(delivered);
+            // The lease spans model execution and terminal provider delivery.
+            slot.lease = None;
+            if !slot.waiting_for_delivery {
+                slots.remove(request_id);
+            }
+        }
+    }
+
+    fn abandon_delivery_wait(&self, request_id: &str) {
+        let mut slots = self
+            .slots
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .remove(request_id);
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(slot) = slots.get_mut(request_id) {
+            slot.waiting_for_delivery = false;
+            if slot.delivery_succeeded.is_some() {
+                slots.remove(request_id);
+            }
+        }
     }
 
     fn take_delivery(&self, request_id: &str) -> Option<bool> {
-        self.delivery_status
+        self.slots
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .remove(request_id)
+            .and_then(|slot| slot.delivery_succeeded)
     }
 }
 
@@ -117,7 +140,12 @@ impl TurnHost<QueuedPayload> for NativeHost {
             .as_ref()
             .ok_or_else(|| "channel turn has no trusted host context".to_owned())?;
         let (agent_progress, mut progress_rx) = mpsc::channel(64);
-        let progress_forwarder = tokio::spawn(async move {
+        let progress_forwarder = request
+            .payload
+            .ctx
+            .as_ref()
+            .map(crate::core::runtime::DispatchCtx::clone)
+            .map(|dispatch| dispatch.spawn(async move {
             while let Some(event) = progress_rx.recv().await {
                 if progress
                     .send(TurnSignal::Progress(Box::new(event)))
@@ -127,7 +155,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
                     break;
                 }
             }
-        });
+        }));
         let response = crate::channels::runtime::dispatch::host_agent::run_host_agent_turn(
             trusted.host_agent.clone(),
             crate::channels::runtime::dispatch::host_agent::HostChannelTurn {
@@ -147,7 +175,9 @@ impl TurnHost<QueuedPayload> for NativeHost {
         )
         .await
         .map_err(|error| error.to_string());
-        let _ = progress_forwarder.await;
+        if let Some(progress_forwarder) = progress_forwarder {
+            let _ = progress_forwarder.await;
+        }
         response.map(|response| TurnResult {
             reply: response.text,
             data: serde_json::json!({
@@ -361,6 +391,7 @@ pub(crate) async fn run(
             };
         }
     };
+    runtime.shared.begin_delivery_wait(&request_id);
     let request = TurnRequest {
         scope: ScopeKey {
             agent_id: trusted.host_agent.definition.id.clone(),
@@ -377,17 +408,17 @@ pub(crate) async fn run(
         host_authored: false,
         disposition: QueueDisposition::Interrupt,
         deadline: Some(crate::agent::session_host::turn_backstop::configured_backstop()),
-        idle_timeout: Some(std::time::Duration::from_secs(900)),
+        idle_timeout: Some(crate::agent::turn_policy::configured_idle_window()),
     };
     let runner_result = runtime.runner.run(request).await;
-    let queued = matches!(runner_result, Err(tinyagents_harness::turn_runner::TurnRunnerError::Queued));
+    let queued = matches!(
+        &runner_result,
+        Err(tinyagents_harness::turn_runner::TurnRunnerError::Queued)
+    );
     let result = runner_result.map_err(|error| error.to_string());
-    runtime
-        .shared
-        .slots
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&request_id);
+    if queued {
+        runtime.shared.abandon_delivery_wait(&request_id);
+    }
     let result = result.map(|result| {
         let provider = result.data["provider"].as_str().map(str::to_owned);
         let model = result.data["model"].as_str().map(str::to_owned);
@@ -399,7 +430,11 @@ pub(crate) async fn run(
     });
     NativeTurnExecution {
         result,
-        delivery_succeeded: runtime.shared.take_delivery(&request_id),
+        delivery_succeeded: if queued {
+            None
+        } else {
+            runtime.shared.take_delivery(&request_id)
+        },
         queued,
     }
 }

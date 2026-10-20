@@ -34,9 +34,10 @@ pub(crate) struct TrustedAgentTurn {
     pub(crate) approval: ApprovalTurnContext,
     pub(crate) relay_thread: Option<String>,
     pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
-    /// Captured compiled-module reply port for native channel turns. This
-    /// stays in trusted queue state and is never reconstructed from metadata.
-    pub(crate) native_reply: Option<Arc<crate::channels::bus::NativeProgressiveReply>>,
+    /// Captured configured compiled-module target for native turns. The
+    /// progressive handle itself is opened at runner checkout per admitted
+    /// request, so queued follow-ups never reuse a finished handle.
+    pub(crate) native_target: Option<Arc<crate::channels::runtime::dispatch::processor::progressive::NativeProgressiveTarget>>,
 }
 
 impl std::fmt::Debug for TrustedAgentTurn {
@@ -47,7 +48,7 @@ impl std::fmt::Debug for TrustedAgentTurn {
             .field("session_scoped", &!self.session_key.is_empty())
             .field("relay_thread", &self.relay_thread)
             .field("imported_history_rows", &self.imported_history.len())
-            .field("native_reply", &self.native_reply.is_some())
+            .field("native_target", &self.native_target.is_some())
             .finish_non_exhaustive()
     }
 }
