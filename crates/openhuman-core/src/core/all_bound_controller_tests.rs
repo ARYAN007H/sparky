@@ -16,8 +16,12 @@ fn record_event(event: &'static str) {
         .push(event);
 }
 
-fn take_events() -> Vec<&'static str> {
-    std::mem::take(&mut *EVENTS.lock().expect("event lock is not poisoned"))
+fn clear_events() {
+    EVENTS.lock().expect("event lock is not poisoned").clear();
+}
+
+fn events() -> Vec<&'static str> {
+    EVENTS.lock().expect("event lock is not poisoned").clone()
 }
 
 #[derive(Debug)]
@@ -73,14 +77,14 @@ fn params() -> Map<String, Value> {
 fn bound_controller_uses_its_parser_for_decode_and_runtime_invocation() {
     let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
     CALLS.store(0, Ordering::SeqCst);
-    take_events();
+    clear_events();
     let controller = BoundRegisteredController::typed(schema(), parse_value, run_value);
 
     controller
         .decode_params(params())
         .expect("the bound parser accepts the fixture");
     assert_eq!(CALLS.load(Ordering::SeqCst), 1, "decoder only parses");
-    assert_eq!(take_events(), ["parse"]);
+    assert_eq!(events(), ["parse"]);
 
     let output = futures::executor::block_on(controller.invoke(DispatchCtx::unbound(), params()))
         .expect("runtime invocation succeeds");
@@ -90,14 +94,14 @@ fn bound_controller_uses_its_parser_for_decode_and_runtime_invocation() {
         3,
         "invocation parses then runs"
     );
-    assert_eq!(take_events(), ["parse", "parse", "run"]);
+    assert_eq!(events(), ["parse", "parse", "run"]);
 }
 
 #[test]
 fn bound_controller_decode_does_not_run_gate_or_business_handler() {
     let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
     CALLS.store(0, Ordering::SeqCst);
-    take_events();
+    clear_events();
     let controller =
         BoundRegisteredController::after_gate(schema(), gate, parse_value, |_ctx, (), parsed| {
             run_value(DispatchCtx::unbound(), parsed)
@@ -107,20 +111,20 @@ fn bound_controller_decode_does_not_run_gate_or_business_handler() {
         .decode_params(params())
         .expect("the bound parser accepts the fixture");
     assert_eq!(CALLS.load(Ordering::SeqCst), 1, "only the parser ran");
-    assert_eq!(take_events(), ["parse"]);
+    assert_eq!(events(), ["parse"]);
 
     let output = futures::executor::block_on(controller.invoke(DispatchCtx::unbound(), params()))
         .expect("gated runtime invocation succeeds");
     assert_eq!(output, Value::String("fixture".to_owned()));
     assert_eq!(CALLS.load(Ordering::SeqCst), 4, "gate, parser, then runner");
-    assert_eq!(take_events(), ["parse", "gate", "parse", "run"]);
+    assert_eq!(events(), ["parse", "gate", "parse", "run"]);
 }
 
 #[test]
 fn bound_controller_runs_gate_before_parser() {
     let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
     CALLS.store(0, Ordering::SeqCst);
-    take_events();
+    clear_events();
     let controller =
         BoundRegisteredController::after_gate(schema(), gate, parse_value, run_value_after_gate);
 
@@ -128,7 +132,7 @@ fn bound_controller_runs_gate_before_parser() {
         .expect("gated runtime invocation succeeds");
     assert_eq!(output, Value::String("fixture".to_owned()));
     assert_eq!(CALLS.load(Ordering::SeqCst), 3);
-    assert_eq!(take_events(), ["gate", "parse", "run"]);
+    assert_eq!(events(), ["gate", "parse", "run"]);
 }
 
 fn run_value_after_gate(_ctx: DispatchCtx, _gate: (), parsed: Parsed) -> ControllerFuture {
@@ -138,7 +142,7 @@ fn run_value_after_gate(_ctx: DispatchCtx, _gate: (), parsed: Parsed) -> Control
 #[test]
 fn bound_controller_preserves_parser_errors() {
     let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
-    take_events();
+    clear_events();
     let controller = BoundRegisteredController::typed(schema(), parse_value, run_value);
     let error = controller
         .decode_params(Map::new())
