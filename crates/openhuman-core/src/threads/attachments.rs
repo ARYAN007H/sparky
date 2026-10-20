@@ -489,58 +489,7 @@ async fn validate_staged_files(
     {
         return Err("staged attachment count exceeds configured limit".into());
     }
-    let tenant = tenant_for(ctx)?;
     for entry in entries {
-        let Some(id) = opaque_media(&entry.part).and_then(|media| media.opaque_id.as_deref())
-        else {
-            continue;
-        };
-        let manifest_path = staged_manifest_path(&config.workspace_dir, id)?;
-        let claim_path = manifest_path.with_extension("claim.json");
-        let canceled_claim = StagedAttachmentClaim {
-            tenant: tenant.clone(),
-            thread_id: thread_id.to_string(),
-            message_id: String::new(),
-            part: entry.part.clone(),
-            canceled: true,
-        };
-        let bytes = serde_json::to_vec(&canceled_claim)
-            .map_err(|error| format!("serialize staged attachment cancellation: {error}"))?;
-        let temp_path = manifest_path.with_extension(format!("{}.claim-tmp", uuid::Uuid::new_v4()));
-        let mut file = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp_path)
-            .await
-            .map_err(|error| format!("create staged attachment cancellation: {error}"))?;
-        use tokio::io::AsyncWriteExt;
-        file.write_all(&bytes)
-            .await
-            .map_err(|error| format!("write staged attachment cancellation: {error}"))?;
-        file.sync_all()
-            .await
-            .map_err(|error| format!("sync staged attachment cancellation: {error}"))?;
-        drop(file);
-        let owns_cancellation = match tokio::fs::hard_link(&temp_path, &claim_path).await {
-            Ok(()) => true,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                let claim: StagedAttachmentClaim = serde_json::from_slice(
-                    &tokio::fs::read(&claim_path)
-                        .await
-                        .map_err(|read| format!("read staged attachment claim: {read}"))?,
-                )
-                .map_err(|read| format!("decode staged attachment claim: {read}"))?;
-                claim.canceled
-                    && claim.tenant == tenant
-                    && claim.thread_id == thread_id
-                    && claim.part == entry.part
-            }
-            Err(error) => return Err(format!("publish staged attachment cancellation: {error}")),
-        };
-        let _ = tokio::fs::remove_file(&temp_path).await;
-        if !owns_cancellation {
-            continue;
-        }
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
