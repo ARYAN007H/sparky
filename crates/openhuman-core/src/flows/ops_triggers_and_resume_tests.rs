@@ -238,9 +238,25 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
     flows_set_enabled(&config, &created.value.id, true)
         .await
         .unwrap();
-    let original_job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
+    let job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
         .unwrap()
         .expect("cron job bound on enable");
+    let run_at = chrono::DateTime::parse_from_rfc3339("2026-10-20T09:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    crate::cron::record_run(
+        &config,
+        &job.id,
+        run_at,
+        run_at,
+        "ok",
+        Some("prior schedule result"),
+        17,
+    )
+    .unwrap();
+    let original_job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
+        .unwrap()
+        .expect("seeded schedule job remains registered");
 
     let mut graph = schedule_trigger_graph("0 9 * * *");
     graph["nodes"][0]["config"]["inputs"] = json!({"team": "platform"});
@@ -252,6 +268,9 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
         .unwrap()
         .expect("schedule job remains bound after input-only edit");
     assert_eq!(job.id, original_job.id, "input edits must preserve the binding");
+    assert_eq!(job.last_run, original_job.last_run);
+    assert_eq!(job.last_status, original_job.last_status);
+    assert_eq!(job.last_output, original_job.last_output);
     assert_eq!(job.expression, original_job.expression);
 }
 

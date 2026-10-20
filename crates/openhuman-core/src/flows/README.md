@@ -4,9 +4,10 @@ Saved automation workflows: the graphs a user builds on the Workflows canvas,
 or that the workflow copilot builds for them in chat. This domain owns the
 saved-flow lifecycle (create, edit, enable, run, resume, cancel), the bridge
 from trigger events to runs, the agent tools and sub-agents that author and
-suggest flows, and the adapters that let the vendored `tinyflows` engine call
-real OpenHuman services. The engine itself (graph model, validation,
-compilation, execution) lives in [`vendor/tinyflows/`](../../../../vendor/tinyflows/).
+suggest flows, and the host callbacks that TinyFlows invokes for OpenHuman
+services. TinyFlows owns graph validation, compilation, execution, and catalog
+behavior; OpenHuman reaches these through [`tinyflows-bus`](../../../../vendor/tinyflows/)
+and serves the product-specific callbacks.
 
 Callers are the JSON-RPC/CLI surface (`flows.*`, used by the Workflows UI), the
 event bus (cron ticks and Composio triggers), and agents that hold the flow
@@ -23,24 +24,23 @@ tools.
         v                      v                            | Composio trigger
    schemas.rs --------->  ops/*  <-----------------  bus/trigger.rs
                                |  |
-          validate, gate,      |  |  compile + run
-          persist              |  |
+                 policy,      |  |  trigger dispatch
+                 RPC mapping  |  |
                                v  v
-   store.rs / draft_store.rs       tinyflows engine (vendor/tinyflows)
-   (FlowCatalogDocuments on the           |
-    storage ports)                       | capability traits
-                                         v
-                              tinyflows/caps  (agent, llm, tools,
-                              http, code, memory, state store)
-                                         |
-                                         v
-                       OpenHuman services: harness, Composio,
-                       native tools, memory, approval gate
+                       TinyFlows TinyBus contracts
+                  Authoring / Catalog / Runs / Portability
+                         |                         ^
+              CatalogStorage callback             | CapsHost callbacks
+                         |                         |
+                  host storage             OpenHuman services: harness,
+                                          Composio, native tools, memory,
+                                          HTTP and approval policy
 ```
 
-`ops/` is the business layer. Everything else either calls into it (RPC
-handlers, agent tools, the trigger subscriber) or is called by it (the store,
-the engine, the capability seam).
+`ops/` is the host business layer. RPC handlers, agent tools, and the trigger
+subscriber call into it. It calls TinyFlows through bus contracts and applies
+OpenHuman policy; TinyFlows calls back through the host's scoped storage and
+capability objects.
 
 ### Saving a flow
 
@@ -102,8 +102,9 @@ automatic dispatch based on its trigger node:
 | `webhook` | Not implemented. Enabling logs an actionable warning; incoming webhook requests are observed but never start a run. |
 | `manual` and others | No automatic dispatch. |
 
-`flows_update` rebinds a schedule when an enabled flow's trigger kind or config
-changes, so a new cron expression takes effect. At boot,
+`flows_update` rebinds a schedule when its normalized trigger kind or typed
+schedule changes, so a new cron expression takes effect without rebinding for
+pinned-input or unrelated graph edits. At boot,
 `reconcile_schedule_triggers_on_boot` (called from [`core/runtime/services.rs`](../core/runtime/services.rs))
 re-arms schedules for every enabled flow.
 
@@ -246,8 +247,8 @@ Top level:
 | `mod.rs` | Module declarations and re-exports: node contracts and flow-memory helpers. |
 | [`ops.rs`](./ops.rs), `ops/` | Business operations returning `Outcome<T>`. See the table below. |
 | [`schemas.rs`](./schemas.rs), `schemas/`, [`schemas_handlers.rs`](./schemas_handlers.rs) | Controller schemas (split into `builder_schemas.rs`, `definition_schemas.rs`, `draft_schemas.rs`, `run_schemas.rs`) and thin handlers that load config, read params and call `ops::flows_*`. |
-| [`store.rs`](./store.rs) | Binds `FlowCatalogDocuments` to this host's storage (`scoped`, `documents`). Every function only substitutes the catalog; anything else in a body is host policy leaking into persistence. |
-| `draft_store.rs` | Same binding for the catalog's drafts. |
+| [`store.rs`](./store.rs) | Translates host flow operations to TinyFlows Catalog bus requests; the module owns catalog persistence through the scoped `CatalogStorage` callback. |
+| `draft_store.rs` | Compatibility adapter for draft requests over TinyFlows' Catalog contract. |
 | [`bus.rs`](./bus.rs), `bus/` | The trigger and run-digest subscribers. |
 | [`runs_adapter.rs`](./runs_adapter.rs), `runs_adapter/` | Scope-bound CatalogStorage and CapsHost ownership, Runs Start/Poll/Cancel calls, cursor projection, and legacy RPC result mapping. |
 | [`tools.rs`](./tools.rs) | `ProposeWorkflowTool` (`propose_workflow`) and `RunFlowTool` (`run_flow`). |

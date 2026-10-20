@@ -228,8 +228,9 @@ async fn flows_update_inner(
     }
 
     if graph_changed && updated.enabled {
-        let trigger_unchanged = existing.graph.trigger().map(|trigger| &trigger.config)
-            == updated.graph.trigger().map(|trigger| &trigger.config);
+        let trigger_unchanged = bus::extract_trigger_kind(&existing)
+            == bus::extract_trigger_kind(&updated)
+            && bus::extract_trigger_config(&existing) == bus::extract_trigger_config(&updated);
         if !trigger_unchanged {
             tracing::debug!(target: "flows", flow_id = %id, "[flows] flows_update: trigger changed on an enabled flow — rebinding automatic-dispatch trigger");
             unbind_trigger(config, &existing);
