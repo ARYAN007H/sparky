@@ -2,9 +2,23 @@
 //! `SessionEntry`/`SessionCacheFingerprint`, the turn result
 //! (`WebChatTaskResult`), and the `channel.web_*` request param structs.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::agent::OpenHumanSessionHost;
+
+/// Typed acknowledgement emitted when a web chat message enters the run queue.
+/// Attachment values are sanitized opaque references minted by the core.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) struct QueuedChatAck {
+    pub(super) queued: bool,
+    pub(super) queue_mode: String,
+    pub(super) client_id: String,
+    pub(super) thread_id: String,
+    pub(super) request_id: String,
+    pub(super) queue_depth: usize,
+    pub(super) queued_attachments: Vec<tinychannels_bus::ContentPart>,
+}
 
 /// All inputs that the cached `SessionEntry`'s `Agent` was built from,
 /// captured at build time. The cache-hit predicate is a single
