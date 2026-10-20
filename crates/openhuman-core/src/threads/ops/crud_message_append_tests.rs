@@ -503,6 +503,40 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     .await
     .expect("public metadata update");
 
+    let (left, right) = tokio::join!(
+        message_update(
+            &ctx,
+            UpdateConversationMessageRequest {
+                thread_id: "uploads".into(),
+                message_id: saved.id.clone(),
+                extra_metadata: Some(json!({"seen": true})),
+            },
+        ),
+        message_update(
+            &ctx,
+            UpdateConversationMessageRequest {
+                thread_id: "uploads".into(),
+                message_id: saved.id.clone(),
+                extra_metadata: Some(json!({"reactionSummary": {"heart": 1}})),
+            },
+        ),
+    );
+    left.expect("concurrent metadata update one");
+    right.expect("concurrent metadata update two");
+    let current = conversations::blocking::get_messages(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+        "uploads",
+    )
+    .await
+    .unwrap()
+    .into_iter()
+    .find(|message| message.id == saved.id)
+    .unwrap();
+    assert_eq!(current.extra_metadata["pinned"], true);
+    assert_eq!(current.extra_metadata["seen"], true);
+    assert_eq!(current.extra_metadata["reactionSummary"]["heart"], 1);
+
     let resolved = crate::threads::attachments::resolve_persisted_parts(
         &ctx,
         "uploads",
@@ -517,6 +551,6 @@ async fn public_metadata_updates_preserve_private_attachment_bindings() {
     };
     assert_eq!(
         tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
-        b"\\x89PNG\\r\\n\\x1a\\n"
+        b"\x89PNG\r\n\x1a\n"
     );
 }
