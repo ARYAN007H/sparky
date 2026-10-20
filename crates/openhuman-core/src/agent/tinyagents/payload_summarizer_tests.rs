@@ -108,8 +108,8 @@ async fn unary_summarizer_child_keeps_summary_output_off_the_streaming_path() {
     let model = Arc::new(UnaryOnlyModel(AtomicBool::new(false)));
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
     harness
-        .register_model("summary", model.clone())
-        .set_default_model("summary");
+        .with_model( model.clone())
+        ;
 
     let run = harness
         .invoke_in_context(&(), child, vec![Message::user("summarize this")])
