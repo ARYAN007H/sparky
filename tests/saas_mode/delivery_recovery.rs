@@ -111,7 +111,11 @@ fn leave_undelivered_result(root: &std::path::Path, user: &str) {
     )
     .with_notify_mode(NotifyMode::Followup);
     let gate = store
-        .acquire_parent_gate(THREAD, "delivery-recovery-fixture", std::time::Duration::from_secs(30))
+        .acquire_parent_gate(
+            THREAD,
+            "delivery-recovery-fixture",
+            std::time::Duration::from_secs(30),
+        )
         .expect("acquire the parent's completion gate")
         .expect("the completion gate is free");
     store
