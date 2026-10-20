@@ -111,4 +111,14 @@ test.describe('Webhook tunnel CRUD (UI + core RPC + mock backend)', () => {
     // Connections surface, not the former trigger-history controls.
     await expect(page.getByTestId('two-pane-nav-composio')).toBeVisible();
   });
+
+  test('legacy /webhooks route redirects to Connections', async ({ page }) => {
+    await page.goto('/#/webhooks');
+    await waitForAppReady(page);
+
+    await expect
+      .poll(async () => page.evaluate(() => window.location.hash), { timeout: 10_000 })
+      .toContain('/connections');
+    await expect(page.getByTestId('two-pane-nav-composio')).toBeVisible();
+  });
 });
