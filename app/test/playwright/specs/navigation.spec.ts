@@ -27,9 +27,7 @@ const ROUTES: RouteEntry[] = [
   { route: '/skills', expectedHash: '/connections' }, // back-compat redirect
   { route: '/activity', expectedHash: '/settings/account' }, // back-compat redirect
   { route: '/intelligence', expectedHash: '/settings/account' }, // back-compat redirect
-  // Desktop Settings is a modal overlay (the backgroundLocation pattern): the
-  // /settings index redirects to the first panel and the modal renders on top
-  // of the /chat fallback backdrop.
+      // Settings is a routed page and the /settings index resolves to Account.
   { route: '/settings', expectedHash: '/settings/account' },
 ];
 
@@ -46,6 +44,7 @@ test.describe('Navigation', () => {
 
       // After redirects the hash should begin with the final landing path.
       const escapedLanding = landing.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const minimumTextLength = route === '/human' ? 20 : 50;
       await expect
         .poll(async () => page.evaluate(() => window.location.hash))
         .toMatch(new RegExp(`^#${escapedLanding}`));
@@ -58,10 +57,9 @@ test.describe('Navigation', () => {
           const text = await page.locator('#root').innerText();
           return text.trim().length;
         })
-        // `/human` intentionally keeps the mascot stage sparse; its complete
-        // navigation chrome is shorter than the old generic 50-character
-        // heuristic while still proving the application rendered.
-        .toBeGreaterThan(20);
+        // Human is intentionally sparse; native-equivalent app routes must
+        // retain the broader nonblank-content threshold.
+        .toBeGreaterThan(minimumTextLength);
     });
   }
 });

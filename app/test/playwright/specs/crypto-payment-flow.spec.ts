@@ -17,7 +17,7 @@ test.describe('Crypto Payment Flow', () => {
 
   test('open billing dashboard button is present', async ({ page }) => {
     await waitForAppReady(page);
-    await expect(page.getByRole('button', { name: 'Open billing dashboard' })).toBeVisible();
+    await expect(page.getByTestId('account-open-billing')).toBeVisible();
   });
 
   test('keeps billing as an explicit account action', async ({ page }) => {
