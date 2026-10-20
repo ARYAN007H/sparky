@@ -346,6 +346,10 @@ async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
         .value
         .data
         .unwrap();
+    assert_eq!(
+        saved.content, "look",
+        "modern typed image uploads must not persist a staging marker"
+    );
     let (text, files) = crate::agent::attachments::parse(&saved.content);
     assert_eq!(text.trim(), "look");
     assert_eq!(files.len(), 1);
