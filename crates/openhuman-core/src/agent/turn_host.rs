@@ -57,6 +57,9 @@ impl std::fmt::Debug for TrustedAgentTurn {
 /// The trusted, already-routed inputs for one agent turn.
 pub(crate) struct AgentTurnRequest {
     pub(crate) message: String,
+    /// Trusted typed message assembled after validating attachment refs at the
+    /// owning persistence boundary. `None` retains the normal text conversion.
+    pub(crate) message_input: Option<tinyinference_llm::message::Message>,
     pub(crate) thread_id: Option<String>,
     pub(crate) origin: AgentTurnOrigin,
     pub(crate) approval: ApprovalTurnContext,
@@ -120,15 +123,30 @@ impl AgentTurnHost {
 
         // Keep the large agent future behind a pointer while the origin scope
         // is active. The origin is explicit and independent from RPC metadata.
-        Box::pin(with_origin(
-            request.origin.clone(),
-            session.run_single_with_approval(
-                &request.message,
-                Some(request.origin),
-                request.approval,
-            ),
-        ))
-        .await
+        let origin = request.origin;
+        let message = request.message;
+        let input = request.message_input;
+        let approval = request.approval;
+        let turn = async move {
+            match input {
+                Some(input) => {
+                    session
+                        .run_single_with_approval_and_message(
+                            &message,
+                            input,
+                            Some(origin.clone()),
+                            approval,
+                        )
+                        .await
+                }
+                None => {
+                    session
+                        .run_single_with_approval(&message, Some(origin.clone()), approval)
+                        .await
+                }
+            }
+        };
+        Box::pin(with_origin(origin, turn)).await
     }
 }
 

@@ -157,12 +157,10 @@ fn threads_round_trip_through_the_backend_store() {
         .unwrap();
     assert_eq!(appended.id, "a");
     assert_eq!(store.get_messages("t").unwrap().len(), 1);
-    assert!(
-        !store
-            .search_cross_thread_messages("needle", 5, None)
-            .unwrap()
-            .is_empty()
-    );
+    assert!(!store
+        .search_cross_thread_messages("needle", 5, None)
+        .unwrap()
+        .is_empty());
     assert!(store.delete_thread("t", "2026-01-02T00:00:00Z").unwrap());
     assert!(store.list_threads().unwrap().is_empty());
 }

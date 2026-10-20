@@ -20,7 +20,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::threads::store as conversations;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 const MIGRATION_MARKER: &str = "state/migrations/welcome_to_orchestrator_v1.done";
 const WELCOME_THREAD_LABEL: &str = "onboarding";

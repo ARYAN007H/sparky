@@ -150,31 +150,27 @@ async fn recording_an_artifact_twice_writes_one_row() {
     let ws = temp_ws();
     seed_thread(&ws, "t-1");
 
-    assert!(
-        record_artifact_row(
-            &DispatchCtx::unbound(),
-            ws.clone(),
-            "t-1",
-            "a",
-            "A",
-            Some("req-1")
-        )
-        .await
-        .unwrap()
-    );
+    assert!(record_artifact_row(
+        &DispatchCtx::unbound(),
+        ws.clone(),
+        "t-1",
+        "a",
+        "A",
+        Some("req-1")
+    )
+    .await
+    .unwrap());
     // A new version, a retry or a re-delivered ready event.
-    assert!(
-        !record_artifact_row(
-            &DispatchCtx::unbound(),
-            ws.clone(),
-            "t-1",
-            "a",
-            "A v2",
-            Some("req-2")
-        )
-        .await
-        .unwrap()
-    );
+    assert!(!record_artifact_row(
+        &DispatchCtx::unbound(),
+        ws.clone(),
+        "t-1",
+        "a",
+        "A v2",
+        Some("req-2")
+    )
+    .await
+    .unwrap());
 
     let rows: Vec<_> =
         conversations::blocking::get_messages_with_artifact_rows(DispatchCtx::unbound(), ws, "t-1")

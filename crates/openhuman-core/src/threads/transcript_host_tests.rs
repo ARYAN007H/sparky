@@ -10,10 +10,10 @@ use std::sync::Arc;
 
 use crate::agent::session_store::splice_fixture::memory_locator;
 use tempfile::TempDir;
-use tinyagents_session::transcript::TranscriptMessage;
 use tinyagents_session::transcript::view::{
-    DisplayItem, ToolCallStatus, project_records, project_thread_in,
+    project_records, project_thread_in, DisplayItem, ToolCallStatus,
 };
+use tinyagents_session::transcript::TranscriptMessage;
 use tinyagents_session::transcript::{self, TranscriptLocator};
 
 /// A thread's display records, read back through the store port.
