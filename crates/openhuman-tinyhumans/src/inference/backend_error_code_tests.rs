@@ -1,5 +1,31 @@
 use super::*;
 
+fn extract_backend_error_code(err: &str) -> Option<BackendErrorCode> {
+    extract_backend_error_code_token(err).and_then(|token| BackendErrorCode::from_token(&token))
+}
+
+fn is_backend_malformed_bad_request(err: &str) -> bool {
+    let classification = classify(Some(PROVIDER_LABEL), err);
+    classification.kind == Some(BackendErrorKind::BadRequest)
+        && classification.malformed_bad_request
+}
+
+fn is_backend_client_guard_leak(err: &str) -> bool {
+    matches!(
+        classify(Some(PROVIDER_LABEL), err).kind,
+        Some(BackendErrorKind::PayloadTooLarge | BackendErrorKind::ContextLengthExceeded)
+    )
+}
+
+fn backend_error_code_skips_sentry(err: &str) -> bool {
+    let classification = classify(None, err);
+    classification.backend_owned && !classification.reportable
+}
+
+fn managed_error_skips_sentry(err: &str) -> bool {
+    backend_error_code_skips_sentry(err)
+}
+
 #[test]
 fn extracts_known_tokens() {
     let body = r#"OpenHuman API error (429 Too Many Requests): {"error":{"message":"slow down","errorCode":"RATE_LIMITED","retryAfter":30}}"#;
@@ -11,6 +37,34 @@ fn extracts_known_tokens() {
         extract_backend_error_code(body),
         Some(BackendErrorCode::RateLimited)
     );
+}
+
+#[test]
+fn every_known_wire_token_maps_to_its_provider_neutral_kind() {
+    for (token, kind) in [
+        ("RATE_LIMITED", BackendErrorKind::RateLimited),
+        (
+            "USER_INSUFFICIENT_CREDITS",
+            BackendErrorKind::InsufficientCredits,
+        ),
+        (
+            "UPSTREAM_UNAVAILABLE",
+            BackendErrorKind::UpstreamUnavailable,
+        ),
+        ("MODEL_UNAVAILABLE", BackendErrorKind::ModelUnavailable),
+        ("PAYLOAD_TOO_LARGE", BackendErrorKind::PayloadTooLarge),
+        (
+            "CONTEXT_LENGTH_EXCEEDED",
+            BackendErrorKind::ContextLengthExceeded,
+        ),
+        ("BAD_REQUEST", BackendErrorKind::BadRequest),
+        ("INTERNAL_ERROR", BackendErrorKind::Internal),
+    ] {
+        let wire = format!(r#"OpenHuman API error: {{"errorCode":"{token}"}}"#);
+        let classification = classify(Some(PROVIDER_LABEL), &wire);
+        assert_eq!(classification.token.as_deref(), Some(token), "{token}");
+        assert_eq!(classification.kind, Some(kind), "{token}");
+    }
 }
 
 #[test]
