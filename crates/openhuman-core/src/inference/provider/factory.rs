@@ -1,29 +1,5 @@
-//! Unified chat-provider factory.
-//!
-//! Resolves workload names (e.g. `"reasoning"`, `"summarization"`) to a
-//! crate-native `ChatModel` plus the concrete model id selected for a workload.
-//!
-//! ## Provider-string grammar
-//!
-//! ```text
-//! "openhuman"                    → the registered managed chat model; model = config.default_model
-//! "cloud" / missing              → primary_cloud; legacy custom inference_url wins when
-//!                                  primary still points at OpenHuman after migration
-//! "ollama:<model>[@<temp>]"      → local Ollama at config.local_ai.base_url
-//! "lmstudio:<model>[@<temp>]"    → local LM Studio
-//! "mlx:<model>[@<temp>]"         → local MLX-compatible server
-//! "local-openai:<model>[@<temp>]"→ generic local OpenAI-compatible
-//! "<slug>:<model>[@<temp>]"      → cloud_providers entry keyed by slug;
-//!                                  builds the crate-native OpenAI client (Bearer) or
-//!                                  Anthropic flavour depending on auth_style.
-//! ```
-//!
-//! The optional `@<temp>` suffix pins a per-workload temperature override on
-//! the built provider. The model id sent upstream never includes the suffix.
-//!
-//! Unknown slugs and missing-creds configurations produce actionable errors.
-//!
-//! ## Module layout
+//! Host adapter for provider construction and access policy. Provider route
+//! grammar and route-kind classification live in TinyInference.
 //!
 //! - [`routing`] — role → configured provider string resolution.
 //! - [`primary_cloud`] — `primary_cloud` / legacy `inference_url` resolution.
@@ -134,16 +110,6 @@ use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
 pub const PROVIDER_OPENHUMAN: &str = "openhuman";
 /// Provider id used for the managed OpenHuman inference backend.
 pub const INFERENCE_BACKEND_ID: &str = PROVIDER_OPENHUMAN;
-/// Prefix for Ollama-local providers: `"ollama:<model>"`.
-pub const OLLAMA_PROVIDER_PREFIX: &str = "ollama:";
-/// Prefix for LM Studio-local providers: `"lmstudio:<model>"`.
-pub const LM_STUDIO_PROVIDER_PREFIX: &str = "lmstudio:";
-/// Prefix for MLX-compatible local providers: `"mlx:<model>"`.
-pub const MLX_PROVIDER_PREFIX: &str = "mlx:";
-/// Prefix for OMLX local providers: `"omlx:<model>"`.
-pub const OMLX_PROVIDER_PREFIX: &str = "omlx:";
-/// Prefix for generic local OpenAI-compatible providers: `"local-openai:<model>"`.
-pub const LOCAL_OPENAI_PROVIDER_PREFIX: &str = "local-openai:";
 /// Prefix for the Claude Agent SDK subprocess provider: `"claude_agent_sdk:<model>"`.
 pub const CLAUDE_AGENT_SDK_PREFIX: &str = "claude_agent_sdk:";
 /// Sentinel for the Claude Agent SDK provider without a model suffix.
