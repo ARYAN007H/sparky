@@ -130,7 +130,14 @@ export default async function queuedImageAttachmentRoundtrip({
   if (!threadId) throw new Error("new chat thread was not selected");
 
   await composer.fill("Hold this turn while I queue an image.");
-  await page.getByTestId("send-message-button").click();
+  await page.waitForTimeout(250);
+  const firstSend = page.getByTestId("send-message-button");
+  if (!(await firstSend.count())) {
+    const value = await composer.inputValue().catch(() => "<not an input>");
+    await page.screenshot({ path: join(logDir, "queued-first-send-missing.png") });
+    throw new Error(`first send button missing after fill (draft=${JSON.stringify(value)})`);
+  }
+  await firstSend.click();
   await waitUntil(
     () =>
       mock
