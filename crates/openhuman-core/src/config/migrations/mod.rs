@@ -26,7 +26,6 @@ use crate::config::Config;
 mod enable_session_shadow_reads;
 mod expand_autonomy_defaults;
 mod migrate_legacy_embedding_provider;
-mod normalize_default_model_tier;
 mod phase_out_profile_md;
 mod reconcile_orphaned_providers;
 mod remove_write_auto_approve;
@@ -34,7 +33,6 @@ mod repair_http_request_limits;
 mod retire_chat_v1_model;
 pub(crate) mod retire_cloud_provider_type;
 mod retire_local_whisper_stt;
-mod retire_managed_tier_slugs;
 mod unify_ai_provider_settings;
 
 /// Current target schema version. Bumped alongside every new migration.
