@@ -999,10 +999,25 @@ function isStartedChatAck(value: unknown): value is StartedChatAck {
   return (
     isRecord(value) &&
     value.accepted === true &&
+    value.queued !== true &&
     typeof value.client_id === 'string' &&
+    value.client_id.length > 0 &&
     typeof value.thread_id === 'string' &&
-    typeof value.request_id === 'string'
+    value.thread_id.length > 0 &&
+    typeof value.request_id === 'string' &&
+    value.request_id.length > 0
   );
+}
+
+function unwrapChatAck(value: unknown): unknown {
+  for (let depth = 0; depth < 4 && isRecord(value); depth += 1) {
+    if (Object.hasOwn(value, 'error')) {
+      throw new Error('Core returned an error while accepting the chat message');
+    }
+    if (!Object.hasOwn(value, 'result') && !Object.hasOwn(value, 'data')) break;
+    value = Object.hasOwn(value, 'result') ? value.result : value.data;
+  }
+  return value;
 }
 
 export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendAck> {
@@ -1012,7 +1027,7 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
     throw new Error('Socket not connected — no client ID for event routing');
   }
 
-  const result = await callCoreRpc({
+  const response = await callCoreRpc({
     method: 'openhuman.channel_web_chat',
     params: {
       client_id: clientId,
@@ -1029,22 +1044,26 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
       reasoning_effort: params.reasoningEffort ?? undefined,
     },
   });
+  const result = unwrapChatAck(response);
 
   // Keep accepting the legacy scalar while consuming the authoritative started
   // and queued acknowledgement shapes returned by current cores.
   if (typeof result === 'string') {
     return { requestId: result, queuedAttachments: [] };
   }
-  if (isStartedChatAck(result)) {
-    return { requestId: result.request_id, queuedAttachments: [] };
-  }
   if (result == null) {
     return { queuedAttachments: [] };
   }
-  if (!isQueuedChatAck(result)) {
+  if (isQueuedChatAck(result)) {
+    return { requestId: result.request_id, queuedAttachments: result.queued_attachments };
+  }
+  if (isStartedChatAck(result)) {
+    return { requestId: result.request_id, queuedAttachments: [] };
+  }
+  if (typeof result !== 'string') {
     throw new Error('Core returned an invalid chat queue acknowledgement');
   }
-  return { requestId: result.request_id, queuedAttachments: result.queued_attachments };
+  return { requestId: result, queuedAttachments: [] };
 }
 
 export async function chatSend(params: ChatSendParams): Promise<string | undefined> {
