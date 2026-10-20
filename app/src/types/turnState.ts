@@ -1,7 +1,7 @@
 /** TypeScript aliases generated from the persisted Rust session record schemas. */
 import type { ThreadWireTypes } from './threadWire.generated';
 
-export type PersistedTurnState = ThreadWireTypes['getTurnState']['state'];
+export type PersistedTurnState = NonNullable<ThreadWireTypes['getTurnState']['turnState']>;
 export type PersistedTurnLifecycle = PersistedTurnState['lifecycle'];
 export type PersistedTurnPhase = NonNullable<PersistedTurnState['phase']>;
 export type PersistedToolTimelineEntry = PersistedTurnState['toolTimeline'][number];
