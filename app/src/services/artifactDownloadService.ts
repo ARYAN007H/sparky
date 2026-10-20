@@ -123,6 +123,7 @@ function listedArtifactKind(raw: string | undefined): ListedArtifactKind | null 
     case 'presentation':
     case 'document':
     case 'image':
+    case 'video':
     case 'other':
       return raw;
     default:
