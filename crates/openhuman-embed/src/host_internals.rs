@@ -204,13 +204,6 @@ pub mod inference {
     }
 }
 
-/// tinyhumans: the team ops budget gate.
-pub mod integrations {
-    pub mod client {
-        pub use openhuman_core::integrations::client::budget_gate;
-    }
-}
-
 /// Native memory bearer types used by hosted backend transport adapters.
 pub mod memory {
     pub use openhuman_core::memory::engine::{BearerSource, CallbackBearerSource, MemoryError};
