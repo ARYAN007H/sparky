@@ -1,5 +1,6 @@
 use super::*;
-use tinyinference_llm::model::ChatModel;
+use tinyinference_llm::model::{ChatModel, ModelRequest};
+use tinyinference_llm::message::Message;
 
 #[test]
 fn managed_model_preserves_the_openhuman_response_cache_identity() {
@@ -81,4 +82,83 @@ fn managed_bearer_keeps_the_stored_key_transport_guard() {
         .resolve_bearer("https://api.example.test/openai/v1")
         .expect_err("a foreign HTTPS origin must not receive the stored key");
     assert!(error.to_string().contains("unmanaged or insecure"));
+}
+
+async fn unauthorized_chat_response() -> axum::response::Response {
+    use axum::response::IntoResponse;
+    (
+        axum::http::StatusCode::UNAUTHORIZED,
+        axum::Json(serde_json::json!({
+            "error": { "message": "HOST_AUTH_CALLBACK_MARKER" }
+        })),
+    )
+        .into_response()
+}
+
+#[tokio::test]
+async fn owner_typed_managed_auth_callback_publishes_session_expiry() {
+    use openhuman_embed::__host::core::events::DomainEvent;
+
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("initialize event bus");
+    let mut events = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .expect("event bus initialized")
+        .receiver();
+    let tmp = tempfile::TempDir::new().expect("temporary credentials");
+    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+        tmp.path(),
+        false,
+        "test-managed-key",
+    )
+    .expect("store test API key");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind fixture server");
+    let addr = listener.local_addr().expect("fixture address");
+    let app = axum::Router::new().route(
+        "/openai/v1/chat/completions",
+        axum::routing::post(unauthorized_chat_response),
+    );
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let options = ManagedOptions {
+        openhuman_dir: Some(tmp.path().to_path_buf()),
+        secrets_encrypt: false,
+        ..ManagedOptions::default()
+    };
+    let model = build_chat_model(
+        Some(&format!("http://{addr}")),
+        &options,
+        "reasoning-v1",
+        true,
+        None,
+        true,
+    )
+    .expect("build owner model");
+
+    assert!(model
+        .invoke(&(), ModelRequest::new(vec![Message::user("ping")]))
+        .await
+        .is_err());
+    server.abort();
+
+    let mut source = None;
+    loop {
+        match events.try_recv() {
+            Ok(DomainEvent::SessionExpired { source: value, reason })
+                if reason.contains("HOST_AUTH_CALLBACK_MARKER") =>
+            {
+                source = Some(value);
+                break;
+            }
+            Ok(_) | Err(tinybus::TryRecvError::Lagged(_)) => continue,
+            Err(_) => break,
+        }
+    }
+    assert_eq!(
+        source.as_deref(),
+        Some("openhuman_backend_model.invoke(401)"),
+        "the owner's explicit managed-auth callback must preserve invoke attribution"
+    );
 }
