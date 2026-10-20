@@ -416,7 +416,12 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
   ]) {
     const f = sourceParityFixture();
     try {
-      const proof = { ...f.parity, ...overrides.proof };
+      const proof = {
+        ...f.parity,
+        ...overrides.proof,
+        testFile: { ...f.parity.testFile, ...overrides.proof?.testFile },
+        binding: { ...f.parity.binding, ...overrides.proof?.binding },
+      };
       const result = validate(f, { ...overrides, proof });
       assert.match(result.message, diagnostic, `${name} mutant failed for the wrong reason: ${result.message}`);
     } finally {
