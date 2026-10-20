@@ -235,7 +235,6 @@ pub(crate) async fn deliver_to_origin(
             channel,
             reply_target,
             channel_session,
-            thread_id,
             ..
         } => {
             let identity = channel_session
@@ -247,8 +246,8 @@ pub(crate) async fn deliver_to_origin(
             let text = strip_openhuman_link_markup(text);
             channel_bridge::send_to_channel(
                 channel,
+                identity,
                 reply_target,
-                thread_id.as_deref(),
                 &text,
                 &origin_request_id(&job.id, run_id),
             )

@@ -80,12 +80,12 @@ pub async fn send_to_channel(
     .map_err(|_| "channel progressive output could not be opened".to_string())?;
     match reply.finish(text).await {
         Ok(result) if crate::channels::runtime::dispatch::delivery_succeeded(&result) => Ok(()),
-        Ok(ProgressiveResult::DeliveryBatch { .. }
-        | ProgressiveResult::DeliveryOutcome { .. }
-        | ProgressiveResult::DeliveryOutcomes { .. }
-        | ProgressiveResult::DeliveryUnsupported { .. }) => {
-            Err("channel provider did not confirm complete delivery".into())
-        }
+        Ok(
+            ProgressiveResult::DeliveryBatch { .. }
+            | ProgressiveResult::DeliveryOutcome { .. }
+            | ProgressiveResult::DeliveryOutcomes { .. }
+            | ProgressiveResult::DeliveryUnsupported { .. },
+        ) => Err("channel provider did not confirm complete delivery".into()),
         Ok(_) => Err("channel provider returned an invalid delivery result".into()),
         Err(_) => Err("channel progressive delivery failed".into()),
     }

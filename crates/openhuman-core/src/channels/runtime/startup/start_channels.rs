@@ -252,9 +252,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
         .map_err(|_| anyhow::anyhow!("channel callback context was already initialized"))?;
     // Cron channel context and replies use the durable agent transcript; this
     // bridge retains only the live channel transport adapters.
-    crate::cron::channel_bridge::register_channel_bridge(Arc::clone(
-        &runtime_ctx.module_objects,
-    ));
+    crate::cron::channel_bridge::register_channel_bridge(Arc::clone(&runtime_ctx.module_objects));
 
     let startup = module_runtime
         .as_mut()
