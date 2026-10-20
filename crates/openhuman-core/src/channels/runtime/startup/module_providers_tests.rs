@@ -467,7 +467,7 @@ async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_te
 
     let mut projected = None;
     let mut gateway_terminal = None;
-    tokio::time::timeout(Duration::from_secs(5), async {
+    let both_events = tokio::time::timeout(Duration::from_secs(5), async {
         while projected.is_none() || gateway_terminal.is_none() {
             let event = web_events.recv().await.expect("web event bus");
             if event.context().request_id != request_id {
@@ -482,8 +482,14 @@ async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_te
             }
         }
     })
-    .await
-    .expect("projected renderer event and SaaS gateway terminal both arrive");
+    .await;
+    if both_events.is_err() {
+        assert!(
+            gateway_terminal.is_some(),
+            "the scoped provider terminal should still arrive independently"
+        );
+        panic!("provider terminal arrived, but the web projector did not emit chat_done");
+    }
 
     let projected = projected.expect("canonical projector output");
     let projected_wire = serde_json::to_value(&projected).expect("web renderer wire");
