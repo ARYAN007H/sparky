@@ -186,14 +186,14 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
 
         let dispatch = DispatchCtx::new(context_a);
         let mut config = Config::default();
-        config.chat_provider = Some("p_hosted:chat-v1".to_string());
+        config.chat_provider = Some("p_hosted:fixture/model-v1".to_string());
         config.cloud_providers.push(CloudProviderCreds {
             id: "p_hosted_fixture".to_string(),
             slug: "p_hosted".to_string(),
             label: "Hosted fixture".to_string(),
             endpoint: "https://hosted.example.test/v1".to_string(),
             auth_style: AuthStyle::OpenhumanJwt,
-            default_model: Some("chat-v1".to_string()),
+            default_model: Some("fixture/model-v1".to_string()),
         });
 
         let observed = CoreContext::scope(context_b, async {
@@ -214,7 +214,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             let string_turn = create_turn_chat_model_from_string_with_native_tools_and_route(
                 &dispatch,
                 "chat",
-                "p_hosted:chat-v1",
+                "p_hosted:fixture/model-v1",
                 &config,
                 "hint:chat",
                 0.0,
