@@ -567,8 +567,9 @@ async fn run_typed_mode(
         subagent_prompt_protocol(parent.tool_call_format, &filtered_specs);
     // Load AGENTS.md instruction layers once, at prompt-build time, when the
     // config gate is on. The global layer comes from the workspace dir; the
-    // project layer comes from the global config `action_dir`. Loading here
-    // (not per turn) keeps the sub-agent system
+    // project layer prefers an explicitly inherited workspace root and falls
+    // back to the global config `action_dir`. Loading here (not per turn) keeps
+    // the sub-agent system
     // prompt byte-stable for prefix caching.
     let agents_md = if parent.agent_config.agents_md_enabled {
         let local_dir = options
