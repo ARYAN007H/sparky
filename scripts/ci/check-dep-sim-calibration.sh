@@ -134,7 +134,10 @@ cd "$(dirname "$0")/../.."
 # 309 -> 311 on 2026-10-19: `tinyagents-hooks` and `tinystoragedrivers-schema`
 # are split out of tinyagents-harness and tinystoragedrivers-core; see the
 # 334/311/3 entry in `kernel-floor.limits`.
+# 311 -> 315 on 2026-10-20: tinymemory 2.0.0 makes `async-lock`,
+# `event-listener` and `event-listener-strategy` unconditional; see the
+# 338/315/3 entry in `kernel-floor.limits`.
 # See kernel-floor.limits.
-EXPECTED_NAMES=311
+EXPECTED_NAMES=315
 
 exec python3 scripts/dep-sim.py --cut-nothing --expect-names "${EXPECTED_NAMES}"
