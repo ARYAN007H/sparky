@@ -46,6 +46,7 @@ pub mod schema_support;
 pub mod scope;
 pub mod scope_move;
 pub mod secrets;
+pub mod sessions;
 pub mod state_kv;
 
 pub use scope::{scope_for_agent, scope_for_module, scope_for_profile, tenant_scope};
@@ -321,12 +322,23 @@ pub fn driver_is_shared(driver: &str) -> bool {
     driver == "mongodb"
 }
 
-/// Whether a backend with this driver name makes a compare-and-swap
+/// Whether an opened backend makes a compare-and-swap
 /// (`Precondition::Version` / `Absent`) atomic across processes, which a
-/// [`lease::DocumentLeases`] needs to exclude other nodes. MongoDB and SQLite
-/// do (a database-side conditional write; SQLite's immediate transaction
-/// under the file lock); the memory driver lives in one process, and the
-/// file driver checks versions in-process only.
+/// [`lease::DocumentLeases`] needs to exclude other nodes. The driver says so
+/// itself with [`tinystoragedrivers::Capability::SharedAcrossProcesses`], and
+/// tinystoragedrivers' `conformance::run_shared` proves the claim per driver.
+pub fn backend_has_cross_process_cas(backend: &dyn StorageBackend) -> bool {
+    backend
+        .capabilities()
+        .contains(tinystoragedrivers::Capability::SharedAcrossProcesses)
+}
+
+/// The same answer from a driver name alone, for the boot guard, which judges
+/// a configured URL before anything is opened (so it has no backend to ask).
+/// It must agree with [`backend_has_cross_process_cas`]: MongoDB and SQLite
+/// claim `SharedAcrossProcesses`; the memory driver lives in one process and
+/// the file driver checks versions in-process only. A test opens a real
+/// backend per driver and pins the two together.
 pub fn driver_has_cross_process_cas(driver: &str) -> bool {
     matches!(driver, "mongodb" | "sqlite")
 }

@@ -158,7 +158,7 @@ impl FlowsHost {
                         .value)
                 }
                 PortOperation::AgentsList => {
-                    let agents = crate::agent::registry::list_agents(&context, false)
+                    let agents = crate::agent_registry::list_agents(&context, false)
                         .await
                         .map_err(|error| error.to_string())?;
                     wire!(agents
@@ -247,18 +247,23 @@ impl FlowsHost {
     async fn preflight_tool(&self, slug: String, args: Value) -> Result<Value, String> {
         let config = Arc::clone(&self.config);
         self.in_context(async move {
-            if let Some(backend) = crate::flows::tinyflows::caps::tools::backend_for(&slug) {
-                backend
-                    .preflight(&config, &slug, &args)
-                    .await
-                    .map_err(|error| error.to_string())?;
-            }
+            preflight_mock_tool(&config, &slug, &args).await?;
             // The module discards this acknowledgement and returns only its
             // deterministic MockTools result. Never invoke the real backend.
             Ok(Value::Null)
         })
         .await
     }
+}
+
+async fn preflight_mock_tool(config: &Config, slug: &str, args: &Value) -> Result<(), String> {
+    if let Some(backend) = crate::flows::caps_host::tools::backend_for(slug) {
+        backend
+            .preflight(config, slug, args)
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 fn required<T: DeserializeOwned>(value: &Value, key: &str) -> Result<T, String> {
@@ -354,5 +359,9 @@ pub(crate) async fn register(
         },
     })
 }
+
+#[cfg(test)]
+#[path = "builder_host_tests.rs"]
+mod tests;
 
 use super::ops;

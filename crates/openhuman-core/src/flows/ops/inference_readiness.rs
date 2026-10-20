@@ -8,7 +8,10 @@ pub(super) struct InferenceReadinessEvaluation {
 
 /// Resolve the effective inference workload for an agent node. This remains
 /// beside the graph adapter because it depends on TinyFlows node configuration.
-pub(super) fn agent_node_role(config: &Config, node: &tinyflows::model::Node) -> &'static str {
+pub(super) async fn agent_node_role(
+    config: &Config,
+    node: &tinyflows::model::Node,
+) -> &'static str {
     if let Some(agent_ref) = node
         .config
         .get("agent_ref")
@@ -16,22 +19,45 @@ pub(super) fn agent_node_role(config: &Config, node: &tinyflows::model::Node) ->
         .map(str::trim)
         .filter(|s| !s.is_empty() && !s.starts_with('='))
     {
-        use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+        use crate::agent_registry::host_definition::AgentDefinitionRegistry;
         if let Err(error) = AgentDefinitionRegistry::init_global(&config.workspace_dir) {
             tracing::debug!(target: "flows", %error,
                 "[flows] readiness: agent definition registry unavailable; using registry fallback");
         }
         let definition = AgentDefinitionRegistry::current().and_then(|r| r.get(agent_ref).cloned());
-        let custom = crate::agent::registry::find_custom_in_config(config, agent_ref);
+        let custom = crate::agent_registry::find_custom_in_config(config, agent_ref);
         if definition.is_some() || custom.is_some() {
             let entry_model = if definition.is_some() {
                 None
             } else {
                 custom.as_ref().and_then(|entry| entry.model.as_deref())
             };
-            let override_model =
-                crate::flows::tinyflows::caps::resolve_node_model(&node.config, entry_model)
-                    .map(|model| crate::flows::agent_route::harness_model_default_override(&model));
+            let effective_iteration_cap = definition
+                .as_ref()
+                .map(|definition| u32::try_from(definition.max_iterations).unwrap_or(u32::MAX))
+                .unwrap_or(1);
+            let override_model = match crate::modules::tinyflows::portability_proxy(config).await {
+                Ok(proxy) => proxy
+                    .call::<tinyflows_bus::portability::PreparedAgentRun>(
+                        tinyflows_bus::portability::methods::PREPARE_AGENT_RUN,
+                        &(tinyflows_bus::portability::PrepareAgentRun {
+                            request: node.config.clone(),
+                            entry_model: entry_model.map(str::to_owned),
+                            system_prompt: None,
+                            effective_iteration_cap,
+                        },),
+                    )
+                    .await
+                    .map(|prepared| prepared.model)
+                    .map_err(|error| error.to_string()),
+                Err(error) => Err(error),
+            }
+            .unwrap_or_else(|error| {
+                tracing::debug!(target: "flows", %error,
+                    "[flows] readiness: module model preparation unavailable");
+                None
+            })
+            .map(|model| crate::flows::agent_route::harness_model_default_override(&model));
             return crate::agent::session_host::provider_role_for_definition(
                 override_model
                     .as_deref()
@@ -115,12 +141,14 @@ pub(super) async fn evaluate_inference_readiness(
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Option<InferenceReadinessEvaluation> {
-    let roles: Vec<_> = graph
+    let mut roles = Vec::new();
+    for node in graph
         .nodes
         .iter()
         .filter(|node| node.kind == NodeKind::Agent)
-        .map(|node| (node.id.clone(), agent_node_role(config, node)))
-        .collect();
+    {
+        roles.push((node.id.clone(), agent_node_role(config, node).await));
+    }
     let evaluation = crate::inference::readiness::evaluate(ctx, config, &roles).await?;
     let message = format_evaluation(&evaluation);
     let node_id = match evaluation.failures.as_slice() {

@@ -178,57 +178,56 @@ fn the_flows_record_serves_the_schedule_object() {
     assert_eq!(component_for("tinyflows"), Some("tinyflows"));
 }
 
-/// The pins are the published v0.8.26 `checksum.toml` (the first release with
-/// schedule contract v6 and Copilot prompt resources).
+/// The pins are copied from the published v0.8.28 `checksum.toml`.
 #[test]
 fn the_flows_record_pins_every_host_of_one_release() {
     let record = find("tinyflows").unwrap();
-    assert_eq!(record.version, "0.8.26");
+    assert_eq!(record.version, "0.8.28");
     assert_eq!(record.assets.len(), 11);
     let expected = [
         (
-            "tinyflows-module-0.8.26-macos-26-arm64.tar.gz",
-            "7580d7ca414b1a1cb5d950cb02ca274bad3028bfcd6193a0bf1101f36e8e3f0c",
+            "tinyflows-module-0.8.28-macos-26-arm64.tar.gz",
+            "387b2fdf527b087700cc7b68fee2866fe5590a34f5041819793b5b05caf97e90",
         ),
         (
-            "tinyflows-module-0.8.26-macos-26-x86_64.tar.gz",
-            "92ed4344f3838f35a030caf88407886127c0293529d06640b124c3e708f8998a",
+            "tinyflows-module-0.8.28-macos-26-x86_64.tar.gz",
+            "fdcba79686d466ec2d163ab23ed0a56e148884c360b66a074c0dbb918decb6a3",
         ),
         (
-            "tinyflows-module-0.8.26-macos-15-arm64.tar.gz",
-            "2aae71e0d241d0cf39e219b96b10ddacc24b3c5c9e88d32acaf8dccc221c3da3",
+            "tinyflows-module-0.8.28-macos-15-arm64.tar.gz",
+            "923d720d622a535e6cd547ffda1c6f73cc70b7b1c13681a374633d81f51069eb",
         ),
         (
-            "tinyflows-module-0.8.26-macos-15-x86_64.tar.gz",
-            "3c5fcc9302ee1a11334eb9aead916a607fc7a01d9aa067545c0c41bf118e58db",
+            "tinyflows-module-0.8.28-macos-15-x86_64.tar.gz",
+            "d2f34c52863cb1d3a78256f59fa9e54e26af62b39540f24f072c89e18de6ae65",
         ),
         (
-            "tinyflows-module-0.8.26-ubuntu-24.04-x86_64.tar.gz",
-            "4f5030fba094e81e909ad342b6a31abf55ae0615c0b894c4c71f1d712fa2981c",
+            "tinyflows-module-0.8.28-ubuntu-24.04-x86_64.tar.gz",
+            "c3224ba59b7683cf2459a1e1e8946b5ad2c6200d729c96bfd9c084450c6cd65d",
         ),
         (
-            "tinyflows-module-0.8.26-ubuntu-24.04-arm64.tar.gz",
-            "442963394c17e5c43e02b3e57558b2549c752048eef36a616b03119b84cc556e",
+            "tinyflows-module-0.8.28-ubuntu-24.04-arm64.tar.gz",
+            "2306e7fda0f1edb75e90b79bd645ec1806f04d004b5ec615c83f67789c8a3655",
         ),
         (
-            "tinyflows-module-0.8.26-ubuntu-22.04-x86_64.tar.gz",
-            "e86eda1b9d37d9733f265821ff0d7e89e276991ce7cae2838d6c7a273d15631f",
+            "tinyflows-module-0.8.28-ubuntu-22.04-x86_64.tar.gz",
+            "54bb2ac4e085cac962d368815d485df3e0050b8b475a66b58cd96a044c4de40e",
         ),
         (
-            "tinyflows-module-0.8.26-ubuntu-22.04-arm64.tar.gz",
-            "4b0deb89170ccbf22ae89d994520559c4243c24822d376d6bf92b72c01efc9d9",
+            "tinyflows-module-0.8.28-ubuntu-22.04-arm64.tar.gz",
+            "3d92636d08b549533452ac971c01edb42a02be170ea974286c215647c09f3491",
         ),
         (
-            "tinyflows-module-0.8.26-windows-2025-x86_64.zip",
-            "f13088909316c00873ff87b9ee2970d35c231c946f27f3506ecdf6f7bc0b20c0",
+            "tinyflows-module-0.8.28-windows-2025-x86_64.zip",
+            "d8772f00d1dce3ff6000cee492348bdb8176660d798fa55edecf172c3d279ef0",
         ),
         (
-            "tinyflows-module-0.8.26-windows-2022-x86_64.zip",
-            "f71ba5038f4658ab4b29967eb37020376e5e5a1fc32323036a8bdd079e140b9a",
+            "tinyflows-module-0.8.28-windows-2022-x86_64.zip",
+            "e1c926be3b5f1e8d4b2d1492797df2357ddfb3d90fdeb190664fe972f9703ddf",
         ),
         (
-            "tinyflows-module-0.8.26-windows-11-arm64.zip",
-            "96c860ecce2d82537aedb2efd97c8c4fc9b023c0b370e06be8a0efe50cbef078",
+            "tinyflows-module-0.8.28-windows-11-arm64.zip",
+            "8395463124c85256009fae44e0b34c95b3a494270bbc7f8e80cc03d4f174fd9a",
         ),
     ];
     for (asset, (archive, sha256)) in record.assets.iter().zip(expected) {

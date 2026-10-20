@@ -22,8 +22,10 @@ pub mod backfill;
 pub mod billing;
 pub mod brain;
 pub mod bus;
+pub mod confine;
 pub mod deletion;
 pub mod engine;
+pub mod engine_registry;
 pub mod error;
 pub mod explore;
 pub mod guard;
@@ -42,12 +44,10 @@ pub(crate) mod tool_writes;
 pub mod tools;
 pub mod types;
 
-#[cfg(test)]
-pub(crate) mod test_fixtures;
+pub use error::{MemoryError, MemoryResult};
 
 #[cfg(test)]
-#[path = "confinement_tests.rs"]
-mod confinement_tests;
+pub(crate) mod test_fixtures;
 
 pub use bus::register_memory_subscribers;
 pub use engine::is_on as memory_is_on;

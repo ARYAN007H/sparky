@@ -2,7 +2,7 @@
 
 use crate::inference::provider::{is_raw_passthrough_model, role_for_model_tier};
 
-/// Which execution path an `agent_ref` routes to (see [`crate::flows::tinyflows::caps::OpenHumanAgentRunner`]).
+/// Which execution path an `agent_ref` routes to (see [`crate::flows::caps_host::agent::OpenHumanAgentRunner`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AgentRoute {
     /// A host-registered agent (`agent::host_agents`) — run the full agent
@@ -22,7 +22,7 @@ pub(crate) fn route_for_agent_ref(agent_ref: &str) -> AgentRoute {
     if crate::agent::host_agents::resolve(agent_ref).is_some() {
         return AgentRoute::HostAgent;
     }
-    let has_definition = crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+    let has_definition = crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
         .map(|reg| reg.get(agent_ref).is_some())
         .unwrap_or(false);
     if has_definition {
@@ -45,7 +45,8 @@ pub(crate) fn route_for_agent_ref(agent_ref: &str) -> AgentRoute {
 /// the session builder's generic `chat` role — which inherits
 /// `config.default_model` — to `make_openhuman_backend`, which forwards non-tier
 /// ids to the backend unchanged. Mirrors the per-node routing
-/// [`crate::flows::tinyflows::caps::OpenHumanLlm::complete`] applies via `agent_prompt::resolve_completion_model`.
+/// [`crate::flows::caps_host::OpenHumanLlm::complete`] applies through the
+/// TinyFlows portability contract.
 pub(crate) fn harness_model_default_override(node_model: &str) -> String {
     if is_raw_passthrough_model(node_model) {
         return node_model.to_string();
@@ -59,15 +60,19 @@ pub(crate) fn harness_model_default_override(node_model: &str) -> String {
 /// synthesizes a real `AgentDefinition` for it (issue B38/Gap 2), so it can
 /// run the full tool loop — and [`AgentRoute::RegistryFallback`] for
 /// anything else (no entry at all, or a disabled one, which
-/// [`crate::flows::tinyflows::caps::OpenHumanAgentRunner::run_via_registry_fallback`] itself rejects with a
+/// [`crate::flows::caps_host::agent::OpenHumanAgentRunner::run_via_registry_fallback`] itself rejects with a
 /// clear "is disabled" error rather than silently skipping it here). Pure
 /// over the lookup result so the decision is unit-testable without a live
 /// `Config`/registry.
 pub(crate) fn route_custom_entry_lookup(
-    entry: Option<&crate::agent::registry::AgentRegistryEntry>,
+    entry: Option<&crate::agent_registry::AgentRegistryEntry>,
 ) -> AgentRoute {
     match entry {
         Some(e) if e.enabled => AgentRoute::Harness,
         _ => AgentRoute::RegistryFallback,
     }
 }
+
+#[cfg(test)]
+#[path = "agent_route_tests.rs"]
+mod tests;

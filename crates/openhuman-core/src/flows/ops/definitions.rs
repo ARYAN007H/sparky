@@ -172,14 +172,12 @@ pub async fn flows_get(config: &Config, id: &str) -> Result<Outcome<Flow>, Strin
 }
 
 /// Loads a saved flow's portable [`WorkflowGraph`] by id, for the
-/// `sub_workflow`-by-`workflow_id` resolver capability
-/// (`tinyflows::caps::WorkflowResolver`, implemented in
-/// `crates/openhuman-core/src/flows/tinyflows/caps.rs`).
+/// `sub_workflow`-by-`workflow_id` resolver capability through the compiled
+/// TinyFlows module's Catalog contract.
 ///
 /// Returns `Ok(None)` when no flow with that id exists (the resolver turns that
 /// into a capability error naming the missing id), and `Err` only on a store
-/// failure. Kept sync (the underlying [`store::get_flow`] is sync) so the
-/// resolver can call it directly from its async method without a runtime hop.
+/// failure. Kept sync because the underlying [`store::get_flow`] is sync.
 pub fn load_flow_graph(config: &Config, id: &str) -> Result<Option<WorkflowGraph>, String> {
     tracing::debug!(target: "flows", flow_id = %id, "[flows] load_flow_graph: loading saved flow graph for sub_workflow resolver");
     let graph = store::get_flow(config, id)

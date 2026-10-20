@@ -234,15 +234,8 @@ fn approval_gated_graph_with_error_port() -> Value {
     })
 }
 
-// ── Live run observation (issue G2) ───────────────────────────────────────
-
-use crate::flows::tinyflows::observability::FlowRunObserver;
-use std::sync::Arc as StdArc;
-// `RunObserver` must be in scope to call `on_step_finish` on the observer.
-use tinyflows::observability::{ExecutionStep, RunObserver as _, StepStatus};
-
-/// trigger -> output_parser passthrough: the parser is a non-trigger node, so
-/// the engine fires `on_step_finish` for it, exercising live persistence.
+/// trigger -> output_parser passthrough for the module-owned run integration
+/// tests in `ops_run_rows_and_notifications_tests.rs`.
 fn passthrough_graph() -> Value {
     json!({
         "name": "passthrough",
@@ -438,8 +431,8 @@ fn seeded_slack_send_message_contract_with_schema() -> ToolContract {
 // degrade_completed_status (PR2 — run honesty)
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn clean_step(node_id: &str) -> FlowRunStep {
-    FlowRunStep {
+fn clean_step(node_id: &str) -> tinyflows_catalog::FlowRunStep {
+    tinyflows_catalog::FlowRunStep {
         node_id: node_id.to_string(),
         output: Value::Null,
         port: None,
@@ -608,42 +601,6 @@ fn builder_tool_result(call_id: &str, content: &str) -> tinytools_agent::dialect
     }])
 }
 
-// ── Live-run reliability: drop-guard + boot sweep + detach (bugs B41/B42) ───
-
-/// Seeds a real flow plus an already-inserted `running` `flow_runs` row, and
-/// returns `(config, flow_id, run_id)`. The `TempDir` is returned so the caller
-/// keeps the on-disk store alive for the duration of the test.
-fn seed_running_run(tmp: &TempDir) -> (Config, String, String) {
-    let config = test_config(tmp);
-    let flow = store::create_flow(
-        &config,
-        "reliability".to_string(),
-        structurally_valid_graph(trigger_only_graph()),
-        false,
-        true,
-    )
-    .unwrap();
-    let run_id = format!("flow:{}:{}", flow.id, uuid::Uuid::new_v4());
-    // Stamped well before `PROCESS_RUN_FLOOR` so this row models what the boot
-    // sweep actually targets: a `running` row left behind by a *prior* process.
-    // Using `Utc::now()` here would make the sweep tests order-dependent — the
-    // floor is a process-wide `LazyLock`, so a sibling test that ran a real
-    // flow first would push it past a "now" seed and the row would (correctly)
-    // fall out of the candidate set.
-    store::insert_flow_run(
-        &config,
-        &run_id,
-        &flow.id,
-        &run_id,
-        PRIOR_PROCESS_STARTED_AT,
-    )
-    .unwrap();
-    (config, flow.id, run_id)
-}
-
-/// A `started_at` that provably predates this process's `PROCESS_RUN_FLOOR`.
-const PRIOR_PROCESS_STARTED_AT: &str = "2020-01-01T00:00:00+00:00";
-
 #[path = "ops_support_tests.rs"]
 mod support_tests;
 use support_tests::*;
@@ -664,8 +621,10 @@ mod inference_gate_tests;
 mod migration_and_side_effect_tests;
 #[path = "ops_resume_checkpoint_tests.rs"]
 mod resume_checkpoint_tests;
-#[path = "ops_resume_race_tests.rs"]
-mod resume_race_tests;
+#[path = "ops_resume_compatibility_tests.rs"]
+mod resume_compatibility_tests;
+#[path = "ops_resume_decision_tests.rs"]
+mod resume_decision_tests;
 #[path = "ops_run_finalizer_tests.rs"]
 mod run_finalizer_tests;
 #[path = "ops_run_lifecycle_tests.rs"]

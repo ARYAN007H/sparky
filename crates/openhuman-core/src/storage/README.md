@@ -98,10 +98,12 @@ it with the core stopped.
 - `driver_is_shared(driver)` / `installed_is_shared()`: whether other
   processes may write the same backend (MongoDB). Boot-time recovery, such
   as the orphaned-run sweep, is skipped on a shared backend.
-- `driver_has_cross_process_cas(driver)`: whether a compare-and-swap on
-  that driver is atomic across processes (MongoDB, SQLite), which a
-  clustered node's leases need. Memory and file drivers coordinate only
-  within one process.
+- `backend_has_cross_process_cas(backend)`: whether the backend reports
+  `Capability::SharedAcrossProcesses` (MongoDB, SQLite), i.e. a
+  compare-and-swap atomic across processes, which a clustered node's leases
+  need. `driver_has_cross_process_cas(driver)` is the same answer from a
+  name, for the boot guard, which judges a URL before opening anything.
+  Memory and file drivers coordinate only within one process.
 - `blob_sweep`: reclaims expired blobs (`StorageBackend::sweep_expired_blobs`)
   for `local`, each known agent scope and each provisioned SaaS profile
   (`u:<id>` plus the blob-owning modules' scopes for it) every hour,
@@ -169,10 +171,10 @@ so the rules never read the wall clock:
   (`retry_after_ms`) when to retry. Epochs start at 1 and every acquisition
   except a re-entrant one (the same store instance re-acquiring the epoch it
   holds) writes `epoch + 1`.
-- `renew(grant, now_ms)` extends the grant by CAS on its record version; any
-  write since (a takeover, a release) makes it `LeaseError::Lost`.
-- `release(grant)` writes `released = true` under the same CAS and keeps the
-  record.
+- `renew(grant, now_ms)` extends the latest grant its holder was issued at
+  that epoch; a takeover, a release or a newer grant makes it
+  `LeaseError::Lost`.
+- `release(grant)` marks the record `released` and keeps it.
 - `holder(key)` returns the stored record, live or not (`is_live(now_ms)`).
 
 A grant's `previous_unclean` is set exactly when the acquisition replaced a
@@ -183,8 +185,12 @@ unique among live processes.
 
 | Store | Where | Use |
 | --- | --- | --- |
-| `DocumentLeases` | one document per key, scope `cluster`, collection `leases`; every write carries `Precondition::Absent` or `Version` | clustered nodes on a driver with cross-process CAS |
+| `DocumentLeases` | a thin adapter over tinystoragedrivers' `Leases` (`tsd.leases`, owner `profiles`, scope `cluster`); the record, CAS loop, epoch rules and fence are tsd's | clustered nodes on a driver with cross-process CAS |
 | `LocalLeases` | an exclusive `fs2` flock on `<root>/<sha256(key) hex>/.lease`, record in `.lease.json` beside it; no expiry, the OS drops the lock when the process dies | hosts without a backend |
+
+The move from the v1 `leases` collection runs once per cluster scope
+(`profiles::storage_schema::migrate_legacy_leases`) and is a stop-the-world
+cutover like the rest of schema v2: every node must run this version.
 
 Keys are 1 to 200 bytes of ASCII letters, digits and `- _ . @`, not starting
 with `.`, so they are safe as directory names and document ids. The scope
@@ -217,8 +223,8 @@ change. A scope with one runs `LeaseFence::check` first:
 
 A write the host check admits then goes to the driver through
 `StorageBackend::for_scope_fenced` with `LeaseFence::driver_fence`: the lease
-record (`cluster` scope, `leases` collection, id = the profile) must still
-match `epoch`, `owner` = this node and `released = false`. The driver checks
+record (`cluster` scope, `tsd.leases` collection, id = `Key::of(["profiles", <profile>])`)
+must still match `epoch`, `holder` = this node and no `released` field. The driver checks
 it in the same statement or transaction as the write (tinystoragedrivers
 v0.5.0, `Capability::Fencing`), so a holder paused between its check and
 its write cannot land the write after a takeover. The driver answers
@@ -288,6 +294,15 @@ without fencing).
   (`OPENHUMAN_KEYRING_MASTER_KEY` / `_FILE`, else the OS keychain); with no
   master key they fail closed. The config encryption key stays on the
   process keyring, because `config.toml` is loaded before any agent acts.
+  The layout migration (`storage/layout/credentials.rs`) imports the profile's
+  `auth-profiles.json` and `http-credentials.json` into the `local` scope's
+  secrets, verifies the read-back, archives them (`profile/` in the archive,
+  restored beside `config.toml`) and deletes them. It skips them (files stay,
+  adopted lazily) when no master key is resolvable without minting one, or
+  the file is not JSON; a stored record that does not decrypt with the current
+  key fails the migration. The shared `secrets.enc`, `keyring/master.key` and
+  `dev-keychain.json` are process-level, outside every profile's plan, and are
+  never written into `storage.db`.
 
 ## Background work and agent scopes
 

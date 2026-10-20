@@ -48,7 +48,7 @@ pub async fn flows_list_connections(
 
     // 2. Named HTTP credentials — secret-free summaries (the store never hands
     //    out secret material here; injection happens server-side in
-    //    `tinyflows::caps::OpenHumanHttp`).
+    //    `flows::caps_host::OpenHumanHttp`).
     let http_creds =
         match crate::security::credentials::HttpCredentialsStore::from_config(config).list() {
             Ok(list) => {
@@ -172,7 +172,7 @@ pub(crate) fn build_flow_connections(
     }));
     for cred in http {
         out.push(FlowConnection {
-            // Exactly the shape `tinyflows::caps::http_cred_name` parses.
+            // The `http_cred:<name>` value is the picker wire convention.
             connection_ref: format!("http_cred:{}", cred.name),
             kind: "http".to_string(),
             display: http_credential_display(&cred),
@@ -284,7 +284,10 @@ pub async fn flows_required_connections(
     config: &Config,
     graph_json: Value,
 ) -> Result<Outcome<Value>, String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph_json)?;
+    let graph: tinyflows::model::WorkflowGraph =
+        super::validation::migrate_over_bus(ctx, config, graph_json)
+            .await
+            .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))?;
     let required = compute_required_connections(ctx, config, &graph).await;
     Ok(Outcome::single_log(
         json!({ "required_connections": required }),

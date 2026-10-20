@@ -1,26 +1,8 @@
-//! The `tinyflows` capability seam: wires the `tinyflows` workflow engine
-//! (an external, host-agnostic crate — validate → compile → run on its own
-//! in-crate state-graph runtime) to real OpenHuman services.
+//! TinyFlows' framework-neutral graph vocabulary used by OpenHuman's
+//! authoring and validation adapters.
 //!
-//! This module is export-focused. Every capability adapter except `memory`,
-//! plus the two run entry points — [`build_capabilities`] and
-//! [`open_flow_checkpointer`], re-exported below — live in [`caps`]; the
-//! `memory` node's `MemoryProvider` adapter (`OpenHumanMemory`) lives in its
-//! own [`memory_adapter`] module, per this repo's ~500-line file-size
-//! convention (`caps/` is already large); the durable SQLite checkpoint
-//! backend lives in `tinyflows_sqlite::checkpoint`; run observability logging lives
-//! in [`observability`]. The `flows::` domain
-//! (`crates/openhuman-core/src/flows/ops.rs`) calls [`build_capabilities`] /
-//! [`open_flow_checkpointer`] to drive a run and adapts engine observations
-//! for the agent-owned progress tracing exporter after it settles.
+//! Execution, capabilities, persistence, checkpoints, and run observation are
+//! served through the TinyBus module contract. This module re-exports only the
+//! generic graph model and legacy graph migration needed by host-facing APIs.
 
-pub mod caps;
-pub mod memory_adapter;
-pub mod observability;
-pub mod state;
-#[cfg(test)]
-#[path = "tinyflows_tests.rs"]
-mod tests;
-
-pub use caps::{build_capabilities, open_flow_checkpointer};
-pub use memory_adapter::OpenHumanMemory;
+pub use ::tinyflows::{migrate, model};

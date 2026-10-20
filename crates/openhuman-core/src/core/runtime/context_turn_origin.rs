@@ -43,8 +43,9 @@ impl CoreContext {
             autonomy_tier_ceiling: None,
             components: Default::default(),
             embedder_config: None,
+            latest_embedder_config: None,
             user_skill_roots: true,
-            backend_transport: None,
+            extensions: Default::default(),
             turn_origin: None,
             channel_thread: None,
             session_agent: None,
@@ -55,13 +56,13 @@ impl CoreContext {
     }
 
     /// The turn origin bound to this context, if its entry point supplied one.
-    pub(crate) fn turn_origin(&self) -> Option<&crate::agent::turn_origin::AgentTurnOrigin> {
+    pub(crate) fn turn_origin(&self) -> Option<&crate::security::turn_origin::AgentTurnOrigin> {
         self.turn_origin.as_ref()
     }
 
     /// Typed origin bound to this immutable per-turn context, if supplied by
     /// its entrypoint. Missing authority retains library/CLI behavior.
-    pub fn current_turn_origin() -> Option<crate::agent::turn_origin::AgentTurnOrigin> {
+    pub fn current_turn_origin() -> Option<crate::security::turn_origin::AgentTurnOrigin> {
         Self::scoped_for_turn()
             .or_else(|| DEFAULT_CONTEXT.get().cloned())
             .and_then(|ctx| ctx.turn_origin.clone())
@@ -72,7 +73,7 @@ impl CoreContext {
     /// untouched.
     pub async fn scope_with_turn_origin<F: Future>(
         ctx: Arc<CoreContext>,
-        origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+        origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
         fut: F,
     ) -> F::Output {
         CURRENT_CONTEXT
@@ -90,7 +91,7 @@ impl CoreContext {
     pub(crate) fn derive_channel_turn(
         &self,
         thread: Option<String>,
-        origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+        origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
     ) -> Arc<CoreContext> {
         let ctx = self;
         Arc::new(CoreContext {
@@ -107,8 +108,9 @@ impl CoreContext {
             autonomy_tier_ceiling: ctx.autonomy_tier_ceiling,
             components: ctx.components,
             embedder_config: ctx.embedder_config.clone(),
+            latest_embedder_config: ctx.latest_embedder_config.as_ref().map(Arc::clone),
             user_skill_roots: ctx.user_skill_roots,
-            backend_transport: ctx.backend_transport.clone(),
+            extensions: ctx.extensions.clone(),
             turn_origin: origin.or_else(|| ctx.turn_origin.clone()),
             channel_thread: thread.or_else(|| ctx.channel_thread.clone()),
             session_agent: ctx.session_agent.clone(),

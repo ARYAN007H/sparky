@@ -1,22 +1,21 @@
 use super::*;
 
-/// Maps a store-level [`FlowUpdateError`](tinyflows_catalog::store::FlowUpdateError) to the RPC
+/// Maps the Catalog bus [`FlowUpdateError`](tinyflows_bus::catalog::FlowUpdateError) to the RPC
 /// error string. A concurrency conflict is encoded as a JSON object the UI can
 /// parse (`{ code: "version_conflict", message, current }`) so it can offer a
 /// reload/diff instead of silently clobbering; other variants are plain text.
-fn map_flow_update_error(e: tinyflows_catalog::store::FlowUpdateError) -> String {
+fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
     match e {
-        tinyflows_catalog::store::FlowUpdateError::NotFound => "flow not found".to_string(),
-        tinyflows_catalog::store::FlowUpdateError::Conflict(current) => {
+        tinyflows_bus::catalog::FlowUpdateError::NotFound { .. } => "flow not found".to_string(),
+        tinyflows_bus::catalog::FlowUpdateError::VersionConflict { message, current } => {
             serde_json::to_string(&json!({
                 "code": "version_conflict",
-                "message": "This flow changed since you loaded it. Reload to see the latest \
-                            version, then reapply your change.",
-                "current": *current,
+                "message": message,
+                "current": current,
             }))
             .unwrap_or_else(|_| "version_conflict".to_string())
         }
-        tinyflows_catalog::store::FlowUpdateError::Store(err) => err.to_string(),
+        tinyflows_bus::catalog::FlowUpdateError::Store { message } => message,
     }
 }
 

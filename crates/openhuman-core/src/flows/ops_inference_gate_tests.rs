@@ -181,15 +181,15 @@ async fn inference_gate_surfaces_construction_error() {
 // failure (no network, no test-provider-override seam) so a bug that skips a
 // role would show up as a falsely-empty `errors` list.
 
-#[test]
-fn agent_node_role_prefers_custom_registry_entry_model_pin_over_default() {
+#[tokio::test]
+async fn agent_node_role_prefers_custom_registry_entry_model_pin_over_default() {
     // Finding A/B: a node with no per-node `config.model` but a STATIC
     // (non-`=`) `agent_ref` naming a custom registry entry that itself pins a
     // model (e.g. `hint:reasoning`) must resolve to THAT role — the same
     // precedence `OpenHumanAgentRunner::run_via_harness` applies via
     // `resolve_node_model(&request, entry_model)`, reusing the same sync,
     // config-only accessor (`find_custom_in_config`) it calls.
-    use crate::agent::registry::types::{AgentRegistryEntry, AgentRegistrySource};
+    use crate::agent_registry::types::{AgentRegistryEntry, AgentRegistrySource};
 
     let tmp = TempDir::new().unwrap();
     let mut config = test_config(&tmp);
@@ -219,7 +219,7 @@ fn agent_node_role_prefers_custom_registry_entry_model_pin_over_default() {
     }));
     let node = g.nodes.iter().find(|n| n.id == "a").expect("node 'a'");
     assert_eq!(
-        agent_node_role(&config, node),
+        agent_node_role(&config, node).await,
         "reasoning",
         "the custom registry entry's `hint:reasoning` pin must win over the default role"
     );

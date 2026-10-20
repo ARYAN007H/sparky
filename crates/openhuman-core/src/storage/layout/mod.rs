@@ -38,6 +38,7 @@
 //! core before migrating from the CLI.
 
 pub mod archive;
+pub mod credentials;
 pub mod db;
 pub mod legacy;
 pub mod plan;

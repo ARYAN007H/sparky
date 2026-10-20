@@ -140,7 +140,11 @@ async fn reconcile_schedule_triggers_on_boot_survives_a_corrupt_row() {
     flows_set_enabled(&config, &bad.value.id, true)
         .await
         .unwrap();
-    store::force_corrupt_graph_json_for_test(&config, &bad.value.id, "{ not valid json").unwrap();
+    super::resume_checkpoint_tests::corrupt_saved_flow_graph_for_test(
+        &config,
+        &bad.value.id,
+        "{ not valid json",
+    );
 
     // Remove the cron job `flows_set_enabled` already bound for the good flow
     // above, so the post-reconcile assertion proves
@@ -567,7 +571,7 @@ async fn flows_resume_refuses_when_the_graph_changed_after_park() {
     .await
     .expect_err("resume must refuse once the graph changed after park");
     assert!(
-        error.contains("changed after this run was paused"),
+        error.contains("workflow graph changed after the run parked"),
         "{error}"
     );
 
@@ -583,7 +587,7 @@ async fn flows_resume_refuses_when_the_graph_changed_after_park() {
         run_row
             .error
             .as_deref()
-            .is_some_and(|e| e.contains("changed after this run was paused")),
+            .is_some_and(|e| e.contains("workflow graph changed after the run parked")),
         "the terminal run row should retain the refusal reason: {run_row:?}"
     );
     let flow = flows_get(&config, &created.value.id).await.unwrap().value;

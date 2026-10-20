@@ -34,7 +34,7 @@ use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tempfile::tempdir;
 
-use openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry;
+use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
 use openhuman_rpc::server::build_core_http_router;
 
 // ─── Env serialization ──────────────────────────────────────────────────────
@@ -452,6 +452,10 @@ impl Drop for Stack {
 }
 
 async fn boot_stack(extra_config: &str) -> Stack {
+    // The managed chat provider is installed by the TinyHumans layer; without
+    // it every turn ends in `chat_error.inference` and no request reaches the
+    // scripted upstream.
+    crate::tinyhumans_boot::boot();
     AGENT_DEF_REGISTRY_INIT.get_or_init(|| {
         AgentDefinitionRegistry::init_global_builtins()
             .expect("AgentDefinitionRegistry::init_global_builtins must not fail");

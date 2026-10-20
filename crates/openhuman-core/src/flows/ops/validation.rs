@@ -6,7 +6,7 @@ use tinyflows_bus::{GraphValidation, ImportGraphResult, ValidateGraphRequest};
 #[cfg(test)]
 pub(crate) use tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN;
 
-async fn validate_over_bus(
+pub(super) async fn validate_over_bus(
     ctx: &DispatchCtx,
     config: &Config,
     graph: Value,
@@ -24,6 +24,23 @@ async fn validate_over_bus(
         )
         .await
         .map_err(|error| error.wire_message())
+}
+
+/// Returns the owner's migrated graph for callers that need parsing/migration
+/// without applying the host's save or execution policy.
+pub(super) async fn migrate_over_bus(
+    ctx: &DispatchCtx,
+    config: &Config,
+    graph: Value,
+) -> Result<Value, String> {
+    let report = validate_over_bus(ctx, config, graph).await?;
+    report.graph.ok_or_else(|| {
+        report
+            .errors
+            .first()
+            .map(|error| error.message.clone())
+            .unwrap_or_else(|| "TinyFlows validation returned no graph".to_string())
+    })
 }
 
 fn is_engine_compatibility_error(code: &str) -> bool {
@@ -87,8 +104,8 @@ pub(super) async fn ensure_config_aware_engine_compatible(
     }
 }
 
-/// Validates a candidate graph without persisting it and reports all errors
-/// with host trigger warnings added after successful engine validation.
+/// Validates a candidate graph without persisting it and returns the owner
+/// module's trigger warnings after successful graph validation.
 pub async fn flows_validate(
     ctx: &DispatchCtx,
     config: &Config,
@@ -136,7 +153,7 @@ pub async fn flows_validate(
             "flow validation failed",
         );
     }
-    let graph: WorkflowGraph = match report
+    let _graph: WorkflowGraph = match report
         .graph
         .ok_or_else(|| "TinyFlows validation returned no graph".to_string())
         .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))
@@ -159,7 +176,7 @@ pub async fn flows_validate(
             );
         }
     };
-    let warnings = graph_trigger_warnings(&graph);
+    let warnings = report.warnings;
     Outcome::single_log(
         FlowValidation {
             valid: true,
@@ -211,8 +228,7 @@ pub async fn flows_import(
         .graph
         .ok_or_else(|| "TinyFlows import returned no graph".to_string())
         .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))?;
-    let mut warnings = imported.warnings;
-    warnings.extend(graph_trigger_warnings(&graph));
+    let warnings = imported.warnings;
     Ok(Outcome::single_log(
         FlowImport { graph, warnings },
         "flow imported",

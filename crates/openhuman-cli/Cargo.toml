@@ -98,6 +98,13 @@ path = "../../tests/tinyflows_published_prompt_e2e.rs"
 required-features = ["flows"]
 
 [[test]]
+# Runs the checksum-verified published TinyFlows module through host Runs,
+# CapsHost, and scoped CatalogStorage adapters.
+name = "tinyflows_published_runs_e2e"
+path = "../../tests/tinyflows_published_runs_e2e.rs"
+required-features = ["flows"]
+
+[[test]]
 # Reproduction of the removed spend cap: needs its own process because the
 # global CostTracker is a `OnceCell`, so a shared `--lib` process makes the
 # spend state order-dependent.
@@ -197,9 +204,9 @@ path = "../../tests/memory_cortexdb_live.rs"
 [[test]]
 name = "json_rpc_e2e"
 path = "../../tests/json_rpc_e2e.rs"
-# `voice::reply_speech::{test_seam, TEST_SEAM_ENV}` — the reply-speech seam
-# only exists in the real voice module, not the stub.
-required-features = ["voice"]
+# `openhuman_tinyhumans::voice::reply_speech::{test_seam, TEST_SEAM_ENV}` — the
+# reply-speech seam only exists with the voice feature (hosted TTS provider).
+required-features = ["voice", "http-server"]
 
 [[test]]
 name = "raw_coverage_all"
@@ -239,6 +246,12 @@ name = "storage_default_import_e2e"
 path = "../../tests/storage_default_import_e2e.rs"
 # Without the SQLite driver the stores keep the legacy tables.
 required-features = ["storage-sqlite"]
+
+[[test]]
+# Boots the shipped host on a legacy voice config and proves old listeners stay off.
+name = "legacy_voice_config_boot_e2e"
+path = "../../tests/legacy_voice_config_boot_e2e.rs"
+required-features = ["voice", "http-server"]
 
 [[test]]
 # Builds a whole pre-storage desktop workspace (every legacy per-domain DB and

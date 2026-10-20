@@ -3,7 +3,7 @@
 use anyhow::{anyhow, ensure, Result};
 use tinyagents_definition::PromptSource;
 
-use crate::{agent::harness::host_definition::AgentDefinition, config::Config};
+use crate::{agent_registry::host_definition::AgentDefinition, config::Config};
 
 /// Whether `definition` is one of the bus-backed builtin flow prompt owners.
 ///

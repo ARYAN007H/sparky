@@ -23,6 +23,10 @@
 
 use crate::config::Config;
 
+#[cfg(feature = "modules")]
+#[path = "tinyflows_caps_manifest.rs"]
+mod caps_manifest;
+
 /// Registry id of the module these calls go to.
 pub(crate) const MODULE_ID: &str = "tinyflows";
 
@@ -157,6 +161,40 @@ mod imp {
             .map_err(|error| format!("the tinyflows catalog object is unreachable: {error}"))
     }
 
+    /// Proxy to the module-owned portability helpers used by CapsHost.
+    pub(crate) async fn portability_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::OBJECT_PATH,
+                tinyflows_bus::portability::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
+            .map_err(|error| format!("the tinyflows portability object is unreachable: {error}"))
+    }
+
+    /// Proxy to the module-owned run admission and control surface.
+    pub(crate) async fn runs_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::runs::OBJECT_PATH,
+                tinyflows_bus::runs::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
+            .map_err(|error| format!("the tinyflows runs object is unreachable: {error}"))
+    }
+
     async fn copilot_invoke_interface_proxy(config: &Config) -> Result<Proxy, String> {
         ensure(config).await?;
         let runtime = runtime::runtime()
@@ -220,6 +258,45 @@ mod imp {
             .await
             .map_err(|error| format!("serving the host object did not finish: {error}"))?;
         served
+    }
+
+    /// Serve one callback interface on the module runtime and return an RAII
+    /// registration for it. The token is created inside the spawned task so
+    /// cancellation of the caller cannot leave an unowned interface behind.
+    /// CapsHost registrations advertise the v2 callback contract before their
+    /// address can be handed to the Runs module.
+    pub(crate) async fn serve_registered(
+        path: String,
+        object: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
+        let announces_caps_host = super::caps_manifest::is_caps_host_v2(&object)?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        let connection = runtime.connection().clone();
+        runtime
+            .spawn(async move {
+                let object_path = ObjectPath::new(&path).map_err(|error| error.to_string())?;
+                connection
+                    .request_name(HOST_BUS_NAME)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                connection
+                    .serve_at(object_path.clone(), object)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                if announces_caps_host {
+                    if let Err(error) =
+                        super::caps_manifest::announce_caps_host_v2(&connection).await
+                    {
+                        let _ = connection.unserve(&object_path).await;
+                        return Err(error);
+                    }
+                }
+                Ok(ServedObjectRegistration(path))
+            })
+            .await
+            .map_err(|error| format!("serving the host object did not finish: {error}"))?
     }
 
     /// Serve two interfaces at one object path and return an RAII token for
@@ -304,8 +381,8 @@ mod fixture;
 pub(crate) use imp::serve_pair_after_first;
 #[cfg(feature = "modules")]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
-    serve_pair, unserve,
+    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, portability_proxy, proxy,
+    run_proxy, runs_proxy, serve, serve_pair, serve_registered, unserve,
 };
 
 #[cfg(not(feature = "modules"))]
@@ -342,6 +419,14 @@ mod imp {
         Err(unavailable(config))
     }
 
+    pub(crate) async fn portability_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
+    pub(crate) async fn runs_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
     pub(crate) async fn copilot_invoke_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
         Err(unavailable(config))
     }
@@ -350,6 +435,13 @@ mod imp {
         _path: String,
         _object: impl tinybus::service::Interface + 'static,
     ) -> Result<(), String> {
+        Err("scheduled jobs are unavailable: this build has no module loader".to_string())
+    }
+
+    pub(crate) async fn serve_registered(
+        _path: String,
+        _object: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
         Err("scheduled jobs are unavailable: this build has no module loader".to_string())
     }
 
@@ -366,8 +458,8 @@ mod imp {
 
 #[cfg(not(feature = "modules"))]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
-    serve_pair, unserve,
+    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, portability_proxy, proxy,
+    run_proxy, runs_proxy, serve, serve_pair, serve_registered, unserve,
 };
 
 /// Whether the module can serve in this build and configuration (the switch

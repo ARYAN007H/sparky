@@ -71,4 +71,19 @@ impl SubagentSessionStore {
         docs.update_session(subagent_session_id, update)
             .map_err(|err| format!("{err:#}"))
     }
+
+    pub fn update_session_if<F>(
+        &self,
+        subagent_session_id: &str,
+        update: F,
+    ) -> Result<Option<DurableSubagentSession>, String>
+    where
+        F: FnMut(&mut DurableSubagentSession, String) -> bool + Send + 'static,
+    {
+        let docs = super::store_documents::current(&self.workspace_dir)
+            .map_err(|err| format!("{err:#}"))?;
+        self.import_legacy(&docs)?;
+        docs.update_session_if(subagent_session_id, update)
+            .map_err(|err| format!("{err:#}"))
+    }
 }

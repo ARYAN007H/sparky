@@ -37,14 +37,38 @@ pub async fn flows_set_enabled(
     // line — so an enable of a flow that will never fire itself (webhook,
     // chat_message, form, …) is impossible to miss at the call site.
     if enabled {
-        for warning in graph_trigger_warnings(&flow.graph) {
-            tracing::warn!(
+        match serde_json::to_value(&flow.graph) {
+            Ok(graph) => match super::validation::validate_over_bus(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                config,
+                graph,
+            )
+            .await
+            {
+                Ok(analysis) => {
+                    for warning in analysis.warnings {
+                        tracing::warn!(
+                            target: "flows",
+                            flow_id = %id,
+                            warning = %warning,
+                            "[flows] flows_set_enabled: enabling a flow whose trigger kind does not fire yet"
+                        );
+                        logs.push(format!("warning: {warning}"));
+                    }
+                }
+                Err(error) => tracing::warn!(
+                    target: "flows",
+                    flow_id = %id,
+                    %error,
+                    "[flows] flows_set_enabled: TinyFlows warning analysis failed"
+                ),
+            },
+            Err(error) => tracing::warn!(
                 target: "flows",
                 flow_id = %id,
-                warning = %warning,
-                "[flows] flows_set_enabled: enabling a flow whose trigger kind does not fire yet"
-            );
-            logs.push(format!("warning: {warning}"));
+                %error,
+                "[flows] flows_set_enabled: graph serialization failed during warning analysis"
+            ),
         }
     }
 

@@ -10,7 +10,7 @@ fn counts(input: u64, output: u64, cached: u64) -> BilledUsage {
 /// the harness `StopHookMetrics` impl, priced through the catalog lookup.
 fn record(turn: &mut tinyagents_harness::cost::TurnCost, model: &str, usage: &BilledUsage) {
     use tinyagents_hooks::stop::StopHookMetrics as _;
-    let response = crate::agent::tinyagents::model::native_model_response_for_request(
+    let response = crate::inference::provider::model::native_model_response_for_request(
         &crate::inference::provider::ChatResponse {
             text: Some("ok".into()),
             usage: Some(*usage),

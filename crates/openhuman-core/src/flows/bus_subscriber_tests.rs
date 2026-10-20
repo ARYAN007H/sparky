@@ -1,6 +1,6 @@
 use super::*;
 use tinyflows::model::TriggerKind;
-use tinyflows_catalog::types::FlowRun;
+use tinyflows_catalog::types::{FlowRun, FlowRunTrigger};
 
 #[test]
 fn pinned_trigger_inputs_reads_values_an_author_fixed_for_unattended_runs() {
@@ -201,28 +201,6 @@ async fn digest_ignores_failed_run() {
     let config = test_config(&tmp);
     let _engine = digest_test_engine(&config);
 
-    let flow = flow_with_trigger_config("f-failed", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
-        &config,
-        "run-failed",
-        "f-failed",
-        "thread-failed",
-        "2026-01-01T00:00:00Z",
-    )
-    .unwrap();
-    store::finish_flow_run(
-        &config,
-        "run-failed",
-        "failed",
-        "2026-01-01T00:05:00Z",
-        &[],
-        &[],
-        Some("boom"),
-        None,
-    )
-    .unwrap();
-
     let sub = FlowRunDigestSubscriber::new(config.clone());
     sub.handle(&DomainEvent::FlowRunFinished {
         flow_id: "f-failed".into(),
@@ -243,28 +221,6 @@ async fn digest_ignores_cancelled_run() {
     let config = test_config(&tmp);
     let _engine = digest_test_engine(&config);
 
-    let flow = flow_with_trigger_config("f-cancelled", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
-        &config,
-        "run-cancelled",
-        "f-cancelled",
-        "thread-cancelled",
-        "2026-01-01T00:00:00Z",
-    )
-    .unwrap();
-    store::finish_flow_run(
-        &config,
-        "run-cancelled",
-        "cancelled",
-        "2026-01-01T00:05:00Z",
-        &[],
-        &[],
-        None,
-        None,
-    )
-    .unwrap();
-
     let sub = FlowRunDigestSubscriber::new(config.clone());
     sub.handle(&DomainEvent::FlowRunFinished {
         flow_id: "f-cancelled".into(),
@@ -277,21 +233,7 @@ async fn digest_ignores_cancelled_run() {
 }
 
 #[tokio::test]
-async fn digest_sanitizes_persisted_outputs() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let _engine = digest_test_engine(&config);
-
-    let flow = flow_with_trigger_config("f-ok", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
-        &config,
-        "run-ok",
-        "f-ok",
-        "thread-ok",
-        "2026-01-01T00:00:00Z",
-    )
-    .unwrap();
+async fn digest_rendering_scrubs_persisted_outputs() {
     let step = tinyflows_catalog::FlowRunStep {
         node_id: "n1".to_string(),
         output: json!({
@@ -314,49 +256,27 @@ async fn digest_sanitizes_persisted_outputs() {
         duration_ms: Some(8),
         diagnostics: Vec::new(),
     };
-    store::finish_flow_run(
-        &config,
-        "run-ok",
-        "completed",
-        "2026-01-01T00:05:00Z",
-        &[step, string_step],
-        &[],
-        None,
-        None,
-    )
-    .unwrap();
-
-    let sub = FlowRunDigestSubscriber::new(config.clone());
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-ok".into(),
-        run_id: "run-ok".into(),
-        status: "completed".into(),
-    })
-    .await;
-
-    let digests = stored_digests(&config, "f-ok").await;
-    assert_eq!(
-        digests.len(),
-        1,
-        "completed run must produce one run digest"
-    );
-    let entry = &digests[0];
-    assert_eq!(entry.meta.source.kind, tinymemory_api::SourceKind::Agent);
-    assert!(entry.meta.tags.contains(&crate::flows::flow_tag("f-ok")));
-    assert_eq!(
-        entry.meta.derive,
-        Some(false),
-        "nothing derived from a digest"
-    );
-    assert!(entry.text.contains("f-ok"));
-    assert!(entry.text.contains("completed"));
-    assert!(entry.text.contains("n1"));
-    assert!(entry.text.contains("\"sent\":3"));
-    assert!(!entry.text.contains("synthetic-credential-value"));
-    assert!(entry.text.contains("[REDACTED_SECRET]"));
-    assert!(!entry.text.contains(&token_output));
-    assert!(entry.text.contains("n2"));
-    assert!(entry.text.chars().count() <= DIGEST_MAX_CHARS);
+    let run = FlowRun {
+        id: "run-ok".to_string(),
+        flow_id: "f-ok".to_string(),
+        thread_id: "thread-ok".to_string(),
+        status: "completed".to_string(),
+        started_at: "2026-01-01T00:00:00Z".to_string(),
+        finished_at: Some("2026-01-01T00:05:00Z".to_string()),
+        steps: vec![step, string_step],
+        pending_approvals: Vec::new(),
+        error: None,
+        graph_hash: None,
+    };
+    let entry = render_run_digest("f-ok", &run);
+    assert!(entry.contains("completed"));
+    assert!(entry.contains("n1"));
+    assert!(entry.contains("\"sent\":3"));
+    assert!(!entry.contains("synthetic-credential-value"));
+    assert!(entry.contains("[REDACTED_SECRET]"));
+    assert!(!entry.contains(&token_output));
+    assert!(entry.contains("n2"));
+    assert!(entry.chars().count() <= DIGEST_MAX_CHARS);
 }
 
 #[tokio::test]
@@ -367,32 +287,39 @@ async fn digest_treats_completed_with_warnings_as_success() {
 
     let flow = flow_with_trigger_config("f-warn", true, json!({}));
     store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
+    let run = crate::flows::ops::flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
-        "run-warn",
-        "f-warn",
-        "thread-warn",
-        "2026-01-01T00:00:00Z",
+        &flow.id,
+        json!({}),
+        serde_json::Map::new(),
+        FlowRunTrigger::Rpc,
     )
+    .await
     .unwrap();
-    store::finish_flow_run(
-        &config,
-        "run-warn",
-        "completed_with_warnings",
-        "2026-01-01T00:05:00Z",
-        &[],
-        &[],
-        None,
-        None,
-    )
-    .unwrap();
+    let run_id = run.value["thread_id"].as_str().unwrap().to_owned();
 
+    // The real run has already exercised the module-owned storage/projection
+    // path. Call the digest policy directly with the warning-success status so
+    // this test does not depend on a process-global subscriber registration.
+    for digest in stored_digests(&config, "f-warn").await {
+        crate::memory::ops::forget(
+            &config,
+            crate::memory::types::ForgetParams {
+                ids: vec![digest.id.0],
+                reach: None,
+            },
+        )
+        .await
+        .unwrap();
+    }
     let sub = FlowRunDigestSubscriber::new(config.clone());
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-warn".into(),
-        run_id: "run-warn".into(),
-        status: "completed_with_warnings".into(),
-    })
+    sub.handle_finished(
+        crate::core::runtime::DispatchCtx::ambient(),
+        "f-warn",
+        &run_id,
+        "completed_with_warnings",
+    )
     .await;
 
     assert_eq!(stored_digests(&config, "f-warn").await.len(), 1);
@@ -478,183 +405,4 @@ fn render_run_digest_is_bounded_and_includes_key_fields() {
     assert!(digest.contains("completed"));
     assert!(digest.contains("n1"));
     assert!(digest.chars().count() <= DIGEST_MAX_CHARS);
-}
-
-#[test]
-fn dedup_commit_name_and_domains_are_stable() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let sub = DedupCommitSubscriber::new(test_config(&tmp));
-    assert_eq!(sub.name(), "flows::dedup_commit");
-    assert_eq!(sub.domains(), Some(&["cron"][..]));
-}
-
-#[tokio::test]
-async fn dedup_commit_ignores_unrelated_events() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let sub = DedupCommitSubscriber::new(test_config(&tmp));
-    // Must not panic for any event other than `FlowRunFinished`.
-    sub.handle(&DomainEvent::CronJobTriggered {
-        job_id: "j1".into(),
-        job_name: "test".into(),
-        job_type: "shell".into(),
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn dedup_commit_flow_with_no_dedup_nodes_is_a_noop() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let flow = flow_with_trigger_config("f-no-dedup", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
-
-    let sub = DedupCommitSubscriber::new(config);
-    // Must not panic when the flow has no `dedup` node at all.
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-no-dedup".into(),
-        run_id: "run-1".into(),
-        status: "completed".into(),
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn dedup_commit_unions_tentative_into_committed_and_clears_tentative_on_success() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let flow = flow_with_dedup_node("f-ok", "dd");
-    store::upsert_flow(&config, &flow).unwrap();
-
-    let namespace = dedup_state_namespace("f-ok");
-    store::kv_set(&config, &namespace, "dedup:dd:committed", &json!(["a"])).unwrap();
-    store::kv_set(
-        &config,
-        &namespace,
-        "dedup:dd:tentative",
-        &json!(["b", "c"]),
-    )
-    .unwrap();
-
-    let sub = DedupCommitSubscriber::new(config.clone());
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-ok".into(),
-        run_id: "run-ok".into(),
-        status: "completed".into(),
-    })
-    .await;
-
-    let committed = store::kv_get(&config, &namespace, "dedup:dd:committed")
-        .unwrap()
-        .expect("committed key must still exist");
-    let mut committed: Vec<&str> = committed
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|v| v.as_str().unwrap())
-        .collect();
-    committed.sort_unstable();
-    assert_eq!(committed, vec!["a", "b", "c"], "committed = union");
-
-    assert!(
-        store::kv_get(&config, &namespace, "dedup:dd:tentative")
-            .unwrap()
-            .is_none(),
-        "tentative must be cleared after a successful commit"
-    );
-}
-
-#[tokio::test]
-async fn dedup_commit_treats_completed_with_warnings_as_success() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let flow = flow_with_dedup_node("f-warn", "dd");
-    store::upsert_flow(&config, &flow).unwrap();
-
-    let namespace = dedup_state_namespace("f-warn");
-    store::kv_set(&config, &namespace, "dedup:dd:tentative", &json!(["x"])).unwrap();
-
-    let sub = DedupCommitSubscriber::new(config.clone());
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-warn".into(),
-        run_id: "run-warn".into(),
-        status: "completed_with_warnings".into(),
-    })
-    .await;
-
-    let committed = store::kv_get(&config, &namespace, "dedup:dd:committed")
-        .unwrap()
-        .expect("completed_with_warnings must still commit");
-    assert_eq!(committed, json!(["x"]));
-    assert!(store::kv_get(&config, &namespace, "dedup:dd:tentative")
-        .unwrap()
-        .is_none());
-}
-
-#[tokio::test]
-async fn dedup_commit_releases_tentative_without_touching_committed_on_failure() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let flow = flow_with_dedup_node("f-failed", "dd");
-    store::upsert_flow(&config, &flow).unwrap();
-
-    let namespace = dedup_state_namespace("f-failed");
-    store::kv_set(&config, &namespace, "dedup:dd:committed", &json!(["a"])).unwrap();
-    store::kv_set(&config, &namespace, "dedup:dd:tentative", &json!(["b"])).unwrap();
-
-    let sub = DedupCommitSubscriber::new(config.clone());
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-failed".into(),
-        run_id: "run-failed".into(),
-        status: "failed".into(),
-    })
-    .await;
-
-    assert_eq!(
-        store::kv_get(&config, &namespace, "dedup:dd:committed")
-            .unwrap()
-            .unwrap(),
-        json!(["a"]),
-        "committed must be untouched by a failed run"
-    );
-    assert!(
-        store::kv_get(&config, &namespace, "dedup:dd:tentative")
-            .unwrap()
-            .is_none(),
-        "tentative must be released (cleared) on failure so the item retries"
-    );
-}
-
-#[tokio::test]
-async fn dedup_commit_releases_tentative_on_cancelled_and_interrupted() {
-    for status in ["cancelled", "interrupted"] {
-        let tmp = tempfile::TempDir::new().unwrap();
-        let config = test_config(&tmp);
-        let flow_id = format!("f-{status}");
-        let flow = flow_with_dedup_node(&flow_id, "dd");
-        store::upsert_flow(&config, &flow).unwrap();
-
-        let namespace = dedup_state_namespace(&flow_id);
-        store::kv_set(&config, &namespace, "dedup:dd:tentative", &json!(["z"])).unwrap();
-
-        let sub = DedupCommitSubscriber::new(config.clone());
-        sub.handle(&DomainEvent::FlowRunFinished {
-            flow_id: flow_id.clone(),
-            run_id: format!("run-{status}"),
-            status: status.to_string(),
-        })
-        .await;
-
-        assert!(
-            store::kv_get(&config, &namespace, "dedup:dd:committed")
-                .unwrap()
-                .is_none(),
-            "status {status} must never commit"
-        );
-        assert!(
-            store::kv_get(&config, &namespace, "dedup:dd:tentative")
-                .unwrap()
-                .is_none(),
-            "status {status} must release tentative"
-        );
-    }
 }

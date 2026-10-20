@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn catalog_mirrors_builtins() {
-    use crate::agent::registry::agents::BUILTINS;
+    use crate::agent_registry::agents::BUILTINS;
 
     let resources = resource_specs();
     for b in BUILTINS {
@@ -108,7 +108,7 @@ fn read_resource_returns_minus_32002_for_unknown_uri() {
 
 #[tokio::test]
 async fn read_resource_returns_content_for_each_subagent() {
-    use crate::agent::registry::agents::BUILTINS;
+    use crate::agent_registry::agents::BUILTINS;
     let config = crate::config::Config::default();
     let ctx = crate::core::runtime::DispatchCtx::new(
         crate::core::runtime::CoreContext::for_test_with_config(

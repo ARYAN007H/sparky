@@ -8,10 +8,23 @@ use tinytools::ToolSpec;
 #[cfg(feature = "flows")]
 #[path = "runtime_session_flow_prompt_tests.rs"]
 mod flow_prompt_tests;
+#[path = "runtime_session_terminal_tests.rs"]
+mod terminal_tests;
+
+fn synthesized_tool_names(
+    prelude: &super::OpenHumanTurnPrelude,
+) -> std::collections::HashSet<String> {
+    prelude
+        .tool_surface
+        .lock()
+        .expect("tool surface")
+        .synthesized_tool_names
+        .clone()
+}
 
 #[tokio::test]
 async fn committed_progress_uses_each_turns_receipt_sender() {
-    use crate::agent::progress::AgentProgress;
+    use crate::progress::AgentProgress;
     use tinyagents_runtime::{
         CommitReceipt, ResumeMode, SessionTurnOutcome, TranscriptTurnOptions,
     };
@@ -65,8 +78,8 @@ async fn committed_progress_uses_each_turns_receipt_sender() {
 /// completion and nobody can find it.
 #[tokio::test]
 async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
-    use crate::agent::progress::AgentProgress;
-    use tinyagents_harness::turn_stop::TurnStopKind;
+    use crate::progress::AgentProgress;
+    use tinyagents_harness::{turn_stop::TurnStopKind, TurnFailureClass, TurnStop};
     use tinyagents_runtime::{
         CommitReceipt, ResumeMode, SessionTurnOutcome, TranscriptTurnOptions,
     };
@@ -74,14 +87,11 @@ async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
     let (tx, mut rx) = tokio::sync::mpsc::channel(4);
     let mut context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     context.progress = Some(tx);
-    context.session_sidecar.lock().unwrap().stop =
-        Some(crate::agent::turn_projection::breaker_stop_with_cause(
-            tinyagents_harness::no_progress::ClassifiedStopCause {
-                class: "uncertain_side_effect".into(),
-                operation: "web_answer_tool".into(),
-                summary: "classified failure".into(),
-            },
-        ));
+    context.session_sidecar.lock().unwrap().stop = Some(TurnStop::breaker_with_cause(
+        "Stopping after 2 attempts",
+        TurnFailureClass::new("uncertain_side_effect"),
+        Some("web_answer_tool".to_owned()),
+    ));
     let receipt = CommitReceipt {
         outcome: SessionTurnOutcome {
             history: Vec::new(),
@@ -143,7 +153,7 @@ fn clearing_progress_releases_warm_prelude_sender() {
 /// an event that was dropped.
 #[tokio::test]
 async fn committed_turn_completion_waits_for_a_full_progress_channel() {
-    use crate::agent::progress::AgentProgress;
+    use crate::progress::AgentProgress;
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     tx.send(AgentProgress::TurnStarted).await.unwrap();
@@ -180,7 +190,7 @@ async fn committed_turn_completion_waits_for_a_full_progress_channel() {
 /// deadline passes, the committed chat response must still be able to return.
 #[tokio::test(start_paused = true)]
 async fn committed_turn_completion_is_bounded_when_progress_stalls() {
-    use crate::agent::progress::AgentProgress;
+    use crate::progress::AgentProgress;
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     tx.send(AgentProgress::TurnStarted).await.unwrap();
@@ -203,7 +213,7 @@ fn spec(name: &str) -> ToolSpec {
 #[cfg(feature = "mcp")]
 #[test]
 fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
@@ -245,7 +255,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
 
     let action = "mcp_weather_forecast_abc123".to_string();
     prelude.refresh_delegation_tool_surface().unwrap();
-    assert!(prelude.synthesized_tool_names_for_test().contains(&action));
+    assert!(synthesized_tool_names(&prelude).contains(&action));
     {
         let surface = prelude.tool_surface.lock().expect("tool surface");
         assert!(surface.deferred_tool_names.contains(&action));
@@ -260,7 +270,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         .connected
         .clear();
     prelude.refresh_delegation_tool_surface().unwrap();
-    assert!(!prelude.synthesized_tool_names_for_test().contains(&action));
+    assert!(!synthesized_tool_names(&prelude).contains(&action));
     assert!(!prelude
         .tool_surface
         .lock()
@@ -272,7 +282,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
 #[cfg(feature = "mcp")]
 #[tokio::test]
 async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec() {
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
@@ -391,7 +401,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
     )
     .expect("desktop orchestrator");
     for name in ["browser", "browser_open"] {
-        assert!(host.deferred_tool_names_for_test().contains(name), "{name}");
+        assert!(host.deferred_tool_names.contains(name), "{name}");
         assert!(!host
             .visible_tool_specs_arc()
             .iter()
@@ -434,10 +444,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
     )
     .expect("browser-disabled orchestrator");
     for name in ["browser", "browser_open"] {
-        assert!(
-            !disabled.deferred_tool_names_for_test().contains(name),
-            "{name}"
-        );
+        assert!(!disabled.deferred_tool_names.contains(name), "{name}");
     }
 }
 
@@ -448,7 +455,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
 /// current integration authorization snapshot confirms Gmail is connected.
 #[tokio::test]
 async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().expect("tempdir");
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
@@ -471,9 +478,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
 
     // Fresh process: no integrations known, so no actions are synthesised.
     prelude.refresh_delegation_tool_surface().unwrap();
-    assert!(!prelude
-        .synthesized_tool_names_for_test()
-        .contains("GMAIL_SEND_EMAIL"));
+    assert!(!synthesized_tool_names(prelude).contains("GMAIL_SEND_EMAIL"));
 
     // Resume hands back what the thread was sent.
     let recorded = ToolSnapshot::new(vec![
@@ -485,7 +490,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
     prelude.adopt_recorded_tools(Some(&recorded));
     {
         let mut mutable = prelude.mutable.lock().expect("prelude state");
-        mutable.connected_integrations = vec![crate::agent::prompts::ConnectedIntegration {
+        mutable.connected_integrations = vec![crate::integrations::ConnectedIntegration {
             toolkit: "gmail".into(),
             description: String::new(),
             tools: Vec::new(),
@@ -498,7 +503,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
     }
     prelude.refresh_delegation_tool_surface().unwrap();
 
-    let names = prelude.synthesized_tool_names_for_test();
+    let names = synthesized_tool_names(prelude);
     assert!(names.contains("GMAIL_SEND_EMAIL"), "{names:?}");
     assert!(names.contains("GMAIL_FETCH_EMAILS"), "{names:?}");
     assert!(
@@ -552,7 +557,7 @@ const SURFACED_GOAL_TOOL: &str = "goal_complete";
 fn text_dialect_host(
     thread_id: Option<&str>,
 ) -> (crate::agent::OpenHumanSessionHost, tempfile::TempDir) {
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().expect("tempdir");
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
@@ -669,7 +674,7 @@ async fn newly_connected_action_cannot_shadow_a_permanent_source() {
             Ok(tinytools::ToolResult::success("host"))
         }
     }
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().unwrap();
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
@@ -697,7 +702,7 @@ async fn newly_connected_action_cannot_shadow_a_permanent_source() {
     ));
     {
         let mut mutable = prelude.mutable.lock().unwrap();
-        mutable.connected_integrations = vec![crate::agent::prompts::ConnectedIntegration {
+        mutable.connected_integrations = vec![crate::integrations::ConnectedIntegration {
             toolkit: "gmail".into(),
             description: String::new(),
             tools: Vec::new(),

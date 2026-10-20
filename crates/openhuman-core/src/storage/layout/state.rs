@@ -140,6 +140,10 @@ pub struct LayoutState {
     /// entries have moved.
     #[serde(default)]
     pub plan: Option<Plan>,
+    /// Credential files (beside `config.toml`) the import step copied into
+    /// the database; only these are ever archived and deleted.
+    #[serde(default)]
+    pub credentials: Vec<String>,
 }
 
 impl LayoutState {
@@ -154,6 +158,7 @@ impl LayoutState {
             archive: format!("{}-{stamp}.tar.zst", sanitize(user)),
             done: Vec::new(),
             plan: None,
+            credentials: Vec::new(),
         }
     }
 

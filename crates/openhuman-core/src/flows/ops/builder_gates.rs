@@ -49,7 +49,7 @@ pub(crate) async fn run_builder_gates(
                 &(
                     graph,
                     host.authoring.clone(),
-                    vec![crate::flows::tinyflows::caps::NATIVE_TOOL_PREFIX.to_string()],
+                    vec![crate::flows::caps_host::NATIVE_TOOL_PREFIX.to_string()],
                 ),
             )
             .await
@@ -144,8 +144,12 @@ pub(crate) async fn build_builder_proposal(
         ));
     }
 
-    let summary = tinyflows::summary::summarize(graph);
-    let mut warnings = graph_trigger_warnings(graph);
+    let graph_json = serde_json::to_value(graph).map_err(|error| error.to_string())?;
+    let analysis = super::validation::validate_over_bus(ctx, config, graph_json).await?;
+    let summary = analysis
+        .summary
+        .ok_or_else(|| "TinyFlows validation returned no graph summary".to_string())?;
+    let mut warnings = analysis.warnings;
     match graph_wiring_warnings(ctx, config, graph).await {
         Ok(wiring_warnings) => warnings.extend(wiring_warnings),
         Err(error) => {

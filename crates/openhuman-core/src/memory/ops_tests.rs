@@ -16,6 +16,27 @@ fn learn_params(text: &str) -> LearnParams {
 }
 
 #[cfg(feature = "channels")]
+#[test]
+fn corrupt_legacy_channel_threads_are_skipped_without_modifying_the_source() {
+    let tmp = tempfile::tempdir().unwrap();
+    let workspace = tmp.path().join("workspace");
+    let memory_dir = workspace.join("memory");
+    std::fs::create_dir_all(&memory_dir).unwrap();
+    let legacy_file = memory_dir.join("channel_threads.json");
+    let corrupt = br#"{"discord":["unfinished"}"#;
+    std::fs::write(&legacy_file, corrupt).unwrap();
+
+    let threads = legacy_channel_threads(&workspace, "discord");
+
+    assert!(threads.is_empty(), "invalid legacy state is skipped");
+    assert_eq!(std::fs::read(&legacy_file).unwrap(), corrupt);
+    assert!(
+        !legacy_file.with_extension("json.corrupt").exists(),
+        "a state read must not move or quarantine the legacy file"
+    );
+}
+
+#[cfg(feature = "channels")]
 #[tokio::test]
 async fn reserved_thread_matching_uses_module_identity_boundaries() {
     use tinychannels_bus::module_inbound::PrepareChannelIdentityRequest;

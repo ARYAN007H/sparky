@@ -227,6 +227,35 @@ fn push(entries: &mut Vec<Entry>, path: String, abs: &Path, action: Action, reas
     });
 }
 
+/// The profile-level entries (beside `config.toml`) the credential import
+/// copied into the database, named `@profile/<file>` and classified
+/// [`Action::Delete`]. Only `imported` files that still exist are listed.
+pub fn scan_credentials(profile_dir: &Path, imported: &[String]) -> Vec<Entry> {
+    let mut entries = Vec::new();
+    for name in imported {
+        let abs = profile_dir.join(name);
+        if std::fs::symlink_metadata(&abs).is_ok() {
+            push(
+                &mut entries,
+                format!("{}{name}", super::credentials::PROFILE_PREFIX),
+                &abs,
+                Action::Delete,
+                "imported into encrypted storage secrets",
+            );
+        }
+    }
+    entries
+}
+
+/// Where plan entry `rel` is on disk: below `workspace` for a workspace
+/// entry, below `profile_dir` for an `@profile/` entry.
+pub fn locate(workspace: &Path, profile_dir: &Path, rel: &str) -> (PathBuf, PathBuf) {
+    match rel.strip_prefix(super::credentials::PROFILE_PREFIX) {
+        Some(name) => (profile_dir.to_path_buf(), profile_dir.join(name)),
+        None => (workspace.to_path_buf(), join(workspace, rel)),
+    }
+}
+
 /// The path of a plan entry below `base` (`workspace/` or `files/`).
 pub fn join(base: &Path, rel: &str) -> PathBuf {
     rel.split('/')

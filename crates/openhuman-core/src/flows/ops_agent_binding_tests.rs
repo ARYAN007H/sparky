@@ -223,28 +223,17 @@ async fn flows_run_fails_cleanly_without_invoking_engine_when_inference_not_read
         "error must surface the specific reason (signed out): {err}"
     );
 
-    // The run row settled `failed` with that same message, and the engine
-    // never ran (no persisted steps) — this is the "no pointless work" half
-    // of the contract, not just "the RPC call returned an error".
+    // Provider readiness is a host preflight before the module's StartRun
+    // admission boundary, so rejection must not create a module-owned run row
+    // or stamp the saved workflow as executed.
     let runs = flows_list_runs(&config, &created.value.id, 1)
         .await
         .unwrap()
         .value;
-    let run = runs.first().expect("a run row must exist");
-    assert_eq!(run.status, "failed");
-    assert!(
-        run.steps.is_empty(),
-        "the engine must never have executed a step: {:?}",
-        run.steps
-    );
-    let run_error = run
-        .error
-        .as_deref()
-        .expect("a failed run must carry an error message");
-    assert!(
-        run_error.to_ascii_lowercase().contains("ai provider"),
-        "the persisted run error must explain the AI-provider problem: {run_error}"
-    );
+    assert!(runs.is_empty(), "preflight rejection must not admit a run");
+    let reloaded = flows_get(&config, &created.value.id).await.unwrap();
+    assert!(reloaded.value.last_run_at.is_none());
+    assert!(reloaded.value.last_status.is_none());
 
     // `SignedOutTestGuard` restores the prior flag on drop at the end of this
     // scope — no other test observes this override.
@@ -320,8 +309,8 @@ async fn claude_agent_flow_readiness_does_not_require_an_openhuman_session() {
     }
 }
 
-#[test]
-fn harness_readiness_uses_runtime_role_and_node_override() {
+#[tokio::test]
+async fn harness_readiness_uses_runtime_role_and_node_override() {
     let tmp = TempDir::new().unwrap();
     let mut config = test_config(&tmp);
     config.default_model = None;
@@ -334,15 +323,15 @@ fn harness_readiness_uses_runtime_role_and_node_override() {
         "edges": [{"from_node": "t", "to_node": "a"}]
     }));
     let node = g.nodes.iter_mut().find(|n| n.id == "a").unwrap();
-    assert_eq!(agent_node_role(&config, node), "coding");
+    assert_eq!(agent_node_role(&config, node).await, "coding");
     config.default_model = Some("hint:reasoning".into());
-    assert_eq!(agent_node_role(&config, node), "reasoning");
+    assert_eq!(agent_node_role(&config, node).await, "reasoning");
     node.config["model"] = json!("chat-v1");
-    assert_eq!(agent_node_role(&config, node), "chat");
+    assert_eq!(agent_node_role(&config, node).await, "chat");
     node.config["model"] = json!("hint:summarization");
-    assert_eq!(agent_node_role(&config, node), "summarization");
+    assert_eq!(agent_node_role(&config, node).await, "summarization");
     node.config["model"] = json!("custom-model-id");
-    assert_eq!(agent_node_role(&config, node), "chat");
+    assert_eq!(agent_node_role(&config, node).await, "chat");
 }
 
 #[tokio::test]
@@ -385,4 +374,65 @@ async fn harness_readiness_checks_session_for_execution_provider() {
             assert!(errors.is_empty(), "{errors:?}");
         }
     }
+}
+
+/// The agent-ref gate resolves a custom agent through the context it is handed,
+/// not the one the calling task happens to run under: two tenants' registries
+/// never cross.
+#[tokio::test]
+async fn agent_ref_gate_reads_the_registry_of_the_explicit_context() {
+    use crate::agent_registry::types::{AgentRegistryEntry, AgentRegistrySource};
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+
+    let entry = AgentRegistryEntry {
+        id: "tenant_a_only_agent".to_string(),
+        name: "A".to_string(),
+        description: "registered for tenant A".to_string(),
+        source: AgentRegistrySource::Custom,
+        enabled: true,
+        model: None,
+        system_prompt: None,
+        tool_allowlist: Vec::new(),
+        tool_denylist: Vec::new(),
+        tool_rules: None,
+        subagents: Default::default(),
+        tags: Vec::new(),
+        metadata: Value::Null,
+    };
+    let tmp_a = TempDir::new().unwrap();
+    let tmp_b = TempDir::new().unwrap();
+    let mut config_a = test_config(&tmp_a);
+    config_a.agent_registry.entries.push(entry);
+    let config_b = test_config(&tmp_b);
+    let core_a = CoreContext::for_test_with_config(DomainSet::full(), config_a.clone());
+    let core_b = CoreContext::for_test_with_config(DomainSet::full(), config_b.clone());
+    let ctx_a = DispatchCtx::new(core_a);
+    let ctx_b = DispatchCtx::new(std::sync::Arc::clone(&core_b));
+
+    let g = graph(json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "a", "kind": "agent", "name": "Plan",
+              "config": { "agent_ref": "tenant_a_only_agent", "prompt": "go" } }
+        ],
+        "edges": [ { "from_node": "t", "to_node": "a" } ]
+    }));
+
+    // Both calls run scoped to tenant B, so an ambient read would answer B's
+    // registry for A's call.
+    let (for_a, for_b) = CoreContext::scope(core_b, async {
+        (
+            crate::flows::host_gates::validate_agent_refs(&ctx_a, &config_a, &g).await,
+            crate::flows::host_gates::validate_agent_refs(&ctx_b, &config_b, &g).await,
+        )
+    })
+    .await;
+    assert!(
+        for_a.is_empty(),
+        "tenant A's own agent must resolve: {for_a:?}"
+    );
+    assert!(
+        for_b.iter().any(|e| e.contains("tenant_a_only_agent")),
+        "tenant B must not see tenant A's agent: {for_b:?}"
+    );
 }

@@ -87,9 +87,10 @@ pub struct ProfileHost {
     pub(super) operator: Arc<CoreContext>,
     pub(super) node: String,
     pub(super) open: Mutex<HashMap<ProfileId, Slot>>,
-    /// Held across every operation that takes or gives back a lease (open,
-    /// eviction, release, deprovision), so no two of them interleave and
-    /// the slot count stays exact. Lookups of an open profile never wait
+    /// Held across every operation that takes, renews or gives back a lease
+    /// (open, heartbeat renewal, eviction, release, deprovision), so no two
+    /// of them interleave, a release never carries a grant a renewal just
+    /// superseded, and the slot count stays exact. Lookups of an open profile never wait
     /// for it. Taken after the profile's own lifecycle lock, never before.
     pub(super) gate: tokio::sync::Mutex<()>,
     /// One lock per profile, held for the whole of each lifecycle operation
@@ -504,6 +505,11 @@ impl ProfileHost {
             .iter()
             .map(|(id, slot)| (id.clone(), slot.grant.clone()))
             .collect()
+    }
+
+    /// The current grant of `id`, when it is open here.
+    pub(crate) fn grant_of(&self, id: &ProfileId) -> Option<LeaseGrant> {
+        self.lock().get(id).map(|slot| slot.grant.clone())
     }
 
     /// Replace `id`'s grant `old` with `renewed`, unless the slot moved on

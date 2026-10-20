@@ -48,16 +48,17 @@ pub const EVENTS_ROOT: &str = "/ai/tinyhumans/openhuman/events";
 
 /// The interface the event catalog is published under.
 ///
-/// Removing a variant breaks compatibility with peers that may still publish
-/// it, so a breaking catalog change ships under a new interface name.
-pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events2";
+/// The interface identity stays stable across catalog versions; peers use
+/// [`EVENTS_VERSION`] to detect incompatible catalogs.
+pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events";
 
 /// The version of the event catalog this build speaks.
 ///
-/// Bump the minor for an added variant or field; bump the major for a breaking
-/// change and publish it under a new interface name. Peers exchange this through [`manifest`], so a version skew between
-/// the kernel and an out-of-process integration is reported at startup with
-/// both numbers rather than as a decode failure later.
+/// Bump the minor for an added variant or field; bump the major for a removed
+/// variant or another change that an older subscriber cannot parse. Peers
+/// exchange this through [`manifest`], so a version skew between the kernel
+/// and an out-of-process integration is reported at startup with both numbers
+/// rather than as a decode failure later.
 ///
 /// `1.1.0` added the MCP reconnect-supervisor variants (#5931).
 /// `1.2.0` added `ActiveWorkspaceChanged` (#5966).
@@ -97,6 +98,7 @@ pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events2";
 /// `2.0.0` removes `CronDeliveryRequested`; announce delivery now sends
 /// synchronously through the cron channel bridge.
 /// `2.1.0` adds optional `CronJobCompleted` tenant ownership.
+/// `2.0.0` also retires the obsolete desktop push-to-talk transcript event.
 pub const EVENTS_VERSION: Version = Version::new(2, 1, 0);
 
 /// The bus. Initialised once by [`init`]; safe to touch before that.

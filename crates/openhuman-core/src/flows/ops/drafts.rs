@@ -101,47 +101,46 @@ pub(crate) async fn flows_draft_promote_with_context(
     require_approval: Option<bool>,
 ) -> Result<Outcome<Flow>, String> {
     ctx.enter(async move {
-        let draft = draft_store::get_draft(config, id)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| format!("draft '{id}' not found"))?;
-
-    tracing::debug!(
-        target: "flows",
-        draft_id = %id,
-        promotes_to = draft.flow_id.as_deref().unwrap_or("<new flow>"),
-        "[flows] flows_draft_promote: promoting draft through the create/update gates"
-    );
-
-    let outcome = match &draft.flow_id {
-        Some(flow_id) => {
-            flows_update_with_context(
-                ctx,
-                config,
-                flow_id,
-                Some(draft.name.clone()),
-                Some(draft.graph.clone()),
-                require_approval,
-                None,
+        let callbacks = crate::flows::authoring_host::register(Arc::new(config.clone()), ctx.clone())
+            .await?;
+        let storage = crate::flows::catalog_storage::register(ctx, config).await?;
+        let proxy = crate::modules::tinyflows::catalog_proxy(config).await?;
+        let response: tinyflows_bus::catalog::PromoteDraftResponse = proxy
+            .call(
+                tinyflows_bus::catalog::members::PROMOTE_DRAFT,
+                &(
+                    tinyflows_bus::catalog::PromoteDraftRequest {
+                        storage: storage.storage(),
+                        host: callbacks.draft_promotion.clone(),
+                        id: id.to_owned(),
+                        require_approval,
+                    },
+                ),
             )
-            .await?
-        }
-        None => {
-            flows_create_with_context(
-                ctx,
-                config,
-                draft.name.clone(),
-                draft.graph.clone(),
-                require_approval.unwrap_or(false),
-            )
-            .await?
-        }
-    };
+            .await
+            .map_err(|error| error.to_string())?;
 
-    // Only remove the draft once the flow write succeeded.
-    if let Err(e) = draft_store::delete_draft(config, id) {
-        tracing::warn!(target: "flows", draft_id = %id, error = %e, "[flows] flows_draft_promote: flow saved but draft file could not be removed");
-    }
-        Ok(outcome)
+        match response {
+            tinyflows_bus::catalog::PromoteDraftResponse::Error(error) => Err(error.message),
+            tinyflows_bus::catalog::PromoteDraftResponse::Ok(result) => {
+                let flow: Flow = crate::flows::store::roundtrip(result.workflow)
+                    .map_err(|error| error.to_string())?;
+                let mut logs = result
+                    .metadata
+                    .get("logs")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                if let Some(warning) = result.cleanup_warning {
+                    tracing::warn!(target: "flows", draft_id = %id, %warning, "[flows] promoted draft cleanup failed");
+                    logs.push(warning);
+                }
+                Ok(Outcome::new(flow, logs))
+            }
+        }
     })
     .await
 }
