@@ -233,14 +233,14 @@ impl WebHost {
         }
 
         let (config, thread_dir, checked, projection, activity) = self.shared.with(id, |slot| {
-                (
-                    slot.config.clone(),
-                    slot.thread_dir.clone(),
-                    slot.session.take(),
-                    slot.projection.clone(),
-                    slot.activity.clone(),
-                )
-            });
+            (
+                slot.config.clone(),
+                slot.thread_dir.clone(),
+                slot.session.take(),
+                slot.projection.clone(),
+                slot.activity.clone(),
+            )
+        });
         let (Some(config), Some(mut checked), Some(projection)) = (config, checked, projection)
         else {
             return Err("web chat turn started without a checked-out session".to_owned());

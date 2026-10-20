@@ -101,10 +101,18 @@ fn typed_media_is_valid_chat_input_without_caption_text() {
     ));
 }
 
+#[test]
+fn collect_queue_rejects_typed_media_before_it_can_be_accepted_and_dropped() {
+    assert!(validate_queue_mode_media(QueueMode::Collect, true, false, false).is_err());
+    assert!(validate_queue_mode_media(QueueMode::Collect, false, true, false).is_err());
+    assert!(validate_queue_mode_media(QueueMode::Collect, false, false, true).is_err());
+    assert!(validate_queue_mode_media(QueueMode::Followup, false, false, true).is_ok());
+}
+
 #[tokio::test]
 async fn voice_note_turn_id_is_bound_to_its_exact_user_row_before_admission() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-    use crate::threads::store::{blocking, ConversationMessage, CreateConversationThread};
+    use crate::threads::store::{ConversationMessage, CreateConversationThread, blocking};
     use crate::tools::toolpacks::ToolGroups;
     use serde_json::json;
 

@@ -13,7 +13,7 @@ use tinyagents_harness::turn_runner::{QueueDisposition, TurnRequest, TurnRunnerE
 use tinychannels_bus::web::{ChatRequestMetadata, QueueMode};
 use uuid::Uuid;
 
-use super::super::runner::{runtime, scope_of, Admission};
+use super::super::runner::{Admission, runtime, scope_of};
 use super::super::turn_activity::configured_idle_window;
 use crate::agent::queued_turn::QueuedPayload;
 use crate::core::events::DomainEvent;
@@ -188,6 +188,20 @@ fn parse_mode(mode: Option<&str>) -> QueueMode {
     }
 }
 
+fn validate_queue_mode_media(
+    mode: QueueMode,
+    has_voice_note: bool,
+    has_stored_media: bool,
+    has_uploads: bool,
+) -> Result<(), StartChatError> {
+    if mode == QueueMode::Collect && (has_voice_note || has_stored_media || has_uploads) {
+        return Err(StartChatError::Other(
+            "collect queue mode does not support typed attachments".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn disposition(mode: QueueMode) -> QueueDisposition {
     match mode {
         QueueMode::Interrupt => QueueDisposition::Interrupt,
@@ -348,19 +362,16 @@ async fn start_chat_inner(
         return Err(StartChatError::Other("message is required".to_string()));
     }
     let mode = parse_mode(queue_mode.as_deref());
-    if mode == QueueMode::Collect
-        && (voice_note_id.is_some()
-            || stored_attachments
-                .as_ref()
-                .is_some_and(|input| !input.parts.is_empty())
-            || attachment_uploads
-                .as_ref()
-                .is_some_and(|parts| !parts.is_empty()))
-    {
-        return Err(StartChatError::Other(
-            "collect queue mode does not support typed attachments".to_string(),
-        ));
-    }
+    validate_queue_mode_media(
+        mode,
+        voice_note_id.is_some(),
+        stored_attachments
+            .as_ref()
+            .is_some_and(|input| !input.parts.is_empty()),
+        attachment_uploads
+            .as_ref()
+            .is_some_and(|parts| !parts.is_empty()),
+    )?;
     // A profile this node no longer hosts (its lease was lost or released)
     // starts no new turn here. No-op outside SaaS.
     crate::profiles::host::ensure_hosted(ctx).map_err(StartChatError::Other)?;
@@ -493,7 +504,7 @@ async fn bind_voice_note_request_id(
     note_id: &str,
     request_id: &str,
 ) -> Result<(), StartChatError> {
-    use crate::threads::store::{blocking, ConversationMessagePatch};
+    use crate::threads::store::{ConversationMessagePatch, blocking};
 
     let workspace_dir = ctx
         .load_config()
