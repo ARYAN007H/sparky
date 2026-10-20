@@ -12,6 +12,18 @@ pub use crate::core::envelope::{ApiEnvelope, ApiError, ApiMeta, EmptyRequest, Pa
 
 /// Typed acknowledgement returned when a web chat message enters the run queue.
 /// Attachment values are sanitized opaque references minted by the core.
+/// Typed acknowledgement returned when a web chat message starts immediately.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct StartedChatAck {
+    pub accepted: bool,
+    pub client_id: String,
+    pub thread_id: String,
+    pub request_id: String,
+}
+
+/// Typed acknowledgement returned when a web chat message enters the run queue.
+/// Attachment values are sanitized opaque references minted by the core.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct QueuedChatAck {

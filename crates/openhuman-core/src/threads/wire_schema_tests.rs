@@ -10,6 +10,7 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         "thread",
         "message",
         "queuedChatAck",
+        "startedChatAck",
         "threadsList",
         "threadMessages",
         "threadDelete",
@@ -41,6 +42,20 @@ fn thread_wire_schema_exports_the_core_and_session_records() {
         assert!(
             ack["required"].as_array().unwrap().contains(&field.into()),
             "ack schema must require serialized field {field}"
+        );
+    }
+}
+
+#[test]
+fn started_chat_ack_schema_requires_every_serialized_field() {
+    let schema: serde_json::Value =
+        serde_json::from_str(&thread_wire_schema_json().expect("schema serializes"))
+            .expect("schema is JSON");
+    let ack = &schema["$defs"]["StartedChatAck"];
+    for field in ["accepted", "client_id", "thread_id", "request_id"] {
+        assert!(
+            ack["required"].as_array().unwrap().contains(&field.into()),
+            "started ack schema must require serialized field {field}"
         );
     }
 }

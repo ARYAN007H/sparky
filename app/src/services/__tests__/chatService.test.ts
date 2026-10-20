@@ -420,7 +420,23 @@ describe('chatService.subscribeChatEvents', () => {
     ).resolves.toEqual({ requestId: 'request-1', queuedAttachments: attachments });
   });
 
-  it('maps the scalar request identity returned for a started turn', async () => {
+  it('maps the started-turn acknowledgement returned by the core', async () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    mockCallCoreRpc.mockResolvedValue({
+      accepted: true,
+      client_id: 'socket-1',
+      thread_id: 'thread-1',
+      request_id: 'request-started',
+    });
+
+    await expect(chatSendWithAck({ threadId: 'thread-1', message: 'hello' })).resolves.toEqual({
+      requestId: 'request-started',
+      queuedAttachments: [],
+    });
+  });
+
+  it('preserves compatibility with the legacy scalar request identity', async () => {
     const socket = createMockSocket();
     bindMockSocket(socket);
     mockCallCoreRpc.mockResolvedValue('request-started');

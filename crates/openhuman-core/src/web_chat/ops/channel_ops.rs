@@ -307,12 +307,12 @@ pub async fn channel_web_chat_with_attachments(
     }
 
     Ok(Outcome::single_log(
-        json!({
-            "accepted": true,
-            "client_id": client_id.trim(),
-            "thread_id": thread_id.trim(),
-            "request_id": result,
-        }),
+        crate::threads::rpc_models::StartedChatAck {
+            accepted: true,
+            client_id: client_id.trim().to_owned(),
+            thread_id: thread_id.trim().to_owned(),
+            request_id: result,
+        },
         "web channel request accepted",
     ))
 }

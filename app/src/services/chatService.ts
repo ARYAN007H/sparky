@@ -8,7 +8,7 @@
  */
 import debug from 'debug';
 
-import type { QueuedChatAck } from '../types/threadWire.generated';
+import type { QueuedChatAck, StartedChatAck } from '../types/threadWire.generated';
 import {
   type ArtifactFailedEvent,
   ArtifactKind,
@@ -994,6 +994,16 @@ function isQueuedChatAck(value: unknown): value is QueuedChatAck {
   );
 }
 
+function isStartedChatAck(value: unknown): value is StartedChatAck {
+  return (
+    isRecord(value) &&
+    value.accepted === true &&
+    typeof value.client_id === 'string' &&
+    typeof value.thread_id === 'string' &&
+    typeof value.request_id === 'string'
+  );
+}
+
 export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendAck> {
   const socket = socketService.getSocket();
   const clientId = socket?.id;
@@ -1023,6 +1033,9 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
   // turns return the typed acknowledgement object below.
   if (typeof result === 'string') {
     return { requestId: result, queuedAttachments: [] };
+  }
+  if (isStartedChatAck(result)) {
+    return { requestId: result.request_id, queuedAttachments: [] };
   }
   if (result == null) {
     return { queuedAttachments: [] };
