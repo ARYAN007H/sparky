@@ -22,9 +22,7 @@ type Failure = tinytools::status::ClassifiedFailure;
 pub(crate) fn turn_event(event: AgentProgress) -> Option<ChannelOutputEvent> {
     match event {
         AgentProgress::TextDelta { delta, iteration } => Some(text_delta(delta, iteration)),
-        AgentProgress::ThinkingDelta { delta, iteration } => {
-            Some(thinking_delta(delta, iteration))
-        }
+        AgentProgress::ThinkingDelta { delta, iteration } => Some(thinking_delta(delta, iteration)),
         AgentProgress::ToolCallStarted {
             call_id,
             tool_name,
@@ -436,4 +434,3 @@ pub(crate) fn sub_delta(
     out.iteration = Some(iteration);
     ChannelOutputEvent::Subagent(Box::new(out))
 }
-

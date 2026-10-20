@@ -275,9 +275,7 @@ impl ProgressProjection {
                 }
                 self.pending_narration.push_str(&delta);
                 if !self.metadata.hold_text_stream {
-                    self.surface
-                        .output(map::text_delta(delta, iteration))
-                        .await;
+                    self.surface.output(map::text_delta(delta, iteration)).await;
                 }
             }
             AgentProgress::ThinkingDelta { delta, iteration } => {
