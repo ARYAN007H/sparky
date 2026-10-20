@@ -284,7 +284,17 @@ impl StateKv {
             }
             Ok(())
         })?;
-        self.quarantine_invalid_legacy::<T>(legacy)
+        // Validating the legacy file reparses it, so do it once per backend
+        // instance, scope, state name and requested value type; a failed
+        // validation is retried by the next call.
+        let key = format!(
+            "quarantine/{}/{}/{name}/{}",
+            self.owner,
+            self.ns,
+            std::any::type_name::<T>()
+        );
+        self.repo
+            .once_per_backend(&key, || self.quarantine_invalid_legacy::<T>(legacy))
     }
 
     fn quarantine_invalid_legacy<T: DeserializeOwned>(&self, legacy: &Path) -> Result<()> {
