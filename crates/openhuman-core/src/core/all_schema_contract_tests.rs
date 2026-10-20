@@ -155,7 +155,6 @@ fn builtin_controller_snapshot() -> Vec<ControllerEntry> {
         .collect()
 }
 
-#[cfg(any(feature = "modules", feature = "mcp"))]
 fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<ControllerParamContract>)
 {
     let controllers = builtin_controller_snapshot()
@@ -181,7 +180,7 @@ fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<Contr
 
 #[test]
 #[cfg(any(feature = "modules", feature = "mcp"))]
-fn voice_and_representative_handler_examples_match_real_pure_parsers() {
+fn representative_handler_examples_match_real_pure_parsers() {
     let (controllers, contracts) = representative_parameter_contracts();
     verify_parameter_contracts(&controllers, &contracts).unwrap();
 }
@@ -233,6 +232,10 @@ fn every_covered_required_declaration_rejects_removal_and_optional_mutants() {
 #[test]
 #[cfg(not(any(feature = "modules", feature = "mcp")))]
 fn optional_domain_controller_methods_are_absent_when_features_are_disabled() {
+    let (controllers, contracts) = representative_parameter_contracts();
+    assert!(controllers.is_empty());
+    assert!(contracts.is_empty());
+
     let methods = builtin_controller_snapshot()
         .into_iter()
         .map(|controller| controller.schema.method_name())
