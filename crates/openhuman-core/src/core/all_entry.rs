@@ -1,10 +1,6 @@
 //! Controller entry types shared by the global registry and domain modules.
 
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use serde_json::{Map, Value};
 
