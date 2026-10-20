@@ -73,12 +73,6 @@ fn referenced_child_graph(workflow_id: &str) -> Value {
     })
 }
 
-fn structurally_valid_graph(value: Value) -> WorkflowGraph {
-    let graph = tinyflows::migrate::deserialize_graph(value).expect("graph should deserialize");
-    tinyflows::validate::validate(&graph).expect("fixture should be structurally valid");
-    graph
-}
-
 #[tokio::test]
 async fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
     const CHILD_ENV: &str = "OPENHUMAN_FLOWS_IMPORT_AUTHORING_CHILD";
@@ -296,7 +290,7 @@ fn http_summary(name: &str, scheme: &str) -> HttpCredentialSummary {
 // ── Flow Scout suggestion lifecycle ──────────────────────────────────────────
 
 fn seed_suggestion(config: &Config, id: &str) {
-    let s = tinyflows_catalog::FlowSuggestion {
+    let s = tinyflows_bus::catalog::FlowSuggestion {
         id: id.to_string(),
         title: format!("Idea {id}"),
         one_liner: "does a thing".to_string(),
@@ -307,7 +301,7 @@ fn seed_suggestion(config: &Config, id: &str) {
         suggested_slugs: vec![],
         build_prompt: "Build a workflow…".to_string(),
         confidence: 0.5,
-        status: tinyflows_catalog::SuggestionStatus::New,
+        status: tinyflows_bus::catalog::SuggestionStatus::New,
         created_at: "2026-07-05T00:00:00Z".to_string(),
         source_run_id: None,
     };
@@ -315,15 +309,6 @@ fn seed_suggestion(config: &Config, id: &str) {
 }
 
 // ── validate_binding_resolvability ──────────────────────────────────────────
-
-/// Runs a candidate graph `Value` through the exact same migrate/validate
-/// path the builder tools use, for a [`WorkflowGraph`] test fixture.
-fn graph(value: Value) -> WorkflowGraph {
-    let graph = tinyflows::migrate::deserialize_graph(value).expect("test graph deserializes");
-    tinyflows::validate::validate(&graph).expect("structurally valid test graph");
-    tinyflows::compat::ensure_compatible(&graph).expect("engine-compatible test graph");
-    graph
-}
 
 // ── validate_inference_readiness (provider-connectivity author gate, B45) ──
 //
@@ -431,8 +416,8 @@ fn seeded_slack_send_message_contract_with_schema() -> ToolContract {
 // degrade_completed_status (PR2 — run honesty)
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn clean_step(node_id: &str) -> tinyflows_catalog::FlowRunStep {
-    tinyflows_catalog::FlowRunStep {
+fn clean_step(node_id: &str) -> tinyflows_bus::catalog::FlowRunStep {
+    tinyflows_bus::catalog::FlowRunStep {
         node_id: node_id.to_string(),
         output: Value::Null,
         port: None,

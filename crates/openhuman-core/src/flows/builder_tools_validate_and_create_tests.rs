@@ -535,7 +535,7 @@ async fn cancel_flow_run_refuses_a_run_the_caller_does_not_own() {
         &owner_flow.id,
         json!({}),
         serde_json::Map::new(),
-        tinyflows_catalog::FlowRunTrigger::Rpc,
+        tinyflows_bus::runs::FlowRunTrigger::Rpc,
     )
     .await
     .unwrap();
