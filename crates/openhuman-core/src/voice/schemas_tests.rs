@@ -6,6 +6,15 @@ use crate::core::all::{
 use serde_json::json;
 
 #[test]
+fn legacy_voice_catalog_keeps_its_handler_and_example_contracts() {
+    crate::core::all::verify_parameter_contracts(
+        &all_voice_registered_controllers(),
+        &crate::voice::parameter_contracts(),
+    )
+    .unwrap();
+}
+
+#[test]
 fn voice_schema_wire_contracts_are_preserved() {
     let identities = [
         ("voice_status", "status"),

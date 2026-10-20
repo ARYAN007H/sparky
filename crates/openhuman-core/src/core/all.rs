@@ -594,10 +594,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     );
     // Voice transcription and synthesis (gated behind the `voice` feature).
     #[cfg(feature = "voice")]
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Voice,
-        crate::voice::all_voice_registered_controllers(),
+        crate::voice::all_voice_controller_entries(),
     );
     // Webhook tunnel management
     push(

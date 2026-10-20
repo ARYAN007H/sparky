@@ -21,6 +21,7 @@ mod parameter_contracts;
 pub(crate) use parameter_contracts::contracts as parameter_contracts;
 
 // Re-export the public API that callers outside this module use.
+pub(crate) use registry::all_voice_controller_entries;
 pub use registry::{all_voice_controller_schemas, all_voice_registered_controllers, voice_schemas};
 
 // ---------------------------------------------------------------------------
