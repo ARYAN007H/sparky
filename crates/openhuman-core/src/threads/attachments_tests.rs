@@ -148,3 +148,114 @@ async fn staged_claim_and_cancellation_have_one_atomic_winner() {
         assert!(!publish_staged_claim(&claim_path, &bound).await.unwrap());
     }
 }
+
+#[tokio::test]
+async fn multipart_claim_failure_keeps_prior_claim_owned_by_retry() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = dir.path().join("workspace");
+    config.action_dir = dir.path().join("actions");
+    let claim_dir = config.workspace_dir.join(STAGED_DIR);
+    tokio::fs::create_dir_all(&claim_dir).await.unwrap();
+    let first = image(MediaReference {
+        opaque_id: Some("multipart-first".into()),
+        ..Default::default()
+    });
+    let second = image(MediaReference {
+        opaque_id: Some("multipart-second".into()),
+        ..Default::default()
+    });
+    let first_path = staged_manifest_path(&config.workspace_dir, "multipart-first").unwrap();
+    let second_path = staged_manifest_path(&config.workspace_dir, "multipart-second").unwrap();
+    publish_staged_claim(
+        &second_path.with_extension("claim.json"),
+        &claim("", second.clone(), true),
+    )
+    .await
+    .unwrap();
+    let entries = vec![
+        StoredAttachment {
+            part: first.clone(),
+            path: "first.png".into(),
+        },
+        StoredAttachment {
+            part: second.clone(),
+            path: "second.png".into(),
+        },
+    ];
+    assert!(claim_staged_refs(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "thread",
+        &config,
+        "user:req",
+        &entries,
+    )
+    .await
+    .is_err());
+
+    let first_claim_path = first_path.with_extension("claim.json");
+    let owner = claim("user:req", first.clone(), false);
+    assert!(!publish_staged_claim(&first_claim_path, &owner)
+        .await
+        .unwrap());
+    assert!(
+        publish_staged_claim(&first_claim_path, &claim("user:other", first, false))
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn discarding_claimed_attachment_preserves_row_owned_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = dir.path().join("workspace");
+    config.action_dir = dir.path().join("actions");
+    let part = image(MediaReference {
+        opaque_id: Some("committed".into()),
+        content_type: Some("image/png".into()),
+        ..Default::default()
+    });
+    let claim_dir = config.workspace_dir.join(STAGED_DIR);
+    tokio::fs::create_dir_all(&claim_dir).await.unwrap();
+    let manifest_path = staged_manifest_path(&config.workspace_dir, "committed").unwrap();
+    publish_staged_claim(
+        &manifest_path.with_extension("claim.json"),
+        &claim("user:req", part.clone(), false),
+    )
+    .await
+    .unwrap();
+    let workspace = crate::agent::attachments::thread_action_dir(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &config.workspace_dir,
+        Some("thread"),
+    )
+    .await
+    .unwrap();
+    tokio::fs::create_dir_all(&workspace).await.unwrap();
+    let relative_path = "committed.png";
+    let file_path = workspace.join(relative_path);
+    tokio::fs::write(&file_path, b"row-owned bytes")
+        .await
+        .unwrap();
+    let metadata = serde_json::json!({"__openhumanStoredAttachments": [{
+        "part": part,
+        "path": relative_path
+    }]});
+    let entries = stored(&metadata).unwrap();
+
+    discard_staged_entries(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "thread",
+        &config,
+        entries,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        tokio::fs::read(file_path).await.unwrap(),
+        b"row-owned bytes"
+    );
+    assert!(manifest_path.with_extension("claim.json").exists());
+}

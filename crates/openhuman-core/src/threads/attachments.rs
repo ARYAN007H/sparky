@@ -529,9 +529,18 @@ pub(crate) async fn discard_staged_parts(
         .await
         .map_err(|error| format!("staged attachment configuration unavailable: {error}"))?;
     let entries = read_staged_entries(ctx, thread_id, requested, &config).await?;
+    discard_staged_entries(ctx, thread_id, &config, entries).await
+}
+
+async fn discard_staged_entries(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    config: &crate::config::Config,
+    entries: Vec<StoredAttachment>,
+) -> Result<(), String> {
     let workspace = crate::agent::attachments::thread_action_dir(
         ctx,
-        &config,
+        config,
         &config.workspace_dir,
         Some(thread_id),
     )
@@ -560,7 +569,7 @@ pub(crate) async fn discard_staged_parts(
             external_channel: false,
             workspace: Some(workspace.clone()),
         };
-        let path = crate::agent::attachments::resolve_path(&config, &entry.path, &scope)
+        let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
             .await
             .map_err(|error| format!("staged attachment cleanup refused: {error}"))?;
         tokio::fs::remove_file(path)
