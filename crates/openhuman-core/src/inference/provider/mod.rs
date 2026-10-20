@@ -23,7 +23,7 @@ pub(crate) use factory::is_raw_passthrough_model;
 pub use factory::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
-    provider_for_role, role_for_model_tier, BYOK_INCOMPLETE_SENTINEL,
+    provider_for_role, BYOK_INCOMPLETE_SENTINEL,
 };
 
 #[cfg(test)]

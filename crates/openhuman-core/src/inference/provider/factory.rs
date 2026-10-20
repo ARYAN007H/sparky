@@ -25,7 +25,6 @@
 //!
 //! ## Module layout
 //!
-//! - [`tiers`] — managed tier / `hint:*` vocabulary and capability lookups.
 //! - [`routing`] — role → configured provider string resolution.
 //! - [`primary_cloud`] — `primary_cloud` / legacy `inference_url` resolution.
 //! - [`access_gates`] — privacy-mode, session, and egress chokepoints.
