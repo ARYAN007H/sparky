@@ -49,6 +49,18 @@ fn gate(_ctx: DispatchCtx) -> ControllerTask<()> {
     Box::pin(async { Ok(()) })
 }
 
+fn failing_gate(_ctx: DispatchCtx) -> ControllerTask<()> {
+    CALLS.fetch_add(1, Ordering::SeqCst);
+    record_event("gate");
+    Box::pin(async { Err("gate rejected".to_owned()) })
+}
+
+fn failing_parse(_params: Map<String, Value>) -> Result<Parsed, String> {
+    CALLS.fetch_add(1, Ordering::SeqCst);
+    record_event("parse");
+    Err("parser rejected".to_owned())
+}
+
 fn schema() -> ControllerSchema {
     ControllerSchema {
         namespace: "bound_test",
@@ -151,6 +163,39 @@ fn bound_controller_preserves_parser_errors() {
 }
 
 #[test]
+fn bound_controller_gate_error_short_circuits_parser_and_runner() {
+    let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
+    CALLS.store(0, Ordering::SeqCst);
+    clear_events();
+    let controller = BoundRegisteredController::after_gate(
+        schema(),
+        failing_gate,
+        parse_value,
+        run_value_after_gate,
+    );
+
+    let error = futures::executor::block_on(controller.invoke(DispatchCtx::unbound(), params()))
+        .expect_err("gate failure is returned");
+    assert_eq!(error, "gate rejected");
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(events(), ["gate"]);
+}
+
+#[test]
+fn bound_controller_runtime_parser_error_short_circuits_runner() {
+    let _lock = TEST_LOCK.lock().expect("test lock is not poisoned");
+    CALLS.store(0, Ordering::SeqCst);
+    clear_events();
+    let controller = BoundRegisteredController::typed(schema(), failing_parse, run_value);
+
+    let error = futures::executor::block_on(controller.invoke(DispatchCtx::unbound(), params()))
+        .expect_err("parser failure is returned");
+    assert_eq!(error, "parser rejected");
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(events(), ["parse"]);
+}
+
+#[test]
 fn production_registry_binds_threads_upsert_to_its_declared_parser() {
     use serde_json::json;
 
@@ -165,6 +210,17 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
         .collect();
     assert_eq!(entries.len(), 1, "threads.upsert has one raw registry entry");
     let entry = entries[0];
+    let bound_methods: Vec<_> = registry()
+        .iter()
+        .chain(internal_registry())
+        .filter(|grouped| matches!(grouped.controller.handler, EntryHandler::Bound(_)))
+        .map(|grouped| grouped.controller.schema.method_name())
+        .collect();
+    assert_eq!(bound_methods, ["threads.upsert"], "staged bound inventory");
+    assert!(
+        matches!(entry.handler, EntryHandler::Bound(_)),
+        "threads.upsert must be bound at the production registration site"
+    );
 
     let required = ["id", "title", "created_at"];
     let declared: Vec<_> = entry
