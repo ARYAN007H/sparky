@@ -62,11 +62,11 @@ export default async function typedImageAttachmentRoundtrip({ page, mock, log, l
   const append = rpcCalls.find((call) => call.method === "openhuman.threads_message_append");
   if (!append) throw new Error("composer did not persist the user message through the core");
   const part = append.params?.attachments?.[0];
-  const dataUri = part?.image?.media?.url;
+  const dataUri = part?.media?.url;
   if (
     part?.kind !== "image" ||
-    part?.image?.media?.contentType !== "image/png" ||
-    part?.image?.media?.fileName !== FILE_NAME ||
+    part?.media?.contentType !== "image/png" ||
+    part?.media?.fileName !== FILE_NAME ||
     !dataUri?.startsWith("data:image/png;name=")
   ) {
     throw new Error(`core append lacked the typed PNG payload: ${JSON.stringify(part)}`);
