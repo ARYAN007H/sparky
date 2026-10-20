@@ -4828,7 +4828,7 @@ async fn thread_goal_is_set_read_back_and_completed_across_turns_inner() {
     // Turn 2: goal_get reads the persisted goal back — same id, same objective
     // and budget, still active. (Token accounting is not asserted here: the
     // scripted upstream returns no `usage`, so a turn charges nothing against
-    // the budget. `agent::goals::runtime`'s unit tests cover the accounting
+    // the budget. The harness-tools goal tests cover the accounting
     // and the budget-limit transition directly.)
     let request_id = send_web_chat(
         &stack.rpc_base,
