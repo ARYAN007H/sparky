@@ -5,6 +5,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import {
+  classifySpecFiles,
+  verifyDiagnosticBytes,
+} from "../../app/scripts/e2e-web-selection.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -107,13 +111,38 @@ test("strict and diagnostic selections partition discovered specs fail-closed", 
   assert.equal(new Set([...required.files, ...diagnostic.files]).size, all.files.length);
 });
 
-test("diagnostic runtime rejects changed baseline bytes and stale owner metadata", () => {
-  const result = spawnSync("node", [selectionResolver, "--selection=diagnostic"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /aui-tool-result-elements\.spec\.ts/);
+test("selection classifier rejects unknown diagnostics and protected-owner demotion", () => {
+  const base = {
+    protectedOwnerFiles: ["test/playwright/specs/owner.spec.ts"],
+    diagnostics: [{ path: "test/playwright/specs/legacy.spec.ts" }],
+  };
+  assert.throws(
+    () => classifySpecFiles(["test/playwright/specs/owner.spec.ts"], base),
+    /stale or unknown diagnostic spec/,
+  );
+  assert.throws(
+    () =>
+      classifySpecFiles(
+        ["test/playwright/specs/owner.spec.ts", "test/playwright/specs/legacy.spec.ts"],
+        { ...base, diagnostics: [{ path: "test/playwright/specs/owner.spec.ts" }] },
+      ),
+    /protected browser owners cannot be diagnostic/,
+  );
+});
+
+test("diagnostic source bytes are pinned to their reviewed baseline", () => {
+  assert.throws(
+    () =>
+      verifyDiagnosticBytes(
+        {
+          diagnostics: [
+            { path: "test/playwright/specs/legacy.spec.ts", sha256: "0".repeat(64) },
+          ],
+        },
+        () => Buffer.from("changed bytes"),
+      ),
+    /diagnostic source changed/,
+  );
 });
 
 test("CI Full requires every Playwright lane and manual workflow shares the artifact scheduler", () => {
