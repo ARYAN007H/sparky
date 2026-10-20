@@ -692,9 +692,21 @@ pub(crate) fn mark_stopped_task_if_thread_stopped(
             entry.router.resume_parent(thread_id);
             match entry.router.admit_child_generation(thread_id) {
                 Ok(Some(_)) => {}
-                Ok(None) | Err(_) => {
+                Ok(None) => {
                     state().deleted_threads.insert(thread_key.clone());
                     stopped = true;
+                }
+                Err(error) => {
+                    // Refuse this admission, but do not turn a transient store
+                    // failure into process-lifetime deletion. A later spawn can
+                    // retry once the owner store is healthy.
+                    log::warn!(
+                        "[background_completions] parent admission failed thread_id={thread_id} error={error}"
+                    );
+                    if let Err(tombstone_error) = entry.router.tombstone(task_id) {
+                        log::warn!("[background_completions] tombstone failed task_id={task_id} error={tombstone_error}");
+                    }
+                    return true;
                 }
             }
         }

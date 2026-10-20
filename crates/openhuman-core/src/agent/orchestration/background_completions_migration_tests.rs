@@ -354,3 +354,36 @@ async fn degrading_a_leased_completion_keeps_its_lease() {
         "a fallback router must not make another delivery claim while the first lease is active"
     );
 }
+
+#[tokio::test]
+async fn transient_parent_admission_failure_does_not_permanently_delete_thread() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let ws = workspace();
+    let w = ws.path();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let store = Arc::new(ToggleStore::default());
+    install_store_for_test(w, store.clone());
+    store.fail_writes.store(true, Ordering::SeqCst);
+
+    assert!(mark_stopped_task_if_thread_stopped(
+        &ctx,
+        w,
+        "retryable-parent",
+        "rejected-child",
+    ));
+
+    store.fail_writes.store(false, Ordering::SeqCst);
+    assert!(!mark_stopped_task_if_thread_stopped(
+        &ctx,
+        w,
+        "retryable-parent",
+        "accepted-child",
+    ));
+    assert!(CompletionTarget::new(
+        ctx,
+        w.to_path_buf(),
+        "retryable-session".into(),
+        Some("retryable-parent".into()),
+    )
+    .is_ok());
+}
