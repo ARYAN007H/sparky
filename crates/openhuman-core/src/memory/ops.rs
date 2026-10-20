@@ -506,7 +506,7 @@ fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     // the old file. If no value is available (including a failed import),
     // retain the legacy read path. Malformed JSON is skipped without moving
     // or rewriting its source.
-    if let Ok(Some(all)) = super::state_store::load::<BTreeMap<String, BTreeSet<String>>>(
+    if let Ok(Some(all)) = super::state_store::load_strict::<BTreeMap<String, BTreeSet<String>>>(
         workspace,
         "channel_threads",
     ) {

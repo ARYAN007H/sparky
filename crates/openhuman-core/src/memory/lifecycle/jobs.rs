@@ -65,7 +65,7 @@ impl QueueStore for FileQueueStore {
     }
 
     fn save(&self, state: &QueueState) -> std::result::Result<(), String> {
-        super::super::state_store::save(&self.workspace_dir, STATE, state)
+        super::super::state_store::save_workspace(&self.workspace_dir, STATE, state)
             .map_err(|error| error.to_string())
     }
 }
