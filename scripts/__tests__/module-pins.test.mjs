@@ -360,6 +360,14 @@ test("source parity proof rejects production, manifest, build, lock, and unknown
         proof: fixture.parity,
       });
       assert.equal(result.ok, false, `${changedFile} was incorrectly accepted`);
+      const widenedCandidate = validateTestOnlySourceParity({
+        repoPath: fixture.root,
+        version: "1.0.0",
+        assets: [{ hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) }],
+        actualHead: head,
+        proof: { ...fixture.parity, candidateCommit: head },
+      });
+      assert.equal(widenedCandidate.ok, false, `${changedFile} was accepted after widening the attested full head`);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
