@@ -7,12 +7,14 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
     use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use tinyinference_llm::message::Message;
+    use tinyinference_llm::model::ModelRequest;
 
     fn entry(name: &'static str, probed: Arc<AtomicBool>) -> ChatModelEntry {
         ChatModelEntry {
             build: Arc::new(move |_| {
                 Ok((
-                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![])),
+                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![name])),
                     name.to_string(),
                 ))
             }),
@@ -63,6 +65,35 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         let (_, model) = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
             .expect("explicit model entry builds");
         assert_eq!(model, "context-a-one-shot");
+        for (chat, _, _) in [
+            create_turn_chat_model_with_native_tools_and_route(
+                &dispatch,
+                "chat",
+                &config,
+                "hint:chat",
+                0.0,
+                true,
+                &crate::security::egress::EgressLedger::none(),
+            )
+            .expect("role-routed turn uses explicit model entry"),
+            create_turn_chat_model_from_string_with_native_tools_and_route(
+                &dispatch,
+                "chat",
+                "openhuman",
+                &config,
+                "hint:chat",
+                0.0,
+                true,
+                &crate::security::egress::EgressLedger::none(),
+            )
+            .expect("explicit managed turn uses explicit model entry"),
+        ] {
+            let response = chat
+                .invoke(&(), ModelRequest::new(vec![Message::user("probe")]))
+                .await
+                .expect("fixture response");
+            assert_eq!(response.text(), "context-a-one-shot");
+        }
         probe_inference_readiness(&dispatch, "chat", &config)
             .await
             .expect("explicit model entry is ready");
