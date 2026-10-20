@@ -41,10 +41,11 @@ fn registered_provider_default_runs_with_an_unpinned_config() {
                 .agent(AgentSpec::new("managed-default").access(Access::readonly()))
                 .expect("agent builds");
 
-            let turn = agent
-                .run("hello")
-                .await
-                .expect("registered provider supplies the unpinned default model");
+            let turn = agent.run("hello").await;
+            if let Err(error) = &turn {
+                eprintln!("managed model fixture turn error: {error:#}");
+            }
+            let turn = turn.expect("registered provider supplies the unpinned default model");
             assert!(turn.reply.contains("fixture reply"));
 
             let requests = chat_requests(&inference).await;
