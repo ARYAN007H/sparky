@@ -376,14 +376,16 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                         context
                     },
                     tool_call_id: tool_call_id.clone(),
-                    args: Some(serde_json::json!({
-                        "artifact_id": artifact_id,
-                        "kind": kind,
-                        "title": title,
-                        "workspace_dir": workspace_dir,
-                        "path": path,
-                        "size_bytes": size_bytes,
-                    })),
+                    args: Some(serde_json::json!(
+                        crate::agent::artifacts::types::ArtifactReadyPayload {
+                            artifact_id: artifact_id.clone(),
+                            kind: kind.clone(),
+                            title: title.clone(),
+                            workspace_dir: workspace_dir.clone(),
+                            path: path.clone(),
+                            size_bytes: *size_bytes,
+                        }
+                    )),
                 });
             }
             DomainEvent::ArtifactFailed {
@@ -414,13 +416,15 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                         context
                     },
                     tool_call_id: tool_call_id.clone(),
-                    args: Some(serde_json::json!({
-                        "artifact_id": artifact_id,
-                        "kind": kind,
-                        "title": title,
-                        "workspace_dir": workspace_dir,
-                        "error": error,
-                    })),
+                    args: Some(serde_json::json!(
+                        crate::agent::artifacts::types::ArtifactFailedPayload {
+                            artifact_id: artifact_id.clone(),
+                            kind: kind.clone(),
+                            title: title.clone(),
+                            workspace_dir: workspace_dir.clone(),
+                            error: error.clone(),
+                        }
+                    )),
                 });
             }
             DomainEvent::ArtifactPending {
@@ -450,13 +454,15 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                         context
                     },
                     tool_call_id: tool_call_id.clone(),
-                    args: Some(serde_json::json!({
-                        "artifact_id": artifact_id,
-                        "kind": kind,
-                        "title": title,
-                        "workspace_dir": workspace_dir,
-                        "path": path,
-                    })),
+                    args: Some(serde_json::json!(
+                        crate::agent::artifacts::types::ArtifactPendingPayload {
+                            artifact_id: artifact_id.clone(),
+                            kind: kind.clone(),
+                            title: title.clone(),
+                            workspace_dir: workspace_dir.clone(),
+                            path: path.clone(),
+                        }
+                    )),
                 });
             }
             _ => {}

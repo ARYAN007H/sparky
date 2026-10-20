@@ -1,21 +1,34 @@
 /**
  * Frontend view of the chat wire contract.
  *
- * Every shape here is DERIVED from `chatWire.generated.ts`, which is generated
- * from the tinychannels `WebChannelEvent` JSON schema (`pnpm chat-wire:generate`;
- * CI runs `pnpm chat-wire:check`). Do not re-declare a wire field by hand: change
- * the schema upstream and regenerate.
+ * Wire envelopes here are derived from `chatWire.generated.ts`, generated from
+ * the tinychannels `WebChannelEvent` schema. Core-owned artifact and thread
+ * records come from `threadWire.generated.ts` (`pnpm chat-wire:generate`; CI
+ * runs `pnpm chat-wire:check`). Do not re-declare owner record fields by hand:
+ * change the schema source and regenerate.
  *
  * Two derivations are applied to the generated variants:
  * - `null` is dropped from optional fields. The core omits `None` on the wire
  *   (`skip_serializing_if`), so `null` never arrives; consumers read absence.
  * - fields the core always sets for an event are made required (see each alias).
  *
- * The only hand-written shapes are the typed views of fields the schema leaves
- * as open JSON (`goal`, `todos`, `copy_params`, `citations`, tool `args`). Each
- * is marked "open JSON in the schema" below.
+ * Owner-defined records and enum values are imported from the generated thread
+ * schema. Hand-written types below are consumer projections of open event JSON
+ * or flattened host events; their validation/transformations are documented at
+ * the projection boundary.
  */
 import type { ChatErrorCopyParams } from '../lib/chatErrorCopy';
+import type {
+  ArtifactFailedPayload,
+  ArtifactKind as ArtifactKindWire,
+  ArtifactPendingPayload,
+  ArtifactReadyPayload,
+  QueueMode as QueueModeWire,
+  RunMode as RunModeWire,
+  ThreadGoal as ThreadGoalWire,
+  TodoItem as TodoItemWire,
+  TurnCitation as TurnCitationWire,
+} from '../types/threadWire.generated';
 import type {
   ChatSuggestion,
   ContentPart,
@@ -31,6 +44,9 @@ import type {
 } from './chatWire.generated';
 
 export type { ContentPart, OutboundContentPart, WebChannelEvent };
+export type QueueMode = QueueModeWire;
+export type RunMode = RunModeWire;
+export type ArtifactKind = ArtifactKindWire;
 
 type Tag = WebChannelEvent['event'];
 type Variant<K extends Tag> = Extract<WebChannelEvent, { event: K }>;
@@ -73,15 +89,8 @@ export type QueueItemPayload = NoNull<WebQueueItemPayload>;
 /** One follow-up suggestion chip. */
 export type ChatSuggestionWire = NoNull<ChatSuggestion>;
 
-/** A memory citation on `chat_done` / `chat_segment` (open JSON in the schema). */
-export interface ChatCitation {
-  id: string;
-  key: string;
-  namespace?: string;
-  score?: number;
-  timestamp: string;
-  snippet: string;
-}
+/** A memory citation on `chat_done` / `chat_segment`, from the core record schema. */
+export type ChatCitation = TurnCitationWire;
 
 // ── Turn lifecycle ───────────────────────────────────────────────────────────
 
@@ -203,22 +212,11 @@ export type ChatPlanReviewRequestEvent = Omit<
 
 // ── Thread state (goal, todos, run mode) ─────────────────────────────────────
 
-/** One item of a thread's todo list (open JSON in the schema). */
-export interface ChatThreadTodoItem {
-  content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  reason?: string;
-}
+/** One item of a thread's todo list, from the TinyAgents owner schema. */
+export type ChatThreadTodoItem = TodoItemWire;
 
-/** The thread's durable goal (open JSON in the schema; owned by tinyagents-graph). */
-export interface ThreadGoal {
-  goal_id: string;
-  objective: string;
-  status: 'active' | 'paused' | 'budget_limited' | 'complete';
-  token_budget?: number;
-  tokens_used: number;
-  time_used_seconds: number;
-}
+/** The thread's durable goal, from the TinyAgents owner schema. */
+export type ThreadGoal = ThreadGoalWire;
 
 export type ChatThreadTodosChangedEvent = Omit<WireEvent<'thread_todos_changed'>, 'todos'> & {
   todos: ChatThreadTodoItem[];
@@ -227,8 +225,6 @@ export type ChatThreadGoalUpdatedEvent = Omit<WireEvent<'thread_goal_updated'>, 
   goal: ThreadGoal;
 };
 export type ChatThreadGoalClearedEvent = WireEvent<'thread_goal_cleared'>;
-export type RunMode = 'plan' | 'build';
-
 /** `run_mode_changed` as consumers see it; the wire carries the mode in `message`. */
 export type ChatRunModeChangedEvent = Omit<WireEvent<'run_mode_changed'>, 'message'> & {
   mode: RunMode;
@@ -246,29 +242,18 @@ export function decodeRunModeChanged(
 // The artifact payload rides the wire event's open `args` JSON; chatService
 // validates it and flattens it into these views.
 
-export type ArtifactKind = 'presentation' | 'document' | 'image' | 'video' | 'other';
-
-interface ArtifactBase {
+interface ArtifactContext {
   thread_id: string;
   client_id?: string;
-  artifact_id: string;
-  kind: ArtifactKind;
-  title: string;
-  workspace_dir: string;
   tool_call_id?: string;
   request_id?: string;
 }
 
-export interface ArtifactReadyEvent extends ArtifactBase {
-  path: string;
-  size_bytes: number;
-}
-export interface ArtifactFailedEvent extends ArtifactBase {
-  error: string;
-}
-export interface ArtifactPendingEvent extends ArtifactBase {
-  path: string;
-}
+type ValidatedArtifactKind<T> = Omit<T, 'kind'> & { kind: ArtifactKind };
+
+export type ArtifactReadyEvent = ValidatedArtifactKind<ArtifactReadyPayload> & ArtifactContext;
+export type ArtifactFailedEvent = ValidatedArtifactKind<ArtifactFailedPayload> & ArtifactContext;
+export type ArtifactPendingEvent = ValidatedArtifactKind<ArtifactPendingPayload> & ArtifactContext;
 
 // ── Queue and suggestions ────────────────────────────────────────────────────
 

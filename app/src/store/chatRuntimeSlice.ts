@@ -5,6 +5,7 @@ import { mapDisplayItems } from '../features/conversations/derived/mapDisplayIte
 import { threadApi } from '../services/api/threadApi';
 import type { CostSource } from '../services/chatService';
 import type { DerivedTranscriptPage } from '../types/derivedTranscript';
+import type { ArtifactKind } from '../types/threadWire.generated';
 import type {
   AgentRun,
   PersistedSubagentActivity,
@@ -869,7 +870,7 @@ export type ArtifactStatus = 'in_progress' | 'ready' | 'failed';
 export interface ArtifactSnapshot {
   artifactId: string;
   /** Kind slug from the Rust `ArtifactKind` enum. */
-  kind: 'presentation' | 'document' | 'image' | 'video' | 'other';
+  kind: ArtifactKind;
   /** Human-readable title; also the on-disk filename stem. */
   title: string;
   status: ArtifactStatus;

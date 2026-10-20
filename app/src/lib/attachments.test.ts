@@ -299,6 +299,9 @@ describe('video attachments', () => {
       expect(attachmentsToParts([result.attachment])).toEqual([
         {
           kind: 'video',
+          caption: null,
+          durationMs: null,
+          thumbnail: null,
           media: expect.objectContaining({
             url: 'data:video/mp4;name=clip.mp4;base64,AQIDBA==',
             contentType: 'video/mp4',
@@ -450,12 +453,22 @@ describe('attachmentsToParts', () => {
     expect(attachmentsToParts([a])).toEqual([
       {
         kind: 'image',
+        altText: null,
+        caption: null,
         media: {
           kind: 'image',
           url: 'data:image/png;base64,abc',
           contentType: 'image/png',
           fileName: 'shot.png',
           sizeBytes: 321,
+          codec: null,
+          durationMs: null,
+          height: null,
+          localCachePath: null,
+          path: null,
+          platformMessageId: null,
+          transcribed: false,
+          width: null,
         },
       },
     ]);
@@ -479,6 +492,7 @@ describe('attachmentsToParts', () => {
       {
         kind: 'file',
         fileName: 'doc.pdf',
+        caption: null,
         media: expect.objectContaining({
           kind: 'document',
           url: 'data:application/pdf;base64,abc',

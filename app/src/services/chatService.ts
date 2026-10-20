@@ -52,6 +52,7 @@ import {
   ProactiveMessageEvent,
   QueueItemEvent,
   QueueItemPayload,
+  QueueMode,
   WireEvent,
 } from './chatWire';
 import { callCoreRpc } from './coreRpcClient';
@@ -85,6 +86,7 @@ export type {
   ChatThreadGoalUpdatedEvent,
   ChatThreadGoalClearedEvent,
   ChatRunModeChangedEvent,
+  QueueMode,
   ArtifactKind,
   ArtifactReadyEvent,
   ArtifactFailedEvent,
@@ -643,6 +645,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     'presentation',
     'document',
     'image',
+    'video',
     'other',
   ]);
   const isValidArtifactKind = (k: unknown): k is ArtifactKind =>
@@ -892,9 +895,6 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
   };
 }
 
-// UI-only send options; the RPC `queue_mode` remains a server-owned string.
-type QueueMode = 'interrupt' | 'steer' | 'followup' | 'collect' | 'parallel';
-
 interface ChatSendParams {
   threadId: string;
   message: string;
@@ -1010,11 +1010,7 @@ function isStartedChatAck(value: unknown): value is StartedChatAck {
 }
 
 function unwrapChatAck(value: unknown): unknown {
-  if (
-    isRecord(value) &&
-    Object.hasOwn(value, 'result') &&
-    Array.isArray(value.logs)
-  ) {
+  if (isRecord(value) && Object.hasOwn(value, 'result') && Array.isArray(value.logs)) {
     return value.result;
   }
   return value;

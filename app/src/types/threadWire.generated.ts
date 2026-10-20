@@ -3,6 +3,10 @@
 // Do not edit by hand; run `pnpm chat-wire:generate`.
 
 /**
+ * The category of an artifact produced by the agent.
+ */
+export type ArtifactKind = 'presentation' | 'document' | 'image' | 'video' | 'other';
+/**
  * Lifecycle of an in-flight (or formerly in-flight) turn.
  *
  * `Started` is set when the user sends and the agent loop is about
@@ -183,6 +187,26 @@ export type VoiceTranscriptState = 'pending' | 'complete' | 'unavailable';
  * Visual button emphasis; it does not change action authority.
  */
 export type ButtonStyle = 'primary' | 'secondary' | 'danger';
+/**
+ * Web chat's five request dispositions (distinct from harness queue lanes).
+ */
+export type QueueMode = 'interrupt' | 'steer' | 'followup' | 'collect' | 'parallel';
+/**
+ * A per-run mode gating side-effecting tools, toggled by the host without
+ * restarting the run.
+ *
+ * `Build` (the default) leaves tool exposure and execution unrestricted.
+ * `Plan` hides every side-effecting tool from the model
+ * ([`PlanModeMiddleware`]'s `before_model`, the same auditable
+ * `AgentEvent::ToolsFiltered` mechanism [`ContextualToolSelectionMiddleware`]
+ * uses) and denies it at execution (`before_tool`, the same
+ * [`ToolPolicy`]/[`ToolSideEffects`] classification
+ * [`ToolPolicyMiddleware::deny_side_effects`] enforces) — except for tools on
+ * the middleware's allowlist, which stay available in either mode so a host
+ * can keep read-only tools and a handful of plan-mode-specific tools (e.g.
+ * `plan_exit`, `request_plan_review`, `todo`) reachable while planning.
+ */
+export type RunMode = 'build' | 'plan';
 
 /**
  * Root schema whose properties provide the UI-facing thread record aliases.
@@ -191,22 +215,31 @@ export interface ThreadWireTypes {
   agentRun: AgentRun;
   agentRunGet: RunLedgerGetWireResponse;
   agentRunList: AgentRunListResponse;
+  artifactFailedPayload: ArtifactFailedPayload;
+  artifactKind: ArtifactKind;
+  artifactPendingPayload: ArtifactPendingPayload;
+  artifactReadyPayload: ArtifactReadyPayload;
   clearTurnState: ClearTurnStateResponse;
   getTurnState: GetTurnStateResponse;
   listTurnStates: ListTurnStatesResponse;
   message: ConversationMessageRecord;
   purgeResult: PurgeConversationThreadsResponse;
+  queueMode: QueueMode;
   queuedChatAck: QueuedChatAck;
   runEvent: RunEvent;
   runEventList: RunEventListResponse;
+  runMode: RunMode;
   runTelemetry: RunTelemetry;
   startedChatAck: StartedChatAck;
   thread: ConversationThreadSummary;
   threadDelete: DeleteConversationThreadResponse;
+  threadGoal: ThreadGoal;
   threadMessages: ConversationMessagesResponse;
   threadSearch: ThreadSearchResponse;
   threadSearchHit: ThreadSearchHit;
+  threadTodoItem: TodoItem;
   threadsList: ConversationThreadsListResponse;
+  turnCitation: TurnCitation;
 }
 /**
  * A persisted background agent run: a subagent, worker thread, background
@@ -330,6 +363,40 @@ export interface AgentRunListResponse {
    */
   count: number;
   runs: AgentRun[];
+}
+/**
+ * Artifact fields carried inside `WebChannelEvent.args` when generation
+ * failed. The producer truncates `error` before publishing this payload.
+ */
+export interface ArtifactFailedPayload {
+  artifact_id: string;
+  error: string;
+  kind: string;
+  title: string;
+  workspace_dir: string;
+}
+/**
+ * Artifact fields carried inside the generic `WebChannelEvent.args` payload
+ * when an artifact has been reserved and generation is in progress.
+ */
+export interface ArtifactPendingPayload {
+  artifact_id: string;
+  kind: string;
+  path: string;
+  title: string;
+  workspace_dir: string;
+}
+/**
+ * Artifact fields carried inside `WebChannelEvent.args` after a file is
+ * available for download.
+ */
+export interface ArtifactReadyPayload {
+  artifact_id: string;
+  kind: string;
+  path: string;
+  size_bytes: number;
+  title: string;
+  workspace_dir: string;
 }
 /**
  * Response payload for `openhuman.threads_turn_state_clear`.
@@ -758,6 +825,56 @@ export interface DeleteConversationThreadResponse {
   deleted: boolean;
 }
 /**
+ * A single thread-scoped goal.
+ */
+export interface ThreadGoal {
+  /**
+   * Set when a continuation iteration produced **no progress**, to stop a
+   * continuation loop. Cleared on any user-initiated run or external
+   * mutation (e.g. a fresh `goal_set` or [`super::note_user_turn`]).
+   */
+  continuationSuppressed: boolean;
+  /**
+   * Creation time (unix epoch milliseconds).
+   */
+  createdAtMs: number;
+  /**
+   * Version identifier, re-minted on **every objective replacement**. Stale
+   * accounting writes that pass a non-matching `expected_goal_id` are
+   * silently ignored — see [`super::store::account_usage`].
+   */
+  goalId: string;
+  /**
+   * The durable objective, one or more sentences.
+   */
+  objective: string;
+  /**
+   * Lifecycle state.
+   */
+  status: 'active' | 'paused' | 'budget_limited' | 'complete';
+  /**
+   * The thread this goal belongs to (one goal per thread).
+   */
+  threadId: string;
+  /**
+   * Cumulative wall-clock seconds accounted against this goal.
+   */
+  timeUsedSeconds: number;
+  /**
+   * Optional token ceiling. When set and `tokens_used >= token_budget`, the
+   * goal transitions to [`ThreadGoalStatus::BudgetLimited`].
+   */
+  tokenBudget?: number | null;
+  /**
+   * Cumulative tokens accounted against this goal.
+   */
+  tokensUsed: number;
+  /**
+   * Last-mutation time (unix epoch milliseconds).
+   */
+  updatedAtMs: number;
+}
+/**
  * Response payload for message list operations.
  */
 export interface ConversationMessagesResponse {
@@ -784,9 +901,58 @@ export interface ThreadSearchHit {
   threadId: string;
 }
 /**
+ * One item on a thread's todo list.
+ */
+export interface TodoItem {
+  /**
+   * The step, as the model wrote it.
+   */
+  content: string;
+  /**
+   * Why the step was cancelled. Absent in every other state.
+   */
+  reason?: string | null;
+  /**
+   * Lifecycle state.
+   */
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+}
+/**
  * Response payload for thread list operations.
  */
 export interface ConversationThreadsListResponse {
   count: number;
   threads: ConversationThreadSummary[];
+}
+/**
+ * A recall citation attached to a chat reply so the UI can show where a
+ * memory-informed answer came from. Same JSON shape the chat surface has
+ * always rendered: `key` is the item kind, `namespace` its source kind,
+ * `timestamp` when it was observed, `snippet` a short excerpt.
+ */
+export interface TurnCitation {
+  /**
+   * Item id.
+   */
+  id: string;
+  /**
+   * Item kind (`document`, `conversation`, `learning`).
+   */
+  key: string;
+  /**
+   * Source kind (`folder`, `agent`, …).
+   */
+  namespace?: string | null;
+  /**
+   * Relevance, when the engine reports one.
+   */
+  score?: number | null;
+  /**
+   * Short excerpt.
+   */
+  snippet: string;
+  /**
+   * When the item was observed (RFC 3339), or empty.
+   */
+  timestamp: string;
 }

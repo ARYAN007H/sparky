@@ -396,7 +396,7 @@ pub struct ImportStateView {
 /// memory-informed answer came from. Same JSON shape the chat surface has
 /// always rendered: `key` is the item kind, `namespace` its source kind,
 /// `timestamp` when it was observed, `snippet` a short excerpt.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TurnCitation {
     /// Item id.
     pub id: String,
