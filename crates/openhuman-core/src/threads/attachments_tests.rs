@@ -157,16 +157,18 @@ async fn multipart_claim_failure_keeps_prior_claim_owned_by_retry() {
     config.action_dir = dir.path().join("actions");
     let claim_dir = config.workspace_dir.join(STAGED_DIR);
     tokio::fs::create_dir_all(&claim_dir).await.unwrap();
+    let first_id = uuid::Uuid::new_v4().to_string();
+    let second_id = uuid::Uuid::new_v4().to_string();
     let first = image(MediaReference {
-        opaque_id: Some("multipart-first".into()),
+        opaque_id: Some(first_id.clone()),
         ..Default::default()
     });
     let second = image(MediaReference {
-        opaque_id: Some("multipart-second".into()),
+        opaque_id: Some(second_id.clone()),
         ..Default::default()
     });
-    let first_path = staged_manifest_path(&config.workspace_dir, "multipart-first").unwrap();
-    let second_path = staged_manifest_path(&config.workspace_dir, "multipart-second").unwrap();
+    let first_path = staged_manifest_path(&config.workspace_dir, &first_id).unwrap();
+    let second_path = staged_manifest_path(&config.workspace_dir, &second_id).unwrap();
     publish_staged_claim(
         &second_path.with_extension("claim.json"),
         &claim("", second.clone(), true),
@@ -211,14 +213,15 @@ async fn discarding_claimed_attachment_preserves_row_owned_file() {
     let mut config = crate::config::Config::default();
     config.workspace_dir = dir.path().join("workspace");
     config.action_dir = dir.path().join("actions");
+    let opaque_id = uuid::Uuid::new_v4().to_string();
     let part = image(MediaReference {
-        opaque_id: Some("committed".into()),
+        opaque_id: Some(opaque_id.clone()),
         content_type: Some("image/png".into()),
         ..Default::default()
     });
     let claim_dir = config.workspace_dir.join(STAGED_DIR);
     tokio::fs::create_dir_all(&claim_dir).await.unwrap();
-    let manifest_path = staged_manifest_path(&config.workspace_dir, "committed").unwrap();
+    let manifest_path = staged_manifest_path(&config.workspace_dir, &opaque_id).unwrap();
     publish_staged_claim(
         &manifest_path.with_extension("claim.json"),
         &claim("user:req", part.clone(), false),
