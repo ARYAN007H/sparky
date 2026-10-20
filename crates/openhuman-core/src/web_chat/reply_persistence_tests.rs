@@ -237,7 +237,6 @@ fn a_spoken_reply_row_points_at_its_stored_audio() {
         "req-v",
         "YWJj",
         "audio/mpeg",
-        &[] as &[serde_json::Value],
     );
     persist_delivered_reply(&ctx, &ws, "t-voice", "req-v", "Hello", &[]).expect("append");
     persist_delivered_reply(&ctx, &ws, "t-no-audio", "req-w", "Hi", &[]).ok();

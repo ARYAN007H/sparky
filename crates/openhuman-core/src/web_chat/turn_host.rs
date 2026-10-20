@@ -348,7 +348,7 @@ impl WebHost {
         let turn_elapsed = turn_started.elapsed();
 
         if let Ok(task_result) = result.as_ref() {
-            speak_and_publish(&config, request, task_result).await;
+            speak_and_publish(&ctx, &config, request, task_result).await;
         }
 
         // TinyMemes: remix the final reply (slang + memes) when the flag puts
@@ -481,6 +481,7 @@ impl WebHost {
 /// Speak the reply when the request, the thread or the voice mode asks for it,
 /// and tell a push-to-talk session what was committed.
 async fn speak_and_publish(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &crate::config::Config,
     request: &TurnRequest<QueuedPayload>,
     task_result: &WebChatTaskResult,
@@ -514,8 +515,20 @@ async fn speak_and_publish(
                     &request.request_id,
                     &outcome.value.audio_base64,
                     &outcome.value.audio_mime,
-                    &outcome.value.visemes,
                 );
+                if stored {
+                    if let Err(err) = super::voice_notes::persist_reply_visemes(
+                        ctx,
+                        &config.workspace_dir,
+                        &request.request_id,
+                        &outcome.value.visemes,
+                    ) {
+                        log::warn!(
+                            "[web_channel][voice_note] could not store reply timeline request_id={}: {err}",
+                            request.request_id
+                        );
+                    }
+                }
                 log::debug!(
                     "[web_channel] reply_speech dispatched chars={} stored={stored} client_id={} thread_id={thread_id} request_id={}",
                     task_result.full_response.len(),
