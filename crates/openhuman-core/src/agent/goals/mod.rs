@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, Weak};
 
-use tinyagents_harness_tools::goals::{GoalObserver, GoalStore, ThreadGoal};
-use tinytools::Tool;
+use tinyagents_harness_tools::goals::{GoalObserver, GoalStore, GoalTool, GoalToolKind, ThreadGoal};
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolPolicy, ToolResult, ToolRunContext};
 
 /// Serialize a [`ThreadGoal`] for the existing goal event and RPC payload.
 #[must_use]
@@ -75,17 +75,80 @@ impl GoalObserver for OpenHumanGoalObserver {
 
 /// The model-facing goal controls, backed by the context-scoped observer.
 pub fn goal_tools(workspace_dir: &Path) -> Vec<Box<dyn Tool>> {
-    let context = crate::core::runtime::DispatchCtx::ambient();
-    let store = goal_store(workspace_dir, &context);
-    tinyagents_harness_tools::goals::GoalToolKind::MODEL_FACING
+    GoalToolKind::MODEL_FACING
         .into_iter()
         .map(|kind| {
-            Box::new(tinyagents_harness_tools::goals::GoalTool::new(
-                kind,
-                Arc::clone(&store),
-            )) as Box<dyn Tool>
+            Box::new(OpenHumanGoalTool::new(kind, workspace_dir)) as Box<dyn Tool>
         })
         .collect()
+}
+
+struct OpenHumanGoalTool {
+    kind: GoalToolKind,
+    workspace_dir: PathBuf,
+    metadata: GoalTool,
+}
+
+impl OpenHumanGoalTool {
+    fn new(kind: GoalToolKind, workspace_dir: &Path) -> Self {
+        let metadata_store = tinyagents_session::port::InMemorySessionStores::new().kv;
+        Self {
+            kind,
+            workspace_dir: workspace_dir.to_path_buf(),
+            metadata: GoalTool::new(kind, Arc::new(GoalStore::new(metadata_store))),
+        }
+    }
+
+    fn for_context(&self, context: Option<&dyn ToolRunContext>) -> GoalTool {
+        let dispatch =
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        GoalTool::new(
+            self.kind,
+            goal_store(&self.workspace_dir, &dispatch),
+        )
+    }
+}
+
+#[async_trait::async_trait]
+impl Tool for OpenHumanGoalTool {
+    fn name(&self) -> &str {
+        self.metadata.name()
+    }
+
+    fn description(&self) -> &str {
+        self.metadata.description()
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        self.metadata.parameters_schema()
+    }
+
+    fn supports_markdown(&self) -> bool {
+        self.metadata.supports_markdown()
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        self.metadata.permission_level()
+    }
+
+    fn policy(&self) -> ToolPolicy {
+        self.metadata.policy()
+    }
+
+    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        self.metadata.execute(args).await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: serde_json::Value,
+        options: ToolCallOptions,
+        context: Option<&dyn ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        self.for_context(context)
+            .execute_with_context(args, options, context)
+            .await
+    }
 }
 
 /// Best-effort account of receipt-backed usage against a thread's goal.
