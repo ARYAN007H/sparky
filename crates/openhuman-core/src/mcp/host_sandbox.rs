@@ -162,6 +162,7 @@ fn admit_all(raw: &[String], home: Option<&Path>) -> Vec<String> {
         let path = expanded.canonicalize().unwrap_or_else(|_| expanded.clone());
         if SecurityPolicy::is_always_forbidden(&expanded)
             || SecurityPolicy::is_always_forbidden(&path)
+            || exposes_credentials(&expanded, home)
             || exposes_credentials(&path, home)
         {
             tracing::warn!("[mcp] refused a stdio sandbox grant: host floor forbids it");
