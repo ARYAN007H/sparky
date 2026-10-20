@@ -145,49 +145,6 @@ fn render_withheld_specialists(ctx: &PromptContext<'_>) -> String {
     let _ = ctx;
     String::new()
 }
-    tracing::debug!(
-        count = rows.len(),
-        "[orchestrator-prompt] rendering withheld-specialist routing"
-    );
-
-    // Keep the live specialist roster in the prompt even when the tool schema
-    // is packed away. Escape registry text before placing it into prompt markup.
-    let mut by_pack: std::collections::BTreeMap<&'static str, Vec<(String, String)>> =
-        std::collections::BTreeMap::new();
-    for (tool, pack, description) in rows {
-        by_pack
-            .entry(pack)
-            .or_default()
-            .push((tool, prompt_safe(&description)));
-    }
-    let entries: Vec<String> = by_pack
-        .into_iter()
-        .map(|(pack, tools)| {
-            let roster = tools
-                .into_iter()
-                .map(|(tool, description)| format!("`{tool}`: {description}"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("`{pack}` ({roster})")
-        })
-        .collect();
-    format!(
-        "## Capabilities not in your tool list\n\nVia `use_skill`: {}.",
-        entries.join(", ")
-    )
-}
-
-fn prompt_safe(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| match ch {
-            '`' => "'".to_string(),
-            ch if ch.is_control() => format!("\\u{{{:x}}}", ch as u32),
-            ch => ch.to_string(),
-        })
-        .collect()
-}
-
 /// How this session can reach `specialist` right now, as the call to name.
 ///
 /// The hand-off tool in backticks when it is on the belt; the `use_skill` form
