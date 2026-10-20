@@ -1114,6 +1114,14 @@ async fn run_managed_capture_turn(
     );
     drop(events);
     stack.shutdown_and_wait().await;
+    // The bare test router dispatches RPC with DispatchCtx::unbound(). Its
+    // cached web-chat agent outlives a router shutdown, so remove that session
+    // from the same process-default slot before the fixture resets its files.
+    openhuman_core::web_chat::invalidate_thread_sessions(
+        &openhuman_core::core::runtime::DispatchCtx::unbound(),
+        "managed-capture-thread",
+    )
+    .await;
 
     with_captured_proxy_requests(|requests| requests.clone())
 }
