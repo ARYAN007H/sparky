@@ -104,6 +104,17 @@ fn approval_gated_parser_graph() -> Value {
     })
 }
 
+fn deduplicating_graph() -> Value {
+    json!({
+        "name": "Published run state",
+        "nodes": [
+            { "id": "trigger", "kind": "trigger", "name": "Manual" },
+            { "id": "dedup", "kind": "dedup", "name": "Once per item", "config": { "key": "=item.id" } }
+        ],
+        "edges": [{ "from_node": "trigger", "to_node": "dedup" }]
+    })
+}
+
 #[tokio::test]
 async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     let _env_lock = env_guard::env_lock_async().await;
@@ -199,6 +210,47 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     )
     .await;
     assert_eq!(approved_row["status"], "completed");
+
+    // Module-owned dedup state is committed through the same captured
+    // CatalogStorage callback and survives between public Starts on one flow.
+    let dedup_flow = ok(
+        addr,
+        TEST_TOKEN,
+        13,
+        "openhuman.flows_create",
+        json!({ "name": "Published dedup state", "graph": deduplicating_graph() }),
+    )
+    .await;
+    let dedup_flow_id = dedup_flow["id"].as_str().expect("dedup flow id").to_owned();
+    let item = json!({ "id": "stable-item" });
+    let first_dedup = ok(
+        addr,
+        TEST_TOKEN,
+        14,
+        "openhuman.flows_run",
+        json!({ "id": dedup_flow_id, "input": item }),
+    )
+    .await;
+    assert_eq!(
+        first_dedup["output"]["nodes"]["dedup"]["items"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    let second_dedup = ok(
+        addr,
+        TEST_TOKEN,
+        15,
+        "openhuman.flows_run",
+        json!({ "id": dedup_flow_id, "input": item }),
+    )
+    .await;
+    assert_eq!(
+        second_dedup["output"]["nodes"]["dedup"]["items"]
+            .as_array()
+            .map(Vec::len),
+        Some(0)
+    );
 
     let parked = ok(
         addr,
