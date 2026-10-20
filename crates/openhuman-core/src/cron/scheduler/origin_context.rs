@@ -91,8 +91,12 @@ async fn origin_messages(
             ..
         } => match validated_channel_session(ctx, config, channel, identity) {
             Ok(Some((session_key, agent_id, tenant))) => {
+                let Some(core) = ctx.core() else {
+                    tracing::warn!("[cron] channel origin has no resolved core context");
+                    return Vec::new();
+                };
                 let locator = crate::agent::session_store::transcripts_or_files_in(
-                    ctx.core().expect("validated tenant has a core context"),
+                    core,
                     &crate::agent::session_store::agent_key_for(&tenant, &agent_id),
                     &config.workspace_dir,
                 );
