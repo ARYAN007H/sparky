@@ -95,7 +95,11 @@ test.describe('Gmail Integration Flows', () => {
     await page.getByTestId('two-pane-nav-composio').click();
 
     await page.getByTestId('skill-install-composio-gmail').click();
-    await expect(page.getByRole('dialog', { name: /Connect Gmail/i })).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: /Connect Gmail/i });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByTestId('skill-install-composio-gmail')).toHaveAccessibleName(/Connect/i);
   });
 
   test('connected Gmail exposes management affordances', async ({ page }) => {
@@ -117,12 +121,18 @@ test.describe('Gmail Integration Flows', () => {
     await dialog.getByRole('button', { name: /close/i }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByTestId('skill-install-composio-gmail')).toHaveAccessibleName(/Connect/i);
+
+    await page.getByTestId('skill-install-composio-gmail').click();
+    const setup = page.getByRole('dialog', { name: /Connect Gmail/i });
+    await expect(setup).toBeVisible();
+    await expect(setup.getByRole('button', { name: 'Connect Gmail', exact: true })).toBeVisible();
   });
 
   test('failed and expired states remain usable', async ({ page }) => {
     await seedConnector('FAILED');
     await page.reload();
     await waitForAppReady(page);
+    await expect(page.getByRole('button', { name: 'Connections' })).toBeVisible();
     // Phase 2: "Composio" tab renamed to "Apps"
     await page.getByTestId('two-pane-nav-composio').click();
     await expect(page.getByTestId('skill-install-composio-gmail')).toContainText(CONNECTOR_NAME);
@@ -130,6 +140,7 @@ test.describe('Gmail Integration Flows', () => {
     await seedConnector('EXPIRED');
     await page.reload();
     await waitForAppReady(page);
+    await expect(page.getByRole('button', { name: 'Connections' })).toBeVisible();
     // Phase 2: "Composio" tab renamed to "Apps"
     await page.getByTestId('two-pane-nav-composio').click();
     await expect(page.getByTestId(`skill-install-composio-${TOOLKIT_SLUG}`)).toContainText(
