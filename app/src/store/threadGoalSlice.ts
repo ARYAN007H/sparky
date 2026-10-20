@@ -5,6 +5,7 @@
  * the old tool-result-scraping `selectThreadGoal` in `harnessState.ts`.
  */
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+
 import type { ThreadGoal as ThreadGoalWire } from '../types/threadWire.generated';
 
 export type ThreadGoalStatus = ThreadGoalWire['status'];

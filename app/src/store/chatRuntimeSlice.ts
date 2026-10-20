@@ -4,8 +4,8 @@ import debug from 'debug';
 import { mapDisplayItems } from '../features/conversations/derived/mapDisplayItems';
 import { threadApi } from '../services/api/threadApi';
 import type { CostSource } from '../services/chatService';
-import type { ArtifactKind } from '../types/threadWire.generated';
 import type { DerivedTranscriptPage } from '../types/derivedTranscript';
+import type { ArtifactKind } from '../types/threadWire.generated';
 import type {
   AgentRun,
   PersistedSubagentActivity,

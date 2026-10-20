@@ -50,9 +50,9 @@ import {
   ExternalTransferPendingEvent,
   externalTransferProvider,
   ProactiveMessageEvent,
-  QueueMode,
   QueueItemEvent,
   QueueItemPayload,
+  QueueMode,
   WireEvent,
 } from './chatWire';
 import { callCoreRpc } from './coreRpcClient';
@@ -1010,11 +1010,7 @@ function isStartedChatAck(value: unknown): value is StartedChatAck {
 }
 
 function unwrapChatAck(value: unknown): unknown {
-  if (
-    isRecord(value) &&
-    Object.hasOwn(value, 'result') &&
-    Array.isArray(value.logs)
-  ) {
+  if (isRecord(value) && Object.hasOwn(value, 'result') && Array.isArray(value.logs)) {
     return value.result;
   }
   return value;
