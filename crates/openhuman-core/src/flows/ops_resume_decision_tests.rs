@@ -298,9 +298,22 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
     )
     .await
     .expect_err("resuming an already-completed run must be a clear error, not a silent no-op");
-    let expected = "flow run is not parked for approval (status: completed)";
+    let expected = "is not waiting for approval";
     if !err.contains(expected) {
-        eprintln!("ResumeRun nonparked-status diagnostic: {err}");
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let tenant_scoped = dispatch
+            .tenant()
+            .map(|tenant| tenant.is_scoped())
+            .unwrap_or(false);
+        let module_state = crate::modules::ops::state_of("tinyflows");
+        let module_version = crate::modules::registry::find("tinyflows")
+            .map(|record| record.version)
+            .unwrap_or("missing");
+        eprintln!(
+            "ResumeRun nonparked-status diagnostic: error={err}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; registry_version={module_version}; artifact={:?}",
+            config.workspace_dir.display(),
+            crate::modules::local_artifact("tinyflows")
+        );
     }
     assert!(
         err.contains(expected),
