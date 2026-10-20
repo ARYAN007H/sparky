@@ -44,7 +44,6 @@ use crate::flows::{
     FLOWS_TAG,
 };
 use crate::memory::types::{FetchParams, RecallParams};
-use crate::memory::MemoryError;
 use crate::security::approval::{
     redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
 };
@@ -54,6 +53,7 @@ use crate::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::security::SecurityPolicy;
 use tinybox_bus::CommandClass;
 use tinymemory_api::wrap_untrusted_for_agent;
+use tinymemory_api::Error;
 use tinymemory_api::{Hit, LearningKind, MemoryMeta, MetaFilter, SourceKind};
 
 use super::caps::{enforce_node_tier_gate, gate_call_for_tier};
@@ -225,7 +225,7 @@ fn is_untrusted(meta: &MemoryMeta) -> bool {
 }
 
 /// Maps a memory failure onto the node's capability error.
-fn capability_error(op: &str, error: &MemoryError) -> EngineError {
+fn capability_error(op: &str, error: &Error) -> EngineError {
     EngineError::Capability(format!("memory node: {op} failed: {error}"))
 }
 
@@ -437,10 +437,7 @@ impl MemoryProvider for OpenHumanMemory {
         let audit_id = self.tier_gate_write("forget", &action).await?;
 
         let flow_id = self.trusted_flow_id()?;
-        let filter = MetaFilter {
-            tags_any: vec![flow_key_tag(&flow_id, key)],
-            ..MetaFilter::default()
-        };
+        let filter = MetaFilter::tags_any([flow_key_tag(&flow_id, key)]);
         let forget_result = forget_matching(&self.config, filter)
             .await
             .map_err(|e| capability_error("forget", &e));
