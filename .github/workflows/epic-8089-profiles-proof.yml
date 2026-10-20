@@ -101,11 +101,11 @@ jobs:
               new = '''inputs: vec![FieldSchema { required: false, ..string_field("user_id", "The gateway's id for the user.") }],'''
           elif os.environ["PROFILES_PROOF_CASE"] == "parser-wiring":
               old = '''        parse_credential,
-        run_set_credential,'''
+                  run_set_credential,'''
               new = '''        |_params: Map<String, Value>| -> Result<CredentialParams, String> {
-            Err("mutation parser failure".to_owned())
-        },
-        run_set_credential,'''
+                      Err("mutation parser failure".to_owned())
+                  },
+                  run_set_credential,'''
           else:
               raise SystemExit("unrecognized Profiles proof mutation")
           if source.count(old) != 1:
