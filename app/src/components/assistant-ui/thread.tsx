@@ -631,15 +631,22 @@ const ChannelMessageActivity: FC = () => {
   const activity = metadata?.extraMetadata?.channelActivity;
   if (!activity || typeof activity !== 'object') return null;
   const value = activity as {
-    reactions?: Array<{ value?: unknown; customEmojiId?: unknown }>;
-    readReceipts?: unknown[];
+    reactions?: Array<{ value?: unknown; customEmojiId?: unknown }> | Record<string, unknown>;
+    readReceipts?: unknown[] | Record<string, unknown>;
+  };
+  const storedItems = (items: unknown): unknown[] => {
+    if (Array.isArray(items)) return items;
+    if (items && typeof items === 'object') return Object.values(items);
+    return [];
   };
   const reactionCounts = new Map<string, number>();
-  for (const reaction of value.reactions ?? []) {
-    if (typeof reaction.value !== 'string' || reaction.value.length === 0) continue;
-    reactionCounts.set(reaction.value, (reactionCounts.get(reaction.value) ?? 0) + 1);
+  for (const reaction of storedItems(value.reactions)) {
+    if (!reaction || typeof reaction !== 'object') continue;
+    const item = reaction as { value?: unknown };
+    if (typeof item.value !== 'string' || item.value.length === 0) continue;
+    reactionCounts.set(item.value, (reactionCounts.get(item.value) ?? 0) + 1);
   }
-  const readCount = value.readReceipts?.length ?? 0;
+  const readCount = storedItems(value.readReceipts).length;
   if (reactionCounts.size === 0 && readCount === 0) return null;
   return (
     <div data-slot="aui_channel-message-activity" className="mt-1 flex flex-wrap gap-1">

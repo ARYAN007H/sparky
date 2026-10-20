@@ -499,13 +499,31 @@ const threadSlice = createSlice({
         );
         const persisted = prior?.extraMetadata?.channelActivity;
         const saved = persisted && typeof persisted === 'object' ? persisted : undefined;
+        const storedItems = (items: unknown): Array<Record<string, unknown>> => {
+          if (Array.isArray(items)) {
+            return items.filter(item => item && typeof item === 'object');
+          }
+          if (items && typeof items === 'object') {
+            return Object.values(items).filter(item => item && typeof item === 'object');
+          }
+          return [];
+        };
         thread[rowId] = {
-          reactions: Array.isArray((saved as ChannelActivity | undefined)?.reactions)
-            ? (saved as ChannelActivity).reactions.map(item => ({ ...item }))
-            : [],
-          readReceipts: Array.isArray((saved as ChannelActivity | undefined)?.readReceipts)
-            ? (saved as ChannelActivity).readReceipts.map(item => ({ ...item }))
-            : [],
+          reactions: storedItems((saved as ChannelActivity | undefined)?.reactions).map(
+            item => ({
+              actorId: typeof item.actorId === 'string' ? item.actorId : '',
+              value: typeof item.value === 'string' ? item.value : '',
+              ...(typeof item.customEmojiId === 'string'
+                ? { customEmojiId: item.customEmojiId }
+                : {}),
+            })
+          ),
+          readReceipts: storedItems((saved as ChannelActivity | undefined)?.readReceipts).map(
+            item => ({
+              actorId: typeof item.actorId === 'string' ? item.actorId : '',
+              ...(typeof item.timestamp === 'number' ? { timestamp: item.timestamp } : {}),
+            })
+          ),
         };
       }
       const activity = thread[rowId];

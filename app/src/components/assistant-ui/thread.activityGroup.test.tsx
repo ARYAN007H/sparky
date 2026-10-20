@@ -69,8 +69,8 @@ describe('activity group', () => {
               custom: {
                 extraMetadata: {
                   channelActivity: {
-                    reactions: [{ actorId: 'alice', value: '🔥' }],
-                    readReceipts: [{ actorId: 'bob', timestamp: 123 }],
+                    reactions: { 'reaction-key': { actorId: 'alice', value: '🔥' } },
+                    readReceipts: { 'receipt-key': { actorId: 'bob', timestamp: 123 } },
                   },
                 },
               },
