@@ -472,11 +472,16 @@ impl TurnModelSource {
         let provider_string = source.primary_override.clone().unwrap_or_else(|| {
             crate::inference::provider::provider_for_role(&source.role, &source.config)
         });
-        crate::inference::context_window::resolve_context_window(
+        let resolved_context = source.ctx().resolved();
+        let extensions = resolved_context
+            .as_deref()
+            .map(crate::core::runtime::CoreContext::extensions);
+        crate::inference::context_window::resolve_context_window_in(
             &source.role,
             &provider_string,
             model,
             &source.config,
+            extensions,
         )
         .await
     }

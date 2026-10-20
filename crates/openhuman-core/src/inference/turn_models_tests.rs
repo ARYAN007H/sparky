@@ -104,6 +104,10 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
             ),
             Some(131_072)
         );
+        assert_eq!(
+            source.effective_context_window("context-a-model").await,
+            Some(131_072)
+        );
     })
     .await;
 }
