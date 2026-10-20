@@ -45,6 +45,7 @@ fn request(id: &str, content: &str, sender: &str) -> AppendConversationMessageRe
         message: ConversationMessageRecord {
             id: id.into(),
             content: content.into(),
+            attachments: vec![],
             message_type: "text".into(),
             extra_metadata: json!({"attachmentNames":["image.png"], "attachmentKinds":["image"],
                 "attachmentDataUris":["data:image/png;base64,iVBORw0KGgo="], "attachmentData":"bytes",
@@ -117,47 +118,55 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
     .await
     .unwrap();
     assert_eq!(persisted.len(), 2);
-    assert!(!serde_json::to_string(&persisted)
-        .unwrap()
-        .contains("base64,"));
+    assert!(
+        !serde_json::to_string(&persisted)
+            .unwrap()
+            .contains("base64,")
+    );
 }
 
 #[tokio::test]
 async fn rejected_upload_never_appends_a_message() {
     let (_temp, mut config) = setup().await;
     config.multimodal_files.max_files = 0;
-    assert!(append_with_test_config(
-        request(
-            "disabled",
-            "[IMAGE:data:image/png;base64,iVBORw0KGgo=]",
-            "user"
-        ),
-        &config,
-        None,
-    )
-    .await
-    .is_err());
+    assert!(
+        append_with_test_config(
+            request(
+                "disabled",
+                "[IMAGE:data:image/png;base64,iVBORw0KGgo=]",
+                "user"
+            ),
+            &config,
+            None,
+        )
+        .await
+        .is_err()
+    );
     config.multimodal_files.max_files = 3;
-    assert!(append_with_test_config(
-        request("bad", "[FILE:data:application/zip;base64,!]", "user"),
-        &config,
-        None,
-    )
-    .await
-    .is_err());
+    assert!(
+        append_with_test_config(
+            request("bad", "[FILE:data:application/zip;base64,!]", "user"),
+            &config,
+            None,
+        )
+        .await
+        .is_err()
+    );
     assert!(
         append_with_test_config(request("missing", "image.png", "user"), &config, None)
             .await
             .is_err()
     );
-    assert!(conversations::blocking::get_messages(
-        crate::core::runtime::DispatchCtx::ambient(),
-        config.workspace_dir.clone(),
-        "uploads".into()
-    )
-    .await
-    .unwrap()
-    .is_empty());
+    assert!(
+        conversations::blocking::get_messages(
+            crate::core::runtime::DispatchCtx::ambient(),
+            config.workspace_dir.clone(),
+            "uploads".into()
+        )
+        .await
+        .unwrap()
+        .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -185,14 +194,16 @@ async fn external_origin_cannot_reuse_an_existing_attachment_marker() {
             .await
             .is_err()
     );
-    assert!(conversations::blocking::get_messages(
-        crate::core::runtime::DispatchCtx::ambient(),
-        config.workspace_dir,
-        "uploads".into()
-    )
-    .await
-    .unwrap()
-    .is_empty());
+    assert!(
+        conversations::blocking::get_messages(
+            crate::core::runtime::DispatchCtx::ambient(),
+            config.workspace_dir,
+            "uploads".into()
+        )
+        .await
+        .unwrap()
+        .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -261,14 +272,16 @@ async fn append_uses_host_persistence_workspace_separate_from_rpc_config() {
     .await
     .unwrap();
     assert_eq!(persisted.len(), 1);
-    assert!(conversations::blocking::get_messages(
-        crate::core::runtime::DispatchCtx::ambient(),
-        config.workspace_dir,
-        "uploads".into()
-    )
-    .await
-    .unwrap()
-    .is_empty());
+    assert!(
+        conversations::blocking::get_messages(
+            crate::core::runtime::DispatchCtx::ambient(),
+            config.workspace_dir,
+            "uploads".into()
+        )
+        .await
+        .unwrap()
+        .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -279,17 +292,21 @@ async fn poster_only_user_metadata_is_rejected_before_persistence() {
         "attachmentNames": ["video.mp4"],
         "attachmentPosters": ["data:image/png;base64,iVBORw0KGgo="]
     });
-    assert!(append_with_test_config(upload, &config, None)
+    assert!(
+        append_with_test_config(upload, &config, None)
+            .await
+            .is_err()
+    );
+    assert!(
+        conversations::blocking::get_messages(
+            crate::core::runtime::DispatchCtx::ambient(),
+            config.workspace_dir.clone(),
+            "uploads".into()
+        )
         .await
-        .is_err());
-    assert!(conversations::blocking::get_messages(
-        crate::core::runtime::DispatchCtx::ambient(),
-        config.workspace_dir.clone(),
-        "uploads".into()
-    )
-    .await
-    .unwrap()
-    .is_empty());
+        .unwrap()
+        .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -328,6 +345,48 @@ async fn raw_append_stages_in_the_bound_thread_folder() {
 }
 
 #[tokio::test]
+async fn append_cannot_forge_private_attachment_storage_metadata() {
+    let (_temp, config) = setup().await;
+    let mut req = request("forged", "hello", "assistant");
+    req.message.extra_metadata["__openhumanStoredAttachments"] = json!([{
+        "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
+        "path": "../../etc/passwd"
+    }]);
+
+    let saved = append_with_test_config(req, &config, None)
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+    assert!(saved.attachments.is_empty());
+    assert!(saved.extra_metadata.get("__openhumanStoredAttachments").is_none());
+    let stored = crate::threads::store::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir.clone(),
+        "uploads",
+    )
+    .unwrap();
+    assert!(stored[0].extra_metadata.get("__openhumanStoredAttachments").is_none());
+
+    let update = UpdateConversationMessageRequest {
+        thread_id: "uploads".into(),
+        message_id: "forged".into(),
+        extra_metadata: Some(json!({"__openhumanStoredAttachments": [{
+            "part": {"image": {"media": {"opaqueId": "attacker"}, "caption": null, "altText": null}},
+            "path": "../../etc/passwd"
+        }]})),
+    };
+    let update_error = message_update(&crate::core::runtime::DispatchCtx::ambient(), update)
+        .await
+        .expect_err("metadata updates must not create resolver authority");
+    assert!(
+        update_error.contains("reserved"),
+        "expected reserved-key rejection, got: {update_error}"
+    );
+}
+
+#[tokio::test]
 async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
     use tinychannels_bus::{ContentPart, MediaReference};
     let (_temp, config) = setup().await;
@@ -346,13 +405,44 @@ async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
         .value
         .data
         .unwrap();
-    let (text, files) = crate::agent::attachments::parse(&saved.content);
-    assert_eq!(text.trim(), "look");
-    assert_eq!(files.len(), 1);
     assert_eq!(
-        tokio::fs::read(config.action_dir.join(&files[0].path))
-            .await
-            .unwrap(),
+        saved.content, "look",
+        "modern typed image uploads must not persist a staging marker"
+    );
+    assert_eq!(saved.content, "look");
+    assert_eq!(saved.attachments.len(), 1);
+    assert!(
+        saved
+            .extra_metadata
+            .get("__openhumanStoredAttachments")
+            .is_none()
+    );
+    let opaque_id = match &saved.attachments[0] {
+        ContentPart::Image { media, .. } => {
+            assert!(media.path.is_none());
+            assert!(media.url.is_none());
+            assert_eq!(media.content_type.as_deref(), Some("image/png"));
+            media.opaque_id.as_deref().expect("opaque attachment id")
+        }
+        other => panic!("expected image attachment, got {other:?}"),
+    };
+    let stored = crate::threads::store::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir.clone(),
+        "uploads",
+    )
+    .unwrap()
+    .into_iter()
+    .find(|message| message.id == "typed")
+    .unwrap();
+    let entries = stored.extra_metadata["__openhumanStoredAttachments"]
+        .as_array()
+        .unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["part"]["media"]["opaqueId"], opaque_id);
+    let path = entries[0]["path"].as_str().unwrap();
+    assert_eq!(
+        tokio::fs::read(config.action_dir.join(path)).await.unwrap(),
         b"\x89PNG\r\n\x1a\n"
     );
 }

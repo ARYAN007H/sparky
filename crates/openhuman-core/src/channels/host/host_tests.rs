@@ -88,20 +88,54 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
         &thread_id,
     )
     .unwrap();
-    let row_id = crate::threads::store::persist_channel_message(
-        &alice,
-        &workspace,
-        &channel,
-        &conversation,
-        &thread_id,
-        "Provider conversation",
-        provider_id,
-        "user",
-        "hello from Telegram",
-        serde_json::json!({"voiceNote": {"opaqueId": "voice-asset-7"}}),
+    let barrier = Arc::new(std::sync::Barrier::new(8));
+    let runtime = tokio::runtime::Handle::current();
+    let writers = (0..8).map(|_| {
+        let barrier = Arc::clone(&barrier);
+        let runtime = runtime.clone();
+        let alice = alice.clone();
+        let workspace = workspace.clone();
+        let channel = channel.clone();
+        let conversation = conversation.clone();
+        let thread_id = thread_id.clone();
+        tokio::task::spawn_blocking(move || {
+            barrier.wait();
+            runtime.block_on(crate::threads::store::persist_channel_message(
+                &alice,
+                &workspace,
+                &channel,
+                &conversation,
+                &thread_id,
+                "Provider conversation",
+                provider_id,
+                "user",
+                "hello from Telegram",
+                serde_json::json!({"voiceNote": {"opaqueId": "voice-asset-7"}}),
+            ))
+        })
+    });
+    let row_ids = futures::future::join_all(writers)
+        .await
+        .into_iter()
+        .map(|result| result.unwrap().unwrap())
+        .collect::<Vec<_>>();
+    assert!(row_ids.iter().all(|id| id == "user:provider-receipt-42"));
+    let row_id = row_ids[0].clone();
+    let persisted = crate::threads::store::blocking::get_messages(
+        alice.clone(),
+        workspace.clone(),
+        thread_id.clone(),
     )
     .await
     .unwrap();
+    assert_eq!(
+        persisted
+            .iter()
+            .filter(|message| message.id == row_id)
+            .count(),
+        1,
+        "concurrent duplicate channel delivery persists one authoritative row"
+    );
     assert_eq!(row_id, "user:provider-receipt-42");
 
     // Bob has a same-named row in another profile, but has no trusted binding

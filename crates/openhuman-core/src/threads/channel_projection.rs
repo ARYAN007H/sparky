@@ -7,15 +7,18 @@
 //! guesses from a sender, recent message, or equality between provider and row
 //! identifiers.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tinychannels_bus::{ChannelRef, ConversationRef};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
-use crate::core::runtime::{tenant::tenant_key, DispatchCtx, Tenant};
-use crate::storage::{self, documents::Repo};
+use crate::core::runtime::{DispatchCtx, Tenant, tenant::tenant_key};
+use crate::storage::{
+    self,
+    documents::{Repo, compare_and_swap},
+};
 
 const DOMAIN: &str = "threads::channel_projection";
 const COLLECTION: &str = "thread_channel_messages";
@@ -296,34 +299,68 @@ fn bind_row_in(repo: &Repo, key: MessageBindingKey, thread_id: &str, row_id: &st
     let id = doc_id(&key)?;
     let (thread_id, row_id) = (thread_id.to_string(), row_id.to_string());
     repo.run(|docs| async move {
-        let stored = docs.get(COLLECTION, &id).await?;
-        let Some(stored) = stored else {
+        let Some(stored) = docs.get(COLLECTION, &id).await? else {
             return Err(tinystoragedrivers::StorageError::not_found(
                 "provider message has no trusted thread binding",
             ));
         };
-        let precondition = stored.unchanged();
-        let mut binding: MessageBinding = serde_json::from_value(stored.doc)
+        let binding: MessageBinding = serde_json::from_value(stored.doc)
             .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
         if binding.key != key || binding.thread_id != thread_id {
             return Err(tinystoragedrivers::StorageError::conflict(
                 "provider message thread binding does not match persisted row",
             ));
         }
-        if binding
-            .row_id
-            .as_deref()
-            .is_some_and(|existing| existing != row_id)
-        {
-            return Err(tinystoragedrivers::StorageError::conflict(
-                "provider message is already bound to another OpenHuman row",
-            ));
+        if let Some(existing) = binding.row_id.as_deref() {
+            return if existing == row_id {
+                Ok(())
+            } else {
+                Err(tinystoragedrivers::StorageError::conflict(
+                    "provider message is already bound to another OpenHuman row",
+                ))
+            };
         }
-        binding.row_id = Some(row_id);
-        let body: Value = serde_json::to_value(binding)
+
+        let expected_key = key.clone();
+        let expected_thread = thread_id.clone();
+        let expected_row = row_id.clone();
+        let changed = compare_and_swap(&docs, COLLECTION, &id, |doc| {
+            let mut current: MessageBinding = serde_json::from_value(doc.clone()).ok()?;
+            if current.key != expected_key || current.thread_id != expected_thread {
+                return None;
+            }
+            match current.row_id.as_deref() {
+                Some(existing) if existing == expected_row => None,
+                Some(_) => None,
+                None => {
+                    current.row_id = Some(expected_row.clone());
+                    serde_json::to_value(current).ok()
+                }
+            }
+        })
+        .await?;
+        if changed.is_some() {
+            return Ok(());
+        }
+
+        // A competing identical bind is success; any other state fails closed.
+        let stored = docs.get(COLLECTION, &id).await?.ok_or_else(|| {
+            tinystoragedrivers::StorageError::not_found(
+                "provider message has no trusted thread binding",
+            )
+        })?;
+        let current: MessageBinding = serde_json::from_value(stored.doc)
             .map_err(|e| tinystoragedrivers::StorageError::invalid_input(e.to_string()))?;
-        docs.put(COLLECTION, &id, json!(body), precondition).await?;
-        Ok(())
+        if current.key == key
+            && current.thread_id == thread_id
+            && current.row_id.as_deref() == Some(row_id.as_str())
+        {
+            Ok(())
+        } else {
+            Err(tinystoragedrivers::StorageError::conflict(
+                "provider message is already bound to another OpenHuman row",
+            ))
+        }
     })?;
     Ok(())
 }

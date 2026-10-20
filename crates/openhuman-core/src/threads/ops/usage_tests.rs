@@ -1,7 +1,7 @@
 use super::*;
 use tinyagents_harness::cost::CostSource;
-use tinyagents_session::transcript::spend::CostSplit;
 use tinyagents_session::transcript::UsageCostSource;
+use tinyagents_session::transcript::spend::CostSplit;
 
 const UNCATALOGUED: &str = "openrouter/z-ai/glm-5.3-flash";
 const CATALOGUED: &str = "claude-sonnet-4-6";

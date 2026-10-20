@@ -3,11 +3,11 @@
 //! store-type <-> wire-type conversions every handler needs.
 
 use crate::config::Config;
-use crate::core::runtime::context::CoreContext;
 use crate::core::runtime::DispatchCtx;
+use crate::core::runtime::context::CoreContext;
+use crate::threads::THREAD_TITLE_LOG_PREFIX;
 use crate::threads::store as conversations;
 use crate::threads::store::{ConversationMessage, ConversationThread};
-use crate::threads::THREAD_TITLE_LOG_PREFIX;
 use crate::threads::{ConversationMessageRecord, ConversationThreadSummary};
 use std::path::PathBuf;
 use tinyagents_harness::title::{title_from_user_message, title_log_fingerprint};
@@ -168,11 +168,15 @@ pub(super) fn thread_to_summary(thread: ConversationThread) -> ConversationThrea
 }
 
 pub(super) fn message_to_record(message: ConversationMessage) -> ConversationMessageRecord {
+    let attachments = crate::threads::attachments::public_refs(&message.extra_metadata);
+    let mut extra_metadata = message.extra_metadata;
+    crate::threads::attachments::strip_private_metadata(&mut extra_metadata);
     ConversationMessageRecord {
         id: message.id,
         content: message.content,
+        attachments,
         message_type: message.message_type,
-        extra_metadata: message.extra_metadata,
+        extra_metadata,
         sender: message.sender,
         created_at: message.created_at,
     }

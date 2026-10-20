@@ -896,6 +896,8 @@ type QueueMode = 'interrupt' | 'steer' | 'followup' | 'collect' | 'parallel';
 interface ChatSendParams {
   threadId: string;
   message: string;
+  /** Persisted user row that owns the opaque `attachments` refs. */
+  persistedMessageId?: string;
   /**
    * Typed attachments (`image`/`video`/`file` parts with an inline `data:` URI)
    * sent beside `message`; the core stages them. Never splice upload markers
@@ -964,6 +966,7 @@ export async function chatSend(params: ChatSendParams): Promise<string | undefin
       client_id: clientId,
       thread_id: params.threadId,
       message: params.message,
+      persisted_message_id: params.persistedMessageId ?? undefined,
       attachments: params.attachments?.length ? params.attachments : undefined,
       model_override: params.model ?? undefined,
       locale: params.locale ?? undefined,

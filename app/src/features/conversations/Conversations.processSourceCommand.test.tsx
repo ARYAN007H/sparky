@@ -331,12 +331,22 @@ describe('the agent-process-source command follows the panel that hosts it', () 
     registry.reset();
   });
 
-  it('persists raw uploads once and sends the core returned durable reference', async () => {
-    const staged =
-      '[ATTACHMENT:%7B%22path%22%3A%22uploads%2Ft%2Fa%2Fphoto.png%22%2C%22name%22%3A%22photo.png%22%2C%22mime%22%3A%22image%2Fpng%22%2C%22size_bytes%22%3A3%7D]';
+  it('persists raw uploads once and sends the core returned opaque reference', async () => {
+    const persistedAttachment = {
+      kind: 'image',
+      media: {
+        opaqueId: 'stored-photo',
+        contentType: 'image/png',
+        fileName: 'photo.png',
+        sizeBytes: 3,
+      },
+      caption: null,
+      altText: null,
+    } as const;
     vi.mocked(threadApi.appendMessage).mockImplementationOnce(async (_id, message) => ({
       ...message,
-      content: staged,
+      id: 'persisted-user-row',
+      attachments: [persistedAttachment],
     }));
     await renderChat('text');
     const picker = document.querySelector('input[type="file"]');
@@ -362,8 +372,14 @@ describe('the agent-process-source command follows the panel that hosts it', () 
     expect(JSON.stringify(uploaded.extraMetadata)).not.toContain('base64');
     expect(uploaded.extraMetadata).not.toHaveProperty('attachmentDataUris');
     expect(chatSend).toHaveBeenLastCalledWith(
-      expect.objectContaining({ threadId: THREAD_ID, message: staged })
+      expect.objectContaining({
+        threadId: THREAD_ID,
+        message: uploaded.content,
+        persistedMessageId: 'persisted-user-row',
+        attachments: [persistedAttachment],
+      })
     );
+    expect(uploaded.content).not.toMatch(/\[(?:ATTACHMENT|IMAGE|FILE):/i);
   });
 
   it('keeps queued raw upload content only in memory until the core append flush', async () => {

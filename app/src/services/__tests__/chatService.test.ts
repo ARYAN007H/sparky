@@ -537,10 +537,16 @@ describe('chatService typed attachments', () => {
   it('chatSend forwards attachments as typed parts and leaves the text alone', async () => {
     bindMockSocket(createMockSocket());
 
-    await chatSend({ threadId: 'thread-1', message: 'look', attachments: [image] });
+    await chatSend({
+      threadId: 'thread-1',
+      message: 'look',
+      persistedMessageId: 'persisted-user-row',
+      attachments: [image],
+    });
 
     const params = mockCallCoreRpc.mock.calls[0][0].params;
     expect(params.message).toBe('look');
+    expect(params.persisted_message_id).toBe('persisted-user-row');
     expect(params.attachments).toEqual([image]);
     expect(JSON.stringify(params.message)).not.toMatch(/\[(IMAGE|FILE):/);
   });

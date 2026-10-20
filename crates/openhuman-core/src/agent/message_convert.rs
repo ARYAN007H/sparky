@@ -26,8 +26,8 @@ use crate::inference::provider::ChatResponse;
 use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
-    message_to_display_transcript as message_to_chat_message,
-    message_to_native_transcript as message_to_native_chat_message, REASONING_EXT_KEY,
+    REASONING_EXT_KEY, message_to_display_transcript as message_to_chat_message,
+    message_to_native_transcript as message_to_native_chat_message,
 };
 use tinyagents_session::transcript::TranscriptMessage;
 
@@ -174,6 +174,64 @@ pub(crate) fn user_message_from_text(text: &str) -> Message {
     }
     log::debug!("[agent][message_convert] stored {images} image attachment(s) as typed parts");
     Message::User(UserMessage { content: blocks })
+}
+
+/// Build the user turn from marker-free persisted text and trusted media refs.
+/// Callers must resolve opaque refs against the exact persisted message under
+/// its DispatchCtx before passing parts here; paths on these internal parts are
+/// never accepted from the RPC caller.
+pub(crate) fn user_message_from_parts(
+    text: &str,
+    parts: &[tinychannels_bus::ContentPart],
+) -> Result<Message, String> {
+    let mut content = Vec::new();
+    if !text.is_empty() {
+        content.push(ContentBlock::Text(text.to_string()));
+    }
+    for part in parts {
+        match part {
+            tinychannels_bus::ContentPart::Image {
+                media,
+                caption,
+                alt_text,
+            } => {
+                let path = media
+                    .path
+                    .clone()
+                    .ok_or_else(|| "resolved image attachment has no trusted path".to_string())?;
+                if let Some(caption) = caption.as_ref().filter(|text| !text.is_empty()) {
+                    content.push(ContentBlock::Text(caption.clone()));
+                }
+                if let Some(alt) = alt_text.as_ref().filter(|text| !text.is_empty()) {
+                    content.push(ContentBlock::Text(alt.clone()));
+                }
+                content.push(ContentBlock::Image(ImageRef {
+                    url: path,
+                    mime_type: media.content_type.clone(),
+                }));
+            }
+            tinychannels_bus::ContentPart::Audio { media, .. }
+            | tinychannels_bus::ContentPart::Video { media, .. }
+            | tinychannels_bus::ContentPart::File { media, .. } => {
+                let path = media
+                    .path
+                    .clone()
+                    .ok_or_else(|| "resolved media attachment has no trusted path".to_string())?;
+                let media_ref = MediaRef::Path {
+                    path,
+                    media_type: media.content_type.clone(),
+                };
+                let block = match part {
+                    tinychannels_bus::ContentPart::Audio { .. } => ContentBlock::Audio(media_ref),
+                    tinychannels_bus::ContentPart::Video { .. } => ContentBlock::Video(media_ref),
+                    _ => ContentBlock::Document(media_ref),
+                };
+                content.push(block);
+            }
+            _ => return Err("resolved attachment has an unsupported kind".into()),
+        }
+    }
+    Ok(Message::User(UserMessage { content }))
 }
 
 /// The inverse of [`user_message_from_text`]: a user message's text with each

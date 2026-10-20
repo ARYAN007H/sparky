@@ -8,12 +8,12 @@
 use crate::threads::turn_state::rpc_types::persisted_tool_failure;
 use tinyagents_harness::progress::AgentProgress;
 
+use tinyagents_session::turn_state::TurnStateMirror;
 use tinyagents_session::turn_state::mirror::caps::{cap_persisted_args, cap_persisted_output};
 use tinyagents_session::turn_state::types::{
     SubagentActivity, SubagentToolCall, SubagentTranscriptItem, ToolTimelineEntry,
     ToolTimelineStatus, TurnLifecycle, TurnPhase,
 };
-use tinyagents_session::turn_state::TurnStateMirror;
 
 /// Host extension of the upstream mirror: fold one [`AgentProgress`] event into
 /// the snapshot.

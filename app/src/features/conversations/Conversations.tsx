@@ -1317,6 +1317,8 @@ const Conversations = ({
     // Originals ride beside the text as typed parts; the core stages them.
     const attachmentParts = attachmentsToParts(pendingAttachments);
     let messageText = trimmed;
+    let persistedMessageId: string | undefined;
+    let persistedAttachmentParts: ContentPart[] = [];
     const userMessage: ThreadMessage = {
       id: `msg_${globalThis.crypto.randomUUID()}`,
       content: messageText,
@@ -1351,6 +1353,8 @@ const Conversations = ({
       if (retryingUnchangedMessage) {
         // The core already has this exact prompt from the failed attempt.
         messageText = previousFailedMessage.content;
+        persistedMessageId = previousFailedMessage.id;
+        persistedAttachmentParts = previousFailedMessage.attachments ?? [];
       } else if (previousFailedMessage) {
         // A corrected retry must replace the already-persisted failed prompt;
         // appending it would leave both prompts in the transcript. The edit
@@ -1387,6 +1391,8 @@ const Conversations = ({
         ).unwrap();
         // The core saved the originals before returning this durable reference.
         messageText = persisted.message.content;
+        persistedMessageId = persisted.message.id;
+        persistedAttachmentParts = persisted.message.attachments ?? [];
         persistedFailedMessageByThreadRef.current.set(sendingThreadId, persisted.message);
       }
     } catch (error) {
@@ -1436,7 +1442,15 @@ const Conversations = ({
       await chatSend({
         threadId: sendingThreadId,
         message: messageText,
-        ...(opts?.voicePart ? { attachments: [opts.voicePart] } : {}),
+        ...(persistedAttachmentParts.length || opts?.voicePart
+          ? {
+              persistedMessageId,
+              attachments: [
+                ...persistedAttachmentParts,
+                ...(opts?.voicePart ? [opts.voicePart] : []),
+              ],
+            }
+          : {}),
         ...(modelOverride !== undefined ? { model: modelOverride } : {}),
         locale: uiLocale,
         reasoningEffort: composerReasoningEffort,

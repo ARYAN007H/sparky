@@ -5,11 +5,11 @@ use super::support::{
     counts, envelope, message_to_record, record_to_message, run_to_completion, thread_to_summary,
     workspace_dir,
 };
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
+use crate::threads::ThreadsError;
 use crate::threads::store as conversations;
 use crate::threads::store::{ConversationMessagePatch, CrossThreadHit};
-use crate::threads::ThreadsError;
 use crate::threads::{
     ApiEnvelope, AppendConversationMessageRequest, ConversationMessageRecord,
     ConversationMessagesRequest, ConversationMessagesResponse, ConversationThreadSummary,
@@ -203,12 +203,66 @@ async fn message_append_with_config(
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     persistence_dir: &std::path::Path,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
-    if request.message.sender == "user" && !request.attachments.is_empty() {
-        // Typed attachments become the staging markers here, once, so the
-        // rest of this function sees the same content a marker send would.
+    // Reserve the private path map for values minted after core staging. A
+    // caller may send arbitrary public metadata but never storage authority.
+    crate::threads::attachments::strip_private_metadata(&mut request.message.extra_metadata);
+    let typed_attachments = if request.message.sender == "user" {
+        std::mem::take(&mut request.attachments)
+    } else {
+        Vec::new()
+    };
+    let typed_media_count = typed_attachments
+        .iter()
+        .filter(|part| {
+            matches!(
+                part,
+                tinychannels_bus::ContentPart::Image { .. }
+                    | tinychannels_bus::ContentPart::Audio { .. }
+                    | tinychannels_bus::ContentPart::Video { .. }
+                    | tinychannels_bus::ContentPart::File { .. }
+            )
+        })
+        .count();
+    let staged_refs = if !typed_attachments.is_empty()
+        && crate::threads::attachments::validate_opaque_parts(&typed_attachments).is_ok()
+    {
+        request.message.attachments = crate::threads::attachments::bind_staged_refs(
+            ctx,
+            &request.thread_id,
+            config,
+            &typed_attachments,
+            &mut request.message.extra_metadata,
+        )
+        .await
+        .map_err(ThreadsError::Message)?;
+        Some(typed_attachments.clone())
+    } else {
+        None
+    };
+    if typed_attachments
+        .iter()
+        .any(|part| matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. }))
+    {
+        return Err(ThreadsError::Message(
+            "voice notes must be sent through channel.web_chat".into(),
+        ));
+    }
+    let original_content = request.message.content.clone();
+    if !typed_attachments.is_empty()
+        && (original_content.contains("[IMAGE:")
+            || original_content.contains("[FILE:")
+            || !crate::agent::attachments::parse(&original_content)
+                .1
+                .is_empty())
+    {
+        return Err(ThreadsError::Message(
+            "typed attachments cannot be combined with legacy attachment markers".into(),
+        ));
+    }
+    if !typed_attachments.is_empty() && staged_refs.is_none() {
         request.message.content = crate::agent::attachments::parts::fold_into_message(
             &request.message.content,
-            &request.attachments,
+            &typed_attachments,
         )
         .map_err(|error| ThreadsError::Message(error.to_string()))?;
     }
@@ -307,7 +361,7 @@ async fn message_append_with_config(
                 "user upload bytes require attachment markers before persistence".into(),
             ));
         }
-        request.message.content = crate::agent::attachments::stage_turn(
+        let staged_content = crate::agent::attachments::stage_turn(
             &request.message.content,
             Some(config),
             Some(&tinytools::WorkspaceDescriptor::new(workspace)),
@@ -316,6 +370,22 @@ async fn message_append_with_config(
         )
         .await
         .map_err(|error| ThreadsError::Message(format!("stage user attachments: {error}")))?;
+        if typed_media_count > 0 && staged_refs.is_none() {
+            let (clean_content, staged_files) = crate::agent::attachments::parse(&staged_content);
+            if staged_files.len() != typed_media_count {
+                return Err(ThreadsError::Message(
+                    "typed attachment staging did not preserve media order".into(),
+                ));
+            }
+            let entries =
+                crate::threads::attachments::from_staged_parts(&typed_attachments, &staged_files)
+                    .map_err(ThreadsError::Message)?;
+            request.message.attachments =
+                crate::threads::attachments::save(&mut request.message.extra_metadata, entries);
+            request.message.content = clean_content.trim().to_string();
+        } else {
+            request.message.content = staged_content;
+        }
         if raw_upload || durable_upload {
             if let Some(metadata) = request.message.extra_metadata.as_object_mut() {
                 for field in byte_fields {
@@ -332,6 +402,11 @@ async fn message_append_with_config(
     )
     .await
     .map_err(|err| ThreadsError::from_thread_scoped_store_error(&request.thread_id, err))?;
+    if let Some(staged_refs) = staged_refs {
+        crate::threads::attachments::consume_staged_parts(ctx, &request.thread_id, &staged_refs)
+            .await
+            .map_err(ThreadsError::Message)?;
+    }
     Ok(envelope(
         message_to_record(message),
         Some(counts([("num_messages", 1)])),
@@ -409,6 +484,14 @@ pub async fn message_update(
     ctx: &DispatchCtx,
     request: UpdateConversationMessageRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, String> {
+    if request
+        .extra_metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("__openhumanStoredAttachments"))
+        .is_some()
+    {
+        return Err("private attachment storage metadata is reserved".into());
+    }
     let dir = workspace_dir().await?;
     let message = conversations::blocking::update_message(
         ctx.clone(),
