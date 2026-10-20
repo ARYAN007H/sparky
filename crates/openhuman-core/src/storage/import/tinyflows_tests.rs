@@ -324,6 +324,32 @@ fn a_record_the_backend_already_holds_is_never_overwritten() {
 }
 
 #[test]
+fn an_invalid_flow_record_keeps_the_import_open_for_retry() {
+    let (dir, config) = workspace();
+    let path = dir.path().join("flows/flows.db");
+    let conn = crate::storage::rusqlite::Connection::open(&path).unwrap();
+    let oversized = "x".repeat(3 * 1024 * 1024);
+    conn.execute(
+        "UPDATE flow_definitions SET graph_json = ?1 WHERE id = 'flow-alpha'",
+        [&oversized],
+    )
+    .unwrap();
+    drop(conn);
+
+    let before = tree(dir.path());
+    let backend = backend();
+
+    let first = import_flows(&backend, &Scope::local(), &config).unwrap();
+    assert!(
+        matches!(first, Outcome::Incomplete { skipped: 1, .. }),
+        "a skipped flow record must keep the migration incomplete: {first:?}"
+    );
+    let retry = import_flows(&backend, &Scope::local(), &config).unwrap();
+    assert!(matches!(retry, Outcome::Incomplete { skipped: 1, .. }));
+    assert_eq!(tree(dir.path()), before, "the legacy files were modified");
+}
+
+#[test]
 fn a_workspace_without_legacy_files_imports_nothing_and_leaves_no_marker() {
     let dir = TempDir::new().unwrap();
     let config = Config {
