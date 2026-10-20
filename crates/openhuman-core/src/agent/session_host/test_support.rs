@@ -4,16 +4,12 @@ use crate::config::Config;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
 use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelHooks};
 use std::sync::Arc;
-use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
+use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
 struct SessionFixtureModel;
 
 #[async_trait::async_trait]
 impl ChatModel<()> for SessionFixtureModel {
-    fn profile(&self) -> Option<&ModelProfile> {
-        None
-    }
-
     async fn invoke(
         &self,
         _state: &(),
@@ -88,15 +84,6 @@ pub(crate) fn install_model_fixture_in(extensions: &crate::core::slots::Extensio
         PROVIDER_OPENHUMAN,
         model_fixture_entry(),
     );
-}
-
-pub(crate) fn model_fixture_context() -> Arc<crate::core::runtime::CoreContext> {
-    let context = crate::core::runtime::CoreContext::for_test(
-        crate::core::runtime::DomainSet::full(),
-        None,
-    );
-    install_model_fixture_in(context.extensions());
-    context
 }
 
 pub(crate) fn config_with_model_fixture() -> Config {
