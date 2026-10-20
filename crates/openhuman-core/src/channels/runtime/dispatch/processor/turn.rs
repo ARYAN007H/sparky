@@ -523,7 +523,7 @@ pub(crate) async fn process_channel_runtime_message(
             }
         }
         #[cfg(not(test))]
-        None => super::native_runner::NativeTurnExecution {
+        None => super::super::native_runner::NativeTurnExecution {
             result: Err("channel turn has no configured host agent".to_owned()),
             delivery_succeeded: None,
             queued: false,
