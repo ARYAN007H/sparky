@@ -755,6 +755,187 @@ async fn channels_status_reflects_managed_dm_credential_e2e() {
     rpc_join.abort();
 }
 
+/// Exercise the Telegram bot-token lifecycle through the host JSON-RPC wire
+/// using the registry-pinned TinyChannels release staged by the standard Rust
+/// test runner. Telegram credential validation is local to the module and
+/// does not call the Bot API.
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    feature = "modules"
+))]
+#[tokio::test]
+async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rpc_e2e() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+
+    let pinned = openhuman_core::modules::registry::find("tinychannels")
+        .expect("TinyChannels is registered in the module asset registry");
+    assert_eq!(pinned.version, "0.1.36", "use the pinned module release");
+    assert!(
+        std::env::var_os("OPENHUMAN_MODULE_SOURCE").is_none()
+            && std::env::var_os("OPENHUMAN_MODULE_SOURCE_DIR").is_none()
+            && std::env::var_os("OPENHUMAN_MODULE_SOURCE_TINYCHANNELS").is_none(),
+        "the integration must use the staged release, not a source or linked override"
+    );
+    let module_paths_env = std::env::var_os("OPENHUMAN_MODULE_PATH")
+        .expect("the standard Rust test runner must stage TinyChannels on OPENHUMAN_MODULE_PATH");
+    let module_paths = std::env::split_paths(&module_paths_env).collect::<Vec<_>>();
+    let artifact = openhuman_core::modules::local_artifact("tinychannels")
+        .expect("the standard Rust test runner must stage the pinned TinyChannels library");
+    let artifact_dir = artifact
+        .parent()
+        .expect("the staged TinyChannels artifact has a parent directory");
+    assert!(
+        module_paths.iter().any(|path| path == artifact_dir),
+        "TinyChannels must resolve to the standard runner's staged release path: {artifact:?}"
+    );
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+    for config_dir in [&openhuman_home, &openhuman_home.join("users/local")] {
+        let config_path = config_dir.join("config.toml");
+        let mut config_text = std::fs::read_to_string(&config_path).expect("minimal config exists");
+        config_text.push_str("\n[modules]\nsource = \"release\"\nallow_download = false\n");
+        std::fs::write(config_path, config_text).expect("disable module downloads in test config");
+    }
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+
+    let connect = post_json_rpc(
+        &rpc_base,
+        7151,
+        "openhuman.channels_connect",
+        json!({
+            "channel": "telegram",
+            "authMode": "bot_token",
+            "credentials": { "bot_token": "fixture-A" }
+        }),
+    )
+    .await;
+    let connected = peel_logs_envelope(assert_no_jsonrpc_error(
+        &connect,
+        "Telegram channels_connect fixture A",
+    ));
+    assert_eq!(connected.get("status").and_then(Value::as_str), Some("connected"));
+    assert_eq!(connected.get("restart_required").and_then(Value::as_bool), Some(true));
+
+    let status_a = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7152,
+            "openhuman.channels_status",
+            json!({ "channel": "telegram" }),
+        )
+        .await,
+        "Telegram status after fixture A",
+        "telegram",
+        "bot_token",
+    );
+    assert_eq!(status_a.get("connected").and_then(Value::as_bool), Some(true));
+    assert_eq!(status_a.get("has_credentials").and_then(Value::as_bool), Some(true));
+
+    let rejected = post_json_rpc(
+        &rpc_base,
+        7153,
+        "openhuman.channels_connect",
+        json!({
+            "channel": "telegram",
+            "authMode": "bot_token",
+            "credentials": { "bot_token": "" }
+        }),
+    )
+    .await;
+    assert!(
+        rejected.get("error").is_some(),
+        "an empty Telegram bot token must be rejected: {rejected}"
+    );
+    let preserved = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7154,
+            "openhuman.channels_status",
+            json!({ "channel": "telegram" }),
+        )
+        .await,
+        "Telegram status after rejected empty token",
+        "telegram",
+        "bot_token",
+    );
+    assert_eq!(preserved.get("connected").and_then(Value::as_bool), Some(true));
+    assert_eq!(preserved.get("has_credentials").and_then(Value::as_bool), Some(true));
+
+    let disconnect = post_json_rpc(
+        &rpc_base,
+        7155,
+        "openhuman.channels_disconnect",
+        json!({ "channel": "telegram", "authMode": "bot_token" }),
+    )
+    .await;
+    let disconnected = peel_logs_envelope(assert_no_jsonrpc_error(
+        &disconnect,
+        "Telegram channels_disconnect",
+    ));
+    assert_eq!(disconnected.get("disconnected").and_then(Value::as_bool), Some(true));
+    let status_disconnected = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7156,
+            "openhuman.channels_status",
+            json!({ "channel": "telegram" }),
+        )
+        .await,
+        "Telegram status after disconnect",
+        "telegram",
+        "bot_token",
+    );
+    assert_eq!(status_disconnected.get("connected").and_then(Value::as_bool), Some(false));
+    assert_eq!(status_disconnected.get("has_credentials").and_then(Value::as_bool), Some(false));
+
+    let reconnect = post_json_rpc(
+        &rpc_base,
+        7157,
+        "openhuman.channels_connect",
+        json!({
+            "channel": "telegram",
+            "authMode": "bot_token",
+            "credentials": { "bot_token": "fixture-B" }
+        }),
+    )
+    .await;
+    let reconnected = peel_logs_envelope(assert_no_jsonrpc_error(
+        &reconnect,
+        "Telegram channels_connect fixture B",
+    ));
+    assert_eq!(reconnected.get("status").and_then(Value::as_str), Some("connected"));
+    let status_b = channel_status_entry(
+        &post_json_rpc(
+            &rpc_base,
+            7158,
+            "openhuman.channels_status",
+            json!({ "channel": "telegram" }),
+        )
+        .await,
+        "Telegram status after fixture B",
+        "telegram",
+        "bot_token",
+    );
+    assert_eq!(status_b.get("connected").and_then(Value::as_bool), Some(true));
+    assert_eq!(status_b.get("has_credentials").and_then(Value::as_bool), Some(true));
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
 /// Credential channel descriptions are consumed by the setup form to build
 /// its credential fields. Keep the email and Yuanbao field contracts reachable
 /// through the same JSON-RPC surface used by the app.
