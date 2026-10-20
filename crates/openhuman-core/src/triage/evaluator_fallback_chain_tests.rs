@@ -69,6 +69,26 @@ fn classify_string_recognises_429_with_retry_after() {
 }
 
 #[test]
+fn classify_string_preserves_long_fractional_and_inline_retry_hints() {
+    for (message, expected) in [
+        ("HTTP 429 Too Many Requests; Retry-After: 60", 60_000),
+        (
+            "HTTP 429 Too Many Requests; Retry-After: 2.5 seconds",
+            2_500,
+        ),
+        ("HTTP 429 Too Many Requests; retry_after 1.5", 1_500),
+    ] {
+        match classify_error(message.to_string()) {
+            ArmError::Retryable {
+                retry_after_ms: Some(actual),
+                ..
+            } => assert_eq!(actual, expected, "Retry-After in {message:?}"),
+            _ => panic!("expected retry hint {expected}ms from {message:?}"),
+        }
+    }
+}
+
+#[test]
 fn classify_string_recognises_5xx_as_transient() {
     let err = classify_error("upstream returned 503 Service Unavailable".to_string());
     assert!(
