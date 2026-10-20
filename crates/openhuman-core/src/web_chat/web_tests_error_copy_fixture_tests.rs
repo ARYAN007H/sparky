@@ -54,16 +54,16 @@ const EXPECTED: &[(
     ("transient_529", "anthropic API error (529): overloaded", "provider_error", "provider", true, None, Some("anthropic"), None, "The AI provider is temporarily unavailable. Please try again later."),
     ("generic", "kaboom", "inference", "provider", true, None, None, None, "Something went wrong. Please try again."),
     ("fallback_chain", "All providers/models failed. Attempts: x", "inference", "provider", true, None, None, Some(false), "Something went wrong. Please try again."),
-    ("be_rate_limited", "OpenHuman API error (429): {\"error\":{\"errorCode\":\"RATE_LIMITED\",\"retryAfter\":30}}", "rate_limited", "provider", true, Some(30000), Some("openhuman"), None, "Your AI provider is rate-limiting requests. You can retry in this thread. Try again in 30 seconds."),
-    ("be_credits", "OpenHuman API error (402): {\"error\":{\"errorCode\":\"USER_INSUFFICIENT_CREDITS\"}}", "budget_exhausted", "openhuman_billing", false, None, Some("openhuman"), None, "You're out of credits. Top up, or switch to 'Use Your Own Models' in Settings."),
-    ("be_upstream", "OpenHuman API error (502): {\"error\":{\"errorCode\":\"UPSTREAM_UNAVAILABLE\"}}", "provider_error", "provider", true, None, Some("openhuman"), None, "The AI service is temporarily unavailable — we've been notified. Please try again shortly."),
-    ("be_model_unavailable", "OpenHuman API error (503): {\"error\":{\"errorCode\":\"MODEL_UNAVAILABLE\"}}", "provider_error", "provider", true, None, Some("openhuman"), None, "The AI service is temporarily unavailable — we've been notified. Please try again shortly."),
-    ("be_payload", "OpenHuman API error (413): {\"error\":{\"errorCode\":\"PAYLOAD_TOO_LARGE\"}}", "payload_too_large", "config", false, None, Some("openhuman"), None, "Your message or attachment is too large for this model. Shorten it or remove the attachment — or start a new thread."),
-    ("be_context", "OpenHuman API error (400): {\"error\":{\"errorCode\":\"CONTEXT_LENGTH_EXCEEDED\"}}", "context_overflow", "config", false, None, Some("openhuman"), None, "The conversation is too long. Please start a new chat."),
-    ("be_bad_request", "OpenHuman API error (400): {\"error\":{\"errorCode\":\"BAD_REQUEST\",\"message\":\"x\"}}", "provider_request_rejected", "provider", false, None, Some("openhuman"), None, "The request was rejected — usually a model or parameter mismatch. Try a different model in Connections → API keys → LLM."),
-    ("be_bad_request_malformed", "OpenHuman API error (400): {\"error\":{\"errorCode\":\"BAD_REQUEST\",\"malformed\":true}}", "provider_request_rejected", "provider", false, None, Some("openhuman"), None, "Something went wrong with this message. Try rephrasing it — or start a new thread if it keeps happening."),
-    ("be_bad_request_history", "OpenHuman API error (400): {\"error\":{\"errorCode\":\"BAD_REQUEST\",\"message\":\"messages with role 'tool' must be a response to a preceding message with 'tool_calls'\"}}", "provider_request_rejected", "provider", true, None, Some("openhuman"), None, "We hit a temporary glitch in this conversation — we've cleared it. Please send your message again."),
-    ("be_internal", "OpenHuman API error (500): {\"error\":{\"errorCode\":\"INTERNAL_ERROR\"}}", "inference", "provider", true, None, Some("openhuman"), None, "Something went wrong — we've been notified. Please try again."),
+    ("be_rate_limited", "openhuman API error (429): transient limit; Retry-After: 30", "rate_limited", "provider", true, Some(30000), Some("openhuman"), None, "Your AI provider is rate-limiting requests. You can retry in this thread. Try again in 30 seconds."),
+    ("be_credits", "openhuman API error (402): account has no credits", "budget_exhausted", "openhuman_billing", false, None, Some("openhuman"), None, "You're out of credits. Top up, or switch to 'Use Your Own Models' in Settings."),
+    ("be_upstream", "openhuman API error (502): service temporarily unavailable", "provider_error", "provider", true, None, Some("openhuman"), None, "The AI service is temporarily unavailable — we've been notified. Please try again shortly."),
+    ("be_model_unavailable", "openhuman API error (503): selected model unavailable", "provider_error", "provider", true, None, Some("openhuman"), None, "The AI service is temporarily unavailable — we've been notified. Please try again shortly."),
+    ("be_payload", "openhuman API error (413): request payload exceeds limit", "payload_too_large", "config", false, None, Some("openhuman"), None, "Your message or attachment is too large for this model. Shorten it or remove the attachment — or start a new thread."),
+    ("be_context", "openhuman API error (400): conversation context limit exceeded", "context_overflow", "config", false, None, Some("openhuman"), None, "The conversation is too long. Please start a new chat."),
+    ("be_bad_request", "openhuman API error (400): parameters rejected", "provider_request_rejected", "provider", false, None, Some("openhuman"), None, "The request was rejected — usually a model or parameter mismatch. Try a different model in Connections → API keys → LLM."),
+    ("be_bad_request_malformed", "openhuman API error (400): malformed request", "provider_request_rejected", "provider", false, None, Some("openhuman"), None, "Something went wrong with this message. Try rephrasing it — or start a new thread if it keeps happening."),
+    ("be_bad_request_history", "openhuman API error (400): messages with role 'tool' must be a response to a preceding message with 'tool_calls'", "provider_request_rejected", "provider", true, None, Some("openhuman"), None, "We hit a temporary glitch in this conversation — we've cleared it. Please send your message again."),
+    ("be_internal", "openhuman API error (500): internal service failure", "inference", "provider", true, None, Some("openhuman"), None, "Something went wrong — we've been notified. Please try again."),
 ];
 
 #[test]
@@ -72,7 +72,26 @@ fn every_failure_class_keeps_its_exact_copy_and_wire_values() {
     for (case, input, error_type, source, retryable, retry_after_ms, provider, fallback, message) in
         EXPECTED
     {
-        let got = classify_inference_error(input);
+        let backend_kind = match *case {
+            "be_rate_limited" => Some(BackendErrorKind::RateLimited),
+            "be_credits" => Some(BackendErrorKind::InsufficientCredits),
+            "be_upstream" => Some(BackendErrorKind::UpstreamUnavailable),
+            "be_model_unavailable" => Some(BackendErrorKind::ModelUnavailable),
+            "be_payload" => Some(BackendErrorKind::PayloadTooLarge),
+            "be_context" => Some(BackendErrorKind::ContextLengthExceeded),
+            "be_bad_request" | "be_bad_request_history" => Some(BackendErrorKind::BadRequest),
+            "be_bad_request_malformed" => Some(BackendErrorKind::BadRequest),
+            "be_internal" => Some(BackendErrorKind::Internal),
+            _ => None,
+        };
+        let got = match backend_kind {
+            Some(kind) => classify_with_backend_metadata(
+                input,
+                kind,
+                *case == "be_bad_request_malformed",
+            ),
+            None => classify_inference_error(input),
+        };
         assert_eq!(got.error_type, *error_type, "{case}: error_type");
         assert_eq!(got.source, *source, "{case}: source");
         assert_eq!(got.retryable, *retryable, "{case}: retryable");
