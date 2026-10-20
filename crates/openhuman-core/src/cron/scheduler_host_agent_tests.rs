@@ -43,13 +43,9 @@ impl HostAgentResolver for Host {
                 .unwrap();
         definition.id = agent_id.to_string();
         let builds = Arc::clone(&self.belt_builds);
-        let context = CoreContext::for_test(
-            DomainSet::full(),
-            Some(self.config.workspace_dir.clone()),
-        );
-        crate::agent::session_host::test_support::install_model_fixture_in(
-            context.extensions(),
-        );
+        let context =
+            CoreContext::for_test(DomainSet::full(), Some(self.config.workspace_dir.clone()));
+        crate::agent::session_host::test_support::install_model_fixture_in(context.extensions());
         Some(HostAgent {
             definition,
             config: self.config.clone(),
