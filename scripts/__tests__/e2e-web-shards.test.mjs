@@ -126,6 +126,62 @@ test("failure artifact names are unique across all four Playwright lanes", () =>
   }
 });
 
+test("failed unit traces survive when later Playwright units run", () => {
+  const runner = path.join(fixtureRoot, "clearing-runner.sh");
+  fs.writeFileSync(
+    runner,
+    `#!/usr/bin/env bash
+set -euo pipefail
+output=""
+for arg in "$@"; do
+  case "$arg" in --output=*) output="${"${arg#*=}"}" ;; esac
+done
+if [[ -z "$output" ]]; then output="$SHARED_OUTPUT"; fi
+rm -rf "$output"
+mkdir -p "$output"
+printf '%s|%s\\n' "$OPENHUMAN_WORKSPACE" "$output" >> "$CALL_LOG"
+count=0
+[[ ! -f "$CALL_COUNT" ]] || count="$(cat "$CALL_COUNT")"
+count=$((count + 1))
+printf '%s\\n' "$count" > "$CALL_COUNT"
+if (( count == 1 )); then
+  printf 'first-unit-trace\\n' > "$output/trace.zip"
+  exit 1
+fi
+`,
+  );
+  fs.chmodSync(runner, 0o755);
+  const callLog = path.join(fixtureRoot, "trace-calls.log");
+  const callCount = path.join(fixtureRoot, "trace-call-count");
+  const sharedOutput = path.join(fixtureRoot, "shared-test-results");
+  const workspace = path.join(fixtureRoot, "trace-workspaces");
+
+  const result = run(["--lane=4", "--lanes=4"], {
+    E2E_WEB_SESSION_RUNNER: `bash ${runner}`,
+    CALL_LOG: callLog,
+    CALL_COUNT: callCount,
+    SHARED_OUTPUT: sharedOutput,
+    OPENHUMAN_WORKSPACE: workspace,
+  });
+
+  assert.equal(result.status, 1, result.stderr);
+  const calls = fs.readFileSync(callLog, "utf8").trim().split("\n");
+  assert.equal(calls.length, 18, "later assigned units still run after failure");
+  const [, firstOutput] = calls[0].split("|");
+  const [, secondOutput] = calls[1].split("|");
+  assert.notEqual(firstOutput, secondOutput);
+  assert.ok(path.isAbsolute(firstOutput));
+  assert.ok(fs.existsSync(path.join(firstOutput, "trace.zip")));
+  assert.equal(
+    fs.readFileSync(path.join(workspace, "lane-4/receipts/special-3.exit"), "utf8").trim(),
+    "1",
+  );
+  assert.equal(
+    fs.readFileSync(path.join(workspace, "lane-4/receipts/special-7.exit"), "utf8").trim(),
+    "0",
+  );
+});
+
 test("failed units retain failure while later units run in distinct workspaces", () => {
   const runner = path.join(fixtureRoot, "runner.sh");
   fs.writeFileSync(
