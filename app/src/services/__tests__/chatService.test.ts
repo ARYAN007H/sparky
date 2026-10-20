@@ -420,6 +420,17 @@ describe('chatService.subscribeChatEvents', () => {
     ).resolves.toEqual({ requestId: 'request-1', queuedAttachments: attachments });
   });
 
+  it('maps the scalar request identity returned for a started turn', async () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    mockCallCoreRpc.mockResolvedValue('request-started');
+
+    await expect(chatSendWithAck({ threadId: 'thread-1', message: 'hello' })).resolves.toEqual({
+      requestId: 'request-started',
+      queuedAttachments: [],
+    });
+  });
+
   it('rejects an invalid queue acknowledgement instead of trusting raw RPC data', async () => {
     const socket = createMockSocket();
     bindMockSocket(socket);
