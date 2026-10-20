@@ -8,8 +8,13 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tinychannels_bus::{ContentPart, MediaReference};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use crate::agent::attachments::Attachment;
+use crate::storage::{
+    self,
+    documents::{compare_and_swap, Repo},
+};
 
 const STORAGE_KEY: &str = "__openhumanStoredAttachments";
 
@@ -27,6 +32,8 @@ struct StagedAttachment {
     thread_id: String,
     attachment: StoredAttachment,
     expires_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    claim: Option<StagedAttachmentClaim>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -40,7 +47,8 @@ struct StagedAttachmentClaim {
     canceled: bool,
 }
 
-const STAGED_DIR: &str = "openhuman-staged-attachments";
+const STAGED_DOMAIN: &str = "threads::attachments";
+const STAGED_COLLECTION: &str = "staged_thread_attachments";
 const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
 /// Persist sanitized typed parts and their private staged paths in message
@@ -214,15 +222,44 @@ fn tenant_for(
     .map_err(|error| error.to_string())
 }
 
-fn staged_manifest_path(
-    workspace: &std::path::Path,
-    opaque_id: &str,
-) -> Result<std::path::PathBuf, String> {
+fn staged_doc_id(opaque_id: &str) -> Result<String, String> {
     let uuid = uuid::Uuid::parse_str(opaque_id)
         .map_err(|_| "staged attachment reference is invalid".to_string())?;
-    Ok(workspace
-        .join(STAGED_DIR)
-        .join(format!("{}.json", uuid.simple())))
+    Ok(uuid.simple().to_string())
+}
+
+fn staged_collections() -> Vec<CollectionSpec> {
+    vec![CollectionSpec::new(STAGED_COLLECTION)]
+}
+
+fn staged_repo(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace: &std::path::Path,
+) -> Result<Repo, String> {
+    let tenant = tenant_for(ctx)?;
+    let backend = storage::local::backend_for(workspace)
+        .map_err(|error| format!("open staged attachment storage: {error}"))?;
+    let scope = storage::scope_from(
+        tenant.profile.as_deref(),
+        tenant.agent.as_deref(),
+        crate::core::runtime::mode::is_saas(),
+    )
+    .map_err(|error| format!("scope staged attachment storage: {error}"))?;
+    Repo::on(&backend, &scope, STAGED_DOMAIN, staged_collections)
+        .map_err(|error| format!("open staged attachment collection: {error}"))
+}
+
+fn get_staged_record(repo: &Repo, id: &str) -> Result<Option<StagedAttachment>, String> {
+    let id = id.to_string();
+    repo.run(|docs| async move {
+        let Some(stored) = docs.get(STAGED_COLLECTION, &id).await? else {
+            return Ok(None);
+        };
+        serde_json::from_value(stored.doc)
+            .map(Some)
+            .map_err(|error| tinystoragedrivers::StorageError::invalid_input(error.to_string()))
+    })
+    .map_err(|error| error.to_string())
 }
 
 async fn read_staged_entries(
@@ -233,22 +270,25 @@ async fn read_staged_entries(
 ) -> Result<Vec<StoredAttachment>, String> {
     validate_opaque_parts(requested)?;
     let tenant = tenant_for(ctx)?;
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
     let mut entries = Vec::with_capacity(requested.len());
     for part in requested {
         let opaque_id = opaque_media(part)
             .and_then(|media| media.opaque_id.as_deref())
             .ok_or_else(|| "staged attachment reference is missing".to_string())?;
-        let path = staged_manifest_path(&config.workspace_dir, opaque_id)?;
-        let bytes = tokio::fs::read(&path)
-            .await
-            .map_err(|_| "staged attachment is missing or expired".to_string())?;
-        let manifest: StagedAttachment = serde_json::from_slice(&bytes)
-            .map_err(|error| format!("staged attachment record is invalid: {error}"))?;
+        let id = staged_doc_id(opaque_id)?;
+        let manifest = get_staged_record(&repo, &id)?
+            .ok_or_else(|| "staged attachment is missing or expired".to_string())?;
         if manifest.tenant != tenant || manifest.thread_id != thread_id {
             return Err("staged attachment belongs to a different scope".into());
         }
-        if manifest.expires_at < chrono::Utc::now().timestamp() {
+        if manifest.expires_at < chrono::Utc::now().timestamp()
+            && manifest.claim.as_ref().is_none_or(|claim| claim.canceled)
+        {
             return Err("staged attachment is missing or expired".into());
+        }
+        if manifest.claim.as_ref().is_some_and(|claim| claim.canceled) {
+            return Err("staged attachment was canceled".into());
         }
         if &manifest.attachment.part != part {
             return Err("staged attachment reference does not match its stored record".into());
@@ -291,12 +331,12 @@ async fn claim_staged_refs(
         return Err("staged attachment target message ID is empty".into());
     }
     let tenant = tenant_for(ctx)?;
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
     for entry in entries {
         let opaque_id = opaque_media(&entry.part)
             .and_then(|media| media.opaque_id.as_deref())
             .ok_or_else(|| "staged attachment reference is missing".to_string())?;
-        let manifest_path = staged_manifest_path(&config.workspace_dir, opaque_id)?;
-        let claim_path = manifest_path.with_extension("claim.json");
+        let id = staged_doc_id(opaque_id)?;
         let claim = StagedAttachmentClaim {
             tenant: tenant.clone(),
             thread_id: thread_id.to_string(),
@@ -304,53 +344,70 @@ async fn claim_staged_refs(
             part: entry.part.clone(),
             canceled: false,
         };
-        publish_staged_claim(&claim_path, &claim).await?;
+        claim_staged_record(&repo, &tenant, thread_id, &id, &entry.part, &claim)?;
     }
     Ok(())
 }
 
-async fn publish_staged_claim(
-    claim_path: &std::path::Path,
+fn claim_staged_record(
+    repo: &Repo,
+    tenant: &crate::core::runtime::Tenant,
+    thread_id: &str,
+    id: &str,
+    part: &ContentPart,
     claim: &StagedAttachmentClaim,
 ) -> Result<bool, String> {
-    let bytes = serde_json::to_vec(claim)
-        .map_err(|error| format!("serialize staged attachment claim: {error}"))?;
-    let temp_path = claim_path.with_extension(format!("{}.claim-tmp", uuid::Uuid::new_v4()));
-    let mut file = tokio::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temp_path)
-        .await
-        .map_err(|error| format!("create staged attachment claim: {error}"))?;
-    use tokio::io::AsyncWriteExt;
-    file.write_all(&bytes)
-        .await
-        .map_err(|error| format!("write staged attachment claim: {error}"))?;
-    file.sync_all()
-        .await
-        .map_err(|error| format!("sync staged attachment claim: {error}"))?;
-    drop(file);
-    let result = match tokio::fs::hard_link(&temp_path, claim_path).await {
-        Ok(()) => Ok(true),
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            let stored: StagedAttachmentClaim = serde_json::from_slice(
-                &tokio::fs::read(claim_path)
-                    .await
-                    .map_err(|read| format!("read staged attachment claim: {read}"))?,
-            )
-            .map_err(|read| format!("decode staged attachment claim: {read}"))?;
-            if stored == *claim {
-                Ok(false)
-            } else if stored.canceled {
-                Err("staged attachment was canceled before it could be bound".into())
-            } else {
-                Err("staged attachment is already bound to another message".into())
+    let id = id.to_string();
+    let tenant = tenant.clone();
+    let thread_id = thread_id.to_string();
+    let part = part.clone();
+    let claim = claim.clone();
+    repo.run(|docs| async move {
+        let updated = compare_and_swap(&docs, STAGED_COLLECTION, &id, |doc| {
+            let mut record: StagedAttachment = serde_json::from_value(doc.clone()).ok()?;
+            if record.tenant != tenant
+                || record.thread_id != thread_id
+                || record.attachment.part != part
+                || record.expires_at < chrono::Utc::now().timestamp()
+            {
+                return None;
             }
+            if record.claim.is_some() {
+                return None;
+            }
+            record.claim = Some(claim.clone());
+            serde_json::to_value(record).ok()
+        })
+        .await?;
+        if updated.is_some() {
+            return Ok(true);
         }
-        Err(error) => Err(format!("publish staged attachment claim: {error}")),
-    };
-    let _ = tokio::fs::remove_file(temp_path).await;
-    result
+        let Some(stored) = docs.get(STAGED_COLLECTION, &id).await? else {
+            return Err(tinystoragedrivers::StorageError::not_found(
+                "staged attachment is missing or expired",
+            ));
+        };
+        let record: StagedAttachment = serde_json::from_value(stored.doc)
+            .map_err(|error| tinystoragedrivers::StorageError::invalid_input(error.to_string()))?;
+        if record.tenant != tenant || record.thread_id != thread_id || record.attachment.part != part
+        {
+            return Err(tinystoragedrivers::StorageError::conflict(
+                "staged attachment belongs to a different scope",
+            ));
+        }
+        if record.claim.as_ref() == Some(&claim) {
+            return Ok(false);
+        }
+        if record.claim.as_ref().is_some_and(|existing| existing.canceled) {
+            return Err(tinystoragedrivers::StorageError::conflict(
+                "staged attachment was canceled before it could be bound",
+            ));
+        }
+        Err(tinystoragedrivers::StorageError::conflict(
+            "staged attachment is already bound to another message",
+        ))
+    })
+    .map_err(|error| error.to_string())
 }
 
 /// Stage media supplied with a queued follow-up, returning only opaque refs.
@@ -398,17 +455,14 @@ pub(crate) async fn stage_queued_parts(
     let (_, files) = crate::agent::attachments::parse(&staged);
     let entries = from_staged_parts(input, &files)?;
     let tenant = tenant_for(ctx)?;
-    let manifest_dir = config.workspace_dir.join(STAGED_DIR);
-    tokio::fs::create_dir_all(&manifest_dir)
-        .await
-        .map_err(|error| format!("create queued attachment store: {error}"))?;
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
     let expires_at = chrono::Utc::now().timestamp() + STAGED_TTL_SECS;
     let mut public = Vec::with_capacity(entries.len());
     for attachment in entries {
         let opaque_id = opaque_media(&attachment.0)
             .and_then(|media| media.opaque_id.as_deref())
             .ok_or_else(|| "staged attachment has no opaque reference".to_string())?;
-        let path = staged_manifest_path(&config.workspace_dir, opaque_id)?;
+        let id = staged_doc_id(opaque_id)?;
         let manifest = StagedAttachment {
             tenant: tenant.clone(),
             thread_id: thread_id.to_string(),
@@ -417,19 +471,16 @@ pub(crate) async fn stage_queued_parts(
                 path: attachment.1,
             },
             expires_at,
+            claim: None,
         };
-        let bytes = serde_json::to_vec(&manifest)
+        let body = serde_json::to_value(&manifest)
             .map_err(|error| format!("serialize queued attachment record: {error}"))?;
-        let mut file = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .await
-            .map_err(|error| format!("create queued attachment record: {error}"))?;
-        use tokio::io::AsyncWriteExt;
-        file.write_all(&bytes)
-            .await
-            .map_err(|error| format!("write queued attachment record: {error}"))?;
+        repo.run(|docs| async move {
+            docs.put(STAGED_COLLECTION, &id, body, Precondition::Absent)
+                .await?;
+            Ok(())
+        })
+        .map_err(|error| format!("persist queued attachment record: {error}"))?;
         public.push(manifest.attachment.part);
     }
     Ok(public)
@@ -547,13 +598,13 @@ async fn discard_staged_entries(
     .await
     .map_err(|error| format!("staged attachment workspace unavailable: {error}"))?;
     let tenant = tenant_for(ctx)?;
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
     for entry in entries {
         let Some(id) = opaque_media(&entry.part).and_then(|media| media.opaque_id.as_deref())
         else {
             continue;
         };
-        let manifest_path = staged_manifest_path(&config.workspace_dir, id)?;
-        let claim_path = manifest_path.with_extension("claim.json");
+        let id = staged_doc_id(id)?;
         let cancellation = StagedAttachmentClaim {
             tenant: tenant.clone(),
             thread_id: thread_id.to_string(),
@@ -561,12 +612,8 @@ async fn discard_staged_entries(
             part: entry.part.clone(),
             canceled: true,
         };
-        match publish_staged_claim(&claim_path, &cancellation).await {
-            Ok(_) => {}
-            Err(error) if error == "staged attachment is already bound to another message" => {
-                continue;
-            }
-            Err(error) => return Err(error),
+        if !cancel_staged_record(&repo, &tenant, thread_id, &id, &entry.part, &cancellation)? {
+            continue;
         }
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
@@ -580,9 +627,65 @@ async fn discard_staged_entries(
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(format!("remove staged attachment: {error}")),
         }
-        let _ = tokio::fs::remove_file(manifest_path).await;
     }
     Ok(())
+}
+
+fn cancel_staged_record(
+    repo: &Repo,
+    tenant: &crate::core::runtime::Tenant,
+    thread_id: &str,
+    id: &str,
+    part: &ContentPart,
+    cancellation: &StagedAttachmentClaim,
+) -> Result<bool, String> {
+    let id = id.to_string();
+    let tenant = tenant.clone();
+    let thread_id = thread_id.to_string();
+    let part = part.clone();
+    let cancellation = cancellation.clone();
+    repo.run(|docs| async move {
+        let updated = compare_and_swap(&docs, STAGED_COLLECTION, &id, |doc| {
+            let mut record: StagedAttachment = serde_json::from_value(doc.clone()).ok()?;
+            if record.tenant != tenant
+                || record.thread_id != thread_id
+                || record.attachment.part != part
+            {
+                return None;
+            }
+            if record.claim.is_some() {
+                return None;
+            }
+            record.claim = Some(cancellation.clone());
+            serde_json::to_value(record).ok()
+        })
+        .await?;
+        if updated.is_some() {
+            return Ok(true);
+        }
+        let Some(stored) = docs.get(STAGED_COLLECTION, &id).await? else {
+            return Err(tinystoragedrivers::StorageError::not_found(
+                "staged attachment is missing",
+            ));
+        };
+        let record: StagedAttachment = serde_json::from_value(stored.doc)
+            .map_err(|error| tinystoragedrivers::StorageError::invalid_input(error.to_string()))?;
+        if record.tenant != tenant || record.thread_id != thread_id || record.attachment.part != part
+        {
+            return Err(tinystoragedrivers::StorageError::conflict(
+                "staged attachment belongs to a different scope",
+            ));
+        }
+        match record.claim {
+            Some(existing) if existing == cancellation => Ok(true),
+            Some(existing) if existing.canceled => Ok(false),
+            Some(_) => Ok(false),
+            None => Err(tinystoragedrivers::StorageError::conflict(
+                "staged attachment cancellation raced with another change",
+            )),
+        }
+    })
+    .map_err(|error| error.to_string())
 }
 
 /// Retire manifests after the staged refs have been durably bound to a
