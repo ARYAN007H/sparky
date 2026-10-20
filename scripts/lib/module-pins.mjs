@@ -199,7 +199,11 @@ export function validateTestOnlySourceParity({
   actualHead,
   proof,
   runGit = (args) =>
-    execFileSync("git", args, { cwd: repoPath, encoding: "utf8" }).trim(),
+    execFileSync("git", args, {
+      cwd: repoPath,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim(),
 }) {
   try {
     if (typeof repoPath !== "string" || repoPath.length === 0) {
