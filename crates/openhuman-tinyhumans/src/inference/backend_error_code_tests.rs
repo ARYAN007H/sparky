@@ -78,7 +78,7 @@ fn extraction_is_case_insensitive_on_key_and_normalises_value() {
 
 #[test]
 fn unknown_token_is_present_but_not_recognised() {
-    let body = r#"{"errorCode":"SOME_FUTURE_CODE"}"#;
+    let body = r#"OpenHuman API error: {"errorCode":"SOME_FUTURE_CODE"}"#;
     assert_eq!(
         extract_backend_error_code_token(body).as_deref(),
         Some("SOME_FUTURE_CODE")
@@ -140,7 +140,7 @@ fn client_guard_leak_codes_page_but_other_state_codes_do_not() {
 fn malformed_flag_without_bad_request_is_ignored() {
     // A stray `malformed` flag on a non-BAD_REQUEST code must not turn a
     // backend-owned error into a paging one.
-    let body = r#"{"errorCode":"INTERNAL_ERROR","malformed":true}"#;
+    let body = r#"OpenHuman API error: {"errorCode":"INTERNAL_ERROR","malformed":true}"#;
     assert!(!is_backend_malformed_bad_request(body));
     assert!(backend_error_code_skips_sentry(body));
 }
