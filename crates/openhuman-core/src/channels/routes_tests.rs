@@ -169,6 +169,7 @@ fn provider_alias_and_route_selection_round_trip() {
 fn provider_descriptors_use_configured_slugs_and_keep_managed_aliases() {
     use crate::config::schema::{AuthStyle, CloudProviderCreds};
 
+    super::register_hosted_route_test_policy();
     let config = crate::config::Config {
         cloud_providers: vec![
             CloudProviderCreds {

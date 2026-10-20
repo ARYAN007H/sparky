@@ -27,6 +27,15 @@ fn provider_descriptors(config: &crate::config::Config) -> Vec<ProviderDescripto
         .collect()
 }
 
+#[cfg(test)]
+pub(crate) fn register_hosted_route_test_policy() {
+    use crate::config::schema::cloud_providers::AuthStyle;
+    crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == "openhuman"),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
+}
+
 fn default_route_selection(ctx: &ChannelRuntimeContext) -> ChannelRouteSelection {
     ChannelRouteSelection {
         provider: ctx.default_provider.as_str().to_string(),

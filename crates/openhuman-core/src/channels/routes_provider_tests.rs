@@ -11,6 +11,7 @@ use tinychannels_bus::ChannelMessage;
 async fn handle_runtime_command_routes_configured_provider_slug_and_alias() {
     use crate::config::schema::{AuthStyle, CloudProviderCreds};
 
+    super::register_hosted_route_test_policy();
     let mut ctx = runtime_context(PathBuf::from("/tmp"));
     crate::channels::module_fixture::client().await;
     let mut config = crate::config::Config::default();
