@@ -248,7 +248,6 @@ async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
     );
 }
 
-#[tokio::test]
 #[tokio::test(start_paused = true)]
 async fn failed_async_child_is_reported_to_the_parent_without_a_success_result() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
