@@ -472,7 +472,13 @@ test("source parity proof rejects descendants, dirty files, asset drift, renames
     const f = sourceParityFixture();
     try {
       f.git(tagChange === "moved" ? ["tag", "-f", "-a", "-m", "moved", "v1.0.0", f.candidateCommit] : ["tag", "-d", "v1.0.0"]);
-      assert.match(validate(f).message, /release tag does not resolve to the attested release commit/, `${tagChange} tag failed for the wrong reason`);
+      assert.match(
+        validate(f).message,
+        tagChange === "moved"
+          ? /release tag does not resolve to the attested release commit/
+          : /unknown revision/,
+        `${tagChange} tag failed for the wrong reason`,
+      );
     } finally {
       rmSync(f.root, { recursive: true, force: true });
     }
