@@ -1,6 +1,8 @@
 //! Per-sender routing and runtime command handling.
 
-use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
+use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
+#[cfg(test)]
+use super::context::clear_sender_history;
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
 use std::sync::Arc;
@@ -143,12 +145,17 @@ impl RouteCallbacks {
     }
 }
 
-pub(crate) async fn handle_runtime_command_if_needed(
+pub(crate) async fn handle_runtime_command_with_reset<F, Fut>(
     ctx: &ChannelRuntimeContext,
     msg: &traits::ChannelMessage,
     target_channel: Option<&Arc<dyn Channel>>,
     sender_key: &str,
-) -> bool {
+    reset_history: F,
+) -> bool
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
     // This is a host dispatch hint; the module alone parses and recognizes
     // commands. Ordinary messages avoid creating a private callback object.
     if !msg.content.trim_start().starts_with('/') {
@@ -224,7 +231,21 @@ pub(crate) async fn handle_runtime_command_if_needed(
         );
     }
     if clear_history {
-        clear_sender_history(&ctx.conversation_histories, sender_key);
+        if let Err(error) = reset_history().await {
+            tracing::warn!("channel durable history reset failed: {error}");
+            if let Some(channel) = target_channel {
+                let copy = crate::web_chat::classify_inference_error(
+                    "OpenHuman session persistence failed while resetting this conversation",
+                );
+                let _ = channel
+                    .send_with_outbound_intent(
+                        &SendMessage::new(copy.message, &msg.reply_target)
+                            .in_thread(msg.thread_ts.clone()),
+                    )
+                    .await;
+            }
+            return true;
+        }
     }
     let Some(reply) = reply else {
         return false;
@@ -241,6 +262,20 @@ pub(crate) async fn handle_runtime_command_if_needed(
         }
     }
     true
+}
+
+#[cfg(test)]
+pub(crate) async fn handle_runtime_command_if_needed(
+    ctx: &ChannelRuntimeContext,
+    msg: &traits::ChannelMessage,
+    target_channel: Option<&Arc<dyn Channel>>,
+    sender_key: &str,
+) -> bool {
+    handle_runtime_command_with_reset(ctx, msg, target_channel, sender_key, || async {
+        clear_sender_history(&ctx.conversation_histories, sender_key);
+        Ok(())
+    })
+    .await
 }
 
 #[cfg(test)]
