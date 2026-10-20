@@ -100,10 +100,8 @@ async fn origin_messages(
                     &crate::agent::session_store::agent_key_for(&tenant, &agent_id),
                     &config.workspace_dir,
                 );
-                let session = tinyagents_session::transcript::SessionRef::scoped(
-                    session_key,
-                    agent_id,
-                );
+                let session =
+                    tinyagents_session::transcript::SessionRef::scoped(session_key, agent_id);
                 let head = locator.head_generation(&session);
                 locator
                     .read_session_transcript(&head)
@@ -136,7 +134,7 @@ async fn origin_messages(
 
 /// Validate persisted channel identity claims against the current callback
 /// tenant and the config-owned channel-to-agent selection.
-fn validated_channel_session(
+pub(super) fn validated_channel_session(
     ctx: &DispatchCtx,
     config: &Config,
     channel: &str,
