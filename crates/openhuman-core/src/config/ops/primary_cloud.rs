@@ -139,14 +139,13 @@ fn cloud_entry_provider_string(entry: &CloudProviderCreds, config: &Config) -> S
                 .map(str::trim)
                 .filter(|model| !model.is_empty())
         })
-        .unwrap_or(crate::config::DEFAULT_MODEL);
+        .unwrap_or("");
 
     format!("{}:{model}", entry.slug)
 }
 
 fn is_openhuman_cloud_entry(config: &Config, entry: &CloudProviderCreds) -> bool {
-    entry.slug == PROVIDER_OPENHUMAN
-        || crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style)
+    crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style)
         || looks_like_openhuman_backend(config, &entry.endpoint)
 }
 
