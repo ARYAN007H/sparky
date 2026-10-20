@@ -27,26 +27,22 @@ fn provider_role_override_routes_hint_workloads() {
         provider_role_for_model_override(Some("hint:agentic")),
         "agentic"
     );
-    assert_eq!(
-        provider_role_for_model_override(Some("agentic-v1")),
-        "agentic"
-    );
+    // Hosted vocabulary is supplied by the installed provider policy. With
+    // no hosted policy in bare core, an arbitrary model id stays concrete.
+    assert_eq!(provider_role_for_model_override(Some("agentic-v1")), "chat");
     assert_eq!(
         provider_role_for_model_override(Some("hint:coding")),
         "coding"
     );
     assert_eq!(
         provider_role_for_model_override(Some("summarization-v1")),
-        "summarization"
+        "chat"
     );
     assert_eq!(
         provider_role_for_model_override(Some("hint:reasoning")),
         "reasoning"
     );
-    assert_eq!(
-        provider_role_for_model_override(Some("reasoning-v1")),
-        "reasoning"
-    );
+    assert_eq!(provider_role_for_model_override(Some("reasoning-v1")), "chat");
     assert_eq!(
         provider_role_for_model_override(Some("gpt-4.1-mini")),
         "chat"
