@@ -55,11 +55,12 @@ fn field(out: &Value, name: &str) -> Option<Value> {
 /// user". A failed run must come back `failed`, never as a success.
 #[tokio::test]
 async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
-    use crate::agent::orchestration::running_subagents::{register, status_channel};
-    use crate::agent::orchestration::subagent_sessions::SubagentSessionStore;
+    use crate::agent::orchestration::subagent_sessions::{
+        mark_failed, mark_finished, SubagentSessionStore,
+    };
+    use crate::agent::subagent_host::SubagentRunStatus;
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use std::sync::Arc;
-    use tinyagents_harness::run_queue::RunQueue;
-    use tinyagents_orchestration::subagent::DetachedSubagentStatus;
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("tempdir");
@@ -87,47 +88,56 @@ async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
             "createdAt": "2026-01-01T00:00:00Z",
             "updatedAt": "2026-01-01T00:00:00Z",
             "lastUsedAt": "2026-01-01T00:00:00Z"
+        }, {
+            "subagentSessionId": "subsess-sub-rpc-failed",
+            "parentSession": "session-rpc",
+            "parentThreadId": "thread-rpc",
+            "workerThreadId": null,
+            "agentId": "agent_memory",
+            "displayName": null,
+            "model": null,
+            "sandboxMode": "workspace",
+            "actionRoot": null,
+            "taskKey": "task",
+            "taskTitle": "Task",
+            "currentTaskId": "sub-rpc-failed",
+            "status": "running",
+            "reusable": true,
+            "latestHistory": null,
+            "latestError": null,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z",
+            "lastUsedAt": "2026-01-01T00:00:00Z"
         }]))
         .expect("session fixture");
     store.save(&seeded).expect("seed store");
+    mark_finished(
+        &store,
+        "subsess-sub-rpc-done",
+        "sub-rpc-done",
+        &SubagentRunStatus::Completed,
+        Vec::new(),
+    )
+    .expect("completed driver row");
+    mark_failed(
+        &store,
+        "subsess-sub-rpc-failed",
+        "sub-rpc-failed",
+        "boom".into(),
+    )
+    .expect("failed driver row");
     let before = serde_json::to_string(&store.load().expect("load seeded")).expect("encode");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config);
+    let ctx = DispatchCtx::new(Arc::clone(&core));
     for (task_id, status, outcome) in [
-        (
-            "sub-rpc-done",
-            DetachedSubagentStatus::Completed {
-                output: "ok".into(),
-                iterations: 1,
-            },
-            "completed",
-        ),
-        (
-            "sub-rpc-failed",
-            DetachedSubagentStatus::Failed {
-                error: "boom".into(),
-            },
-            "failed",
-        ),
+        ("sub-rpc-done", "completed"),
+        ("sub-rpc-failed", "failed"),
     ] {
-        let (tx, rx) = status_channel();
-        register(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            task_id.into(),
-            "agent_memory".into(),
-            "session-rpc".into(),
-            None,
-            Some(format!("subsess-{task_id}")),
-            workspace.path().to_path_buf(),
-            Some("thread-rpc".into()),
-            Arc::new(RunQueue::new()),
-            tokio::spawn(async {}).abort_handle(),
-            rx,
-        )
-        .expect("fixture registration admitted");
-        tx.send(status).expect("status channel open");
-
         let mut params = Map::new();
         params.insert("taskId".into(), json!(task_id));
-        let out = handle_subagent_cancel(DispatchCtx::process_default(), params)
+        let out = handle_subagent_cancel(ctx.clone(), params)
             .await
             .expect("handler ok");
         assert_eq!(field(&out, "cancelled"), Some(json!(false)), "{task_id}");
