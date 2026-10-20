@@ -10,8 +10,6 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::core::envelope::{ApiEnvelope, ApiError, ApiMeta, EmptyRequest, PaginationMeta};
 
-/// Typed acknowledgement returned when a web chat message enters the run queue.
-/// Attachment values are sanitized opaque references minted by the core.
 /// Typed acknowledgement returned when a web chat message starts immediately.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]

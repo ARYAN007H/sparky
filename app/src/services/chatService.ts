@@ -1029,8 +1029,8 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
     },
   });
 
-  // Started turns keep the legacy scalar request_id response. Only queued
-  // turns return the typed acknowledgement object below.
+  // Keep accepting the legacy scalar while consuming the authoritative started
+  // and queued acknowledgement shapes returned by current cores.
   if (typeof result === 'string') {
     return { requestId: result, queuedAttachments: [] };
   }
