@@ -1,7 +1,6 @@
+use super::*;
 use tinymemory_api::{ConsolidateRequest, ItemKind, Namespace, Reach};
 use tinymemory_tools::BackgroundJob;
-
-use super::*;
 
 #[tokio::test]
 async fn host_memory_state_adapters_use_the_state_kv_port() {
@@ -34,7 +33,7 @@ async fn host_memory_state_adapters_use_the_state_kv_port() {
         "jobs",
     ] {
         assert!(
-            super::load::<serde_json::Value>(workspace, name)
+            load::<serde_json::Value>(workspace, name)
                 .unwrap()
                 .is_some(),
             "memory state value {name} is stored through the KV port"
@@ -49,14 +48,14 @@ fn state_values_do_not_leak_between_workspaces() {
     let first_config = crate::memory::test_fixtures::config_in(&first);
     let second_config = crate::memory::test_fixtures::config_in(&second);
 
-    super::save(&first_config.workspace_dir, "isolation", &"first workspace").unwrap();
+    save(&first_config.workspace_dir, "isolation", &"first workspace").unwrap();
 
     assert_eq!(
-        super::load::<String>(&first_config.workspace_dir, "isolation").unwrap(),
+        load::<String>(&first_config.workspace_dir, "isolation").unwrap(),
         Some("first workspace".to_string())
     );
     assert!(
-        super::load::<String>(&second_config.workspace_dir, "isolation")
+        load::<String>(&second_config.workspace_dir, "isolation")
             .unwrap()
             .is_none(),
         "a second workspace must not read the first workspace's state"
