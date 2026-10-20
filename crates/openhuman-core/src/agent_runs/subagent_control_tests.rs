@@ -131,7 +131,7 @@ async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
     config.workspace_dir = workspace.path().to_path_buf();
     let core = CoreContext::for_test_with_config(DomainSet::full(), config);
     let ctx = DispatchCtx::new(Arc::clone(&core));
-    for (task_id, status, outcome) in [
+    for (task_id, outcome) in [
         ("sub-rpc-done", "completed"),
         ("sub-rpc-failed", "failed"),
     ] {
