@@ -25,8 +25,10 @@ use env_guard::EnvVarGuard;
 use scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
 };
+use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
@@ -81,6 +83,7 @@ fn env_lock() -> std::sync::MutexGuard<'static, ()> {
 
 static SCRIPTED_COMPLETIONS: OnceLock<Mutex<std::collections::VecDeque<Value>>> = OnceLock::new();
 static CAPTURED_COMPLETION_REQUESTS: OnceLock<Mutex<Vec<Value>>> = OnceLock::new();
+static CAPTURED_PROXY_REQUESTS: OnceLock<Mutex<Vec<Value>>> = OnceLock::new();
 const SCRIPT_DISCOVERED_MCP_TOOL: &str = "__script_discovered_mcp_tool__";
 
 fn with_scripted<T>(f: impl FnOnce(&mut std::collections::VecDeque<Value>) -> T) -> T {
@@ -94,6 +97,15 @@ fn with_scripted<T>(f: impl FnOnce(&mut std::collections::VecDeque<Value>) -> T)
 
 fn with_captured<T>(f: impl FnOnce(&mut Vec<Value>) -> T) -> T {
     let m = CAPTURED_COMPLETION_REQUESTS.get_or_init(|| Mutex::new(Vec::new()));
+    let mut guard = match m.lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    f(&mut guard)
+}
+
+fn with_captured_proxy_requests<T>(f: impl FnOnce(&mut Vec<Value>) -> T) -> T {
+    let m = CAPTURED_PROXY_REQUESTS.get_or_init(|| Mutex::new(Vec::new()));
     let mut guard = match m.lock() {
         Ok(g) => g,
         Err(p) => p.into_inner(),
@@ -292,12 +304,24 @@ async fn hold_for_canary_peer(canary: String) {
 
 async fn scripted_chat_completions(
     uri: Uri,
-    _headers: HeaderMap,
+    headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> axum::response::Response {
     use axum::response::IntoResponse;
 
     let streaming = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
+    let authorization = headers.get(AUTHORIZATION).and_then(|value| value.to_str().ok());
+    with_captured_proxy_requests(|requests| {
+        requests.push(json!({
+            "path": uri.path(),
+            "authorization_present": authorization.is_some(),
+            "authorization_bearer": authorization.is_some_and(|value| {
+                value
+                    .get(..7)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("Bearer "))
+            }),
+        }));
+    });
     // Web chat also asks for follow-up suggestions in a separate model call.
     // Answer it without consuming the turn's scripted agent completions.
     if body
@@ -667,14 +691,16 @@ struct Stack {
     _workspace_guard: EnvVarGuard,
     _backend_guard: EnvVarGuard,
     _vite_guard: EnvVarGuard,
-    _tmp: tempfile::TempDir,
-    mock_join: tokio::task::JoinHandle<Result<(), std::io::Error>>,
+    _tmp: Option<tempfile::TempDir>,
+    mock_join: Option<tokio::task::JoinHandle<Result<(), std::io::Error>>>,
     rpc_join: tokio::task::JoinHandle<Result<(), std::io::Error>>,
 }
 
 impl Stack {
     fn shutdown(&self) {
-        self.mock_join.abort();
+        if let Some(mock_join) = &self.mock_join {
+            mock_join.abort();
+        }
         self.rpc_join.abort();
     }
 }
@@ -682,7 +708,9 @@ impl Stack {
 // Abort server tasks even when a test assertion panics before shutdown().
 impl Drop for Stack {
     fn drop(&mut self) {
-        self.mock_join.abort();
+        if let Some(mock_join) = &self.mock_join {
+            mock_join.abort();
+        }
         self.rpc_join.abort();
     }
 }
@@ -699,6 +727,18 @@ async fn boot_stack() -> Stack {
 const SUPERVISED_AUTONOMY_CONFIG: &str = "[autonomy]\nenabled = true\nlevel = \"supervised\"\n";
 
 async fn boot_stack_with_config(extra_config: &str) -> Stack {
+    boot_stack_with_options(extra_config, None, None).await
+}
+
+async fn boot_stack_with_capture_endpoint(api_origin: String, home: PathBuf) -> Stack {
+    boot_stack_with_options("", Some(api_origin), Some(home)).await
+}
+
+async fn boot_stack_with_options(
+    extra_config: &str,
+    api_origin_override: Option<String>,
+    home_override: Option<PathBuf>,
+) -> Stack {
     // This suite boots the core in-process, so install the hosted backend
     // transport before any RPC can reach backend-backed providers.
     tinyhumans_boot::boot();
@@ -714,20 +754,30 @@ async fn boot_stack_with_config(extra_config: &str) -> Stack {
     // it every turn fails with `chat_error.inference`.
     tinyhumans_boot::boot();
 
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path().to_path_buf();
+    let tmp = home_override.is_none().then(|| tempdir().expect("tempdir"));
+    let home = home_override.unwrap_or_else(|| {
+        tmp.as_ref()
+            .expect("temporary home exists without override")
+            .path()
+            .to_path_buf()
+    });
     let openhuman_home = home.join(".openhuman");
     let action_dir = home.join("OpenHuman/projects");
     std::fs::create_dir_all(&action_dir).expect("create action directory");
 
     let home_guard = EnvVarGuard::set_to_path("HOME", &home);
     let action_dir_guard = EnvVarGuard::set_to_path("OPENHUMAN_ACTION_DIR", &action_dir);
-    let workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &home.join("workspace"));
     let backend_guard = EnvVarGuard::unset("BACKEND_URL");
     let vite_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
 
-    let (mock_addr, mock_join) = serve_on_ephemeral(scripted_upstream_router()).await;
-    let mock_origin = format!("http://{mock_addr}");
+    let (mock_origin, mock_join) = match api_origin_override {
+        Some(api_origin) => (api_origin, None),
+        None => {
+            let (mock_addr, mock_join) = serve_on_ephemeral(scripted_upstream_router()).await;
+            (format!("http://{mock_addr}"), Some(mock_join))
+        }
+    };
     write_min_config(&openhuman_home, &mock_origin, extra_config);
     // Pre-write user-scoped config so it's found after auth_store_session activates "e2e-user".
     write_min_config(
