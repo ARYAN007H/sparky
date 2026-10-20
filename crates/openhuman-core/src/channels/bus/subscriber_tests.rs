@@ -39,7 +39,7 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
         succeed_in: Some(workspace.path().to_path_buf()),
     };
     crate::web_chat::set_test_run_chat_task_block(Some(block.clone())).await;
-    crate::web_chat::ops::set_last_run_chat_task_error_for_test(None).await;
+    crate::web_chat::set_last_run_chat_task_error_for_test(None).await;
 
     let ctx = DispatchCtx::ambient();
     let client_id = "channel-timeout-client";
