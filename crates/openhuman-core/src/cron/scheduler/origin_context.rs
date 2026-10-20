@@ -90,7 +90,7 @@ async fn origin_messages(
             channel,
             ..
         } => match validated_channel_session(ctx, config, channel, identity) {
-            Ok(Some((session_key, agent_id, tenant))) => {
+            Ok((session_key, agent_id, tenant)) => {
                 let Some(core) = ctx.core() else {
                     tracing::warn!("[cron] channel origin has no resolved core context");
                     return Vec::new();
@@ -105,6 +105,7 @@ async fn origin_messages(
                 let head = locator.head_generation(&session);
                 locator
                     .read_session_transcript(&head)
+                    .ok()
                     .and_then(|read| read.read_session().ok().flatten())
                     .map(|history| {
                         history
@@ -122,7 +123,6 @@ async fn origin_messages(
                     })
                     .unwrap_or_default()
             }
-            Ok(None) => Vec::new(),
             Err(error) => {
                 tracing::warn!(%error, "[cron] refusing unscoped channel origin context");
                 Vec::new()
@@ -139,7 +139,7 @@ pub(super) fn validated_channel_session(
     config: &Config,
     channel: &str,
     identity: &ChannelSessionIdentity,
-) -> Result<Option<(String, String, crate::core::runtime::Tenant)>, String> {
+) -> Result<(String, String, crate::core::runtime::Tenant), String> {
     let tenant = ctx.tenant().map_err(|error| error.to_string())?;
     let tenant_scope = crate::core::runtime::tenant_key(&tenant, "");
     if identity.tenant_key != tenant_scope {
@@ -179,11 +179,11 @@ pub(super) fn validated_channel_session(
     if selected_agent != identity.agent_id {
         return Err("channel origin agent no longer matches its configured route".into());
     }
-    Ok(Some((
+    Ok((
         crate::core::runtime::tenant_key(&tenant, &identity.session_key),
         identity.agent_id.clone(),
         tenant,
-    )))
+    ))
 }
 
 /// Prompt for a `current` run: tagged task, unattended preamble, the bounded

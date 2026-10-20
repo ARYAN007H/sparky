@@ -161,6 +161,18 @@ pub(crate) async fn deliver_to_origin(
         ));
     };
     let text = output.trim();
+    if let JobOrigin::Channel {
+        channel,
+        channel_session,
+        ..
+    } = origin
+    {
+        let identity = channel_session
+            .as_deref()
+            .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
+        super::origin_context::validated_channel_session(ctx, config, channel, identity)
+            .map_err(|error| anyhow!("invalid channel origin: {error}"))?;
+    }
 
     // The job's tenant: a hosted profile's or an embedded agent's host routes
     // the reply itself; otherwise it keys the transcript store below.
@@ -231,8 +243,7 @@ pub(crate) async fn deliver_to_origin(
                 .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
             let (session_key, agent_id, _tenant) =
                 super::origin_context::validated_channel_session(ctx, config, channel, identity)
-                    .map_err(|error| anyhow!("invalid channel origin: {error}"))?
-                    .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
+                    .map_err(|error| anyhow!("invalid channel origin: {error}"))?;
             let text = strip_openhuman_link_markup(text);
             channel_bridge::send_to_channel(
                 channel,
@@ -279,8 +290,7 @@ async fn append_channel_transcript(
 ) -> Result<()> {
     let (session_key, agent_id, _) =
         super::origin_context::validated_channel_session(ctx, config, channel, identity)
-            .map_err(|error| anyhow!("invalid channel origin: {error}"))?
-            .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
+            .map_err(|error| anyhow!("invalid channel origin: {error}"))?;
     let transcripts = origin_channel_transcripts(ctx, config, identity, &agent_id)?;
     append_to_origin_transcript(
         transcripts.as_ref(),
