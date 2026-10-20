@@ -85,7 +85,7 @@ async fn upload_body(
     files: &dyn FileStore,
     record: &ArtifactRecord,
     version: &ArtifactVersion,
-) -> anyhow::Result<(Vec<u8>, String, &'static str)> {
+) -> anyhow::Result<(Vec<u8>, String, String)> {
     if record.holds_file() {
         let file = version
             .file
@@ -102,16 +102,10 @@ async fn upload_body(
             Some(ext) => format!("{}.{ext}", file_stem(&record.title)),
             None => file_stem(&record.title),
         };
-        let mime = match file.media_type.as_deref() {
-            Some("image/png") => "image/png",
-            Some("image/jpeg") => "image/jpeg",
-            Some("image/gif") => "image/gif",
-            Some("image/webp") => "image/webp",
-            Some("application/pdf") => "application/pdf",
-            Some("text/plain") => "text/plain",
-            Some("text/csv") => "text/csv",
-            _ => mime_for_path(path),
-        };
+        let mime = file
+            .media_type
+            .clone()
+            .unwrap_or_else(|| mime_for_path(path).to_string());
         return Ok((bytes, name, mime));
     }
     let ext = match record.kind {
@@ -124,7 +118,8 @@ async fn upload_body(
         ArtifactKind::Markdown => "text/markdown",
         ArtifactKind::Html => "text/html",
         _ => "text/plain",
-    };
+    }
+    .to_string();
     Ok((version.body.clone().into_bytes(), name, mime))
 }
 
@@ -244,7 +239,7 @@ impl ArtifactPublisher for StorageArtifactPublisher {
         );
         let part = reqwest::multipart::Part::bytes(bytes)
             .file_name(filename)
-            .mime_str(mime)?;
+            .mime_str(&mime)?;
         let visibility = if options.public { "public" } else { "private" };
         let form = reqwest::multipart::Form::new()
             .part("file", part)

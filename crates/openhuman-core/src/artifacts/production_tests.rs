@@ -92,7 +92,7 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     let file = record.latest().unwrap().file.clone().unwrap();
     assert_eq!(file.key, format!("artifacts/files/{id}/v1.pptx"));
     let ctx = crate::core::runtime::DispatchCtx::process_default();
-    let file_store = super::super::tiny_store::file_store_for(&workspace, &ctx).unwrap();
+    let file_store = production.file_store.as_ref().unwrap();
     assert_eq!(file_store.read(&file.key).await.unwrap(), b"deck-v1");
     assert_eq!(
         files_in(&files),
@@ -122,7 +122,14 @@ async fn a_revision_reuses_the_id_and_file_and_keeps_the_history() {
     );
     // Each version still holds what it was.
     let ctx = crate::core::runtime::DispatchCtx::process_default();
-    let file_store = super::super::tiny_store::file_store_for(&workspace, &ctx).unwrap();
+    let (_, file_store) = super::super::tiny_store::artifacts_service_with_file_store(
+        &workspace,
+        FileRoots::new(&files),
+        None,
+        None,
+        &ctx,
+    );
+    let file_store = file_store.unwrap();
     let key_of = |n: u32| record.version(n).unwrap().file.clone().unwrap().key;
     assert_eq!(file_store.read(&key_of(1)).await.unwrap(), b"deck-v1");
     assert_eq!(file_store.read(&key_of(2)).await.unwrap(), b"deck-v2!");
