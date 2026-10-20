@@ -1,6 +1,6 @@
+use super::*;
 use super::super::managed_reasoning::REASONING_OFF_METADATA_KEY;
 use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
-use super::*;
 use serde_json::Value;
 use tinyinference_llm::model::ChatModel;
 
@@ -47,8 +47,21 @@ fn managed_model_keeps_its_explicit_thread_without_an_ambient_scope() {
 fn managed_model_advertises_tool_and_vision_capabilities() {
     let model = backend();
     let profile = model.profile().expect("managed profile");
+    assert_eq!(profile.provider.as_deref(), Some("managed"));
     assert!(profile.tool_calling);
+    assert!(profile.parallel_tool_calls);
+    assert!(profile.streaming_tool_chunks);
     assert!(profile.modalities.image_in);
+}
+
+#[test]
+fn managed_model_forced_text_mode_disables_native_tool_capabilities() {
+    let model = backend().with_native_tool_calling(false);
+    let profile = model.profile().expect("managed profile");
+    assert_eq!(profile.provider.as_deref(), Some("managed"));
+    assert!(!profile.tool_calling);
+    assert!(!profile.parallel_tool_calls);
+    assert!(!profile.streaming_tool_chunks);
 }
 
 #[test]

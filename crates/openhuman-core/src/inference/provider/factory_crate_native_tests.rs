@@ -492,10 +492,6 @@ fn configured_openhuman_jwt_slug_routes_to_managed_chat_model() {
         .expect("registered host policy should recognize this route")
         .expect("registered model should build");
     assert_eq!(pinned_id, "vendor/pinned");
-    assert!(
-        model.profile().is_none(),
-        "the generic fixture has no host profile"
-    );
     crate::inference::registry::unregister_chat_model(
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
     );

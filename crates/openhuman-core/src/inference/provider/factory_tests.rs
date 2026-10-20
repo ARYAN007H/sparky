@@ -4,10 +4,8 @@ use crate::config::Config;
 use crate::security::credentials::AuthService;
 use tempfile::TempDir;
 
-#[cfg(test)]
 struct ManagedRouteFixtureModel;
 
-#[cfg(test)]
 #[async_trait::async_trait]
 impl ChatModel<()> for ManagedRouteFixtureModel {
     async fn invoke(
@@ -21,7 +19,6 @@ impl ChatModel<()> for ManagedRouteFixtureModel {
     }
 }
 
-#[cfg(test)]
 fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
     use crate::config::schema::cloud_providers::AuthStyle;
     use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
@@ -74,7 +71,6 @@ fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
     native_modes
 }
 
-#[cfg(test)]
 fn fixture_managed_entry(id: &str) -> CloudProviderCreds {
     CloudProviderCreds {
         id: id.to_string(),

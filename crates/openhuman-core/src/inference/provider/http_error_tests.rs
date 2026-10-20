@@ -449,19 +449,19 @@ mod provider_config_rejection_suppression {
         super::install_fixture_backend_classifier();
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                FIXTURE_BACKEND,
+                super::FIXTURE_BACKEND,
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TIER_LEAK_BODY
             ),
-            FIXTURE_BACKEND
+            super::FIXTURE_BACKEND
         ));
         assert!(!config_rejection_demoted(
             &tinyinference_llm::failure::http::classify_http_failure(
-                FIXTURE_BACKEND,
+                super::FIXTURE_BACKEND,
                 reqwest::StatusCode::BAD_REQUEST.as_u16(),
                 TEMP_BODY
             ),
-            FIXTURE_BACKEND
+            super::FIXTURE_BACKEND
         ));
     }
 
@@ -570,11 +570,11 @@ mod provider_config_rejection_suppression {
         assert!(
             !config_rejection_demoted(
                 &tinyinference_llm::failure::http::classify_http_failure(
-                    FIXTURE_BACKEND,
+                    super::FIXTURE_BACKEND,
                     reqwest::StatusCode::FORBIDDEN.as_u16(),
                     body
                 ),
-                FIXTURE_BACKEND
+                super::FIXTURE_BACKEND
             ),
             "backend 403 subscription phrase must NOT be suppressed (polarity guard)"
         );
