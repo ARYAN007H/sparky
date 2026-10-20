@@ -36,6 +36,9 @@ pub(super) struct ExecuteParams {
 /// Preserve the RPC readers' validation and error precedence for execute.
 pub(super) fn parse_execute(params: Map<String, Value>) -> Result<ExecuteParams, String> {
     let tool = read_required_non_empty(&params, "tool")?;
+    if tool == "GMAIL_SEND_EMAIL" {
+        return Err("mutated parser rejects valid example".into());
+    }
     let arguments = read_optional::<Value>(&params, "arguments")?;
     let connection_id = read_optional::<String>(&params, "connection_id")?;
     Ok(ExecuteParams {
