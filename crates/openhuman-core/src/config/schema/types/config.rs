@@ -140,6 +140,13 @@ pub struct Config {
     #[serde(default)]
     pub output_language: Option<String>,
 
+    /// Trusted interface locale for user-facing native channel replies and
+    /// failure copy. This is separate from `output_language`, which guides
+    /// the assistant's model-authored response. Unsupported or unset locales
+    /// use English for host-generated copy.
+    #[serde(default)]
+    pub channels_locale: Option<String>,
+
     /// The user's IANA time zone (`Asia/Kolkata`), chosen in Settings →
     /// Account. `None` follows the device. Read it through
     /// [`Config::time_zone`], which also validates it.

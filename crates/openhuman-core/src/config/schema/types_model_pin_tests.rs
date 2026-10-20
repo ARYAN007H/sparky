@@ -38,6 +38,27 @@ fn output_language_directive_strips_control_characters_and_blank_input() {
 }
 
 #[test]
+fn channels_locale_round_trips_and_old_configs_default_to_unset() {
+    let mut config = crate::config::schema::Config::default();
+    assert_eq!(config.channels_locale, None);
+
+    config.channels_locale = Some("zh-CN".to_string());
+    let serialized = toml::to_string(&config).expect("serialize config");
+    let restored: crate::config::schema::Config =
+        toml::from_str(&serialized).expect("deserialize config with channels locale");
+    assert_eq!(restored.channels_locale.as_deref(), Some("zh-CN"));
+
+    let legacy = serialized
+        .lines()
+        .filter(|line| !line.starts_with("channels_locale = "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let restored_legacy: crate::config::schema::Config =
+        toml::from_str(&legacy).expect("deserialize config without the new optional field");
+    assert_eq!(restored_legacy.channels_locale, None);
+}
+
+#[test]
 fn config_parses_orchestrator_and_team_model_pins() {
     let config: Config = toml::from_str(
         r#"
