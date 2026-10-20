@@ -1,4 +1,4 @@
-//! Backend `errorCode` extraction + Sentry-ownership decision.
+//! Hosted backend error-token parsing and provider-neutral classification.
 //!
 //! The OpenHuman **managed backend** (PR #870 / backend `tinyhumansai/backend#870`)
 //! stamps every inference error response with a stable machine-readable
@@ -8,28 +8,12 @@
 //! {"error":{"message":"Rate limited","errorCode":"RATE_LIMITED","retryAfter":30}}
 //! ```
 //!
-//! That body is the only thing that distinguishes a **managed** failure (our
-//! operator key / account / quota / routing) from a **BYO** failure (the user
-//! runs their own provider key, no `errorCode` is present). The presence of an
-//! `errorCode` is therefore the single load-bearing signal for two decisions:
-//!
-//! 1. **Classification** ([`super::super::super::web_chat::web_errors::classify_inference_error`]):
-//!    when an `errorCode` is present, branch on it FIRST and ignore the
-//!    substring heuristics; when it is absent, fall back to the substring
-//!    ladder (the BYO / direct-provider path, whose "check your API key" /
-//!    "check your model settings" copy is correct there).
-//! 2. **Sentry ownership** (`api_error` / `before_send` / `expected_error_kind`):
-//!    any response carrying an `errorCode` is owned by the backend (it already
-//!    paged, or it is expected user-state) so the FE must **not** double-report
-//!    — with the single exception of a backend-flagged **malformed**
-//!    `BAD_REQUEST`, which means the client built a payload the backend
-//!    couldn't parse (a client bug worth paging). See the spec's "golden rule"
-//!    (F2) and the malformed-`BAD_REQUEST` carve-out (F8/B8).
-//!
-//! Everything in this module operates on the **already-flattened error string**
-//! (`"OpenHuman API error (429 …): {…errorCode…}"`) because the typed provider
-//! error is collapsed to a `String` at the native-bus boundary before it
-//! reaches the channel classifier or the higher-layer re-report sites.
+//! The provider adapter owns parsing and emits a generic
+//! [`BackendErrorClassification`] through the core registry. That value keeps
+//! provider ownership, backend ownership, reportability, optional token, and
+//! display kind separate. Core chat and observability code consumes those
+//! fields without learning hosted token vocabulary or parsing provider
+//! envelopes.
 
 use super::managed_model::PROVIDER_LABEL;
 use openhuman_embed::__host::inference_registry::{BackendErrorClassification, BackendErrorKind};
@@ -132,11 +116,13 @@ pub fn is_managed_backend_envelope(err: &str) -> bool {
 /// Production consumers use the registered classification's ownership and
 /// reportability fields instead.
 #[cfg(test)]
+#[cfg(test)]
 pub fn managed_error_skips_sentry(err: &str) -> bool {
     is_managed_backend_envelope(err) && backend_error_code_skips_sentry(err)
 }
 
 /// Parse a recognised [`BackendErrorCode`] out of a flattened error string.
+#[cfg(test)]
 #[cfg(test)]
 pub fn extract_backend_error_code(err: &str) -> Option<BackendErrorCode> {
     extract_backend_error_code_token(err).and_then(|t| BackendErrorCode::from_token(&t))
@@ -168,6 +154,7 @@ pub fn body_flags_malformed(err: &str) -> bool {
 
 /// Test helper for recognizing a backend-flagged malformed `BAD_REQUEST`.
 #[cfg(test)]
+#[cfg(test)]
 pub fn is_backend_malformed_bad_request(err: &str) -> bool {
     matches!(
         extract_backend_error_code(err),
@@ -189,6 +176,7 @@ pub fn is_backend_malformed_bad_request(err: &str) -> bool {
 /// also suppressed them the guard leak would be invisible to everyone. Display
 /// classification is unchanged — the user still sees the actionable copy.
 #[cfg(test)]
+#[cfg(test)]
 pub fn is_backend_client_guard_leak(err: &str) -> bool {
     matches!(
         extract_backend_error_code(err),
@@ -207,6 +195,7 @@ pub fn is_backend_client_guard_leak(err: &str) -> bool {
 ///
 /// Production consumers use [`BackendErrorClassification`] so ownership is
 /// kept separate from its optional canonical token.
+#[cfg(test)]
 #[cfg(test)]
 pub fn backend_error_code_skips_sentry(err: &str) -> bool {
     extract_backend_error_code_token(err).is_some()

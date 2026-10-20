@@ -12,14 +12,16 @@ async fn a_brand_new_workspace_persists_and_reopens_generic_config() {
             if !config.cloud_providers.is_empty() {
                 return false;
             }
-            config.cloud_providers.push(crate::config::schema::CloudProviderCreds {
-                id: "fixture-provider-id".to_string(),
-                slug: "fixture-provider".to_string(),
-                label: "Fixture Provider".to_string(),
-                endpoint: "https://fixture.example/v1".to_string(),
-                auth_style: crate::config::schema::AuthStyle::Bearer,
-                default_model: None,
-            });
+            config
+                .cloud_providers
+                .push(crate::config::schema::CloudProviderCreds {
+                    id: "fixture-provider-id".to_string(),
+                    slug: "fixture-provider".to_string(),
+                    label: "Fixture Provider".to_string(),
+                    endpoint: "https://fixture.example/v1".to_string(),
+                    auth_style: crate::config::schema::AuthStyle::Bearer,
+                    default_model: None,
+                });
             true
         }),
     );
