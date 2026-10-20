@@ -192,7 +192,7 @@ pub async fn message_append(
         .load_config()
         .await
         .map_err(|error| ThreadsError::Message(format!("load config: {error}")))?;
-    let persistence_dir = workspace_dir().await.map_err(ThreadsError::Message)?;
+    let persistence_dir = config.workspace_dir.clone();
     message_append_with_config(ctx, request, &config, origin.as_ref(), &persistence_dir).await
 }
 

@@ -566,14 +566,6 @@ pub(crate) async fn resolve_persisted_parts(
         .load_config()
         .await
         .map_err(|error| format!("stored attachment configuration unavailable: {error}"))?;
-    let workspace = crate::agent::attachments::thread_action_dir(
-        ctx,
-        &config,
-        &config.workspace_dir,
-        Some(thread_id),
-    )
-    .await
-    .map_err(|error| format!("stored attachment workspace unavailable: {error}"))?;
     let messages =
         crate::threads::store::get_messages(ctx, config.workspace_dir.clone(), thread_id)?;
     let row = messages
