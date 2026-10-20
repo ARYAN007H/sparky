@@ -223,15 +223,14 @@ async fn run_pending_rolls_back_schema_version_when_save_fails() {
 }
 
 #[tokio::test]
-async fn run_pending_v7_to_v8_rolls_back_default_model_when_save_fails() {
+async fn run_pending_v7_to_v8_rolls_back_schema_version_when_save_fails() {
     let tmp = TempDir::new().unwrap();
     fs::create_dir_all(tmp.path().join("workspace")).unwrap();
 
     let mut config = config_in(&tmp);
     config.schema_version = 7;
     config.default_model = Some("reasoning-v1".to_string());
-    // Force save() to fail after normalize_default_model_tier mutates
-    // default_model, so the 7->8 rollback path runs.
+    // Force save() to fail so the generic 7->8 schema gate remains retryable.
     let blocker = tmp.path().join("blocker");
     fs::write(&blocker, "not a directory").unwrap();
     config.config_path = blocker.join("nested").join("config.toml");

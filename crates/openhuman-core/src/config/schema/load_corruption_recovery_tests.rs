@@ -596,8 +596,8 @@ async fn load_or_init_recovers_from_non_utf8_config() {
 
     // Should have loaded defaults (not crashed).
     assert!(
-        config.default_model.is_some(),
-        "must load defaults from non-UTF-8 config"
+        config.default_model.is_none(),
+        "bare core has no provider-owned default model"
     );
 
     // The runtime recovery flag must be set so the boot path can surface a
