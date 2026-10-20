@@ -15,6 +15,9 @@ use super::{SubagentSessionStore, SubagentSessionUpsert};
 /// Routes generic Jobs/Message session operations through OpenHuman's existing
 /// workspace-scoped session store. Legacy rows acquire a lifecycle key only
 /// from their validated pause checkpoint; the public task id is never enough.
+/// The current TinyAgents session upsert contract does not carry its driver's
+/// admitted parent epoch, so these rows retain `None` and use the completion
+/// router's legacy epoch-zero fencing semantics.
 #[derive(Clone)]
 pub(crate) struct OpenHumanTinySubagentSessionStore {
     store: SubagentSessionStore,
@@ -224,7 +227,10 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
                 worker_thread_id: upsert.worker_thread_id,
                 task_id: upsert.task_id,
                 lifecycle_key: Some(upsert.lifecycle_key),
-                parent_epoch: upsert.parent_epoch,
+                // TinyUpsert has no admitted parent epoch. Do not infer one
+                // from the live router here; admission happened separately in
+                // the owning driver and a later lifecycle could now be open.
+                parent_epoch: None,
             },
             reuse.as_ref(),
         )
