@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const script = path.join(repoRoot, "app/scripts/e2e-web-shards.sh");
+fs.mkdirSync(path.join(repoRoot, "target"), { recursive: true });
 const fixtureRoot = fs.mkdtempSync(path.join(repoRoot, "target", "e2e-web-shards-test-"));
 
 function run(args, env = {}) {
