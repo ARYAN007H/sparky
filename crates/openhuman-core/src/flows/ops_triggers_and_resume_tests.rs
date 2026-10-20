@@ -257,12 +257,23 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
     let original_job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
         .unwrap()
         .expect("seeded schedule job remains registered");
+    assert_eq!(original_job.last_run, Some(run_at));
+    assert_eq!(original_job.last_status.as_deref(), Some("ok"));
+    assert_eq!(
+        original_job.last_output.as_deref(),
+        Some("prior schedule result")
+    );
 
     let mut graph = schedule_trigger_graph("0 9 * * *");
     graph["nodes"][0]["config"]["inputs"] = json!({"team": "platform"});
-    flows_update(&config, &created.value.id, None, Some(graph), None, None)
+    let updated = flows_update(&config, &created.value.id, None, Some(graph), None, None)
         .await
         .unwrap();
+    assert_eq!(
+        updated.value.graph.trigger().unwrap().config["inputs"]["team"],
+        "platform",
+        "the input edit must be persisted for this rebind regression"
+    );
 
     let job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
         .unwrap()
