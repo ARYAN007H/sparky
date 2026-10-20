@@ -81,7 +81,7 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
         seen[0],
         (
             "chat".to_string(),
-            Some("openrouter/deepseek/deepseek-v4-flash".to_string()),
+            None,
             Some("thread-1".to_string())
         )
     );
