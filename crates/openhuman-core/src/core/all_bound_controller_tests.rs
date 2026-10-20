@@ -9,6 +9,29 @@ static CALLS: AtomicUsize = AtomicUsize::new(0);
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 static EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
+fn staged_bound_methods() -> Vec<&'static str> {
+    let mut methods = vec!["composio.execute", "threads.upsert"];
+    #[cfg(feature = "voice")]
+    methods.extend([
+        "voice.status",
+        "voice.transcribe",
+        "voice.transcribe_bytes",
+        "voice.tts",
+        "voice.reply_synthesize",
+        "voice.stt_dispatch",
+        "voice.tts_dispatch",
+        "voice.set_providers",
+        "voice.update_provider_settings",
+        "voice.list_models",
+        "voice.test_provider",
+        "voice.live_providers",
+        "voice.live_settings_get",
+        "voice.live_settings_set",
+        "voice.live_test_provider",
+    ]);
+    methods
+}
+
 fn record_event(event: &'static str) {
     EVENTS
         .lock()
@@ -222,7 +245,7 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
         .collect();
     assert_eq!(
         bound_methods,
-        ["composio.execute", "threads.upsert"],
+        staged_bound_methods(),
         "staged bound inventory"
     );
     assert!(
@@ -298,7 +321,7 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
         .collect();
     assert_eq!(
         bound_methods,
-        ["composio.execute", "threads.upsert"],
+        staged_bound_methods(),
         "staged bound inventory"
     );
     assert!(
