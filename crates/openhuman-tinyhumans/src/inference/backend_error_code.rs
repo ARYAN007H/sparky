@@ -259,6 +259,3 @@ pub(crate) fn classify(
 #[path = "backend_error_code_tests.rs"]
 mod tests;
 
-#[cfg(test)]
-#[path = "error_code_tests.rs"]
-mod tests;

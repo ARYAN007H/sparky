@@ -17,11 +17,11 @@ mod managed_calls;
 mod managed_catalog;
 mod managed_embedding;
 mod managed_model;
+mod backend_error_code;
 mod managed_reasoning;
 mod managed_session;
 mod managed_usage;
 mod tiers;
-mod backend_error_code;
 
 use std::sync::Arc;
 
