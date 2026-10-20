@@ -88,6 +88,41 @@ fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
 }
 
 #[test]
+fn voice_facts_require_matching_configured_account_and_full_conversation() {
+    let tenant = crate::core::runtime::Tenant {
+        profile: Some("voice-scope-profile".into()),
+        agent: None,
+    };
+    let mut voice = envelope("shared", "same-turn", true);
+    voice.conversation.thread_id = Some("thread-a".into());
+    voice.conversation.topic_id = Some("topic-a".into());
+    record_inbound_envelope(&voice, &tenant);
+
+    let config = ChannelVoiceConfig::default();
+    let matching = HostVoiceScope {
+        conversation: voice.conversation.clone(),
+        ..scope("telegram", "shared", "same-turn")
+    };
+    assert!(resolve_policy(&config, &matching, &tenant).inbound_has_voice);
+
+    let mut other_thread = matching.clone();
+    other_thread.conversation.thread_id = Some("thread-b".into());
+    assert!(!resolve_policy(&config, &other_thread, &tenant).inbound_has_voice);
+
+    let mut other_topic = matching.clone();
+    other_topic.conversation.topic_id = Some("topic-b".into());
+    assert!(!resolve_policy(&config, &other_topic, &tenant).inbound_has_voice);
+
+    let mut mismatched_account = matching.clone();
+    mismatched_account.configured_instance = "telegram:other".into();
+    assert!(!resolve_policy(&config, &mismatched_account, &tenant).inbound_has_voice);
+
+    let mut mismatched_channel = matching;
+    mismatched_channel.channel.id = "discord".into();
+    assert!(!resolve_policy(&config, &mismatched_channel, &tenant).inbound_has_voice);
+}
+
+#[test]
 fn same_channel_account_and_turn_ids_do_not_cross_voice_facts_between_tenants() {
     let alice = crate::core::runtime::Tenant {
         profile: Some("profile-alice".into()),
