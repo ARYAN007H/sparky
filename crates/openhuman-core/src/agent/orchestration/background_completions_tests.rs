@@ -591,7 +591,13 @@ fn deleting_a_thread_with_only_compacted_completion_history_stays_durable() {
     let _guard = test_guard();
     let ws = workspace();
     let w = ws.path();
-    record(w, "sess-cm-history", "sub-1", "x", Some("thread-cm-history"));
+    record(
+        w,
+        "sess-cm-history",
+        "sub-1",
+        "x",
+        Some("thread-cm-history"),
+    );
     let router = router_for_workspace(w);
     let claimed = router
         .claim_pending("thread-cm-history", usize::MAX)

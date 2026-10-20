@@ -103,10 +103,7 @@ impl CompletionStore for FullDisk {
     ) -> tinyagents_harness::error::Result<Vec<CompletionRecord>> {
         self.0.try_list(parent_key)
     }
-    fn compact(
-        &self,
-        retain: std::time::Duration,
-    ) -> tinyagents_harness::error::Result<usize> {
+    fn compact(&self, retain: std::time::Duration) -> tinyagents_harness::error::Result<usize> {
         self.0.compact(retain)
     }
 }
@@ -234,10 +231,7 @@ impl CompletionStore for ToggleStore {
         self.inner.try_list(parent_key)
     }
 
-    fn compact(
-        &self,
-        retain: std::time::Duration,
-    ) -> tinyagents_harness::error::Result<usize> {
+    fn compact(&self, retain: std::time::Duration) -> tinyagents_harness::error::Result<usize> {
         self.inner.compact(retain)
     }
 }

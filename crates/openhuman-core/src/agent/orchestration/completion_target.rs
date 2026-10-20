@@ -60,10 +60,8 @@ impl CompletionTarget {
         parent_thread_id: Option<String>,
     ) -> anyhow::Result<Self> {
         let parent_epoch = if let Some(thread_id) = parent_thread_id.as_deref() {
-            let router = super::background_completions::router_for_workspace_ctx(
-                &ctx,
-                &workspace_dir,
-            );
+            let router =
+                super::background_completions::router_for_workspace_ctx(&ctx, &workspace_dir);
             Some(
                 router
                     .admit_child_generation(thread_id)?
@@ -105,7 +103,9 @@ impl CompletionTarget {
             &self.parent_session,
             task_id,
             agent_id,
-            format!("[SUBAGENT_FAILED] the async sub-agent errored before producing a result: {error}"),
+            format!(
+                "[SUBAGENT_FAILED] the async sub-agent errored before producing a result: {error}"
+            ),
             self.parent_thread_id.clone(),
             self.parent_epoch,
             BackgroundAgentOutcome::Failed,
