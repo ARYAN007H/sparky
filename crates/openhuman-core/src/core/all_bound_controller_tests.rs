@@ -146,6 +146,34 @@ fn production_registry_binds_every_socket_controller_to_its_declared_parser() {
     );
     verify_parameter_contracts(&entries, &contracts)
         .expect("raw socket entries use their declared schemas and runtime decoders");
+    for contract in &contracts {
+        let entry = entries
+            .iter()
+            .find(|entry| entry.schema.method_name() == contract.method)
+            .expect("independent fixture selects a raw socket entry");
+        crate::core::all::verify_parameter_schema(&entry.schema, contract)
+            .expect("positive socket contract matches the production schema");
+        for &required in contract.required {
+            for make_optional in [false, true] {
+                let mut broken = entry.schema.clone();
+                if make_optional {
+                    broken
+                        .inputs
+                        .iter_mut()
+                        .find(|field| field.name == required)
+                        .expect("required field exists in schema")
+                        .required = false;
+                } else {
+                    broken.inputs.retain(|field| field.name != required);
+                }
+                assert!(
+                    crate::core::all::verify_parameter_schema(&broken, contract).is_err(),
+                    "{} independent contract rejects removed/optional {required}",
+                    contract.method
+                );
+            }
+        }
+    }
 }
 
 fn record_event(event: &'static str) {
