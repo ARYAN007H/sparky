@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use axum::http::header::AUTHORIZATION;
 use env_guard::EnvVarGuard;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 #[path = "support/storage_drivers.rs"]
 #[macro_use]
@@ -185,13 +185,11 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
     let approval_run_id = approval_parked["thread_id"]
         .as_str()
         .expect("approval run id");
-    assert!(
-        approval_parked["pending_approvals"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|v| v == "gate")
-    );
+    assert!(approval_parked["pending_approvals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == "gate"));
     let approved = ok(
         addr,
         TEST_TOKEN,
@@ -264,13 +262,11 @@ async fn published_runs_use_scoped_host_capabilities_and_persist_lifecycle() {
         .as_str()
         .expect("parked run id")
         .to_owned();
-    assert!(
-        parked["pending_approvals"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|v| v == "request")
-    );
+    assert!(parked["pending_approvals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == "request"));
 
     // Resume reaches the real host CapsHost callback. The captured read-only
     // policy denies Network before the deliberately closed loopback endpoint is
