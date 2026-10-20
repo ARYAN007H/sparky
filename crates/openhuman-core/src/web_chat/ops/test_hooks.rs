@@ -23,6 +23,10 @@ pub struct TestRunChatTaskBlock {
     /// Lets a test end a parked turn without using cancellation, so it can
     /// exercise terminal queue handling such as follow-up dispatch.
     pub release: std::sync::Arc<tokio::sync::Notify>,
+    /// Maximum virtual wall time to keep the controlled turn parked before
+    /// returning the fixture's elapsed result. Existing tests use 30 seconds;
+    /// long-turn ingress tests can select a larger value.
+    pub max_park_for: std::time::Duration,
     /// When set, a released turn succeeds with a fixed reply stored under
     /// this workspace instead of failing, so success delivery is observable.
     pub succeed_in: Option<std::path::PathBuf>,
@@ -31,6 +35,20 @@ pub struct TestRunChatTaskBlock {
 #[cfg(any(test, debug_assertions))]
 pub(crate) static TEST_RUN_CHAT_TASK_BLOCK: Lazy<Mutex<Option<TestRunChatTaskBlock>>> =
     Lazy::new(|| Mutex::new(None));
+
+#[cfg(test)]
+pub(crate) static TEST_LAST_RUN_CHAT_TASK_ERROR: Lazy<Mutex<Option<String>>> =
+    Lazy::new(|| Mutex::new(None));
+
+#[cfg(test)]
+pub(crate) async fn set_last_run_chat_task_error_for_test(error: Option<&str>) {
+    *TEST_LAST_RUN_CHAT_TASK_ERROR.lock().await = error.map(str::to_owned);
+}
+
+#[cfg(test)]
+pub(crate) async fn last_run_chat_task_error_for_test() -> Option<String> {
+    TEST_LAST_RUN_CHAT_TASK_ERROR.lock().await.clone()
+}
 
 /// Process-wide lock serializing every test that drives the global
 /// `run_chat_task` test hooks (`set_test_run_chat_task_block`,
@@ -137,7 +155,7 @@ pub(crate) async fn run_test_hooks(
             }
             None => Err("test block released".to_string()),
         }),
-        _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {
+        _ = tokio::time::sleep(block.max_park_for) => {
             Some(Err("test block elapsed".to_string()))
         }
     }
@@ -156,6 +174,7 @@ pub(crate) async fn track_parallel_turn_for_test(
         started: Default::default(),
         dropped: Default::default(),
         release: Default::default(),
+        max_park_for: std::time::Duration::from_secs(30),
         succeed_in: None,
     };
     set_test_run_chat_task_block(Some(block.clone())).await;

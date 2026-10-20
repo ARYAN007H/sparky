@@ -89,6 +89,37 @@ impl WebHost {
         let ctx = Self::ctx_of(request)?;
         let id = request.request_id.as_str();
         let payload = &request.payload;
+        // The runner has not checked out a session yet, so per-request state
+        // cannot contain a resolved config at this point. Load it from the
+        // request's trusted dispatch context before deriving the durable
+        // session identity; the resolved copy is saved in the slot below.
+        let mut config = ctx.load_config().await?;
+        // The harness lock is local to this WebRuntime. Native channel and
+        // relay runners use the same agent-domain lease before checking out
+        // this durable identity, so separate surface runners cannot resume
+        // and commit the same transcript concurrently.
+        let tenant = ctx.tenant().map_err(|error| error.to_string())?;
+        let tenant_scope = crate::core::runtime::tenant::tenant_key(&tenant, "");
+        let agent_id = super::session::pick_target_agent_id(&config);
+        // A parallel fork has its own transcript identity, while the other
+        // queue modes resume the canonical thread session.
+        let session_identity = if policy == CheckoutPolicy::Fork {
+            format!("fork:{}", request.request_id)
+        } else {
+            crate::core::runtime::tenant::tenant_key(&tenant, &request.thread_id)
+        };
+        let lease = crate::agent::session_lease::SessionLease::acquire(
+            crate::agent::session_lease::SessionLeaseKey::new(
+                tenant_scope,
+                agent_id,
+                session_identity,
+            ),
+            None,
+        )
+        .await
+        .map_err(|()| "agent session lease was cancelled".to_owned())?;
+        self.shared
+            .with(id, |slot| slot.session_lease = Some(lease));
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.
@@ -114,7 +145,6 @@ impl WebHost {
             return Ok(session);
         }
 
-        let mut config = ctx.load_config().await?;
         // A thread started in a chosen folder acts there, not in the global
         // `action_dir`. Applied before checkout so the session agent, its
         // security policy (which grants `action_dir` as a trusted root) and its
@@ -232,23 +262,6 @@ impl WebHost {
         let _tap = AbortOnDrop(tap);
         let _beat = AbortOnDrop(spawn_heartbeat(&ctx, projection.clone()));
 
-        agent.set_on_progress(Some(progress_tx));
-        agent.set_run_queue(Some(queue));
-        agent.set_thread_id(Some(thread_id));
-        agent.set_host_env(crate::agent::turn_env::HostTurnEnv {
-            cancellation: Some(cancellation),
-            turn_deadline: request
-                .deadline
-                .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
-            ..Default::default()
-        });
-        // Also the turn's workspace, so attachment reads and delegated
-        // sub-agents (which load a fresh config) use the folder its uploads
-        // were staged in (#7714).
-        if let Some(dir) = thread_dir {
-            agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(dir)));
-        }
-
         let origin = AgentTurnOrigin::WebChat {
             thread_id: thread_id.to_owned(),
             client_id: payload.client_id.clone(),
@@ -266,9 +279,25 @@ impl WebHost {
         // a pointer rather than inlining it into this frame.
         #[cfg(feature = "tinymemes")]
         let turn_started = std::time::Instant::now();
-        let turn = Box::pin(with_origin(
-            origin.clone(),
-            agent.run_single_with_approval(&request.text, Some(origin), approval),
+        let turn = Box::pin(crate::agent::turn_host::AgentTurnHost::run(
+            agent,
+            crate::agent::turn_host::AgentTurnRequest {
+                message: request.text.clone(),
+                thread_id: Some(thread_id.to_owned()),
+                origin,
+                approval,
+                progress: Some(progress_tx),
+                run_queue: Some(queue),
+                cancellation,
+                turn_deadline: request.deadline,
+                // Also the turn's workspace, so attachment reads and
+                // delegated sub-agents use the upload folder (#7714).
+                workspace: thread_dir
+                    .map(tinytools::WorkspaceDescriptor::new)
+                    .map(crate::agent::turn_host::WorkspaceBinding::Set)
+                    .unwrap_or(crate::agent::turn_host::WorkspaceBinding::Clear),
+                host_env: Default::default(),
+            },
         ));
         let outcome = turn.await;
         let result = match outcome {

@@ -12,8 +12,13 @@
 
 mod helpers;
 pub(crate) mod host_agent;
+mod native_runner;
 mod processor;
 mod routing;
+
+pub(crate) use processor::progressive::{
+    delivery_succeeded, hosted_relay_target, NativeProgressiveTarget,
+};
 
 pub(crate) use processor::{
     process_channel_message, process_channel_runtime_message, run_message_dispatch_loop,

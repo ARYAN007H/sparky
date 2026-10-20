@@ -16,6 +16,8 @@
 
 mod approval;
 mod bus_turn;
+pub(crate) mod progressive;
+mod reset;
 mod turn;
 
 use crate::channels::context::ChannelRuntimeContext;
@@ -31,6 +33,10 @@ pub(crate) struct RuntimeChannelMessage {
     pub(crate) inbound_envelope: Option<ChannelInboundEnvelope>,
     pub(crate) authenticated_relay: bool,
     pub(crate) prepared_inbound: Option<tinychannels_bus::module_inbound::PreparedChannelInbound>,
+    pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
+    /// Trusted per-turn callback target installed by a hosted relay. Native
+    /// configured channels resolve their target from the prepared envelope.
+    pub(crate) progressive_target: Option<Arc<progressive::NativeProgressiveTarget>>,
 }
 
 impl RuntimeChannelMessage {
@@ -43,6 +49,8 @@ impl RuntimeChannelMessage {
             inbound_envelope: Some(inbound_envelope),
             authenticated_relay: false,
             prepared_inbound: None,
+            imported_history: Vec::new(),
+            progressive_target: None,
         }
     }
 
@@ -56,6 +64,8 @@ impl RuntimeChannelMessage {
             inbound_envelope: Some(delivery.envelope),
             authenticated_relay: delivery.delivered_via_authenticated_relay,
             prepared_inbound: None,
+            imported_history: Vec::new(),
+            progressive_target: None,
         }
     }
 }
@@ -67,12 +77,15 @@ impl From<ChannelMessage> for RuntimeChannelMessage {
             inbound_envelope: None,
             authenticated_relay: false,
             prepared_inbound: None,
+            imported_history: Vec::new(),
+            progressive_target: None,
         }
     }
 }
 
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
+pub(crate) use reset::reset_durable_channel_session;
 pub(crate) use turn::{process_channel_message, process_channel_runtime_message};
 
 /// Run every inbound message through the agent pipeline, at most

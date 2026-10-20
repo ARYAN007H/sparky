@@ -66,6 +66,7 @@ fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(HashMap::new()),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(model)),
         default_provider: Arc::new("openai".into()),
         tools_registry: Arc::new(vec![Box::new(DummyTool) as Box<dyn Tool>]),
@@ -344,7 +345,7 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 }
 
 #[tokio::test]
-async fn handle_runtime_command_set_model_clears_sender_history_and_persists_route_override() {
+async fn clear_history_command_uses_reset_callback_and_persists_route_override() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let key = "telegram_alice_room";
     ctx.conversation_histories
@@ -366,21 +367,23 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(
+    let reset_called = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let callback_flag = Arc::clone(&reset_called);
+    let handled = handle_runtime_command_with_reset(
         &ctx,
         &msg,
         Some(&channel),
         &conversation_history_key(&msg),
+        move || async move {
+            callback_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        },
     )
     .await;
     assert!(handled);
+    assert!(reset_called.load(std::sync::atomic::Ordering::SeqCst));
 
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(key)
-        .is_none());
+    assert!(ctx.conversation_histories.lock().unwrap().contains_key(key));
     assert_eq!(
         get_route_selection(&ctx, key),
         ChannelRouteSelection {

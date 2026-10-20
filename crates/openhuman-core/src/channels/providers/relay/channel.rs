@@ -78,6 +78,48 @@ impl RelayChannel {
             })),
         }
     }
+
+    /// Publish lossless typed output to the gateway that owns provider delivery.
+    /// Host event acceptance has no provider receipt; receipt IDs arrive
+    /// separately from the gateway and are never fabricated.
+    pub(crate) fn publish_typed_reply(
+        &self,
+        channel: &tinychannels_bus::ChannelRef,
+        conversation: &tinychannels_bus::ConversationRef,
+        turn_id: &str,
+        sequence: u64,
+        segment_index: u32,
+        idempotency_key: &str,
+        parts: &[tinychannels_bus::OutboundContentPart],
+        text: &str,
+    ) {
+        self.sent
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(text.to_owned());
+        publish_web_channel_event(WebChannelEvent::ChannelOutbound {
+            context: crate::web_chat::event_context(
+                self.client_id.clone(),
+                self.thread_id.clone(),
+                self.request_id.clone(),
+            ),
+            full_response: Some(text.to_owned()),
+            structured: Some(json!({
+                "kind": CHANNEL_OUTBOUND_EVENT,
+                "channel": self.channel,
+                "chat_id": conversation.id,
+                "thread_ts": conversation.thread_id,
+                "reply_to_message_id": self.reply_to,
+                "turn_id": turn_id,
+                "sequence": sequence,
+                "segment_index": segment_index,
+                "idempotency_key": idempotency_key,
+                "channel_ref": channel,
+                "conversation_ref": conversation,
+                "parts": parts,
+            })),
+        });
+    }
 }
 
 #[async_trait]

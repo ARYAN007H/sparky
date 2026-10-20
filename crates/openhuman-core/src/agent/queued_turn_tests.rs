@@ -1,4 +1,46 @@
 use super::*;
+use crate::agent::host_agents::HostAgent;
+use crate::core::runtime::{CoreContext, DomainSet};
+
+fn trusted_turn(session_key: &str) -> Arc<super::super::turn_host::TrustedAgentTurn> {
+    let definition =
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+            .get("orchestrator")
+            .cloned()
+            .expect("built-in orchestrator definition");
+    Arc::new(super::super::turn_host::TrustedAgentTurn {
+        host_agent: HostAgent {
+            definition,
+            config: crate::config::Config::default(),
+            host_tools: None,
+            context: CoreContext::for_test(DomainSet::full(), None),
+            hooks: Default::default(),
+        },
+        channel: "telegram".into(),
+        session_key: session_key.into(),
+        event_session_id: "event-scope".into(),
+        origin: crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+            channel: "telegram".into(),
+            sender: Some("sender-a".into()),
+            sender_name: Some("Alice".into()),
+            reply_target: "conversation-a".into(),
+            message_id: "message-a".into(),
+            history_key: Some("legacy-history-a".into()),
+        },
+        approval: crate::security::approval::ApprovalTurnContext::chat(
+            crate::security::approval::ApprovalChatContext {
+                thread_id: "conversation-a".into(),
+                client_id: "telegram".into(),
+                request_id: Some("message-a".into()),
+            },
+        ),
+        relay_thread: Some("relay-a".into()),
+        imported_history: vec![tinyagents_session::transcript::TranscriptMessage::user(
+            "trusted imported row",
+        )],
+        native_target: None,
+    })
+}
 
 fn marker(name: &str) -> String {
     super::super::attachments::Attachment {
@@ -63,4 +105,56 @@ fn clips_unicode_codepoints_for_captions_and_names() {
     assert_eq!(text_preview(&long), expected);
     assert_eq!(text_preview(&marker(&long)), expected);
     assert_eq!(text_preview(&"α".repeat(80)), "α".repeat(80));
+}
+
+#[test]
+fn requeued_placeholder_adopts_trusted_agent_and_channel_identity() {
+    let trusted_turn = trusted_turn("tenant-a:telegram:account-a:conversation-a");
+    let running = QueuedPayload {
+        client_id: "client-a".into(),
+        trusted_turn: Some(Arc::clone(&trusted_turn)),
+        ..Default::default()
+    };
+    let mut requeued = QueuedPayload::requeued("thread-a", 7);
+
+    RequeuePayload::adopt(&mut requeued, &running);
+
+    let adopted = requeued
+        .trusted_turn
+        .expect("trusted execution is preserved");
+    assert!(Arc::ptr_eq(&adopted, &trusted_turn));
+    assert_eq!(adopted.host_agent.definition.id, "orchestrator");
+    assert_eq!(
+        adopted.session_key,
+        "tenant-a:telegram:account-a:conversation-a"
+    );
+    assert_eq!(adopted.channel, "telegram");
+    assert!(matches!(
+        &adopted.origin,
+        crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+            sender: Some(sender), ..
+        } if sender == "sender-a"
+    ));
+    assert_eq!(adopted.imported_history.len(), 1);
+}
+
+#[test]
+fn a_populated_requeue_keeps_its_own_trusted_execution() {
+    let running = QueuedPayload {
+        trusted_turn: Some(trusted_turn("tenant-a:telegram:account-a:one")),
+        ..Default::default()
+    };
+    let own_turn = trusted_turn("tenant-b:telegram:account-b:two");
+    let mut queued = QueuedPayload {
+        client_id: "client-b".into(),
+        trusted_turn: Some(Arc::clone(&own_turn)),
+        ..Default::default()
+    };
+
+    RequeuePayload::adopt(&mut queued, &running);
+
+    assert!(Arc::ptr_eq(
+        queued.trusted_turn.as_ref().expect("own authority remains"),
+        &own_turn
+    ));
 }

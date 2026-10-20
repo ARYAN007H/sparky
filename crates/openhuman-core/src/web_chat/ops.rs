@@ -46,6 +46,10 @@ pub use test_hooks::set_test_forced_run_chat_task_error;
 pub(crate) use test_hooks::track_parallel_turn_for_test;
 #[cfg(any(test, debug_assertions))]
 pub use test_hooks::RUN_CHAT_TASK_TEST_LOCK;
+#[cfg(test)]
+pub(crate) use test_hooks::{
+    last_run_chat_task_error_for_test, set_last_run_chat_task_error_for_test,
+};
 #[cfg(any(test, debug_assertions))]
 pub(super) use test_hooks::{run_test_hooks, test_hooks_active, TEST_PARK_AFTER_RUN};
 #[cfg(any(test, debug_assertions))]

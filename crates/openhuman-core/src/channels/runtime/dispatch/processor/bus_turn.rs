@@ -124,3 +124,33 @@ pub(super) async fn dispatch_bus_turn(
             other => anyhow::anyhow!("[agent.run_turn dispatch] {other}"),
         })
 }
+
+/// Keep the injected orchestrator graph available to processor unit fixtures
+/// without leaving a second production execution path behind.
+#[cfg(test)]
+pub(super) async fn dispatch_test_turn(
+    ctx: &ChannelRuntimeContext,
+    msg: &traits::ChannelMessage,
+    route: &ChannelRouteSelection,
+    message: &str,
+    active_turn_model_source: Option<crate::agent::tinyagents::TurnModelSource>,
+    progress_tx: Option<tokio::sync::mpsc::Sender<AgentProgress>>,
+    turn_origin: AgentTurnOrigin,
+    approval: crate::security::approval::ApprovalTurnContext,
+) -> anyhow::Result<AgentTurnResponse> {
+    let history = vec![
+        TranscriptMessage::system(ctx.system_prompt.current().as_str()),
+        TranscriptMessage::user(message),
+    ];
+    dispatch_bus_turn(
+        ctx,
+        msg,
+        route,
+        history,
+        active_turn_model_source,
+        progress_tx,
+        turn_origin,
+        approval,
+    )
+    .await
+}

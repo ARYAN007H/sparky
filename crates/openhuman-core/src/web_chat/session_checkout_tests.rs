@@ -57,7 +57,6 @@ fn write_thread_transcript(workspace_dir: &Path, stem: &str, thread_id: &str, ro
     let meta = TranscriptMeta {
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
         agent_name: "orchestrator_thread".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: Some("root".into()),
@@ -68,6 +67,7 @@ fn write_thread_transcript(workspace_dir: &Path, stem: &str, thread_id: &str, ro
         updated: "2026-09-20T15:36:32Z".into(),
         turn_count: rows.len() / 2,
         prefix_message_count: None,
+        prefix_reset: false,
         input_tokens: 0,
         output_tokens: 0,
         cached_input_tokens: 0,

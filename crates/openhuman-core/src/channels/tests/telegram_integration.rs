@@ -83,6 +83,7 @@ fn make_test_context(
     Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(model)),
         default_provider: Arc::new("test-provider".to_string()),
         tools_registry: Arc::new(vec![]),

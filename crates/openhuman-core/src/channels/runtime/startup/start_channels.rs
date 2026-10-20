@@ -241,6 +241,10 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
         &config,
         parts,
         Arc::clone(&channels_by_name),
+        module_runtime
+            .as_ref()
+            .expect("runtime prepared when providers are configured")
+            .module_objects(),
         message_timeout_secs,
     ));
     context_slot

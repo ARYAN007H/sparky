@@ -6,6 +6,10 @@ use crate::agent::{
     tinyagents::host::OpenHumanRunContext,
 };
 
+pub(super) fn prepare_prefix_for_turn(new_session: bool, prefix_is_frozen: bool) -> bool {
+    new_session || !prefix_is_frozen
+}
+
 impl OpenHumanSessionHost {
     /// Dispatch a turn with authority supplied by its owning entry point.
     pub async fn turn_with_origin(

@@ -194,13 +194,15 @@ pub(crate) async fn run_relay_turn(
         &config,
         parts,
         Arc::new(channels_by_name),
+        Arc::new(HashMap::new()),
         message_timeout_secs,
     );
     runtime.relay_thread = Some(thread_id.clone());
     let ctx = Arc::new(runtime);
 
-    // The thread is the conversation's memory: seed the pipeline's per-chat
-    // history from it, since this runtime context lives for one message.
+    // The relay's legacy conversation rows are imported into the selected
+    // agent's durable session on its first resume. Subsequent calls are
+    // idempotent and existing session history remains authoritative.
     let message = params.to_channel_message();
     let prepared = match crate::modules::channel_controller::prepare_inbound(
         &crate::modules::client(config.clone()),
@@ -221,7 +223,7 @@ pub(crate) async fn run_relay_turn(
             return channel.sent();
         }
     };
-    match store::prior_turns(
+    let imported_history = match store::prior_turns(
         &dispatch_ctx,
         &workspace_dir,
         &thread_id,
@@ -230,19 +232,63 @@ pub(crate) async fn run_relay_turn(
     )
     .await
     {
-        Ok(prior) if !prior.is_empty() => {
-            ctx.conversation_histories
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .insert(prepared.history_key.clone(), prior);
+        Ok(prior) => prior
+            .into_iter()
+            .map(|row| match row.role.as_str() {
+                "user" => tinyagents_session::transcript::TranscriptMessage::user(row.content),
+                "assistant" => {
+                    tinyagents_session::transcript::TranscriptMessage::assistant(row.content)
+                }
+                _ => unreachable!("prior_turns only returns user and assistant rows"),
+            })
+            .collect(),
+        Err(error) => {
+            tracing::warn!(
+                thread_id = %thread_id,
+                %error,
+                "[channels::relay] could not read the thread's history; refusing to start a session without it"
+            );
+            let reply =
+                "⚠️ This chat's history could not be loaded. Please send your message again.";
+            let _ = tinychannels_runtime::Channel::send(
+                channel.as_ref(),
+                &crate::channels::SendMessage::new(reply, &params.chat_id),
+            )
+            .await;
+            record(
+                &dispatch_ctx,
+                &workspace_dir,
+                &params,
+                &thread_id,
+                &channel.sent(),
+            )
+            .await;
+            return channel.sent();
         }
-        Ok(_) => {}
-        Err(error) => tracing::warn!(
-            thread_id = %thread_id,
-            %error,
-            "[channels::relay] could not read the thread's history; running without it"
-        ),
-    }
+    };
+
+    let tenant = match dispatch_ctx.tenant() {
+        Ok(tenant) => tenant,
+        Err(error) => {
+            tracing::warn!("relayed channel turn lost its tenant scope: {error}");
+            return channel.sent();
+        }
+    };
+    let mut channel_ref = prepared.envelope.channel.clone();
+    channel_ref.id = params.channel.clone();
+    // A hosted relay has no local provider account. Bind the host callback to
+    // an account scope derived from the trusted tenant and provider instead;
+    // this value is never accepted from relay parameters or model metadata.
+    channel_ref.account_id = Some(crate::core::runtime::tenant::tenant_key(
+        &tenant,
+        &format!("hosted-channel:{}", params.channel),
+    ));
+    let progressive_target = Arc::new(crate::channels::runtime::dispatch::hosted_relay_target(
+        &config,
+        Arc::clone(&channel),
+        channel_ref,
+        prepared.envelope.conversation.clone(),
+    ));
 
     tracing::debug!(
         channel = %params.channel,
@@ -252,6 +298,8 @@ pub(crate) async fn run_relay_turn(
     );
     let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
+    runtime_message.imported_history = imported_history;
+    runtime_message.progressive_target = Some(progressive_target);
     let turn = process_channel_runtime_message(ctx, runtime_message);
     if let Some(context) = dispatch_ctx.core() {
         crate::core::runtime::CoreContext::scope(

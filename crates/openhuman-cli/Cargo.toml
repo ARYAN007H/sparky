@@ -51,7 +51,7 @@ required-features = ["http-server", "bin-tools"]
 
 [[example]]
 name = "thread_wire_schema"
-path = "examples/thread_wire_schema.rs"
+path = "../../examples/thread_wire_schema.rs"
 
 # The benchmark and profiling binaries (`library-profile`, `rss-bench`,
 # `tool-search-bench`, `tool-dialect-bench`) and their driver scripts live in
@@ -131,6 +131,12 @@ path = "../../tests/storage_secrets_e2e.rs"
 # process-wide slot.
 name = "storage_scope_e2e"
 path = "../../tests/storage_scope_e2e.rs"
+
+[[test]]
+name = "native_channel_session_restart_e2e"
+path = "../../tests/native_channel_session_restart_e2e.rs"
+# Boots the CLI's real native Telegram listener via the compiled linked module.
+required-features = ["linked-modules", "inference", "channels", "storage-sqlite"]
 
 [[test]]
 # Its own binary: two agents on one backend keep cron jobs and flows apart.

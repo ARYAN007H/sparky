@@ -54,6 +54,7 @@ fn meta(thread: &str, agent: &str) -> TranscriptMeta {
         updated: "2026-01-01T00:00:00Z".into(),
         turn_count: 1,
         prefix_message_count: None,
+        prefix_reset: false,
         input_tokens: 0,
         output_tokens: 0,
         cached_input_tokens: 0,
@@ -62,7 +63,6 @@ fn meta(thread: &str, agent: &str) -> TranscriptMeta {
         task_id: None,
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
     }
 }
 

@@ -275,20 +275,12 @@ impl ProgressProjection {
                 }
                 self.pending_narration.push_str(&delta);
                 if !self.metadata.hold_text_stream {
-                    self.surface
-                        .output(ChannelOutputEvent::TextDelta {
-                            text: delta,
-                            iteration: Some(iteration),
-                        })
-                        .await;
+                    self.surface.output(map::text_delta(delta, iteration)).await;
                 }
             }
             AgentProgress::ThinkingDelta { delta, iteration } => {
                 self.surface
-                    .output(ChannelOutputEvent::ThinkingDelta {
-                        text: delta,
-                        iteration: Some(iteration),
-                    })
+                    .output(map::thinking_delta(delta, iteration))
                     .await;
             }
             AgentProgress::ToolCallArgsDelta {
@@ -298,12 +290,15 @@ impl ProgressProjection {
                 iteration,
             } => {
                 self.surface
-                    .output(ChannelOutputEvent::ToolCallArgsDelta {
-                        call_id,
-                        tool_name,
-                        delta,
-                        iteration,
-                    })
+                    .output(
+                        map::turn_event(AgentProgress::ToolCallArgsDelta {
+                            call_id,
+                            tool_name,
+                            delta,
+                            iteration,
+                        })
+                        .expect("tool argument progress maps to a channel event"),
+                    )
                     .await;
             }
             AgentProgress::ToolCallProgress { call_id, message } => {
@@ -312,7 +307,7 @@ impl ProgressProjection {
                     self.ids.request_id
                 );
                 self.surface
-                    .output(ChannelOutputEvent::ToolCallProgress { call_id, message })
+                    .output(map::tool_progress(call_id, message))
                     .await;
             }
             AgentProgress::TurnCompleted { iterations, .. } => {

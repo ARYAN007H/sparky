@@ -4,7 +4,25 @@
 //! selects how this payload is consumed. OpenHuman retains the web and
 //! orchestration metadata needed to dispatch a deferred follow-up turn.
 
+use std::sync::Arc;
 use tinyagents_harness::turn_runner::{QueueDisposition, RequeuePayload, ScopeKey, TurnRequest};
+
+/// Opaque attachment refs supplied for a user row that is already persisted.
+/// Paths and URLs are intentionally absent; the trusted turn resolves the
+/// parts again against the row and current dispatch scope before use.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct StoredAttachmentInput {
+    pub(crate) persisted_message_id: String,
+    pub(crate) parts: Vec<tinychannels_bus::ContentPart>,
+}
+
+/// Opaque refs staged for a queued follow-up. The user row is persisted only
+/// when the turn is admitted, preserving transcript order behind the active
+/// assistant reply.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct PendingAttachmentInput {
+    pub(crate) parts: Vec<tinychannels_bus::ContentPart>,
+}
 
 /// The host metadata one OpenHuman turn carries through TinyAgents' turn
 /// runner and its run queue: which client asked, the per-message model and
@@ -25,6 +43,12 @@ pub struct QueuedPayload {
     pub locale: Option<String>,
     pub metadata: tinychannels_bus::web::ChatRequestMetadata,
     pub queued_at_ms: u64,
+    /// Already-resolved internal agent authority and durable channel identity.
+    /// Requeued placeholders inherit it from their running turn; public chat
+    /// metadata never supplies or overrides this value.
+    pub(crate) trusted_turn: Option<Arc<super::turn_host::TrustedAgentTurn>>,
+    pub(crate) stored_attachments: Option<StoredAttachmentInput>,
+    pub(crate) pending_attachments: Option<PendingAttachmentInput>,
 }
 
 impl std::fmt::Debug for QueuedPayload {
@@ -35,6 +59,9 @@ impl std::fmt::Debug for QueuedPayload {
             .field("temperature", &self.temperature)
             .field("locale", &self.locale)
             .field("queued_at_ms", &self.queued_at_ms)
+            .field("has_trusted_turn", &self.trusted_turn.is_some())
+            .field("has_stored_attachments", &self.stored_attachments.is_some())
+            .field("has_pending_attachments", &self.pending_attachments.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -50,6 +77,17 @@ impl RequeuePayload for QueuedPayload {
     fn adopt(&mut self, running: &Self) {
         if self.ctx.is_none() {
             self.ctx.clone_from(&running.ctx);
+        }
+        if self.trusted_turn.is_none() {
+            self.trusted_turn.clone_from(&running.trusted_turn);
+        }
+        if self.pending_attachments.is_none() {
+            self.pending_attachments
+                .clone_from(&running.pending_attachments);
+        }
+        if self.stored_attachments.is_none() {
+            self.stored_attachments
+                .clone_from(&running.stored_attachments);
         }
         if self.client_id.is_empty() {
             self.client_id.clone_from(&running.client_id);

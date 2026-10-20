@@ -47,7 +47,9 @@ mod types;
 
 mod voice_notes;
 mod web_errors;
-pub(crate) use web_errors::classify_inference_error;
+pub(crate) use web_errors::{
+    classify_inference_error, turn_idle_error_message, turn_timeout_error_message,
+};
 #[cfg(any(test, debug_assertions))]
 #[allow(unused_imports)]
 pub(crate) use web_errors::{
@@ -91,6 +93,8 @@ pub use ops::{
     in_flight_entries_for_test, invalidate_thread_sessions, run_system_turn_on_thread, start_chat,
     StartChatError, SESSION_CHECKOUT_FAILURE, SYSTEM_CLIENT_ID,
 };
+#[cfg(test)]
+pub(crate) use ops::{last_run_chat_task_error_for_test, set_last_run_chat_task_error_for_test};
 pub use types::ChatRequestMetadata;
 
 // Public API — schemas / controllers

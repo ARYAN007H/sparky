@@ -68,6 +68,9 @@ pub mod session_db;
 /// snapshots are owned by `tinyagents-runtime`.
 pub mod session_host;
 pub mod session_import;
+/// Shared keyed leases preventing distinct host runners from checking out the
+/// same durable conversation concurrently.
+pub(crate) mod session_lease;
 pub mod session_store;
 pub mod stop_hooks;
 /// Product-specific adapters around `tinyagents_orchestration::subagent`.
@@ -80,12 +83,20 @@ pub mod tools;
 pub mod triage;
 /// Explicit per-turn host environment handed to the session an entry point runs.
 pub mod turn_env;
+/// Trusted host execution shared by web, native channels and other inbound
+/// surfaces. Presentation and delivery remain adapters at each surface.
+pub(crate) mod turn_host;
 /// Turn-origin task-local — explicit trust/routing label scoped by every
 /// entry point that invokes the agent (web chat, channel runtime, cron,
 /// background jobs, CLI). Read by the approval gate to make
 /// origin-aware decisions rather than inferring trust from the absence of
 /// a chat approval context.
 pub mod turn_origin;
+/// Shared idle and backstop policy for top-level agent turns.
+pub(crate) mod turn_policy;
+/// Canonical mechanical projection from agent progress to channel output
+/// events, shared by web and native channel adapters.
+pub(crate) mod turn_progress;
 /// How a turn that reached the completion path was stopped early (breaker,
 /// deadline wind-down, iteration cap), carried to traces and parent tools.
 pub mod turn_projection;

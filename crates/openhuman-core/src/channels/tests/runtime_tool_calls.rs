@@ -27,6 +27,7 @@ async fn process_channel_message_executes_native_tool_calls() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(ToolCallingModel),
         )),
@@ -102,6 +103,7 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::clone(&default_provider),
         )),
@@ -208,6 +210,7 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::clone(&default_provider),
         )),
@@ -258,6 +261,7 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(IterativeToolModel {
                 required_tool_iterations: 11,
@@ -320,6 +324,7 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(IterativeToolModel {
                 required_tool_iterations: 20,

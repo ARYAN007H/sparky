@@ -148,7 +148,7 @@ async fn import_into(docs: &Arc<dyn DocumentStore>, workspace: &Path) -> anyhow:
                 return Err(anyhow::anyhow!(
                     "write {collection} record: {:?}",
                     error.kind()
-                ))
+                ));
             }
         }
     }

@@ -5,7 +5,6 @@ fn meta() -> tinyagents_session::transcript::TranscriptMeta {
     tinyagents_session::transcript::TranscriptMeta {
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
         agent_name: "adapter-test".into(),
         agent_id: Some("adapter-test".into()),
         agent_type: Some("root".into()),
@@ -16,6 +15,7 @@ fn meta() -> tinyagents_session::transcript::TranscriptMeta {
         updated: chrono::Utc::now().to_rfc3339(),
         turn_count: 0,
         prefix_message_count: None,
+        prefix_reset: false,
         input_tokens: 0,
         output_tokens: 0,
         cached_input_tokens: 0,

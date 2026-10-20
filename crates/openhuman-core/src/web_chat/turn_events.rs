@@ -279,6 +279,8 @@ impl WebEvents {
     }
 
     async fn failed(&self, request: &TurnRequest<QueuedPayload>, surface: &Surface, error: &str) {
+        #[cfg(test)]
+        super::ops::set_last_run_chat_task_error_for_test(Some(error)).await;
         let parallel =
             request.disposition == tinyagents_harness::turn_runner::QueueDisposition::Parallel;
         let raw = host_error(error, Some(request));
@@ -424,9 +426,14 @@ impl EventSink<QueuedPayload> for WebEvents {
         // A message that waited in a run queue and never started was never
         // announced as a turn, so its being dropped is silent too.
         let never_started = self.shared.was_queued(&request.request_id);
-        let (projection, done, note) = match slot {
-            Some(slot) => (slot.projection, slot.result, slot.cancel),
-            None => (None, None, None),
+        let (projection, done, note, _session_lease) = match slot {
+            Some(slot) => (
+                slot.projection,
+                slot.result,
+                slot.cancel,
+                slot.session_lease,
+            ),
+            None => (None, None, None, None),
         };
         if never_started && !matches!(event, TerminalEvent::Completed { .. }) {
             log::debug!(

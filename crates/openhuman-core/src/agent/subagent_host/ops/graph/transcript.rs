@@ -166,13 +166,13 @@ pub(super) fn persist_subagent_transcript(
         updated: now,
         turn_count: 1,
         prefix_message_count: None,
+        prefix_reset: false,
         input_tokens: usage.input_tokens,
         output_tokens: usage.output_tokens,
         cached_input_tokens: usage.cached_input_tokens,
         charged_amount_usd: usage.cost.known_usd,
         thread_id: thread_id.map(str::to_owned),
         task_id: Some(task_id.to_string()),
-        prefix_reset: false,
     };
     let handle = match transcripts.open_stem(transcript_stem, meta.clone()) {
         Ok(handle) => handle,

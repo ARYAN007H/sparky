@@ -1,6 +1,6 @@
 //! Host adapters over one identity-scoped TinyChannels module object.
 
-use super::callback::ChannelHostCallbacks;
+use super::callback::{ChannelHostCallbacks, ProgressiveChannelTransport};
 use super::credentials::hydrate_channel_credentials;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
@@ -32,9 +32,9 @@ pub(super) struct ModuleChannelRuntime {
 }
 
 #[derive(Clone)]
-struct ModuleChannel {
-    name: String,
-    object: ModuleObjectClient,
+pub(super) struct ModuleChannel {
+    pub(super) name: String,
+    pub(super) object: ModuleObjectClient,
     interaction: tinychannels_bus::ChannelInteractionInfo,
     relay: Option<tinychannels_bus::module_relay::RelayReservation>,
     relay_fronted: bool,
@@ -73,8 +73,15 @@ impl ModuleChannelRuntime {
                 tracing::warn!("[channels] legacy delivery import failed, will retry: {error:#}");
             }
         }
-        let callback =
-            ChannelHostCallbacks::new(dispatch_ctx, Arc::clone(&config), context, dispatch);
+        let progressive_channels = Arc::new(OnceLock::new());
+        let callback = ChannelHostCallbacks::new(
+            dispatch_ctx,
+            Arc::clone(&config),
+            context,
+            Arc::clone(&progressive_channels),
+            None,
+            dispatch,
+        );
         let lease = ChannelRuntimeLease::open(client.clone(), callback)
             .await
             .map_err(anyhow::Error::new)
@@ -130,19 +137,26 @@ impl ModuleChannelRuntime {
                         .any(|identity| identity.platform == channel)
             })
         };
-        let channels = infos
-            .iter()
-            .map(|info| {
-                let channel = ModuleChannel {
-                    name: info.name.clone(),
-                    object: lease.object().clone(),
-                    interaction: legacy_interaction(&info.interaction),
-                    relay: relay.clone(),
-                    relay_fronted: relay_fronts(&info.name),
-                };
-                (info.name.clone(), Arc::new(channel) as Arc<dyn Channel>)
-            })
-            .collect();
+        let mut channels = HashMap::new();
+        let mut progressive = HashMap::new();
+        for info in &infos {
+            let channel = ModuleChannel {
+                name: info.name.clone(),
+                object: lease.object().clone(),
+                interaction: legacy_interaction(&info.interaction),
+                relay: relay.clone(),
+                relay_fronted: relay_fronts(&info.name),
+            };
+            let channel = Arc::new(channel);
+            channels.insert(info.name.clone(), channel.clone() as Arc<dyn Channel>);
+            let progressive_channel: Arc<dyn ProgressiveChannelTransport> = channel.clone();
+            progressive.insert(info.name.clone(), Arc::downgrade(&progressive_channel));
+        }
+        progressive_channels
+            .set(Arc::new(progressive))
+            .map_err(|_| {
+                anyhow::anyhow!("progressive channel adapters were already initialized")
+            })?;
         Ok(Self {
             client,
             lease,
@@ -157,6 +171,15 @@ impl ModuleChannelRuntime {
 
     pub(super) fn channels(&self) -> Arc<HashMap<String, Arc<dyn Channel>>> {
         Arc::clone(&self.channels)
+    }
+
+    pub(super) fn module_objects(&self) -> Arc<HashMap<String, ModuleObjectClient>> {
+        Arc::new(
+            self.infos
+                .iter()
+                .map(|info| (info.name.clone(), self.lease.object().clone()))
+                .collect(),
+        )
     }
 
     pub(super) async fn runtime_limits(
@@ -328,6 +351,13 @@ impl Channel for ModuleChannel {
         self.send_prepared(message).await
     }
 
+    async fn send_typed_with_receipt(
+        &self,
+        message: &tinychannels_bus::channel::ChannelOutboundMessage,
+    ) -> anyhow::Result<tinychannels_bus::channel::ChannelSendOutcome> {
+        self.send_progressive_typed(message).await
+    }
+
     async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
         anyhow::bail!("TinyChannels module owns provider listeners")
     }
@@ -462,6 +492,65 @@ impl Channel for ModuleChannel {
 }
 
 impl ModuleChannel {
+    pub(super) async fn send_progressive_typed(
+        &self,
+        message: &tinychannels_bus::channel::ChannelOutboundMessage,
+    ) -> anyhow::Result<tinychannels_bus::channel::ChannelSendOutcome> {
+        let intent = tinychannels_bus::channel::ChannelOutboundIntent {
+            idempotency_key: message.idempotency_key.clone(),
+            channel_id: message.channel_id.clone(),
+            conversation_id: message.conversation_id.clone(),
+            channel_ref: message.channel_ref.clone(),
+            conversation_ref: message.conversation_ref.clone(),
+            reply_to_id: message.reply_to_id.clone(),
+            thread_id: message.thread_id.clone(),
+            turn_id: message.turn_id.clone(),
+            durability: tinychannels_bus::channel::DeliveryDurability::Required,
+            payload: tinychannels_bus::channel::OutboundPayload::Parts {
+                parts: message.parts.clone(),
+            },
+        };
+        let prepared: tinychannels_bus::module_runtime::PreparedChannelIntent = self
+            .object
+            .call_confidential(
+                tinychannels_bus::methods::PREPARE_OUTBOUND_INTENT,
+                (self.name.clone(), ChannelMessagePreparation::Intent(intent)),
+            )
+            .await
+            .map_err(anyhow::Error::new)?;
+        let result: tinychannels_bus::controllers::ChannelSendMessageResult =
+            if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
+                self.object
+                    .call_confidential(
+                        tinychannels_bus::methods::SEND_RELAY_INTENT,
+                        (relay.clone(), prepared.intent),
+                    )
+                    .await
+                    .map_err(anyhow::Error::new)?
+            } else {
+                self.object
+                    .call_confidential(
+                        tinychannels_bus::methods::SEND_CHANNEL_INTENT,
+                        (self.name.clone(), prepared.intent),
+                    )
+                    .await
+                    .map_err(anyhow::Error::new)?
+            };
+        let mut receipt = result.receipt.unwrap_or_default();
+        if receipt.primary_platform_message_id.is_none() {
+            receipt.primary_platform_message_id = result.message_id.clone();
+        }
+        if receipt.platform_message_ids.is_empty() {
+            if let Some(message_id) = result.message_id {
+                receipt.platform_message_ids.push(message_id);
+            }
+        }
+        Ok(tinychannels_bus::channel::ChannelSendOutcome {
+            receipt,
+            error: result.error,
+        })
+    }
+
     async fn send_prepared(&self, message: &SendMessage) -> anyhow::Result<()> {
         let prepared: tinychannels_bus::module_runtime::PreparedChannelIntent = self
             .object
@@ -473,15 +562,17 @@ impl ModuleChannel {
                 ),
             )
             .await
-            .map_err(anyhow::Error::new)?;
-        if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
+            .map_err(|error| {
+                tracing::warn!("channel reply preparation failed in the compiled module");
+                anyhow::Error::new(error)
+            })?;
+        let delivery = if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
             self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
                     tinychannels_bus::methods::SEND_RELAY_INTENT,
                     (relay.clone(), prepared.intent),
                 )
                 .await
-                .map_err(anyhow::Error::new)?;
         } else {
             self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
@@ -489,12 +580,15 @@ impl ModuleChannel {
                     (self.name.clone(), prepared.intent),
                 )
                 .await
-                .map_err(anyhow::Error::new)?;
         };
+        delivery.map_err(|error| {
+            tracing::warn!("channel reply delivery failed in the compiled module");
+            anyhow::Error::new(error)
+        })?;
         Ok(())
     }
 
-    async fn interact(&self, interaction: ChannelInteraction) -> anyhow::Result<()> {
+    pub(super) async fn interact(&self, interaction: ChannelInteraction) -> anyhow::Result<()> {
         match self
             .object
             .call_confidential::<ChannelInteractionResult>(
@@ -512,3 +606,7 @@ impl ModuleChannel {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "module_providers_tests.rs"]
+mod tests;

@@ -32,6 +32,7 @@ fn runtime_context() -> ChannelRuntimeContext {
     ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(HashMap::new()),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(model)),
         default_provider: Arc::new("default".into()),
         tools_registry: Arc::new(vec![Box::new(DummyTool) as Box<dyn Tool>]),

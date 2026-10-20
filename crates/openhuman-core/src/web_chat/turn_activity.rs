@@ -14,32 +14,10 @@ use std::sync::{Arc, Mutex};
 
 use tinyagents_harness::progress::AgentProgress;
 
-/// Default idle window for a web-chat turn, in seconds.
-pub(crate) const DEFAULT_TURN_IDLE_SECS: u64 = 900;
-
-/// Environment override for the idle window, in seconds; `0` disables it.
-pub(crate) const TURN_IDLE_ENV: &str = "OPENHUMAN_WEB_TURN_IDLE_SECS";
-
-/// A window long enough to stand for "never" where the runner needs a value.
-const IDLE_DISABLED: std::time::Duration = std::time::Duration::from_secs(10 * 365 * 24 * 3600);
-
-/// Pure core of [`configured_idle_window`]: an absent or unparseable value
-/// falls back to [`DEFAULT_TURN_IDLE_SECS`]; `0` disables the idle guard.
-pub(crate) fn parse_idle_window(env_value: Option<&str>) -> std::time::Duration {
-    let secs = env_value
-        .and_then(|v| v.trim().parse::<u64>().ok())
-        .unwrap_or(DEFAULT_TURN_IDLE_SECS);
-    if secs > 0 {
-        std::time::Duration::from_secs(secs)
-    } else {
-        IDLE_DISABLED
-    }
-}
-
-/// The idle window in force for this process (env [`TURN_IDLE_ENV`]).
-pub(crate) fn configured_idle_window() -> std::time::Duration {
-    parse_idle_window(std::env::var(TURN_IDLE_ENV).ok().as_deref())
-}
+pub(crate) use crate::agent::turn_policy::{
+    configured_idle_window, parse_idle_window, DEFAULT_IDLE_SECS as DEFAULT_TURN_IDLE_SECS,
+    IDLE_ENV as TURN_IDLE_ENV,
+};
 
 #[derive(Debug, Default)]
 struct State {

@@ -3,8 +3,12 @@
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::{Error, Result};
+use tinychannels_bus::module_progressive::{
+    ProgressiveTransportRequest, ProgressiveTransportResult,
+};
 use tinychannels_bus::{
     ChannelBackendRequest, ChannelBackendResult, HostEventPublication, HostSpeechSynthesisRequest,
     HostSpeechSynthesisResult, HostTranscriptionRequest, HostTranscriptionResult,
@@ -16,6 +20,28 @@ const MAX_CALLBACK_BYTES: usize = 128 * 1024;
 const MAX_TRANSCRIPTION_BYTES: usize = 12 * 1024 * 1024;
 const MAX_CONTROLLER_BYTES: usize = 1024 * 1024;
 
+#[async_trait::async_trait]
+pub(super) trait ProgressiveChannelTransport: Send + Sync {
+    fn configured_name(&self) -> &str;
+
+    async fn dispatch_progressive(
+        &self,
+        request: ProgressiveTransportRequest,
+    ) -> Result<ProgressiveTransportResult>;
+}
+
+#[async_trait::async_trait]
+pub(super) trait ProgressiveOutputObserver: Send + Sync {
+    async fn observe(
+        &self,
+        channel: &tinychannels_bus::ChannelRef,
+        conversation: &tinychannels_bus::ConversationRef,
+        turn_id: &str,
+        sequence: u64,
+        event: &tinychannels_bus::module_progressive::ChannelOutputEvent,
+    ) -> Result<()>;
+}
+
 /// Callbacks capture one immutable host config and a weak runtime context.
 /// The weak reference avoids a cycle from runtime context -> module channel ->
 /// lease -> TinyBus connection -> callback -> runtime context.
@@ -25,6 +51,9 @@ pub(super) struct ChannelHostCallbacks {
     tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
     context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
+    progressive_channels:
+        Arc<OnceLock<Arc<HashMap<String, Weak<dyn ProgressiveChannelTransport>>>>>,
+    output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
     dispatch: mpsc::Sender<RuntimeChannelMessage>,
 }
 
@@ -33,6 +62,10 @@ impl ChannelHostCallbacks {
         ctx: &crate::core::runtime::DispatchCtx,
         config: Arc<Config>,
         context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
+        progressive_channels: Arc<
+            OnceLock<Arc<HashMap<String, Weak<dyn ProgressiveChannelTransport>>>>,
+        >,
+        output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Self {
         Self {
@@ -44,6 +77,8 @@ impl ChannelHostCallbacks {
             ),
             cancellation: crate::channels::runtime::session::channel_session(),
             context,
+            progressive_channels,
+            output_observer,
             dispatch,
         }
     }
@@ -73,10 +108,13 @@ impl ChannelHostCallbacks {
 impl ChannelHostCallbacks {
     async fn deliver_inbound(&self, channel: String, message: serde_json::Value) -> Result<()> {
         Self::validate_callback_size(&message)?;
-        if let Ok(delivery) = serde_json::from_value::<
-            tinychannels_bus::module_relay::RelayInboundDelivery,
-        >(message.clone())
-        {
+        let relay_shaped = message.get("envelope").is_some()
+            || message.get("delivered_via_authenticated_relay").is_some();
+        if relay_shaped {
+            let delivery = serde_json::from_value::<
+                tinychannels_bus::module_relay::RelayInboundDelivery,
+            >(message.clone())
+            .map_err(|_| Error::failed("invalid relay delivery"))?;
             if delivery.envelope.channel.id != channel {
                 return Err(Error::failed(
                     "relay callback channel does not match envelope",
@@ -84,6 +122,38 @@ impl ChannelHostCallbacks {
             }
             self.dispatch
                 .send(RuntimeChannelMessage::from_authenticated_relay(delivery))
+                .await
+                .map_err(|_| Error::failed("channel dispatch is closed"))?;
+            return Ok(());
+        }
+
+        // v22 providers deliver the normalized envelope directly through the
+        // same host callback. Keep it intact until module preparation derives
+        // the legacy prompt projection and scoped identity. A typed-looking
+        // payload must never fall through and be reinterpreted as v21 text.
+        let typed_envelope = message
+            .get("channel")
+            .is_some_and(serde_json::Value::is_object)
+            || ["conversation", "parts", "access"]
+                .iter()
+                .any(|field| message.get(*field).is_some());
+        if typed_envelope {
+            let envelope: tinychannels_bus::ChannelInboundEnvelope =
+                serde_json::from_value(message)
+                    .map_err(|_| Error::failed("invalid inbound envelope"))?;
+            if channel.trim().is_empty()
+                || envelope.channel.id != tinychannels_bus::provider_id(&channel)
+                || envelope.channel.account_id.as_deref() != Some(channel.as_str())
+                || envelope.message_id.trim().is_empty()
+                || envelope.conversation.id.trim().is_empty()
+            {
+                return Err(Error::failed("inbound envelope identity is invalid"));
+            }
+            self.dispatch
+                .send(RuntimeChannelMessage::with_inbound_envelope(
+                    tinychannels_bus::ChannelMessage::default(),
+                    envelope,
+                ))
                 .await
                 .map_err(|_| Error::failed("channel dispatch is closed"))?;
             return Ok(());
@@ -228,9 +298,10 @@ impl ChannelHostCallbacks {
                     None => dispatch.await,
                 }
             }
-            ChannelBackendRequest::ProgressiveTransport(_) => Err(Error::failed(
-                "progressive transport callback is unavailable",
-            )),
+            ChannelBackendRequest::ProgressiveTransport(request) => self
+                .dispatch_progressive_transport(*request)
+                .await
+                .map(|result| ChannelBackendResult::ProgressiveTransport(Box::new(result))),
             request => {
                 crate::channels::controllers::OpenHumanChannelBackend::new((*self.config).clone())
                     .dispatch_callback(request)
@@ -238,5 +309,118 @@ impl ChannelHostCallbacks {
                     .map_err(|_| Error::failed("channel controller callback failed"))
             }
         }
+    }
+}
+
+#[cfg(test)]
+#[path = "callback_tests.rs"]
+mod tests;
+
+impl ChannelHostCallbacks {
+    async fn dispatch_progressive_transport(
+        &self,
+        request: ProgressiveTransportRequest,
+    ) -> Result<ProgressiveTransportResult> {
+        if self.cancellation.is_cancelled() {
+            return Err(Error::failed("channel session ended"));
+        }
+        if let ProgressiveTransportRequest::OutputEvent {
+            channel: route,
+            channel_ref,
+            conversation,
+            turn_id,
+            sequence,
+            event,
+            ..
+        } = &request
+        {
+            if self.cancellation.is_cancelled() {
+                return Err(Error::failed("channel session ended"));
+            }
+            let channel = channel_ref
+                .as_ref()
+                .ok_or_else(|| Error::failed("progressive output channel identity is required"))?;
+            let conversation = conversation.as_ref().ok_or_else(|| {
+                Error::failed("progressive output conversation identity is required")
+            })?;
+            let turn_id = turn_id
+                .as_deref()
+                .ok_or_else(|| Error::failed("progressive output turn identity is required"))?;
+            if conversation.id.is_empty() || turn_id.is_empty() {
+                return Err(Error::failed("progressive output scope is invalid"));
+            }
+            self.progressive_channel(route, Some(channel))?;
+            if let Some(observer) = &self.output_observer {
+                observer
+                    .observe(channel, conversation, turn_id, *sequence, event)
+                    .await?;
+            }
+            return Ok(ProgressiveTransportResult::Acknowledged);
+        }
+        let (channel, channel_ref) = match &request {
+            ProgressiveTransportRequest::OutputEvent {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::Send {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::SendTyped {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::Edit {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::Delete {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::Typing {
+                channel,
+                channel_ref,
+                ..
+            } => (channel.as_str(), channel_ref.as_ref()),
+        };
+        self.progressive_channel(channel, channel_ref)?
+            .dispatch_progressive(request)
+            .await
+    }
+
+    fn progressive_channel(
+        &self,
+        channel: &str,
+        channel_ref: Option<&tinychannels_bus::ChannelRef>,
+    ) -> Result<Arc<dyn ProgressiveChannelTransport>> {
+        let reference = channel_ref.ok_or_else(|| Error::failed("channel account is required"))?;
+        let account = reference
+            .account_id
+            .as_deref()
+            .ok_or_else(|| Error::failed("configured channel account is required"))?;
+        let adapters = self
+            .progressive_channels
+            .get()
+            .ok_or_else(|| Error::failed("progressive channel adapters are unavailable"))?;
+        let adapter = adapters
+            .get(account)
+            .and_then(Weak::upgrade)
+            .ok_or_else(|| Error::failed("configured channel account is unavailable"))?;
+        let configured_provider =
+            tinychannels_bus::capabilities::provider_id(adapter.configured_name());
+        if configured_provider != reference.id
+            || tinychannels_bus::capabilities::provider_id(channel) != reference.id
+        {
+            return Err(Error::failed(
+                "configured channel account does not match request",
+            ));
+        }
+        Ok(adapter)
     }
 }

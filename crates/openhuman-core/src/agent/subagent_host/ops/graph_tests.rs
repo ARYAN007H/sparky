@@ -26,6 +26,7 @@ fn read_stem(
         updated: String::new(),
         turn_count: 0,
         prefix_message_count: None,
+        prefix_reset: false,
         input_tokens: 0,
         output_tokens: 0,
         cached_input_tokens: 0,
@@ -34,7 +35,6 @@ fn read_stem(
         task_id: None,
         session_id: None,
         parent_session_id: None,
-        prefix_reset: false,
     };
     locator
         .open_stem(stem, seed)
