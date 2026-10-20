@@ -6,9 +6,8 @@
  * out, so anything that follows would need its own resetApp() pass. We keep
  * this spec self-contained so the suite ordering doesn't matter.
  *
- * Covers:
- *   - 13.5.1 Clear App Data confirmation dialog + Cancel
- *   - 13.5.3 Full State Reset → back to Welcome screen
+ * Covers the native-only 13.5.3 reset lifecycle. The browser-owned test covers
+ * the confirmation dialog and Cancel action.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +17,6 @@ import { callOpenhumanRpc } from '../helpers/core-rpc';
 import {
   clickSelector,
   clickTestId,
-  clickText,
   textExists,
   waitForTestId,
   waitForText,
@@ -40,19 +38,6 @@ describe('Settings - Data Management', function () {
 
   after(async () => {
     await stopMockServer();
-  });
-
-  it('shows Clear App Data confirmation dialog and handles Cancel (13.5.1)', async () => {
-    await navigateViaHash('/settings/account');
-    await clickTestId('settings-nav-logout-and-clear', 15_000);
-
-    await waitForText('This will sign you out and permanently delete local app data', 5_000);
-
-    await clickText('Cancel');
-    expect(await textExists('This will sign you out and permanently delete local app data')).toBe(
-      false
-    );
-    expect(await textExists('Clear app data')).toBe(true);
   });
 
   it('performs Full State Reset (13.5.3)', async function () {
