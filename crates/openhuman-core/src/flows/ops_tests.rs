@@ -601,42 +601,6 @@ fn builder_tool_result(call_id: &str, content: &str) -> tinytools_agent::dialect
     }])
 }
 
-// ── Live-run reliability: drop-guard + boot sweep + detach (bugs B41/B42) ───
-
-/// Seeds a real flow plus an already-inserted `running` `flow_runs` row, and
-/// returns `(config, flow_id, run_id)`. The `TempDir` is returned so the caller
-/// keeps the on-disk store alive for the duration of the test.
-fn seed_running_run(tmp: &TempDir) -> (Config, String, String) {
-    let config = test_config(tmp);
-    let flow = store::create_flow(
-        &config,
-        "reliability".to_string(),
-        structurally_valid_graph(trigger_only_graph()),
-        false,
-        true,
-    )
-    .unwrap();
-    let run_id = format!("flow:{}:{}", flow.id, uuid::Uuid::new_v4());
-    // Stamped well before `PROCESS_RUN_FLOOR` so this row models what the boot
-    // sweep actually targets: a `running` row left behind by a *prior* process.
-    // Using `Utc::now()` here would make the sweep tests order-dependent — the
-    // floor is a process-wide `LazyLock`, so a sibling test that ran a real
-    // flow first would push it past a "now" seed and the row would (correctly)
-    // fall out of the candidate set.
-    store::insert_flow_run(
-        &config,
-        &run_id,
-        &flow.id,
-        &run_id,
-        PRIOR_PROCESS_STARTED_AT,
-    )
-    .unwrap();
-    (config, flow.id, run_id)
-}
-
-/// A `started_at` that provably predates this process's `PROCESS_RUN_FLOOR`.
-const PRIOR_PROCESS_STARTED_AT: &str = "2020-01-01T00:00:00+00:00";
-
 #[path = "ops_support_tests.rs"]
 mod support_tests;
 use support_tests::*;
