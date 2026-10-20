@@ -102,7 +102,7 @@ pub struct UpdateConversationThreadTitleRequest {
 }
 
 /// Response payload for thread list operations.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationThreadsListResponse {
     pub threads: Vec<ConversationThreadSummary>,
@@ -117,7 +117,7 @@ pub struct ConversationMessagesRequest {
 }
 
 /// Response payload for message list operations.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationMessagesResponse {
     pub messages: Vec<ConversationMessageRecord>,
@@ -165,14 +165,14 @@ pub struct DeleteConversationThreadRequest {
 }
 
 /// Response payload for single-thread deletion.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteConversationThreadResponse {
     pub deleted: bool,
 }
 
 /// Response payload for purging all workspace-backed conversations.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PurgeConversationThreadsResponse {
     pub messages_deleted: usize,
