@@ -84,7 +84,7 @@ impl HostRequest {
 }
 
 struct PreparedHostPlan {
-        invocation: crate::agent_registry::host_definition::AgentDefinition,
+    invocation: crate::agent_registry::host_definition::AgentDefinition,
     options: SubagentRunOptions,
 }
 

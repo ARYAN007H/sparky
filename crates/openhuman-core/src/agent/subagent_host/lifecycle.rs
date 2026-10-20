@@ -29,7 +29,6 @@ mod checkpoint;
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
 pub(super) use driver_adapter::outcome_to_host;
-use driver_adapter::HostInvocation;
 
 #[path = "lifecycle/driver_result.rs"]
 mod driver_result;
