@@ -283,12 +283,7 @@ fn handle_browser_forget_sites(ctx: DispatchCtx, params: Map<String, Value>) -> 
 }
 
 fn handle_computer_status(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let load = computer_status_load(&params);
-        let config = ctx.load_config().await?;
-        crate::core::runtime::components::require_config(&config, "computer")?;
-        controller_value(super::computer::status(&config, load).await)
-    })
+    computer_status_controller_entry().invoke(ctx, params)
 }
 
 fn controller_value(value: impl serde::Serialize) -> Result<Value, String> {
