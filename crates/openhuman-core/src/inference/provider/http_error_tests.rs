@@ -398,17 +398,44 @@ fn provider_http_policy_uses_registered_error_ownership_metadata() {
 }
 
 #[test]
-fn demotion_decision_keeps_quota_ahead_of_backend_owned_error_code() {
-    use tinyinference_llm::failure::{demote_decision, DemotionKind};
+fn quota_demotion_precedes_backend_owned_error_code_guard() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{
+        register_backend_error_classifier_in, BackendErrorClassification,
+    };
+    use std::sync::Arc;
+    use tinyinference_llm::failure::DemotionKind;
+    const PROVIDER: &str = "fixture-owned-code-provider";
+    const BODY: &str = "MONTHLY_REQUEST_COUNT quota exceeded OWNED_CODE";
+    let extensions = Extensions::new();
+    register_backend_error_classifier_in(
+        &extensions,
+        Arc::new(|provider, message| BackendErrorClassification {
+            provider_owned: provider == Some(PROVIDER),
+            backend_owned: provider == Some(PROVIDER) && message.contains("OWNED_CODE"),
+            reportable: false,
+            token: None,
+            kind: None,
+            malformed_bad_request: false,
+        }),
+    );
+    let context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        None,
+        extensions,
+    );
+    crate::core::runtime::CoreContext::sync_scope(context, || {
     let facts = tinyinference_llm::failure::http::classify_http_failure(
-        "fixture-byo-provider",
+        PROVIDER,
         StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-        "MONTHLY_REQUEST_COUNT quota exceeded",
+        BODY,
     );
-    assert_eq!(
-        demote_decision(&facts, false),
-        Some(DemotionKind::QuotaExhausted)
-    );
+        assert!(is_backend_error_code_owned(PROVIDER, BODY));
+        assert_eq!(
+            select_demotion(&facts, true, is_backend_error_code_owned(PROVIDER, BODY)),
+            HostDemotion::Provider(DemotionKind::QuotaExhausted)
+        );
+    });
 }
 
 #[test]
@@ -421,6 +448,27 @@ fn managed_unknown_model_remains_user_configuration_state() {
     );
     assert_eq!(
         demote_decision(&facts, true),
+        Some(DemotionKind::ConfigurationRejected)
+    );
+}
+
+#[test]
+fn managed_provider_config_phrase_remains_reportable_but_unknown_model_demotes() {
+    use tinyinference_llm::failure::{demote_decision, DemotionKind};
+    let config_phrase = tinyinference_llm::failure::http::classify_http_failure(
+        "openhuman",
+        StatusCode::BAD_REQUEST.as_u16(),
+        "invalid temperature: only 1 is allowed for this model",
+    );
+    assert_eq!(demote_decision(&config_phrase, true), None);
+
+    let third_party_phrase = tinyinference_llm::failure::http::classify_http_failure(
+        "custom_openai",
+        StatusCode::BAD_REQUEST.as_u16(),
+        "invalid temperature: only 1 is allowed for this model",
+    );
+    assert_eq!(
+        demote_decision(&third_party_phrase, false),
         Some(DemotionKind::ConfigurationRejected)
     );
 }
