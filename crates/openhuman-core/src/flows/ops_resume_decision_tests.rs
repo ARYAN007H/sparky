@@ -92,9 +92,22 @@ async fn flows_resume_with_mismatched_approvals_is_rejected() {
 async fn flows_resume_with_the_correct_gate_completes_and_runs_downstream() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let created = flows_create(&config, "gated".to_string(), approval_gated_graph(), false)
-        .await
-        .unwrap();
+    let created = flows_create(&config, "gated".to_string(), approval_gated_graph(), false).await;
+    if std::env::var_os("OPENHUMAN_TINYFLOWS_RUN_DIAGNOSTICS").is_some() {
+        if let Err(error) = &created {
+            let tenant_scoped = crate::core::runtime::DispatchCtx::ambient()
+                .tenant()
+                .map(|tenant| tenant.is_scoped())
+                .unwrap_or(false);
+            let module_state = crate::modules::ops::state_of("tinyflows");
+            eprintln!(
+                "flows_create after resume fixtures failed: {error}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; artifact={:?}",
+                config.workspace_dir.display(),
+                crate::modules::local_artifact("tinyflows")
+            );
+        }
+    }
+    let created = created.unwrap();
 
     let run = flows_run(
         &crate::core::runtime::DispatchCtx::ambient(),
