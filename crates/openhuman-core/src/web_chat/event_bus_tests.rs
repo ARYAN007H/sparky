@@ -254,6 +254,30 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
     );
 }
 
+#[tokio::test]
+async fn artifact_surface_preserves_unknown_kind_wire_value() {
+    crate::core::bus::init().await.expect("bus init");
+    let _handle = crate::core::bus::BUS.subscribe(Arc::new(ArtifactSurfaceSubscriber));
+    let mut web_rx = subscribe_web_channel_events();
+    let artifact_id = "artifact-future-kind";
+
+    crate::core::bus::BUS.publish(DomainEvent::ArtifactReady {
+        artifact_id: artifact_id.to_string(),
+        kind: "future_kind".to_string(),
+        title: "A future artifact".to_string(),
+        workspace_dir: "/tmp/ws".to_string(),
+        path: "future.bin".to_string(),
+        size_bytes: 7,
+        thread_id: Some("thread-1".to_string()),
+        client_id: Some("client-1".to_string()),
+        tool_call_id: None,
+        request_id: None,
+    });
+
+    let event = find_artifact_web_event(&mut web_rx, "artifact_ready", artifact_id).await;
+    assert_eq!(wire(&event)["args"]["kind"], "future_kind");
+}
+
 /// A producer that ran outside a harness tool-call context (CLI, cron)
 /// carries `tool_call_id: None` — the bridged event must not fabricate one.
 #[tokio::test]
