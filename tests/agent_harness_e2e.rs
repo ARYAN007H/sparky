@@ -697,8 +697,8 @@ const SUPERVISED_AUTONOMY_CONFIG: &str = "[autonomy]\nenabled = true\nlevel = \"
 async fn boot_stack_with_config(extra_config: &str) -> Stack {
     // Ensure the global AgentDefinitionRegistry is populated with built-in
     // archetypes (orchestrator, vision_agent, task_manager_agent, etc.) before
-    // the RPC stack starts. Without this the session builder cannot synthesise
-    // delegation tools and every `analyze_image`/`spawn_subagent` call becomes
+    // the RPC stack starts. Without this the session builder cannot build
+    // spawn_subagent's agent_id schema and every call becomes
     // "Unknown tool: …", making delegation tests vacuous.
     init_agent_def_registry();
 
@@ -974,22 +974,15 @@ async fn multi_turn_state_persistence_inner() {
 
 // ─── Task 3: Subagent delegation happy path ───────────────────────────────────
 //
-// Tool surface (crates/openhuman-core/src/tools/orchestrator_tools.rs,
-//   crates/openhuman-core/src/agent_registry/agents/vision_agent/agent.toml):
-//   - vision_agent has `delegate_name = "analyze_image"`, so the
-//     orchestrator LLM sees a tool named "analyze_image" synthesised by collect_orchestrator_tools.
-//   - The tool takes { "prompt": string, ... } per ArchetypeDelegationTool schema.
-//   - The orchestrator TOML lists "vision_agent" in its subagents.allowlist.
-//   - AgentDefinitionRegistry must be initialised (done in boot_stack) for the
-//     delegation tool to be synthesised; without it the call becomes "Unknown tool: analyze_image".
+// Tool surface: the orchestrator selects vision_agent through
+// spawn_subagent({ agent_id, prompt, image_paths }).
 //
 // Actual LLM request ordering (with registry init):
-//   request[0] = orchestrator → model returns { tool_calls: [analyze_image(...)] }
+//   request[0] = orchestrator → model returns { tool_calls: [spawn_subagent(...)] }
 //   request[1] = vision_agent subagent inner loop → model returns canary text
 //   request[2] = orchestrator synthesis → model returns final text with canary
 
-/// Orchestrator delegates to vision_agent via the `analyze_image`
-/// tool (delegate_name on the vision_agent definition); the subagent runs
+/// Orchestrator selects vision_agent through `spawn_subagent`; the subagent runs
 /// its own inner LLM call; the final orchestrator synthesis reply contains the
 /// subagent canary. Three upstream requests prove the full delegation path ran.
 #[test]
@@ -1017,14 +1010,13 @@ async fn subagent_delegation_happy_path_inner() {
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
-        // request[0]: Orchestrator calls the `analyze_image` tool
-        // (vision_agent's delegate_name).
+        // request[0]: Orchestrator selects the vision specialist.
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "Find the marker phrase",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
         // request[1]: vision_agent subagent inner LLM call returns its canary.
@@ -1063,7 +1055,7 @@ async fn subagent_delegation_happy_path_inner() {
     );
 
     // Delegation evidenced by ≥3 captured upstream requests:
-    //   request[0] = orchestrator turn: analyze_image tool call returned
+    //   request[0] = orchestrator turn: spawn_subagent tool call returned
     //   request[1] = vision_agent subagent inner LLM call: canary text returned
     //   request[2] = orchestrator synthesis: canary forwarded in final reply
     //
@@ -1115,10 +1107,9 @@ async fn subagent_delegation_happy_path_inner() {
 
 // ─── Task 4: Delegated clarification flow ─────────────────────────────────────
 //
-// `manage_tasks` is task_manager_agent's synthesised delegate (its `agent.toml`
-// `delegate_name`), and `ask_user_clarification` IS in that agent's named tools.
-// So a blocking delegation that needs a detail pauses the *child*, and
-// `dispatch_subagent` hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
+// The orchestrator selects task_manager_agent through spawn_subagent, and
+// ask_user_clarification is in that agent's named tools. A child that needs a
+// detail pauses and hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
 // the `manage_tasks` tool result (#4291). That envelope is an ordinary tool
 // result to the orchestrator — `manage_tasks` is not in its `early_exit_tools`
 // — so the orchestrator relays the question in its OWN next reply, and turn 1
@@ -2027,17 +2018,17 @@ async fn provider_error_retry_inner() {
 //   with the current built-in agent graph; the cap is a safety net for
 //   runtime-registered agents.
 //
-//   Fallback (plan Task 9, step 9.2 fallback): orchestrator → vision_agent
-//   (via `analyze_image`) → vision_agent scripted to call file_write (not in
+//   Fallback: orchestrator → vision_agent via spawn_subagent → vision_agent
+//   scripted to call file_write (not in
 //   vision_agent's read-only named tools → SubagentToolSource::execute returns
 //   a blocked response, tool loop continues) → vision_agent second LLM call
-//   returns DEPTH2_CANARY text → dispatch_subagent forwards as `analyze_image`
+//   returns DEPTH2_CANARY text → spawn_subagent forwards it
 //   tool result → orchestrator synthesis. The three-level synthesis path (user
 //   turn → vision_agent subagent → tool-loop continuation → orchestrator
 //   synthesis) is the deepest path reachable with built-in agents without src/
 //   changes.
 //   LLM request ordering (4 upstream calls):
-//     request[0] = orchestrator → `analyze_image` delegation
+//     request[0] = orchestrator → `spawn_subagent` delegation
 //     request[1] = vision_agent (inner loop) → file_write (blocked)
 //     request[2] = vision_agent (inner loop continuation) → DEPTH2_CANARY text
 //     request[3] = orchestrator synthesis
@@ -2184,7 +2175,7 @@ async fn concurrent_async_subagents_overlap_inner() {
     );
 }
 
-/// Orchestrator delegates to vision_agent via `analyze_image`; it calls
+/// Orchestrator selects vision_agent through `spawn_subagent`; it calls
 /// file_write (not in its read-only named tools, so SubagentToolSource
 /// returns error); vision_agent loops and returns DEPTH2_CANARY;
 /// dispatch_subagent forwards the result; orchestrator synthesizes.
@@ -2223,14 +2214,13 @@ async fn multi_hop_delegation_chain_inner() {
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
-        // request[0]: Orchestrator delegates to vision_agent via
-        // `analyze_image` (its delegate_name, agent_registry/agents/vision_agent/agent.toml:3).
+        // request[0]: Orchestrator selects the vision specialist.
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "deep question",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
         // request[1]: vision_agent first inner LLM call → scripts file_write.
@@ -2243,9 +2233,9 @@ async fn multi_hop_delegation_chain_inner() {
             json!({ "path": "depth-2.txt", "content": "depth-2 write?" }),
         ),
         // request[2]: vision_agent second inner LLM call → text result.
-        // This becomes the `analyze_image` tool result forwarded by dispatch_subagent.
+        // This becomes the spawn_subagent result.
         text_completion("DEPTH2_CANARY"),
-        // request[3]: Orchestrator receives the analyze_image result and synthesizes.
+        // request[3]: Orchestrator receives the subagent result and synthesizes.
         text_completion("Final answer: DEPTH2_CANARY"),
     ]);
     let mut events = spawn_sse_collector(format!(
@@ -2279,7 +2269,7 @@ async fn multi_hop_delegation_chain_inner() {
 
     // ≥4 upstream requests prove the full delegation path ran (≥3 would
     // false-pass if the subagent inner loop early-exited):
-    //   request[0] = orchestrator (analyze_image call),
+    //   request[0] = orchestrator (spawn_subagent call),
     //   request[1] = vision_agent first iter (file_write → blocked),
     //   request[2] = vision_agent second iter (DEPTH2_CANARY text),
     //   request[3] = orchestrator synthesis.
@@ -2292,13 +2282,13 @@ async fn multi_hop_delegation_chain_inner() {
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
-    // No unknown-tool result for `analyze_image` — delegation was synthesised correctly.
-    // Scoped to `analyze_image`: the subagent's `file_write` call IS
+    // No unknown-tool result for spawn_subagent — specialist selection succeeded.
+    // Scoped to spawn_subagent: the subagent's `file_write` call IS
     // rejected as unknown by design (see the ordering note above), so a blanket
     // check would fail on the very mechanic this test exercises.
     assert!(
-        !captured_requests_reject_tool_as_unknown(&requests, "analyze_image"),
-        "found an unknown-tool result — `analyze_image` delegation was not synthesised; requests: {}",
+        !captured_requests_reject_tool_as_unknown(&requests, "spawn_subagent"),
+        "found an unknown-tool result — spawn_subagent was not available; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
