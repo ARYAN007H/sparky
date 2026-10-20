@@ -10,6 +10,7 @@ mod tests;
 
 use crate::inference::registry::classify_backend_error;
 use tinyinference_core::sanitize::sanitize_api_error;
+use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
 use tinyinference_llm::failure::http::{
     classify_and_report_http_failure, ErrorReporter, ProviderHttpFailure, ProviderHttpFailureFacts,
 };
@@ -17,7 +18,6 @@ use tinyinference_llm::failure::{
     local_provider_no_model_loaded_user_message, ollama_cloud_internal_500_user_message,
     should_report_provider_http_status,
 };
-use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
 
 /// Whether a non-2xx provider status is worth a per-attempt Sentry report.
 pub fn should_report_provider_http_failure(status: reqwest::StatusCode) -> bool {

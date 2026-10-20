@@ -404,7 +404,7 @@ fn quota_demotion_precedes_backend_owned_error_code_guard() {
         register_backend_error_classifier_in, BackendErrorClassification,
     };
     use std::sync::Arc;
-    use tinyinference_llm::failure::DemotionKind;
+    use tinyinference_llm::failure::demotion::DemotionKind;
     const PROVIDER: &str = "fixture-owned-code-provider";
     const BODY: &str = "MONTHLY_REQUEST_COUNT quota exceeded OWNED_CODE";
     let extensions = Extensions::new();
@@ -455,7 +455,7 @@ fn quota_demotion_precedes_backend_owned_error_code_guard() {
 
 #[test]
 fn managed_unknown_model_remains_user_configuration_state() {
-    use tinyinference_llm::failure::{demote_decision, DemotionKind};
+    use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
     let facts = tinyinference_llm::failure::http::classify_http_failure(
         "openhuman",
         StatusCode::BAD_REQUEST.as_u16(),
@@ -469,7 +469,7 @@ fn managed_unknown_model_remains_user_configuration_state() {
 
 #[test]
 fn managed_provider_config_phrase_remains_reportable_but_unknown_model_demotes() {
-    use tinyinference_llm::failure::{demote_decision, DemotionKind};
+    use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
     let config_phrase = tinyinference_llm::failure::http::classify_http_failure(
         "openhuman",
         StatusCode::BAD_REQUEST.as_u16(),
@@ -490,7 +490,7 @@ fn managed_provider_config_phrase_remains_reportable_but_unknown_model_demotes()
 
 #[test]
 fn config_rejection_demotion_keeps_provider_status_and_polarity() {
-    use tinyinference_llm::failure::{demote_decision, DemotionKind};
+    use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
     let cases = [
         (
             "custom_openai",
