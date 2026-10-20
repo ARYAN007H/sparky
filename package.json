@@ -8,8 +8,8 @@
   "scripts": {
     "build": "pnpm --filter openhuman-app build",
     "docs:generate": "node scripts/generate-architecture-docs.mjs",
-    "chat-wire:generate": "node scripts/generate-chat-wire-types.mjs",
-    "chat-wire:check": "node scripts/generate-chat-wire-types.mjs --check",
+    "chat-wire:generate": "node scripts/generate-chat-wire-types.mjs && node scripts/generate-thread-wire-types.mjs",
+    "chat-wire:check": "node scripts/generate-chat-wire-types.mjs --check && node scripts/generate-thread-wire-types.mjs --check",
     "docs:check": "node scripts/generate-architecture-docs.mjs --check",
     "docs:test": "node --test scripts/__tests__/generate-architecture-docs.test.mjs scripts/__tests__/generate-embed-docs.test.mjs",
     "test:scripts": "node --test scripts/__tests__/*.test.mjs scripts/mock-api/*.test.mjs scripts/mock-api/routes/__tests__/*.test.mjs",
