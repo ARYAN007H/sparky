@@ -19,6 +19,9 @@
 import type { ChatErrorCopyParams } from '../lib/chatErrorCopy';
 import type {
   ArtifactKind as ArtifactKindWire,
+  ArtifactFailedPayload,
+  ArtifactPendingPayload,
+  ArtifactReadyPayload,
   ChatSuggestion,
   ContentPart,
   OutboundContentPart,
@@ -236,27 +239,16 @@ export function decodeRunModeChanged(
 // The artifact payload rides the wire event's open `args` JSON; chatService
 // validates it and flattens it into these views.
 
-interface ArtifactBase {
+interface ArtifactContext {
   thread_id: string;
   client_id?: string;
-  artifact_id: string;
-  kind: ArtifactKind;
-  title: string;
-  workspace_dir: string;
   tool_call_id?: string;
   request_id?: string;
 }
 
-export interface ArtifactReadyEvent extends ArtifactBase {
-  path: string;
-  size_bytes: number;
-}
-export interface ArtifactFailedEvent extends ArtifactBase {
-  error: string;
-}
-export interface ArtifactPendingEvent extends ArtifactBase {
-  path: string;
-}
+export type ArtifactReadyEvent = ArtifactReadyPayload & ArtifactContext;
+export type ArtifactFailedEvent = ArtifactFailedPayload & ArtifactContext;
+export type ArtifactPendingEvent = ArtifactPendingPayload & ArtifactContext;
 
 // ── Queue and suggestions ────────────────────────────────────────────────────
 
