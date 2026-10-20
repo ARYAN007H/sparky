@@ -68,19 +68,17 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         .expect("detached parent");
     let accepted = crate::core::runtime::CoreContext::scope(
         Arc::clone(&core),
-        Box::pin(
-            SpawnSubagentTool::new().execute_with_live_parent_context(
-                json!({
-                    "agent_id": "task_manager_agent",
-                    "prompt": "wait for the thread stop",
-                    "model": "test-model",
-                    "task_key": "stop detached child"
-                }),
-                None,
-                live.data.child(),
-                detached.clone(),
-            ),
-        ),
+        Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "wait for the thread stop",
+                "model": "test-model",
+                "task_key": "stop detached child"
+            }),
+            None,
+            live.data.child(),
+            detached.clone(),
+        )),
     )
     .await
     .expect("spawn child");

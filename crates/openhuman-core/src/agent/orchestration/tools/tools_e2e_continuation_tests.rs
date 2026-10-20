@@ -168,14 +168,13 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         ),
         task_key: "pause-resume-fixture".into(),
     };
-    let (saved_key, reusable_session_id) =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || {
+    let (saved_key, reusable_session_id) = crate::core::runtime::CoreContext::sync_scope(
+        Arc::clone(&_core),
+        || {
             let mut records = sessions.load().expect("load paused row before corruption");
             let row = records
                 .iter_mut()
-                .find(|session| {
-                    session.subagent_session_id == before_session.subagent_session_id
-                })
+                .find(|session| session.subagent_session_id == before_session.subagent_session_id)
                 .expect("paused row to corrupt");
             row.lifecycle_key
                 .as_mut()
@@ -188,21 +187,33 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
             let reread = sessions.load().expect("reread corrupted paused row");
             let persisted = reread
                 .iter()
-                .find(|session| {
-                    session.subagent_session_id == before_session.subagent_session_id
-                })
+                .find(|session| session.subagent_session_id == before_session.subagent_session_id)
                 .expect("corrupted paused row remains persisted");
             let reusable = crate::agent::orchestration::subagent_sessions::find_reusable(
                 &sessions,
                 &selector,
             )
             .expect("find matching paused session")
-            .expect("the exact spawn selector still selects the paused session");
+            .unwrap_or_else(|| {
+                panic!(
+                    "exact spawn selector did not select corrupted paused row: selector={selector:?}; persisted=(parent_session={:?}, parent_thread_id={:?}, agent_id={:?}, model={:?}, sandbox_mode={:?}, action_root={:?}, task_key={:?}, status={:?}, reusable={})",
+                    persisted.parent_session,
+                    persisted.parent_thread_id,
+                    persisted.agent_id,
+                    persisted.model,
+                    persisted.sandbox_mode,
+                    persisted.action_root,
+                    persisted.task_key,
+                    persisted.status,
+                    persisted.reusable,
+                )
+            });
             (
                 persisted.lifecycle_key.clone().expect("persisted key"),
                 reusable.subagent_session_id,
             )
-        });
+        },
+    );
     assert_ne!(saved_key, original_lifecycle_key);
     assert_eq!(
         reusable_session_id, before_session.subagent_session_id,
