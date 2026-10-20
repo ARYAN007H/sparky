@@ -129,9 +129,14 @@ fn registry_get_legacy_catalog_keeps_its_handler_and_fixture_contract() {
         .into_iter()
         .filter(|controller| controller.schema.method_name() == "mcp_clients.registry_get")
         .collect::<Vec<_>>();
-    crate::core::all::verify_parameter_contracts(
-        &controllers,
-        &[super::registry_get_parameter_contract()],
+    assert_eq!(controllers.len(), 1);
+    assert!(std::ptr::fn_addr_eq(
+        controllers[0].handler,
+        super::handlers::handle_registry_get
+    ));
+    crate::core::all::verify_parameter_schema(
+        &controllers[0].schema,
+        &super::registry_get_parameter_contract(),
     )
-    .expect("legacy catalogue keeps its public handler and authored parser example");
+    .expect("legacy catalogue keeps its authored schema example");
 }

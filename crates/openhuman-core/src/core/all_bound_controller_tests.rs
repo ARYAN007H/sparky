@@ -303,8 +303,6 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
 #[test]
 #[cfg(feature = "mcp")]
 fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
-    use serde_json::json;
-
     let entries: Vec<_> = registry()
         .iter()
         .filter(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get")
@@ -375,11 +373,6 @@ fn production_registry_binds_computer_status_to_its_declared_parser() {
         "computer_status must bind at production registration"
     );
     assert_eq!(entry.rpc_method_name(), "openhuman.modules_computer_status");
-    required_input_contract(&entry.schema, &[]).expect("computer_status has no required inputs");
-    assert_eq!(entry.schema.inputs.len(), 1);
-    assert_eq!(entry.schema.inputs[0].name, "load");
-    assert!(!entry.schema.inputs[0].required);
-
     let contract = crate::modules::schemas::computer_status_parameter_contract();
     crate::core::all::verify_parameter_contracts(std::slice::from_ref(entry),
         std::slice::from_ref(&contract))
