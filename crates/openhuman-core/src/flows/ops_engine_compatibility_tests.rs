@@ -238,7 +238,8 @@ async fn flows_update_rejects_an_incompatible_saved_child_before_persisting() {
         false,
         true,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     let error = flows_update(
         &config,
