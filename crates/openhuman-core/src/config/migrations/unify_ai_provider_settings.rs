@@ -150,7 +150,6 @@ fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
             "[migrations][unify-ai] primary_cloud set to legacy custom entry id={}",
             entry.id
         );
-        return;
     }
 }
 

@@ -67,6 +67,15 @@ pub type ChatModelFactory = Arc<
 pub type ReadinessProbe =
     Arc<dyn Fn(String, String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
 
+/// Resolves a provider-owned model id to its workload role.
+pub type ModelRoleResolver = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+
+/// Resolves a workload role and optional model pin to a concrete model id.
+pub type ModelResolver = Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>;
+
+/// Looks up a provider-owned static context window for a model id.
+pub type ModelContextWindow = Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>;
+
 /// A registered chat-model provider.
 #[derive(Clone)]
 pub struct ChatModelEntry {
@@ -85,7 +94,7 @@ pub struct ProviderModelHooks {
     /// The provider's default model, absent when it has no default.
     pub default_model: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     /// Resolves a role alias or legacy model id to its workload role.
-    pub role_for_model: Arc<dyn Fn(&str) -> Option<String> + Send + Sync>,
+    pub role_for_model: ModelRoleResolver,
     /// Whether a model is a provider-specific alias rather than a concrete id.
     pub is_alias: Arc<dyn Fn(&str) -> bool + Send + Sync>,
     /// Whether a model is a concrete id suitable for pass-through.
@@ -93,9 +102,9 @@ pub struct ProviderModelHooks {
     /// Whether a model accepts image input according to provider metadata.
     pub supports_vision: Arc<dyn Fn(&str) -> bool + Send + Sync>,
     /// Resolves the provider's default/alias policy for a managed construction.
-    pub resolve_model: Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>,
+    pub resolve_model: ModelResolver,
     /// The default model's static context window, if the provider knows it.
-    pub context_window: Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>,
+    pub context_window: ModelContextWindow,
     /// Provider default pricing as (model id, input USD/1M, output USD/1M).
     pub default_pricing: Arc<dyn Fn() -> Option<(String, f64, f64)> + Send + Sync>,
     /// Applies a provider-specific request hint without exposing its wire key.
@@ -261,7 +270,7 @@ pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
     let model = model.trim();
     !model.is_empty()
         && !model.starts_with("hint:")
-        && provider_model_hooks(provider_id).map_or(true, |hooks| (hooks.is_raw_model)(model))
+        && provider_model_hooks(provider_id).is_none_or(|hooks| (hooks.is_raw_model)(model))
 }
 
 /// Whether the provider says `model` supports image input.
