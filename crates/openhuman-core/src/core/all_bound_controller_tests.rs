@@ -560,13 +560,12 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             "{} must have a production-bound parser",
             contract.method
         );
-        let required: Vec<_> = entry
-            .schema
-            .inputs
-            .iter()
-            .filter(|input| input.required)
-            .map(|input| input.name)
-            .collect();
+        assert_eq!(
+            required_input_contract(&entry.schema, contract.required),
+            Ok(()),
+            "{} independent required-field contract",
+            contract.method
+        );
         let optional: Vec<_> = entry
             .schema
             .inputs
@@ -574,11 +573,6 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
             .filter(|input| !input.required)
             .map(|input| input.name)
             .collect();
-        assert_eq!(
-            required, contract.required,
-            "{} required fields",
-            contract.method
-        );
         assert_eq!(
             optional, contract.optional,
             "{} optional fields",
