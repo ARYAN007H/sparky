@@ -8,9 +8,13 @@ use serde_json::json;
 #[test]
 fn legacy_voice_catalog_keeps_its_handlers_and_schema_fixtures() {
     use super::handlers::*;
+    use crate::core::all::ControllerHandler;
 
-    let controllers = all_voice_registered_controllers();
-    let expected = [
+    let controllers: Vec<_> = all_voice_registered_controllers()
+        .into_iter()
+        .filter(|controller| !controller.schema.method_name().contains(".live_"))
+        .collect();
+    let expected: [(&str, ControllerHandler); 11] = [
         ("voice.status", handle_voice_status),
         ("voice.transcribe", handle_voice_transcribe),
         ("voice.transcribe_bytes", handle_voice_transcribe_bytes),

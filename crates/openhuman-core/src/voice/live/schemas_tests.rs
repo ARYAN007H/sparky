@@ -26,8 +26,10 @@ fn registers_four_live_controllers_in_the_voice_namespace() {
 
 #[test]
 fn live_legacy_catalog_keeps_private_handler_identities_and_schema_fixtures() {
+    use crate::core::all::ControllerHandler;
+
     let controllers = live_registered_controllers();
-    let expected = [
+    let expected: [(&str, ControllerHandler); 4] = [
         ("voice.live_providers", handle_live_providers),
         ("voice.live_settings_get", handle_live_settings_get),
         ("voice.live_settings_set", handle_live_settings_set),

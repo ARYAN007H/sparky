@@ -153,7 +153,7 @@ fn computer_status_legacy_catalog_keeps_its_handler_and_fixture_contract() {
     assert_eq!(controllers.len(), 1);
     assert!(std::ptr::fn_addr_eq(
         controllers[0].handler,
-        super::handle_computer_status
+        super::handle_computer_status as crate::core::all::ControllerHandler
     ));
     crate::core::all::verify_parameter_schema(
         &controllers[0].schema,
