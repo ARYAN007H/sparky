@@ -285,6 +285,10 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
     parent.session_id = "headless-spawn-session".into();
     parent.on_progress = Some(progress_tx);
     let (live, _core) = headless_core_backed_parent(workspace.path(), parent);
+    assert!(
+        live.data.dispatch_ctx().resolved().is_some(),
+        "the headless parent carrier retains its core context"
+    );
 
     let result = SpawnSubagentTool::new()
         .execute_with_live_parent_context(

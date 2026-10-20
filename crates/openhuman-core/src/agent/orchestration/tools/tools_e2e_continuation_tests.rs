@@ -38,6 +38,10 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         "continue-paused-e2e",
         "continue-paused-e2e-thread",
     );
+    assert!(
+        live.data.dispatch_ctx().resolved().is_some(),
+        "the parent carrier retains its core context"
+    );
     let paused = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -315,6 +319,10 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         parent,
         "paused-cancel-rpc-parent",
         "paused-cancel-rpc-thread",
+    );
+    assert!(
+        live.data.dispatch_ctx().resolved().is_some(),
+        "the parent carrier retains its core context"
     );
     let parent_cancellation = live.data.child().cancellation;
     let jobs =

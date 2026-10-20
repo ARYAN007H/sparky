@@ -32,3 +32,7 @@ pub(crate) fn incomplete_stop(
         ),
     )
 }
+
+#[cfg(test)]
+#[path = "dispatch_outcomes_tests.rs"]
+mod tests;
