@@ -26,11 +26,7 @@ pub async fn threads_list(
     ctx: &DispatchCtx,
     _request: EmptyRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadsListResponse>>, String> {
-    let dir = ctx
-        .load_config()
-        .await
-        .map_err(|error| format!("load config: {error}"))?
-        .workspace_dir;
+    let dir = workspace_dir().await?;
     let threads = conversations::blocking::list_threads(ctx.clone(), dir)
         .await?
         .into_iter()
@@ -496,7 +492,11 @@ pub async fn message_update(
     {
         return Err("private attachment storage metadata is reserved".into());
     }
-    let dir = workspace_dir().await?;
+    let dir = ctx
+        .load_config()
+        .await
+        .map_err(|error| format!("load config: {error}"))?
+        .workspace_dir;
     let message = conversations::blocking::update_message(
         ctx.clone(),
         dir,
