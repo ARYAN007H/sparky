@@ -312,7 +312,7 @@ pub(crate) async fn process_channel_runtime_message(
             .is_some_and(|ch| ch.supports_draft_updates());
 
     // Set up streaming channel if supported
-    let (progress_tx, progress_rx) = if use_streaming {
+    let (_progress_tx, progress_rx) = if use_streaming {
         let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(64);
         (Some(tx), Some(rx))
     } else {
@@ -516,7 +516,7 @@ pub(crate) async fn process_channel_runtime_message(
                 &route,
                 &enriched_message,
                 active_turn_model_source,
-                progress_tx,
+                _progress_tx,
                 turn_origin,
                 approval,
             )

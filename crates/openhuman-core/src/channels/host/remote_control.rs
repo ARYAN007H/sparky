@@ -1,7 +1,6 @@
 //! Captured host conversation and session state supplied to the channel module.
 
 use crate::channels::context::ChannelRuntimeContext;
-use crate::channels::Channel;
 use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, CreateConversationThread};
 
