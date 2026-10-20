@@ -271,4 +271,4 @@ fn bool_field(name: &'static str, comment: &'static str) -> FieldSchema {
 
 #[cfg(test)]
 #[path = "schemas_tests.rs"]
-mod tests;
+pub(crate) mod tests;
