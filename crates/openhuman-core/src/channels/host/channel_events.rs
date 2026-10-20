@@ -8,13 +8,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
-use tinychannels_bus::ChannelMessage;
-
-#[derive(Clone)]
-struct ReplyContext {
-    reply_target: String,
-    thread_ts: Option<String>,
-}
+use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
 
 /// Captures the account configuration and reply addresses used by approvals.
 pub struct ChannelApprovalSurfaceSubscriber {
