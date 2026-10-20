@@ -95,12 +95,11 @@ pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events";
 /// `ComposioConnectionCreated` and `ComposioConfigChanged` (additive): a
 /// subscriber rebuilds its dispatch context from it instead of reading an
 /// ambient one.
-/// `2.0.0` removes `CronDeliveryRequested`; announce delivery now sends
-/// synchronously through the cron channel bridge. The canonical 2.0 catalog
-/// also retires the obsolete desktop push-to-talk transcript event.
-/// `2.1.0` adds the inbound-event queue variants and optional
+/// The canonical 2.0 catalog retired the desktop push-to-talk transcript
+/// event; canonical 2.1 added inbound-event queue variants.
+/// `3.0.0` removes `CronDeliveryRequested` (announce delivery now sends
+/// synchronously through the cron channel bridge) and includes optional
 /// `CronJobCompleted` tenant ownership.
-/// `3.0.0` combines those 2.x additions with the incompatible removal above.
 pub const EVENTS_VERSION: Version = Version::new(3, 0, 0);
 
 /// The bus. Initialised once by [`init`]; safe to touch before that.
