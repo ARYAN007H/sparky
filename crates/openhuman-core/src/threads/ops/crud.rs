@@ -203,6 +203,9 @@ async fn message_append_with_config(
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     persistence_dir: &std::path::Path,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
+    // Reserve the private path map for values minted after core staging. A
+    // caller may send arbitrary public metadata but never storage authority.
+    crate::threads::attachments::strip_private_metadata(&mut request.message.extra_metadata);
     let typed_attachments = if request.message.sender == "user" {
         std::mem::take(&mut request.attachments)
     } else {
@@ -220,6 +223,22 @@ async fn message_append_with_config(
             )
         })
         .count();
+    let staged_refs = if !typed_attachments.is_empty()
+        && crate::threads::attachments::validate_opaque_parts(&typed_attachments).is_ok()
+    {
+        request.message.attachments = crate::threads::attachments::bind_staged_refs(
+            ctx,
+            &request.thread_id,
+            config,
+            &typed_attachments,
+            &mut request.message.extra_metadata,
+        )
+        .await
+        .map_err(ThreadsError::Message)?;
+        Some(typed_attachments.clone())
+    } else {
+        None
+    };
     if typed_attachments
         .iter()
         .any(|part| matches!(part, tinychannels_bus::ContentPart::VoiceNote { .. }))
@@ -240,7 +259,7 @@ async fn message_append_with_config(
             "typed attachments cannot be combined with legacy attachment markers".into(),
         ));
     }
-    if !typed_attachments.is_empty() {
+    if !typed_attachments.is_empty() && staged_refs.is_none() {
         request.message.content = crate::agent::attachments::parts::fold_into_message(
             &request.message.content,
             &typed_attachments,
@@ -351,7 +370,7 @@ async fn message_append_with_config(
         )
         .await
         .map_err(|error| ThreadsError::Message(format!("stage user attachments: {error}")))?;
-        if typed_media_count > 0 {
+        if typed_media_count > 0 && staged_refs.is_none() {
             let (clean_content, staged_files) = crate::agent::attachments::parse(&staged_content);
             if staged_files.len() != typed_media_count {
                 return Err(ThreadsError::Message(
@@ -383,6 +402,11 @@ async fn message_append_with_config(
     )
     .await
     .map_err(|err| ThreadsError::from_thread_scoped_store_error(&request.thread_id, err))?;
+    if let Some(staged_refs) = staged_refs {
+        crate::threads::attachments::consume_staged_parts(ctx, &request.thread_id, &staged_refs)
+            .await
+            .map_err(ThreadsError::Message)?;
+    }
     Ok(envelope(
         message_to_record(message),
         Some(counts([("num_messages", 1)])),

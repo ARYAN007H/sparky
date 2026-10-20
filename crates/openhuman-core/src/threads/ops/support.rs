@@ -183,13 +183,11 @@ pub(super) fn message_to_record(message: ConversationMessage) -> ConversationMes
 }
 
 pub(super) fn record_to_message(record: ConversationMessageRecord) -> ConversationMessage {
-    let mut extra_metadata = record.extra_metadata;
-    crate::threads::attachments::strip_private_metadata(&mut extra_metadata);
     ConversationMessage {
         id: record.id,
         content: record.content,
         message_type: record.message_type,
-        extra_metadata,
+        extra_metadata: record.extra_metadata,
         sender: record.sender,
         created_at: record.created_at,
     }
