@@ -6,7 +6,7 @@ use tempfile::TempDir;
 async fn cached_probe_serves_definitive_negative_results() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let tmp = TempDir::new().unwrap();
-    let mut config = Config {
+    let config = Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
@@ -22,7 +22,6 @@ async fn cached_probe_serves_definitive_negative_results() {
         )
         .expect("seed app-session token");
     let hit_count = std::sync::Arc::new(AtomicUsize::new(0));
-    let counter = hit_count.clone();
     // The core owns no hosted provider; the managed backend's readiness probe
     // is whatever the host registered. Register one that rejects the way the
     // backend does, and count how often the core actually asks it.
