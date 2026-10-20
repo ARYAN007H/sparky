@@ -27,7 +27,7 @@ use scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
 };
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
@@ -865,6 +865,12 @@ where
 
 /// A released TinySearch module calls the managed Gemini route and returns its
 /// grounded answer to the following model request through the host tool seam.
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    feature = "modules",
+    any(feature = "mcp", feature = "skills")
+))]
 #[test]
 fn managed_tinysearch_answer_reaches_followup_model_request() {
     run_on_agent_stack(
@@ -873,22 +879,40 @@ fn managed_tinysearch_answer_reaches_followup_model_request() {
     );
 }
 
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    feature = "modules",
+    any(feature = "mcp", feature = "skills")
+))]
 async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
     let _lock = env_lock();
-    let artifact = openhuman_core::modules::local_artifact("tinysearch")
-        .expect("the pinned TinySearch release must be staged on OPENHUMAN_MODULE_PATH");
-    assert!(
-        artifact.is_file(),
-        "TinySearch artifact missing: {artifact:?}"
-    );
     let pinned = openhuman_core::modules::registry::find("tinysearch")
         .expect("TinySearch is registered in the module asset registry");
     assert_eq!(pinned.version, "0.5.1", "use the pinned module release");
-    assert!(
-        std::env::var_os("OPENHUMAN_MODULE_SOURCE").is_none()
-            && std::env::var_os("OPENHUMAN_MODULE_SOURCE_DIR").is_none(),
-        "this integration test must load the pinned module artifact, not a linked/source override"
+    const HOST_KEY: &str = "ubuntu-24.04-x86_64";
+    let asset = pinned
+        .asset_for(HOST_KEY)
+        .expect("the pinned TinySearch release has its Linux x86_64 asset");
+    let bundle_root = PathBuf::from(
+        std::env::var_os("OPENHUMAN_BUNDLED_MODULES")
+            .expect("the pinned TinySearch archive must be staged as a bundled release"),
     );
+    let archive = bundle_root
+        .join(pinned.id)
+        .join(pinned.version)
+        .join(asset.host_key)
+        .join(asset.archive);
+    assert!(
+        archive.is_file(),
+        "the registry-pinned TinySearch archive must be present: {archive:?}"
+    );
+    let _bundle_guard = EnvVarGuard::set_to_path("OPENHUMAN_BUNDLED_MODULES", &bundle_root);
+    let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
+    let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
+    let _module_source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYSEARCH");
+    let module_cache = tempdir().expect("isolated module cache");
+    let _module_cache_guard = EnvVarGuard::set_to_path("XDG_CACHE_HOME", module_cache.path());
 
     const QUERY: &str = "What color is the fixture's named answer?";
     const ANSWER: &str = "The fixture's distinct grounded answer is cerulean.";
@@ -897,7 +921,7 @@ async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
         text_completion("I received the grounded answer and its source."),
     ]);
     let stack = boot_stack_with_config(
-        "[search]\nenabled = true\n\n[search.providers.gemini]\nenabled = true\nroute = \"managed\"\n\n[search.roles]\nanswer = [\"gemini\"]\n",
+        "[search]\nenabled = true\n\n[search.providers.gemini]\nenabled = true\nroute = \"managed\"\n\n[search.roles]\nanswer = [\"gemini\"]\n\n[modules]\nsource = \"release\"\nallow_download = false\n",
     )
     .await;
     let mut events = spawn_sse_collector(format!(
@@ -919,6 +943,28 @@ async fn managed_tinysearch_answer_reaches_followup_model_request_inner() {
         done.get("event").and_then(Value::as_str),
         Some("chat_done"),
         "the module-backed answer turn must finish: {done}"
+    );
+
+    let modules_response =
+        post_json_rpc(&stack.rpc_base, 8_234, "openhuman.modules_list", json!({})).await;
+    let modules_response = assert_no_jsonrpc_error(&modules_response, "modules_list after search");
+    let tinysearch = modules_response
+        .pointer("/result/modules")
+        .and_then(Value::as_array)
+        .and_then(|modules| {
+            modules
+                .iter()
+                .find(|module| module.get("id").and_then(Value::as_str) == Some("tinysearch"))
+        })
+        .unwrap_or_else(|| panic!("modules_list omitted TinySearch: {modules_response}"));
+    assert_eq!(
+        tinysearch.get("version").and_then(Value::as_str),
+        Some("0.5.1")
+    );
+    assert_eq!(tinysearch.get("state").and_then(Value::as_str), Some("ready"));
+    assert_eq!(
+        tinysearch.get("source").and_then(Value::as_str),
+        Some("release")
     );
 
     let managed_requests = with_captured_managed_gemini(|requests| requests.clone());
