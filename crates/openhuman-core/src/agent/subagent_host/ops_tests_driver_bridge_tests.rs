@@ -33,7 +33,7 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
     );
     assert_eq!(provider.captured.lock().len(), 1, "child provider must run");
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&parent.data.dispatch_ctx());
     let job = jobs.get(&job_id).expect("driver tool registered the job");
     assert_eq!(job.agent, "test");
@@ -386,7 +386,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     let message_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());
     let message_dispatch: crate::agent::tinyagents::tool_registration::RegisteredToolDispatch =
         std::sync::Arc::new(
-            tinyagents_orchestration::subagent::SubAgentMessageTool::new(jobs.clone())
+            tinyagents_harness_tools::subagents::SubAgentMessageTool::new(jobs.clone())
                 .with_tool_name("steer_subagent")
                 .with_argument_fields("task_id", "subagent_session_id", "message", "__request_id")
                 .with_lane_field("mode")
@@ -605,7 +605,7 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
         make_def_named_tools(&[]),
         "return the persisted result".into(),
         first_options,
-        tinyagents_orchestration::subagent::SubAgentJobRegistry::new(),
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry::new(),
         move |_target, result, effects| {
             let first_tx = first_tx.clone();
             Box::pin(async move {
@@ -638,7 +638,7 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
         make_def_named_tools(&[]),
         "return the persisted result".into(),
         replay_options,
-        tinyagents_orchestration::subagent::SubAgentJobRegistry::new(),
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry::new(),
         move |_target, result, effects| {
             let replay_tx = replay_tx.clone();
             Box::pin(async move {

@@ -430,7 +430,7 @@ async fn memory_live_context_dispatch_cancels_with_parent_without_creating_a_chi
         .with_cancellation(cancellation.clone())
         .into_tinyagents(RunConfig::new("memory-live-context-cancel"));
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&parent.data.dispatch_ctx());
     assert!(jobs.list().is_empty(), "fresh parent has no child jobs");
 

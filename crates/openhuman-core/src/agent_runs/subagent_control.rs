@@ -16,7 +16,7 @@
 
 use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
-use tinyagents_orchestration::subagent::SteerError;
+use tinyagents_orchestration::steering::SteerError;
 
 use crate::agent::orchestration::running_subagents::CancelledSubagent;
 use crate::agent::orchestration::{background_completions, running_subagents, subagent_sessions};

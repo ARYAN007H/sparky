@@ -108,7 +108,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         workspace_dir.clone(),
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
     let selected = crate::agent::orchestration::subagent_sessions::cancel_driver_job_by_task(
         &store,
@@ -218,7 +218,7 @@ pub(crate) fn stop_for_thread(
     if let Some(core_context) = ctx.resolved() {
         if let Ok(workspace_dir) = core_context.workspace_dir() {
             let jobs = crate::core::runtime::slot_for::<
-                tinyagents_orchestration::subagent::SubAgentJobRegistry,
+                tinyagents_harness_tools::subagents::SubAgentJobRegistry,
             >(ctx);
             let driver_stopped =
                 crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(

@@ -9,7 +9,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::agent_loop::phases::execute_tool_batch;
-    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
+    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_runtime::turn_driver::SharedToolSet;
 
     struct PausedModel {

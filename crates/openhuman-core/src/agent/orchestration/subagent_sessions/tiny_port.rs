@@ -21,7 +21,7 @@ pub(crate) struct OpenHumanTinySubagentSessionStore {
     checkpoint_dir: PathBuf,
     parent_session: String,
     parent_thread_id: Option<String>,
-    jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
+    jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
 }
 
 impl OpenHumanTinySubagentSessionStore {
@@ -41,7 +41,7 @@ impl OpenHumanTinySubagentSessionStore {
 
     pub(crate) fn with_jobs(
         mut self,
-        jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        jobs: tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     ) -> Self {
         self.jobs = Some(jobs);
         self

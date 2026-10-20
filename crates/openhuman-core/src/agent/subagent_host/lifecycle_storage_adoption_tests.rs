@@ -239,7 +239,7 @@ async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
         "finish".into(),
         "background",
         Some(completion),
-        Some(tinyagents_orchestration::subagent::SubAgentJobRegistry::default()),
+        Some(tinyagents_harness_tools::subagents::SubAgentJobRegistry::default()),
         None,
     )
     .await

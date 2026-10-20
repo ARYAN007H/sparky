@@ -134,7 +134,7 @@ impl SpawnAsyncSubagentTool {
             match subagent_sessions::find_reusable(&store, &selector) {
                 Ok(Some(session)) => {
                     let jobs = crate::core::runtime::slot_for::<
-                        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+                        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
                     >(&dispatch);
                     let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
                         &store,

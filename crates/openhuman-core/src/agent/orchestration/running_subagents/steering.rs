@@ -44,7 +44,7 @@ pub async fn steer(
     .await?;
     tracing::info!(
         task_id,
-        lane = tinyagents_orchestration::subagent::queue_lane_name(lane),
+        lane = tinyagents_orchestration::steering::queue_lane_name(lane),
         ?route,
         "[running_subagents] steered detached task"
     );
@@ -97,7 +97,7 @@ pub(crate) async fn steer_control(
     .await?;
     tracing::info!(
         task_id,
-        lane = tinyagents_orchestration::subagent::queue_lane_name(lane),
+        lane = tinyagents_orchestration::steering::queue_lane_name(lane),
         ?route,
         "[running_subagents] control-steered detached task"
     );

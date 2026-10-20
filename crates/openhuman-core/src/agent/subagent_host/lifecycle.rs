@@ -213,7 +213,7 @@ pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
     definition: crate::agent_registry::host_definition::AgentDefinition,
     input: String,
     options: SubagentRunOptions,
-    jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    jobs: tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     completion: impl Fn(
             String,
             Result<SubagentRunOutcome, String>,
@@ -239,7 +239,7 @@ async fn spawn_async_via_driver_tool_using_jobs(
     definition: crate::agent_registry::host_definition::AgentDefinition,
     input: String,
     options: SubagentRunOptions,
-    jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
+    jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
     completion: impl Fn(
             String,
             Result<SubagentRunOutcome, String>,
@@ -287,7 +287,7 @@ async fn invoke_async_spawn_driver_tool(
     options: SubagentRunOptions,
     mode: &str,
     completion: Option<HostCompletion>,
-    jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
+    jobs_override: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     invoke_driver_tool_with_request(
@@ -311,7 +311,7 @@ async fn invoke_driver_tool_with_request(
     input: String,
     mode: &str,
     completion: Option<HostCompletion>,
-    jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
+    jobs_override: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
