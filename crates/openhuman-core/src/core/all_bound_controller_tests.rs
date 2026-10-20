@@ -245,7 +245,7 @@ fn production_registry_binds_threads_upsert_to_its_declared_parser() {
     }
 
     for missing in ["id", "title", "created_at"] {
-        let mut params = serde_json::from_value(json!({
+        let mut params: Map<String, Value> = serde_json::from_value(json!({
             "id":"t1", "title":"Hello", "created_at":"2026-04-22T00:00:00Z"
         }))
         .expect("valid upsert params");
