@@ -206,7 +206,8 @@ pub(crate) async fn resume_interrupted_with(
             }
             outcome.started
         }
-        Err(error) => {
+        Err(LaunchError::SlotBusy(_)) => false,
+        Err(LaunchError::Other(error)) => {
             tracing::warn!(
                 code = error.code(),
                 "[memory:import] interrupted import could not resume; stopped"
@@ -226,6 +227,7 @@ pub async fn start(
     launch(ctx, config, Mode::Import, consent, None)
         .await
         .map(|outcome| outcome.state)
+        .map_err(LaunchError::into_error)
 }
 
 /// `memory_import_retry_failed`: stores again the items a finished import
@@ -237,6 +239,7 @@ pub async fn retry_failed(
     launch(ctx, config, Mode::Retry, true, None)
         .await
         .map(|outcome| outcome.state)
+        .map_err(LaunchError::into_error)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -251,6 +254,20 @@ struct LaunchOutcome {
     started: bool,
 }
 
+enum LaunchError {
+    SlotBusy(String),
+    Other(Error),
+}
+
+impl LaunchError {
+    fn into_error(self) -> Error {
+        match self {
+            Self::SlotBusy(reason) => Error::InvalidRequest(reason),
+            Self::Other(error) => error,
+        }
+    }
+}
+
 /// Claims the workspace, begins the Native run and transfers its slot guard
 /// into the context-carrying worker future.
 async fn launch(
@@ -259,9 +276,9 @@ async fn launch(
     mode: Mode,
     consent: bool,
     paused: Option<PauseCheck>,
-) -> Result<LaunchOutcome> {
+) -> std::result::Result<LaunchOutcome, LaunchError> {
     if mode == Mode::Import && !consent {
-        return Err(import_error(&ImportError::ConsentRequired));
+        return Err(LaunchError::Other(import_error(&ImportError::ConsentRequired)));
     }
     let workspace = config.workspace_dir.clone();
     let Some(guard) = run_slots::reserve(&IMPORT, &workspace, &[&BACKFILL, &MIGRATION]) else {
@@ -280,9 +297,9 @@ async fn launch(
         } else {
             format!("a conversation backfill is running; {action} once it finishes")
         };
-        return Err(Error::InvalidRequest(reason));
+        return Err(LaunchError::SlotBusy(reason));
     };
-    let bound = engine::resolve(config).engine()?;
+    let bound = engine::resolve(config).engine().map_err(LaunchError::Other)?;
     let driver = importer(config, bound.engine, consent, paused);
     let begin = {
         let driver = driver.clone();
@@ -298,8 +315,14 @@ async fn launch(
     };
     let (guard, begun) = match begin {
         Ok((guard, Ok(begun))) => (guard, begun),
-        Ok((_guard, Err(error))) => return Err(import_error(&error)),
-        Err(error) => return Err(Error::Engine(format!("import start failed: {error}"))),
+        Ok((_guard, Err(error))) => {
+            return Err(LaunchError::Other(import_error(&error)));
+        }
+        Err(error) => {
+            return Err(LaunchError::Other(Error::Engine(format!(
+                "import start failed: {error}"
+            ))));
+        }
     };
     let state = begun.state.clone();
     tracing::info!(
