@@ -383,29 +383,9 @@ fn format_async_subagent_accepted(
     payload_json: &str,
     fleet: &FleetToolSet,
 ) -> String {
-    // Steering and waiting are independent fleet capabilities: a parent can
-    // have `wait_subagent` without `steer_subagent` (or vice versa), so the
-    // guidance text is built from each independently rather than gated
-    // entirely on `can_wait()` — otherwise a wait-only parent is told to
-    // "send more input" through a tool it does not have.
-    let can_send = fleet.has("steer_subagent");
-    let can_wait = fleet.can_wait();
-    let guidance = match (can_send, can_wait) {
-        (true, true) => {
-            "Use the structured reference below to send more input, wait for completion, or perform a          short timeout tick to check status. If the user does not need the result now, continue          without blocking."
-        }
-        (true, false) => {
-            "Use the structured reference below to send more input if needed. You cannot and need not          wait or poll for it (no shell/sleep, no fake status checks); its result is delivered to          you automatically on a later turn. If the user does not need the result now, continue          without blocking."
-        }
-        (false, true) => {
-            "Use the structured reference below to wait for completion or perform a short timeout tick          to check status. If the user does not need the result now, continue without blocking."
-        }
-        (false, false) => {
-            "Its result is delivered to you automatically on a later turn — you cannot and need not          wait or poll for it (no shell/sleep, no fake status checks). Reply to the user now with          what you know, say the result is on its way, and continue. The structured reference          below lists the only follow-up tools you have for this worker."
-        }
-    };
+    let _ = fleet;
     format!(
-        "Accepted async sub-agent `{agent_id}`. {guidance}
+        "Accepted async sub-agent `{agent_id}`. Its result is delivered automatically. To continue or answer a clarification, call `spawn_subagent` again with the same task_key.
 
 [async_subagent_ref]
 {payload_json}
@@ -427,99 +407,18 @@ fn async_subagent_ref_payload(
     status: &str,
     fleet: &FleetToolSet,
 ) -> serde_json::Value {
-    let mut instructions = serde_json::Map::new();
-    let mut next_actions: Vec<String> = Vec::new();
-
-    if fleet.has("steer_subagent") {
-        instructions.insert(
-            "send_message".into(),
-            json!({
-                "tool": "steer_subagent",
-                "description": "Send additional instructions or context to this running async sub-agent.",
-                "arguments": {
-                    "subagent_session_id": subagent_session_id,
-                    "message": "<message>",
-                    "mode": "steer"
-                }
-            }),
-        );
-        next_actions.push("call steer_subagent to send more input".into());
-    }
-    if fleet.has("wait_subagent") {
-        instructions.insert(
-            "wait".into(),
-            json!({
-                "tool": "wait_subagent",
-                "description": "Block until the async sub-agent finishes, up to the timeout.",
-                "arguments": { "subagent_session_id": subagent_session_id, "timeout_secs": 120 }
-            }),
-        );
-        instructions.insert(
-            "timeout_tick".into(),
-            json!({
-                "tool": "wait_subagent",
-                "description": "Perform a short status tick without committing the parent to a long wait.",
-                "arguments": { "subagent_session_id": subagent_session_id, "timeout_secs": 1 }
-            }),
-        );
-        next_actions.push("call wait_subagent with timeout_secs to collect the result".into());
-        next_actions
-            .push("call wait_subagent with timeout_secs=1 as a timeout tick/status check".into());
-        let reminder = format!(
-            "Check async sub-agent {agent_id} status with wait_subagent using subagent_session_id {subagent_session_id}."
-        );
-        if fleet.has("wait") {
-            instructions.insert(
-                "delayed_tick".into(),
-                json!({
-                    "tool": "wait",
-                    "description": "Trigger a delayed callback before checking this async sub-agent again.",
-                    "arguments": { "duration_secs": 30, "message": reminder }
-                }),
-            );
+    let _ = fleet;
+    let instructions = json!({
+        "answer_or_resume": {
+            "tool": "spawn_subagent",
+            "description": "Continue this task or answer a clarification while preserving its context.",
+            "arguments": { "agent_id": agent_id, "task_key": subagent_session_id, "prompt": "<follow-up or user answer>" }
         }
-        if fleet.has("wait_loop") {
-            instructions.insert(
-                "delayed_loop".into(),
-                json!({
-                    "tool": "wait_loop",
-                    "description": "Trigger repeatable delayed callbacks while this async sub-agent is still relevant.",
-                    "arguments": {
-                        "duration_secs": 30,
-                        "message": reminder,
-                        "loop_key": subagent_session_id,
-                        "iteration": 1
-                    }
-                }),
-            );
-        }
-        if fleet.has("wait") || fleet.has("wait_loop") {
-            next_actions.push(
-                "call wait or wait_loop with the returned message to trigger a delayed status check".into(),
-            );
-        }
-    }
-    if fleet.has("continue_subagent") {
-        instructions.insert(
-            "answer_or_resume".into(),
-            json!({
-                "tool": "continue_subagent",
-                "description": "Answer this worker if it pauses on ask_user_clarification (awaiting_user), or resume it later with a follow-up that keeps its context.",
-                "arguments": { "subagent_session_id": subagent_session_id, "message": "<answer or follow-up>" }
-            }),
-        );
-        next_actions.push(
-            "call continue_subagent only if this worker reports awaiting_user, or to resume it with a follow-up".into(),
-        );
-    }
-    if fleet.has("list_subagents") {
-        next_actions.push("call list_subagents to re-enumerate your workers if this reference scrolls out of context".into());
-    }
-    next_actions.push(if fleet.can_wait() {
-        "continue without waiting when the current user reply does not depend on the result".into()
-    } else {
-        "continue now: the result is delivered to you automatically on a later turn; never poll for it".into()
     });
+    let next_actions = [
+        "reuse the same task_key to continue or answer a clarification".to_string(),
+        "continue without waiting; the result is delivered automatically".to_string(),
+    ];
 
     json!({
         "task_id": task_id,
