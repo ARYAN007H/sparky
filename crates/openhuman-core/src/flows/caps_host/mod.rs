@@ -16,14 +16,20 @@ pub(crate) mod tools;
 #[path = "binding_tests.rs"]
 mod binding_tests;
 
+#[cfg(test)]
 pub(crate) use agent::OpenHumanAgentRunner;
 pub(crate) use binding::{serve, CapsHostRegistration};
 pub(crate) use code::OpenHumanCode;
-pub(crate) use error::{CapsError, EngineError, Result};
-pub(crate) use http::{resolve_http_credential, OpenHumanHttp};
-pub(crate) use llm::{resolve_host_model, OpenHumanLlm};
+pub(crate) use error::{EngineError, Result};
+#[cfg(test)]
+pub(crate) use http::resolve_http_credential;
+pub(crate) use http::OpenHumanHttp;
+#[cfg(test)]
+pub(crate) use llm::resolve_host_model;
+pub(crate) use llm::OpenHumanLlm;
 pub(crate) use memory::OpenHumanMemory;
 pub(crate) use prompt::model_response_to_completion_value;
+#[cfg(test)]
 pub(crate) use service::CapsHostService;
 pub(crate) use tier::{
     close_audit, current_tier_policy, enforce_current_node_tier_gate, enforce_node_tier_gate,

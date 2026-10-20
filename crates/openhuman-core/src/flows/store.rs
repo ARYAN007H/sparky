@@ -7,6 +7,7 @@
 
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
+#[cfg(test)]
 use serde_json::Value;
 use std::path::PathBuf;
 use tinyflows_bus::catalog::{
