@@ -759,11 +759,7 @@ async fn channels_status_reflects_managed_dm_credential_e2e() {
 /// using the registry-pinned TinyChannels release staged by the standard Rust
 /// test runner. Telegram credential validation is local to the module and
 /// does not call the Bot API.
-#[cfg(all(
-    target_os = "linux",
-    target_arch = "x86_64",
-    feature = "modules"
-))]
+#[cfg(all(target_os = "linux", target_arch = "x86_64", feature = "modules"))]
 #[tokio::test]
 async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rpc_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -831,8 +827,14 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         &connect,
         "Telegram channels_connect fixture A",
     ));
-    assert_eq!(connected.get("status").and_then(Value::as_str), Some("connected"));
-    assert_eq!(connected.get("restart_required").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        connected.get("status").and_then(Value::as_str),
+        Some("connected")
+    );
+    assert_eq!(
+        connected.get("restart_required").and_then(Value::as_bool),
+        Some(true)
+    );
 
     let status_a = channel_status_entry(
         &post_json_rpc(
@@ -846,8 +848,14 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         "telegram",
         "bot_token",
     );
-    assert_eq!(status_a.get("connected").and_then(Value::as_bool), Some(true));
-    assert_eq!(status_a.get("has_credentials").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        status_a.get("connected").and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        status_a.get("has_credentials").and_then(Value::as_bool),
+        Some(true)
+    );
 
     let rejected = post_json_rpc(
         &rpc_base,
@@ -876,8 +884,14 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         "telegram",
         "bot_token",
     );
-    assert_eq!(preserved.get("connected").and_then(Value::as_bool), Some(true));
-    assert_eq!(preserved.get("has_credentials").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        preserved.get("connected").and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        preserved.get("has_credentials").and_then(Value::as_bool),
+        Some(true)
+    );
 
     let disconnect = post_json_rpc(
         &rpc_base,
@@ -890,7 +904,10 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         &disconnect,
         "Telegram channels_disconnect",
     ));
-    assert_eq!(disconnected.get("disconnected").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        disconnected.get("disconnected").and_then(Value::as_bool),
+        Some(true)
+    );
     let status_disconnected = channel_status_entry(
         &post_json_rpc(
             &rpc_base,
@@ -903,8 +920,18 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         "telegram",
         "bot_token",
     );
-    assert_eq!(status_disconnected.get("connected").and_then(Value::as_bool), Some(false));
-    assert_eq!(status_disconnected.get("has_credentials").and_then(Value::as_bool), Some(false));
+    assert_eq!(
+        status_disconnected
+            .get("connected")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        status_disconnected
+            .get("has_credentials")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
 
     let reconnect = post_json_rpc(
         &rpc_base,
@@ -921,7 +948,10 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         &reconnect,
         "Telegram channels_connect fixture B",
     ));
-    assert_eq!(reconnected.get("status").and_then(Value::as_str), Some("connected"));
+    assert_eq!(
+        reconnected.get("status").and_then(Value::as_str),
+        Some("connected")
+    );
     let status_b = channel_status_entry(
         &post_json_rpc(
             &rpc_base,
@@ -934,12 +964,19 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         "telegram",
         "bot_token",
     );
-    assert_eq!(status_b.get("connected").and_then(Value::as_bool), Some(true));
-    assert_eq!(status_b.get("has_credentials").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        status_b.get("connected").and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        status_b.get("has_credentials").and_then(Value::as_bool),
+        Some(true)
+    );
 
     let modules_response =
         post_json_rpc(&rpc_base, 7159, "openhuman.modules_list", json!({})).await;
-    let modules_response = assert_no_jsonrpc_error(&modules_response, "modules_list after Telegram");
+    let modules_response =
+        assert_no_jsonrpc_error(&modules_response, "modules_list after Telegram");
     let tinychannels = modules_response
         .get("modules")
         .or_else(|| modules_response.pointer("/result/modules"))
@@ -950,9 +987,18 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
                 .find(|module| module.get("id").and_then(Value::as_str) == Some("tinychannels"))
         })
         .unwrap_or_else(|| panic!("modules_list omitted TinyChannels: {modules_response}"));
-    assert_eq!(tinychannels.get("version").and_then(Value::as_str), Some("0.1.36"));
-    assert_eq!(tinychannels.get("state").and_then(Value::as_str), Some("ready"));
-    assert_eq!(tinychannels.get("source").and_then(Value::as_str), Some("release"));
+    assert_eq!(
+        tinychannels.get("version").and_then(Value::as_str),
+        Some("0.1.36")
+    );
+    assert_eq!(
+        tinychannels.get("state").and_then(Value::as_str),
+        Some("ready")
+    );
+    assert_eq!(
+        tinychannels.get("source").and_then(Value::as_str),
+        Some("release")
+    );
 
     mock_join.abort();
     rpc_join.abort();
