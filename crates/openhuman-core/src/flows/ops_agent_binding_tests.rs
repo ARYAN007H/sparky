@@ -417,13 +417,14 @@ async fn agent_ref_gate_reads_the_registry_of_the_explicit_context() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
+    let graph_json = serde_json::to_value(&g).unwrap();
 
     // Both calls run scoped to tenant B, so an ambient read would answer B's
     // registry for A's call.
     let (for_a, for_b) = CoreContext::scope(core_b, async {
         (
-            crate::flows::host_gates::validate_agent_refs(&ctx_a, &config_a, &g).await,
-            crate::flows::host_gates::validate_agent_refs(&ctx_b, &config_b, &g).await,
+            crate::flows::host_gates::validate_agent_refs(&ctx_a, &config_a, &graph_json).await,
+            crate::flows::host_gates::validate_agent_refs(&ctx_b, &config_b, &graph_json).await,
         )
     })
     .await;
