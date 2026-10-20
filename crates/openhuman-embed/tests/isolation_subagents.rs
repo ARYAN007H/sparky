@@ -32,7 +32,7 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
                 .expect("runtime builds");
 
             // ── reserved ids ──
-            for reserved in ["orchestrator", "planner", "summarizer"] {
+            for reserved in ["orchestrator", "vision_agent", "summarizer"] {
                 let refused = runtime.agent(AgentSpec::new(reserved));
                 assert!(
                     matches!(refused, Err(AgentError::ReservedId(ref id)) if id == reserved),
@@ -40,7 +40,7 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
                 );
             }
             let refused = runtime.agent(
-                AgentSpec::new("lead-x").subagents([("critic", AgentDefinitionSpec::new())]),
+                AgentSpec::new("lead-x").subagents([("vision_agent", AgentDefinitionSpec::new())]),
             );
             assert!(matches!(refused, Err(AgentError::ReservedId(_))));
 

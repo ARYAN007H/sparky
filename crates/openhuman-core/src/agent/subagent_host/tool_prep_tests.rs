@@ -61,7 +61,9 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
         "plan",
         "manage_tasks",
         "create_image",
+        #[cfg(feature = "flows")]
         "build_workflow",
+        #[cfg(feature = "flows")]
         "discover_workflows",
         // `make_presentation` is `presentation_agent`'s `delegate_name`; the agent —
         // and therefore this delegate tool — is compiled out with the
@@ -70,7 +72,7 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
         "make_presentation",
     ] {
         assert!(
-            super::is_subagent_spawn_tool_with_registry(delegate, Some(&registry)),
+            super::is_registered_delegate_alias(delegate, Some(&registry)),
             "`{delegate}` is a synthesised delegation tool and must be \
              stripped from sub-agent tool surfaces"
         );
@@ -78,7 +80,7 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
     // Ordinary worker tools stay visible.
     for plain in ["shell", "file_read", "web_fetch", "todo"] {
         assert!(
-            !super::is_subagent_spawn_tool_with_registry(plain, Some(&registry)),
+            !super::is_registered_delegate_alias(plain, Some(&registry)),
             "`{plain}` must not be classified as a spawn tool"
         );
     }
