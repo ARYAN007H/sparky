@@ -46,6 +46,7 @@ pub(crate) async fn process_channel_runtime_message(
         authenticated_relay,
         prepared_inbound,
         imported_history,
+        progressive_target,
     } = runtime_msg;
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
@@ -88,11 +89,15 @@ pub(crate) async fn process_channel_runtime_message(
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     crate::channels::host::voice::record_inbound_envelope(&envelope);
-    let native_target = match super::progressive::native_target(&ctx, &envelope) {
-        Ok(target) => target.map(Arc::new),
-        Err(error) => {
-            tracing::error!("[dispatch] native channel target is invalid: {error}");
-            return;
+    let native_target = if let Some(target) = progressive_target {
+        Some(target)
+    } else {
+        match super::progressive::native_target(&ctx, &envelope) {
+            Ok(target) => target.map(Arc::new),
+            Err(error) => {
+                tracing::error!("[dispatch] native channel target is invalid: {error}");
+                return;
+            }
         }
     };
 

@@ -34,6 +34,9 @@ pub(crate) struct RuntimeChannelMessage {
     pub(crate) authenticated_relay: bool,
     pub(crate) prepared_inbound: Option<tinychannels_bus::module_inbound::PreparedChannelInbound>,
     pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
+    /// Trusted per-turn callback target installed by a hosted relay. Native
+    /// configured channels resolve their target from the prepared envelope.
+    pub(crate) progressive_target: Option<Arc<super::progressive::NativeProgressiveTarget>>,
 }
 
 impl RuntimeChannelMessage {
@@ -47,6 +50,7 @@ impl RuntimeChannelMessage {
             authenticated_relay: false,
             prepared_inbound: None,
             imported_history: Vec::new(),
+            progressive_target: None,
         }
     }
 
@@ -61,6 +65,7 @@ impl RuntimeChannelMessage {
             authenticated_relay: delivery.delivered_via_authenticated_relay,
             prepared_inbound: None,
             imported_history: Vec::new(),
+            progressive_target: None,
         }
     }
 }
@@ -73,6 +78,7 @@ impl From<ChannelMessage> for RuntimeChannelMessage {
             authenticated_relay: false,
             prepared_inbound: None,
             imported_history: Vec::new(),
+            progressive_target: None,
         }
     }
 }

@@ -10,9 +10,18 @@ use tokio::sync::mpsc;
 /// queued follow-up gets a fresh module handle after it wins admission.
 #[derive(Clone)]
 pub(crate) struct NativeProgressiveTarget {
-    object: tinybus::module::ModuleObjectClient,
+    kind: ProgressiveTargetKind,
     channel: tinychannels_bus::channel::ChannelRef,
     conversation: tinychannels_bus::channel::ConversationRef,
+}
+
+#[derive(Clone)]
+enum ProgressiveTargetKind {
+    Configured(tinybus::module::ModuleObjectClient),
+    HostedRelay {
+        client: tinybus::module::ModuleClient,
+        channel: std::sync::Arc<super::super::super::providers::relay::channel::RelayChannel>,
+    },
 }
 
 impl NativeProgressiveTarget {
@@ -20,16 +29,57 @@ impl NativeProgressiveTarget {
         &self,
         turn_id: &str,
     ) -> anyhow::Result<std::sync::Arc<NativeProgressiveReply>> {
-        Ok(std::sync::Arc::new(
-            NativeProgressiveReply::open(
-                self.object.clone(),
-                self.channel.clone(),
-                self.conversation.clone(),
-                turn_id.to_owned(),
-                std::time::Duration::from_secs(3_660),
-            )
-            .await?,
-        ))
+        let lifetime = std::time::Duration::from_secs(3_660);
+        let reply = match &self.kind {
+            ProgressiveTargetKind::Configured(object) => {
+                NativeProgressiveReply::open(
+                    object.clone(),
+                    self.channel.clone(),
+                    self.conversation.clone(),
+                    turn_id.to_owned(),
+                    lifetime,
+                )
+                .await?
+            }
+            ProgressiveTargetKind::HostedRelay { client, channel } => {
+                let callback = crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
+                    Arc::clone(channel),
+                    self.channel.clone(),
+                    self.conversation.clone(),
+                    turn_id.to_owned(),
+                );
+                let runtime = crate::modules::channel_runtime::ChannelRuntimeLease::open(
+                    client.clone(),
+                    callback,
+                )
+                .await?;
+                NativeProgressiveReply::open_hosted(
+                    runtime,
+                    self.channel.clone(),
+                    self.conversation.clone(),
+                    turn_id.to_owned(),
+                    lifetime,
+                )
+                .await?
+            }
+        };
+        Ok(std::sync::Arc::new(reply))
+    }
+}
+
+pub(crate) fn hosted_relay_target(
+    config: &crate::config::Config,
+    channel: std::sync::Arc<super::super::super::providers::relay::channel::RelayChannel>,
+    channel_ref: tinychannels_bus::channel::ChannelRef,
+    conversation: tinychannels_bus::channel::ConversationRef,
+) -> NativeProgressiveTarget {
+    NativeProgressiveTarget {
+        kind: ProgressiveTargetKind::HostedRelay {
+            client: crate::modules::client(config.clone()),
+            channel,
+        },
+        channel: channel_ref,
+        conversation,
     }
 }
 
@@ -53,7 +103,7 @@ pub(crate) fn native_target(
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("native channel account is not configured"))?;
     Ok(Some(NativeProgressiveTarget {
-        object,
+        kind: ProgressiveTargetKind::Configured(object),
         channel: envelope.channel.clone(),
         conversation: envelope.conversation.clone(),
     }))
