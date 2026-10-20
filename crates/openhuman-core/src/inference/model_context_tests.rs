@@ -83,16 +83,6 @@ fn model_supports_vision_combines_tier_map_and_registry() {
         vision: true,
         ..Default::default()
     }];
-    // `reasoning-v1` and `vision-v1` are the vision-capable managed tiers; the
-    // rest are not.
-    assert!(model_supports_vision("reasoning-v1", &config));
-    assert!(model_supports_vision("hint:reasoning", &config));
-    assert!(model_supports_vision("vision-v1", &config));
-    assert!(model_supports_vision("hint:vision", &config));
-    assert!(!model_supports_vision("chat-v1", &config));
-    assert!(!model_supports_vision("hint:chat", &config));
-    assert!(!model_supports_vision("burst-v1", &config));
-    assert!(!model_supports_vision("hint:burst", &config));
     // BYOK model flagged in the registry is vision-capable.
     assert!(model_supports_vision("my-llava", &config));
     // Unlisted custom model is not.
@@ -119,81 +109,9 @@ fn o1_o3_segment_match_does_not_overmatch() {
     assert_eq!(context_window_for_model("octo3thing"), None);
 }
 
-/// Pins the complete managed-tier vision map — every tier constant and every
-/// `hint:` alias `oh_tier_supports_vision` accepts.
-///
-/// The map's capability set is documented in three places (the
-/// `inference.resolve_model` handler comment, the `oh_tier_supports_vision`
-/// doc, and the [`model_supports_vision`] doc) and those comments drifted out
-/// of sync with it once already (#6075: they claimed the map was "currently all
-/// `false`" long after two tiers returned `true`). Asserting every arm — the
-/// `false` ones included — means a future arm flip fails here and forces the
-/// docs to be revisited, instead of only the two `true` arms being covered.
 #[test]
-fn oh_tier_vision_map_is_exhaustively_pinned() {
-    use crate::inference::provider::factory::oh_tier_supports_vision;
-
-    for tier in [
-        // The managed default (DeepSeek V4 Flash) takes images.
-        "openrouter/deepseek/deepseek-v4-flash",
-        "reasoning-v1",
-        "hint:reasoning",
-        "vision-v1",
-        "hint:vision",
-        // The dedicated OpenRouter passthrough models the media agents
-        // (`vision_agent`, `image_agent`, `video_agent`) are pinned to now
-        // that `hint:vision` / `vision-v1` is deprecated (regression R4).
-        crate::config::MODEL_MEDIA_UNDERSTANDING,
-        crate::config::MODEL_IMAGE_GENERATION_AGENT,
-        crate::config::MODEL_VIDEO_GENERATION_AGENT,
-    ] {
-        assert!(
-            oh_tier_supports_vision(tier),
-            "{tier} must be reported vision-capable"
-        );
-    }
-
-    for tier in [
-        "chat-v1",
-        "hint:chat",
-        "reasoning-quick-v1",
-        "agentic-v1",
-        "hint:agentic",
-        "burst-v1",
-        "hint:burst",
-        "coding-v1",
-        "hint:coding",
-        "summarization-v1",
-        "hint:summarization",
-        // Anything the map does not name at all falls through to `false`.
-        "gpt-5",
-        "",
-    ] {
-        assert!(
-            !oh_tier_supports_vision(tier),
-            "{tier} must not be reported vision-capable"
-        );
-    }
-}
-
-/// R4 regression: the media agents' new `exact` model pin
-/// (`openrouter/qwen/qwen3.5-flash-02-23`, replacing the deprecated `hint:vision`)
-/// must be reported vision-capable through both the tier-map gate and the
-/// combined `model_supports_vision` facade — the two call sites
-/// `dispatch.rs:256` and `runner.rs:1536` actually gate image/video
-/// forwarding on.
-#[test]
-fn media_agent_pinned_model_is_vision_capable() {
-    use crate::config::{Config, MODEL_MEDIA_UNDERSTANDING};
-    use crate::inference::provider::factory::oh_tier_supports_vision;
-
-    assert!(
-        oh_tier_supports_vision(MODEL_MEDIA_UNDERSTANDING),
-        "{MODEL_MEDIA_UNDERSTANDING} must be reported vision-capable"
-    );
-    let config = Config::default();
-    assert!(
-        model_supports_vision(MODEL_MEDIA_UNDERSTANDING, &config),
-        "{MODEL_MEDIA_UNDERSTANDING} must be vision-capable through the combined facade too"
-    );
+fn managed_vision_capability_is_absent_without_provider_policy() {
+    let config = crate::config::Config::default();
+    assert!(!model_supports_vision("hint:reasoning", &config));
+    assert!(!model_supports_vision("openrouter/qwen/qwen3.5-flash-02-23", &config));
 }
