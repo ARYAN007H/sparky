@@ -19,18 +19,9 @@
  */
 import type { ChatErrorCopyParams } from '../lib/chatErrorCopy';
 import type {
-  ArtifactKind as ArtifactKindWire,
-  ArtifactFailedPayload,
-  ArtifactPendingPayload,
-  ArtifactReadyPayload,
   ChatSuggestion,
   ContentPart,
   OutboundContentPart,
-  QueueMode as QueueModeWire,
-  RunMode as RunModeWire,
-  ThreadGoal as ThreadGoalWire,
-  TodoItem as TodoItemWire,
-  TurnCitation as TurnCitationWire,
   WebChannelEvent,
   WebGuardrailPayload,
   WebGuardrailReason,
@@ -40,6 +31,17 @@ import type {
   WebTurnTimingPayload,
   WebTurnUsagePayload,
 } from './chatWire.generated';
+import type {
+  ArtifactFailedPayload,
+  ArtifactKind as ArtifactKindWire,
+  ArtifactPendingPayload,
+  ArtifactReadyPayload,
+  QueueMode as QueueModeWire,
+  RunMode as RunModeWire,
+  ThreadGoal as ThreadGoalWire,
+  TodoItem as TodoItemWire,
+  TurnCitation as TurnCitationWire,
+} from '../types/threadWire.generated';
 
 export type { ContentPart, OutboundContentPart, WebChannelEvent };
 export type QueueMode = QueueModeWire;
