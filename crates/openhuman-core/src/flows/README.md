@@ -86,8 +86,8 @@ back as a `{ code: "version_conflict", ... }` error the UI can offer to reload.
 Every graph change is kept as a revision (`flows_get_history`,
 `flows_rollback`).
 
-Drafts are separate, non-live working copies stored as files under
-`<workspace>/flows/drafts/` ([`draft_store.rs`](./draft_store.rs), [`ops/drafts.rs`](./ops/drafts.rs)). Promoting a
+Drafts are separate, non-live working copies owned by the TinyFlows Catalog
+service ([`draft_store.rs`](./draft_store.rs), [`ops/drafts.rs`](./ops/drafts.rs)). Promoting a
 draft runs the same create/update gates as a normal save.
 
 ### Enabling and triggers
@@ -229,9 +229,8 @@ The catalog (`store.rs`), drafts (`draft_store.rs`), run rows, per-flow state,
 and checkpoints are owned by TinyFlows' module services and the document port.
 OpenHuman registers a scope-bound CatalogStorage callback per acting storage
 scope and retains its stable address with each live or approval-parked run.
-There is one storage path whatever the storage URL says: the installed backend,
-else a SQLite document database of the catalog's own
-(`<workspace>/flows/catalog.db`). The files TinyFlows used to write
+There is one storage path: the installed host storage backend, which defaults
+to local SQLite for desktop use. The files TinyFlows used to write
 (`flows/flows.db`, `flows/drafts/`, `flows/checkpoints.db`) are imported
 read-only once, at boot for an installed backend (`storage::import::tinyflows`)
 and on first use otherwise, and are never written again. When the scope cannot

@@ -145,7 +145,7 @@ fn a_flow_description_is_always_derived_from_its_graph_shape() {
 
 // ── Against a real store ──────────────────────────────────────────────────
 //
-// The mapping tests above never touch `flows.db`. These do, because the
+// The mapping tests above never touch Catalog storage. These do, because the
 // interesting failure is not the mapping — it is `flow_entries` reading the
 // wrong database, or silently swallowing a real one. A unit test over
 // `entry_for` would pass in both cases.

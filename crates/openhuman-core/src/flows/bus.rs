@@ -16,8 +16,8 @@ mod run_digest;
 mod trigger;
 
 pub use run_digest::FlowRunDigestSubscriber;
-pub use trigger::FlowTriggerSubscriber;
 pub(crate) use trigger::describe_trigger;
+pub use trigger::FlowTriggerSubscriber;
 
 // Private helpers and shared imports the colocated tests reach through
 // `use super::*`.

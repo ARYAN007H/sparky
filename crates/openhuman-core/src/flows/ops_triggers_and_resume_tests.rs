@@ -253,14 +253,20 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
     let original_job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
         .unwrap()
         .expect("paused schedule job remains registered");
-    assert!(!original_job.enabled, "precondition: schedule job is paused");
+    assert!(
+        !original_job.enabled,
+        "precondition: schedule job is paused"
+    );
 
     let mut graph = schedule_trigger_graph("0 9 * * *");
     graph["nodes"][0]["config"]["inputs"] = json!({"team": "platform"});
     let updated = flows_update(&config, &created.value.id, None, Some(graph), None, None)
         .await
         .unwrap();
-    assert!(updated.value.enabled, "the flow remains enabled during the edit");
+    assert!(
+        updated.value.enabled,
+        "the flow remains enabled during the edit"
+    );
     assert_eq!(
         updated.value.graph.trigger().unwrap().config["inputs"]["team"],
         "platform",
@@ -270,8 +276,14 @@ async fn flows_update_does_not_rebind_schedule_for_pinned_input_changes() {
     let job = crate::cron::find_flow_schedule_job(&config, &created.value.id)
         .unwrap()
         .expect("schedule job remains bound after input-only edit");
-    assert_eq!(job.id, original_job.id, "input edits must preserve the binding");
-    assert!(!job.enabled, "input-only edits must preserve a paused schedule job");
+    assert_eq!(
+        job.id, original_job.id,
+        "input edits must preserve the binding"
+    );
+    assert!(
+        !job.enabled,
+        "input-only edits must preserve a paused schedule job"
+    );
     assert_eq!(job.expression, original_job.expression);
 }
 

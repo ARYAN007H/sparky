@@ -28,7 +28,10 @@ async fn portability_proxy_describes_bindings_and_returns_pinned_inputs() {
 
     let details = describe_trigger(&config, &schedule_flow).unwrap();
     assert_eq!(details.kind.as_deref(), Some("schedule"));
-    assert!(details.schedule.is_some(), "schedule is returned as a typed value");
+    assert!(
+        details.schedule.is_some(),
+        "schedule is returned as a typed value"
+    );
     let inputs = trigger::pinned_trigger_inputs(&config, &schedule_flow).unwrap();
     assert_eq!(inputs["repo"], json!("acme/api"));
     assert_eq!(inputs["depth"], json!(3));
@@ -42,15 +45,14 @@ async fn portability_proxy_describes_bindings_and_returns_pinned_inputs() {
             "trigger_slug": "GMAIL_NEW_GMAIL_MESSAGE"
         }),
     );
-    assert!(trigger::matches_app_event(
-        &config,
-        &event_flow,
-        "Gmail",
-        "gmail_new_gmail_message"
-    )
-    .unwrap());
-    assert!(!trigger::matches_app_event(&config, &event_flow, "slack", "GMAIL_NEW_GMAIL_MESSAGE")
-        .unwrap());
+    assert!(
+        trigger::matches_app_event(&config, &event_flow, "Gmail", "gmail_new_gmail_message")
+            .unwrap()
+    );
+    assert!(
+        !trigger::matches_app_event(&config, &event_flow, "slack", "GMAIL_NEW_GMAIL_MESSAGE")
+            .unwrap()
+    );
 
     let malformed = flow_with_trigger_config(
         "malformed-flow",

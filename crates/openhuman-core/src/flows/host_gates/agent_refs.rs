@@ -7,7 +7,7 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 // real agent, not the runtime's `RegistryFallback` "unknown agent_ref" case
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// `run_via_registry_fallback` (`tinyflows/caps.rs`) hard-errors mid-run with
+// `run_via_registry_fallback` (`flows/caps_host/agent.rs`) hard-errors mid-run with
 // "unknown agent_ref '…'" the moment an `agent` node's `config.agent_ref`
 // doesn't resolve to either a harness `AgentDefinition` or a custom agent
 // registry entry. Today that is the FIRST time an author finds out — the
@@ -25,7 +25,7 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 
 /// Rejects an `agent` node whose `config.agent_ref` would hit the runtime's
 /// `RegistryFallback` "unknown agent_ref" hard error mid-run
-/// (`run_via_registry_fallback` in `tinyflows/caps.rs`) — a real ref is one
+/// (`run_via_registry_fallback` in `flows/caps_host/agent.rs`) — a real ref is one
 /// that resolves via [`crate::flows::agent_route::route_for_agent_ref`]
 /// to a harness [`AgentDefinition`](crate::agent_registry::host_definition::AgentDefinition)
 /// (`AgentRoute::Harness`), OR — when it routes to `AgentRoute::RegistryFallback`

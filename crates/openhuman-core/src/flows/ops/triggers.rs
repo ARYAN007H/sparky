@@ -92,7 +92,9 @@ pub(super) fn bind_trigger(config: &Config, flow: &Flow) {
     match details.kind.as_deref() {
         Some("schedule") => match details.schedule {
             Some(schedule) => bind_schedule_trigger(config, flow, schedule),
-            None => tracing::warn!(target: "flows", flow_id = %flow.id, "[flows] schedule trigger description omitted its schedule"),
+            None => {
+                tracing::warn!(target: "flows", flow_id = %flow.id, "[flows] schedule trigger description omitted its schedule")
+            }
         },
         Some("webhook") => log_webhook_trigger_deferred(flow, true),
         _ => {
@@ -245,7 +247,9 @@ async fn reconcile_schedule_triggers_in_scope(config: &Config) -> Result<(), Str
                 }
             }
             Ok(_) => {}
-            Err(error) => tracing::warn!(target: "flows", flow_id = %flow.id, %error, "[flows] failed to describe trigger during boot reconcile"),
+            Err(error) => {
+                tracing::warn!(target: "flows", flow_id = %flow.id, %error, "[flows] failed to describe trigger during boot reconcile")
+            }
         }
     }
     tracing::debug!(target: "flows", scanned = flows.len(), reconciled, skipped, "[flows] boot reconciliation of schedule-trigger cron jobs complete");
