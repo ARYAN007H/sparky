@@ -113,13 +113,20 @@ describe('threadSlice synchronous reducers', () => {
         sourceEventId: null,
         sourceTimestamp: null,
         channel: { id: 'telegram', accountId: 'bot-1' },
-        conversation: { kind: 'group', id: 'room-1' },
+        conversation: {
+          kind: 'group',
+          id: 'room-1',
+          parentId: null,
+          scopeId: null,
+          threadId: null,
+          topicId: null,
+        },
         type: 'reaction_added',
         messageId: 'provider-message-42',
         actor: { id: 'alice', altIds: [], name: null, isBot: false, roles: [] },
         reaction: { value: '🔥', customEmojiId: null },
       },
-    } as Parameters<typeof applyChannelEvent>[0];
+    } as const satisfies Parameters<typeof applyChannelEvent>[0];
     store.dispatch(applyChannelEvent(event));
 
     expect(
