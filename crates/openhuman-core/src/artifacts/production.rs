@@ -119,14 +119,13 @@ impl Production {
         )
         .await?;
 
-        let (artifacts, file_store) =
-            super::tiny_store::artifacts_service_with_file_store(
-                workspace_dir,
-                files.clone(),
-                None,
-                chat,
-                ctx,
-            );
+        let (artifacts, file_store) = super::tiny_store::artifacts_service_with_file_store(
+            workspace_dir,
+            files.clone(),
+            None,
+            chat,
+            ctx,
+        );
         let mut production = Self {
             artifacts,
             workspace_dir: workspace_dir.to_path_buf(),
