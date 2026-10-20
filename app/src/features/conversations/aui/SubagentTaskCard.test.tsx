@@ -84,12 +84,19 @@ describe('SubagentTaskCard', () => {
     );
   });
 
-  it('keeps a completed task result without obsolete isolation metadata', () => {
-    const legacyFields = Object.fromEntries([
-      [["work", "tree", "Path"].join(''), ['/repo/.claude', ['work', 'trees'].join(''), 'worker'].join('/')],
-      ['changedFiles', ['notes.md']],
-      ['isDirty', true],
-    ]);
+  it('keeps completed output and ignores legacy worktree fields', () => {
+    const legacyActivity: SubagentActivity & {
+      worktreePath: string;
+      changedFiles: string[];
+      isDirty: boolean;
+    } = {
+      ...activity,
+      status: 'success',
+      output: 'Research is complete.',
+      worktreePath: '/repo/.claude/worktrees/worker',
+      changedFiles: ['notes.md'],
+      isDirty: true,
+    };
     render(
       <SubagentTaskCard
         type="tool-call"
@@ -99,11 +106,7 @@ describe('SubagentTaskCard', () => {
         argsText="{}"
         result={{
           status: 'complete',
-          activity: Object.assign({
-            ...activity,
-            status: 'success',
-            output: 'Research is complete.',
-          }, legacyFields),
+          activity: legacyActivity,
         } as never}
         status={{ type: 'complete' }}
         addResult={() => {}}
@@ -114,7 +117,7 @@ describe('SubagentTaskCard', () => {
 
     expect(screen.getByTestId('assistant-ui-subagent-call')).toHaveAttribute('data-status', 'success');
     expect(screen.getByText('Research is complete.')).toBeInTheDocument();
-    expect(screen.queryByTestId(['work', 'tree', '-actions'].join(''))).toBeNull();
+    expect(screen.queryByTestId('worktree-actions')).toBeNull();
     expect(screen.queryByText(/worker/)).toBeNull();
   });
 
