@@ -34,7 +34,9 @@ pub(crate) fn wrap(
         .map(|p| p.modalities)
         .unwrap_or_default();
     if provider == "openhuman" || provider == "managed" {
-        profile.modalities.image_in = crate::inference::registry::provider_model_supports_vision(
+        let resolved_context = ctx.resolved();
+        profile.modalities.image_in = crate::inference::registry::provider_model_supports_vision_for(
+            resolved_context.as_deref().map(crate::core::runtime::CoreContext::extensions),
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
             model,
         );
