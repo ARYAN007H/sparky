@@ -145,17 +145,9 @@ async fn flows_update_inner(
         }
     };
     let forced_automatic_disarm = disarm_automatic;
-    // B29 Rule 1 analogue: disarm every manual/none → automatic trigger
-    // transition, unconditionally. `now_auto` is safe to compute here (it
-    // only depends on `graph`, THIS call's own incoming graph — never
-    // stale). The "was it automatic before" half of the transition,
-    // however, is NOT decided here: R-m2 found that gating on the
-    // ops-level `existing.graph` read let a concurrent write race this
-    // call and slip an automatic-trigger graph through with `enabled: true`
-    // — `existing` can be arbitrarily stale by the time
-    // `store::update_flow_graph` actually performs its guarded write. That
-    // decision now lives inside `update_flow_graph`, computed against the
-    // row it just re-read there (see its doc comment).
+    // Catalog.PutWorkflow owns the automatic-trigger transition rule. It
+    // evaluates the new graph and fresh persisted row in the module before
+    // writing, and reports the result through `born_disabled`.
     tracing::debug!(
         target: "flows",
         flow_id = %id,
@@ -171,12 +163,8 @@ async fn flows_update_inner(
         require_approval = new_require_approval,
         "[flows] flows_update: persisting changes"
     );
-    // The auto-disarm decision (both the unconditional manual→automatic
-    // transition and `disarm_automatic`'s forced-remote-authoring variant)
-    // is made INSIDE `update_flow_graph`, against the row it re-reads right
-    // before its guarded UPDATE — see R-m2 above and that function's doc
-    // comment. `enabled_override: None` here means "no explicit force from
-    // this caller"; the disarm, if any, still applies on top of that.
+    // The module computes automatic-trigger disarm against its freshly read
+    // row; the explicit request flag is reserved for remote-authoring flows.
     let updated = store::update_flow_graph(
         config,
         id,
