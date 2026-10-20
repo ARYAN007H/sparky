@@ -402,8 +402,9 @@ mod fixture;
 pub(crate) use imp::serve_pair_after_first;
 #[cfg(feature = "modules")]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, portability_proxy, proxy,
-    run_proxy, runs_proxy, serve, serve_pair, serve_registered, unserve,
+    authoring_proxy, catalog_proxy, catalog_proxy_for_migration, copilot_invoke_proxy,
+    copilot_proxy, portability_proxy, proxy, run_proxy, runs_proxy, serve, serve_pair,
+    serve_registered, unserve,
 };
 
 #[cfg(not(feature = "modules"))]
@@ -437,6 +438,12 @@ mod imp {
     }
 
     pub(crate) async fn catalog_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
+    pub(crate) async fn catalog_proxy_for_migration(
+        config: &Config,
+    ) -> Result<tinybus::Proxy, String> {
         Err(unavailable(config))
     }
 
@@ -479,8 +486,9 @@ mod imp {
 
 #[cfg(not(feature = "modules"))]
 pub(crate) use imp::{
-    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, portability_proxy, proxy,
-    run_proxy, runs_proxy, serve, serve_pair, serve_registered, unserve,
+    authoring_proxy, catalog_proxy, catalog_proxy_for_migration, copilot_invoke_proxy,
+    copilot_proxy, portability_proxy, proxy, run_proxy, runs_proxy, serve, serve_pair,
+    serve_registered, unserve,
 };
 
 /// Whether the module can serve in this build and configuration (the switch

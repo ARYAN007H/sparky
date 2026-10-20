@@ -760,7 +760,7 @@ media = ["tinyagents-harness/media"]
 # runtime `DomainSet::flows` flag (#4796): the feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 # NOTE: this gate does NOT drop `tinyagents` itself — 26+ domains consume it.
-flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "dep:tinyflows-drivers", "tinyflows-import/engine", "tinyflows-import/store", "tinyflows-import/catalog", "tinyflows-drivers/catalog", "tinyflows-drivers/schedule"]
+flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "dep:tinyflows-drivers", "tinyflows-import/flow-read", "tinyflows-import/checkpoint-read", "tinyflows-drivers/catalog", "tinyflows-drivers/schedule"]
 # Skills domains: `openhuman::skills` (metadata/discovery/install),
 # `openhuman::skill_runtime` (SKILL.md execution + the skill_executor agent),
 # and `openhuman::skill_registry` (remote catalogs + the skill_setup agent).
