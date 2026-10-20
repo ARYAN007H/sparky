@@ -69,6 +69,19 @@ pub fn provider_for_workspace(workspace_dir: &Path) -> Arc<dyn SessionStoreProvi
     }
 }
 
+/// The provider selected by `context` for `workspace_dir`, else the workspace
+/// fallback. This preserves agent-local host overrides when work carries an
+/// explicit dispatch context rather than the ambient task context.
+pub fn provider_for_workspace_in(
+    workspace_dir: &Path,
+    context: &crate::core::runtime::DispatchCtx,
+) -> Arc<dyn SessionStoreProvider> {
+    match super::installed_in(context) {
+        Some(installed) => installed,
+        None => fallback_provider(workspace_dir),
+    }
+}
+
 /// The provider over `workspace_dir`'s default backend, installed or not.
 pub(super) fn fallback_provider(workspace_dir: &Path) -> Arc<dyn SessionStoreProvider> {
     let backend = match crate::storage::local::backend_for(workspace_dir) {

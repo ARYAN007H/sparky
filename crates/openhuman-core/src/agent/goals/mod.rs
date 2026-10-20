@@ -40,7 +40,7 @@ pub fn goal_store(
     }
 
     let owner_stores = match context.tenant() {
-        Ok(tenant) => crate::storage::sessions::provider_for_workspace(workspace_dir)
+        Ok(tenant) => crate::storage::sessions::provider_for_workspace_in(workspace_dir, context)
             .for_agent(&crate::core::runtime::session_key(&tenant)),
         Err(no_tenant) => {
             log::warn!("[thread_goals] {no_tenant}; using throwaway in-memory store");
