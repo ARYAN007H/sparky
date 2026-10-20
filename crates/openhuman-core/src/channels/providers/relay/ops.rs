@@ -283,14 +283,12 @@ pub(crate) async fn run_relay_turn(
         &tenant,
         &format!("hosted-channel:{}", params.channel),
     ));
-    let progressive_target = Arc::new(
-        crate::channels::runtime::dispatch::processor::progressive::hosted_relay_target(
-            &config,
-            Arc::clone(&channel),
-            channel_ref,
-            prepared.envelope.conversation.clone(),
-        ),
-    );
+    let progressive_target = Arc::new(crate::channels::runtime::dispatch::hosted_relay_target(
+        &config,
+        Arc::clone(&channel),
+        channel_ref,
+        prepared.envelope.conversation.clone(),
+    ));
 
     tracing::debug!(
         channel = %params.channel,
