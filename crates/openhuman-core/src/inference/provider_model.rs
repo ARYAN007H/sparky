@@ -41,7 +41,12 @@ pub fn resolve_provider_model_hint(provider_id: &str, hint: &str, config: &Confi
     if trimmed.is_empty() {
         return trimmed.to_string();
     }
-    let Some(role) = crate::inference::registry::provider_model_role(provider_id, trimmed) else {
+    let role = trimmed
+        .strip_prefix("hint:")
+        .filter(|role| WORKLOAD_ROLES.contains(role))
+        .map(str::to_string)
+        .or_else(|| crate::inference::registry::provider_model_role(provider_id, trimmed));
+    let Some(role) = role else {
         return trimmed.to_string();
     };
 
