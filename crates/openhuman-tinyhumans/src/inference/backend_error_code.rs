@@ -31,7 +31,8 @@
 //! error is collapsed to a `String` at the native-bus boundary before it
 //! reaches the channel classifier or the higher-layer re-report sites.
 
-use super::openhuman_backend_model;
+use super::managed_model::PROVIDER_LABEL;
+use openhuman_embed::__host::inference_registry::{BackendErrorClassification, BackendErrorKind};
 
 /// A recognised backend `errorCode` token (PR #870).
 ///
@@ -121,7 +122,7 @@ pub fn extract_backend_error_code_token(err: &str) -> Option<String> {
 /// downstream sites (`expected_error_kind`, `before_send`) that no longer carry
 /// the typed provider.
 pub fn is_managed_backend_envelope(err: &str) -> bool {
-    let label = openhuman_backend_model::PROVIDER_LABEL.to_ascii_lowercase();
+    let label = PROVIDER_LABEL.to_ascii_lowercase();
     let lower = err.to_ascii_lowercase();
     lower.starts_with(&format!("{label} api error"))
         || lower.starts_with(&format!("{label} streaming api error"))
@@ -214,6 +215,49 @@ pub fn backend_error_code_skips_sentry(err: &str) -> bool {
         && !is_backend_malformed_bad_request(err)
         && !is_backend_client_guard_leak(err)
 }
+
+/// Classify an error for the core's generic observability and chat surfaces.
+pub(crate) fn classify(
+    provider: Option<&str>,
+    err: &str,
+) -> BackendErrorClassification {
+    let provider_owned = provider.map_or_else(
+        || is_managed_backend_envelope(err),
+        |provider| provider == PROVIDER_LABEL,
+    );
+    let token = provider_owned
+        .then(|| extract_backend_error_code_token(err))
+        .flatten();
+    let kind = token.as_deref().and_then(BackendErrorCode::from_token).map(|code| match code {
+        BackendErrorCode::RateLimited => BackendErrorKind::RateLimited,
+        BackendErrorCode::UserInsufficientCredits => BackendErrorKind::InsufficientCredits,
+        BackendErrorCode::UpstreamUnavailable => BackendErrorKind::UpstreamUnavailable,
+        BackendErrorCode::ModelUnavailable => BackendErrorKind::ModelUnavailable,
+        BackendErrorCode::PayloadTooLarge => BackendErrorKind::PayloadTooLarge,
+        BackendErrorCode::ContextLengthExceeded => BackendErrorKind::ContextLengthExceeded,
+        BackendErrorCode::BadRequest => BackendErrorKind::BadRequest,
+        BackendErrorCode::InternalError => BackendErrorKind::Internal,
+    });
+    let malformed_bad_request = matches!(kind, Some(BackendErrorKind::BadRequest))
+        && body_flags_malformed(err);
+    let client_guard_leak = matches!(
+        kind,
+        Some(BackendErrorKind::PayloadTooLarge | BackendErrorKind::ContextLengthExceeded)
+    );
+    let backend_owned = provider_owned && token.is_some();
+    BackendErrorClassification {
+        provider_owned,
+        backend_owned,
+        reportable: !backend_owned || malformed_bad_request || client_guard_leak,
+        token,
+        kind,
+        malformed_bad_request,
+    }
+}
+
+#[cfg(test)]
+#[path = "backend_error_code_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "error_code_tests.rs"]
