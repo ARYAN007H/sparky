@@ -2,6 +2,21 @@ import { expect, test } from '@playwright/test';
 
 import { bootAuthenticatedPage, callCoreRpc, waitForAppReady } from '../helpers/core-rpc';
 
+function unwrapResult(value: unknown): unknown {
+  let current = value;
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (!current || typeof current !== 'object' || !('result' in current)) return current;
+    current = (current as { result: unknown }).result;
+  }
+  return current;
+}
+
+async function listCronJobs(): Promise<Array<{ id?: string; name?: string; enabled?: boolean }>> {
+  const jobs = unwrapResult(await callCoreRpc<unknown>('openhuman.cron_list', {}));
+  expect(Array.isArray(jobs), 'cron_list returns job rows').toBe(true);
+  return jobs as Array<{ id?: string; name?: string; enabled?: boolean }>;
+}
+
 async function openCronJobsPanel(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/#/settings/cron-jobs');
   await waitForAppReady(page);
@@ -23,19 +38,31 @@ test.describe('Cron jobs settings panel', () => {
   });
 
   test('a cron row toggles, persists after refresh, and can be removed', async ({ page }) => {
-    const name = 'e2e_runner_consolidation';
-    const created = (await callCoreRpc<unknown>('openhuman.cron_add', {
-      name,
-      schedule: { kind: 'cron', expr: '0 8 * * *' },
-      job_type: 'agent',
-      prompt: 'Disposable runner ownership fixture',
-    })) as { result?: { id?: string } };
-    const jobId = created.result?.id;
-    expect(jobId, 'cron_add returns the created row id').toBeTruthy();
+    const jobsBefore = await listCronJobs();
+    let morning = jobsBefore.find(job => job.name === 'morning_briefing');
+    if (!morning) {
+      const created = unwrapResult(
+        await callCoreRpc<unknown>('openhuman.cron_create', {
+          name: 'morning_briefing',
+          schedule: '0 8 * * *',
+          enabled: true,
+        })
+      );
+      morning = created as { id?: string; name?: string; enabled?: boolean };
+    }
+    const morningId = morning.id;
+    expect(morningId, 'morning_briefing has a generated id').toBeTruthy();
+    if (morning.enabled === false) {
+      await callCoreRpc('openhuman.cron_update', {
+        job_id: morningId,
+        patch: { enabled: true },
+      });
+    }
+
     await openCronJobsPanel(page);
-    const row = page.getByTestId(`cron-job-row-${jobId}`);
-    const toggle = page.getByTestId(`cron-job-toggle-${jobId}`);
-    const remove = page.getByTestId(`cron-job-remove-${jobId}`);
+    await page.getByTestId('cron-refresh').click();
+    const row = page.getByTestId(`cron-job-row-${morningId}`);
+    const toggle = page.getByTestId(`cron-job-toggle-${morningId}`);
 
     await expect(row).toBeVisible();
     await expect(toggle).toHaveAttribute('aria-label', 'Pause');
@@ -46,16 +73,26 @@ test.describe('Cron jobs settings panel', () => {
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-label', 'Pause');
 
-    await remove.click();
-    await expect(row).toHaveCount(0);
-    const listed = (await callCoreRpc<unknown>('openhuman.cron_list', {})) as unknown;
-    const jobs = Array.isArray(listed)
-      ? listed
-      : listed && typeof listed === 'object' && 'result' in listed
-        ? (listed as { result: unknown }).result
-        : listed;
-    expect(Array.isArray(jobs), 'cron_list returns rows after removal').toBe(true);
-    expect((jobs as Array<{ id?: string }>).some(job => job.id === jobId)).toBe(false);
+    const removable = unwrapResult(
+      await callCoreRpc<unknown>('openhuman.cron_add', {
+        name: 'e2e_remove_me',
+        schedule: { kind: 'cron', expr: '0 8 * * *' },
+        job_type: 'agent',
+        prompt: 'Disposable cron removal fixture',
+      })
+    ) as { id?: string };
+    const removableId = removable.id;
+    expect(removableId, 'cron_add returns a generated id').toBeTruthy();
+    await callCoreRpc('openhuman.cron_update', {
+      job_id: removableId,
+      patch: { enabled: false },
+    });
+    await page.getByTestId('cron-refresh').click();
+    const removableRow = page.getByTestId(`cron-job-row-${removableId}`);
+    await expect(removableRow).toBeVisible();
+    await page.getByTestId(`cron-job-remove-${removableId}`).click();
+    await expect(removableRow).toHaveCount(0);
+    expect((await listCronJobs()).some(job => job.id === removableId)).toBe(false);
   });
 
   test('refresh action is visible in the cron jobs panel', async ({ page }) => {
