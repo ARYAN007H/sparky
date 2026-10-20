@@ -449,22 +449,25 @@ export default async function queuedImageAttachmentRoundtrip({
     throw new Error("queued model image bytes differ from the browser upload");
   }
 
-  const imageRequest = mock
+  const imageCandidates = mock
     .requests()
     .filter((request) => /(?:^|\/)chat\/completions(?:\?|$)/.test(request.url))
-    .findLast((request) =>
-      JSON.stringify(JSON.parse(request.body).messages ?? []).includes(QUEUED_PROMPT),
+    .map((request) => ({ request, body: JSON.parse(request.body) }))
+    .filter(({ body }) =>
+      (body.messages ?? []).some((message) => {
+        if (message.role !== "user") return false;
+        if (typeof message.content === "string") return message.content === QUEUED_PROMPT;
+        return Array.isArray(message.content) && message.content.some(
+          (part) => part.type === "text" && part.text === QUEUED_PROMPT,
+        );
+      }),
     );
-  if (!imageRequest) throw new Error("queued turn did not reach the mock model");
-  const input = JSON.stringify(JSON.parse(imageRequest.body).messages ?? []);
-  if (/\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(input)) {
-    throw new Error("queued model input contains a legacy marker");
+  if (!imageCandidates.length) {
+    throw new Error("queued turn did not reach the mock model with an exact user prompt");
   }
-  if (!input.includes(IMAGE_BYTES.toString("base64"))) {
-    const userMessages =
-      JSON.parse(imageRequest.body).messages?.filter((message) => message.role === "user") ?? [];
-    const mediaShape = userMessages.map((message) => ({
-      contentType: typeof message.content,
+  const candidateShapes = imageCandidates.map(({ body }) =>
+    body.messages.filter((message) => message.role === "user").map((message) => ({
+      role: message.role,
       content: Array.isArray(message.content)
         ? message.content.map((part) => ({
             type: part.type,
@@ -473,10 +476,17 @@ export default async function queuedImageAttachmentRoundtrip({
               ? { urlPrefix: String(part.image_url.url ?? "").slice(0, 48), detail: part.image_url.detail }
               : undefined,
           }))
-        : String(message.content).slice(0, 240),
-    }));
+        : message.content,
+    })),
+  );
+  const imageRequest = imageCandidates[imageCandidates.length - 1].request;
+  const input = JSON.stringify(imageCandidates[imageCandidates.length - 1].body.messages ?? []);
+  if (/\[(?:ATTACHMENT|IMAGE|FILE|VOICE):/i.test(input)) {
+    throw new Error("queued model input contains a legacy marker");
+  }
+  if (!input.includes(IMAGE_BYTES.toString("base64"))) {
     throw new Error(
-      `queued model input did not contain the uploaded PNG bytes; user content shape: ${JSON.stringify(mediaShape)}`,
+      `queued model input did not contain the uploaded PNG bytes; exact-prompt candidates: ${JSON.stringify(candidateShapes)}`,
     );
   }
 
