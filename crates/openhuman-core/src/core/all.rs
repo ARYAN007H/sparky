@@ -4,15 +4,18 @@
 //! controllers (e.g., memory, skills, config) and providing a unified
 //! interface for both the CLI and RPC layers to invoke them.
 
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use serde_json::{Map, Value};
 
+#[path = "all_entry.rs"]
 mod all_entry;
 pub use all_entry::{
     BoundRegisteredController, CliHandler, ControllerEntry, ControllerFuture, ControllerHandler,
     ControllerTask, RegisteredCliAdapter, RegisteredController,
 };
+
+use crate::core::ControllerSchema;
 
 pub use super::domain_group::DomainGroup;
 mod components_gate;
