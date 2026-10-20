@@ -561,10 +561,7 @@ async fn discard_staged_entries(
             part: entry.part.clone(),
             canceled: true,
         };
-        let owns_cancellation = publish_staged_claim(&claim_path, &cancellation).await?;
-        if !owns_cancellation {
-            continue;
-        }
+        publish_staged_claim(&claim_path, &cancellation).await?;
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
@@ -572,9 +569,11 @@ async fn discard_staged_entries(
         let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
             .await
             .map_err(|error| format!("staged attachment cleanup refused: {error}"))?;
-        tokio::fs::remove_file(path)
-            .await
-            .map_err(|error| format!("remove staged attachment: {error}"))?;
+        match tokio::fs::remove_file(path).await {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("remove staged attachment: {error}")),
+        }
         let _ = tokio::fs::remove_file(manifest_path).await;
     }
     Ok(())
