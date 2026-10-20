@@ -32,7 +32,7 @@ use crate::storage::documents::Repo;
 use crate::storage::import_state;
 use crate::storage::{Scope, StorageBackend};
 
-type CatalogMigrationKey = (PathBuf, String);
+type CatalogMigrationKey = (PathBuf, String, usize);
 
 static CATALOG_MIGRATIONS: LazyLock<
     Mutex<HashMap<CatalogMigrationKey, std::result::Result<(), String>>>,
@@ -165,6 +165,7 @@ pub fn import_flows(
         .await
     });
     record_catalog_migration(
+        backend,
         config,
         scope,
         migration.as_ref().map(|_| ()).map_err(ToString::to_string),
@@ -199,19 +200,32 @@ async fn migrate_catalog_storage(
 }
 
 fn record_catalog_migration(
+    backend: &Arc<dyn StorageBackend>,
     config: &Config,
     scope: &Scope,
     outcome: std::result::Result<(), String>,
 ) {
-    let key = (config.workspace_dir.clone(), scope.as_str().to_owned());
+    let key = (
+        config.workspace_dir.clone(),
+        scope.as_str().to_owned(),
+        Arc::as_ptr(backend) as *const () as usize,
+    );
     CATALOG_MIGRATIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .insert(key, outcome);
 }
 
-fn catalog_migration_ready(config: &Config, scope: &Scope) -> bool {
-    let key = (config.workspace_dir.clone(), scope.as_str().to_owned());
+fn catalog_migration_ready(
+    backend: &Arc<dyn StorageBackend>,
+    config: &Config,
+    scope: &Scope,
+) -> bool {
+    let key = (
+        config.workspace_dir.clone(),
+        scope.as_str().to_owned(),
+        Arc::as_ptr(backend) as *const () as usize,
+    );
     matches!(
         CATALOG_MIGRATIONS
             .lock()
@@ -253,11 +267,11 @@ pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Res
         return Ok(());
     };
     let scope = crate::storage::current_scope().map_err(|error| error.to_string())?;
-    if !catalog_migration_ready(config, &scope) {
+    if !catalog_migration_ready(&backend, config, &scope) {
         let result = migrate_catalog_storage(&backend, config, &scope)
             .await
             .map_err(|error| format!("{error:#}"));
-        record_catalog_migration(config, &scope, result.clone());
+        record_catalog_migration(&backend, config, &scope, result.clone());
         result?;
     }
     if legacy_flow_import_pending(&backend, config, &scope)
@@ -309,6 +323,7 @@ async fn migrate_owner_stores(
         {
             let catalog = migrate_catalog_storage(&backend, &config, &scope).await;
             record_catalog_migration(
+                &backend,
                 &config,
                 &scope,
                 catalog.as_ref().map(|_| ()).map_err(ToString::to_string),
