@@ -892,6 +892,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
   };
 }
 
+// UI-only send options; the RPC `queue_mode` remains a server-owned string.
 type QueueMode = 'interrupt' | 'steer' | 'followup' | 'collect' | 'parallel';
 
 interface ChatSendParams {

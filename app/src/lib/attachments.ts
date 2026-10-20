@@ -2,10 +2,10 @@
  * Utilities for multimodal chat attachments.
  *
  * Originals travel as typed `ContentPart`s ({@link attachmentsToParts}) next to
- * the message text; the core stages them and returns durable
- * `[ATTACHMENT:…]` references, which {@link parseAttachmentReferences} reads
- * back for display. The `[IMAGE:]`/`[FILE:]` marker grammar is an internal
- * staging format of the core and is no longer built here.
+ * the message text; the core stages them and returns durable opaque typed
+ * references. {@link parseAttachmentReferences} remains for legacy marker
+ * records. The `[IMAGE:]`/`[FILE:]` marker grammar is an internal staging
+ * format of the core and is no longer built here.
  */
 import debugFactory from 'debug';
 
