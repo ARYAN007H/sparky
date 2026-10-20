@@ -166,6 +166,21 @@ fn hosted_normalizer_leaves_custom_and_explicit_primary_choices_alone() {
 }
 
 #[test]
+fn hosted_cost_defaults_include_the_registered_managed_model_price() {
+    let _registry = crate::registry_test_lock();
+    crate::register::register_all(&crate::install::InstallOptions::default());
+
+    let prices = openhuman_embed::__host::config::schema::CostConfig::default().prices;
+    let expected = super::super::tiers::default_pricing().expect("hosted default pricing");
+    assert_eq!(expected.0, MODEL_MANAGED_DEFAULT);
+    let actual = prices
+        .get(MODEL_MANAGED_DEFAULT)
+        .expect("hosted cost defaults expose their owned managed price");
+    assert!((actual.input - expected.1).abs() < f64::EPSILON);
+    assert!((actual.output - expected.2).abs() < f64::EPSILON);
+}
+
+#[test]
 fn managed_tier_vocabulary_maps_aliases_and_leaves_concrete_ids_raw() {
     for (model, role) in [
         ("reasoning-v1", "reasoning"),

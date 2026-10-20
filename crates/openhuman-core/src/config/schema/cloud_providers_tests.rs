@@ -154,6 +154,11 @@ fn hosted_presets_and_classification_are_context_scoped() {
 
     assert!(super::builtin_cloud_provider("tenant-hosted").is_none());
     crate::core::runtime::CoreContext::sync_scope(context, || {
+        let presets = super::builtin_cloud_providers();
+        assert_eq!(presets[0].slug, "tenant-hosted");
+        assert_eq!(presets[0].label, "Tenant Hosted");
+        assert_eq!(presets[0].endpoint, "https://tenant.example/v1");
+        assert!(presets.iter().any(|preset| preset.slug == "openai"));
         assert!(super::builtin_cloud_provider("tenant-hosted").is_some());
         assert!(super::is_hosted_cloud_identity("tenant-hosted"));
         assert!(!super::is_hosted_auth_style(AuthStyle::Bearer));

@@ -29,20 +29,6 @@ fn cost_dashboard_config_serde_roundtrip() {
     assert!((c.dashboard.alert_threshold - 0.9).abs() < f64::EPSILON);
 }
 
-/// Pre-existing failure, unrelated to the spend cap: dc5c014da consolidated
-/// pricing onto a single managed default and left this asserting `>= 3`, which
-/// `get_default_pricing` — one entry — can never satisfy. Pinning the entry
-/// that must exist says what the default pricing is actually for; a count says
-/// nothing and goes stale the next time the catalogue is consolidated.
-#[test]
-fn cost_config_default_pricing_has_known_models() {
-    let c = CostConfig::default();
-    assert!(
-        c.prices.is_empty(),
-        "bare core has no provider-owned price catalog"
-    );
-}
-
 #[test]
 fn cost_config_serde_roundtrip() {
     let c = CostConfig::default();
