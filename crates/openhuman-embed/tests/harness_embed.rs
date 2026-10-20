@@ -66,11 +66,22 @@ const STEP_BUDGET: std::time::Duration = std::time::Duration::from_secs(180);
 /// once turned into a silent timeout.
 const RUNTIME_SHUTDOWN: std::time::Duration = std::time::Duration::from_secs(10);
 
+/// Panics with `message`, printing it first.
+///
+/// The linked tinyflows module installs TinyBus's process-wide panic hook,
+/// which writes only `module panicked at <file>:<line>` and drops the payload,
+/// for the host's panics too. Without this line a failure in CI names a line
+/// number and nothing else.
+fn fail(message: String) -> ! {
+    eprintln!("harness_embed failure: {message}");
+    panic!("{message}")
+}
+
 /// Runs `step` for at most `STEP_BUDGET`, failing with its `name` otherwise.
 async fn bounded<T>(name: &str, step: impl std::future::IntoFuture<Output = T>) -> T {
     tokio::time::timeout(STEP_BUDGET, step.into_future())
         .await
-        .unwrap_or_else(|_| panic!("{name} did not finish within {STEP_BUDGET:?}"))
+        .unwrap_or_else(|_| fail(format!("{name} did not finish within {STEP_BUDGET:?}")))
 }
 
 /// Deadlock guard for the overlapping turns below. Not a speed budget.
@@ -234,14 +245,14 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             })
             .await
             .unwrap_or_else(|_| {
-                panic!(
+                fail(format!(
                     "{CONCURRENT_TURNS} turns did not overlap: at most {} of them were \
                      ever in flight at the provider together ({} waiting at the gate \
                      after {CONCURRENT_HANG_GUARD:?}); the gate opens only when all \
                      {CONCURRENT_TURNS} are, so turns serialized or are capped",
                     provider_server.peak_in_flight(),
                     provider_server.in_flight(),
-                )
+                ))
             });
             // Informational only; nothing asserts on it.
             eprintln!(
