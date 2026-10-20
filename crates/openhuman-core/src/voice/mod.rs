@@ -52,6 +52,8 @@ pub use ops::*;
 #[cfg(feature = "voice")]
 pub use schemas::{all_voice_controller_schemas, all_voice_registered_controllers, voice_schemas};
 #[cfg(feature = "voice")]
+pub(crate) use schemas::all_voice_controller_entries;
+#[cfg(feature = "voice")]
 pub use types::{VoiceSpeechResult, VoiceStatus, VoiceTtsResult};
 
 // ---------------------------------------------------------------------------
