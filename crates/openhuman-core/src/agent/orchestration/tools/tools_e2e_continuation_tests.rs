@@ -141,6 +141,72 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
     let before_job_count = jobs.list().len();
 
+    // A durable host row and the checkpoint must agree on the full owner key.
+    // Corrupt only its root run identity and drive the real spawn path: resume
+    // must refuse before mutating the paused row or admitting another child.
+    let mut mismatched_records = sessions.load().expect("paused sessions");
+    let row = mismatched_records
+        .iter_mut()
+        .find(|session| session.subagent_session_id == before_session.subagent_session_id)
+        .expect("paused row to corrupt");
+    row.lifecycle_key
+        .as_mut()
+        .expect("paused session retains lifecycle key")
+        .root_run_id
+        .push_str("-mismatch");
+    sessions
+        .save(&mismatched_records)
+        .expect("corrupt only the persisted lifecycle owner key");
+    let refused_resume = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "This must not resume against a different lifecycle key.",
+                "model": "test-model",
+                "task_key": "pause-resume-fixture"
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "pause-resume-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("mismatched checkpoint refusal is returned as a tool error");
+    assert!(refused_resume.is_error);
+    assert!(
+        refused_resume
+            .output()
+            .contains("paused checkpoint does not match the reusable session"),
+        "refusal identifies the mismatched checkpoint: {}",
+        refused_resume.output()
+    );
+    assert_eq!(jobs.list().len(), before_job_count, "refusal admits no child");
+    assert_eq!(
+        provider.calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "refusal invokes no child model"
+    );
+    assert_eq!(
+        sessions
+            .load()
+            .expect("refused row remains persisted")
+            .into_iter()
+            .find(|session| session.subagent_session_id == before_session.subagent_session_id)
+            .expect("paused row remains present")
+            .status,
+        DurableSubagentStatus::AwaitingUser,
+        "refusal leaves the paused row untouched"
+    );
+    let mut restored_records = sessions.load().expect("mismatched sessions");
+    let row = restored_records
+        .iter_mut()
+        .find(|session| session.subagent_session_id == before_session.subagent_session_id)
+        .expect("paused row to restore");
+    row.lifecycle_key = Some(original_lifecycle_key.clone());
+    sessions
+        .save(&restored_records)
+        .expect("restore the persisted lifecycle key for the valid continuation");
+
     let resumed = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
