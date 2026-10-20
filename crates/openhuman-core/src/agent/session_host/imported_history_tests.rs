@@ -188,13 +188,14 @@ async fn run_imported_history_prefix_regression() {
 
 #[tokio::test]
 async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
-    use tinyagents_session::transcript::{TranscriptMeta, TranscriptMessage};
+    use tinyagents_session::transcript::{TranscriptMessage, TranscriptMeta};
 
     let root = tempfile::tempdir().expect("workspace");
     let locator = crate::agent::session_store::splice_fixture::memory_locator();
-    let model: Arc<dyn ChatModel<()>> = Arc::new(
-        tinyagents_harness::testkit::ScriptedModel::replies(vec!["unused"]),
-    );
+    let model: Arc<dyn ChatModel<()>> =
+        Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+            "unused",
+        ]));
     let mut host = SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(&locator))
         .chat_model(model)
@@ -243,7 +244,10 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
             Err(anyhow::anyhow!("legacy store unavailable"))
         })
         .await;
-    assert!(missing.is_err(), "failed legacy reads stop before a turn starts");
+    assert!(
+        missing.is_err(),
+        "failed legacy reads stop before a turn starts"
+    );
     assert!(
         !locator.session_exists(&session),
         "a failed import must not create an empty durable transcript"
@@ -265,9 +269,10 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     // A separate host bound to a session with committed durable rows never
     // consults the legacy source, even when that source is unavailable.
     let second_root = tempfile::tempdir().expect("second workspace");
-    let second_model: Arc<dyn ChatModel<()>> = Arc::new(
-        tinyagents_harness::testkit::ScriptedModel::replies(vec!["unused"]),
-    );
+    let second_model: Arc<dyn ChatModel<()>> =
+        Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+            "unused",
+        ]));
     let mut resumed = SessionHostBuilder::new()
         .with_session_history_locator(locator.clone())
         .chat_model(second_model)

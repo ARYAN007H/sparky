@@ -47,9 +47,7 @@ impl OpenHumanSessionHost {
     /// adjacent session-host tests and callers that need to seed that same
     /// recorded session store.
     #[cfg(test)]
-    pub(crate) fn bound_session_ref(
-        &self,
-    ) -> Option<&tinyagents_session::transcript::SessionRef> {
+    pub(crate) fn bound_session_ref(&self) -> Option<&tinyagents_session::transcript::SessionRef> {
         self.session.as_ref()
     }
 

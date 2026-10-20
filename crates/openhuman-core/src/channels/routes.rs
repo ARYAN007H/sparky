@@ -257,8 +257,7 @@ where
             let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
             let _ = channel
                 .send_with_outbound_intent(
-                    &SendMessage::new(&copy, &msg.reply_target)
-                        .in_thread(msg.thread_ts.clone()),
+                    &SendMessage::new(&copy, &msg.reply_target).in_thread(msg.thread_ts.clone()),
                 )
                 .await;
         }

@@ -296,9 +296,6 @@ async fn relay_preflight_failure_uses_trusted_channel_locale_without_running_age
     .await;
 
     assert_eq!(agent_runs.load(std::sync::atomic::Ordering::SeqCst), 0);
-    assert_eq!(
-        replies,
-        vec!["Algo salió mal. Inténtalo de nuevo."]
-    );
+    assert_eq!(replies, vec!["Algo salió mal. Inténtalo de nuevo."]);
     assert!(!replies[0].contains("COMPONENT_DISABLED"));
 }

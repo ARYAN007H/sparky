@@ -22,9 +22,9 @@ pub(crate) use commands::{configured_providers, has_listener_configuration};
 #[cfg(feature = "channels")]
 pub(crate) mod context;
 #[cfg(feature = "channels")]
-pub(crate) mod failure_copy;
-#[cfg(feature = "channels")]
 pub mod controllers;
+#[cfg(feature = "channels")]
+pub(crate) mod failure_copy;
 #[cfg(feature = "channels")]
 pub mod host;
 #[cfg(feature = "channels")]

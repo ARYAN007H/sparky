@@ -114,10 +114,7 @@ impl HostAgent {
             let dispatch = crate::core::runtime::DispatchCtx::new(Arc::clone(&self.context));
             session
                 .adopt_legacy_history_if_needed(|| async {
-                    source
-                        .load(&dispatch)
-                        .await
-                        .map_err(anyhow::Error::msg)
+                    source.load(&dispatch).await.map_err(anyhow::Error::msg)
                 })
                 .await
                 .map_err(|_| {

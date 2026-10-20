@@ -1,8 +1,8 @@
 //! `channel_relay_inbound`: record a relayed message and run its turn.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde_json::{json, Value};
 
@@ -36,7 +36,12 @@ impl LegacyHistoryImport {
         message_id: String,
         limit: usize,
     ) -> Self {
-        Self { workspace_dir, thread_id, message_id, limit }
+        Self {
+            workspace_dir,
+            thread_id,
+            message_id,
+            limit,
+        }
     }
 
     pub(crate) async fn load(
@@ -215,8 +220,7 @@ pub(crate) async fn run_relay_turn(
                 %error,
                 "[channels::relay] could not build the turn"
             );
-            let reply =
-                crate::channels::failure_copy::generic_failure(Some(&config));
+            let reply = crate::channels::failure_copy::generic_failure(Some(&config));
             let _ = tinychannels_runtime::Channel::send(
                 channel.as_ref(),
                 &crate::channels::SendMessage::new(&reply, &params.chat_id),
