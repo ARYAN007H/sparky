@@ -12,6 +12,7 @@ impl ProgressProjection {
         event: AgentProgress,
         ledger_context: ProgressLedgerContext,
     ) {
+        let event_kind = std::mem::discriminant(&event);
         if let AgentProgress::SubagentFailed {
             agent_id, error, ..
         } = &event
@@ -27,6 +28,11 @@ impl ProgressProjection {
         if let Some(output) = map::subagent_event(event, self.round, ledger_context.parent_call_id)
         {
             self.surface.output(output).await;
+        } else {
+            log::debug!(
+                "[web_channel][bridge] unprojected event={event_kind:?} request_id={}",
+                self.ids.request_id,
+            );
         }
     }
 }
