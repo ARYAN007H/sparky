@@ -203,13 +203,17 @@ where
                         model: current.model,
                     },
                     history_len,
-                    session_scope: reset_scope.map(Box::new),
-                    configured_channel: target_channel
-                        .filter(|channel| channel.name() == msg.channel)
-                        .map(|channel| tinychannels_bus::module_control::ConfiguredControlChannel {
-                            name: channel.name().to_owned(),
-                            capabilities: channel.capabilities(),
-                        }),
+                    session_scope: reset_scope.clone().map(Box::new),
+                    configured_channel: reset_scope.as_ref().and_then(|scope| {
+                        let account = scope.channel.account_id.as_deref()?;
+                        let channel = ctx.channels_by_name.get(account)?;
+                        (channel.name() == account
+                            && tinychannels_bus::provider_id(channel.name()) == scope.channel.id)
+                            .then(|| tinychannels_bus::module_control::ConfiguredControlChannel {
+                                name: channel.name().to_owned(),
+                                capabilities: channel.capabilities(),
+                            })
+                    }),
                     providers: provider_descriptors(),
                 },),
             )
