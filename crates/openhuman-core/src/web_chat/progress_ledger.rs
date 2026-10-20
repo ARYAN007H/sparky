@@ -1,6 +1,5 @@
 //! Host adapter for the owner-provided generic progress ledger recorder.
 
-pub(super) use tinyagents_orchestration::run_progress_ledger::ChildDone;
 pub(super) use tinyagents_orchestration::run_progress_ledger::ProgressLedgerContext;
 pub(super) type Ledger = tinyagents_orchestration::run_progress_ledger::RunProgressLedger;
 

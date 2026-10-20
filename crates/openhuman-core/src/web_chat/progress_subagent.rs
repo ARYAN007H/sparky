@@ -95,7 +95,7 @@ impl ProgressProjection {
                 task_id,
                 question,
                 worker_thread_id,
-                checkpoint_path,
+                ..
             } => {
                 self.surface
                     .output(map::sub_awaiting_user(
