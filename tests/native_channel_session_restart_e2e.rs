@@ -313,7 +313,7 @@ fn start_core(
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
         .env(
             "RUST_LOG",
-            "tinychannels=debug,tinychannels_module=debug,tinystoragedrivers=debug,openhuman::storage_host=info,openhuman_core::channels=debug",
+            "tinychannels=debug,tinychannels::remote=debug,tinychannels_module=debug,tinychannels_module::service=debug,tinystoragedrivers=debug,openhuman::storage_host=info,openhuman_core::channels=debug",
         )
         .env("OPENHUMAN_MODEL", "mock:session-model")
         .env("OPENHUMAN_BACKEND_API_KEY", MOCK_API_KEY)
@@ -366,6 +366,25 @@ async fn wait_until(label: &str, mut condition: impl FnMut() -> bool) {
     let deadline = Instant::now() + Duration::from_secs(45);
     while !condition() {
         assert!(Instant::now() < deadline, "timed out waiting for {label}");
+        sleep(Duration::from_millis(50)).await;
+    }
+}
+
+async fn wait_for_new_session_reply(state: &MockState) {
+    let deadline = Instant::now() + Duration::from_secs(45);
+    loop {
+        let sent = state.sent_messages.lock().expect("Telegram sent messages");
+        if sent.iter().any(|body| {
+            body["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("Started new session"))
+        }) {
+            return;
+        }
+        if Instant::now() >= deadline {
+            panic!("timed out waiting for Telegram /new reply; outbound bodies: {sent:#?}");
+        }
+        drop(sent);
         sleep(Duration::from_millis(50)).await;
     }
 }
@@ -548,20 +567,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
 
     // The real module command must reset only chat 42's durable SessionRef.
     push_update(&mocks.state, 102, 12, "/new");
-    wait_until("Telegram /new reply", || {
-        mocks
-            .state
-            .sent_messages
-            .lock()
-            .expect("Telegram sent messages")
-            .iter()
-            .any(|body| {
-                body["text"]
-                    .as_str()
-                    .is_some_and(|text| text.contains("Started new session"))
-            })
-    })
-    .await;
+    wait_for_new_session_reply(&mocks.state).await;
     wait_for_update_ack(102).await;
 
     push_update(&mocks.state, 103, 13, AFTER_RESET_TEXT);
