@@ -36,7 +36,10 @@ pub(super) fn socket_parameter_contracts() -> Vec<ControllerParamContract> {
             method: "socket.connect",
             required: &["url", "token"],
             optional: &[],
-            examples: vec![json!({"url":"https://example.invalid/socket", "token":"test-token"})],
+            examples: vec![
+                json!({"url":"https://example.invalid/socket", "token":"test-token"}),
+                json!({"url":"", "token":""}),
+            ],
         },
         ControllerParamContract {
             method: "socket.disconnect",
@@ -154,10 +157,18 @@ fn emit_parser_defaults_data_to_null_and_preserves_any_json_value() {
             .expect("all JSON payload values remain accepted");
         assert_eq!(parsed.data, data);
     }
-    assert_eq!(
-        parse_emit(Map::new()).err().expect("missing event fails"),
-        "missing required param 'event'"
-    );
+    for params in [
+        serde_json::json!({}),
+        serde_json::json!({"event":null}),
+        serde_json::json!({"event":42}),
+    ] {
+        assert_eq!(
+            parse_emit(serde_json::from_value(params).expect("object params"))
+                .err()
+                .expect("missing or non-string event fails"),
+            "missing required param 'event'"
+        );
+    }
 }
 
 #[test]
@@ -168,6 +179,25 @@ fn ignored_map_parser_accepts_unknown_values() {
     }))
     .expect("object params");
     assert_eq!(parse_ignored_params(params), Ok(()));
+
+    let params = serde_json::from_value(serde_json::json!({
+        "anything":[null, true, {"nested":42}],
+        "other":"ignored"
+    }))
+    .expect("object params");
+    let entries = all_controller_entries();
+    for method in [
+        "socket.disconnect",
+        "socket.state",
+        "socket.connect_with_session",
+    ] {
+        entries
+            .iter()
+            .find(|entry| entry.schema.method_name() == method)
+            .expect("ignored-map method has a bound registry entry")
+            .decode_params(params.clone())
+            .expect("actual parser deliberately accepts unknown keys and values");
+    }
 }
 
 // ── handlers (without manager): require_manager errors ─────────
