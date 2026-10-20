@@ -97,7 +97,7 @@ test.describe('Gmail Integration Flows', () => {
     await page.getByTestId('skill-install-composio-gmail').click();
     const dialog = page.getByRole('dialog', { name: /Connect Gmail/i });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByTestId('skill-install-composio-gmail')).toHaveAccessibleName(/Connect/i);
   });
