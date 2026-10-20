@@ -319,7 +319,6 @@ fn paused_driver_cancel_marks_only_the_observed_session_failed() {
             task_id: lifecycle_key.task_id.clone(),
             lifecycle_key: Some(lifecycle_key.clone()),
             parent_epoch: Some(1),
-        parent_epoch: None,
         },
         None,
     )
