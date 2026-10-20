@@ -75,13 +75,6 @@ export function openHumanToolEntries(): Record<string, OpenHumanToolEntry> {
     task: { type: 'backend', display: 'standalone', render: SubagentTaskCard },
 
     /**
-     * `spawn_parallel_agents`: two or more independent sub-agent workers fanned
-     * out concurrently. Rendered as the vendored `SubagentList` progress board
-     * above each worker's own `TaskCard` row (`ParallelAgentsCard.tsx`),
-     * grouped by `subagent.parentCallId === toolCallId`.
-     */
-
-    /**
      * Image / video generation: the `elements-image-generation` placeholder
      * while it runs, then the `image` element per produced artifact. Pulled
      * out for its own spot in the transcript rather than folded into the
