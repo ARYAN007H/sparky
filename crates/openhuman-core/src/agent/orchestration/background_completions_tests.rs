@@ -587,6 +587,37 @@ fn a_delete_marker_outlives_compaction() {
 }
 
 #[test]
+fn deleting_a_thread_with_only_compacted_completion_history_stays_durable() {
+    let _guard = test_guard();
+    let ws = workspace();
+    let w = ws.path();
+    record(w, "sess-cm-history", "sub-1", "x", Some("thread-cm-history"));
+    let router = router_for_workspace(w);
+    let claimed = router
+        .claim_pending("thread-cm-history", usize::MAX)
+        .unwrap();
+    let receipts: Vec<_> = claimed
+        .iter()
+        .map(|record| record.receipt().expect("claimed record has receipt"))
+        .collect();
+    assert_eq!(router.mark_delivered(&receipts).unwrap(), 1);
+    router.compact(std::time::Duration::ZERO).unwrap();
+
+    // Simulate a restart before the delete request. The completion row is
+    // compacted, but the owner's parent lifecycle marker still records that
+    // this thread had background work.
+    forget_workspace_for_test(w);
+    assert_eq!(discard_for_thread(&cx(), w, "thread-cm-history"), 0);
+    forget_workspace_for_test(w);
+    assert!(mark_stopped_task_if_thread_stopped(
+        &cx(),
+        w,
+        "thread-cm-history",
+        "sub-late"
+    ));
+}
+
+#[test]
 fn deleting_a_thread_that_never_used_background_work_writes_nothing() {
     let _guard = test_guard();
     let ws = workspace();
