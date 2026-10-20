@@ -8,6 +8,29 @@ pub(crate) struct GraphNode<'a> {
     pub(crate) config: &'a Value,
 }
 
+/// Rejects malformed node identity fields before a host callback evaluates a
+/// gate. TinyFlows has already normalized the graph; this preserves the bus
+/// boundary's required JSON shape without parsing an engine-owned AST here.
+pub(crate) fn validate_host_gate_input_shape(graph: &Value) -> Result<(), String> {
+    let nodes = graph
+        .get("nodes")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "workflow graph must contain a node array".to_string())?;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.get("id").and_then(Value::as_str).is_none() {
+            return Err(format!(
+                "workflow graph node {index} must have a string `id`"
+            ));
+        }
+        if node.get("kind").and_then(Value::as_str).is_none() {
+            return Err(format!(
+                "workflow graph node {index} must have a string `kind`"
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Iterates structurally valid nodes from TinyFlows' normalized graph JSON.
 pub(crate) fn nodes(graph: &Value) -> impl Iterator<Item = GraphNode<'_>> {
     graph

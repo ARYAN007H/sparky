@@ -64,6 +64,7 @@ impl Callbacks {
         let config = Arc::clone(&self.config);
         let context = self.context.clone();
         self.in_context(async move {
+            crate::flows::host_gates::validate_host_gate_input_shape(&graph)?;
             match stage.as_str() {
                 tinyflows_bus::host::TOOL_POLICY => {
                     Ok(crate::flows::host_gates::validate_upload_paths(&graph))

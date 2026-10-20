@@ -51,6 +51,32 @@ async fn check_gate_rejects_a_tool_node_without_its_id() {
         )
         .unwrap();
 
+    let valid = proxy
+        .call::<Vec<String>>(
+            tinyflows_bus::host::CHECK_GATE,
+            (
+                tinyflows_bus::host::TOOL_POLICY,
+                json!({
+                    "nodes": [{
+                        "id": "upload",
+                        "kind": "tool_call",
+                        "name": "Upload",
+                        "config": {
+                            "slug": "oh:storage_upload_file",
+                            "args": {"path": "report.html"}
+                        }
+                    }],
+                    "edges": []
+                }),
+            ),
+        )
+        .await
+        .expect("a valid normalized graph reaches the registered host callback");
+    assert!(
+        valid.is_empty(),
+        "valid relative upload should pass: {valid:?}"
+    );
+
     let result = proxy
         .call::<Vec<String>>(
             tinyflows_bus::host::CHECK_GATE,
@@ -71,9 +97,10 @@ async fn check_gate_rejects_a_tool_node_without_its_id() {
         )
         .await;
 
+    let error = result.expect_err("a node without an id is malformed");
     assert!(
-        result.is_err(),
-        "a node without an id is malformed: {result:?}"
+        error.to_string().contains("node 0"),
+        "expected a node-shape error, got {error}"
     );
 }
 
