@@ -295,7 +295,7 @@ fn run_deprovision(_ctx: DispatchCtx, payload: ProfileParams) -> ControllerFutur
     Box::pin(async move { to_json(super::ops::deprovision(&payload.profile_id).await?) })
 }
 
-fn run_list(_ctx: DispatchCtx, (): ()) -> ControllerFuture {
+fn run_list(_ctx: DispatchCtx, _payload: ()) -> ControllerFuture {
     Box::pin(async move { to_json(super::ops::list().await?) })
 }
 

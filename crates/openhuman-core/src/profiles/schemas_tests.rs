@@ -90,6 +90,80 @@ pub(crate) fn profile_parameter_contracts() -> Vec<crate::core::all::ControllerP
 }
 
 #[test]
+fn credential_schema_and_parser_keep_field_order_defaults_and_kinds() {
+    use crate::profiles::credentials::UserCredentialKind;
+    use serde_json::json;
+
+    let schema = profiles_schemas("set_credential");
+    assert_eq!(
+        schema
+            .inputs
+            .iter()
+            .map(|field| field.name)
+            .collect::<Vec<_>>(),
+        ["profile_id", "kind", "token", "expires_at"]
+    );
+
+    let absent = parse_credential(
+        json!({
+            "profile_id":"p1",
+            "kind":"api_key",
+            "token":"fixture-only-token"
+        })
+        .as_object()
+        .expect("object params")
+        .clone(),
+    )
+    .expect("api key with absent expiry");
+    assert_eq!(absent.kind, UserCredentialKind::ApiKey);
+    assert_eq!(absent.expires_at, None);
+
+    let null = parse_credential(
+        json!({
+            "profile_id":"p1",
+            "kind":"session",
+            "token":"fixture-only-token",
+            "expires_at":null
+        })
+        .as_object()
+        .expect("object params")
+        .clone(),
+    )
+    .expect("session with null expiry");
+    assert_eq!(null.kind, UserCredentialKind::Session);
+    assert_eq!(null.expires_at, None);
+
+    let string = parse_credential(
+        json!({
+            "profile_id":"p1",
+            "kind":"session",
+            "token":"fixture-only-token",
+            "expires_at":"not-normalized"
+        })
+        .as_object()
+        .expect("object params")
+        .clone(),
+    )
+    .expect("string expiry remains unchanged by the parser");
+    assert_eq!(string.expires_at.as_deref(), Some("not-normalized"));
+
+    for invalid in [json!("unknown"), json!(42), json!(null)] {
+        let params = json!({
+            "profile_id":"p1",
+            "kind":invalid,
+            "token":"fixture-only-token"
+        })
+        .as_object()
+        .expect("object params")
+        .clone();
+        assert!(parse_credential(params)
+            .err()
+            .expect("invalid credential kind")
+            .starts_with("invalid params:"));
+    }
+}
+
+#[test]
 fn the_operator_plane_is_its_own_domain_family() {
     use crate::core::all::DomainGroup;
     use crate::core::runtime::DomainSet;
