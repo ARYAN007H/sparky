@@ -86,9 +86,11 @@ run_unit() {
   local workspace="$workspace_root/lane-$lane/$unit"
   local receipt="$receipt_dir/$unit.exit"
   mkdir -p "$workspace"
+  workspace="$(cd "$workspace" && pwd)"
+  local output="$workspace/test-results"
   export OPENHUMAN_WORKSPACE="$workspace"
   local status=0
-  bash scripts/ci-cancel-aware.sh "${runner_cmd[@]}" "$@" || status=$?
+  bash scripts/ci-cancel-aware.sh "${runner_cmd[@]}" "$@" --output="$output" || status=$?
   printf '%s\n' "$status" > "$receipt"
   echo "unit=$unit exit=$status receipt=$receipt"
   (( status == 0 )) || overall=1
