@@ -48,6 +48,20 @@ async function expectLandedInChat(page: Page): Promise<void> {
     .poll(async () => page.evaluate(() => window.location.hash), { timeout: 20_000 })
     .toMatch(/^#\/chat/);
   await expect.poll(readOnboardingCompleted, { timeout: 20_000 }).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = (
+          window as typeof window & {
+            __OPENHUMAN_CORE_STATE__?: () => {
+              snapshot?: { onboardingCompleted?: boolean };
+            };
+          }
+        ).__OPENHUMAN_CORE_STATE__?.();
+        return state?.snapshot?.onboardingCompleted;
+      })
+    )
+    .toBe(true);
   // Nothing of the onboarding stepper may linger once the user is in the app.
   await expect(page.getByTestId('onboarding-layout')).toHaveCount(0);
 }
