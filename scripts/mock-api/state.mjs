@@ -485,4 +485,3 @@ export function getMockTeam() {
     role: "ADMIN",
   };
 }
-
