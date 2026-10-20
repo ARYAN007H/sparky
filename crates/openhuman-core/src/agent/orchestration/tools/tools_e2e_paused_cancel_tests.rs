@@ -1,5 +1,5 @@
-use super::*;
 use super::continuation_tests::core_backed_live_parent;
+use super::*;
 
 #[tokio::test]
 async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
