@@ -77,7 +77,9 @@ async fn run_recorded_route(
             PrebuiltModelResolver::new(primary, [("backup".into(), successful)])
                 .with_primary_name("primary"),
         );
-        harness.with_model_resolver(resolver).with_policy(RunPolicy {
+        harness
+            .with_model_resolver(resolver)
+            .with_policy(RunPolicy {
                 retry: tinyagents_harness::retry::RetryPolicy::default().with_max_attempts(1),
                 fallback: Some(tinyagents_harness::retry::FallbackPolicy::new([
                     "primary", "backup",
@@ -164,17 +166,20 @@ async fn resolved_route_enrichment_uses_actual_provider_model_and_call_identity(
             _ => None,
         })
         .expect("model attempt has a native call id");
-    assert!(events.iter().any(|event| matches!(
-        event,
-        AgentEvent::GenerationEnriched { call_id: enriched, enrichment }
-            if enriched == &call_id
-                && enrichment.provider_id.as_deref() == Some("anthropic")
-                && enrichment.pricing.as_ref().is_some_and(|pricing| {
-                    pricing.input_per_mtok_usd == Some(5.0)
-                        && pricing.cached_input_per_mtok_usd == Some(0.5)
-                        && pricing.output_per_mtok_usd == Some(25.0)
-                })
-    )), "pricing and provider metadata use the actual response route, not configured fallback values; events={events:#?}");
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            AgentEvent::GenerationEnriched { call_id: enriched, enrichment }
+                if enriched == &call_id
+                    && enrichment.provider_id.as_deref() == Some("anthropic")
+                    && enrichment.pricing.as_ref().is_some_and(|pricing| {
+                        pricing.input_per_mtok_usd == Some(5.0)
+                            && pricing.cached_input_per_mtok_usd == Some(0.5)
+                            && pricing.output_per_mtok_usd == Some(25.0)
+                    })
+        )),
+        "pricing and provider metadata use the actual response route, not configured fallback values; events={events:#?}"
+    );
 }
 
 #[tokio::test]

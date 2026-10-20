@@ -378,8 +378,8 @@ impl SessionHostBuilder {
         mut self,
         policy: Arc<
             dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+                    crate::agent::tinyagents::host::OpenHumanRunContext,
+                >,
         >,
     ) -> Self {
         self.tool_policy = Some(policy);

@@ -157,13 +157,15 @@ fn unavailable_module_error_names_its_cargo_feature() {
 fn discovered_config_still_rejects_typed_boot_edits() {
     let builder = RuntimeBuilder::desktop().cron(Default::default());
     assert!(builder.validate().is_err());
-    assert!(RuntimeBuilder::desktop()
-        .model_defaults(ModelDefaults {
-            max_tokens: Some(300),
-            ..Default::default()
-        })
-        .validate()
-        .is_ok());
+    assert!(
+        RuntimeBuilder::desktop()
+            .model_defaults(ModelDefaults {
+                max_tokens: Some(300),
+                ..Default::default()
+            })
+            .validate()
+            .is_ok()
+    );
 }
 
 #[test]

@@ -104,8 +104,8 @@ use openhuman_core::core::runtime::{CoreRuntime, DomainSet, ServiceSet};
 use openhuman_core::tools::toolpacks::ToolGroups;
 
 use crate::agent::{Agent, AgentError, AgentSpec};
-use crate::harness::workspace::ResolvedWorkspace;
 use crate::harness::HarnessCore;
+use crate::harness::workspace::ResolvedWorkspace;
 use crate::{Core, CoreError};
 
 /// Guards the process-scoped core state described in the module docs.

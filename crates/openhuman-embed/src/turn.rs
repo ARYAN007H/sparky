@@ -49,8 +49,8 @@ use openhuman_core::security::turn_origin::AgentTurnOrigin;
 
 #[path = "turn_types.rs"]
 mod types;
-pub(crate) use types::{is_safe_endpoint_for_bearer, sanitize_url_for_display};
 pub use types::{Route, TurnOutcome, TurnRequest};
+pub(crate) use types::{is_safe_endpoint_for_bearer, sanitize_url_for_display};
 #[path = "turn_control.rs"]
 mod control;
 
@@ -173,11 +173,11 @@ impl Turn {
     pub fn tools(
         mut self,
         factory: impl for<'a> Fn(
-                openhuman_core::agent::TurnContext<'a>,
-            ) -> openhuman_core::agent::HostTurnTools
-            + Send
-            + Sync
-            + 'static,
+            openhuman_core::agent::TurnContext<'a>,
+        ) -> openhuman_core::agent::HostTurnTools
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         self.tools = Some(Arc::new(factory));
         self
@@ -606,7 +606,7 @@ async fn dispatch(
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
                     use openhuman_core::inference::host_runtime::ops::{
-                        agent_chat_reply_for, AgentChatTarget,
+                        AgentChatTarget, agent_chat_reply_for,
                     };
                     let mut config = dispatch
                         .load_config()
@@ -652,7 +652,7 @@ async fn dispatch(
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
                     use openhuman_core::inference::host_runtime::ops::{
-                        agent_chat_for, AgentChatTarget,
+                        AgentChatTarget, agent_chat_for,
                     };
                     let mut config = inner.config.clone();
                     let route = openhuman_core::config::schema::EphemeralRoute::from_params(

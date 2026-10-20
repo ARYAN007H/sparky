@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_harness::context::RunConfig;
 use tinyagents_harness::middleware::PromptCacheGuardMiddleware;
 use tinyagents_harness::runtime::AgentHarness;
@@ -79,9 +79,7 @@ async fn run(s: &Scenario) -> Value {
         vec![ModelResponse::assistant("done")]
     }));
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
-    harness
-        .with_model( model.clone())
-        ;
+    harness.with_model(model.clone());
     if s.with_tools {
         harness.register_tool(Arc::new(Lookup));
     }

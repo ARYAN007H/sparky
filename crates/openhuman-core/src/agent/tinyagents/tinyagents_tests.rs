@@ -142,7 +142,7 @@ async fn run_policy_decodes_stringified_nested_object_arguments() {
 
     let mut harness: tinyagents_harness::runtime::AgentHarness<()> =
         tinyagents_harness::runtime::AgentHarness::new();
-    harness.with_model( model);
+    harness.with_model(model);
     harness.register_tool(tool.clone());
     harness.with_policy(run_policy_for(10, false));
 

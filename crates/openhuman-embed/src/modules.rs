@@ -11,7 +11,7 @@ pub use openhuman_core::modules::ops::set_bundled_releases_dir;
 /// this for each module it links; no shipped host does.
 #[cfg(feature = "modules")]
 pub use openhuman_core::modules::linked::{
-    is_registered as is_linked_registered, register_linked, LinkedFactory,
+    LinkedFactory, is_registered as is_linked_registered, register_linked,
 };
 
 /// The browser-control module.

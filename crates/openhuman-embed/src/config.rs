@@ -70,12 +70,12 @@ pub use tinytools::{
     DefaultEffect, Patterns, RuleEffect, Surface, ToolMatcher, ToolRule, ToolRules,
 };
 
+/// The core's config type, as [`crate::RuntimeConfig`].
+pub use openhuman_core::config::Config as RuntimeConfig;
 /// Typed runtime builder policy groups from the core configuration contract.
 pub use openhuman_core::config::schema::{
     AutonomyConfig, CronConfig, PrivacyConfig, PrivacyMode, SecretsConfig,
 };
-/// The core's config type, as [`crate::RuntimeConfig`].
-pub use openhuman_core::config::Config as RuntimeConfig;
 
 /// Load `config.toml` (creating defaults when absent) with the environment
 /// overlay and per-user scoping — what a core with no supplied config boots

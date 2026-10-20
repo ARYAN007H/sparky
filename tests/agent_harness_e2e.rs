@@ -30,15 +30,15 @@ use std::time::Duration;
 /// Prevents `ApprovalGate` from writing `./approval/approval.db` into the repo root.
 static GATE_WORKSPACE: OnceLock<tempfile::TempDir> = OnceLock::new();
 
-use axum::http::{header::AUTHORIZATION, HeaderMap, StatusCode, Uri};
+use axum::http::{HeaderMap, StatusCode, Uri, header::AUTHORIZATION};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tempfile::tempdir;
 
 use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
-use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
+use openhuman_core::core::auth::{CORE_TOKEN_ENV_VAR, init_rpc_token};
 use openhuman_rpc::server::build_core_http_router;
 
 const TEST_RPC_TOKEN: &str = "json-rpc-e2e-local-token";
@@ -2629,8 +2629,8 @@ async fn streaming_tool_call_accumulation() {
     use openhuman_core::progress::AgentProgress;
     use std::sync::Mutex;
     use streaming_support::{
-        agent_with_s, native_tool_response_s, text_response_s, workspace_s, EchoTool,
-        ScriptedProvider,
+        EchoTool, ScriptedProvider, agent_with_s, native_tool_response_s, text_response_s,
+        workspace_s,
     };
     use tinyinference_llm::model::{ModelProfile, ModelStreamItem};
     use tinyinference_llm::tool::ToolDelta;

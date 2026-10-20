@@ -12,7 +12,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_definition::{AgentDefinition, InMemoryDefinitionRegistry};
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_harness::host::{
@@ -158,7 +158,7 @@ async fn run_with_hooks(target: &'static str) -> (Option<Outcome>, usize, usize)
     let (secret, secret_ran) = leaf("secret");
     let outcome = Arc::new(Mutex::new(None));
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
-    harness.with_model( model());
+    harness.with_model(model());
     harness.with_policy(nested_enabled());
     harness.register_tool(allowed);
     harness.register_tool(secret);
@@ -225,10 +225,9 @@ async fn the_security_gate_refuses_a_nested_call_on_the_hosted_path() {
     ));
     let host = HostCapabilities::new(
         Arc::new(StaticContextComposer::empty()),
-        Arc::new(InMemoryDefinitionRegistry::new(vec![AgentDefinition::new(
-            "helper", "Helper", "test",
-        )
-        .with_tools(["caller", "read_file"])])),
+        Arc::new(InMemoryDefinitionRegistry::new(vec![
+            AgentDefinition::new("helper", "Helper", "test").with_tools(["caller", "read_file"]),
+        ])),
         gate,
         Arc::new(FixedModelResolver::new(model())),
     );

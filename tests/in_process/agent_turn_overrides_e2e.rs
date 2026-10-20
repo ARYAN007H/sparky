@@ -25,16 +25,16 @@
 //! positive here.
 #![allow(clippy::await_holding_lock)]
 
-use crate::env_guard::env_lock_async;
 use crate::env_guard::EnvVarGuard;
+use crate::env_guard::env_lock_async;
 use async_trait::async_trait;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
-use openhuman_core::agent::session_host::TurnOverrides;
 use openhuman_core::agent::OpenHumanSessionHost;
+use openhuman_core::agent::session_host::TurnOverrides;
 use openhuman_core::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use openhuman_core::config::{AgentConfig, ContextConfig};
 use tinyagents_definition::ToolScope;

@@ -568,9 +568,11 @@ async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
         Err(SteerError::NotOwned)
     );
     assert_eq!(pair.a.queue.status().await.steers, 0);
-    assert!(snapshot_for_parent(&bob, PARENT)
-        .iter()
-        .all(|worker| worker.task_id != a_task));
+    assert!(
+        snapshot_for_parent(&bob, PARENT)
+            .iter()
+            .all(|worker| worker.task_id != a_task)
+    );
 
     assert!(
         cancel_by_task(&alice, &b_task).is_none(),
@@ -597,9 +599,11 @@ async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
         "alice reaches her own worker"
     );
     assert_eq!(b_side.unwrap(), (true, true), "bob reaches his own worker");
-    assert!(snapshot_for_parent(&alice, PARENT)
-        .iter()
-        .all(|worker| worker.task_id != a_task));
+    assert!(
+        snapshot_for_parent(&alice, PARENT)
+            .iter()
+            .all(|worker| worker.task_id != a_task)
+    );
 }
 
 #[tokio::test]

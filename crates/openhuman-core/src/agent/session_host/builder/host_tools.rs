@@ -64,8 +64,8 @@ pub struct HostTurnTools {
     pub policy: Option<
         Arc<
             dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+                    crate::agent::tinyagents::host::OpenHumanRunContext,
+                >,
         >,
     >,
 }
@@ -180,8 +180,8 @@ impl HostTurnTools {
         mut self,
         policy: Arc<
             dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+                    crate::agent::tinyagents::host::OpenHumanRunContext,
+                >,
         >,
     ) -> Self {
         self.policy = Some(policy);
@@ -205,8 +205,8 @@ pub(super) struct MergedHostTurnTools {
     pub policy: Option<
         Arc<
             dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+                    crate::agent::tinyagents::host::OpenHumanRunContext,
+                >,
         >,
     >,
     pub withheld: HashSet<String>,

@@ -57,10 +57,12 @@ fn record_is_thread_scoped_and_batches_in_completion_order() {
     let claimed = router.claim_pending("thread-A", usize::MAX).unwrap();
     assert_eq!(claimed.len(), 2, "everything ready is claimed as one batch");
     assert_eq!(claimed[0].result.text, "eiffel");
-    assert!(router
-        .claim_pending("thread-A", usize::MAX)
-        .unwrap()
-        .is_empty());
+    assert!(
+        router
+            .claim_pending("thread-A", usize::MAX)
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -80,10 +82,12 @@ fn headless_completion_is_dropped() {
     let _guard = test_guard();
     let ws = workspace();
     record(ws.path(), "sess-headless", "sub-1", "x", None);
-    assert!(router_for_workspace(ws.path())
-        .claim_pending("", usize::MAX)
-        .unwrap()
-        .is_empty());
+    assert!(
+        router_for_workspace(ws.path())
+            .claim_pending("", usize::MAX)
+            .unwrap()
+            .is_empty()
+    );
     assert!(recover_pending_threads(&cx(), ws.path()).is_empty());
 }
 
@@ -513,9 +517,7 @@ fn clear_all_also_withdraws_a_completion_a_delivery_has_leased() {
     record(w, "sess-l", "sub-1", "x", Some("thread-leased"));
     let router = router_for_workspace(w);
     // A delivery claimed it: the record is leased but still pending in the store.
-    let claimed = router
-        .claim_pending("thread-leased", usize::MAX)
-        .unwrap();
+    let claimed = router.claim_pending("thread-leased", usize::MAX).unwrap();
     assert_eq!(claimed.len(), 1);
     let receipts: Vec<_> = claimed
         .iter()

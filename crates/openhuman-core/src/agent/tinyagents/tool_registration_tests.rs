@@ -134,7 +134,7 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
     use tinyagents_harness::{
-        agent_loop::phases::execute_tool_batch, context::RunConfig, ComponentId,
+        ComponentId, agent_loop::phases::execute_tool_batch, context::RunConfig,
     };
 
     let workspace = tempfile::tempdir().expect("live harness workspace");
@@ -245,7 +245,7 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
     use tinyagents_harness::{
-        agent_loop::phases::execute_tool_batch, context::RunConfig, ComponentId,
+        ComponentId, agent_loop::phases::execute_tool_batch, context::RunConfig,
     };
 
     let workspace = tempfile::tempdir().expect("live harness workspace");
@@ -382,7 +382,7 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
 #[tokio::test]
 async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() {
     use crate::memory::test_fixtures::{bind_reference, config_in};
-    use tinyagents_harness::{context::RunConfig, CallId};
+    use tinyagents_harness::{CallId, context::RunConfig};
     use tinytools::ToolCallOptions;
     let workspace = tempfile::tempdir().unwrap();
     let config = config_in(&workspace);

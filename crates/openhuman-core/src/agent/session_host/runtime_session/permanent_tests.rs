@@ -1,6 +1,6 @@
 use super::*;
 use std::{collections::HashSet, sync::Arc};
-use tinyagents_session::transcript::{session_stem, SessionRef};
+use tinyagents_session::transcript::{SessionRef, session_stem};
 use tinyinference_llm::message::Message;
 use tinytools::ToolSpec;
 

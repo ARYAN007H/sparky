@@ -3,8 +3,8 @@ use super::*;
 #[tokio::test]
 async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
     use crate::agent::orchestration::subagent_sessions::{
-        cancel_driver_job_by_task, mark_finished, upsert_running, DurableSubagentStatus,
-        SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
+        DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore,
+        SubagentSessionUpsert, cancel_driver_job_by_task, mark_finished, upsert_running,
     };
 
     let directory = tempfile::tempdir().unwrap();
@@ -204,7 +204,7 @@ async fn terminal_and_pause_race_leave_only_one_authoritative_state() {
 #[tokio::test]
 async fn shared_flights_are_partitioned_by_agent_and_workspace() {
     use crate::core::runtime::agent_scope::test_agent_context;
-    use crate::core::runtime::{context::CoreContext, DomainSet};
+    use crate::core::runtime::{DomainSet, context::CoreContext};
 
     let root = CoreContext::for_test(DomainSet::full(), None);
     let alpha = test_agent_context(&root, "alpha");

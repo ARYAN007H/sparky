@@ -423,11 +423,11 @@ impl AgentSpec {
     pub fn tools(
         mut self,
         f: impl for<'a> Fn(
-                openhuman_core::agent::TurnContext<'a>,
-            ) -> openhuman_core::agent::HostTurnTools
-            + Send
-            + Sync
-            + 'static,
+            openhuman_core::agent::TurnContext<'a>,
+        ) -> openhuman_core::agent::HostTurnTools
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         self.host_tools = Some(std::sync::Arc::new(f));
         self

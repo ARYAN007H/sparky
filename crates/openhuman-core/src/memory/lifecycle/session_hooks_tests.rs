@@ -1,6 +1,6 @@
 use super::*;
 
-use tinyagents_harness::summarization::{checkpoint_message, SummaryPlacement};
+use tinyagents_harness::summarization::{SummaryPlacement, checkpoint_message};
 use tinyinference_llm::ToolCall;
 
 fn assistant_with_call(id: &str, name: &str) -> Message {

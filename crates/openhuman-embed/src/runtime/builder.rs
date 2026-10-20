@@ -20,10 +20,10 @@ use openhuman_core::core::types::HostKind;
 use openhuman_core::tools::toolpacks::ToolGroups;
 use tinyagents_session::port::SessionStoreProvider;
 
-use super::seams::HostSeams;
 use super::ApiKey;
-use crate::harness::{Access, Provider, Workspace};
+use super::seams::HostSeams;
 use crate::Session;
+use crate::harness::{Access, Provider, Workspace};
 
 // Re-exported for the sibling test module and older call sites that reached
 // the default triples through this module.
@@ -46,7 +46,7 @@ pub(crate) use super::build::{effective_host_kind, routed_provider_effective};
 #[cfg(test)]
 pub(crate) use super::presets::{default_domains, default_services};
 #[cfg(test)]
-pub(crate) use super::{RuntimeError, RUNTIME_LIVE};
+pub(crate) use super::{RUNTIME_LIVE, RuntimeError};
 
 /// Who produces the [`Config`] the core boots with.
 ///

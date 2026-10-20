@@ -80,7 +80,7 @@ pub use openhuman_core::config::ComposioHostCredential;
 pub use openhuman_core::config::Config as RuntimeConfig;
 pub use openhuman_core::config::{SearchHostCredential, UnknownKeyedSearchProvider};
 /// The exact ambient tenant, inherited across profile turns and their scoped tasks.
-pub use openhuman_core::core::runtime::{current_tenant, NoTenant, Tenant};
+pub use openhuman_core::core::runtime::{NoTenant, Tenant, current_tenant};
 pub use openhuman_core::security::TrustedAccess;
 pub use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};
 // The seam `AgentSpec::tools` needs: the belt types, and `Tool` itself from the
@@ -108,7 +108,7 @@ pub mod agent_progress {
 #[cfg(feature = "skills")]
 pub mod skill_registry {
     pub use openhuman_core::skills::catalog::{
-        skill_registry, ReqwestTransport, HERMES_REGISTRY_ID,
+        HERMES_REGISTRY_ID, ReqwestTransport, skill_registry,
     };
 }
 
@@ -153,11 +153,11 @@ mod turn_steering;
 #[path = "host_internals.rs"]
 pub mod __host;
 
+pub use openhuman_core::core::ControllerSchema;
 /// Look up the schema of a registered RPC method (`openhuman.<ns>_<fn>`).
 pub use openhuman_core::core::all::schema_for_rpc_method;
 /// Whether this build carries the HTTP server surface the router mounts.
 pub use openhuman_core::core::http_server_status::HTTP_SERVER_COMPILED_IN;
-pub use openhuman_core::core::ControllerSchema;
 /// Why a listen-port pick failed (another live core holds the port, ...).
 pub use openhuman_core::platform::connectivity::rpc::PickListenPortError;
 /// Whether this build carries the voice domain.
@@ -183,10 +183,10 @@ pub use harness::{
 };
 #[cfg(feature = "mcp")]
 pub use harness::{HttpHeader, McpAuthConfig, McpServer};
+pub use openhuman_core::cron::JobOrigin;
 /// Host-routed delivery of scheduled replies, for [`RuntimeBuilder::cron_delivery`]
 /// and the profile runtime alike.
 pub use openhuman_core::cron::host_delivery::{CronDelivery, CronReply};
-pub use openhuman_core::cron::JobOrigin;
 #[cfg(feature = "profiles")]
 pub use profiles::{
     ChatReply, CronSweepReport, DirectProfileProvider, OpenError, ProfileError, ProfileEvents,
@@ -195,14 +195,14 @@ pub use profiles::{
 };
 #[cfg(all(feature = "profiles", feature = "channels"))]
 pub use profiles::{RelayAccepted, RelayMessage};
-pub use runtime::builder::DEFAULT_MAX_AGENTS;
 /// Read-only view of a [`RuntimeBuilder`], for the layered crates' tests.
 #[doc(hidden)]
 pub use runtime::BuilderSummary;
+pub use runtime::builder::DEFAULT_MAX_AGENTS;
 pub use runtime::{
-    run_from_args, AgentDefaults, ApiKey, ConfigSource, ConfigurationInfo, DefaultsInfo,
-    LearningSettings, ModelDefaults, RemoveAgent, Runtime, RuntimeBuilder, RuntimeDefaults,
-    RuntimeError, RuntimeInfo, RuntimeModule, SkillsPolicy, StorageInfo, WeightClass,
+    AgentDefaults, ApiKey, ConfigSource, ConfigurationInfo, DefaultsInfo, LearningSettings,
+    ModelDefaults, RemoveAgent, Runtime, RuntimeBuilder, RuntimeDefaults, RuntimeError,
+    RuntimeInfo, RuntimeModule, SkillsPolicy, StorageInfo, WeightClass, run_from_args,
 };
 
 /// The types the [`RuntimeBuilder`] seam options take: controller
@@ -264,7 +264,7 @@ pub use complete::{
     CompletionTrace, CompletionUsage,
 };
 pub use session_store::{InMemorySessionStores, SessionStoreProvider};
-pub use turn::{absolute, Route, Turn, TurnOutcome, TurnRequest};
+pub use turn::{Route, Turn, TurnOutcome, TurnRequest, absolute};
 pub use turn_cancellation::TurnCancellation;
 pub use turn_steering::{SteerRefused, TurnSteering};
 

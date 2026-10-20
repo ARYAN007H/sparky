@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptMeta};
 
 /// The `{"_meta": ...}` header line of a classic transcript.

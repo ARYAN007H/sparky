@@ -36,8 +36,8 @@
 //! log line. [`unwrap_outcome_envelope`] absorbs that here so no facade method
 //! and no host has to think about it.
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use super::error::CoreError;
 use openhuman_core::core::runtime::CoreRuntime;

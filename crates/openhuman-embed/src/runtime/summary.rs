@@ -11,8 +11,8 @@ use openhuman_core::core::all::DomainGroup;
 use openhuman_core::core::runtime::{DomainSet, ServiceSet, TokenSource};
 use openhuman_core::core::types::HostKind;
 
-use super::builder::ConfigSource;
 use super::RuntimeBuilder;
+use super::builder::ConfigSource;
 use crate::harness::Workspace;
 
 /// What a [`RuntimeBuilder`] is set to; see the module docs.

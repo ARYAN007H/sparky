@@ -2,7 +2,7 @@
 
 use tinyagents_harness::ids::TaskId;
 use tinyagents_harness::run_queue::QueueLane;
-use tinyagents_orchestration::steering::{steer_detached, SteerAccess, SteerError};
+use tinyagents_orchestration::steering::{SteerAccess, SteerError, steer_detached};
 
 use super::cancel::now_ms;
 use super::registry::{control_admits, owner_key, registry};

@@ -34,7 +34,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::ops_discover::{discover_workflows, is_workspace_trusted};
 use crate::config::Config;

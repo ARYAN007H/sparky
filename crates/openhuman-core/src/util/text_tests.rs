@@ -92,7 +92,7 @@ fn test_truncate_zero_max_chars() {
 #[test]
 fn test_truncate_at_byte_boundary() {
     let s = "Hello 🦀 World"; // 16 bytes total. "🦀" is 4 bytes at index 6-9.
-                              // No truncation
+    // No truncation
     assert_eq!(truncate_at_byte_boundary(s, 16), s);
     assert_eq!(truncate_at_byte_boundary(s, 20), s);
 

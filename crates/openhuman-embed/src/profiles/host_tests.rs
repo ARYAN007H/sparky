@@ -65,11 +65,13 @@ fn profiles_keep_a_nonempty_readonly_permission_map_without_operator_grants() {
     let mut config = openhuman_core::profiles::layout::profile_config(&layout, &id);
     capabilities.configure(&mut config);
     assert!(!config.agent.channel_permissions.is_empty());
-    assert!(config
-        .agent
-        .channel_permissions
-        .values()
-        .all(|level| level == "readonly"));
+    assert!(
+        config
+            .agent
+            .channel_permissions
+            .values()
+            .all(|level| level == "readonly")
+    );
 }
 
 #[test]

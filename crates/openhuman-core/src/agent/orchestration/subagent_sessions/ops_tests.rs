@@ -108,43 +108,51 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
     .unwrap();
     assert_eq!(first.subagent_session_id, second.subagent_session_id);
 
-    assert!(mark_finished(
-        &store,
-        &second.subagent_session_id,
-        "first-task",
-        &SubagentRunStatus::Completed,
-        vec![TranscriptMessage::user("stale")],
-    )
-    .is_err());
+    assert!(
+        mark_finished(
+            &store,
+            &second.subagent_session_id,
+            "first-task",
+            &SubagentRunStatus::Completed,
+            vec![TranscriptMessage::user("stale")],
+        )
+        .is_err()
+    );
     let current = store.load().unwrap().remove(0);
     assert_eq!(current.current_task_id.as_deref(), Some("second-task"));
     assert_eq!(current.status, DurableSubagentStatus::Running);
     assert!(current.latest_history.is_none());
-    assert!(mark_failed(
-        &store,
-        &second.subagent_session_id,
-        "first-task",
-        "stale failure".into(),
-    )
-    .is_err());
+    assert!(
+        mark_failed(
+            &store,
+            &second.subagent_session_id,
+            "first-task",
+            "stale failure".into(),
+        )
+        .is_err()
+    );
     assert!(store.load().unwrap()[0].latest_error.is_none());
 
     close(&store, &second.subagent_session_id).unwrap();
-    assert!(mark_finished(
-        &store,
-        &second.subagent_session_id,
-        "second-task",
-        &SubagentRunStatus::Completed,
-        vec![TranscriptMessage::user("late after close")],
-    )
-    .is_err());
-    assert!(mark_failed(
-        &store,
-        &second.subagent_session_id,
-        "second-task",
-        "late failure".into(),
-    )
-    .is_err());
+    assert!(
+        mark_finished(
+            &store,
+            &second.subagent_session_id,
+            "second-task",
+            &SubagentRunStatus::Completed,
+            vec![TranscriptMessage::user("late after close")],
+        )
+        .is_err()
+    );
+    assert!(
+        mark_failed(
+            &store,
+            &second.subagent_session_id,
+            "second-task",
+            "late failure".into(),
+        )
+        .is_err()
+    );
     let closed = store.load().unwrap().remove(0);
     assert_eq!(closed.status, DurableSubagentStatus::Closed);
     assert!(closed.latest_history.is_none());
@@ -222,12 +230,14 @@ fn driver_task_cancel_reports_legacy_failure_and_refuses_ambiguous_ids() {
             .unwrap()
             .is_none()
     );
-    assert!(store
-        .load()
-        .unwrap()
-        .iter()
-        .filter(|row| row.current_task_id.as_deref() == Some("same-public-id"))
-        .all(|row| row.status == DurableSubagentStatus::Running));
+    assert!(
+        store
+            .load()
+            .unwrap()
+            .iter()
+            .filter(|row| row.current_task_id.as_deref() == Some("same-public-id"))
+            .all(|row| row.status == DurableSubagentStatus::Running)
+    );
 }
 
 #[test]
@@ -496,14 +506,16 @@ fn upsert_persists_the_full_lifecycle_key_without_collapsing_to_task_id() {
     )
     .unwrap();
     assert_eq!(resolved, key);
-    assert!(resolve_lifecycle_key(
-        &store,
-        &session.subagent_session_id,
-        "another-parent",
-        Some("thread-a"),
-        dir.path(),
-    )
-    .is_err());
+    assert!(
+        resolve_lifecycle_key(
+            &store,
+            &session.subagent_session_id,
+            "another-parent",
+            Some("thread-a"),
+            dir.path(),
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -564,12 +576,14 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
 
     let all = list_for_parent(&store, "parent-a", None).unwrap();
     assert_eq!(all.len(), 2);
-    assert!(all
-        .iter()
-        .any(|session| session.subagent_session_id == first.subagent_session_id));
-    assert!(all
-        .iter()
-        .any(|session| session.subagent_session_id == second.subagent_session_id));
+    assert!(
+        all.iter()
+            .any(|session| session.subagent_session_id == first.subagent_session_id)
+    );
+    assert!(
+        all.iter()
+            .any(|session| session.subagent_session_id == second.subagent_session_id)
+    );
 
     let thread_a = list_for_parent(&store, "parent-a", Some("thread-a")).unwrap();
     assert_eq!(thread_a.len(), 1);
@@ -580,14 +594,16 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
 fn missing_session_updates_return_errors() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
-    assert!(mark_finished(
-        &store,
-        "missing",
-        "sub-1",
-        &SubagentRunStatus::Completed,
-        vec![]
-    )
-    .is_err());
+    assert!(
+        mark_finished(
+            &store,
+            "missing",
+            "sub-1",
+            &SubagentRunStatus::Completed,
+            vec![]
+        )
+        .is_err()
+    );
     assert!(mark_failed(&store, "missing", "sub-1", "boom".into()).is_err());
     assert!(!close(&store, "missing").unwrap());
 }

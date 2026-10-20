@@ -137,10 +137,7 @@ fn delivered_pause_leaves_the_task_key_free_for_a_later_delivery() {
     let pause_receipt = pause_batch[0]
         .receipt()
         .expect("claimed pause has a settlement receipt");
-    assert_eq!(
-        router.mark_delivered(&[pause_receipt]).unwrap(),
-        1
-    );
+    assert_eq!(router.mark_delivered(&[pause_receipt]).unwrap(), 1);
 
     record(
         w,
@@ -160,14 +157,13 @@ fn delivered_pause_leaves_the_task_key_free_for_a_later_delivery() {
     let completion_receipt = completion_batch[0]
         .receipt()
         .expect("claimed completion has a settlement receipt");
-    assert_eq!(
-        router.mark_delivered(&[completion_receipt]).unwrap(),
-        1
+    assert_eq!(router.mark_delivered(&[completion_receipt]).unwrap(), 1);
+    assert!(
+        router
+            .claim_pending("thread-sequential", usize::MAX)
+            .unwrap()
+            .is_empty()
     );
-    assert!(router
-        .claim_pending("thread-sequential", usize::MAX)
-        .unwrap()
-        .is_empty());
 }
 
 #[test]

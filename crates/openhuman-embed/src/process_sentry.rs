@@ -13,8 +13,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use openhuman_core::core::observability as obs;
-pub use sentry::protocol::Event;
 pub use sentry::ClientOptions;
+pub use sentry::protocol::Event;
 
 /// Re-exported so a host initialises the same `sentry` the options were
 /// built for.
