@@ -214,12 +214,69 @@ async fn a_matching_active_agent_scope_is_a_legacy_source() {
     let context = CoreContext::for_test(DomainSet::full(), Some(workspace.clone())).derive_with(
         ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).session_agent("agent-a"),
     );
+    let backend: std::sync::Arc<dyn crate::storage::StorageBackend> =
+        std::sync::Arc::new(crate::storage::MemoryStorage::new());
+    let old_scope = crate::storage::scope_for_agent("agent-a");
+    let old = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &old_scope,
+        "memory",
+        "state",
+    )
+    .unwrap();
+    let item = crate::memory::deletion::PendingDeletion::Thread {
+        thread_id: "agent-owed".into(),
+    };
+    old.put("pending_deletions", &vec![item.clone()]).unwrap();
+    let target_scope = super::workspace_scope(&workspace).unwrap();
+    let target = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &target_scope,
+        "memory",
+        "state",
+    )
+    .unwrap();
 
-    let scopes = CoreContext::scope(context, async {
-        super::legacy_queue_scopes(&workspace)
+    let migrated = CoreContext::scope(context.clone(), async {
+        super::legacy_queue_scopes(&workspace).contains(&old_scope)
+            && super::migrate_existing_queue_scopes(&workspace, &backend, &target_scope, &target)
+                .is_ok()
     })
     .await;
-    assert!(scopes.contains(&crate::storage::scope_for_agent("agent-a")));
+    assert!(migrated);
+    assert_eq!(
+        target
+            .get::<Vec<crate::memory::deletion::PendingDeletion>>("pending_deletions")
+            .unwrap(),
+        Some(vec![item])
+    );
+
+    let other_workspace = tmp.path().join("other-workspace");
+    let other_scope = super::workspace_scope(&other_workspace).unwrap();
+    let other_target = crate::storage::state_kv::StateKv::on_backend(
+        &backend,
+        &other_scope,
+        "memory",
+        "state",
+    )
+    .unwrap();
+    CoreContext::scope(context, async {
+        super::migrate_existing_queue_scopes(
+            &other_workspace,
+            &backend,
+            &other_scope,
+            &other_target,
+        )
+        .unwrap();
+    })
+    .await;
+    assert!(
+        other_target
+            .get::<Vec<crate::memory::deletion::PendingDeletion>>("pending_deletions")
+            .unwrap()
+            .is_none(),
+        "an active agent scope is not copied into a different workspace"
+    );
 }
 
 #[test]
