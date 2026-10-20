@@ -884,7 +884,22 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
         {
           kind: 'file' as const,
           fileName: 'archive.zip',
-          media: { url: 'data:application/zip;name=archive.zip;base64,AQID' },
+          caption: null,
+          media: {
+            kind: 'document' as const,
+            url: 'data:application/zip;name=archive.zip;base64,AQID',
+            contentType: null,
+            fileName: 'archive.zip',
+            sizeBytes: null,
+            codec: null,
+            durationMs: null,
+            height: null,
+            localCachePath: null,
+            path: null,
+            platformMessageId: null,
+            transcribed: false,
+            width: null,
+          },
         },
       ];
       const durable =

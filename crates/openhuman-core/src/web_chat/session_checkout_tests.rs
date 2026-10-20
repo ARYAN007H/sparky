@@ -11,8 +11,8 @@ use std::path::Path;
 use tinyagents_session::transcript::TranscriptMeta;
 
 use super::{
-    CheckedOutSession, CheckoutPolicy, checkin_session_agent, checkin_session_agent_if_vacant,
-    checkout_session_agent, fingerprint_diff,
+    checkin_session_agent, checkin_session_agent_if_vacant, checkout_session_agent,
+    fingerprint_diff, CheckedOutSession, CheckoutPolicy,
 };
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
@@ -57,6 +57,7 @@ fn write_thread_transcript(workspace_dir: &Path, stem: &str, thread_id: &str, ro
     let meta = TranscriptMeta {
         session_id: None,
         parent_session_id: None,
+        prefix_reset: false,
         agent_name: "orchestrator_thread".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: Some("root".into()),

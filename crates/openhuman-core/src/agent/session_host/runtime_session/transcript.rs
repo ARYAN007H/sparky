@@ -63,6 +63,7 @@ impl OpenHumanSessionHost {
                 .session
                 .as_ref()
                 .and_then(|session| session.parent_session_id()),
+            prefix_reset: false,
         }
     }
 }

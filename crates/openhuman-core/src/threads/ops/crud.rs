@@ -417,6 +417,7 @@ pub async fn message_update(
         request.message_id.clone(),
         ConversationMessagePatch {
             extra_metadata: request.extra_metadata,
+            ..Default::default()
         },
     )
     .await?;

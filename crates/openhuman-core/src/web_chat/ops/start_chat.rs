@@ -439,6 +439,7 @@ async fn bind_voice_note_request_id(
         row.id.clone(),
         ConversationMessagePatch {
             extra_metadata: Some(extra_metadata),
+            ..Default::default()
         },
     )
     .await

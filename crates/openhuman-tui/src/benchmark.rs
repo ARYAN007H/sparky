@@ -1,8 +1,8 @@
 //! Deterministic, offline measurements of the real viewport and TestBackend renderer.
 use super::{render, state::TranscriptState, ui_state::UiState, viewport::ViewportCache};
 use openhuman_rpc::embed::chat_surface::{WebChannelEvent, WebEventContext};
-use ratatui::{Terminal, backend::TestBackend};
-use serde_json::{Value, json};
+use ratatui::{backend::TestBackend, Terminal};
+use serde_json::{json, Value};
 use std::{hint::black_box, time::Instant};
 
 const SAMPLES: usize = 200;

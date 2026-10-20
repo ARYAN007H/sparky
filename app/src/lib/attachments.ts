@@ -323,10 +323,33 @@ export function attachmentsToParts(attachments: Attachment[]): ContentPart[] {
       contentType: a.mimeType,
       fileName: a.file.name,
       sizeBytes: a.originalSizeBytes,
+      codec: null,
+      durationMs: null,
+      height: null,
+      localCachePath: null,
+      path: null,
+      platformMessageId: null,
+      transcribed: false,
+      width: null,
     };
-    if (a.kind === 'image') return { kind: 'image', media: { ...media, kind: 'image' } };
-    if (a.kind === 'video') return { kind: 'video', media: { ...media, kind: 'video' } };
-    return { kind: 'file', fileName: a.file.name, media: { ...media, kind: 'document' } };
+    if (a.kind === 'image') {
+      return { kind: 'image', altText: null, caption: null, media: { ...media, kind: 'image' } };
+    }
+    if (a.kind === 'video') {
+      return {
+        kind: 'video',
+        caption: null,
+        durationMs: null,
+        thumbnail: null,
+        media: { ...media, kind: 'video' },
+      };
+    }
+    return {
+      kind: 'file',
+      fileName: a.file.name,
+      caption: null,
+      media: { ...media, kind: 'document' },
+    };
   });
 }
 

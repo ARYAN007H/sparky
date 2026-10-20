@@ -70,6 +70,8 @@ const IGNORED: &[&str] = &[
     "proactive_message",
     "voice_speak",
     "user_error",
+    // Canonical provider read/reaction events are not transcript rows in the TUI.
+    "channel_event",
 ];
 
 /// Classify one event tag.

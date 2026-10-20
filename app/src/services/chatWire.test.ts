@@ -55,6 +55,7 @@ describe('chatWire', () => {
       input_tokens: 10,
       output_tokens: 5,
       cached_input_tokens: 2,
+      context_tokens: 0,
       context_window: 1000,
       cost_usd: null,
       cost_source: 'unknown',
