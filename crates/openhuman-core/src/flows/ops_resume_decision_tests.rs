@@ -299,25 +299,16 @@ async fn flows_resume_of_a_non_paused_run_errors_clearly() {
     .await
     .expect_err("resuming an already-completed run must be a clear error, not a silent no-op");
     let expected = "is not waiting for approval";
-    if std::env::var_os("OPENHUMAN_TINYFLOWS_RUN_DIAGNOSTICS").is_some() || !err.contains(expected)
-    {
-        let dispatch = crate::core::runtime::DispatchCtx::ambient();
-        let tenant_scoped = dispatch
-            .tenant()
-            .map(|tenant| tenant.is_scoped())
-            .unwrap_or(false);
-        let module_state = crate::modules::ops::state_of("tinyflows");
-        let module_version = crate::modules::registry::find("tinyflows")
-            .map(|record| record.version)
-            .unwrap_or("missing");
-        eprintln!(
-            "ResumeRun nonparked-status diagnostic: error={err}; workspace={}; tenant_scoped={tenant_scoped}; TinyFlows state={module_state:?}; registry_version={module_version}; artifact={:?}",
-            config.workspace_dir.display(),
-            crate::modules::local_artifact("tinyflows")
-        );
-    }
     assert!(
         err.contains(expected),
         "expected a clear non-paused-run error, got: {err}"
+    );
+    let completed = flows_get_run(&config, &thread_id)
+        .await
+        .expect("read the completed run after refused resume")
+        .value;
+    assert_eq!(
+        completed.status, "completed",
+        "refusing a resume must leave the completed run unchanged"
     );
 }

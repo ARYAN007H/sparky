@@ -63,7 +63,10 @@ fn the_description_names_the_trigger_and_step_count() {
             node(
                 "t",
                 NodeKind::Trigger,
-                serde_json::json!({ "trigger_kind": "schedule" }),
+                serde_json::json!({
+                    "trigger_kind": "schedule",
+                    "schedule": "0 9 * * *"
+                }),
             ),
             node("a", NodeKind::Agent, serde_json::json!({})),
             node("b", NodeKind::Agent, serde_json::json!({})),
@@ -145,7 +148,7 @@ fn a_flow_description_is_always_derived_from_its_graph_shape() {
 
 // ── Against a real store ──────────────────────────────────────────────────
 //
-// The mapping tests above never touch `flows.db`. These do, because the
+// The mapping tests above never touch Catalog storage. These do, because the
 // interesting failure is not the mapping — it is `flow_entries` reading the
 // wrong database, or silently swallowing a real one. A unit test over
 // `entry_for` would pass in both cases.
@@ -211,15 +214,17 @@ fn entries_are_sorted_by_name_so_the_prompt_prefix_is_stable() {
     // unrelated to the conversation.
     let tmp = TempDir::new().unwrap();
     let config = store_config(&tmp);
+    let graph = WorkflowGraph {
+        nodes: vec![node(
+            "trigger",
+            NodeKind::Trigger,
+            serde_json::json!({ "trigger_kind": "manual" }),
+        )],
+        ..Default::default()
+    };
     for name in ["Zebra", "Alpha", "Mango"] {
-        super::super::store::create_flow(
-            &config,
-            name.to_string(),
-            WorkflowGraph::default(),
-            false,
-            true,
-        )
-        .expect("flow saves");
+        super::super::store::create_flow(&config, name.to_string(), graph.clone(), false, true)
+            .expect("flow saves");
     }
     let names: Vec<String> = flow_entries(&config).into_iter().map(|e| e.name).collect();
     assert_eq!(names, vec!["Alpha", "Mango", "Zebra"]);

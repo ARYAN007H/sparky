@@ -7,9 +7,6 @@
 
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
-#[cfg(test)]
-use serde_json::Value;
-use std::path::PathBuf;
 use tinyflows_bus::catalog::{
     self, DeleteWorkflowResult, FlowUpdateError as BusUpdateError, GetRevisionRequest,
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
@@ -19,11 +16,6 @@ use tinyflows_catalog::{Flow, FlowRevision, FlowSuggestion, SuggestionStatus};
 
 use crate::config::Config;
 use crate::modules::tinyflows as module;
-
-/// Retained only for callers that display the legacy workflow folder path.
-pub fn dir(config: &Config) -> PathBuf {
-    config.workspace_dir.join("flows")
-}
 
 pub(crate) fn call_catalog<T, A>(config: &Config, member: &'static str, args: A) -> Result<T>
 where
@@ -73,64 +65,6 @@ fn put_result(response: PutWorkflowResponse) -> Result<Flow> {
             | BusUpdateError::VersionConflict { message, .. }
             | BusUpdateError::Store { message } => message,
         })),
-    }
-}
-
-/// Seed a caller-chosen id through CatalogStorage for host tests.
-#[cfg(test)]
-pub fn upsert_flow(config: &Config, flow: &Flow) -> Result<()> {
-    test_seed_flow(config, flow)
-}
-
-#[cfg(test)]
-fn test_seed_flow(config: &Config, flow: &Flow) -> Result<()> {
-    let storage = super::catalog_storage::register_blocking(config)?;
-    let _: ListWorkflowsResult =
-        call_catalog(config, catalog::members::LIST_WORKFLOWS, (storage.clone(),))?;
-    let created_ms = chrono::DateTime::parse_from_rfc3339(&flow.created_at)
-        .map(|date| date.timestamp_millis())
-        .unwrap_or(0);
-    let updated_ms = chrono::DateTime::parse_from_rfc3339(&flow.updated_at)
-        .map(|date| date.timestamp_millis())
-        .unwrap_or(created_ms);
-    let mut doc = serde_json::json!({
-        "name": flow.name,
-        "graph": flow.graph,
-        "enabled": flow.enabled,
-        "created_ms": created_ms,
-        "updated_ms": updated_ms,
-        "require_approval": flow.require_approval,
-        "revision": 1,
-        "incarnation": uuid::Uuid::new_v4().to_string(),
-    });
-    if let Some(status) = &flow.last_status {
-        doc["last_status"] = Value::String(status.clone());
-    }
-    if let Some(last_run_at) = &flow.last_run_at {
-        if let Ok(date) = chrono::DateTime::parse_from_rfc3339(last_run_at) {
-            doc["last_run_ms"] = Value::from(date.timestamp_millis());
-        }
-    }
-    let request = catalog::DocPutRequest {
-        collection: "flows.definitions".into(),
-        id: flow.id.clone(),
-        doc,
-        precondition: catalog::CatalogDocumentPrecondition::None,
-        schema: 2,
-        expires_ms: None,
-        created_ms: Some(created_ms),
-    };
-    match super::catalog_storage::call_test_storage::<catalog::CatalogStorageReply, _>(
-        config,
-        catalog::storage::PUT,
-        (request,),
-    )? {
-        catalog::CatalogStorageReply::Value { .. } => Ok(()),
-        catalog::CatalogStorageReply::Error { error } => Err(anyhow!(
-            "CatalogStorage fixture write failed ({}): {}",
-            error.kind,
-            error.message
-        )),
     }
 }
 

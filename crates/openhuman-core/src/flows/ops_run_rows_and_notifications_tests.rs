@@ -18,7 +18,18 @@ async fn flows_resume_with_no_recorded_run_for_thread_id_errors_clearly() {
     )
     .await
     .expect_err("must error when no run is recorded for this thread_id");
-    assert!(err.contains("flow run does not exist in this owner scope"));
+    assert!(
+        err.contains("thread-that-was-never-started") && err.contains("not found"),
+        "unexpected missing-run error: {err}"
+    );
+    assert!(
+        flows_list_runs(&config, &created.value.id, 20)
+            .await
+            .unwrap()
+            .value
+            .is_empty(),
+        "rejecting an unknown thread must not admit a run"
+    );
 }
 
 // ── run history (flows_list_runs / flows_get_run) ────────────────────────
@@ -621,9 +632,14 @@ async fn flows_cancel_run_cancels_a_parked_pending_approval_run() {
     .await
     .expect_err("a cancelled run must not be resumable");
     assert!(
-        err.contains("flow run is not parked for approval (status: cancelled)"),
-        "{err}"
+        err.contains(&format!(
+            "flow run '{thread_id}' is not waiting for approval"
+        )),
+        "unexpected cancelled-run resume error: {err}"
     );
+    let unchanged = flows_get_run(&config, &thread_id).await.unwrap().value;
+    assert_eq!(unchanged.status, "cancelled");
+    assert!(unchanged.pending_approvals.is_empty());
 }
 
 #[tokio::test]

@@ -1,6 +1,7 @@
-//! The `flows::` domain: saved automation workflows (tinyflows graphs) —
-//! create/get/list/update/delete/enable/run, backed by SQLite. Mirrors
-//! `crates/openhuman-core/src/cron/`'s module shape.
+//! The `flows::` domain: saved automation workflows (TinyFlows graphs) —
+//! create/get/list/update/delete/enable/run through the TinyFlows module and
+//! its CatalogStorage callback. Mirrors `crates/openhuman-core/src/cron/`'s
+//! module shape.
 //!
 //! Business logic lives in [`ops`]; workflow definitions in `store`; the RPC/CLI
 //! controller surface in `schemas` (private, re-exported below).
@@ -41,7 +42,9 @@ pub(crate) mod registration;
 pub(crate) mod runs_adapter;
 mod schemas;
 mod store;
-/// The tinyflows engine seam (formerly `crate::tinyflows`).
+#[cfg(test)]
+pub(crate) mod test_support;
+/// Generic graph model and legacy migration re-exports retained for host APIs.
 pub mod tinyflows;
 
 // Portable catalog vocabulary is imported directly from `tinyflows-catalog`.
