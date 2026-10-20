@@ -142,68 +142,9 @@ pub fn build(ctx: &PromptContext<'_>) -> Result<String> {
 /// turn. Only a withheld specialist needs prose, because its description is
 /// the thing the model cannot see.
 fn render_withheld_specialists(ctx: &PromptContext<'_>) -> String {
-    // Empty is the harness's "everything is visible" sentinel, not "nothing
-    // visible" — with no filter, nothing is withheld and the section is void.
-    if ctx.visible_tool_names.is_empty() {
-        tracing::debug!(
-            agent = ctx.agent_id,
-            "[orchestrator-prompt] no visible-tool filter; nothing can be withheld"
-        );
-        return String::new();
-    }
-    let Some(registry) = AgentDefinitionRegistry::current() else {
-        tracing::debug!(
-            "[orchestrator-prompt] no agent registry; withheld-specialist section omitted"
-        );
-        return String::new();
-    };
-    let Some(definition) = resolve_definition(&registry, ctx.agent_id) else {
-        tracing::debug!(
-            agent = ctx.agent_id,
-            "[orchestrator-prompt] agent id does not resolve to a registry entry"
-        );
-        return String::new();
-    };
-
-    let mut rows: Vec<(String, &'static str, String)> = Vec::new();
-    for entry in &definition.subagents {
-        // `Skills(_)` expands to searchable integration actions, not a
-        // delegate tool; the `## Connected Integrations` block covers them.
-        let SubagentEntry::AgentId(agent_id) = entry else {
-            continue;
-        };
-        // Runtime-only, never given a delegate tool — see the same skip in
-        // `collect_orchestrator_tools`.
-        if agent_id == "summarizer" {
-            continue;
-        }
-        let Some(target) = registry.get(agent_id) else {
-            continue;
-        };
-        let tool_name = target
-            .delegate_name
-            .clone()
-            .unwrap_or_else(|| format!("delegate_{}", target.id));
-        if ctx.visible_tool_names.contains(&tool_name) {
-            continue;
-        }
-        let Some(pack) = toolpacks::pack_for_tool(&tool_name) else {
-            // Not advertised and not packed: the agent is compiled out or the
-            // belt never listed it, so there is no route to describe.
-            continue;
-        };
-        rows.push((tool_name, pack.id, target.when_to_use.clone()));
-    }
-
-    if rows.is_empty() {
-        tracing::debug!(
-            agent = ctx.agent_id,
-            subagents = definition.subagents.len(),
-            visible = ctx.visible_tool_names.len(),
-            "[orchestrator-prompt] no withheld specialists to render"
-        );
-        return String::new();
-    }
+    let _ = ctx;
+    String::new()
+}
     tracing::debug!(
         count = rows.len(),
         "[orchestrator-prompt] rendering withheld-specialist routing"
@@ -264,26 +205,12 @@ fn hand_off_route(ctx: &PromptContext<'_>, specialist: &str) -> Option<String> {
     if !listed {
         return None;
     }
-    let target = registry.get(specialist)?;
-    let tool = target
-        .delegate_name
-        .clone()
-        .unwrap_or_else(|| format!("delegate_{}", target.id));
-    if ctx.visible_tool_names.is_empty() || ctx.visible_tool_names.contains(&tool) {
-        return Some(format!("`{tool}`"));
+    registry.get(specialist)?;
+    if ctx.visible_tool_names.is_empty() || ctx.visible_tool_names.contains("spawn_subagent") {
+        Some(format!("`spawn_subagent` with agent_id `{specialist}`"))
+    } else {
+        None
     }
-    // A packed route is only a route if this session can call `use_skill`
-    // itself. A filtered belt holding neither the delegate nor `use_skill` has
-    // no way to reach the specialist, and naming one anyway is the same "call a
-    // tool you do not have" failure this whole block exists to end (#6302).
-    if !ctx
-        .visible_tool_names
-        .contains(tinyagents_harness_tools::skills::USE_SKILL)
-    {
-        return None;
-    }
-    toolpacks::pack_for_tool(&tool)
-        .map(|pack| format!("`{tool}` (`use_skill` skill `{}`)", pack.id))
 }
 
 /// How this session runs an installed skill: its own `run_workflow`, on the
