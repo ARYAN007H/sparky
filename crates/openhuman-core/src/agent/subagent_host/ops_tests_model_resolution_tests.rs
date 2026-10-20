@@ -478,7 +478,7 @@ fn resolve_subagent_source_hint_with_config_routes_via_factory() {
     // distinct `default_model` so the assertion proves the role — not the
     // global default — drives the resolved tier.
     config.agentic_provider = Some("openhuman".to_string());
-    config.default_model = Some("chat-v1".to_string());
+    config.default_model = Some("fixture-reasoning".to_string());
 
     let parent: Arc<dyn ChatModel<()>> = ScriptedProvider::new(vec![]);
     let (_resolved_source, resolved_model) = super::super::resolve_subagent_source(

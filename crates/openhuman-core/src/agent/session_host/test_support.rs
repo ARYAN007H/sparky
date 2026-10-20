@@ -65,10 +65,11 @@ fn model_fixture_entry() -> ChatModelEntry {
                     .strip_prefix("hint:")
                     .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
                     .map(|_| "test/session-fixture".to_string()),
-                None => config
-                    .default_model
-                    .clone()
-                    .or_else(|| Some("test/session-fixture".into())),
+                None => match config.default_model.as_deref() {
+                    Some("fixture-reasoning") => Some("test/selected-reasoning".into()),
+                    Some(model) => Some(model.to_string()),
+                    None => Some("test/session-fixture".into()),
+                },
             }),
             context_window: Arc::new(|_| None),
             default_pricing: Arc::new(|| None),
