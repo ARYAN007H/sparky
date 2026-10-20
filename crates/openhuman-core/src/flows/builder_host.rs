@@ -175,18 +175,21 @@ impl SandboxRunner for FlowsHost {
             config: self.config.clone(),
             dispatch: crate::core::runtime::DispatchCtx::ambient(),
         };
-        let callback_lease = SandboxCallbackLease {
-            runtime,
-            path: Some(object_path),
-        };
-        runtime
-            .spawn(async move {
-                connection.request_name(SANDBOX_CALLBACK_BUS).await?;
-                connection.serve_at(served_path, callback).await
+        // The registration task owns the lease it returns. If this caller is
+        // canceled while request_name/serve_at is pending, dropping its
+        // JoinHandle detaches the task; the returned lease is then dropped
+        // when registration completes and unregisters the callback.
+        let callback_lease = await_registration(runtime.spawn(async move {
+            connection.request_name(SANDBOX_CALLBACK_BUS).await?;
+            connection.serve_at(served_path.clone(), callback).await?;
+            Ok::<_, tinybus::Error>(SandboxCallbackLease {
+                runtime,
+                path: Some(served_path),
             })
-            .await
-            .map_err(|error| error.to_string())?
-            .map_err(|error| error.to_string())?;
+        }))
+        .await
+        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())?;
 
         let response = async {
             let proxy: Proxy = runtime
@@ -254,6 +257,12 @@ impl SandboxToolPreflight {
 struct SandboxCallbackLease {
     runtime: &'static tinybus::module::ModuleRuntime,
     path: Option<tinybus::ObjectPath>,
+}
+
+async fn await_registration<T>(
+    task: tokio::task::JoinHandle<Result<T, tinybus::Error>>,
+) -> Result<Result<T, tinybus::Error>, tokio::task::JoinError> {
+    task.await
 }
 
 impl Drop for SandboxCallbackLease {
@@ -361,3 +370,7 @@ impl NodeKindSource for OverlayNodeKinds {
         super::node_contracts::node_kind_contract(kind)
     }
 }
+
+#[cfg(test)]
+#[path = "builder_host_tests.rs"]
+mod tests;
