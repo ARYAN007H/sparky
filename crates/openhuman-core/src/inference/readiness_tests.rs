@@ -9,6 +9,8 @@ async fn cached_probe_serves_definitive_negative_results() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
+    let _model_override_guard =
+        crate::inference::provider::factory::test_provider_override::exclusive();
     let tmp = TempDir::new().unwrap();
     let mut config = Config {
         workspace_dir: tmp.path().join("workspace"),
