@@ -69,6 +69,16 @@ fn guardrail_verdict_user_message(verdict: &str) -> &'static str {
     }
 }
 
+fn submission_has_content(
+    message: &str,
+    stored_attachments: Option<&crate::agent::queued_turn::StoredAttachmentInput>,
+    attachment_uploads: Option<&[tinychannels_bus::ContentPart]>,
+) -> bool {
+    !message.trim().is_empty()
+        || stored_attachments.is_some_and(|input| !input.parts.is_empty())
+        || attachment_uploads.is_some_and(|parts| !parts.is_empty())
+}
+
 impl std::error::Error for StartChatError {}
 
 impl From<String> for StartChatError {
@@ -331,7 +341,11 @@ async fn start_chat_inner(
     if thread_id.is_empty() {
         return Err(StartChatError::Other("thread_id is required".to_string()));
     }
-    if message.is_empty() {
+    if !submission_has_content(
+        &message,
+        stored_attachments.as_ref(),
+        attachment_uploads.as_deref(),
+    ) {
         return Err(StartChatError::Other("message is required".to_string()));
     }
     // A profile this node no longer hosts (its lease was lost or released)
