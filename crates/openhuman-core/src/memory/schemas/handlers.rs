@@ -31,7 +31,9 @@ fn to_json<T: Serialize>(value: T) -> Result<Value, String> {
     Outcome::new(value, Vec::new()).into_cli_compatible_json()
 }
 
-fn finish<T: Serialize, E: Into<MemoryError>>(result: std::result::Result<T, E>) -> Result<Value, String> {
+fn finish<T: Serialize, E: Into<MemoryError>>(
+    result: std::result::Result<T, E>,
+) -> Result<Value, String> {
     to_json(result.map_err(Into::into).map_err(String::from)?)
 }
 

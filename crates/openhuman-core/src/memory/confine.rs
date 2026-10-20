@@ -120,9 +120,7 @@ pub async fn recall(
         params.filter,
         &allowed_reach(config, identity),
     )?);
-    ops::recall(config, params)
-        .await
-        .map_err(MemoryError::from)
+    ops::recall(config, params).await.map_err(MemoryError::from)
 }
 
 /// `memory_fetch`, confined.
@@ -139,9 +137,7 @@ pub async fn fetch(
         params.filter,
         &allowed_reach(config, identity),
     )?);
-    ops::fetch(config, params)
-        .await
-        .map_err(MemoryError::from)
+    ops::fetch(config, params).await.map_err(MemoryError::from)
 }
 
 /// `memory_learn`, confined: the learning lands inside the caller's layout.
@@ -175,9 +171,7 @@ pub async fn forget(
         params.reach,
         &allowed_reach(config, identity),
     )?);
-    ops::forget(config, params)
-        .await
-        .map_err(MemoryError::from)
+    ops::forget(config, params).await.map_err(MemoryError::from)
 }
 
 /// `memory_items_list`, confined. The explorer path narrows first (a
