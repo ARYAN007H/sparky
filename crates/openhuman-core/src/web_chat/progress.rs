@@ -292,12 +292,15 @@ impl ProgressProjection {
                 iteration,
             } => {
                 self.surface
-                    .output(ChannelOutputEvent::ToolCallArgsDelta {
-                        call_id,
-                        tool_name,
-                        delta,
-                        iteration,
-                    })
+                    .output(
+                        map::turn_event(AgentProgress::ToolCallArgsDelta {
+                            call_id,
+                            tool_name,
+                            delta,
+                            iteration,
+                        })
+                        .expect("tool argument progress maps to a channel event"),
+                    )
                     .await;
             }
             AgentProgress::ToolCallProgress { call_id, message } => {
