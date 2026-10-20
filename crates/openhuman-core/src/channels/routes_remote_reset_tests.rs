@@ -194,6 +194,15 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         2
     );
 
+    let direct_reset = crate::channels::runtime::dispatch::reset_durable_channel_session(
+        &alice_runtime,
+        &reset.message,
+        &reset.durable_session_key,
+        &reset.history_key,
+    )
+    .await;
+    assert!(direct_reset.is_ok(), "direct reset failure: {direct_reset:#?}");
+
     let cleared = crate::channels::host::remote_control::dispatch_callback(
         &alice_dispatch,
         &alice_runtime,
