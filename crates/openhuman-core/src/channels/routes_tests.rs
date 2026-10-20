@@ -397,6 +397,27 @@ async fn clear_history_command_uses_reset_callback_and_persists_route_override()
     assert!(sent[0].content.contains("Model switched to `gpt-5-mini`"));
 }
 
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn remote_clear_without_typed_scope_fails_closed() {
+    let ctx = runtime_context(std::env::temp_dir().join("remote-clear-scope"));
+    let dispatch = ctx.dispatch_ctx();
+    let cancellation = tokio_util::sync::CancellationToken::new();
+
+    let result = crate::channels::host::remote_control::dispatch_callback(
+        &dispatch,
+        &ctx,
+        &crate::core::runtime::Tenant::default(),
+        &cancellation,
+        tinychannels_bus::module_remote::RemoteHostRequest::ClearHistory {
+            sender_key: "telegram_alice_chat".into(),
+        },
+    )
+    .await;
+
+    assert!(result.is_err(), "an unscoped reset must never report success");
+}
+
 #[tokio::test]
 async fn handle_runtime_command_telegram_status_replies_without_agent() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
