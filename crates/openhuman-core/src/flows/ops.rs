@@ -47,7 +47,7 @@ use crate::flows::draft_store;
 use crate::flows::store;
 use crate::security::approval::{ApprovalChatContext, ApprovalTurnContext};
 use crate::security::turn_origin::{with_origin, AgentTurnOrigin};
-use tinyflows_catalog::build_registry;
+mod build_registry;
 use tinyflows_catalog::types::{FlowConnection, FlowRunTrigger, FlowSuggestion, SuggestionStatus};
 use tokio_util::sync::CancellationToken;
 use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
