@@ -424,6 +424,9 @@ Migration steps:
 
 | Kind | Name | Version | Scope | Indexed fields |
 | --- | --- | --- | --- | --- |
+| collection | `threads.channel_messages` | 1 | tenant |  |
+| collection | `threads.reply_viseme_timelines` | 1 | agent |  |
+| collection | `threads.staged_attachments` | 1 | agent |  |
 | collection | `threads.transcript_keys` | 2 | tenant |  |
 
 Migration steps:
