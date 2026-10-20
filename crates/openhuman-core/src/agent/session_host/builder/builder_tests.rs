@@ -22,12 +22,10 @@ fn spec(name: &str) -> ToolSpec {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn test_config(tmp: &tempfile::TempDir) -> crate::config::Config {
-    let config = crate::config::Config {
-        workspace_dir: tmp.path().join("workspace"),
-        action_dir: tmp.path().join("workspace"),
-        config_path: tmp.path().join("config.toml"),
-        ..crate::config::Config::default()
-    };
+    let mut config = crate::agent::session_host::test_support::config_with_model_fixture();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.action_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     config
 }
