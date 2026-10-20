@@ -1,6 +1,6 @@
-use super::*;
 use super::super::managed_reasoning::REASONING_OFF_METADATA_KEY;
 use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
+use super::*;
 use serde_json::Value;
 use tinyinference_llm::model::ChatModel;
 
