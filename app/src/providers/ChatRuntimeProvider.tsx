@@ -1013,9 +1013,6 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
           );
         },
         onSubagentDone: (event: ChatSubagentDoneEvent) => {
-          // Worktree isolation metadata (#3376) — present only for workers that ran
-          // with `isolation = "worktree"`; drives the inline worktree row's
-          // open/diff/remove affordances. Undefined fields leave the row untouched.
           dispatch(
             subagentDone({
               threadId: event.thread_id,
@@ -1026,9 +1023,6 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
               elapsedMs: event.subagent?.elapsed_ms,
               outputChars: event.subagent?.output_chars,
               output: event.subagent?.output,
-              worktreePath: event.subagent?.worktree_path,
-              changedFiles: event.subagent?.changed_files,
-              isDirty: event.subagent?.dirty_status,
             })
           );
 
