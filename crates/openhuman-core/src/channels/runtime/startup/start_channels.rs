@@ -250,13 +250,11 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     context_slot
         .set(Arc::downgrade(&runtime_ctx))
         .map_err(|_| anyhow::anyhow!("channel callback context was already initialized"))?;
-    // Let cron jobs created from a channel chat read that chat's history, send
-    // into it and append their replies to it.
-    crate::cron::channel_bridge::register_channel_bridge(
-        Arc::clone(&runtime_ctx.conversation_histories),
-        Arc::clone(&runtime_ctx.channels_by_name),
-        crate::channels::context::MAX_CHANNEL_HISTORY,
-    );
+    // Cron channel context and replies use the durable agent transcript; this
+    // bridge retains only the live channel transport adapters.
+    crate::cron::channel_bridge::register_channel_bridge(Arc::clone(
+        &runtime_ctx.channels_by_name,
+    ));
 
     let startup = module_runtime
         .as_mut()
