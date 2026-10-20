@@ -7,8 +7,6 @@ use parking_lot::Mutex;
 use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
-use tinyagents_harness::context::RunConfig;
-use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinytools_agent::dialect::ToolCallFormat;

@@ -11,8 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use tinyagents_orchestration::subagent::{
-    orphaned_subagent_reason, record_agent_id, record_parent_session, subagent_record_for_task,
-    task_status_label, WaitError,
+    orphaned_subagent_reason, record_agent_id, record_parent_session, task_status_label,
 };
 use tinyagents_tasks::{
     reconcile_orphaned_tasks, DriverTaskStore, InMemoryTaskStore, OrchestrationTaskFilter,

@@ -70,7 +70,6 @@ pub use lifecycle::{
     continue_subagent, continue_subagent_with_parent, run_subagent, run_subagent_with_parent,
     OpenHumanSubagentHost,
 };
-pub(crate) use ops::is_safe_task_id;
 pub use types::{
     SubagentCheckpointData, SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
     SubagentRunStatus, SubagentUsage,

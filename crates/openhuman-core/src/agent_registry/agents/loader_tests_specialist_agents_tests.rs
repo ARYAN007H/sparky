@@ -247,8 +247,8 @@ fn orchestrator_routes_every_registered_specialist_through_spawn_subagent() {
     let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
     let orchestrator = registry.get("orchestrator").expect("orchestrator exists");
     let spawn = crate::agent::orchestration::tools::SpawnSubagentTool::new();
-    let allowed = spawn
-        .parameters_schema()
+    let schema = spawn.parameters_schema();
+    let allowed = schema
         .pointer("/properties/agent_id/enum")
         .and_then(serde_json::Value::as_array)
         .expect("spawn_subagent has a finite agent_id enum");
