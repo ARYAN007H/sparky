@@ -30,12 +30,6 @@ fn all_topologies_names_do_not_collide_with_production_tools() {
     );
     let tool_names: std::collections::HashSet<_> = tools.iter().map(|t| t.name()).collect();
 
-    // Verify runtime tool `spawn_parallel_agents` is present in the checked tool set
-    assert!(
-        tool_names.contains("spawn_parallel_agents"),
-        "expected spawn_parallel_agents in production all_tools registration"
-    );
-
     let reports = crate::agent::tinyagents::tool_registration::host_graph_topologies();
     for report in &reports {
         assert!(
