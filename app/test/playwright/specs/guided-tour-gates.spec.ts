@@ -42,13 +42,6 @@ test.describe('Guided tour gates', () => {
   });
 
   test('follows the current seven-step route and ends with its seeded welcome note', async ({ page }) => {
-    page.on('console', async message => {
-      if (!message.text().includes('[walkthrough] event')) return;
-      const args = await Promise.all(
-        message.args().map(argument => argument.jsonValue().catch(() => message.text()))
-      );
-      console.log(`[tour-event] ${JSON.stringify(args)}`);
-    });
     await armWalkthrough(page);
 
     const steps = [
