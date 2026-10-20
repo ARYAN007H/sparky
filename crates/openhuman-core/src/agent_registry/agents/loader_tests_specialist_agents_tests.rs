@@ -244,25 +244,40 @@ fn specialist_agents_are_registered_with_narrow_tools() {
 
 #[test]
 fn orchestrator_routes_every_registered_specialist_through_spawn_subagent() {
-    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use std::sync::Arc;
+
+    let registry =
+        Arc::new(crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only());
     let orchestrator = registry.get("orchestrator").expect("orchestrator exists");
-    let spawn = crate::agent::orchestration::tools::SpawnSubagentTool::new();
-    let schema = spawn.parameters_schema();
-    let allowed = schema
-        .pointer("/properties/agent_id/enum")
-        .and_then(serde_json::Value::as_array)
-        .expect("spawn_subagent has a finite agent_id enum");
-    for entry in &orchestrator.subagents {
-        let SubagentEntry::AgentId(agent_id) = entry else {
-            continue;
-        };
-        assert!(
-            allowed
-                .iter()
-                .any(|candidate| candidate.as_str() == Some(agent_id)),
-            "orchestrator allows `{agent_id}` but spawn_subagent does not"
-        );
-    }
+    let config = crate::config::Config::default();
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(
+            config,
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(registry),
+    );
+    CoreContext::sync_scope(core, || {
+        let spawn = crate::agent::orchestration::tools::SpawnSubagentTool::new();
+        let schema = spawn.parameters_schema();
+        let allowed = schema
+            .pointer("/properties/agent_id/enum")
+            .and_then(serde_json::Value::as_array)
+            .expect("spawn_subagent has a finite agent_id enum");
+        for entry in &orchestrator.subagents {
+            let SubagentEntry::AgentId(agent_id) = entry else {
+                continue;
+            };
+            assert!(
+                allowed
+                    .iter()
+                    .any(|candidate| candidate.as_str() == Some(agent_id)),
+                "orchestrator allows `{agent_id}` but spawn_subagent does not"
+            );
+        }
+    });
 }
 
 #[test]
