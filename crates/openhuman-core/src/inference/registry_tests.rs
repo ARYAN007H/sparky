@@ -37,7 +37,27 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
             ))
         }),
         probe: None,
-        models: None,
+        models: Some(ProviderModelHooks {
+            default_model: Arc::new(|| Some("host/fake-default".to_string())),
+            role_for_model: Arc::new(|model| {
+                (model == "hint:reasoning").then(|| "reasoning".to_string())
+            }),
+            is_alias: Arc::new(|model| model == "hint:reasoning"),
+            is_raw_model: Arc::new(|model| model != "hint:reasoning"),
+            supports_vision: Arc::new(|_| false),
+            resolve_model: Arc::new(|_, config, model| match model {
+                Some("hint:reasoning") => Some("host/resolved-reasoning".to_string()),
+                Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
+                Some(_) => None,
+                None => config
+                    .default_model
+                    .clone()
+                    .or_else(|| Some("host/fake-default".to_string())),
+            }),
+            context_window: Arc::new(|_| None),
+            default_pricing: Arc::new(|| None),
+            without_reasoning: Arc::new(|request| request),
+        }),
     }
 }
 
@@ -79,8 +99,13 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
     let seen = seen.lock().unwrap();
     assert_eq!(
         seen[0],
-        ("chat".to_string(), None, Some("thread-1".to_string()))
+        (
+            "chat".to_string(),
+            Some("host/resolved-reasoning".to_string()),
+            Some("thread-1".to_string())
+        )
     );
+    assert_eq!(seen[1].1.as_deref(), Some("host/fake-default"));
     assert_eq!(
         seen.len(),
         2,
@@ -100,7 +125,7 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
     });
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
         "cloud",
-        Some("any-model"),
+        "any-model",
         8,
         "",
         None,
