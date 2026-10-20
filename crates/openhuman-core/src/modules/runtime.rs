@@ -115,6 +115,16 @@ async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<(
     }
     #[cfg(feature = "web3")]
     super::wallet_host::install(connection).await?;
+    // Deliver / ClassifySalience for the inbound event queues; with the
+    // component off the module never loads, so nothing would call them.
+    #[cfg(feature = "inbound-queues")]
+    {
+        if host.components().eventqueues {
+            crate::inbound::host::install(connection).await?;
+        } else {
+            tracing::debug!("[modules] eventqueues component off; inbound Host not served");
+        }
+    }
     Ok(())
 }
 

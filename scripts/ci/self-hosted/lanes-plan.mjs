@@ -319,7 +319,27 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           when: areas.docs,
           run: "pnpm docs:test",
         },
-        { name: "docs-drift", when: areas.docs, run: "pnpm docs:check" },
+        {
+          name: "docs-drift",
+          when: areas.docs,
+          // ex63: `docs:check` runs the storage schema dump and the embed
+          // capability report through cargo. Without the shared build target
+          // and rustEnv they compiled the core again in the plain target,
+          // incremental and with full debuginfo, so none of the shared build
+          // applied (315 s in EX63 run 39371566398). With them the dump is
+          // the storage-schema check's build and the report the embed
+          // examples'.
+          ...(ex63
+            ? {
+                env: {
+                  ...rustEnv,
+                  CARGO_BUILD_TARGET_DIR: targetDir("build"),
+                  STORAGE_SCHEMA_FEATURES: "core-product",
+                },
+              }
+            : {}),
+          run: "pnpm docs:check",
+        },
         {
           name: "scripts-self-tests",
           when: areas.scripts,

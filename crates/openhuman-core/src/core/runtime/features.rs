@@ -13,6 +13,7 @@ pub fn compiled_features() -> std::collections::BTreeMap<String, bool> {
         ("documents", cfg!(feature = "documents")),
         ("hosting", cfg!(feature = "hosting")),
         ("tinymemes", cfg!(feature = "tinymemes")),
+        ("inbound-queues", cfg!(feature = "inbound-queues")),
         ("modules", cfg!(feature = "modules")),
         ("voice", cfg!(feature = "voice")),
         ("web3", cfg!(feature = "web3")),

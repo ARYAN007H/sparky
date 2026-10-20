@@ -457,11 +457,12 @@ The thread JSONL store moved to `tinyagents_session::threads` (`vendor/tinyagent
 
 ### 10.3 Message Sync & Ingestion
 
-| ID     | Feature                   | Layer | Test path(s)                                                      | Status | Notes |
-| ------ | ------------------------- | ----- | ----------------------------------------------------------------- | ------ | ----- |
-| 10.3.1 | Incoming Message Sync     | RU+WD | `crates/openhuman-core/src/channels/tests/`, `gmail-flow.spec.ts` | ✅     |       |
-| 10.3.2 | Message Deduplication     | RU    | `crates/openhuman-core/src/channels/tests/`                       | ✅     |       |
-| 10.3.4 | Real-Time vs Delayed Sync | RU    | `crates/openhuman-core/src/channels/tests/runtime_dispatch.rs`    | ✅     |       |
+| ID     | Feature                   | Layer | Test path(s)                                                                                               | Status | Notes                                                                                                                                                                                           |
+| ------ | ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 10.3.1 | Incoming Message Sync     | RU+WD | `crates/openhuman-core/src/channels/tests/`, `gmail-flow.spec.ts`                                           | ✅     |                                                                                                                                                                                                 |
+| 10.3.2 | Message Deduplication     | RU    | `crates/openhuman-core/src/channels/tests/`                                                                 | ✅     |                                                                                                                                                                                                 |
+| 10.3.4 | Real-Time vs Delayed Sync | RU    | `crates/openhuman-core/src/channels/tests/runtime_dispatch.rs`                                              | ✅     |                                                                                                                                                                                                 |
+| 10.3.5 | Inbound Event Queues (Composio triggers, agent webhooks) | RU+RI | `crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber_tests.rs`, `crates/openhuman-core/src/skills/webhooks/bus_tests.rs`, `crates/openhuman-core/src/inbound/`, `tests/components_e2e.rs`, `tests/inbound_linked_e2e.rs` | ✅ | Run against the real `tinyeventqueues` module linked into the test binary: a `Deferred` triage is retried at `defer_until_ms` instead of dropped, a redelivered trigger produces one turn, the direct path runs with the queues off. `inbound.*` RPC answers `COMPONENT_DISABLED:eventqueues` when off. `inbound_linked_e2e` (local, `linked-modules`) boots the module through the process-wide runtime on host storage |
 
 ### 10.4 Messaging Operations
 

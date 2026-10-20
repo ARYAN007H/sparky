@@ -413,6 +413,23 @@ Migration steps:
 - `history_v2`: `tasks.history` v1 to v2 from `orchestration_task_history`
 - `completions_v2`: `tasks.completions` v1 to v2 from `orchestration_completions`
 
+## teq
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `teq.ambient` | 1 | module |  |
+| collection | `teq.buckets` | 1 | module |  |
+| collection | `teq.cadence` | 1 | module |  |
+| collection | `teq.coalesce` | 1 | module | `due_ms`, `thread_group` |
+| collection | `teq.conversations` | 1 | module |  |
+| collection | `teq.digest` | 1 | module |  |
+| collection | `teq.habituation` | 1 | module |  |
+| collection | `teq.outcomes` | 1 | module | `disposition`, `expires_ms` |
+| collection | `teq.redriven` | 1 | module |  |
+| collection | `teq.staged` | 1 | module | `due_ms`, `cadence_key` |
+| collection | `teq.threads` | 1 | module |  |
+| collection | `teq.tombstones` | 1 | module | `expires_ms` |
+
 ## threads
 
 | Kind | Name | Version | Scope | Indexed fields |

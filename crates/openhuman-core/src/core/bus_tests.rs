@@ -24,7 +24,7 @@ fn the_manifest_declares_the_catalog_in_both_directions() {
 
 #[test]
 fn removing_an_event_advances_the_catalog_major_version() {
-    assert_eq!(EVENTS_VERSION, tinybus::Version::new(2, 0, 0));
+    assert_eq!(EVENTS_VERSION, tinybus::Version::new(2, 1, 0));
 }
 
 #[tokio::test]

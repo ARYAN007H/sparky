@@ -40,6 +40,7 @@ fn full_product_features_enabled() -> bool {
         ("file-logging", cfg!(feature = "file-logging")),
         ("hosting", cfg!(feature = "hosting")),
         ("tinymemes", cfg!(feature = "tinymemes")),
+        ("inbound-queues", cfg!(feature = "inbound-queues")),
         ("storage-sqlite", cfg!(feature = "storage-sqlite")),
     ];
     let declared: std::collections::BTreeSet<_> = include_str!(concat!(

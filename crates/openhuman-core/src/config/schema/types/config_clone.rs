@@ -93,6 +93,7 @@ impl Clone for Config {
             custom_embeddings: self.custom_embeddings.clone(),
             tokenjuice: self.tokenjuice.clone(),
             memes: self.memes.clone(),
+            inbound: self.inbound.clone(),
             components: self.components.clone(),
             hosting: self.hosting.clone(),
             storage: self.storage.clone(),
