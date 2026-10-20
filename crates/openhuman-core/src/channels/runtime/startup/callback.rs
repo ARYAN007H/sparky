@@ -283,6 +283,7 @@ impl ChannelHostCallbacks {
                     .is_some_and(|id| id.starts_with("tinychannels_media_v1_"))
             })
             .ok_or_else(|| Error::failed("voice media has no durable scoped reference"))?;
+        tracing::info!("scoped channel voice media accepted");
         Ok(tinychannels_bus::HostStoreVoiceMediaResult {
             media,
             // A local durable reference does not grant public-link access.
