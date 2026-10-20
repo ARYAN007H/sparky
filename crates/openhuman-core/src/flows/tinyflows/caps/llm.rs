@@ -14,9 +14,7 @@ use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
-use crate::inference::provider::{
-    create_chat_model_with_model_id_in, is_raw_passthrough_model, role_for_model_tier,
-};
+use crate::inference::provider::create_chat_model_with_model_id_in;
 use tinyflows::nodes::integration::agent_prompt;
 use tinyinference_llm::model::ModelRequest;
 
@@ -71,7 +69,10 @@ impl LlmProvider for OpenHumanLlm {
             .filter(|s| !s.is_empty());
         let role = match node_model {
             Some(model) => {
-                let mapped = role_for_model_tier(model);
+                let mapped = crate::inference::provider_model::role_for_provider_model(
+                    crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                    model,
+                );
                 tracing::debug!(
                     target: "flows",
                     node_model = model,
@@ -107,8 +108,12 @@ impl LlmProvider for OpenHumanLlm {
                 .map_err(|e| EngineError::Capability(e.to_string()))?;
         // `create_chat_provider` handed back the role's default model. If the node
         // pinned a raw/BYOK id, forward it verbatim instead (issue #4598).
-        let model =
-            agent_prompt::resolve_completion_model(node_model, model, is_raw_passthrough_model);
+        let model = agent_prompt::resolve_completion_model(node_model, model, |candidate| {
+            crate::inference::provider_model::is_raw_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                candidate,
+            )
+        });
 
         let mut model_request = ModelRequest::new(
             messages

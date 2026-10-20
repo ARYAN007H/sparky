@@ -7,9 +7,9 @@ use std::sync::Arc;
 use openhuman_embed::__host::egress::{emit_external_transfer, enforce_egress, EgressDescriptor};
 use openhuman_embed::__host::inference_registry::EmbeddingRequest;
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
-use openhuman_embed::__host::security::credentials::{AuthService, APP_SESSION_PROVIDER};
 use tinyinference_embeddings::{BearerResolver, CloudEmbeddingModel, EmbeddingModel};
 
+use super::managed_session::resolve_session_bearer;
 use crate::backend::url::effective_api_url;
 use crate::client::endpoint::is_managed_endpoint_for_api_key;
 
@@ -73,17 +73,13 @@ impl ManagedEmbeddingModel {
                 log::debug!("[tinyhumans][embeddings] authenticating with api-key");
                 return Ok(key);
             }
-            let auth = AuthService::new(&state_dir, secrets_encrypt);
-            auth.get_provider_bearer_token(APP_SESSION_PROVIDER, None)
-                .map_err(|error| tinyinference_embeddings::Error::Embedding(error.to_string()))?
-                .filter(|token| !token.trim().is_empty())
-                .ok_or_else(|| {
-                    tinyinference_embeddings::Error::Validation(
-                        "No backend session for cloud embeddings: log in to OpenHuman or set a \
-                         TinyHumans API key"
-                            .into(),
-                    )
-                })
+            resolve_session_bearer(
+                &state_dir,
+                secrets_encrypt,
+                None,
+                "managed_embedding.resolve_bearer",
+            )
+            .map_err(|error| tinyinference_embeddings::Error::Embedding(error.to_string()))
         });
         let model = model.to_string();
         Self {

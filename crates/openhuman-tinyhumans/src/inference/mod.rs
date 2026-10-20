@@ -13,6 +13,7 @@
 //! `register` is the one place it does so; `crate::register::register_all`
 //! calls it from `install()`.
 
+mod backend_error_code;
 mod managed_calls;
 mod managed_catalog;
 mod managed_embedding;
@@ -20,13 +21,17 @@ mod managed_model;
 mod managed_reasoning;
 mod managed_session;
 mod managed_usage;
+mod tiers;
+#[cfg(test)]
+pub(crate) use tiers::MODEL_MANAGED_DEFAULT;
 
 use std::sync::Arc;
 
-use openhuman_embed::__host::config::{Config, MODEL_MANAGED_DEFAULT};
+use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::inference_registry::{
-    register_catalog, register_chat_model, register_embedding, BoxFuture, ChatModelEntry,
-    ChatModelFactory, ChatModelRequest, ReadinessProbe, PROVIDER_OPENHUMAN,
+    register_backend_error_classifier, register_catalog, register_chat_model,
+    register_config_normalizer, register_embedding, BoxFuture, ChatModelEntry, ChatModelFactory,
+    ChatModelRequest, ProviderModelHooks, ReadinessProbe, PROVIDER_OPENHUMAN,
 };
 use tinyinference_llm::model::ChatModel;
 
@@ -54,8 +59,9 @@ pub(crate) fn build_chat_model(
         .model_override
         .map(str::trim)
         .filter(|model| !model.is_empty())
-        .unwrap_or(MODEL_MANAGED_DEFAULT)
-        .to_string();
+        .map(str::to_string)
+        .or_else(tiers::default_model)
+        .ok_or_else(|| anyhow::anyhow!("TinyHumans managed inference has no configured model"))?;
     let default_model = request
         .default_model
         .map(str::trim)
@@ -99,12 +105,25 @@ pub(crate) fn register(_options: &InstallOptions) {
         ChatModelEntry {
             build,
             probe: Some(readiness_probe()),
+            models: Some(ProviderModelHooks {
+                default_model: Arc::new(tiers::default_model),
+                role_for_model: Arc::new(tiers::role_for_model),
+                is_alias: Arc::new(tiers::is_alias),
+                is_raw_model: Arc::new(tiers::is_raw_model),
+                supports_vision: Arc::new(tiers::supports_vision),
+                resolve_model: Arc::new(tiers::resolve_model),
+                context_window: Arc::new(tiers::context_window),
+                default_pricing: Arc::new(tiers::default_pricing),
+                without_reasoning: Arc::new(managed_reasoning::without_reasoning),
+            }),
         },
     );
     register_embedding(PROVIDER_OPENHUMAN, |request| {
         Ok(Box::new(ManagedEmbeddingModel::from_request(request)))
     });
     register_catalog(PROVIDER_OPENHUMAN, managed_catalog::entry());
+    register_config_normalizer(PROVIDER_OPENHUMAN, Arc::new(tiers::normalize_config));
+    register_backend_error_classifier(Arc::new(backend_error_code::classify));
     log::debug!(
         "[tinyhumans] inference: registered the managed chat model, embeddings and catalog"
     );

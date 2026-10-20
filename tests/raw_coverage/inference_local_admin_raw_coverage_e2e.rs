@@ -24,7 +24,7 @@ use openhuman_core::config::schema::cloud_providers::{
 use openhuman_core::config::Config;
 use tinyinference_local::service::LocalAiService;
 use openhuman_core::inference::provider::factory::auth_key_for_slug;
-use openhuman_core::inference::provider::list_configured_models;
+use openhuman_core::inference::provider::models::catalog_listing::list_configured_models;
 use openhuman_core::security::credentials::{AuthService, DEFAULT_AUTH_PROFILE_NAME};
 
 /// One captured mock request: method/path, optional auth header, JSON body.

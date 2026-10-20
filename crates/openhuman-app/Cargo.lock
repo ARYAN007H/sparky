@@ -6591,6 +6591,7 @@ dependencies = [
  "tinyinference-embeddings",
  "tinyinference-image",
  "tinyinference-llm",
+ "tinyinference-providers",
  "tinyinference-video",
  "tinystoragedrivers-core",
  "tinytools",
@@ -6615,6 +6616,7 @@ dependencies = [
  "tinyagents-graph",
  "tinyagents-harness",
  "tinyinference-llm",
+ "tinyinference-providers",
  "tinytools",
  "tokio",
  "tracing",
@@ -6669,6 +6671,7 @@ dependencies = [
  "tinyagents-definition",
  "tinyagents-harness",
  "tinyinference-llm",
+ "tinyinference-providers",
  "tinytools",
 ]
 
@@ -7043,6 +7046,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tinyinference-core",
+ "tinyinference-embeddings",
  "tinyinference-providers",
  "tinytools-agent",
  "tokio",
@@ -7105,11 +7109,13 @@ dependencies = [
 name = "tinyinference-voice"
 version = "0.4.1"
 dependencies = [
+ "async-trait",
  "base64 0.23.1",
  "reqwest 0.12.28",
  "schemars 1.2.2",
  "serde",
  "serde_json",
+ "tempfile",
  "tinyinference-core",
  "tinyinference-local",
  "tokio",

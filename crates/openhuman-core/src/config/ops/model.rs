@@ -293,7 +293,10 @@ pub async fn apply_model_settings(
             Some(trimmed.to_string())
         };
         if let Some(ref m) = config.default_model {
-            if crate::inference::provider::factory::is_known_openhuman_tier(m) {
+            if crate::inference::registry::provider_model_is_alias(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                m,
+            ) {
                 log::warn!(
                     "[config][model-settings] default_model '{}' is a retired tier slug or \
                      role hint, not a catalog model — managed turns run on the platform \

@@ -10,9 +10,9 @@ previously `providers/` (pre-consolidation single-crate layout); see
 
 ## Public surface
 
-- **Factory** ([`factory.rs`](./factory.rs) + `factory/`: `routing.rs`, `tiers.rs`, `turn_model.rs`, `subprocess_providers.rs`, `access_gates.rs`, `chat_model.rs`, `cloud_slug.rs`, `credentials.rs`, `local_runtime.rs`, `managed_backend.rs`, `primary_cloud.rs`), `create_chat_model`,
+- **Factory** ([`factory.rs`](./factory.rs) + `factory/`: `routing.rs`, `turn_model.rs`, `subprocess_providers.rs`, `access_gates.rs`, `chat_model.rs`, `cloud_slug.rs`, `credentials.rs`, `local_runtime.rs`, `managed_backend.rs`), `create_chat_model`,
   `create_chat_model_from_string[_with_model_id]`,
-  `create_chat_model_with_model_id`, `provider_for_role`, `role_for_model_tier`,
+  `create_chat_model_with_model_id`, `provider_for_role`,
   `probe_inference_readiness`, `BYOK_INCOMPLETE_SENTINEL`. Parses the
   provider-string grammar (`openhuman`, `cloud`, `ollama:<model>`,
   `lmstudio:<model>`, `mlx:<model>`, `omlx:<model>`, `local-openai:<model>`,
@@ -22,9 +22,9 @@ previously `providers/` (pre-consolidation single-crate layout); see
   gates before building a model. See
   [docs/gitbooks/en/features/model-routing/local-and-byok-models.md](../../../../../docs/gitbooks/en/features/model-routing/local-and-byok-models.md)
   for the user-facing side of local and BYOK routing.
-- **Models**: the managed provider is a registered chat model
-  (`inference::registry`, built in `openhuman-tinyhumans`); the core keeps `PROVIDER_LABEL` and
-  `without_reasoning` ([`openhuman_backend_model.rs`](./openhuman_backend_model.rs)); OpenAI-compatible and Anthropic builders live
+- **Models**: providers are registered chat models
+  (`inference::registry`); TinyHumans supplies its hosted model vocabulary and request policy.
+  OpenAI-compatible and Anthropic builders live
   in `tinyinference_llm::providers` and are called directly.
 - **DTOs** ([`types.rs`](./types.rs)): `ChatResponse`, `ProviderDelta`,
   `ToolCall`, `UsageInfo`, `AGENT_TURN_MAX_OUTPUT_TOKENS`.
@@ -60,10 +60,10 @@ previously `providers/` (pre-consolidation single-crate layout); see
 - `crate::inference::auth_error_registry`: surfaces OpenHuman per-provider auth errors
   back to the UI.
 - `crate::core::bus` (`BUS.publish`) / `crate::core::events::DomainEvent`:
-  `ops/http_error.rs::publish_backend_session_expired` and
+  `http_error.rs::publish_backend_session_expired` and
   the registered managed model (`openhuman-tinyhumans`) publish `DomainEvent::SessionExpired` when the
   managed backend reports an auth failure, so the credentials layer can
-  clear/refresh the session; [`ops/http_error.rs`](./ops/http_error.rs) also publishes
+  clear/refresh the session; [`http_error.rs`](./http_error.rs) also publishes
   `DomainEvent::ProviderApiKeyRejected` the first time a BYO key is rejected.
 - `crate::mcp::server::local` (via the vendored `claude_code` driver), the Claude Code
   provider points the sandboxed `claude` subprocess at the in-process MCP
@@ -85,11 +85,10 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
 
 ## Sub-modules
 
-- `ops/`: `http_error` (HTTP error
-  classification, Sentry routing, `api_error`), `models`
-  (`list_configured_models`), `provider_factory` (`ProviderRuntimeOptions`,
-  `list_providers`).
-  Preserves the original `pub use ops::*` contract split out of a single `ops.rs`.
+- [`http_error.rs`](./http_error.rs) owns provider HTTP error classification,
+  Sentry routing, and `api_error`; [`models/`](./models/) owns model catalog
+  listing and local-runtime entries. Delegation's `ProviderRuntimeOptions`
+  live with [`tools/delegate.rs`](../tools/delegate.rs).
 - Claude Code CLI provider: `tinyagents_harness::providers::claude_code` in [`vendor/tinyagents`](../../../../../vendor/tinyagents/); see the [Claude Code provider guide](../../../../../docs/gitbooks/en/developing/providers/claude-code.md).
 
 ## Tests
@@ -98,12 +97,11 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
   [`factory_egress_fallback_tests.rs`](./factory_egress_fallback_tests.rs), [`factory_route_resolution_tests.rs`](./factory_route_resolution_tests.rs),
   [`factory_test_provider_override_tests.rs`](./factory_test_provider_override_tests.rs): provider-string parsing, access
   gates, and model construction.
-- [`ops_tests.rs`](./ops_tests.rs), [`ops_tests_error_suppression_tests.rs`](./ops_tests_error_suppression_tests.rs),
-  [`ops_tests_models_parsing_tests.rs`](./ops_tests_models_parsing_tests.rs), [`ops/http_error_tests.rs`](./ops/http_error_tests.rs), [`ops/models_tests.rs`](./ops/models_tests.rs): error
-  classification and model listing.
+- [`http_error_tests.rs`](./http_error_tests.rs), [`models/mod_tests.rs`](./models/mod_tests.rs),
+  and provider model-listing tests: error classification and model listing.
 - Claude Code provider tests live with the provider in
   [`vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/`](../../../../../vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/).
-- [`openhuman_backend_model_tests.rs`](./openhuman_backend_model_tests.rs): managed host transport; reusable provider
+- [`http_error_tests.rs`](./http_error_tests.rs): generic host error handling with provider ownership from the installed classifier.
   builder and Codex tests live in TinyInference and TinyAgents.
 
 Local runtime chat providers (Ollama, LM Studio, MLX, oMLX, local-openai)

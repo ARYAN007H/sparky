@@ -149,8 +149,8 @@ pub(super) async fn cached_probe_inference_readiness(
 /// applies, so this probe checks the same route the node will actually
 /// dispatch to at run time. Precedence (findings A+B on this gate):
 ///
-/// 1. Node `config.model` — a managed tier or `hint:*` alias, translated via
-///    [`role_for_model_tier`](crate::inference::provider::role_for_model_tier).
+/// 1. Node `config.model` — a generic `hint:*` role or provider-owned model
+///    alias translated through the provider-model registry.
 /// 2. A static (non-`=`) `agent_ref` whose custom
 ///    [`AgentRegistryEntry`](crate::agent_registry::AgentRegistryEntry)
 ///    itself pins a `model` (e.g. `hint:reasoning`) — resolved the same way
@@ -205,7 +205,10 @@ pub(super) fn agent_node_role(config: &Config, node: &tinyflows::model::Node) ->
         .map(str::trim)
         .filter(|s| !s.is_empty());
     if let Some(model) = pinned_model {
-        return crate::inference::provider::role_for_model_tier(model);
+        return crate::inference::provider_model::role_for_provider_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            model,
+        );
     }
 
     "summarization"

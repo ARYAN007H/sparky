@@ -64,15 +64,16 @@ pub fn run(config: &Config, memory: MemoryEngineCheck) -> Result<DoctorReport> {
     })
 }
 
-fn doctor_model_targets() -> Vec<String> {
-    crate::inference::provider::list_providers()
-        .into_iter()
-        .map(|provider| provider.name.to_string())
+fn doctor_model_targets(config: &Config) -> Vec<String> {
+    config
+        .cloud_providers
+        .iter()
+        .map(|provider| provider.slug.clone())
         .collect()
 }
 
-pub fn run_models(_config: &Config, _use_cache: bool) -> Result<ModelProbeReport> {
-    let targets = doctor_model_targets();
+pub fn run_models(config: &Config, _use_cache: bool) -> Result<ModelProbeReport> {
+    let targets = doctor_model_targets(config);
 
     if targets.is_empty() {
         anyhow::bail!("No providers available for model probing");

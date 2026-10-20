@@ -434,3 +434,141 @@ async fn embedding_without_a_session_reports_no_backend_session() {
         .expect_err("no session must not embed");
     assert!(err.to_string().contains("No backend session"), "{err}");
 }
+
+/// The offline local credential is not a TinyHumans account bearer. Managed
+/// embeddings must reject it before the HTTP transport sends a request.
+#[tokio::test]
+async fn offline_local_session_is_refused_before_embedding_request() {
+    use axum::{routing::post, Json, Router};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    let requests = Arc::new(AtomicUsize::new(0));
+    let app = Router::new().route(
+        "/openai/v1/embeddings",
+        post({
+            let requests = Arc::clone(&requests);
+            move || async move {
+                requests.fetch_add(1, Ordering::SeqCst);
+                Json(serde_json::json!({
+                    "object": "list",
+                    "data": [{ "object": "embedding", "index": 0, "embedding": [0.1, 0.2] }],
+                    "model": "m"
+                }))
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let tmp = tempfile::tempdir().unwrap();
+    AuthService::new(tmp.path(), false)
+        .store_provider_token(
+            openhuman_embed::__host::security::credentials::APP_SESSION_PROVIDER,
+            "default",
+            "header.payload.local",
+            HashMap::new(),
+            true,
+        )
+        .unwrap();
+    let provider = ManagedEmbeddingModel::new(
+        Some(format!("http://{addr}")),
+        tmp.path().to_path_buf(),
+        false,
+        "m",
+        2,
+        None,
+    );
+
+    let err = provider
+        .embed(&["hello".to_string()])
+        .await
+        .expect_err("an offline local session cannot authenticate managed embeddings");
+    assert!(err.to_string().contains("offline local session"), "{err}");
+    assert_eq!(requests.load(Ordering::SeqCst), 0);
+}
+
+/// Expired session tokens fail before transport and publish the same
+/// SessionExpired event as managed chat, so the host can begin re-auth.
+#[tokio::test]
+async fn expired_session_publishes_session_expired_before_embedding_request() {
+    use axum::{routing::post, Json, Router};
+    use openhuman_embed::__host::core::events::DomainEvent;
+    use openhuman_embed::__host::security::credentials::session_support::SESSION_EXPIRES_AT_META;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("bus init");
+    let mut rx = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .unwrap()
+        .receiver();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let app = Router::new().route(
+        "/openai/v1/embeddings",
+        post({
+            let requests = Arc::clone(&requests);
+            move || async move {
+                requests.fetch_add(1, Ordering::SeqCst);
+                Json(serde_json::json!({
+                    "object": "list",
+                    "data": [{ "object": "embedding", "index": 0, "embedding": [0.1, 0.2] }],
+                    "model": "m"
+                }))
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let tmp = tempfile::tempdir().unwrap();
+    let mut metadata = HashMap::new();
+    metadata.insert(
+        SESSION_EXPIRES_AT_META.to_string(),
+        "2000-01-01T00:00:00Z".to_string(),
+    );
+    AuthService::new(tmp.path(), false)
+        .store_provider_token(
+            openhuman_embed::__host::security::credentials::APP_SESSION_PROVIDER,
+            "default",
+            "expired.session.jwt",
+            metadata,
+            true,
+        )
+        .unwrap();
+    let provider = ManagedEmbeddingModel::new(
+        Some(format!("http://{addr}")),
+        tmp.path().to_path_buf(),
+        false,
+        "m",
+        2,
+        None,
+    );
+
+    let err = provider
+        .embed(&["hello".to_string()])
+        .await
+        .expect_err("an expired session must fail before the request");
+    assert!(err.to_string().contains("SESSION_EXPIRED"), "{err}");
+    assert_eq!(requests.load(Ordering::SeqCst), 0);
+    let mut published = None;
+    while let Ok(event) = rx.try_recv() {
+        if let DomainEvent::SessionExpired { source, reason } = event {
+            if source == "managed_embedding.resolve_bearer" {
+                published = Some((source, reason));
+                break;
+            }
+        }
+    }
+    let (source, reason) = published.expect("expired embedding credentials publish SessionExpired");
+    assert_eq!(source, "managed_embedding.resolve_bearer");
+    assert!(reason.contains("token expired locally"), "{reason}");
+}
