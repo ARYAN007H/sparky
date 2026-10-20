@@ -1040,6 +1040,20 @@ test("private storage-schema dump builds in the plain target with the product fe
   );
 });
 
+test("private docs drift reuses the storage-schema build instead of compiling the core in the plain target", () => {
+  const ex63 = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
+  const find = (lane, name) =>
+    ex63.lanes.find((l) => l.name === lane).checks.find((c) => c.name === name);
+  const docs = find("frontend", "docs-drift");
+  assert.equal(docs.run, "pnpm docs:check");
+  assert.deepEqual(docs.env, find("static", "storage-schema").env);
+  const hosted = buildPlan({ profile: "hosted", areas: ALL });
+  assert.equal(
+    hosted.lanes.find((l) => l.name === "frontend").checks.find((c) => c.name === "docs-drift").env,
+    undefined,
+  );
+});
+
 test("offline examples build in the dev profile so no release artifacts need cleaning", () => {
   for (const plan of plans()) {
     const lint = plan.lanes.find((lane) => lane.name === "rust-lint");
