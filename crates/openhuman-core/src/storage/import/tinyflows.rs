@@ -22,7 +22,9 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::Arc;
+#[cfg(feature = "flows")]
+use std::sync::{LazyLock, Mutex, Weak};
 
 use anyhow::{Context, Result};
 
@@ -32,11 +34,17 @@ use crate::storage::documents::Repo;
 use crate::storage::import_state;
 use crate::storage::{Scope, StorageBackend};
 
-type CatalogMigrationKey = (PathBuf, String, usize);
+#[cfg(feature = "flows")]
+struct CatalogMigrationEntry {
+    workspace_dir: PathBuf,
+    scope: String,
+    backend: Weak<dyn StorageBackend>,
+    outcome: std::result::Result<(), String>,
+}
 
-static CATALOG_MIGRATIONS: LazyLock<
-    Mutex<HashMap<CatalogMigrationKey, std::result::Result<(), String>>>,
-> = LazyLock::new(Default::default);
+#[cfg(feature = "flows")]
+static CATALOG_MIGRATIONS: LazyLock<Mutex<Vec<CatalogMigrationEntry>>> =
+    LazyLock::new(Default::default);
 
 /// The marker name of the flow catalog (flows, revisions, runs, state,
 /// suggestions, drafts) and checkpoints.
@@ -217,42 +225,54 @@ async fn migrate_catalog_storage(
         .context("migrate the TinyFlows catalog storage")
 }
 
+#[cfg(feature = "flows")]
 fn record_catalog_migration(
     backend: &Arc<dyn StorageBackend>,
     config: &Config,
     scope: &Scope,
     outcome: std::result::Result<(), String>,
 ) {
-    let key = (
-        config.workspace_dir.clone(),
-        scope.as_str().to_owned(),
-        Arc::as_ptr(backend) as *const () as usize,
-    );
-    CATALOG_MIGRATIONS
+    let backend = Arc::downgrade(backend);
+    let mut migrations = CATALOG_MIGRATIONS
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .insert(key, outcome);
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    migrations.retain(|entry| entry.backend.strong_count() > 0);
+    if let Some(entry) = migrations.iter_mut().find(|entry| {
+        entry.workspace_dir == config.workspace_dir
+            && entry.scope == scope.as_str()
+            && Weak::ptr_eq(&entry.backend, &backend)
+    }) {
+        entry.outcome = outcome;
+    } else {
+        migrations.push(CatalogMigrationEntry {
+            workspace_dir: config.workspace_dir.clone(),
+            scope: scope.as_str().to_owned(),
+            backend,
+            outcome,
+        });
+    }
 }
 
+#[cfg(feature = "flows")]
 fn catalog_migration_ready(
     backend: &Arc<dyn StorageBackend>,
     config: &Config,
     scope: &Scope,
 ) -> bool {
-    let key = (
-        config.workspace_dir.clone(),
-        scope.as_str().to_owned(),
-        Arc::as_ptr(backend) as *const () as usize,
-    );
-    matches!(
-        CATALOG_MIGRATIONS
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(&key),
-        Some(Ok(()))
-    )
+    let backend = Arc::downgrade(backend);
+    CATALOG_MIGRATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .find(|entry| {
+            entry.workspace_dir == config.workspace_dir
+                && entry.scope == scope.as_str()
+                && Weak::ptr_eq(&entry.backend, &backend)
+        })
+        .is_some_and(|entry| entry.outcome.is_ok())
 }
 
+#[cfg(feature = "flows")]
 fn flow_import_marker_done(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<bool> {
     let markers = Repo::on(
         backend,
@@ -281,10 +301,16 @@ pub(crate) fn legacy_flow_import_pending(
 /// the local workflow scope; other domains and other storage scopes continue.
 #[cfg(feature = "flows")]
 pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Result<(), String> {
-    let Some(backend) = crate::storage::installed() else {
-        return Ok(());
-    };
     let scope = crate::storage::current_scope().map_err(|error| error.to_string())?;
+    let installed = crate::storage::installed();
+    let fallback = installed.is_none();
+    let backend = match installed {
+        Some(backend) => backend,
+        // The workspace-local fallback owns storage preparation and module
+        // migrations, but intentionally does not import legacy domain files.
+        None => crate::storage::local::backend_for(&config.workspace_dir)
+            .map_err(|error| format!("open the fallback storage: {error:#}"))?,
+    };
     if !catalog_migration_ready(&backend, config, &scope) {
         let result = migrate_catalog_storage(&backend, config, &scope)
             .await
@@ -292,7 +318,8 @@ pub(crate) async fn ensure_flow_scope_ready(config: &Config) -> std::result::Res
         record_catalog_migration(&backend, config, &scope, result.clone());
         result?;
     }
-    if legacy_flow_import_pending(&backend, config, &scope)
+    if !fallback
+        && legacy_flow_import_pending(&backend, config, &scope)
         .map_err(|error| format!("check the legacy flow import marker: {error:#}"))?
     {
         return Err(
