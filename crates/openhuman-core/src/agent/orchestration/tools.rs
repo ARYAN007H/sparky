@@ -7,17 +7,8 @@ mod spawn_subagent;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
 #[cfg(test)]
-#[path = "tools/tools_e2e_tests.rs"]
-mod tools_e2e_tests;
-#[cfg(test)]
-#[path = "tools/tools_e2e_continuation_tests.rs"]
-mod tools_e2e_continuation_tests;
-#[cfg(test)]
 #[path = "tools/tools_e2e_driver_tests.rs"]
 mod tools_e2e_driver_tests;
-#[cfg(test)]
-#[path = "tools/tools_e2e_workspace_owner_tests.rs"]
-mod tools_e2e_workspace_owner_tests;
 
 /// A minimal live TinyAgents carrier over `parent`, for tests that drive a
 /// concrete tool directly under an explicit parent execution context.
