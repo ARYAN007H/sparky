@@ -55,6 +55,7 @@
 use crate::config::Config;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
 use std::collections::HashSet;
+use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// Counters returned by [`run`] for diagnostics. Logged at INFO once per run.
 #[derive(Debug, Default, Clone)]
@@ -109,9 +110,8 @@ pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
             || s == "cloud"
             || s == PROVIDER_OPENHUMAN
             // The owner classifier also accepts bare provider-kind aliases
-            // such as `openai`; persisted workload routes require a model
-            // separator, matching the previous prefix grammar.
-            || (s.contains(':') && tinyinference_local::profile::is_local_provider_string(s))
+            // such as `openai`; only a parsed local route is persisted here.
+            || ProviderRoute::parse(s).is_some_and(|route| matches!(route.kind(), RouteKind::Local(_)))
         {
             continue;
         }
