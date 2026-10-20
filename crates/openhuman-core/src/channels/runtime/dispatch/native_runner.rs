@@ -25,6 +25,7 @@ type Runner = TurnRunner<NativeHost, NativeIngress, NativeReplies, NativeEvents,
 #[derive(Default)]
 struct NativeSlot {
     lease: Option<SessionLease>,
+    native_reply: Option<Arc<NativeProgressiveReply>>,
     reply: Option<String>,
     progress_failed: bool,
     waiting_for_delivery: bool,
@@ -225,7 +226,19 @@ impl NativeHost {
         )
         .await
         .map_err(|()| "channel session lease was cancelled".to_owned())?;
-        self.shared.with(&request.request_id, |slot| slot.lease = Some(lease));
+        let native_reply = match trusted.native_target.as_ref() {
+            Some(target) => Some(
+                target
+                    .open(&request.request_id)
+                    .await
+                    .map_err(|error| format!("native progressive output unavailable: {error}"))?,
+            ),
+            None => None,
+        };
+        self.shared.with(&request.request_id, |slot| {
+            slot.lease = Some(lease);
+            slot.native_reply = native_reply;
+        });
         Ok(TurnSession {
             session_id,
             fingerprint: None,
@@ -271,15 +284,13 @@ struct NativeEvents {
 #[async_trait]
 impl EventSink<QueuedPayload> for NativeEvents {
     async fn progress(&self, request: &TurnRequest<QueuedPayload>, event: tinyagents_harness::progress::AgentProgress) {
-        let Some(reply) = request
-            .payload
-            .trusted_turn
-            .as_ref()
-            .and_then(|trusted| trusted.native_reply.as_ref())
-        else {
+        let Some(event) = super::processor::progressive::output_event(event) else {
             return;
         };
-        let Some(event) = super::processor::progressive::output_event(event) else {
+        let reply = self
+            .shared
+            .with(&request.request_id, |slot| slot.native_reply.clone());
+        let Some(reply) = reply else {
             return;
         };
         match reply.feed(vec![event]).await {
@@ -289,11 +300,9 @@ impl EventSink<QueuedPayload> for NativeEvents {
     }
 
     async fn terminal(&self, request: &TurnRequest<QueuedPayload>, event: TerminalEvent) {
-        let reply = request
-            .payload
-            .trusted_turn
-            .as_ref()
-            .and_then(|trusted| trusted.native_reply.as_ref());
+        let reply = self
+            .shared
+            .with(&request.request_id, |slot| slot.native_reply.clone());
         let (text, cancelled) = match event {
             TerminalEvent::Completed { .. } => (
                 self.shared
@@ -307,13 +316,13 @@ impl EventSink<QueuedPayload> for NativeEvents {
             .shared
             .with(&request.request_id, |slot| slot.progress_failed);
         let delivered = if cancelled || progress_failed {
-            if let Some(reply) = reply {
+            if let Some(reply) = reply.as_ref() {
                 if let Err(error) = reply.close().await {
                     tracing::warn!("[dispatch] native progressive close failed: {error}");
                 }
             }
             false
-        } else if let (Some(reply), Some(text)) = (reply, text.as_deref()) {
+        } else if let (Some(reply), Some(text)) = (reply.as_ref(), text.as_deref()) {
             super::processor::progressive::finish_native_reply(
                 &Some(Arc::clone(reply)),
                 text,
