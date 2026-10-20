@@ -33,7 +33,6 @@ async fn a_text_kind_shows_its_newest_version() {
         "operator",
         2,
     ));
-    let dir = tempfile::tempdir().unwrap();
     let body = body_of(&record, None, None, &DocumentConverter::none()).await;
     assert_eq!(body.kind, "markdown");
     assert_eq!(body.version, 2);
