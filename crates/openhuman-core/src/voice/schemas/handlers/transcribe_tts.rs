@@ -84,11 +84,7 @@ pub(crate) fn voice_tts_dispatch_controller() -> BoundRegisteredController {
     )
 }
 
-fn run_voice_status(
-    _ctx: DispatchCtx,
-    config: Config,
-    (): (),
-) -> ControllerFuture {
+fn run_voice_status(_ctx: DispatchCtx, config: Config, (): ()) -> ControllerFuture {
     Box::pin(async move { to_json(crate::voice::voice_status(&config).await?) })
 }
 

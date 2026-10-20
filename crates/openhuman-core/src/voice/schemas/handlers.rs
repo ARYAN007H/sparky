@@ -17,6 +17,6 @@ pub(super) use transcribe_tts::{
     handle_voice_reply_synthesize, handle_voice_status, handle_voice_stt_dispatch,
     handle_voice_transcribe, handle_voice_transcribe_bytes, handle_voice_tts,
     handle_voice_tts_dispatch, voice_reply_synthesize_controller, voice_status_controller,
-    voice_stt_dispatch_controller, voice_transcribe_bytes_controller,
-    voice_transcribe_controller, voice_tts_controller, voice_tts_dispatch_controller,
+    voice_stt_dispatch_controller, voice_transcribe_bytes_controller, voice_transcribe_controller,
+    voice_tts_controller, voice_tts_dispatch_controller,
 };

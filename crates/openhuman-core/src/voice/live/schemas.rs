@@ -11,7 +11,8 @@ use super::ops;
 use super::types::LiveSettingsPatch;
 use crate::config::Config;
 use crate::core::all::{
-    BoundRegisteredController, ControllerEntry, ControllerFuture, ControllerTask, RegisteredController,
+    BoundRegisteredController, ControllerEntry, ControllerFuture, ControllerTask,
+    RegisteredController,
 };
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
@@ -162,24 +163,12 @@ fn live_test_provider_controller() -> BoundRegisteredController {
     )
 }
 
-fn run_live_providers(
-    _ctx: DispatchCtx,
-    config: Config,
-    (): (),
-) -> ControllerFuture {
-    Box::pin(async move {
-        to_value(ops::live_providers(&config).value)
-    })
+fn run_live_providers(_ctx: DispatchCtx, config: Config, (): ()) -> ControllerFuture {
+    Box::pin(async move { to_value(ops::live_providers(&config).value) })
 }
 
-fn run_live_settings_get(
-    _ctx: DispatchCtx,
-    config: Config,
-    (): (),
-) -> ControllerFuture {
-    Box::pin(async move {
-        to_value(ops::live_settings_get(&config).value)
-    })
+fn run_live_settings_get(_ctx: DispatchCtx, config: Config, (): ()) -> ControllerFuture {
+    Box::pin(async move { to_value(ops::live_settings_get(&config).value) })
 }
 
 fn run_live_settings_set(ctx: DispatchCtx, patch: LiveSettingsPatch) -> ControllerFuture {
