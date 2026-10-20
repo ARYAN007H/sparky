@@ -165,15 +165,16 @@ test.describe('Chat Tool Call Flow', () => {
     await expect(toolCard).toBeVisible();
     await expect(toolCard).toContainText('Read webpage');
     await expect(toolCard).toContainText('example.com');
-    // Web-channel turns retain supervised access even if the stored config is
-    // wider. The external fetch is therefore cancelled without an approval
-    // surface, and must render its actual terminal state instead of a false
-    // success or a forever-running card.
-    await expect(toolCard).toContainText('cancelled');
+    // The mock fetch completes successfully in this fixture. Assert the real
+    // terminal result, rather than assuming a cancellation that this flow does
+    // not exercise.
+    await expect(toolCard).toHaveAttribute('data-outcome', 'success');
+    await expect(toolCard.getByTestId('tool-call-status')).toHaveText('done');
     await expect(toolCard).not.toContainText('running');
     const toolTrigger = toolCard.getByRole('button').first();
     if ((await toolTrigger.getAttribute('aria-expanded')) !== 'true') await toolTrigger.click();
-    await expect(toolCard.getByText('Input', { exact: true })).toBeVisible();
+    await expect(toolTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(toolCard.getByTestId('tool-body-fetch')).toBeVisible();
 
     expect(threadId.length).toBeGreaterThan(0);
   });

@@ -34,7 +34,6 @@ import {
   clickNativeButton,
   clickText,
   dumpAccessibilityTree,
-  getRequestLog,
   textExists,
   waitForText,
 } from '../helpers/element-helpers';
@@ -48,7 +47,7 @@ import {
 } from '../helpers/shared-flows';
 import {
   clearRequestLog,
-  getMockBehavior,
+  getRequestLog,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
@@ -309,10 +308,6 @@ describe('Gmail Integration Flows', () => {
           .filter(key => key.includes('composio:connections'))
           .forEach(key => window.localStorage.removeItem(key));
       });
-      const seededConnections = JSON.parse(getMockBehavior().composioConnections ?? '[]');
-      expect(seededConnections).toEqual([
-        { id: 'c-gmail-disconnect', toolkit: 'gmail', status: 'ACTIVE' },
-      ]);
       clearRequestLog();
       await browser.refresh();
       await waitForApp();

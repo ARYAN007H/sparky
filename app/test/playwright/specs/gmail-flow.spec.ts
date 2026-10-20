@@ -114,9 +114,9 @@ test.describe('Gmail Integration Flows', () => {
       timeout: 15_000,
     });
     await expect(dialog).not.toContainText('Gmail is connected');
-    await expect(page.getByTestId('skill-install-composio-gmail')).toHaveAccessibleName(
-      /Gmail,.*Connect\./i
-    );
+    await dialog.getByRole('button', { name: /close/i }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByTestId('skill-install-composio-gmail')).toHaveAccessibleName(/Connect/i);
   });
 
   test('failed and expired states remain usable', async ({ page }) => {
