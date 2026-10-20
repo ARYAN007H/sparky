@@ -2,10 +2,10 @@
 //!
 //! The TinyMemory backfill driver owns planning, progress, batching and
 //! idempotent writes. This host adapter supplies the conversation thread
-//! source, the existing state-file path, consent, engine binding and task
+//! source, the state-KV checkpoint, consent, engine binding and task
 //! lifetime.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -21,8 +21,8 @@ use tinymemory_tools::backfill::{
 use tinymemory_tools::layout::identity::Identity;
 
 pub use tinymemory_tools::backfill::{
-    pending_range, turns_of, BackfillPhase, BackfillState, BackfillView, PastTurn, BACKFILL_TAG,
-    MAIN_AGENT,
+    BACKFILL_TAG, BackfillPhase, BackfillState, BackfillView, MAIN_AGENT, PastTurn, pending_range,
+    turns_of,
 };
 
 /// `memory_conversations_backfill_start` params.
@@ -70,25 +70,18 @@ struct FileCounterStore {
     workspace_dir: PathBuf,
 }
 
-impl FileCounterStore {
-    fn path(&self) -> PathBuf {
-        self.workspace_dir
-            .join("memory")
-            .join("conversations_backfill.json")
-    }
-}
-
 impl CounterStore for FileCounterStore {
     fn load(&self) -> BackfillFile {
-        std::fs::read_to_string(self.path())
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
+        super::state_store::load(&self.workspace_dir, "conversations_backfill")
+            .unwrap_or_else(|error| {
+                tracing::warn!(%error, "[memory:backfill] reading state failed");
+                None
+            })
             .unwrap_or_default()
     }
 
     fn save(&self, file: &BackfillFile) -> std::result::Result<(), String> {
-        let bytes = serde_json::to_vec_pretty(file).map_err(|error| error.to_string())?;
-        crate::security::secret_storage::file_store::write_atomic(&self.path(), &bytes)
+        super::state_store::save(&self.workspace_dir, "conversations_backfill", file)
             .map_err(|error| error.to_string())
     }
 }

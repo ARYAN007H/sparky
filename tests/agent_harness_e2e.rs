@@ -15,8 +15,12 @@
 mod env_guard;
 #[path = "support/linked_modules.rs"]
 mod linked_modules;
+#[path = "support/mcp_stub_trusted.rs"]
+mod mcp_stub_trusted;
 #[path = "support/scripted_stack.rs"]
 mod scripted_stack;
+#[path = "support/tinyhumans_boot.rs"]
+mod tinyhumans_boot;
 use env_guard::EnvVarGuard;
 use scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
@@ -37,7 +41,7 @@ use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tempfile::tempdir;
 
-use openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry;
+use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
 use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
 use openhuman_rpc::server::build_core_http_router;
 
@@ -695,12 +699,20 @@ async fn boot_stack() -> Stack {
 const SUPERVISED_AUTONOMY_CONFIG: &str = "[autonomy]\nenabled = true\nlevel = \"supervised\"\n";
 
 async fn boot_stack_with_config(extra_config: &str) -> Stack {
+    // This suite boots the core in-process, so install the hosted backend
+    // transport before any RPC can reach backend-backed providers.
+    tinyhumans_boot::boot();
+
     // Ensure the global AgentDefinitionRegistry is populated with built-in
     // archetypes (orchestrator, vision_agent, task_manager_agent, etc.) before
     // the RPC stack starts. Without this the session builder cannot synthesise
     // delegation tools and every `analyze_image`/`spawn_subagent` call becomes
     // "Unknown tool: …", making delegation tests vacuous.
     init_agent_def_registry();
+    // The managed `openhuman` chat provider (and the other hosted registries)
+    // are installed by the TinyHumans layer, not built into the core; without
+    // it every turn fails with `chat_error.inference`.
+    tinyhumans_boot::boot();
 
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().to_path_buf();
@@ -975,7 +987,7 @@ async fn multi_turn_state_persistence_inner() {
 // ─── Task 3: Subagent delegation happy path ───────────────────────────────────
 //
 // Tool surface (crates/openhuman-core/src/tools/orchestrator_tools.rs,
-//   crates/openhuman-core/src/agent/registry/agents/vision_agent/agent.toml):
+//   crates/openhuman-core/src/agent_registry/agents/vision_agent/agent.toml):
 //   - vision_agent has `delegate_name = "analyze_image"`, so the
 //     orchestrator LLM sees a tool named "analyze_image" synthesised by collect_orchestrator_tools.
 //   - The tool takes { "prompt": string, ... } per ArchetypeDelegationTool schema.
@@ -2034,7 +2046,7 @@ async fn provider_error_retry_inner() {
 // multi_hop_delegation_chain:
 //   Depth-1 subagents (vision_agent, task_manager_agent, etc.) do NOT have
 //   spawn tools in their named lists. Verified: vision_agent's agent.toml
-//   (agent/registry/agents/vision_agent/agent.toml) names only `file_read` and
+//   (agent_registry/agents/vision_agent/agent.toml) names only `file_read` and
 //   `image_info`. It contains no
 //   spawn_subagent, spawn_worker_thread, or spawn_parallel_agents. The only
 //   agents with spawn tools are orchestrator and trigger_reactor (loader.rs:383,
@@ -2244,7 +2256,7 @@ async fn multi_hop_delegation_chain_inner() {
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
         // request[0]: Orchestrator delegates to vision_agent via
-        // `analyze_image` (its delegate_name, agent/registry/agents/vision_agent/agent.toml:3).
+        // `analyze_image` (its delegate_name, agent_registry/agents/vision_agent/agent.toml:3).
         tool_call_completion(
             "analyze_image",
             json!({
@@ -2369,10 +2381,10 @@ async fn multi_hop_delegation_chain_inner() {
 
 mod streaming_support {
     use async_trait::async_trait;
-    use openhuman_core::agent::harness::host_definition::{
+    use openhuman_core::agent::OpenHumanSessionHost;
+    use openhuman_core::agent_registry::host_definition::{
         AgentDefinition, AgentDefinitionRegistry,
     };
-    use openhuman_core::agent::OpenHumanSessionHost;
     use openhuman_core::config::{AgentConfig, ContextConfig};
     use serde_json::json;
     use std::collections::VecDeque;
@@ -2646,7 +2658,7 @@ mod streaming_support {
 ///   5. Final answer is "stream final".
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn streaming_tool_call_accumulation() {
-    use openhuman_core::agent::progress::AgentProgress;
+    use openhuman_core::progress::AgentProgress;
     use std::sync::Mutex;
     use streaming_support::{
         agent_with_s, native_tool_response_s, text_response_s, workspace_s, EchoTool,
@@ -3943,6 +3955,10 @@ fn peel_logs_envelope(v: &Value) -> &Value {
 /// through the orchestrator's direct registry tools; its answer reaches the model.
 #[cfg(feature = "mcp")]
 #[test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry() {
     run_on_agent_stack(
         "agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry",
@@ -4172,32 +4188,31 @@ async fn orchestrator_defers_its_mcp_registry_tools_without_a_hand_off_inner() {
     stack.shutdown();
 }
 
-/// Search discovers a connected MCP action with its schema, then the model
-/// calls that action by its own name on the same orchestrator turn.
+/// Search discovers an operator-declared MCP action with its schema, then the
+/// model calls that action by its own name on the same orchestrator turn. The
+/// stub is declared in `config.toml` as an operator-trusted stdio server (see
+/// `support/mcp_stub_trusted.rs` for why this is temporary).
 #[cfg(feature = "mcp")]
 #[test]
-fn orchestrator_calls_a_connected_mcp_tool_directly() {
+fn orchestrator_calls_an_operator_trusted_mcp_tool_directly() {
     run_on_agent_stack(
-        "orchestrator_calls_a_connected_mcp_tool_directly",
-        orchestrator_calls_a_connected_mcp_tool_directly_inner,
+        "orchestrator_calls_an_operator_trusted_mcp_tool_directly",
+        orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner,
     );
 }
 
 #[cfg(feature = "mcp")]
-async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
+async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
     let _lock = env_lock();
     let _ttl = EnvVarGuard::set("OPENHUMAN_APPROVAL_TTL_SECS", "120");
     ensure_approval_gate().await;
     let _approval_bridge = register_approval_bridge();
-    let (registry_addr, registry_join) = serve_mcp_registry_fixture().await;
-    let _registry = EnvVarGuard::set(
-        "MCP_OFFICIAL_REGISTRY_BASE",
-        format!("http://{registry_addr}"),
-    );
     reset_script(Vec::new());
-    let stack = boot_stack().await;
-    // Connecting also writes the tool cache the orchestrator's surface reads.
-    declare_and_connect_registry_echo_server(&stack.rpc_base, 940).await;
+    let stack = boot_stack_with_config(&mcp_stub_trusted::trusted_stub_toml(
+        "echo",
+        env!("CARGO_BIN_EXE_test-mcp-stub"),
+    ))
+    .await;
 
     reset_script(vec![
         tool_call_completion(
@@ -4286,7 +4301,6 @@ async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
         "the direct MCP call failed: {result}"
     );
 
-    registry_join.abort();
     stack.shutdown();
 }
 

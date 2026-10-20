@@ -65,6 +65,8 @@ pub fn start(config: &crate::config::Config) {
 #[cfg(feature = "mcp")]
 pub(crate) mod module_client;
 
+mod host_cleanup;
+
 /// Brings this domain up — the build without it, where there is nothing to do.
 #[cfg(not(feature = "mcp"))]
 pub fn start(_config: &crate::config::Config) {}
@@ -206,6 +208,7 @@ pub mod audit;
 // ordinary dependency, and the startup path calls `host::init` without a `cfg`
 // of its own. Gating this would break the build with the domain turned off.
 pub mod host;
+pub(crate) mod host_sandbox;
 pub mod registry;
 pub mod server;
 #[cfg(feature = "mcp")]

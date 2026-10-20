@@ -14,34 +14,43 @@ use tinymemory_integrations::sources::{SourceState, SourceStatus};
 /// Serialises state-file read-modify-writes in this process.
 static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
+const STATE: &str = "sources_state";
+
 fn path(workspace_dir: &Path) -> PathBuf {
-    workspace_dir.join("memory").join("sources_state.json")
+    crate::memory::state_store::legacy_path(workspace_dir, STATE)
 }
 
 fn read_all(workspace_dir: &Path) -> BTreeMap<String, SourceState> {
-    let file = path(workspace_dir);
-    let Ok(text) = std::fs::read_to_string(&file) else {
-        return BTreeMap::new();
-    };
-    serde_json::from_str(&text).unwrap_or_else(|error| {
-        tracing::warn!(%error, "[memory:sources] sync state unparsable; set aside");
-        if let Err(error) = std::fs::rename(&file, file.with_extension("json.corrupt")) {
-            tracing::warn!(%error, "[memory:sources] could not set sync state file aside");
+    match crate::memory::state_store::load(workspace_dir, STATE) {
+        Ok(Some(state)) => state,
+        Ok(None) => {
+            quarantine_legacy_file(workspace_dir);
+            BTreeMap::new()
         }
-        BTreeMap::new()
-    })
+        Err(error) => {
+            tracing::warn!(%error, "[memory:sources] reading sync state failed");
+            quarantine_legacy_file(workspace_dir);
+            BTreeMap::new()
+        }
+    }
 }
 
 fn write_all(workspace_dir: &Path, all: &BTreeMap<String, SourceState>) {
+    if let Err(error) = crate::memory::state_store::save(workspace_dir, STATE, all) {
+        tracing::warn!(%error, "[memory:sources] writing sync state failed");
+    }
+}
+
+fn quarantine_legacy_file(workspace_dir: &Path) {
     let file = path(workspace_dir);
-    let result = serde_json::to_vec_pretty(all)
-        .map_err(std::io::Error::other)
-        .and_then(|json| {
-            crate::security::secret_storage::file_store::write_atomic(&file, &json)
-                .map_err(std::io::Error::other)
-        });
-    if let Err(error) = result {
-        tracing::warn!(error = %error, "[memory:sources] writing sync state failed");
+    let Ok(bytes) = std::fs::read(&file) else {
+        return;
+    };
+    if serde_json::from_slice::<BTreeMap<String, SourceState>>(&bytes).is_ok() {
+        return;
+    }
+    if let Err(error) = std::fs::rename(&file, file.with_extension("json.corrupt")) {
+        tracing::warn!(%error, "[memory:sources] could not set sync state file aside");
     }
 }
 

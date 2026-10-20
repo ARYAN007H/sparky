@@ -78,12 +78,6 @@ impl StorageBackend for Backend {
             Arc::clone(inner.blobs()),
         ))
     }
-    fn database(&self, name: &str) -> StoreResult<Arc<dyn StorageBackend>> {
-        Ok(Arc::new(Self {
-            inner: self.inner.database(name)?,
-            faults: Arc::clone(&self.faults),
-        }))
-    }
 }
 
 #[derive(Debug)]
@@ -241,7 +235,9 @@ async fn put_raw_policy(docs: &ScopedStorage, job_id: &str, policy: serde_json::
         .unwrap();
 }
 
-pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case: Case) {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn policy_reads_refuse_execution_without_consuming_a_slot() {
+    let case = Case::open();
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: workspace.path().join("workspace"),
@@ -422,10 +418,10 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         let reads = faults.calls.lock().unwrap();
         assert!(reads
             .iter()
-            .any(|(scope, id)| scope == "profile:policy-alpha" && id == &job.id));
+            .any(|(scope, id)| scope == "u:policy-alpha" && id == &job.id));
         assert!(reads
             .iter()
-            .any(|(scope, id)| scope == "profile:policy-beta" && id == &job.id));
+            .any(|(scope, id)| scope == "u:policy-beta" && id == &job.id));
     }
     faults.read.store(false, Ordering::SeqCst);
     CoreContext::scope(Arc::clone(&alpha), async {
@@ -455,7 +451,9 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
     assert!(AgentContextRegistry::deregister("policy-beta", &beta));
 }
 
-pub(super) async fn malformed_policy_rows_refuse_execution(case: Case) {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn malformed_policy_rows_refuse_execution() {
+    let case = Case::open();
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: workspace.path().join("workspace"),

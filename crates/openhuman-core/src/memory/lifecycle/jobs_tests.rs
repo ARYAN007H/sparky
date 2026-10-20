@@ -1,6 +1,6 @@
 use super::*;
-use tinymemory_tools::queue::QueueState;
 use tinymemory_tools::queue::MAX_ATTEMPTS;
+use tinymemory_tools::queue::QueueState;
 
 use tinymemory_api::{ConsolidateRequest, ItemKind, Reach};
 
@@ -23,9 +23,11 @@ fn workspace_queues_are_released_after_the_last_holder_drops() {
     drop(queue_of(&sentinel));
 
     let queues = QUEUES.lock().unwrap();
-    assert!(workspaces
-        .iter()
-        .all(|workspace| !queues.contains_key(workspace)));
+    assert!(
+        workspaces
+            .iter()
+            .all(|workspace| !queues.contains_key(workspace))
+    );
 }
 
 fn build(agent: &str) -> BackgroundJob {
@@ -41,7 +43,9 @@ fn corrupt_job_queue_file_is_set_aside() {
     let file = path(tmp.path());
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     std::fs::write(&file, b"{\"pending\":[").unwrap();
-    let store = FileQueueStore { file: file.clone() };
+    let store = FileQueueStore {
+        workspace_dir: tmp.path().to_path_buf(),
+    };
 
     assert_eq!(store.load(), QueueState::default());
     assert!(
@@ -70,7 +74,11 @@ async fn duplicates_merge_and_the_queue_survives_a_reload() {
 
     let queue = snapshot(&config).await;
     assert_eq!(queue.pending.len(), 3, "one per (root, job)");
-    assert!(path(&config.workspace_dir).exists());
+    assert!(
+        crate::memory::state_store::load::<JobQueue>(&config.workspace_dir, "jobs")
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -134,17 +142,21 @@ async fn a_run_needs_an_engine() {
 }
 
 #[tokio::test]
-async fn the_build_delay_comes_from_the_recall_config_and_the_file_store_is_the_workspaces() {
+async fn the_build_delay_comes_from_recall_config_and_the_queue_uses_the_state_store() {
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config_in(&tmp);
     bind_reference(&config);
     config.memory.recall.build_delay_secs = 3600;
     enqueue(&config, &Namespace::ROOT, vec![build("a")]).await;
     assert!(has_pending(&config.workspace_dir));
-    let on_disk: QueueState =
-        serde_json::from_str(&std::fs::read_to_string(path(&config.workspace_dir)).unwrap())
-            .unwrap();
-    assert_eq!(on_disk.pending.len(), 1, "persisted in memory/jobs.json");
+    let stored: QueueState = crate::memory::state_store::load(&config.workspace_dir, "jobs")
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        stored.pending.len(),
+        1,
+        "persisted through the state KV port"
+    );
     assert!(run(&config, Selection::Due).await.unwrap().is_empty());
 }
 

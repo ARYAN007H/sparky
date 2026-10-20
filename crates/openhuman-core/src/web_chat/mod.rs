@@ -31,7 +31,6 @@ pub(crate) mod citations;
 mod egress_surface;
 mod event_bus;
 mod event_bus_channel;
-mod journal_shadow;
 mod ops;
 // Response delivery/segmentation for the web surface (folded in from the former
 // standalone `presentation` provider — it is the web channel's delivery formatter).
@@ -45,6 +44,7 @@ mod session;
 mod suggestions;
 mod turn_activity;
 mod turn_close;
+pub(crate) mod turn_guards;
 mod turn_timing;
 mod types;
 

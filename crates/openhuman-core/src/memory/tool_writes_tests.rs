@@ -1,5 +1,5 @@
 use super::*;
-use crate::memory::test_fixtures::{bind_reference, config_in, stored, RefusingEngine};
+use crate::memory::test_fixtures::{RefusingEngine, bind_reference, config_in, stored};
 use crate::memory::tools::CallFacts;
 use serde_json::json;
 use tinymemory_api::{MetaFilter, Namespace, Reach};
@@ -194,7 +194,11 @@ fn persistence_failure_and_invalid_scope_never_acknowledge_a_write() {
     let args = json!({"action":"learn","text":"Prefers tea"});
     assert!(enqueue(&config, &args, &facts).is_err());
     assert!(!path(&config.workspace_dir).exists());
-    std::fs::write(config.workspace_dir.join("memory"), "blocks directory").unwrap();
+    std::fs::write(
+        config.workspace_dir.join("storage"),
+        "blocks the storage directory",
+    )
+    .unwrap();
     assert!(enqueue(&config, &args, &self::facts(&config)).is_err());
 }
 
@@ -210,32 +214,21 @@ fn private_outbox_is_scrubbed_before_persistence_and_has_a_size_limit() {
         &facts(&config),
     )
     .unwrap();
-    let file = path(&config.workspace_dir);
-    let persisted = std::fs::read_to_string(&file).unwrap();
+    let persisted = serde_json::to_string(&read(&config.workspace_dir).unwrap()).unwrap();
     assert!(!persisted.contains(secret));
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        assert_eq!(
-            std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
-        assert_eq!(
-            std::fs::metadata(file.parent().unwrap())
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777,
-            0o700
-        );
-    }
+    assert!(
+        !path(&config.workspace_dir).exists(),
+        "the queue is a storage value, not a file"
+    );
     let huge = "x".repeat(MAX_BYTES);
-    assert!(enqueue(
-        &config,
-        &json!({"action":"learn","text":huge}),
-        &facts(&config)
-    )
-    .is_err());
+    assert!(
+        enqueue(
+            &config,
+            &json!({"action":"learn","text":huge}),
+            &facts(&config)
+        )
+        .is_err()
+    );
     assert_eq!(read(&config.workspace_dir).unwrap().len(), 1);
 }
 
@@ -299,6 +292,10 @@ impl tinymemory_api::MemoryEngine for HeldEngine {
     }
 }
 
+/// A guard against a hang, not a latency budget: on a loaded machine the held
+/// write still acknowledges promptly, so a generous bound never slows a pass.
+const TIMEOUT: Duration = Duration::from_secs(30);
+
 #[tokio::test]
 async fn held_engine_writes_do_not_delay_acknowledgements_or_hold_the_producer_lock() {
     use tinytools::Tool;
@@ -313,18 +310,18 @@ async fn held_engine_writes_do_not_delay_acknowledgements_or_hold_the_producer_l
     crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
     let tool = crate::memory::MemoryTool::new(Arc::new(config.clone()));
     let first = tokio::time::timeout(
-        Duration::from_secs(2),
+        TIMEOUT,
         tool.execute(json!({"action":"learn","text":"First fact"})),
     )
     .await
     .unwrap()
     .unwrap();
     assert!(!first.is_error);
-    tokio::time::timeout(Duration::from_secs(2), engine.entered.notified())
+    tokio::time::timeout(TIMEOUT, engine.entered.notified())
         .await
         .unwrap();
     let second = tokio::time::timeout(
-        Duration::from_secs(2),
+        TIMEOUT,
         tool.execute(json!({"action":"learn","text":"Second fact"})),
     )
     .await
@@ -345,13 +342,16 @@ fn corrupt_existing_outbox_is_preserved_and_refuses_new_writes() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     let file = path(&config.workspace_dir);
-    super::super::files::write_private(&file, b"corrupt existing state").unwrap();
-    assert!(enqueue(
-        &config,
-        &json!({"action":"learn","text":"Prefers tea"}),
-        &facts(&config)
-    )
-    .is_err());
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(&file, b"corrupt existing state").unwrap();
+    assert!(
+        enqueue(
+            &config,
+            &json!({"action":"learn","text":"Prefers tea"}),
+            &facts(&config)
+        )
+        .is_err()
+    );
     assert_eq!(std::fs::read(&file).unwrap(), b"corrupt existing state");
 }
 
@@ -420,12 +420,14 @@ fn a_full_outbox_keeps_existing_writes_and_refuses_a_new_one() {
     let mut entries = read(&config.workspace_dir).unwrap();
     entries.resize(MAX_PENDING, entries[0].clone());
     write(&config.workspace_dir, &entries).unwrap();
-    assert!(enqueue(
-        &config,
-        &json!({"action":"learn","text":"new"}),
-        &facts(&config)
-    )
-    .is_err());
+    assert!(
+        enqueue(
+            &config,
+            &json!({"action":"learn","text":"new"}),
+            &facts(&config)
+        )
+        .is_err()
+    );
     assert_eq!(read(&config.workspace_dir).unwrap().len(), MAX_PENDING);
 }
 
@@ -654,12 +656,16 @@ async fn erasing_one_owner_fences_pending_writes_from_every_team_root() {
     let fence = fence_and_clear(&crate::core::runtime::DispatchCtx::ambient(), &first)
         .await
         .unwrap();
-    assert!(read_at(&queue_path(&first, &facts(&first).reach.at))
-        .unwrap()
-        .is_empty());
-    assert!(read_at(&queue_path(&second, &facts(&second).reach.at))
-        .unwrap()
-        .is_empty());
+    assert!(
+        read_at(&queue_path(&first, &facts(&first).reach.at))
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        read_at(&queue_path(&second, &facts(&second).reach.at))
+            .unwrap()
+            .is_empty()
+    );
     drop(fence);
     let engine = bind_reference(&first);
     assert_eq!(drain(&first).await, 0);

@@ -1,13 +1,13 @@
 //! The background job queue: the slow memory work TinyMemory hands back.
 //!
 //! The queue itself (dedupe, retry, history) is `tinymemory_tools::queue`;
-//! this module is the host adapter: one queue per workspace over a file
-//! store (`<workspace>/memory/jobs.json`), the engine and `[memory.recall]
+//! this module is the host adapter: one queue per workspace over the
+//! `memory`/`state`/`jobs` storage value, the engine and `[memory.recall]
 //! build_delay_secs` it runs against, and the `memory_background` cron hook.
 //!
 //! `post_turn` and brain ingests return `BackgroundJob` values (belief builds,
 //! deferred ingests) instead of running them. They are queued here, persisted
-//! in `<workspace>/memory/jobs.json` so a restart loses none, de-duplicated
+//! in the `memory`/`state`/`jobs` storage value so a restart loses none, de-duplicated
 //! (two builds of one scope are one build), and run by the
 //! `memory_background` cron job ([`run_due`]) once they are at least
 //! `[memory.recall] build_delay_secs` old — a belief build reads the facts the
@@ -22,8 +22,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 use tinymemory_api::Namespace;
-use tinymemory_tools::queue::{JobQueue as Queue, QueueError, QueueState, QueueStore};
 use tinymemory_tools::BackgroundJob;
+use tinymemory_tools::queue::{JobQueue as Queue, QueueError, QueueState, QueueStore};
 
 use tinymemory_tools::queue::{JobRun, Selection};
 
@@ -37,39 +37,53 @@ pub const BACKGROUND_JOB: &str = "memory_background";
 /// Minutes between queue runs.
 pub const BACKGROUND_INTERVAL_MINS: u64 = 5;
 
-/// The queue file of a workspace.
-fn path(workspace_dir: &Path) -> PathBuf {
-    workspace_dir.join("memory").join("jobs.json")
+/// The persisted queue as the UI reads it.
+pub type JobQueue = QueueState;
+
+const STATE: &str = "jobs";
+
+fn quarantine_corrupt_legacy_file(workspace_dir: &Path) {
+    let legacy = path(workspace_dir);
+    let Ok(bytes) = std::fs::read(&legacy) else {
+        return;
+    };
+    if serde_json::from_slice::<QueueState>(&bytes).is_ok() {
+        return;
+    }
+    if let Err(error) = std::fs::rename(&legacy, legacy.with_extension("json.corrupt")) {
+        tracing::warn!(%error, "[memory:jobs] could not set queue file aside");
+    }
 }
 
-/// A [`QueueStore`] over `<workspace>/memory/jobs.json`.
+/// The queue file of a workspace.
+fn path(workspace_dir: &Path) -> PathBuf {
+    super::super::state_store::legacy_path(workspace_dir, STATE)
+}
+
+/// A [`QueueStore`] over the workspace's `jobs` state value.
 struct FileQueueStore {
-    file: PathBuf,
+    workspace_dir: PathBuf,
 }
 
 impl QueueStore for FileQueueStore {
     fn load(&self) -> QueueState {
-        let Ok(text) = std::fs::read_to_string(&self.file) else {
-            return QueueState::default();
-        };
-        serde_json::from_str(&text).unwrap_or_else(|error| {
-            tracing::warn!(%error, "[memory:jobs] queue unparsable; set aside");
-            if let Err(error) =
-                std::fs::rename(&self.file, self.file.with_extension("json.corrupt"))
-            {
-                tracing::warn!(%error, "[memory:jobs] could not set queue file aside");
+        match super::super::state_store::load(&self.workspace_dir, STATE) {
+            Ok(Some(queue)) => queue,
+            Ok(None) => {
+                quarantine_corrupt_legacy_file(&self.workspace_dir);
+                QueueState::default()
             }
-            QueueState::default()
-        })
+            Err(error) => {
+                tracing::warn!(%error, "[memory:jobs] reading the queue failed");
+                quarantine_corrupt_legacy_file(&self.workspace_dir);
+                QueueState::default()
+            }
+        }
     }
 
     fn save(&self, state: &QueueState) -> std::result::Result<(), String> {
-        serde_json::to_vec_pretty(state)
+        super::super::state_store::save(&self.workspace_dir, STATE, state)
             .map_err(|error| error.to_string())
-            .and_then(|json| {
-                crate::security::secret_storage::file_store::write_atomic(&self.file, &json)
-                    .map_err(|error| error.to_string())
-            })
     }
 }
 
@@ -86,7 +100,7 @@ fn queue_of(workspace_dir: &Path) -> Arc<WorkspaceQueue> {
         return queue;
     }
     let queue = Arc::new(Queue::new(FileQueueStore {
-        file: path(workspace_dir),
+        workspace_dir: workspace_dir.to_path_buf(),
     }));
     queues.insert(workspace_dir.to_path_buf(), Arc::downgrade(&queue));
     queue

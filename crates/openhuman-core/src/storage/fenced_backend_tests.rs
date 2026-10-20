@@ -9,6 +9,9 @@ use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+#[path = "fenced_blob_stream_tests.rs"]
+mod blob_stream_tests;
+
 const TTL: Duration = Duration::from_secs(30);
 const MARGIN_MS: u64 = 5_000;
 
@@ -165,24 +168,6 @@ async fn a_renewed_grant_keeps_admitting_writes() {
     a.put("profile:alice", "n").await.unwrap();
 }
 
-#[tokio::test]
-async fn named_databases_are_fenced_too() {
-    let backend = shared();
-    let (a, b) = (Node::new("node-a", &backend), Node::new("node-b", &backend));
-    a.take("alice").await;
-    b.set_clock(TTL.as_millis() as u64 + 1);
-    b.take("alice").await;
-    let sessions = a.storage.database("sessions").unwrap();
-    let scoped = sessions
-        .for_scope(&Scope::new("alice~default").unwrap())
-        .unwrap();
-    assert!(scoped
-        .documents()
-        .put("t", "x", json!({}), Precondition::None)
-        .await
-        .is_err());
-}
-
 /// File leases (`LocalLeases`, hosts without a backend) cannot be lost while
 /// the process lives, so a fence over one admits writes until the holder
 /// releases it.
@@ -258,8 +243,8 @@ impl LeaseStore for PausedAfterCheck {
         Ok(record)
     }
 
-    fn record_scope(&self) -> Option<Scope> {
-        self.inner.record_scope()
+    fn driver_fence(&self, key: &str, node: &str, epoch: u64) -> Option<tinystoragedrivers::Fence> {
+        self.inner.driver_fence(key, node, epoch)
     }
 }
 
@@ -340,18 +325,6 @@ async fn memory_driver_refuses_a_write_after_a_takeover_the_check_missed() {
     driver_refuses_the_write_the_host_check_admitted(shared()).await;
 }
 
-#[cfg(feature = "storage-sqlite")]
-#[tokio::test]
-async fn sqlite_driver_refuses_a_write_after_a_takeover_the_check_missed() {
-    let dir = tempfile::tempdir().unwrap();
-    let url = format!("sqlite:{}", dir.path().join("fenced.db").display());
-    let backend =
-        tinystoragedrivers::open(&tinystoragedrivers::StorageConfig::parse(&url).unwrap())
-            .await
-            .unwrap();
-    driver_refuses_the_write_the_host_check_admitted(backend).await;
-}
-
 /// Streams and blobs go through the driver fence too.
 #[tokio::test]
 async fn stream_and_blob_writes_are_driver_fenced() {
@@ -369,26 +342,6 @@ async fn stream_and_blob_writes_are_driver_fenced() {
     let scoped = b.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     leases.armed.store(true, Ordering::SeqCst);
     assert!(scoped.blobs().put("k", b"x".to_vec(), None).await.is_err());
-}
-
-/// A named database cannot see the lease record, so its writes get the
-/// host check only: the race stays open there, as the module docs say.
-#[tokio::test]
-async fn a_named_database_falls_back_to_the_host_check() {
-    let backend = shared();
-    let (a, fence, leases) = paused_holder(&backend).await;
-    let scoped = a
-        .database("sessions")
-        .unwrap()
-        .for_scope(&Scope::new("profile:alice").unwrap())
-        .unwrap();
-    leases.armed.store(true, Ordering::SeqCst);
-    scoped
-        .documents()
-        .put("t", "x", json!({}), Precondition::None)
-        .await
-        .unwrap();
-    assert!(!fence.is_fenced());
 }
 
 /// A driver without fencing gets the host check only, and writes through.
@@ -417,9 +370,6 @@ impl StorageBackend for NoFencing {
     }
     fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage> {
         self.0.for_scope(scope)
-    }
-    fn database(&self, name: &str) -> Result<Arc<dyn StorageBackend>> {
-        self.0.database(name)
     }
 }
 
@@ -570,16 +520,4 @@ async fn conditional_append_passes_through(inner: Arc<dyn StorageBackend>) {
 #[tokio::test]
 async fn fenced_memory_backend_passes_conditional_appends_through() {
     conditional_append_passes_through(shared()).await;
-}
-
-#[cfg(feature = "storage-sqlite")]
-#[tokio::test]
-async fn fenced_sqlite_backend_passes_conditional_appends_through() {
-    let dir = tempfile::tempdir().unwrap();
-    let url = format!("sqlite:{}", dir.path().join("cond.db").display());
-    let backend =
-        tinystoragedrivers::open(&tinystoragedrivers::StorageConfig::parse(&url).unwrap())
-            .await
-            .unwrap();
-    conditional_append_passes_through(backend).await;
 }

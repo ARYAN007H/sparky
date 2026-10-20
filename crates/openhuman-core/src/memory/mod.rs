@@ -24,9 +24,9 @@ pub mod brain;
 pub mod bus;
 pub mod deletion;
 pub mod engine;
+pub mod engine_registry;
 pub mod error;
 pub mod explore;
-pub(crate) mod files;
 #[cfg(test)]
 #[path = "guard_tests.rs"]
 mod guard;
@@ -39,6 +39,7 @@ pub(crate) mod run_slots;
 pub mod schemas;
 pub mod scope;
 pub mod sources;
+pub(crate) mod state_store;
 pub mod status;
 pub(crate) mod tool_writes;
 pub mod tools;
@@ -57,4 +58,4 @@ pub use schemas::{
     all_controller_schemas as all_memory_controller_schemas,
     all_registered_controllers as all_memory_registered_controllers,
 };
-pub use tools::{MemoryTool, MEMORY_TOOL_NAME};
+pub use tools::{MEMORY_TOOL_NAME, MemoryTool};

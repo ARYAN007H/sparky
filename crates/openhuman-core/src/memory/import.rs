@@ -1,7 +1,7 @@
 //! Importing a v1 memory store into the selected engine.
 //!
 //! TinyMemory owns import batching, checkpoints, retry and backoff. This host
-//! adapter keeps consent, the existing atomic checkpoint path, billing and
+//! adapter keeps consent, the state-KV checkpoint, billing and
 //! scheduler policy, executor context, and post-import layout migration.
 
 use std::path::{Path, PathBuf};
@@ -14,7 +14,6 @@ use tinymemory_integrations::import::{
 };
 
 use crate::config::Config;
-use crate::security::secret_storage::file_store::write_atomic;
 
 use super::engine;
 use super::run_slots::{self, BACKFILL, IMPORT, MIGRATION};
@@ -28,32 +27,37 @@ pub(crate) type PauseCheck = Arc<dyn Fn() -> bool + Send + Sync>;
 /// Whether memory work that uploads on its own may run now.
 pub(crate) type BillingCheck = Arc<dyn Fn(&Config) -> bool + Send + Sync>;
 
-/// The state file, written atomically (staged, synced, renamed): a crash
-/// mid-write leaves the previous state, never a torn file that reads back as
-/// a fresh start and re-sends everything.
-pub(crate) struct FileCheckpointStore {
-    path: PathBuf,
+/// The imported state-KV checkpoint.
+pub(crate) struct StateKvCheckpointStore {
+    workspace_dir: PathBuf,
 }
 
-impl FileCheckpointStore {
+const STATE: &str = "import_state";
+
+/// Backwards-compatible name for the former file checkpoint adapter.
+pub(crate) type FileCheckpointStore = StateKvCheckpointStore;
+
+impl StateKvCheckpointStore {
     pub(crate) fn new(workspace_dir: &Path) -> Self {
         Self {
-            path: workspace_dir.join("memory").join("import_state.json"),
+            workspace_dir: workspace_dir.to_path_buf(),
         }
     }
 }
 
-impl CheckpointStore for FileCheckpointStore {
+impl CheckpointStore for StateKvCheckpointStore {
     fn load(&self) -> ImportFile {
-        std::fs::read_to_string(&self.path)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
+        super::state_store::load(&self.workspace_dir, STATE)
+            .unwrap_or_else(|error| {
+                tracing::warn!(%error, "[memory:import] reading the checkpoint failed");
+                None
+            })
             .unwrap_or_default()
     }
 
     fn save(&self, file: &ImportFile) -> std::result::Result<(), String> {
-        let json = serde_json::to_vec_pretty(file).map_err(|error| error.to_string())?;
-        write_atomic(&self.path, &json).map_err(|error| error.to_string())
+        super::state_store::save(&self.workspace_dir, STATE, file)
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -67,7 +71,7 @@ impl Pacer for TokioPacer {
 }
 
 fn read_file(workspace_dir: &Path) -> ImportFile {
-    FileCheckpointStore::new(workspace_dir).load()
+    StateKvCheckpointStore::new(workspace_dir).load()
 }
 
 /// Whether the last import ended with its last batch not confirmed listed:
@@ -89,7 +93,7 @@ fn importer(
     let mut importer = Importer::new(
         config.workspace_dir.clone(),
         engine,
-        Arc::new(FileCheckpointStore::new(&config.workspace_dir)),
+        Arc::new(StateKvCheckpointStore::new(&config.workspace_dir)),
         Arc::new(TokioPacer),
         Arc::new(move || consent),
     )

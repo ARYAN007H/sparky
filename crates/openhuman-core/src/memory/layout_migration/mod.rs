@@ -11,8 +11,9 @@ pub mod state;
 pub(crate) mod test_host;
 
 pub use app_host::AppHost;
-pub use ops::{retry, scan, start, status, tick, StartParams};
+pub use ops::{StartParams, retry, scan, start, status, tick};
 pub use state::FileStateStore;
+pub use state::StateKvMigrationStore;
 pub use tinymemory_tools::layout_migration::{
     LayoutHost, MigrationState, MigrationStateStore, MigrationStatus, Outcome, Phase, ScanView,
     Trigger,

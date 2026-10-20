@@ -63,7 +63,7 @@ where
             // execute the full core boot sequence. Hosted turns still need
             // the same built-in definition registry that boot initializes in
             // production, so install it before constructing the router.
-            openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+            openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
                 .expect("initialize built-in agent definitions for JSON-RPC E2E");
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(2)
@@ -1402,7 +1402,10 @@ async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
         Some(1),
         "{one}"
     );
-    assert!(!sites.join("shop.test.json").exists());
+    // Site memory lives in the storage KV since schema v2: the legacy files
+    // above are imported once and left in place, so what was forgotten is
+    // read from the counts, not from the directory.
+    assert!(sites.join("shop.test.json").exists());
     assert!(sites.join("books.test.json").exists());
 
     let blank = post_json_rpc(
@@ -1428,7 +1431,21 @@ async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
         Some(1),
         "{every}"
     );
-    assert!(!sites.join("books.test.json").exists());
+    assert!(sites.join("books.test.json").exists());
+
+    let none_left = post_json_rpc(
+        &rpc_base,
+        41_255,
+        "openhuman.modules_browser_forget_sites",
+        json!({}),
+    )
+    .await;
+    let none_left = peel_logs_envelope(assert_no_jsonrpc_error(&none_left, "forget again"));
+    assert_eq!(
+        none_left.get("forgotten").and_then(Value::as_u64),
+        Some(0),
+        "nothing may remain after forgetting every site: {none_left}"
+    );
 
     rpc_join.abort();
 }
@@ -3622,7 +3639,7 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     state.lifecycle = tinyagents_session::turn_state::TurnLifecycle::Streaming;
     state.iteration = 2;
     state.streaming_text = "partial".into();
-    openhuman_core::agent::session_store::turn_states_for(&workspace_dir)
+    openhuman_core::storage::sessions::turn_states_for(&workspace_dir)
         .put(&state)
         .expect("seed snapshot");
 
@@ -3681,7 +3698,7 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     );
     state2.lifecycle = tinyagents_session::turn_state::TurnLifecycle::Completed;
     state2.updated_at = "2999-01-01T00:00:00Z".into();
-    openhuman_core::agent::session_store::turn_states_for(&workspace_dir)
+    openhuman_core::storage::sessions::turn_states_for(&workspace_dir)
         .put(&state2)
         .expect("seed snapshot 2");
 
@@ -3801,9 +3818,8 @@ async fn json_rpc_run_ledger_lifecycle() {
         .await
         .expect("load config");
 
-    openhuman_core::agent::session_store::ledger_sync::upsert_agent_run(
-        &config.workspace_dir,
-        tinyagents_session::run_ledger::AgentRunUpsert {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = tinyagents_session::run_ledger::AgentRunUpsert {
             id: "sub-run-1".to_string(),
             kind: tinyagents_session::run_ledger::AgentRunKind::WorkerThread,
             parent_run_id: Some("req-run-1".to_string()),
@@ -3822,18 +3838,19 @@ async fn json_rpc_run_ledger_lifecycle() {
             metadata: json!({ "source": "json_rpc_e2e" }),
             started_at: None,
             completed_at: None,
-        },
-    )
+        };
+        async move { ledger.upsert_agent_run(ledger_arg_0).await }
+    })
     .expect("seed run");
 
-    openhuman_core::agent::session_store::ledger_sync::append_run_event(
-        &config.workspace_dir,
-        tinyagents_session::run_ledger::RunEventAppend {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = tinyagents_session::run_ledger::RunEventAppend {
             run_id: "sub-run-1".to_string(),
             event_type: "subagent_awaiting_user".to_string(),
             payload: json!({ "question": "Which repo should I inspect?" }),
-        },
-    )
+        };
+        async move { ledger.append_run_event(ledger_arg_0).await }
+    })
     .expect("seed event");
 
     let list = post_json_rpc(
@@ -3918,7 +3935,6 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
         .await
         .expect("load config");
 
-    use openhuman_core::agent::session_store::ledger_sync::upsert_agent_run;
     use tinyagents_session::run_ledger::{AgentRunKind, AgentRunStatus, AgentRunUpsert};
     let seed = |id: &str, status: AgentRunStatus| AgentRunUpsert {
         id: id.to_string(),
@@ -3938,25 +3954,25 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
         completed_at: None,
     };
     // Two awaiting-user (needs_input), one running (working), one completed.
-    upsert_agent_run(
-        &config.workspace_dir,
-        seed("work-a", AgentRunStatus::AwaitingUser),
-    )
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = seed("work-a", AgentRunStatus::AwaitingUser);
+        async move { ledger.upsert_agent_run(ledger_arg_0).await }
+    })
     .expect("seed a");
-    upsert_agent_run(
-        &config.workspace_dir,
-        seed("work-b", AgentRunStatus::AwaitingUser),
-    )
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = seed("work-b", AgentRunStatus::AwaitingUser);
+        async move { ledger.upsert_agent_run(ledger_arg_0).await }
+    })
     .expect("seed b");
-    upsert_agent_run(
-        &config.workspace_dir,
-        seed("work-c", AgentRunStatus::Running),
-    )
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = seed("work-c", AgentRunStatus::Running);
+        async move { ledger.upsert_agent_run(ledger_arg_0).await }
+    })
     .expect("seed c");
-    upsert_agent_run(
-        &config.workspace_dir,
-        seed("work-d", AgentRunStatus::Completed),
-    )
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = seed("work-d", AgentRunStatus::Completed);
+        async move { ledger.upsert_agent_run(ledger_arg_0).await }
+    })
     .expect("seed d");
 
     let list = post_json_rpc(&rpc_base, 9131, "openhuman.agent_work_list", json!({})).await;
@@ -4046,9 +4062,8 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     );
 
     // Seed a durable workflow run, then list + get it.
-    openhuman_core::agent::session_store::ledger_sync::upsert_workflow_run(
-        &config.workspace_dir,
-        tinyagents_session::run_ledger::WorkflowRunUpsert {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = tinyagents_session::run_ledger::WorkflowRunUpsert {
             id: "wf-run-1".to_string(),
             definition_id: "parallel_research_cross_check".to_string(),
             parent_thread_id: Some("thread-wf-1".to_string()),
@@ -4059,8 +4074,9 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
             summary: None,
             started_at: None,
             completed_at: None,
-        },
-    )
+        };
+        async move { ledger.upsert_workflow_run(ledger_arg_0).await }
+    })
     .expect("seed workflow run");
 
     let list = post_json_rpc(
@@ -4244,15 +4260,14 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
     );
 
     // Mark A done directly via the run ledger, then B claims fine.
-    let task_a = openhuman_core::agent::session_store::ledger_sync::get_agent_team_task(
-        &config.workspace_dir,
-        &task_a_id,
-    )
+    let task_a = openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = task_a_id.to_string();
+        async move { ledger.get_agent_team_task(&ledger_arg_0).await }
+    })
     .expect("get task A")
     .expect("task A present");
-    openhuman_core::agent::session_store::ledger_sync::upsert_agent_team_task(
-        &config.workspace_dir,
-        tinyagents_session::run_ledger::AgentTeamTaskUpsert {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = tinyagents_session::run_ledger::AgentTeamTaskUpsert {
             id: task_a.id.clone(),
             team_id: task_a.team_id.clone(),
             title: task_a.title.clone(),
@@ -4266,8 +4281,9 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
             source_run_id: task_a.source_run_id.clone(),
             order_index: task_a.order_index,
             created_at: Some(task_a.created_at),
-        },
-    )
+        };
+        async move { ledger.upsert_agent_team_task(ledger_arg_0).await }
+    })
     .expect("mark A done");
 
     let claim_b_ok = post_json_rpc(
@@ -8561,13 +8577,10 @@ async fn public_paths_accessible_without_token() {
     // headers, etc.). The invariant here is that the auth middleware does NOT
     // reject them with 401.
     //
-    // NOTE: `/events` and `/ws/dictation` enforce their own credential inside
-    // the handler (bind token / bearer / `?token=`), so an unauthenticated GET
-    // to those returns 401 from the HANDLER (not the middleware). `/events`
-    // requires a `client_id` query param, so an empty request is rejected by
-    // Axum's extractor (400) before the handler's own auth runs — it stays in
-    // this `!= 401` group. `/ws/dictation` is asserted separately below now
-    // that it is authenticated at the upgrade boundary (C4 / issue #1924).
+    // NOTE: `/events` enforces its own credential inside the handler, so an
+    // unauthenticated GET returns 401 from the HANDLER (not the middleware).
+    // It requires a `client_id` query param, so an empty request is rejected
+    // by Axum's extractor (400) before the handler's own auth runs.
     for path in ["/events"] {
         let resp = client
             .get(format!("{base}{path}"))
@@ -8582,9 +8595,7 @@ async fn public_paths_accessible_without_token() {
         );
     }
 
-    // `/ws/dictation` is now authenticated at the upgrade boundary (C4 /
-    // issue #1924): an unauthenticated request (no bearer header, no
-    // `?token=`) must be rejected with 401 by the handler before any upgrade.
+    // The removed dictation socket must fall through to the normal 404.
     let resp = client
         .get(format!("{base}/ws/dictation"))
         .send()
@@ -8592,8 +8603,8 @@ async fn public_paths_accessible_without_token() {
         .unwrap_or_else(|e| panic!("GET /ws/dictation: {e}"));
     assert_eq!(
         resp.status(),
-        StatusCode::UNAUTHORIZED,
-        "/ws/dictation must reject unauthenticated upgrades with 401 (got {})",
+        StatusCode::NOT_FOUND,
+        "removed /ws/dictation endpoint must return 404 (got {})",
         resp.status()
     );
 
@@ -9216,6 +9227,10 @@ async fn mcp_clients_lifecycle() {
 /// `mcp_clients_config_set` with a `command` pointing at the stub binary, which
 /// is how a user adds any server now — the registry is browse-only.
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn mcp_clients_declare_connect_tool_call_happy_path() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
@@ -9391,6 +9406,10 @@ async fn mcp_clients_declare_connect_tool_call_happy_path() {
 /// survives and answers again, then retire it by dropping it from `mcp.json`
 /// and prove neither the install nor a call to it is left behind.
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn mcp_clients_reconfigure_then_retire_over_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
@@ -12103,6 +12122,9 @@ fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech() {
 
 async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
+    // The hosted `cloud` TTS provider (and its test seam) is registered by the
+    // TinyHumans layer, not built into the core.
+    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
@@ -12113,9 +12135,12 @@ async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner()
     let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
     // Activate the reply_speech test seam so synthesize_reply records and
     // short-circuits instead of calling the hosted backend.
-    let _seam_guard = EnvVarGuard::set(openhuman_core::voice::reply_speech::TEST_SEAM_ENV, "1");
+    let _seam_guard = EnvVarGuard::set(
+        openhuman_tinyhumans::voice::reply_speech::TEST_SEAM_ENV,
+        "1",
+    );
 
-    openhuman_core::voice::reply_speech::test_seam::clear();
+    openhuman_tinyhumans::voice::reply_speech::test_seam::clear();
 
     let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
     let mock_origin = format!("http://{}", mock_addr);
@@ -12185,7 +12210,7 @@ async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner()
     // because the bridge task may finish slightly after chat_done.
     let mut observed: Vec<String> = Vec::new();
     for _ in 0..50 {
-        observed = openhuman_core::voice::reply_speech::test_seam::observed();
+        observed = openhuman_tinyhumans::voice::reply_speech::test_seam::observed();
         if !observed.is_empty() {
             break;
         }
@@ -12212,13 +12237,10 @@ async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner()
 
 // ── Model resolution and voice settings ─────────────────────────────────
 
-/// E2E: voice-server settings round-trip over JSON-RPC — Phase 2 always-on
-/// toggle + "Hey Tiny" wake word. Regression guard for the bug where the
-/// Settings toggle silently did nothing because `always_on_enabled` was absent
-/// from the `update_voice_server_settings` controller param schema (rejected as
-/// "unknown param 'always_on_enabled'" before reaching the handler).
+/// E2E: the retired dictation and voice-server config methods are absent from
+/// the JSON-RPC surface.
 #[tokio::test]
-async fn json_rpc_voice_server_settings_roundtrip_always_on_and_wake_word() {
+async fn json_rpc_retired_dictation_and_voice_server_methods_are_unknown() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
@@ -12235,63 +12257,15 @@ async fn json_rpc_voice_server_settings_roundtrip_always_on_and_wake_word() {
     let rpc_base = format!("http://{}", rpc_addr);
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // GET defaults — wake_word "Hey Tiny", always-on off.
-    let initial = post_json_rpc(
-        &rpc_base,
-        7401,
-        "openhuman.config_get_voice_server_settings",
-        json!({}),
-    )
-    .await;
-    let initial_outer = assert_no_jsonrpc_error(&initial, "get_voice_server_settings initial");
-    assert_eq!(
-        initial_outer
-            .get("result")
-            .and_then(|r| r.get("always_on_enabled"))
-            .and_then(Value::as_bool),
-        Some(false),
-        "default always_on_enabled should be false, envelope: {initial_outer}"
-    );
-    assert_eq!(
-        initial_outer
-            .get("result")
-            .and_then(|r| r.get("wake_word"))
-            .and_then(Value::as_str),
-        Some("Hey Tiny"),
-        "default wake_word should be 'Hey Tiny', envelope: {initial_outer}"
-    );
-
-    // UPDATE — change the wake word and pass `always_on_enabled` (the param that
-    // used to be rejected). Kept false so the test never opens a real mic.
-    let update = post_json_rpc(
-        &rpc_base,
-        7402,
-        "openhuman.config_update_voice_server_settings",
-        json!({ "always_on_enabled": false, "wake_word": "Computer" }),
-    )
-    .await;
-    assert_no_jsonrpc_error(
-        &update,
-        "update_voice_server_settings (always_on_enabled + wake_word)",
-    );
-
-    // GET again — wake word persisted, no error.
-    let after = post_json_rpc(
-        &rpc_base,
-        7403,
-        "openhuman.config_get_voice_server_settings",
-        json!({}),
-    )
-    .await;
-    let after_outer = assert_no_jsonrpc_error(&after, "get_voice_server_settings after update");
-    assert_eq!(
-        after_outer
-            .get("result")
-            .and_then(|r| r.get("wake_word"))
-            .and_then(Value::as_str),
-        Some("Computer"),
-        "wake_word should persist, envelope: {after_outer}"
-    );
+    for (id, method) in [
+        (7401, "openhuman.config_get_dictation_settings"),
+        (7402, "openhuman.config_update_dictation_settings"),
+        (7403, "openhuman.config_get_voice_server_settings"),
+        (7404, "openhuman.config_update_voice_server_settings"),
+    ] {
+        let response = post_json_rpc(&rpc_base, id, method, json!({})).await;
+        assert_unknown_method(&response, method);
+    }
 
     rpc_join.abort();
 }

@@ -13,6 +13,27 @@
 # Simulate with: scripts/dep-sim.py --cut <crates>
 #
 # History
+#   334/311/3  2026-10-19  Two first-party crates split out of existing ones
+#                      (EX63 run 39182774906, Linux: 334 packages / 311 names /
+#                      3 native, against 332/309/3). New names: `tinyagents-hooks`
+#                      v2.2.0 (the stop and tool hook traits, extracted from
+#                      tinyagents-harness; openhuman-core and tinyagents-runtime
+#                      depend on it directly) and `tinystoragedrivers-schema`
+#                      v1.0.0 (the schema vocabulary extracted from
+#                      tinystoragedrivers-core). Both are vendored workspace
+#                      crates pulled in by the tinyagents 2.2.0 and
+#                      tinystoragedrivers d45d090 bumps; no third-party crate and
+#                      no native build was added, and neither is a duplicate
+#                      version of an existing crate, so there is nothing to dedupe.
+#   332/309/3  2026-10-18  Configurable storage backend selection (epic #7973)
+#                      makes tinystoragedrivers-core an always-on dependency of
+#                      the tinyagents session stores and the flows graph. Its
+#                      sealed-stream codec (StreamSeal, zstd-compressed JSON) adds
+#                      the zstd closure (zstd, zstd-safe, zstd-sys) and the core's
+#                      own `zstd` dependency now resolves through it, so the flows
+#                      profile gains a third native build (zstd-sys alongside
+#                      libsqlite3-sys and ring). Measured on CI (Linux):
+#                      332 packages / 309 names / 3 native.
 #   337/316/3  2026-10-04  Merge upstream/main file-intake and module updates.
 #                      The merged flows profile measures 337 packages / 316
 #                      names / 3 native builds (including libdeflate-sys).
@@ -724,4 +745,7 @@
 # 326/303/2 2026-10-16 Ratchet to the measured graph. CI (Linux, EX63 run
 #                      38878335779 on merge base 63c951aea7) reports flows at
 #                      326 packages / 303 names / 2 native against 328/304.
-flows:326:303:2
+# 321/301/2 2026-10-16 Re-measure after the upstream/main merge at ba83482245.
+#                      CI (Linux, EX63) reports five fewer packages and two
+#                      fewer unique crate names; native builds remain at two.
+flows:334:311:3

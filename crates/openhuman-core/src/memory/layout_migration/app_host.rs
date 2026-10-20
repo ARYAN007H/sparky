@@ -10,7 +10,7 @@ use tinymemory_tools::layout_migration::{
     Engines, FlowPlacement, FsLegacyClaim, LegacyClaim, Placement,
 };
 
-use super::state::FileStateStore;
+use super::state::StateKvMigrationStore;
 use crate::config::{Config, MemoryLayoutMode};
 use crate::memory::engine::{self, CORTEXDB_ENGINE};
 use crate::memory::scope;
@@ -19,14 +19,14 @@ use tinymemory_api::{Error, Result};
 /// The app's [`lm::LayoutHost`], bound to one account's config.
 pub struct AppHost {
     config: Config,
-    store: FileStateStore,
+    store: StateKvMigrationStore,
 }
 
 impl AppHost {
     /// The host that migrates `config`'s account.
     #[must_use]
     pub fn new(config: Config) -> Self {
-        let store = FileStateStore::new(&config.workspace_dir);
+        let store = StateKvMigrationStore::new(&config.workspace_dir);
         Self { config, store }
     }
 }

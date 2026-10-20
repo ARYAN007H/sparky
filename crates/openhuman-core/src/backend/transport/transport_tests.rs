@@ -10,9 +10,11 @@ struct NamedTransport(&'static str);
 #[test]
 fn transports_without_memory_support_return_no_memory_bearer_adapter() {
     let transport = NamedTransport("plain");
-    assert!(transport
-        .memory_bearer_source(Arc::new(crate::config::Config::default()))
-        .is_none());
+    assert!(
+        transport
+            .memory_bearer_source(Arc::new(crate::config::Config::default()))
+            .is_none()
+    );
 }
 
 #[async_trait]

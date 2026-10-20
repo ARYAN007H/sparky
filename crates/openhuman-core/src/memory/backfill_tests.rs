@@ -339,8 +339,6 @@ async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
             ),
         }
         .expect("peer owns its driver-specific slot");
-        let state_path = workspace.join("memory/conversations_backfill.json");
-
         let blocked = start(
             &DispatchCtx::ambient(),
             &config,
@@ -351,7 +349,11 @@ async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
         assert_eq!(blocked.state.phase, BackfillPhase::Idle);
         assert_eq!((blocked.pending_threads, blocked.pending_turns), (1, 1));
         assert!(!is_running(&workspace));
-        assert!(!state_path.exists());
+        assert!(
+            crate::memory::state_store::load::<BackfillFile>(&workspace, "conversations_backfill")
+                .unwrap()
+                .is_none()
+        );
 
         drop(peer_guard);
         let started = start(
@@ -365,6 +367,10 @@ async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
         let done = wait_done(&config).await;
         assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
         assert_eq!(done.state.items_stored, 2);
-        assert!(state_path.is_file());
+        assert!(
+            crate::memory::state_store::load::<BackfillFile>(&workspace, "conversations_backfill")
+                .unwrap()
+                .is_some()
+        );
     }
 }

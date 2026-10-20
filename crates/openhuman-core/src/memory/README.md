@@ -18,23 +18,20 @@ Chat thread persistence is not memory. It lives in
 
 Every memory operation starts with `engine::resolve(config)`, which turns
 the `[memory]` config into either `Binding::On(BoundEngine)` or
-`Binding::Off` with a reason. Two engines are supported:
+`Binding::Off` with a reason. Built-in and host-provided engines are bound
+through TinyMemory's native binder:
 
 | Engine       | Endpoint                                                          | Credential                                             | Off when                                              |
 | ------------ | ----------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------- |
-| `tinyhumans` | `[memory.engines.tinyhumans] endpoint`, else `backend::base_url`  | the host's backend credential, resolved per request    | signed out, or no default backend transport installed |
+| `tinyhumans` | registered by `openhuman-tinyhumans` through `engine_registry` (`[memory.engines.tinyhumans] endpoint`, else its control-plane origin) | the host's backend credential, resolved per request | not registered, or signed out |
 | `cortexdb`   | `[memory.engines.cortexdb] endpoint`, else CortexDB's managed API | the API key stored in the keyring as `memory-cortexdb` | no key stored                                         |
 
-The core never keeps a TinyHumans credential of its own. The bearer is
-resolved on every request, so a refreshed session takes effect at once and
-signing out turns memory off. A host `BackendTransport` may provide a
-`memory_bearer_source` adapter; standalone core builds use the same safe
-`resolve_backend_credential` resolver directly, preserving a configured
-memory endpoint without an installed SDK transport. The hosted engine does
-not send memory HTTP through `BackendTransport`: [`engine.rs`](./engine.rs)
-hands TinyMemory's CortexDB client the endpoint, attribution headers and an
-`EngineCredential::Dynamic` backed by the native `CallbackBearerSource`, and
-TinyMemory's HTTP client calls the backend's `/memory/*` routes. The
+The core never keeps a TinyHumans credential or owns that engine's
+configuration. The registered host builder resolves the bearer on every
+request, so a refreshed session takes effect at once and signing out turns
+memory off. The hosted engine lives in `openhuman-tinyhumans`
+(`memory/engine.rs`): it supplies the endpoint, attribution headers and a
+dynamic bearer source to the native binder. The
 `cortexdb` engine calls CortexDB directly with the stored key
 (`EngineCredential::Static`). TinyMemory's native binder caches by settings,
 credential identity and layout, so changes rebuild the engine without event
@@ -116,7 +113,7 @@ user message
 session host prelude ----> prefetch::pre_turn
 (agent/session_host/          takes a completed cached TurnPack (or none)
  runtime_session/             queues user log (index 2n), recall and
- memory_ingest.rs)            optional date hint in a scoped worker
+ session_hooks.rs)             optional date hint in a scoped worker
    v
 MemoryPackMiddleware ----> adds the pack to each model request of the
 (agent/tinyagents/            turn as an ephemeral instruction; it is
@@ -422,7 +419,7 @@ sits in the app directory shared by all accounts
   `tinymemory-integrations`, `tinymemory-import`; the CortexDB engine is in
   its nested `tinycortex`). Fix engine or lifecycle behavior there.
 - Turn delivery belongs to the agent harness: the session host prelude
-  (`agent/session_host/runtime_session/memory_ingest.rs`), the pack
+  (`memory/lifecycle/session_hooks.rs`), the pack
   middleware and the compaction summarizer live under `agent/`.
 - Chat transcripts are owned by `threads`; this folder only reads them for
   backfill and forgets their memory on delete.

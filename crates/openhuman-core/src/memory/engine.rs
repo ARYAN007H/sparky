@@ -5,7 +5,7 @@
 //!
 //! | Engine | Endpoint | Credential | Off when |
 //! | --- | --- | --- | --- |
-//! | `tinyhumans` | `[memory.engines.tinyhumans] endpoint`, else [`crate::backend::base_url`] | the host's backend credential, resolved per request through [`resolve_backend_credential`] | signed out, or no default backend transport |
+//! | `tinyhumans` | registered by the host layer that owns it | the host's backend credential, resolved per request | not registered, or signed out |
 //! | `cortexdb` | `[memory.engines.cortexdb] endpoint`, else CortexDB's managed API | the API key stored as [`MEMORY_CORTEXDB_KEY_NAME`] | no key stored |
 //!
 //! Built engines are cached per config fingerprint (engine id, endpoint,
@@ -29,9 +29,9 @@
 //! TinyHumans credential or a CortexDB key. It is wrapped by TinyMemory's
 //! native binder under the same host scrub policy as a configured engine.
 //!
-//! The core never holds a TinyHumans credential of its own: the bearer comes
-//! from the host's credential seam on every request, so a refreshed session is
-//! used at once and signing out turns memory off.
+//! The core never holds a TinyHumans credential of its own: a registered
+//! engine's bearer comes from the host's credential seam on every request, so
+//! a refreshed session is used at once and signing out turns memory off.
 
 use std::collections::HashMap;
 #[cfg(test)]
@@ -39,16 +39,15 @@ use std::sync::RwLock;
 use std::sync::{Arc, LazyLock};
 
 use sha2::{Digest, Sha256};
-use tinymemory_api::MemoryEngine;
-use tinymemory_integrations::{EngineCredential, EngineSettings};
-
 pub use tinymemory_api::Error as MemoryError;
+use tinymemory_api::MemoryEngine;
 pub use tinymemory_integrations::cortex::CallbackBearerSource;
-pub use tinymemory_integrations::{BearerSource, Binding, BoundEngine, EngineBinder};
+pub use tinymemory_integrations::{
+    BearerSource, Binding, BoundEngine, EngineBinder, EngineCredential, EngineSettings,
+};
 
-use crate::config::schema::MEMORY_CORTEXDB_KEY_NAME;
 use crate::config::Config;
-use crate::security::credentials::session_support::resolve_backend_credential;
+use crate::config::schema::MEMORY_CORTEXDB_KEY_NAME;
 use crate::security::credentials::{AuthService, DEFAULT_AUTH_PROFILE_NAME};
 
 use tinymemory_api::{Error, Result};
@@ -286,8 +285,20 @@ pub(crate) fn host_binding_with<T>(
 /// The configured engine with its scope root (`None` legacy).
 fn resolve_configured(config: &Config, root: Option<&str>) -> Binding {
     let engine_id = config.memory.engine.trim().to_string();
+    // A registered engine (`engine_registry`) wins over the built-in match, and
+    // is resolved per config, so SaaS admits it for every tenant.
+    if let Some(entry) = super::engine_registry::lookup(&engine_id) {
+        tracing::debug!(engine = %engine_id, "[memory:engine] binding a registered engine");
+        return (entry.build)(&super::engine_registry::EngineRequest { config, root });
+    }
     match engine_id.as_str() {
-        TINYHUMANS_ENGINE => resolve_tinyhumans(config, root),
+        // The hosted engine is registered by the host layer that owns it
+        // (`engine_registry`); without one it is simply unavailable.
+        TINYHUMANS_ENGINE => off(
+            Some(TINYHUMANS_ENGINE),
+            None,
+            "no TinyHumans backend is available",
+        ),
         CORTEXDB_ENGINE => resolve_cortexdb(config, root),
         DISABLED_ENGINE => off(None, None, "memory is disabled"),
         "" => {
@@ -336,97 +347,6 @@ fn off(engine: Option<&str>, endpoint: Option<String>, reason: &str) -> Binding 
     }
 }
 
-/// Builds TinyHumans settings for the selected memory layout and fingerprints
-/// the layout separately in the engine cache. The backend owns the TinyHumans
-/// tenant root, so no person-specific root is sent. With `legacy_read`, the
-/// earlier `user:<id>` root is also read and forgotten, never written.
-fn resolve_tinyhumans(config: &Config, root: Option<&str>) -> Binding {
-    let endpoint = match config.memory.endpoint_for(TINYHUMANS_ENGINE) {
-        Some(endpoint) => endpoint,
-        None => match crate::backend::base_url(&config.api_url) {
-            Ok(url) => url,
-            Err(error) => {
-                tracing::debug!(error = %error, "[memory:engine] no backend origin for tinyhumans");
-                return off(
-                    Some(TINYHUMANS_ENGINE),
-                    None,
-                    "no TinyHumans backend is available",
-                );
-            }
-        },
-    };
-    if let Err(error) = resolve_backend_credential(config) {
-        tracing::debug!(error = %error, "[memory:engine] no usable TinyHumans credential");
-        return off(
-            Some(TINYHUMANS_ENGINE),
-            Some(endpoint),
-            "sign in to use TinyHumans memory",
-        );
-    }
-    // The backend expects the host's attribution (`x-sdk-name`, …) on every
-    // request, as every other backend caller sends it; the transport owns it.
-    let headers = attribution_headers();
-    let fingerprint = format!(
-        "{TINYHUMANS_ENGINE}|{endpoint}|{}|{headers:?}",
-        config.config_path.display()
-    );
-    let source = backend_bearer_source(Arc::new(config.clone()));
-    let (settings, layout) = EngineBinder::rooted(
-        EngineSettings {
-            endpoint: Some(endpoint),
-            headers,
-            ..EngineSettings::default()
-        },
-        root,
-        true,
-        config.memory.legacy_user_segment_read,
-    );
-    build_cached(
-        TINYHUMANS_ENGINE,
-        settings,
-        fingerprint + &layout,
-        EngineCredential::Dynamic(source),
-    )
-}
-
-/// The installed transport's attribution headers, as engine settings carry
-/// them. A value that is not text is left out (and logged by name only).
-fn attribution_headers() -> std::collections::BTreeMap<String, String> {
-    crate::backend::attribution_headers()
-        .iter()
-        .filter_map(|(name, value)| match value.to_str() {
-            Ok(value) => Some((name.as_str().to_string(), value.to_string())),
-            Err(_) => {
-                tracing::debug!(header = %name, "[memory:engine] skipping a non-text attribution header");
-                None
-            }
-        })
-        .collect()
-}
-
-/// Resolve the backend credential on every memory request. An installed host
-/// transport can supply its own adapter; standalone core builds retain the
-/// explicit-endpoint path through the shared safe credential resolver.
-fn backend_bearer_source(config: Arc<Config>) -> Arc<dyn BearerSource> {
-    if let Ok(transport) = crate::backend::resolve_backend_transport() {
-        if let Some(source) = transport.memory_bearer_source(Arc::clone(&config)) {
-            return source;
-        }
-    }
-
-    Arc::new(CallbackBearerSource::new(move || {
-        let config = Arc::clone(&config);
-        async move {
-            resolve_backend_credential(&config)
-                .map(crate::security::credentials::session_support::BackendCredential::into_secret)
-                .map_err(|error| {
-                    tracing::debug!(error = %error, "[memory:engine] backend credential unavailable");
-                    MemoryError::Unauthorized("the backend credential is unavailable".to_string())
-                })
-        }
-    }))
-}
-
 fn resolve_cortexdb(config: &Config, root: Option<&str>) -> Binding {
     let configured = config.memory.endpoint_for(CORTEXDB_ENGINE);
     let endpoint = configured
@@ -439,7 +359,7 @@ fn resolve_cortexdb(config: &Config, root: Option<&str>) -> Binding {
                 Some(CORTEXDB_ENGINE),
                 Some(endpoint),
                 "add a CortexDB API key to use CortexDB memory",
-            )
+            );
         }
         Err(error) => {
             tracing::warn!(error = %error, "[memory:engine] reading the CortexDB key failed");
@@ -474,7 +394,7 @@ fn resolve_cortexdb(config: &Config, root: Option<&str>) -> Binding {
     )
 }
 
-fn build_cached(
+pub fn build_cached(
     id: &str,
     settings: EngineSettings,
     fingerprint: String,
@@ -494,6 +414,23 @@ fn build_cached(
         }
     }
     binding
+}
+
+/// Applies TinyMemory's identity-root settings and returns the cache-key
+/// suffix that distinguishes legacy and user-scoped bindings.
+pub fn rooted(
+    settings: EngineSettings,
+    root: Option<&str>,
+    tenant: bool,
+    legacy_read: bool,
+) -> (EngineSettings, String) {
+    EngineBinder::rooted(settings, root, tenant, legacy_read)
+}
+
+/// Wraps a host-supplied engine with OpenHuman's scrubber and TinyMemory's
+/// operation timing decorator.
+pub fn bind_external(engine: Arc<dyn MemoryEngine>, endpoint: impl Into<String>) -> BoundEngine {
+    ENGINE_BINDER.bind_external(engine, endpoint, crate::security::scrub::host_policy())
 }
 
 /// A short, non-reversible identity of a key for the cache fingerprint.
@@ -557,7 +494,7 @@ pub fn clear_cortexdb_key(config: &Config) -> Result<bool> {
 #[must_use]
 pub fn has_key(config: &Config, id: &str) -> bool {
     match id {
-        TINYHUMANS_ENGINE => resolve_backend_credential(config).is_ok(),
+        TINYHUMANS_ENGINE => resolve(config).is_on(),
         CORTEXDB_ENGINE => matches!(read_cortexdb_key(config), Ok(Some(_))),
         _ => false,
     }
