@@ -331,6 +331,65 @@ impl OpenHumanEventSink {
     ) -> anyhow::Result<()> {
         publish_event(domain, kind, payload).await
     }
+
+    /// Publish an event that needs trusted, tenant-scoped row projection.
+    pub(crate) async fn publish_host_in(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        domain: &str,
+        kind: &str,
+        payload: serde_json::Value,
+    ) -> anyhow::Result<()> {
+        if domain == "channel" && kind == "channel_event" {
+            let event: tinychannels_bus::ChannelEvent = serde_json::from_value(payload)
+                .map_err(|error| anyhow::anyhow!("invalid typed channel event: {error}"))?;
+            if let Some(projected) = project_channel_event(ctx, event)
+                .map_err(|error| anyhow::anyhow!("project typed channel event: {error}"))?
+            {
+                crate::web_chat::publish_web_channel_event_in(ctx, projected);
+            }
+            return Ok(());
+        }
+        publish_event(domain, kind, payload).await
+    }
+}
+
+fn project_channel_event(
+    ctx: &crate::core::runtime::DispatchCtx,
+    event: tinychannels_bus::ChannelEvent,
+) -> Result<Option<crate::web_chat::WebChannelEvent>, String> {
+    use tinychannels_bus::ChannelEventKind as Kind;
+
+    // The provider event's target is its nested message_id. event_id identifies
+    // the event itself and must never be used to find a transcript row.
+    let target_message_id = match &event.event {
+        Kind::ReadReceipt { message_id, .. }
+        | Kind::ReactionAdded { message_id, .. }
+        | Kind::ReactionRemoved { message_id, .. } => message_id,
+        _ => return Ok(None),
+    };
+    let Some(conversation) = event.conversation.as_ref() else {
+        return Ok(None);
+    };
+    let Some(target) = crate::threads::channel_projection::resolve_message(
+        ctx,
+        &event.channel,
+        conversation,
+        target_message_id,
+    )? else {
+        // Missing/incomplete/ambiguous ownership is not displayable.
+        return Ok(None);
+    };
+
+    Ok(Some(crate::web_chat::WebChannelEvent::ChannelEvent {
+        context: crate::web_chat::event_context(
+            "channel-runtime",
+            target.thread_id,
+            event.event_id.clone(),
+        ),
+        openhuman_message_id: Some(target.row_id),
+        channel_event: event,
+    }))
 }
 
 fn json_str(payload: &serde_json::Value, key: &str) -> String {
