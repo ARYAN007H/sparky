@@ -1,4 +1,31 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
+
+const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
+
+async function attachCheckpoint(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  await testInfo.attach(`${name}.png`, {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await testInfo.attach(`${name}.html`, {
+    body: await page.content(),
+    contentType: 'text/html',
+  });
+  const response = await fetch(`${MOCK_ADMIN_BASE}/__admin/requests`);
+  expect(response.ok, 'mock request log is available for the checkpoint').toBe(true);
+  const requests = (await response.json()) as Array<Record<string, unknown>>;
+  const safeRequests = requests.map((request) => {
+    const safe = { ...request };
+    for (const key of Object.keys(safe)) {
+      if (/authorization|token|credential|secret/i.test(key)) safe[key] = '[redacted]';
+    }
+    return safe;
+  });
+  await testInfo.attach(`${name}.mock-requests.json`, {
+    body: JSON.stringify(safeRequests, null, 2),
+    contentType: 'application/json',
+  });
+}
 
 import {
   bootRuntimeReadyGuestPage,
@@ -19,13 +46,14 @@ async function bootReviewedFlow(page: import('@playwright/test').Page, userId: s
   await dismissWalkthroughIfPresent(page);
 }
 
-test.describe('Agent review - canonical onboarding + privacy flow', () => {
-  test('launches, reaches the shell, and opens the privacy panel', async ({ page }) => {
+test.describe('Agent review - canonical shell + privacy flow', () => {
+  test('reaches the shell and opens the privacy panel with review artifacts', async ({ page }, testInfo) => {
     await bootReviewedFlow(page, 'pw-agent-review');
 
     // The composer is the durable readiness marker for the unified chat shell;
     // sidebar copy and empty-state headings change independently of readiness.
     await expect(page.getByTestId('chat-message-input')).toBeVisible();
+    await attachCheckpoint(page, testInfo, '01-shell-ready');
 
     await page.goto('/#/settings/privacy');
     await waitForAppReady(page);
@@ -33,5 +61,7 @@ test.describe('Agent review - canonical onboarding + privacy flow', () => {
     await expect(page.getByTestId('settings-privacy-panel')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Product Analytics' })).toBeVisible();
     await expect(page.getByText('Share Product Analytics and Diagnostics')).toBeVisible();
+    await expect(page.getByRole('switch').first()).toBeVisible();
+    await attachCheckpoint(page, testInfo, '02-privacy-panel');
   });
 });
