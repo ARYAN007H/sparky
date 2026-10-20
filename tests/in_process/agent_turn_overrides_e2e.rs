@@ -222,7 +222,7 @@ async fn seed_goal(
     objective: &str,
 ) -> Result<(), String> {
     let store = openhuman_core::storage::sessions::stores_or_ephemeral(workspace).kv;
-    tinyagents_harness::goals::store::set(&store, thread_id, objective, None)
+    tinyagents_harness_tools::goals::store::set(&store, thread_id, objective, None)
         .await
         .map(|_| ())
         .map_err(|error| error.to_string())
@@ -620,7 +620,7 @@ async fn thread_goal_complete_and_clear_stop_the_goal_reaching_later_turns_inner
         seed_goal(&workspace_path, THREAD, OBJECTIVE)
             .await
             .expect("seed an active thread goal for the measured agent");
-        let goal_store = tinyagents_harness::goals::GoalStore::new(
+        let goal_store = tinyagents_harness_tools::goals::GoalStore::new(
             openhuman_core::storage::sessions::stores_or_ephemeral(&workspace_path).kv,
         );
         let seeded = goal_store
