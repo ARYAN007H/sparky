@@ -374,9 +374,10 @@ test("a browser-spec-only change runs the full-inventory skip guard without scri
     "node scripts/ci/check-browser-test-skips.mjs",
   );
   assert.equal(
-    frontendOnly.lanes.find((lane) => lane.name === "scripts-self-tests")
-      ?.active ?? false,
-    true,
+    frontendOnly.lanes
+      .find((lane) => lane.name === "frontend")
+      .checks.find((check) => check.name === "e2e-runner-ownership")?.run,
+    "pnpm e2e:ownership:check",
   );
 
   const filters = fs.readFileSync(
