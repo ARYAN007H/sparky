@@ -228,9 +228,6 @@ if should_run_suite "auth"; then
   run "test/e2e/specs/smoke.spec.ts"                          "smoke"                     "auth"
   run "test/e2e/specs/login-flow.spec.ts"                     "login"                     "auth"
   run "test/e2e/specs/auth-access-control.spec.ts"            "auth"                      "auth"
-  run "test/e2e/specs/logout-relogin-onboarding.spec.ts"      "logout-relogin"            "auth"
-  run "test/e2e/specs/onboarding-modes.spec.ts"               "onboarding-modes"          "auth"
-  run "test/e2e/specs/runtime-picker-login.spec.ts"           "runtime-picker-login"      "auth"
   _mini_summary "auth"
 fi
 
@@ -240,13 +237,7 @@ fi
 if should_run_suite "navigation"; then
   echo ""
   echo "## Running suite: navigation"
-  run "test/e2e/specs/navigation.spec.ts"                     "navigation"                "navigation"
-  run "test/e2e/specs/navigation-smoothness.spec.ts"          "navigation-smoothness"     "navigation"
-  run "test/e2e/specs/navigation-settings-panels.spec.ts"     "navigation-settings"       "navigation"
-  run "test/e2e/specs/command-palette.spec.ts"                "command-palette"           "navigation"
-  run "test/e2e/specs/channels-smoke.spec.ts"                 "channels-smoke"            "navigation"
   run "test/e2e/specs/chip-tabs-keyboard.spec.ts"              "chip-tabs-keyboard"        "navigation"
-  run "test/e2e/specs/guided-tour-gates.spec.ts"              "guided-tour-gates"         "navigation"
   _mini_summary "navigation"
 fi
 
@@ -256,15 +247,7 @@ fi
 if should_run_suite "chat"; then
   echo ""
   echo "## Running suite: chat"
-  run "test/e2e/specs/chat-harness-send-stream.spec.ts"       "chat-send-stream"          "chat"
-  run "test/e2e/specs/chat-harness-cancel.spec.ts"            "chat-cancel"               "chat"
-  run "test/e2e/specs/chat-harness-scroll-render.spec.ts"     "chat-scroll-render"        "chat"
-  run "test/e2e/specs/chat-harness-wallet-flow.spec.ts"       "chat-wallet"               "chat"
-  run "test/e2e/specs/chat-tool-call-flow.spec.ts"            "chat-tool-call"            "chat"
-  run "test/e2e/specs/chat-multi-tool-round.spec.ts"          "chat-multi-tool"           "chat"
   run "test/e2e/specs/chat-live-history-parity.spec.ts"       "chat-live-history-parity"  "chat"
-  run "test/e2e/specs/chat-tool-error-recovery.spec.ts"       "chat-error-recovery"       "chat"
-  run "test/e2e/specs/agent-review.spec.ts"                   "agent-review"              "chat"
   run "test/e2e/specs/chat-harness-subagent-continue.spec.ts" "chat-subagent-continue"    "chat"
   run "test/e2e/specs/chat-background-activity-panel.spec.ts" "chat-background-activity"  "chat"
   run "test/e2e/specs/chat-todos-goals.spec.ts"               "chat-todos-goals"          "chat"
@@ -282,12 +265,6 @@ fi
 if should_run_suite "skills"; then
   echo ""
   echo "## Running suite: skills"
-  run "test/e2e/specs/skills-registry.spec.ts"                "skills-registry"           "skills"
-  run "test/e2e/specs/skill-execution-flow.spec.ts"           "skill-execution"           "skills"
-  run "test/e2e/specs/skill-lifecycle.spec.ts"                "skill-lifecycle"           "skills"
-  run "test/e2e/specs/skill-multi-round.spec.ts"              "skill-multi-round"         "skills"
-  run "test/e2e/specs/skill-oauth.spec.ts"                    "skill-oauth"               "skills"
-  run "test/e2e/specs/skill-socket-reconnect.spec.ts"         "skill-socket-reconnect"    "skills"
   run "test/e2e/specs/skill-activate-invoke-chat.spec.ts"     "skill-activate-invoke"     "skills"
   run "test/e2e/specs/skill-activation-persistence.spec.ts"   "skill-activation-persist"  "skills"
   _mini_summary "skills"
@@ -300,7 +277,6 @@ if should_run_suite "notifications"; then
   echo ""
   echo "## Running suite: notifications"
   run "test/e2e/specs/notifications.spec.ts"                  "notifications"             "notifications"
-  run "test/e2e/specs/cron-jobs-flow.spec.ts"                 "cron-jobs"                 "notifications"
   _mini_summary "notifications"
 fi
 
@@ -310,9 +286,6 @@ fi
 if should_run_suite "webhooks"; then
   echo ""
   echo "## Running suite: webhooks"
-  run "test/e2e/specs/webhooks-ingress-flow.spec.ts"          "webhooks-ingress"          "webhooks"
-  run "test/e2e/specs/webhooks-tunnel-flow.spec.ts"           "webhooks-tunnel"           "webhooks"
-  run "test/e2e/specs/harness-composio-tool-flow.spec.ts"     "harness-composio-tool"     "webhooks"
   _mini_summary "webhooks"
 fi
 
@@ -322,7 +295,6 @@ fi
 if should_run_suite "providers"; then
   echo ""
   echo "## Running suite: providers"
-  run "test/e2e/specs/gmail-flow.spec.ts"                     "gmail"                     "providers"
   run "test/e2e/specs/accounts-provider-modal.spec.ts"        "accounts-providers"        "providers"
   _mini_summary "providers"
 fi
@@ -341,10 +313,6 @@ if should_run_suite "provider-web"; then
   # run "test/e2e/specs/slack-flow.spec.ts"                   "slack"                     "provider-web"
   run "test/e2e/specs/whatsapp-flow.spec.ts"                  "whatsapp"                  "provider-web"
   # notion-flow.spec.ts was removed; skip to avoid "spec not found" failure.
-  # run "test/e2e/specs/notion-flow.spec.ts"                  "notion"                    "provider-web"
-  run "test/e2e/specs/conversations-web-channel-flow.spec.ts" "conversations"             "provider-web"
-  run "test/e2e/specs/composio-triggers-flow.spec.ts"         "composio-triggers"         "provider-web"
-  run "test/e2e/specs/connectivity-state-differentiation.spec.ts" "connectivity-state"   "provider-web"
   _mini_summary "provider-web"
 fi
 
@@ -367,7 +335,6 @@ if should_run_suite "connectors"; then
   run "test/e2e/specs/connector-composio-contract.spec.ts"   "connector-composio-contract" "connectors"
   run "test/e2e/specs/connector-discord-composio.spec.ts"    "connector-discord"         "connectors"
   run "test/e2e/specs/connector-github.spec.ts"              "connector-github"          "connectors"
-  run "test/e2e/specs/connector-gmail-composio.spec.ts"      "connector-gmail-composio"  "connectors"
   run "test/e2e/specs/connector-jira.spec.ts"                "connector-jira"            "connectors"
   run "test/e2e/specs/connector-session-guard.spec.ts"       "connector-session-guard"   "connectors"
   _mini_summary "connectors"
@@ -379,8 +346,6 @@ fi
 if should_run_suite "payments"; then
   echo ""
   echo "## Running suite: payments"
-  run "test/e2e/specs/card-payment-flow.spec.ts"              "card-payment"              "payments"
-  run "test/e2e/specs/crypto-payment-flow.spec.ts"            "crypto-payment"            "payments"
   _mini_summary "payments"
 fi
 
@@ -390,14 +355,8 @@ fi
 if should_run_suite "settings"; then
   echo ""
   echo "## Running suite: settings"
-  run "test/e2e/specs/settings-channels-permissions.spec.ts"  "settings-channels"         "settings"
   run "test/e2e/specs/settings-data-management.spec.ts"       "settings-data"             "settings"
-  run "test/e2e/specs/settings-ai-skills.spec.ts"             "settings-ai-skills"        "settings"
-  run "test/e2e/specs/settings-account-preferences.spec.ts"   "settings-account"          "settings"
-  run "test/e2e/specs/settings-advanced-config.spec.ts"       "settings-advanced"         "settings"
-  run "test/e2e/specs/settings-feature-preferences.spec.ts"   "settings-features"         "settings"
   run "test/e2e/specs/settings-search.spec.ts"                "settings-search"           "settings"
-  run "test/e2e/specs/chip-tabs-keyboard.spec.ts"             "chip-tabs-keyboard"        "settings"
   _mini_summary "settings"
 fi
 
@@ -407,14 +366,10 @@ fi
 if should_run_suite "system"; then
   echo ""
   echo "## Running suite: system"
-  run "test/e2e/specs/local-model-runtime.spec.ts"            "local-model"               "system"
-  run "test/e2e/specs/voice-mode.spec.ts"                     "voice-mode"                "system"
   run "test/e2e/specs/tauri-commands.spec.ts"                 "tauri-commands"            "system"
   # service-connectivity-flow tests the old sidecar service model removed in
   # PR #1061 (core is now in-process). Skip by not setting OPENHUMAN_SERVICE_MOCK=1.
   run "test/e2e/specs/service-connectivity-flow.spec.ts"    "service-connectivity"      "system"
-  run "test/e2e/specs/core-port-conflict-recovery.spec.ts"  "core-port-conflict"        "system"
-  run "test/e2e/specs/ptt-flow.spec.ts"                       "ptt-flow"                  "system"
   _mini_summary "system"
 fi
 
@@ -424,9 +379,6 @@ fi
 if should_run_suite "journeys"; then
   echo ""
   echo "## Running suite: journeys"
-  run "test/e2e/specs/user-journey-full-task.spec.ts"              "journey-full-task"     "journeys"
-  run "test/e2e/specs/user-journey-settings-round-trip.spec.ts"    "journey-settings"      "journeys"
-  run "test/e2e/specs/chat-conversation-history.spec.ts"           "chat-history"          "journeys"
   run "test/e2e/specs/flows.spec.ts"                               "flows"                 "journeys"
   _mini_summary "journeys"
 fi

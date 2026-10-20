@@ -42,6 +42,7 @@ async function ensureRecoveryPhraseGenerateMode(page: Page): Promise<void> {
 
   if (await replaceButton.isVisible()) {
     await replaceButton.click();
+    await page.getByRole('menuitem', { name: 'Create a New Wallet' }).click();
     await page.getByRole('button', { name: 'I understand, replace my wallet' }).click();
   }
 
@@ -81,6 +82,8 @@ test.describe('Settings - Account Preferences', () => {
     await gotoSettingsRoute(page, '/settings/recovery-phrase');
 
     await ensureRecoveryPhraseGenerateMode(page);
+    await page.getByRole('button', { name: 'Reveal recovery phrase' }).click();
+    await expect(page.getByRole('button', { name: 'Copy to Clipboard' })).toBeEnabled();
     await page.locator('#mnemonic-confirm-checkbox').check();
     await page.getByRole('button', { name: 'Save Recovery Phrase' }).click();
 

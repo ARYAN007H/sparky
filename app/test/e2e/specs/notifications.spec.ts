@@ -3,10 +3,8 @@ import { browser, expect } from '@wdio/globals';
 
 import { waitForApp } from '../helpers/app-helpers';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { dumpAccessibilityTree, waitForText } from '../helpers/element-helpers';
 import { supportsExecuteScript } from '../helpers/platform';
 import { resetApp } from '../helpers/reset-app';
-import { navigateViaHash } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 function stepLog(message: string, context?: unknown): void {
@@ -16,20 +14,6 @@ function stepLog(message: string, context?: unknown): void {
     return;
   }
   console.log(`[NotificationsE2E][${stamp}] ${message}`, JSON.stringify(context, null, 2));
-}
-
-async function waitForNotificationsSections(timeout = 10_000): Promise<void> {
-  await browser.waitUntil(
-    async () =>
-      (await browser.execute(() => {
-        const integration = document.querySelector(
-          '[data-testid="integration-notifications-section"]'
-        );
-        const system = document.querySelector('[data-testid="system-events-section"]');
-        return integration !== null && system !== null;
-      })) === true,
-    { timeout, timeoutMsg: 'Notifications sections did not render in time' }
-  );
 }
 
 /**
@@ -73,82 +57,7 @@ describe('Notifications', () => {
     await stopMockServer();
   });
 
-  it('Notifications page renders integration notifications', async () => {
-    await callOpenhumanRpc('openhuman.notification_ingest', {
-      provider: 'e2e',
-      title: 'E2E Test Notification',
-      body: 'Created by the notifications E2E spec',
-      raw_payload: {},
-    });
-    if (!supportsExecuteScript()) {
-      stepLog('skipping UI test — supportsExecuteScript() is false (Appium Mac2)');
-      return;
-    }
-
-    // Navigate to /notifications via direct hash set — the route exists but
-    // may not have a bottom-tab button. Retry the hash set if it bounces.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await browser.execute(() => {
-        // `/notifications` now lands on the Welcome landing; jump to the alerts view.
-        window.location.hash = '/notifications?view=main';
-      });
-      await browser.pause(1_500);
-      const h = await browser.execute(() => window.location.hash);
-      if (String(h).includes('/notifications')) break;
-      stepLog(`hash bounce attempt ${attempt}`, { hash: h });
-    }
-
-    const currentHash = await browser.execute(() => window.location.hash);
-    stepLog('Notifications route hash', { currentHash });
-
-    // If the route redirected (e.g. auth guard), skip the UI assertions
-    // because this spec owns notifications presentation, not RPC result semantics.
-    expect(String(currentHash)).toContain('/notifications');
-
-    await waitForNotificationsSections(10_000);
-
-    // The integration notifications section wraps NotificationCenter.
-    const sectionVisible = await browser.execute(() => {
-      const el = document.querySelector('[data-testid="integration-notifications-section"]');
-      return el !== null;
-    });
-
-    if (!sectionVisible) {
-      const tree = await dumpAccessibilityTree();
-      stepLog('integration-notifications-section not found', { tree: tree.slice(0, 4000) });
-    }
-    expect(sectionVisible).toBe(true);
-    await waitForText('E2E Test Notification', 8_000);
-    await waitForText('Created by the notifications E2E spec', 8_000);
-  });
-
-  it('Notifications page shows System Events section', async () => {
-    if (!supportsExecuteScript()) {
-      stepLog('skipping UI test — supportsExecuteScript() is false (Appium Mac2)');
-      return;
-    }
-
-    // The bare route intentionally shows the notifications welcome screen.
-    // Select the main view before asserting sections from the alerts UI.
-    await navigateViaHash('/notifications?view=main');
-    await waitForNotificationsSections(10_000);
-
-    const sectionVisible = await browser.execute(() => {
-      const el = document.querySelector('[data-testid="system-events-section"]');
-      return el !== null;
-    });
-
-    if (!sectionVisible) {
-      const tree = await dumpAccessibilityTree();
-      stepLog('system-events-section not found', { tree: tree.slice(0, 4000) });
-    }
-    expect(sectionVisible).toBe(true);
-
-    // The heading text and empty state — the section renders t('alerts.title') = 'Alerts'
-    // and t('alerts.empty') = 'No alerts yet' when no system notifications are queued.
-    await waitForText('Alerts', 8_000);
-    await waitForText('No alerts yet', 8_000);
-  });
+  // Rendered notification content and empty-state UI are owned by Playwright.
 
   it('native notification permission command returns a valid state', async () => {
     if (!supportsExecuteScript()) {

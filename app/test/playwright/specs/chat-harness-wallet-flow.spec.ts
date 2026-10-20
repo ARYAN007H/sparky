@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import {
   bootAuthenticatedPage,
+  callCoreRpc,
   dismissWalkthroughIfPresent,
   waitForAppReady,
 } from '../helpers/core-rpc';
@@ -38,11 +39,34 @@ test.describe('Recovery Phrase wallet setup', () => {
     await waitForAppReady(page);
     await dismissWalkthroughIfPresent(page);
 
+    const status = await callCoreRpc<unknown>('openhuman.wallet_status', {});
+    expect(JSON.stringify(status)).toMatch(/"configured"\s*:\s*false/);
+
     await expect(page.getByRole('button', { name: 'Copy to Clipboard' })).toBeVisible();
     await page.getByRole('button', { name: /Reveal recovery phrase/i }).click();
     await page.locator('input[type="checkbox"]').first().check();
     await page.getByRole('button', { name: 'Save Recovery Phrase' }).click();
 
     await expect(page.getByText(/Recovery phrase saved/i)).toBeVisible();
+
+    const walletState = await callCoreRpc<unknown>('openhuman.test_support_read_workspace_file', {
+      rel_path: 'state/wallet-state.json',
+      max_bytes: 131_072,
+    });
+    const content =
+      walletState && typeof walletState === 'object' && 'result' in walletState
+        ? (walletState as { result?: { content_utf8?: unknown } }).result?.content_utf8
+        : undefined;
+    expect(typeof content).toBe('string');
+    const state = JSON.parse(content as string) as {
+      consentGranted?: boolean;
+      source?: string;
+      accounts?: Array<{ chain?: string }>;
+    };
+    expect(state.consentGranted).toBe(true);
+    expect(state.source).toBe('generated');
+    for (const chain of ['evm', 'btc', 'solana', 'tron']) {
+      expect(state.accounts?.some(account => account.chain === chain)).toBe(true);
+    }
   });
 });
