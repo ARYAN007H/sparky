@@ -169,19 +169,6 @@ pub(super) fn names_presented_as_callable<'a>(
             prose = prose.replace(&format!("skill `{}`, tool `{name}`", pack.id), "");
         }
     }
-    // The workflow pack is feature-gated, but its route syntax is still
-    // intentional prose when that pack is unavailable in this build.
-    for route in [
-        "skill `workflows`, tool `build_workflow`",
-        "skill `workflows`, tool `discover_workflows`",
-    ] {
-        prose = prose.replace(route, "");
-    }
-    // The generated workflow guide can also mention the routed tool on its
-    // own after the pack-specific text has been elided.
-    prose = prose
-        .replace("`build_workflow`", "")
-        .replace("`discover_workflows`", "");
     not_callable
         .into_iter()
         .filter(|name| prose.contains(&format!("`{name}`")))

@@ -325,22 +325,11 @@ pub const PACKS: &[ToolPack] = &[
         tools: &[
             "create_image",
             "create_video",
-            // Reading an image, not making one, but it is the same belt from
-            // the model's point of view: the request that reaches for it names
-            // a picture either way.
-            "analyze_image",
             "media_generate_image",
             "media_generate_video",
             "media_list_models",
         ],
         owners: &["image_agent", "video_agent", "vision_agent"],
-        guide: "",
-    },
-    ToolPack {
-        id: "tasks",
-        summary: "Task sources, workflows, artifacts: add, preview, fetch, update, remove.",
-        tools: &[],
-        owners: &["task_manager_agent"],
         guide: "",
     },
     ToolPack {
