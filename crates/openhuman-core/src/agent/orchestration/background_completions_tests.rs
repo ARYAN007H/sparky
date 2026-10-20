@@ -436,10 +436,14 @@ fn undelivered_completions_are_found_again_after_a_restart() {
         Some("thread-boot-done"),
     );
     let router = router_for_workspace(w);
-    router
+    let claimed = router
         .claim_pending("thread-boot-done", usize::MAX)
         .unwrap();
-    router.mark_delivered(&["sub-2"]).unwrap();
+    let receipts: Vec<_> = claimed
+        .iter()
+        .map(|record| record.receipt().expect("claimed record has receipt"))
+        .collect();
+    router.mark_delivered(&receipts).unwrap();
     drop(router);
 
     forget_workspace_for_test(w);
@@ -509,19 +513,20 @@ fn clear_all_also_withdraws_a_completion_a_delivery_has_leased() {
     record(w, "sess-l", "sub-1", "x", Some("thread-leased"));
     let router = router_for_workspace(w);
     // A delivery claimed it: the record is leased but still pending in the store.
-    assert_eq!(
-        router
-            .claim_pending("thread-leased", usize::MAX)
-            .unwrap()
-            .len(),
-        1
-    );
+    let claimed = router
+        .claim_pending("thread-leased", usize::MAX)
+        .unwrap();
+    assert_eq!(claimed.len(), 1);
+    let receipts: Vec<_> = claimed
+        .iter()
+        .map(|record| record.receipt().expect("claimed record has receipt"))
+        .collect();
 
     assert_eq!(clear_all(&cx(), w), 1);
 
     assert!(pending_ids(w, "thread-leased").is_empty());
     assert_eq!(
-        router.mark_delivered(&["sub-1"]).unwrap(),
+        router.mark_delivered(&receipts).unwrap(),
         0,
         "nothing left to settle"
     );

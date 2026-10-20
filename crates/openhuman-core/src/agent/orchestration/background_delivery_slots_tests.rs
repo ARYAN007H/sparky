@@ -100,7 +100,11 @@ async fn one_profiles_busy_turn_does_not_block_anothers_thread() {
     })
     .expect("bob's thread is idle while alice's turn runs");
     assert_eq!(batch[0].task_id, "task-bob");
-    router_b.release(&["task-bob".to_string()]);
+    let receipts: Vec<_> = batch
+        .iter()
+        .map(|record| record.receipt().expect("claimed record has receipt"))
+        .collect();
+    router_b.release(&receipts);
 
     // Bob's Stop clears only Bob's turns; Alice stays busy.
     assert_eq!(
