@@ -34,7 +34,7 @@ pub(crate) fn voice_transcribe_controller() -> BoundRegisteredController {
     BoundRegisteredController::after_gate(
         super::super::registry::voice_schemas("voice_transcribe"),
         load_voice_config,
-        deserialize_params::<TranscribeParams>,
+        |_params| Err("invalid params: deliberate parser mutant".to_string()),
         run_voice_transcribe,
     )
 }
