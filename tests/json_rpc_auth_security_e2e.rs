@@ -1166,7 +1166,9 @@ async fn credential_email_connect_refusal_does_not_store_credentials_over_json_r
         accept_task.abort();
         panic!("email verifier should reach the test-owned IMAP endpoint");
     }
-    accept_task.await.expect("IMAP fixture task should not panic");
+    accept_task
+        .await
+        .expect("IMAP fixture task should not panic");
 
     let error_text = response.get("error").expect("RPC error").to_string();
     for secret in ["e2e-email-password", "e2e@example.invalid"] {
