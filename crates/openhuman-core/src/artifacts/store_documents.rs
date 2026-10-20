@@ -38,12 +38,12 @@ use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, Filter, Precondition, Query, Sort};
 
 use super::storage_schema::{
-    args_body, args_of_body, meta_from_body, meta_to_body, records_spec, ARGS, RECORDS as ARTIFACTS,
+    ARGS, RECORDS as ARTIFACTS, args_body, args_of_body, meta_from_body, meta_to_body, records_spec,
 };
 use super::types::ArtifactMeta;
+use crate::storage::DocumentStoreExt;
 use crate::storage::documents::Repo;
 use crate::storage::schema_support::key_of;
-use crate::storage::DocumentStoreExt;
 
 const DOMAIN: &str = "artifacts::store";
 
@@ -199,7 +199,7 @@ impl Docs {
             Ok(entries) => entries,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
             Err(error) => {
-                return Err(error).with_context(|| format!("read {}", artifacts_dir.display()))
+                return Err(error).with_context(|| format!("read {}", artifacts_dir.display()));
             }
         };
         let mut imported = 0;
@@ -308,7 +308,7 @@ pub(super) async fn delete_record(docs: Docs, artifact_dir: &Path, id: &str) -> 
         Err(e) => {
             return Err(format!(
                 "[artifacts] failed to delete legacy record for id={id}: {e}"
-            ))
+            ));
         }
     }
     let owned = id.to_string();
