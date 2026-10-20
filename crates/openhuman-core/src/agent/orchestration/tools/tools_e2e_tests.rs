@@ -503,6 +503,8 @@ impl ChatModel<()> for LoopingToolModel {
 
 #[path = "tools_e2e_driver_tests.rs"]
 mod driver_tests;
+#[path = "tools_e2e_driver_reuse_tests.rs"]
+mod driver_reuse_tests;
 #[path = "tools_e2e_profile_cancel_tests.rs"]
 mod profile_cancel_tests;
 
