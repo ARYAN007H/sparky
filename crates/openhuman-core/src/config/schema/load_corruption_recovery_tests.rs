@@ -347,7 +347,7 @@ async fn load_or_init_falls_back_to_defaults_when_backup_also_corrupted() {
 
     let config = load_or_init_for_workspace(root).await;
 
-    // Config::default() sets default_model = Some("reasoning-v1").
+    // A bare core has no provider policy that can supply a default model.
     assert_eq!(
         config.default_model.as_deref(),
         None,
