@@ -5,6 +5,7 @@ use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::security::credentials::AuthService;
+use tinyinference_providers::route::{custom_provider_string, split_custom_provider};
 
 use super::{resolve_api_key, LOG_PREFIX};
 use tinyinference_embeddings::catalog;
@@ -65,7 +66,7 @@ fn effective_embedder_slug_from_config(config: &Config) -> &'static str {
     }
     // 3. User OpenAI-compatible endpoint.
     let picker = config.memory.embedding_provider.trim();
-    if picker == "openai" || picker == "custom" || picker.starts_with("custom:") {
+    if picker == "openai" || split_custom_provider(picker).0 == "custom" {
         return "custom";
     }
     // 4. Managed cloud session.
@@ -81,11 +82,9 @@ fn effective_embedder_slug_from_config(config: &Config) -> &'static str {
 }
 
 fn active_custom_profile(config: &Config) -> Option<crate::config::schema::CustomEmbeddingsConfig> {
-    let endpoint = config
-        .memory
-        .embedding_provider
-        .strip_prefix("custom:")?
-        .trim();
+    let (_, endpoint) = split_custom_provider(&config.memory.embedding_provider);
+    let endpoint = endpoint?;
+    let endpoint = endpoint.trim();
     if endpoint.is_empty() {
         return None;
     }
@@ -148,7 +147,8 @@ pub async fn get_settings(config: &Config) -> Result<Outcome<serde_json::Value>,
         .collect();
 
     let vector_search_enabled = {
-        let slug = if provider.starts_with("custom:") {
+        let (_, endpoint) = split_custom_provider(provider);
+        let slug = if endpoint.is_some() {
             "custom"
         } else {
             provider.as_str()
@@ -225,8 +225,10 @@ pub async fn update_settings(
     // Resolve the provider string exactly as it will be persisted so the
     // signature reported to callers describes the saved configuration.
     let effective_provider = match &custom_endpoint {
-        Some(ep) if new_provider == "custom" || new_provider.starts_with("custom:") => {
-            format!("custom:{ep}")
+        Some(ep)
+            if new_provider == "custom" || split_custom_provider(&new_provider).1.is_some() =>
+        {
+            custom_provider_string("custom", Some(ep))
         }
         _ => new_provider.clone(),
     };
@@ -253,17 +255,14 @@ pub async fn update_settings(
     // embedding-capable by construction, and probing `managed`/`cloud`
     // pre-login would false-fail. Resolve the provider string exactly as it
     // will be stored so the probe targets the real endpoint.
-    if effective_provider.starts_with("custom:") {
+    if let (_, Some(endpoint)) = split_custom_provider(&effective_provider) {
         // Probe dimension-agnostically for non-`text-embedding-3-*` models so the
         // user's guessed `dimensions` can't fail an otherwise-valid endpoint; the
         // real length is detected from the returned vector below (issue #4056).
-        let endpoint = effective_provider
-            .strip_prefix("custom:")
-            .expect("custom provider was checked above");
         let api_key = resolve_api_key(&config, "custom");
         let probe = tokio::time::timeout(
             std::time::Duration::from_secs(10),
-            probe_custom_embeddings(endpoint, &api_key, &new_model, new_dims),
+            probe_custom_embeddings(&endpoint, &api_key, &new_model, new_dims),
         )
         .await;
         {
@@ -307,9 +306,8 @@ pub async fn update_settings(
                 // endpoint from the payload OR the already-stored
                 // `custom:<url>` provider, so a model-only update to an
                 // existing custom endpoint still gets the guidance.
-                let listed_endpoint = custom_endpoint
-                    .as_deref()
-                    .or_else(|| effective_provider.strip_prefix("custom:"));
+                let (_, stored_endpoint) = split_custom_provider(&effective_provider);
+                let listed_endpoint = custom_endpoint.as_deref().or(stored_endpoint.as_deref());
                 if let Some(ep) = listed_endpoint {
                     let api_key = resolve_api_key(&config, "custom");
                     tracing::debug!(
@@ -397,8 +395,8 @@ pub async fn update_settings(
     }
     // Store custom endpoint in a convention field if provided
     if let Some(ep) = &custom_endpoint {
-        if new_provider == "custom" || new_provider.starts_with("custom:") {
-            config.memory.embedding_provider = format!("custom:{ep}");
+        if new_provider == "custom" || split_custom_provider(&new_provider).1.is_some() {
+            config.memory.embedding_provider = custom_provider_string("custom", Some(ep));
             config.custom_embeddings = Some(crate::config::schema::CustomEmbeddingsConfig {
                 endpoint: ep.clone(),
                 model: new_model.clone(),

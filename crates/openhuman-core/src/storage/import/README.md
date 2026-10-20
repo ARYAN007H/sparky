@@ -7,7 +7,9 @@ desktop rebinds its workspace to a different user). It moves a classic
 workspace's `session_db/sessions.db`, `session_raw/*.jsonl` transcripts and
 turn-state JSON into the storage backend through TinyAgents' `legacy` reader:
 read-only, id-preserving and only-if-absent. See the storage README for the
-agent each record lands in.
+agent each imported record lands in. The current TinyAgents importer does not
+import legacy entry-tree rows from `sessions.db`; those source files remain
+untouched.
 
 What stays in OpenHuman:
 

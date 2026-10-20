@@ -15,7 +15,8 @@ use std::sync::Arc;
 
 use crate::core::slots::HookSlot;
 use tinyinference_providers::builtin::{
-    BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
+    BuiltinAuthStyle, BuiltinCloudProvider as UpstreamBuiltinCloudProvider, BuiltinPresets,
+    BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
 };
 
 static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =
@@ -94,10 +95,8 @@ pub(crate) fn is_hosted_auth_style_for(
         .is_some_and(|classify| classify(style))
 }
 
-impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
-    for BuiltinCloudProvider
-{
-    fn from(preset: &'static tinyinference_providers::builtin::BuiltinCloudProvider) -> Self {
+impl From<&tinyinference_providers::builtin::BuiltinCloudProvider> for BuiltinCloudProvider {
+    fn from(preset: &tinyinference_providers::builtin::BuiltinCloudProvider) -> Self {
         Self {
             slug: preset.slug,
             label: preset.label,
@@ -113,135 +112,64 @@ impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
 /// Every built-in preset: host-provided entries followed by the
 /// provider-neutral catalog from `tinyinference-providers`.
 pub fn builtin_cloud_providers() -> Vec<BuiltinCloudProvider> {
-    HOSTED_PRESETS
+    let hosted = HOSTED_PRESETS
         .entries_context_first()
         .into_iter()
         .map(|(_, preset)| preset)
-        .chain(UPSTREAM_BUILTINS.iter().map(BuiltinCloudProvider::from))
-        .collect()
-}
-
-pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
-    builtin_cloud_providers()
-        .into_iter()
-        .find(|provider| provider.slug == type_str)
-}
-
-/// Whether `slug` matches a built-in cloud provider preset.
-///
-/// The chat factory uses this to decide capability defaults (e.g. whether the
-/// provider exposes the OpenAI Responses API) only for providers we ship and
-/// therefore know the API surface of. Custom / user-defined slugs are treated
-/// as unknown and keep the permissive defaults.
-pub fn is_builtin_cloud_slug(slug: &str) -> bool {
-    builtin_cloud_provider(slug).is_some()
-}
-
-/// Whether a built-in cloud provider exposes the OpenAI **Responses API**
-/// (`/v1/responses`).
-///
-/// Only OpenAI's first-party endpoint serves `/responses`; every other built-in
-/// preset (DeepSeek, Groq, Mistral, Fireworks, …) is chat-completions-only.
-/// Enabling the chat-completions-404 → `/responses` fallback for those
-/// guarantees a second 404 against an endpoint that does not exist, which floods
-/// Sentry with an empty-body `"<provider> Responses API error:"` event
-/// (TAURI-RUST-5EN — same class as the local-provider TAURI-RUST-59Y fix). The
-/// factory consults this to build chat-completions-only built-ins with
-/// `new_no_responses_fallback`.
-///
-/// Custom / unknown slugs are intentionally NOT covered here (see
-/// [`is_builtin_cloud_slug`]): a user-defined OpenAI-compatible endpoint may be
-/// a genuine OpenAI proxy that does support `/responses`, so the factory keeps
-/// the fallback for those.
-pub fn builtin_cloud_supports_responses_api(slug: &str) -> bool {
-    matches!(slug, "openai")
-}
-
-/// Extract the lowercased authority host from an endpoint URL, dropping the
-/// scheme, any userinfo, the port, and the path. Returns `None` when no host
-/// can be parsed. Tolerant of a missing scheme and of IPv6 literals.
-pub fn endpoint_host(endpoint: &str) -> Option<String> {
-    let s = endpoint.trim();
-    // Drop the scheme (`https://…`); tolerate a bare `host/path` form.
-    let after_scheme = s.split_once("://").map(|(_, rest)| rest).unwrap_or(s);
-    // The authority ends at the first path / query / fragment delimiter.
-    let authority = after_scheme
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or(after_scheme);
-    // Strip any `user:pass@` userinfo prefix.
-    let host_port = authority
-        .rsplit_once('@')
-        .map(|(_, host)| host)
-        .unwrap_or(authority);
-    // Strip the port, handling bracketed IPv6 literals (`[::1]:8080`).
-    let host = if let Some(rest) = host_port.strip_prefix('[') {
-        rest.split_once(']').map(|(h, _)| h).unwrap_or(rest)
-    } else {
-        host_port
-            .rsplit_once(':')
-            .map(|(h, _)| h)
-            .unwrap_or(host_port)
-    };
-    let host = host.trim().to_ascii_lowercase();
-    (!host.is_empty()).then_some(host)
-}
-
-/// Whether `host` is the authority host of any built-in cloud **inference**
-/// provider (e.g. `openrouter.ai`, `api.openai.com`, `api.groq.com`).
-///
-/// Derived entirely from [`BUILTIN_CLOUD_PROVIDERS`] so the set stays in sync
-/// with the provider registry. `host` is compared case-insensitively against
-/// each preset's [`endpoint_host`].
-///
-/// # Why this exists
-///
-/// `config.api_url` is overloaded: it is the chat/inference endpoint, but
-/// `api::config::effective_backend_api_url` also reuses it as the
-/// OpenHuman **backend** base for team/billing/auth calls. A BYO user who
-/// points `api_url` at a provider's canonical base (`https://openrouter.ai/api/v1`)
-/// would otherwise have every backend domain call routed to the inference host
-/// → 400/404 (TAURI-RUST-HW1: 4932 team-usage 400s from `openrouter.ai`).
-/// The backend-URL resolver uses this to treat such hosts as non-backend and
-/// fall back to the default backend chain — the cloud analogue of the local-AI
-/// guard that fixed the Ollama case (OPENHUMAN-TAURI-51/-80/-7Z).
-pub fn host_is_builtin_cloud_provider(host: &str) -> bool {
-    let host = host.trim().to_ascii_lowercase();
-    if host.is_empty() {
-        return false;
-    }
-    builtin_cloud_providers()
+        .collect::<Vec<_>>();
+    // Keep the product's managed entry first for settings presentation. The
+    // owner catalog itself remains generic-first for exact-slug lookup.
+    hosted
         .iter()
-        .any(|p| endpoint_host(p.endpoint).as_deref() == Some(host.as_str()))
+        .copied()
+        .filter(|preset| {
+            !UPSTREAM_BUILTINS
+                .iter()
+                .any(|generic| generic.slug == preset.slug)
+        })
+        .chain(UPSTREAM_BUILTINS.iter().map(BuiltinCloudProvider::from))
+        .collect::<Vec<_>>()
 }
 
-/// Whether an endpoint **host** is a known cloud host that does NOT serve the
-/// OpenAI Responses API (`/v1/responses`) — i.e. it is chat-completions-only,
-/// regardless of which user slug points at it.
-///
-/// Derived entirely from [`BUILTIN_CLOUD_PROVIDERS`]: a host is chat-only when
-/// some built-in preset uses it AND no preset at that host advertises the
-/// Responses API (only OpenAI's `api.openai.com` does). This closes the
-/// custom-slug gap behind the builtin-slug gate
-/// ([`builtin_cloud_supports_responses_api`]): a user slug pointed at, e.g.,
-/// `integrate.api.nvidia.com` must never attempt `/responses` (TAURI-RUST-5A1),
-/// while a genuinely unknown proxy host keeps the permissive fallback so a real
-/// OpenAI proxy still gets `/responses`.
-pub fn endpoint_host_is_chat_completions_only(endpoint: &str) -> bool {
-    let Some(host) = endpoint_host(endpoint) else {
-        return false;
-    };
-    let mut matched_chat_only = false;
-    for provider in builtin_cloud_providers().iter() {
-        if endpoint_host(provider.endpoint).as_deref() == Some(host.as_str()) {
-            if builtin_cloud_supports_responses_api(provider.slug) {
-                // A Responses-capable built-in lives at this host → not chat-only.
-                return false;
+/// Generic provider catalog extended with the host's registered preset
+/// metadata. Host auth policy remains in the owning host registry.
+pub fn builtin_presets() -> BuiltinPresets {
+    let hosted = HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
+        .collect::<Vec<_>>();
+    BuiltinPresets::new(hosted.iter().map(|preset| UpstreamBuiltinCloudProvider {
+        slug: preset.slug,
+        label: preset.label,
+        endpoint: preset.endpoint,
+        // Only route/catalog metadata is consumed from this generic catalog;
+        // persisted OpenhumanJwt remains in the host's schema and is never
+        // converted into runtime bearer authentication.
+        auth_style: match preset.auth_style {
+            AuthStyle::Anthropic => BuiltinAuthStyle::Anthropic,
+            AuthStyle::Bearer | AuthStyle::OpenhumanJwt | AuthStyle::None => {
+                BuiltinAuthStyle::Bearer
             }
-            matched_chat_only = true;
-        }
+        },
+    }))
+}
+
+/// Looks up a provider preset, giving the generic catalog precedence over
+/// host additions with the same slug.
+pub fn builtin_cloud_provider(type_str: &str) -> Option<BuiltinCloudProvider> {
+    if let Some(preset) = BuiltinPresets::default().builtin_cloud_provider(type_str) {
+        return Some(BuiltinCloudProvider::from(preset));
     }
-    matched_chat_only
+    let hosted = HOSTED_PRESETS
+        .entries_context_first()
+        .into_iter()
+        .map(|(_, preset)| preset)
+        .collect::<Vec<_>>();
+    if let Some(preset) = hosted.iter().find(|preset| preset.slug == type_str) {
+        return Some(*preset);
+    }
+    None
 }
 
 /// Authentication header style for a cloud provider.
@@ -358,36 +286,7 @@ pub fn is_slug_reserved(s: &str) -> bool {
 /// The random suffix is not cryptographically strong — it only needs to be
 /// unique within a single user's config file.
 pub fn generate_provider_id(slug: &str) -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    // Cheap pseudo-random from timestamp nanoseconds — adequate for local
-    // config uniqueness without pulling in a PRNG crate.
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-    let mut suffix = String::with_capacity(5);
-    let mut seed = nanos as usize;
-    for _ in 0..5 {
-        suffix.push(chars[seed % chars.len()] as char);
-        seed = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        seed = (seed >> 33) ^ seed;
-    }
-    // Sanitise slug to only alphanumeric + '-' for the id prefix.
-    let safe_slug: String = slug
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .take(20)
-        .collect();
-    format!("p_{}_{}", safe_slug, suffix)
+    super::generate_provider_id_with_prefix("p", slug)
 }
 
 #[cfg(test)]

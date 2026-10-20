@@ -78,7 +78,7 @@ jobs:
 
       - name: Setup Tinymold
         id: tinymold
-        uses: tinyhumansai/tinymold@b7c4c26f184acdbf7133487b158062fc610d2f28
+        uses: tinyhumansai/tinymold@c4a7ea77ce4a95bf0a65fb403de310bd624197d4
         with:
           install: none
           backend: remote
@@ -181,7 +181,7 @@ jobs:
         continue-on-error: true
         # A measured cache push took 8m36s; keep headroom and a finite bound.
         timeout-minutes: 15
-        uses: tinyhumansai/tinymold/save@b7c4c26f184acdbf7133487b158062fc610d2f28
+        uses: tinyhumansai/tinymold/save@c4a7ea77ce4a95bf0a65fb403de310bd624197d4
 
       - name: Record cache statistics and save time
         if: ${{ always() && steps.tinymold.outcome == 'success' }}
