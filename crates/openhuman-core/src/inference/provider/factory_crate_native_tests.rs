@@ -264,7 +264,7 @@ fn create_chat_model_routes_managed_backend_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
     let config = Config::default();
-    let (_model, model_id) = create_chat_model_with_model_id_in(
+    let (model, model_id) = create_chat_model_with_model_id_in(
         &crate::core::runtime::DispatchCtx::ambient(),
         "chat",
         &config,
@@ -479,7 +479,7 @@ fn configured_openhuman_jwt_slug_routes_to_managed_chat_model() {
         .push(fixture_managed_entry("p_fixture"));
     config.chat_provider = Some("fixture-managed:hint:reasoning".to_string());
 
-    let (model, model_id) =
+    let (_model, model_id) =
         try_create_cloud_slug_chat_model("chat", &config, &EgressLedger::none())
             .expect("registered host policy should recognize this route")
             .expect("registered model should build");
