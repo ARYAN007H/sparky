@@ -507,60 +507,20 @@ pub async fn run_pending(config: &mut Config) {
         }
     }
 
-    // 10 -> 11: backfill `cloud_providers` for workspaces that never got the
-    // managed `openhuman` entry.
-    //
-    // This is the repair half, not the fix. The cause is at the creation site:
-    // a fresh workspace is stamped at `CURRENT_SCHEMA_VERSION` and therefore
-    // crosses no gate at all, so the `== 1` step that seeds the managed entry
-    // never ran for it. `seed_new_workspace` closes that hole going forward;
-    // this step exists only for the workspaces already on disk without an
-    // entry, which no creation-site fix can reach. Observed on every workspace
-    // on a developer machine (two production users and one staging), all at
-    // `schema_version = 10` with `cloud_providers = []` — none of which was
-    // ever at version 1, which is what pointed at the creation site.
-    //
-    // The symptom is not subtle now that #6201 lists the managed OpenRouter
-    // catalog in the model picker: `inference_list_models("openhuman")` fails
-    // its lookup in `inference::provider::models::catalog_listing` before any HTTP request
-    // is made, the picker renders "Could not load models from this provider.",
-    // and the failure reaches Sentry through `rpc.invoke_method` — the same
-    // string `is_unknown_provider_user_config` was written to keep out of it.
-    //
-    // Reuses `seed_cloud_providers`, which early-returns when the list is
-    // already populated, so this is a no-op for every healthy workspace and
-    // cannot disturb a user's configured providers.
+    // 10 -> 11: generic schema progression; hosted preset repair is supplied
+    // by the host's registered config normalizer above.
     if config.schema_version == 10 {
-        let mut stats = unify_ai_provider_settings::MigrationStats::default();
-        unify_ai_provider_settings::seed_cloud_providers(config, &mut stats);
         let previous_version = config.schema_version;
-        let seeded = stats.cloud_providers_seeded;
         config.schema_version = 11;
         if let Err(err) = config.save().await {
-            // Roll back BOTH the version and the seeded entries: leaving them
-            // in memory would hand `load_or_init` a config whose providers are
-            // not on disk, and the next launch would seed a second copy.
-            //
-            // Safe to revert unconditionally only because `save` now fails
-            // exclusively *before* it replaces the file: a post-rename
-            // directory-fsync failure warns instead of returning `Err` (see
-            // `Config::save`). While it did return `Err` there, this rollback
-            // could revert state that was genuinely committed, leaving the
-            // process on 10 with no providers while disk held 11 with one.
-            if seeded > 0 {
-                config.cloud_providers.clear();
-            }
             config.schema_version = previous_version;
             log::warn!(
-                "[migrations] reseed_cloud_providers ran but config.save failed: {err:#} — \
-                 rolled in-memory schema_version back to {previous_version} and dropped {seeded} \
-                 seeded entr(y/ies), will retry on next launch"
+                "[migrations] schema_version 10->11 save failed: {err:#} — \
+                 rolled in-memory schema_version back to {previous_version}; will retry"
             );
             return;
         }
-        log::info!(
-            "[migrations] schema_version bumped to 11 (reseed_cloud_providers seeded={seeded})"
-        );
+        log::info!("[migrations] schema_version bumped to 11");
     }
 
     // 11 -> 12: reserialize the config. This step once rewrote a retired
