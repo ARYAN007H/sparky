@@ -22,8 +22,11 @@ fn parameters_schema_advertises_fire_and_forget_fields() {
         .get("properties")
         .and_then(|v| v.as_object())
         .expect("properties");
-    for key in ["context", "model", "task_title"] {
+    for key in ["context", "model", "task_title", "task_key", "image_paths"] {
         assert!(props.contains_key(key), "missing {key}");
+    }
+    for retired in ["blocking", "dedicated_thread", "archetype"] {
+        assert!(!props.contains_key(retired), "legacy {retired} was advertised");
     }
     assert!(
         !props.contains_key("toolkit"),
