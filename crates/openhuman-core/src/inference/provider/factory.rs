@@ -90,7 +90,7 @@ use local_runtime::{
     OptionalChatModelResult,
 };
 pub(crate) use managed_backend::{
-    make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread,
+    make_openhuman_backend_model_for_thread,
 };
 use managed_backend::{managed_chat_model, resolve_managed_model};
 use primary_cloud::{legacy_inference_slug, resolve_primary_cloud_provider_string};

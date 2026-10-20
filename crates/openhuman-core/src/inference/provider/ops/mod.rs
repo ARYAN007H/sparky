@@ -4,7 +4,7 @@
 //! - `sanitize`         — secret scrubbing, error formatting
 //! - `http_error`       — HTTP error classification, Sentry routing, `api_error`
 //! - `models`           — model listing (`list_configured_models`, parsing)
-//! - `provider_factory` — provider construction (`create_*`, `ProviderRuntimeOptions`)
+//! - `provider_factory` — provider construction (`create_*`)
 
 mod http_error;
 mod models;
@@ -24,7 +24,7 @@ pub use models::{
 };
 
 pub use provider_factory::{
-    list_providers, ProviderInfo, ProviderRuntimeOptions, INFERENCE_BACKEND_ID,
+    list_providers, ProviderInfo, INFERENCE_BACKEND_ID,
 };
 
 // ── test re-exports for ops_tests.rs ──
