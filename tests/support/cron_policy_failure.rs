@@ -327,12 +327,7 @@ async fn policy_reads_refuse_execution_without_consuming_a_slot() {
     // Force the persisted occurrence into the past through its actual document port.
     CoreContext::scope(Arc::clone(&alpha), async {
         let docs = storage::current_scoped().unwrap().unwrap();
-        let mut stored = docs
-            .documents()
-            .get(JOBS, &job.id)
-            .await
-            .unwrap()
-            .unwrap();
+        let mut stored = docs.documents().get(JOBS, &job.id).await.unwrap().unwrap();
         let due = chrono::Utc::now() - chrono::Duration::seconds(1);
         stored.doc["next_run"] = json!(due.to_rfc3339());
         stored.doc["next_run_ms"] = json!(due.timestamp_millis());
