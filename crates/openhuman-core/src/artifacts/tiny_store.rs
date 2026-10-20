@@ -390,6 +390,19 @@ pub fn artifacts_service(
     chat: Option<&ApprovalChatContext>,
     ctx: &crate::core::runtime::DispatchCtx,
 ) -> Artifacts {
+    artifacts_service_with_publisher(workspace_dir, files, action_dir, chat, ctx, None)
+}
+
+/// Build an artifact service and bind an optional publisher to the exact
+/// tenant-scoped file store used by that service.
+pub fn artifacts_service_with_publisher(
+    workspace_dir: &Path,
+    files: FileRoots,
+    action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
+    ctx: &crate::core::runtime::DispatchCtx,
+    publisher: Option<&super::publisher_slot::ArtifactPublisherBinder>,
+) -> Artifacts {
     let roots = file_roots(workspace_dir, &files, action_dir);
     let file_store = file_store_for(workspace_dir, ctx);
     let mut records: Arc<dyn ArtifactStore> = Arc::new(versioned_store(workspace_dir));
@@ -409,6 +422,9 @@ pub fn artifacts_service(
         )))
         .with_file_roots(guarded_roots(roots));
     if let Some(file_store) = file_store {
+        if let Some(publisher) = publisher {
+            artifacts = artifacts.with_publisher(publisher(file_store.clone()));
+        }
         artifacts = artifacts.with_file_store(file_store);
     }
     artifacts
@@ -444,12 +460,14 @@ pub fn registered_tools(
         let action_dir = action_dir.to_path_buf();
         Arc::new(
             move |chat: Option<&ApprovalChatContext>, ctx: &crate::core::runtime::DispatchCtx| {
-                let mut service =
-                    artifacts_service(&workspace_dir, files.clone(), Some(&action_dir), chat, ctx);
-                if let Some(publisher) = &publisher {
-                    service = service.with_publisher(publisher.clone());
-                }
-                Arc::new(service)
+                Arc::new(artifacts_service_with_publisher(
+                    &workspace_dir,
+                    files.clone(),
+                    Some(&action_dir),
+                    chat,
+                    ctx,
+                    publisher.as_ref(),
+                ))
             },
         )
     };
