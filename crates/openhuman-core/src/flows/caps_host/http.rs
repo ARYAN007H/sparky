@@ -65,12 +65,15 @@ pub(crate) fn resolve_http_credential(
     store: &HttpCredentialsStore,
     credential_name: Option<&str>,
 ) -> Result<Option<HttpCredential>> {
-    let Some(name) = credential_name
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-    else {
+    let Some(raw_name) = credential_name else {
         return Ok(None);
     };
+    let name = raw_name.trim();
+    if name.is_empty() {
+        return Err(EngineError::Capability(
+            "http_request connection_ref has an empty http_cred name".to_owned(),
+        ));
+    }
     match store.get(name) {
         Ok(Some(cred)) => {
             tracing::debug!(
