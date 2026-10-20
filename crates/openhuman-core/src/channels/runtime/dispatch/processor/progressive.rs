@@ -29,7 +29,7 @@ pub(super) async fn open_native_reply(
     Ok(Some(std::sync::Arc::new(reply)))
 }
 
-pub(super) async fn finish_native_reply(
+pub(crate) async fn finish_native_reply(
     reply: &Option<std::sync::Arc<NativeProgressiveReply>>,
     text: &str,
 ) -> bool {

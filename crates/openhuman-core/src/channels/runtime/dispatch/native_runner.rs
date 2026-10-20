@@ -32,6 +32,7 @@ struct NativeSlot {
 #[derive(Default)]
 struct NativeShared {
     slots: Mutex<HashMap<String, NativeSlot>>,
+    delivery_status: Mutex<HashMap<String, bool>>,
 }
 
 impl NativeShared {
@@ -49,6 +50,24 @@ impl NativeShared {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .get_mut(request_id)
             .and_then(|slot| slot.lease.take())
+    }
+
+    fn record_delivery(&self, request_id: &str, delivered: bool) {
+        self.delivery_status
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(request_id.to_owned(), delivered);
+        self.slots
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(request_id);
+    }
+
+    fn take_delivery(&self, request_id: &str) -> Option<bool> {
+        self.delivery_status
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(request_id)
     }
 }
 
@@ -247,7 +266,42 @@ impl EventSink<QueuedPayload> for NativeEvents {
         }
     }
 
-    async fn terminal(&self, _request: &TurnRequest<QueuedPayload>, _event: TerminalEvent) {}
+    async fn terminal(&self, request: &TurnRequest<QueuedPayload>, event: TerminalEvent) {
+        let reply = request
+            .payload
+            .trusted_turn
+            .as_ref()
+            .and_then(|trusted| trusted.native_reply.as_ref());
+        let (text, cancelled) = match event {
+            TerminalEvent::Completed { .. } => (
+                self.shared
+                    .with(&request.request_id, |slot| slot.reply.clone()),
+                false,
+            ),
+            TerminalEvent::Failed { message, .. } => (Some(message), false),
+            TerminalEvent::Cancelled { .. } => (None, true),
+        };
+        let progress_failed = self
+            .shared
+            .with(&request.request_id, |slot| slot.progress_failed);
+        let delivered = if cancelled || progress_failed {
+            if let Some(reply) = reply {
+                if let Err(error) = reply.close().await {
+                    tracing::warn!("[dispatch] native progressive close failed: {error}");
+                }
+            }
+            false
+        } else if let (Some(reply), Some(text)) = (reply, text.as_deref()) {
+            super::processor::progressive::finish_native_reply(
+                &Some(Arc::clone(reply)),
+                text,
+            )
+            .await
+        } else {
+            false
+        };
+        self.shared.record_delivery(&request.request_id, delivered);
+    }
 }
 
 struct NativeFailures;
@@ -295,6 +349,8 @@ pub(crate) struct NativeTurnExecution {
     pub(crate) result: Result<crate::agent::bus::AgentTurnResponse, String>,
     pub(crate) lease: Option<SessionLease>,
     pub(crate) progress_failed: bool,
+    pub(crate) delivery_succeeded: Option<bool>,
+    pub(crate) queued: bool,
 }
 
 pub(crate) async fn run(
@@ -312,6 +368,8 @@ pub(crate) async fn run(
                 result: Err(error.to_string()),
                 lease: None,
                 progress_failed: false,
+                delivery_succeeded: None,
+                queued: false,
             };
         }
     };
@@ -333,7 +391,9 @@ pub(crate) async fn run(
         deadline: Some(crate::agent::session_host::turn_backstop::configured_backstop()),
         idle_timeout: Some(std::time::Duration::from_secs(900)),
     };
-    let result = runtime.runner.run(request).await.map_err(|error| error.to_string());
+    let runner_result = runtime.runner.run(request).await;
+    let queued = matches!(runner_result, Err(tinyagents_harness::turn_runner::TurnRunnerError::Queued));
+    let result = runner_result.map_err(|error| error.to_string());
     let slot = runtime
         .shared
         .slots
@@ -354,5 +414,7 @@ pub(crate) async fn run(
         result,
         lease: slot.lease,
         progress_failed: slot.progress_failed,
+        delivery_succeeded: runtime.shared.take_delivery(&request_id),
+        queued,
     }
 }
