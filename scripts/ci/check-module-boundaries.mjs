@@ -2,7 +2,7 @@
 // Audit resolved normal/build edges, never Cargo.lock membership or dev edges.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const CONTRACT_REGISTRY = 'registry+https://github.com/rust-lang/crates.io-index';
@@ -168,19 +168,99 @@ export function validatePolicy(policy) {
   }
 }
 
-function cargo(root, args, execute = execFileSync) {
+function cargoText(root, command, args, execute = execFileSync) {
   // All generated manifests and logs stay under the checkout's target/.
   const stdout = execute('bash', [join(root, 'scripts/ci-cancel-aware.sh'),
-    'cargo', 'metadata', '--format-version', '1', ...args], {
+    'cargo', command, ...args], {
     cwd: root, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'],
   });
-  return JSON.parse(stdout);
+  return stdout;
+}
+
+function metadata(root, args, execute = execFileSync) {
+  return JSON.parse(cargoText(root, 'metadata', ['--format-version', '1', ...args], execute));
+}
+
+function parseTreePackage(display) {
+  const match = /^([^\s]+)\s+v([^\s]+)(.*)$/.exec(display);
+  if (!match) throw new Error(`unrecognized Cargo tree package entry: ${display}`);
+  const [, name, version, suffix] = match;
+  const qualifiers = [...suffix.matchAll(/\(([^()]*)\)/g)].map(item => item[1]);
+  const pathQualifier = qualifiers.find(item => isAbsolute(item) || item.startsWith('./') || item.startsWith('../'));
+  const sourceQualifier = qualifiers.find(item => item !== pathQualifier && item !== 'proc-macro');
+  let source = CONTRACT_REGISTRY;
+  let manifestPath;
+  if (pathQualifier) {
+    source = null;
+    manifestPath = join(resolve(pathQualifier), 'Cargo.toml');
+  } else if (sourceQualifier) {
+    source = sourceQualifier.startsWith('git+') || sourceQualifier.startsWith('registry+')
+      ? sourceQualifier
+      : `git+${sourceQualifier}`;
+  }
+  return { id: display, name, version, source, manifest_path: manifestPath };
+}
+
+/** Convert Cargo's package-scoped normal/build tree into the audit graph. */
+export function treeGraph(output) {
+  if (typeof output !== 'string' || !output.trim()) {
+    throw new Error('Cargo dependency tree must be a non-empty string');
+  }
+  const packages = new Map();
+  const nodes = new Map();
+  const byDisplay = new Map();
+  const stack = [];
+  for (const [index, line] of output.trimEnd().split('\n').entries()) {
+    const match = /^(\d+)(.+)$/.exec(line);
+    if (!match) throw new Error(`unrecognized Cargo tree line ${index + 1}`);
+    const depth = Number(match[1]);
+    const raw = match[2];
+    const deduplicated = raw.endsWith(' (*)');
+    const display = deduplicated ? raw.slice(0, -4) : raw;
+    if (depth > stack.length) throw new Error(`Cargo tree skipped a depth at line ${index + 1}`);
+    const parent = depth === 0 ? null : stack[depth - 1];
+    if (depth > 0 && !parent) throw new Error(`Cargo tree has no parent at line ${index + 1}`);
+    stack.length = depth;
+
+    let id = byDisplay.get(display);
+    if (deduplicated) {
+      if (!id) throw new Error(`Cargo tree references an unseen deduplicated package: ${display}`);
+    } else {
+      if (id) throw new Error(`Cargo tree repeats a package without a dedup marker: ${display}`);
+      const pkg = parseTreePackage(display);
+      id = `tree:${index}:${display}`;
+      packages.set(id, { ...pkg, id });
+      nodes.set(id, { id, deps: [] });
+      byDisplay.set(display, id);
+    }
+    if (parent) {
+      nodes.get(parent).deps.push({
+        pkg: id,
+        dep_kinds: [{ kind: null, target: null }],
+      });
+    }
+    stack[depth] = id;
+  }
+  return { packages: [...packages.values()], resolve: { nodes: [...nodes.values()] } };
+}
+
+function hostTree(root, manifest, packageName, allFeatures, execute) {
+  const args = [
+    '--manifest-path', join(root, manifest),
+    '--locked',
+    '-p', packageName,
+    '-e', 'normal,build',
+    '--prefix', 'depth',
+    '--format', '{p}',
+  ];
+  if (allFeatures) args.push('--all-features');
+  return treeGraph(cargoText(root, 'tree', args, execute));
 }
 
 /** Resolve only this contract's selected features, without module/host unification. */
 function contractMetadata(root, contract, allFeatures, execute = execFileSync) {
   const manifest = resolve(root, contract.manifest);
-  const listing = cargo(root, ['--manifest-path', manifest, '--no-deps'], execute);
+  const listing = metadata(root, ['--manifest-path', manifest, '--no-deps'], execute);
   const pkg = listing.packages.find(pkg => resolve(pkg.manifest_path) === manifest);
   if (!pkg || pkg.name !== contract.name) throw new Error(`missing contract ${contract.name}`);
   const harness = join(root, 'target/module-boundaries', contract.name, allFeatures ? 'all' : 'default');
@@ -188,7 +268,7 @@ function contractMetadata(root, contract, allFeatures, execute = execFileSync) {
   const features = allFeatures ? Object.keys(pkg.features) : [];
   writeFileSync(join(harness, 'Cargo.toml'), `[workspace]\n[package]\nname = "boundary-probe"\nversion = "0.0.0"\nedition = "2024"\n[dependencies]\n${contract.name} = { path = ${JSON.stringify(dirname(manifest))}, features = ${JSON.stringify(features)} }\n`);
   writeFileSync(join(harness, 'src/lib.rs'), '');
-  return cargo(root, ['--manifest-path', join(harness, 'Cargo.toml')], execute);
+  return metadata(root, ['--manifest-path', join(harness, 'Cargo.toml')], execute);
 }
 
 export function run(root, strict = false, execute = execFileSync) {
@@ -202,19 +282,23 @@ export function run(root, strict = false, execute = execFileSync) {
     }
   }
   const results = [];
-  for (const [manifest, roots] of [
-    ['Cargo.toml', ['openhuman', 'openhuman-cli', 'openhuman-tui']],
-    ['crates/openhuman-app/Cargo.toml', ['openhuman-app']],
+  for (const [manifest, packageName] of [
+    ['Cargo.toml', 'openhuman'],
+    ['Cargo.toml', 'openhuman-cli'],
+    ['Cargo.toml', 'openhuman-tui'],
+    ['crates/openhuman-app/Cargo.toml', 'openhuman-app'],
   ]) {
-    const metadata = cargo(root, ['--manifest-path', join(root, manifest), '--locked', '--all-features'], execute);
-    results.push(auditGraph(metadata, roots, policy));
+    results.push(auditGraph(hostTree(root, manifest, packageName, true, execute), [packageName], policy));
   }
-  // Without `linked-modules` (default features) no host reaches the bridge.
-  results.push({
-    violations: bridgeReach(cargo(root, ['--manifest-path', join(root, 'Cargo.toml'), '--locked'], execute),
-      ['openhuman-cli', 'openhuman-tui', 'openhuman'], policy),
-    exceptions: [],
-  });
+  // With default features, neither core nor the TUI nor the CLI reaches the
+  // optional linked-modules bridge. The all-feature host audits above allow
+  // that bridge only as a direct CLI edge, never through a wrapper.
+  for (const packageName of ['openhuman-cli', 'openhuman-tui', 'openhuman']) {
+    results.push({
+      violations: bridgeReach(hostTree(root, 'Cargo.toml', packageName, false, execute), [packageName], policy),
+      exceptions: [],
+    });
+  }
   for (const contract of policy.contracts) {
     for (const all of [false, true]) {
       results.push(auditGraph(contractMetadata(root, contract, all, execute), [contract.name], policy, contract.name));

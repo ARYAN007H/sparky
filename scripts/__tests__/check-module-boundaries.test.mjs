@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { auditGraph, bridgeReach, graph, isImplementation, run, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
+import { auditGraph, bridgeReach, graph, isImplementation, run, treeGraph, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
 
 const policy = JSON.parse(readFileSync(new URL('../ci/module-boundaries.json', import.meta.url), 'utf8'));
 const strict = { ...policy, exceptions: [] };
@@ -201,6 +201,48 @@ test('without linked-modules no host reaches the bridge; with it, the CLI does',
   assert.deepEqual(bridgeReach(dev, ['openhuman-cli'], policy), []);
 });
 
+test('Cargo tree parsing preserves package versions, path identity, and dedup edges', () => {
+  const localBus = '/checkout/vendor/tinyjuice/crates/tinyjuice-bus';
+  const m = treeGraph([
+    '0openhuman v0.64.18 (/checkout/crates/openhuman-core)',
+    `1tinyjuice-bus v0.1.0 (${localBus})`,
+    '1wrapper v1.0.0',
+    '2shared v1.0.0',
+    '1wrapper v1.0.0 (*)',
+    '2tinyjuice v1.0.0',
+    '2tinyjuice v2.0.0',
+  ].join('\n'));
+  const bus = m.packages.find(pkg => pkg.name === 'tinyjuice-bus');
+  assert.equal(bus.source, null);
+  assert.equal(bus.manifest_path, `${localBus}/Cargo.toml`);
+  assert.equal(m.packages.filter(pkg => pkg.name === 'tinyjuice').length, 2);
+  assert.equal(m.resolve.nodes.find(node => node.id.startsWith('tree:2:wrapper v1.0.0')).deps.length, 1);
+  const pinned = {
+    ...strict,
+    contractManifests: { 'tinyjuice-bus': `${localBus}/Cargo.toml` },
+  };
+  assert.deepEqual(auditGraph(m, ['openhuman'], pinned).violations, []);
+  const unpinned = treeGraph([
+    '0openhuman v0.64.18',
+    '1tinyjuice-bus v0.1.0',
+  ].join('\n'));
+  assert.equal(auditGraph(unpinned, ['openhuman'], pinned).violations[0].package, 'tinyjuice-bus');
+});
+
+test('a package-scoped normal tree still rejects an activated implementation writer', () => {
+  const m = treeGraph([
+    '0openhuman v0.64.18',
+    '1tinyflows-import v0.1.0',
+    '2tinyflows v0.8.28',
+    '2tinyflows-catalog v0.1.0',
+    '2tinyflows-drivers v0.1.0',
+  ].join('\n'));
+  assert.deepEqual(
+    auditGraph(m, ['openhuman'], strict).violations.map(item => item.package),
+    ['tinyflows', 'tinyflows-catalog', 'tinyflows-drivers'],
+  );
+});
+
 test('host boundary audit ignores writer features unified only by unrelated workspace dev fixtures', () => {
   const root = resolve(new URL('../..', import.meta.url).pathname);
   const harnessRoot = mkdtempSync(join(root, 'target', 'module-boundaries-host-isolation-'));
@@ -247,6 +289,8 @@ test('host boundary audit ignores writer features unified only by unrelated work
       'openhuman-tui': [['openhuman-rpc']],
       openhuman: [],
     });
+    assert.equal(auditGraph(unified, ['openhuman'], strict).violations.length, 4);
+    assert.deepEqual(auditGraph(scoped, ['openhuman'], strict).violations, []);
     const manifestToContract = new Map(policy.contracts.map(item => [
       resolve(harnessRoot, item.manifest), item.name,
     ]));
