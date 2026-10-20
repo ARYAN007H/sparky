@@ -14,8 +14,7 @@
 //!   thread-addressed, and a thread-scoped cancel (Stop, delete, purge) is then
 //!   the router's own `cancel_parent` / `resume_parent`;
 //! * the product-specific lifecycle helpers (`record_failure`,
-//!   `record_awaiting_input`, `mark_collected`, ...) the spawn, wait, cancel and
-//!   thread paths call.
+//!   `record_awaiting_input`, ...) the spawn, cancel and thread paths call.
 //!
 //! When a parent is idle enough to receive a delivery turn, and the turn itself,
 //! stays in [`super::background_delivery`]. The wording is
@@ -53,7 +52,7 @@ use tinyagents_orchestration::subagent::{
 };
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStore,
-    NotifyMode, TombstoneOutcome,
+    NotifyMode,
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
@@ -65,7 +64,7 @@ pub(crate) use super::completion_target::tests::{
     forget_workspace_for_test, install_store_for_test, TestWorkspace,
 };
 pub(crate) use super::completion_target::CompletionTarget;
-use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
+use super::completion_target::awaiting_input_record_id;
 pub(crate) use super::completion_target::{claim_recovery_ctx, forget_recovery_ctx};
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before
@@ -480,48 +479,6 @@ pub(crate) fn pending_for_ctx(
     thread_id: &str,
 ) -> Vec<CompletionRecord> {
     router_for_workspace_ctx(ctx, workspace_dir).pending_for(thread_id)
-}
-
-/// Mark `task_id` as collected inline by the parent (via `wait_subagent`) so its
-/// background completion is not independently delivered as a second, duplicate
-/// answer. The router withdraws an already-recorded completion and drops one
-/// that arrives later. Returns whether a pending completion was withdrawn.
-#[cfg(test)]
-pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
-    let entry = entry_for(workspace_dir);
-    mark_collected_in_entry(entry, task_id)
-}
-
-pub(crate) fn mark_collected_ctx(ctx: &DispatchCtx, workspace_dir: &Path, task_id: &str) -> bool {
-    mark_collected_in_entry(entry_for_ctx(ctx, workspace_dir), task_id)
-}
-
-fn mark_collected_in_entry(entry: Arc<Entry>, task_id: &str) -> bool {
-    let router = &entry.router;
-    let completion = router.tombstone(task_id);
-    // A parent that collected the final result inline has no use for any
-    // queued pause notices from that same task. Sweep them too, including
-    // pauses persisted before a restart.
-    let pause_prefix = awaiting_input_record_prefix(task_id);
-    let pauses: Vec<String> = entry
-        .store
-        .list(None)
-        .into_iter()
-        .filter(|record| record.task_id.starts_with(&pause_prefix))
-        .map(|record| record.task_id)
-        .collect();
-    let pauses_collected = pauses.into_iter().fold(false, |collected, pause_id| {
-        let suppressed = matches!(
-            router.tombstone(&pause_id),
-            Ok(TombstoneOutcome::Suppressed)
-        );
-        collected | suppressed
-    });
-    log::debug!(
-        "[background_completions] mark_collected task_id={task_id} completion={completion:?} \
-         pauses_collected={pauses_collected}"
-    );
-    matches!(completion, Ok(TombstoneOutcome::Suppressed)) || pauses_collected
 }
 
 /// Boot recovery for a workspace: open its log, drop long-settled records, and
