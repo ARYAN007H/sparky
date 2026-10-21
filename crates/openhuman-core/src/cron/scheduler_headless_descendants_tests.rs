@@ -19,6 +19,7 @@ struct CronChildModel {
     accepted_followups: std::sync::atomic::AtomicUsize,
     child_attempts_dangerous_tool: bool,
     child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool,
+    child_dangerous_tool_denied: std::sync::atomic::AtomicBool,
     child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     child_release: tokio::sync::Notify,
 }
@@ -122,12 +123,23 @@ impl ChatModel<()> for CronChildModel {
             .iter()
             .any(|message| message.text().contains(CHILD_PROMPT))
         {
-            self.child_calls
+            let call = self
+                .child_calls
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            if let Some(started) = self.child_started.lock().unwrap().take() {
-                let _ = started.send(());
-            }
             if self.child_attempts_dangerous_tool {
+                if call > 0 {
+                    self.child_dangerous_tool_denied.store(
+                        request.messages.iter().any(|message| {
+                            message.text().contains(
+                                "Scheduled agent turns may use read-only tools only",
+                            )
+                        }),
+                        std::sync::atomic::Ordering::SeqCst,
+                    );
+                    return Ok(ModelResponse::assistant(
+                        "headless-cron-child-returned-after-policy-denial",
+                    ));
+                }
                 self.child_dangerous_tool_schema_seen.store(
                     request
                         .tools
@@ -143,6 +155,9 @@ impl ChatModel<()> for CronChildModel {
                 )];
                 response.finish_reason = Some("tool_calls".into());
                 return Ok(response);
+            }
+            if let Some(started) = self.child_started.lock().unwrap().take() {
+                let _ = started.send(());
             }
             let _drop = ChildInvocationDrop(std::sync::Arc::clone(&self.child_invocation_dropped));
             self.child_release.notified().await;
@@ -193,6 +208,7 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: false,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
+        child_dangerous_tool_denied: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
@@ -262,6 +278,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: false,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
+        child_dangerous_tool_denied: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
@@ -335,6 +352,7 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: true,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
+        child_dangerous_tool_denied: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
