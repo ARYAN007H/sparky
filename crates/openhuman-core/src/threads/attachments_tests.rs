@@ -629,3 +629,74 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
         b"committed bytes"
     );
 }
+
+#[tokio::test]
+async fn canceling_native_media_resolution_cleans_the_first_staged_part() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = dir.path().join("workspace");
+    config.action_dir = dir.path().join("actions");
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let thread_id = "telegram:account-a:conversation-42";
+    let (staged_tx, staged_rx) = tokio::sync::oneshot::channel();
+    let task_ctx = ctx.clone();
+    let task_config = config.clone();
+    let task = tokio::spawn(async move {
+        let source = image(MediaReference {
+            content_type: Some("image/png".into()),
+            kind: tinychannels_bus::MediaKind::Image,
+            ..Default::default()
+        });
+        let staged = crate::threads::attachments::stage_native_channel_part(
+            &task_ctx,
+            thread_id,
+            &task_config,
+            &source,
+            "first-native.png",
+            "image/png",
+            b"cancellation lifecycle fixture",
+        )
+        .await
+        .unwrap();
+        staged_tx.send(staged).unwrap();
+        std::future::pending::<()>().await;
+    });
+    let staged = staged_rx.await.unwrap();
+    let opaque_id = opaque_media(&staged)
+        .and_then(|media| media.opaque_id.as_deref())
+        .unwrap()
+        .to_owned();
+    let workspace = crate::agent::attachments::thread_action_dir(
+        &ctx,
+        &config,
+        &config.workspace_dir,
+        Some(thread_id),
+    )
+    .await
+    .unwrap();
+    let repo = test_repo(&config.workspace_dir);
+    let record = get_staged_record(&repo, &staged_doc_id(&opaque_id).unwrap())
+        .unwrap()
+        .unwrap();
+    let staged_file = workspace.join(record.attachment.path);
+    assert!(
+        staged_file.exists(),
+        "the first staged part is durable before cancellation"
+    );
+
+    task.abort();
+    let _ = task.await;
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let record = get_staged_record(&repo, &staged_doc_id(&opaque_id).unwrap())
+                .unwrap()
+                .unwrap();
+            if record.claim.is_some_and(|claim| claim.canceled) && !staged_file.exists() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("canceling resolution must discard already-staged media");
+}
