@@ -1030,7 +1030,11 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         &module_source_dir,
         &logs.join("typed-media-restarted.log"),
     );
-    assert_ne!(first_pid, restarted.child.id(), "media resume uses a new process");
+    assert_ne!(
+        first_pid,
+        restarted.child.id(),
+        "media resume uses a new process"
+    );
     wait_healthy(
         &restarted_rpc,
         &mut restarted,
