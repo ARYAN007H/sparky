@@ -1,8 +1,6 @@
 use super::*;
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
-use crate::inference::provider::factory::{
-    BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PROVIDER,
-};
+use crate::inference::provider::factory::{BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PROVIDER};
 use crate::security::credentials::AuthService;
 use tempfile::TempDir;
 

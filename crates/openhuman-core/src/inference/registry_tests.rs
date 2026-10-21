@@ -1,7 +1,7 @@
 use super::*;
+use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
-    create_chat_model_from_string, make_openhuman_backend_model_for_thread, model_limits_request,
-    PROVIDER_OPENHUMAN,
+    create_chat_model_from_string, make_openhuman_backend_model_for_thread, PROVIDER_OPENHUMAN,
 };
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};

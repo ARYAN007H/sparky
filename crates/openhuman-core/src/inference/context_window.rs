@@ -178,9 +178,7 @@ fn route_input(
     });
     route.discovery = match local_kind {
         None => match extensions {
-            Some(extensions) => {
-                model_limits_request_for(role, provider, model, config, extensions)
-            }
+            Some(extensions) => model_limits_request_for(role, provider, model, config, extensions),
             None => model_limits_request(role, provider, model, config),
         },
         Some(LocalProviderKind::Ollama) => None,
@@ -245,9 +243,14 @@ pub(crate) fn model_limits_request_for(
     let RouteKind::Cloud { slug } = route.kind() else {
         return None;
     };
-    let entry = config.cloud_providers.iter().find(|entry| entry.slug == slug)?;
-    if crate::config::schema::cloud_providers::is_hosted_auth_style_for(extensions, entry.auth_style)
-    {
+    let entry = config
+        .cloud_providers
+        .iter()
+        .find(|entry| entry.slug == slug)?;
+    if crate::config::schema::cloud_providers::is_hosted_auth_style_for(
+        extensions,
+        entry.auth_style,
+    ) {
         let model = if route.model.trim().is_empty() {
             model
         } else {
@@ -280,9 +283,9 @@ pub(crate) fn model_limits_request_for(
         codex: Some(&resolution.codex),
         ..ProviderBuildOptions::default()
     };
-    ProviderRegistry::new(crate::inference::provider::factory::CloudCredentialResolver(
-        &resolution.key,
-    ))
+    ProviderRegistry::new(
+        crate::inference::provider::factory::CloudCredentialResolver(&resolution.key),
+    )
     .discovery_request(&spec, &options)
 }
 

@@ -143,7 +143,7 @@ caching, remembered route limits, and the shared fallback order:
                            local profile fallback
 ```
 
-The discovery request comes from [`provider/factory/discovery.rs`](./provider/factory/discovery.rs) (`model_limits_request`), built
+The host context-window resolver builds the discovery request at the point it needs it (`context_window.rs`), using
 from the same endpoint and credential resolution the chat factory uses. Route-aware synchronous
 projection uses the exact discovery identity when available; model-only displays use a conservative
 route projection and cannot borrow a learned limit from an unrelated provider. [`model_context.rs`](./model_context.rs) also answers vision capability through

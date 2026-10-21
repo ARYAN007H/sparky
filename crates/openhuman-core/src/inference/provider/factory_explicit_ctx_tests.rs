@@ -217,7 +217,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
 
         let observed = CoreContext::scope(context_b, async {
             let resolved = dispatch.resolved().expect("bound dispatch context");
-            let request = crate::inference::provider::factory::model_limits_request_for(
+            let request = crate::inference::context_window::model_limits_request_for(
                 "chat",
                 "openhuman",
                 "fixture/model-v1",

@@ -50,7 +50,7 @@ pub(crate) fn wrap(
         format!("{provider}:{model}")
     };
     if let Some(request) =
-        crate::inference::provider::factory::model_limits_request("chat", &route, model, &config)
+        crate::inference::context_window::model_limits_request("chat", &route, model, &config)
     {
         if let Some(inputs) = tinyinference_llm::model::discover::model_limits_cache()
             .get_variant(&request.endpoint, &request.model, &request.cache_variant())
