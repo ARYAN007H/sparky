@@ -36,6 +36,9 @@ use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use crate::triage::external_inbound_origin;
 
+/// How much of a failure is stored and published.
+const MAX_DETAIL_CHARS: usize = 1_000;
+
 /// The placeholder a configured prompt takes the batch in.
 const EVENTS_PLACEHOLDER: &str = "{{events}}";
 
@@ -294,7 +297,7 @@ impl Pinned {
     /// Store `turn_id` as failed with `detail` and publish
     /// `InboundTurnFailed`.
     pub fn fail(&self, turn_id: &str, detail: &str) {
-        let detail = crate::core::observability::scrub_detail(detail);
+        let detail: String = detail.chars().take(MAX_DETAIL_CHARS).collect();
         match self.results.finish(turn_id, Err(detail.clone()), now_ms()) {
             Ok(Some(stored)) => {
                 tracing::warn!(turn = %turn_id, detail = %detail, "[inbound] pinned turn failed");
