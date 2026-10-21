@@ -192,7 +192,7 @@ fn handle_list_pending(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
 
 fn handle_list_recent_decisions(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let limit = parse_list_recent_decisions(params)?.map(|value| value as usize);
+        let limit = parse_list_recent_decisions(params)?;
         let outcome = approval_rpc::approval_list_recent_decisions(limit)
             .await
             .map_err(|e| e.to_string())?;
@@ -235,8 +235,8 @@ fn parse_list_pending(params: Map<String, Value>) -> Result<Option<String>, Stri
     read_optional_string(&params, "agent_id")
 }
 
-fn parse_list_recent_decisions(params: Map<String, Value>) -> Result<Option<u64>, String> {
-    read_optional_u64(&params, "limit")
+fn parse_list_recent_decisions(params: Map<String, Value>) -> Result<Option<usize>, String> {
+    Ok(read_optional_u64(&params, "limit")?.map(|value| value as usize))
 }
 
 fn parse_get_gate_state(_params: Map<String, Value>) -> Result<(), String> {
