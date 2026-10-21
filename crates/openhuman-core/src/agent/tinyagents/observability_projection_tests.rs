@@ -1,5 +1,10 @@
 use super::*;
 
+/// W2-budget-dedupe: two `UsageRecorded` events for the *same* model call
+/// (as happens once the observe-only crate `BudgetMiddleware` re-emits usage
+/// its `after_model` folded, on top of the runtime's own emit) must be
+/// recorded into the bridge accounting **exactly once**. Without the dedupe
+/// guard the totals would double.
 #[tokio::test]
 async fn duplicate_usage_for_same_model_call_is_recorded_once() {
     let (tx, mut rx) = tokio::sync::mpsc::channel(64);
