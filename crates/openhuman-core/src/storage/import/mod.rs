@@ -52,6 +52,8 @@
 pub(crate) mod layout_db;
 #[cfg(feature = "legacy-import")]
 pub(crate) mod layout_status;
+#[cfg(feature = "legacy-import")]
+pub(crate) mod scope_move;
 pub mod live;
 mod schemas;
 #[cfg(feature = "legacy-import")]
