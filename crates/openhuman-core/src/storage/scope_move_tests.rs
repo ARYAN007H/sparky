@@ -101,6 +101,7 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
     assert!(report.documents >= 1);
     assert_eq!(report.entries, 2);
     assert_eq!(report.blobs, 1);
+    assert_eq!(report.updated_times_not_restored, 1);
 
     let new = backend
         .for_scope(&scope_for_profile("alice").agent("asha").unwrap())

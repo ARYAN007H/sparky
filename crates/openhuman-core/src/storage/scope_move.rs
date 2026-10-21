@@ -143,6 +143,9 @@ pub struct MoveReport {
     pub entries: u64,
     /// Blobs copied.
     pub blobs: u64,
+    /// Source documents whose `updated_ms` is kept only in the immutable
+    /// inventory because the target `WriteOptions` cannot restore it.
+    pub updated_times_not_restored: u64,
 }
 
 /// Copies the rows in a source inventory to their mapped v2 scopes.
@@ -191,6 +194,9 @@ pub async fn copy_inventory(
         let target = backend.for_scope(&target_scope)?;
         let docs = target.documents();
         for row in inventory.documents.iter().filter(|row| row.scope == source) {
+            if row.meta.updated_ms != 0 {
+                report.updated_times_not_restored += 1;
+            }
             docs.ensure_collection(&CollectionSpec::new(&row.collection))
                 .await?;
             let mut options = WriteOptions::new();
