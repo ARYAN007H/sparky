@@ -28,7 +28,7 @@ pub(crate) struct ChannelRuntimeContext {
     /// Explicit durable conversation for a hosted relay; ordinary channels
     /// use their existing per-sender history and have no relay thread.
     pub(crate) relay_thread: Option<String>,
-    pub(crate) channels_by_name: Arc<HashMap<String, Arc<dyn super::Channel>>>,
+    pub(crate) channels_by_name: Arc<HashMap<String, Arc<super::runtime::ChannelHandle>>>,
     /// Compiled TinyChannels objects for configured providers. Host channel
     /// runners use these objects for module-owned progressive output.
     pub(crate) module_objects: Arc<HashMap<String, tinybus::module::ModuleObjectClient>>,

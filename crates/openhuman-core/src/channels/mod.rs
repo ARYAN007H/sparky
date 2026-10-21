@@ -11,6 +11,7 @@ pub mod contract_schema;
 pub(crate) mod credentials;
 
 pub use tinychannels_bus::SendMessage;
+#[cfg(test)]
 pub use tinychannels_runtime::{Channel, ChannelSendExt};
 
 #[cfg(feature = "channels")]

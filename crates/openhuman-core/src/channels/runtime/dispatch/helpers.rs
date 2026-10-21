@@ -21,7 +21,7 @@ pub(super) fn log_worker_join_result(result: Result<(), tokio::task::JoinError>)
 /// Start the portable typing lifecycle with OpenHuman's configured interval.
 pub(super) fn spawn_typing_task(
     dispatch: &crate::core::runtime::DispatchCtx,
-    channel: std::sync::Arc<dyn crate::channels::Channel>,
+    channel: std::sync::Arc<crate::channels::runtime::ChannelHandle>,
     recipient: String,
     cancellation_token: tokio_util::sync::CancellationToken,
 ) -> tokio::task::JoinHandle<()> {

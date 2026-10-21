@@ -11,16 +11,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tinybus::EventHandler;
 use tinychannels_bus::SendMessage;
-use tinychannels_runtime::Channel;
+use crate::channels::runtime::ChannelHandle;
 
 /// Subscribes to `CronDeliveryRequested` events and dispatches
 /// the output to the named channel.
 pub struct CronDeliverySubscriber {
-    channels_by_name: Arc<HashMap<String, Arc<dyn Channel>>>,
+    channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>,
 }
 
 impl CronDeliverySubscriber {
-    pub fn new(channels_by_name: Arc<HashMap<String, Arc<dyn Channel>>>) -> Self {
+    pub fn new(channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
         Self { channels_by_name }
     }
 }

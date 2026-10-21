@@ -1,7 +1,10 @@
 //! Per-sender routing and runtime command handling.
 
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
-use super::{Channel, ChannelSendExt, SendMessage};
+use super::SendMessage;
+use super::runtime::ChannelHandle;
+#[cfg(test)]
+use super::ChannelSendExt;
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
@@ -150,7 +153,7 @@ impl RouteCallbacks {
 pub(crate) async fn handle_runtime_command_with_reset<F, Fut>(
     ctx: &ChannelRuntimeContext,
     msg: &traits::ChannelMessage,
-    target_channel: Option<&Arc<dyn Channel>>,
+    target_channel: Option<&Arc<ChannelHandle>>,
     sender_key: &str,
     reset_scope: Option<tinychannels_bus::module_remote::RemoteSessionScope>,
     durable_session_key: Option<String>,
@@ -346,7 +349,7 @@ async fn durable_channel_history_len(
 pub(crate) async fn handle_runtime_command_if_needed(
     ctx: &ChannelRuntimeContext,
     msg: &traits::ChannelMessage,
-    target_channel: Option<&Arc<dyn Channel>>,
+    target_channel: Option<&Arc<ChannelHandle>>,
     sender_key: &str,
 ) -> bool {
     handle_runtime_command_with_reset(

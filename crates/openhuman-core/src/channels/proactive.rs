@@ -14,7 +14,10 @@
 //! - The independent `web_chat::proactive` subscriber always delivers the web
 //!   destination, including when the external channels feature is disabled.
 
-use crate::channels::{Channel, ChannelSendExt, SendMessage};
+use crate::channels::runtime::ChannelHandle;
+use crate::channels::SendMessage;
+#[cfg(test)]
+use crate::channels::ChannelSendExt;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -35,7 +38,7 @@ fn proactive_approval_gate() -> Option<Arc<crate::security::approval::ApprovalGa
 pub struct ProactiveMessageSubscriber {
     /// External channels (Telegram, Discord, etc.) keyed by name.
     /// Empty in the desktop/web-only runtime.
-    channels_by_name: Arc<HashMap<String, Arc<dyn Channel>>>,
+    channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>,
 
     /// The user's preferred channel for proactive messages. Read from
     /// config at construction; can be updated at runtime.
@@ -46,7 +49,7 @@ impl ProactiveMessageSubscriber {
     /// Construct with access to the external channels map and a
     /// preferred channel name (from `channels_config.active_channel`).
     pub fn new(
-        channels_by_name: Arc<HashMap<String, Arc<dyn Channel>>>,
+        channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>,
         active_channel: Option<String>,
     ) -> Self {
         Self {

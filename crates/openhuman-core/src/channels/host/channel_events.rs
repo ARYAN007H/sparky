@@ -1,6 +1,9 @@
 //! Host-owned approval routing and turn events over the channel module.
 use crate::channels::capabilities::capabilities_for;
-use crate::channels::{Channel, ChannelSendExt, SendMessage};
+use crate::channels::runtime::ChannelHandle;
+use crate::channels::SendMessage;
+#[cfg(test)]
+use crate::channels::ChannelSendExt;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -12,14 +15,14 @@ use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
 
 /// Captures the account configuration and reply addresses used by approvals.
 pub struct ChannelApprovalSurfaceSubscriber {
-    channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+    channels: Arc<HashMap<String, Arc<ChannelHandle>>>,
     replies: Mutex<HashMap<String, ReplyContext>>,
     config: Option<Arc<crate::config::Config>>,
     cancellation: tokio_util::sync::CancellationToken,
 }
 impl ChannelApprovalSurfaceSubscriber {
     pub fn with_config(
-        channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+        channels: Arc<HashMap<String, Arc<ChannelHandle>>>,
         config: Arc<crate::config::Config>,
     ) -> Self {
         Self {
@@ -30,7 +33,7 @@ impl ChannelApprovalSurfaceSubscriber {
         }
     }
     #[cfg(test)]
-    pub fn new(channels: Arc<HashMap<String, Arc<dyn Channel>>>) -> Self {
+    pub fn new(channels: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
         Self {
             channels,
             replies: Mutex::new(HashMap::new()),
