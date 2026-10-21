@@ -1,7 +1,5 @@
 use super::*;
 use crate::cron::client::testing as cron_store;
-#![cfg(feature = "storage-sqlite")]
-
 use crate::storage::Scope;
 use crate::storage::test_support::{SqliteBackend, sqlite_backend};
 use serde_json::Value;

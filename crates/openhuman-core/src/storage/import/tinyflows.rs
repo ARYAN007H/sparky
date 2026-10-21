@@ -690,10 +690,10 @@ pub(super) fn finish(domain: &'static str, outcome: Result<Outcome>) -> Report {
     Report { domain, outcome }
 }
 
-#[cfg(all(test, feature = "flows"))]
+#[cfg(all(test, feature = "flows", feature = "storage-sqlite"))]
 #[path = "tinyflows_tests.rs"]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "storage-sqlite"))]
 #[path = "tinyflows_cron_tests.rs"]
 mod cron_tests;
