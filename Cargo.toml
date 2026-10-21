@@ -92,7 +92,7 @@ tinystoragedrivers-testkit = { path = "vendor/tinystoragedrivers/crates/tinystor
 tinystoragedrivers-types = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-types" }
 
 [patch."https://github.com/senamakel/tinystoragedrivers"]
-# The v2.0.2 owner APIs are published from the migration fork while the host
+# The v2.1.0 owner APIs are published from the migration fork while the host
 # consumes their canonical module sources from the same pinned vendor tree.
 tinystoragedrivers = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers" }
 tinystoragedrivers-api = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-api" }

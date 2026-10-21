@@ -394,8 +394,8 @@ serde = { version = "1", features = ["derive"] }
 tempfile = "3"
 tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm" }
 # The document-port contract for failure injection in cron storage regressions.
-tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
-tinystoragedrivers = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", default-features = false, features = ["sqlite"] }
+tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.1.0" }
+tinystoragedrivers = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.1.0", default-features = false, features = ["sqlite"] }
 zeroize = "1"
 tinytools = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools" }
 tinytools-std = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
