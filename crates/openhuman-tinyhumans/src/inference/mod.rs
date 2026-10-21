@@ -115,7 +115,7 @@ fn readiness_probe() -> ReadinessProbe {
 
 /// Registers this area's hooks with the core. Idempotent.
 pub(crate) fn register(_options: &InstallOptions) {
-    let build: ChatModelFactory = Arc::new(build_chat_model);
+    let build: ChatModelFactory<ProviderContext> = Arc::new(build_chat_model);
     register_chat_model(
         PROVIDER_OPENHUMAN,
         ChatModelEntry {

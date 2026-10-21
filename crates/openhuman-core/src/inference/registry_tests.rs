@@ -126,11 +126,11 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
     let _guard = crate::inference::inference_test_guard();
     let calls = Arc::new(AtomicUsize::new(0));
     let counter = Arc::clone(&calls);
-    register_embedding(PROVIDER_OPENHUMAN, move |request| {
+    register_embedding(PROVIDER_OPENHUMAN, Arc::new(move |request| {
         assert_eq!(request.dimensions, 8);
         counter.fetch_add(1, Ordering::SeqCst);
         Ok(Box::new(tinyinference_embeddings::NoopEmbeddingModel))
-    });
+    }));
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
         "cloud",
         "any-model",

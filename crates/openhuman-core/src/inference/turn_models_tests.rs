@@ -31,10 +31,10 @@ use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
 fn scoped_model_entry(
     name: &'static str,
     supports_vision: bool,
-) -> crate::inference::registry::ChatModelEntry {
+) -> crate::inference::registry::ChatModelEntry::<crate::inference::registry::ProviderContext> {
     use crate::inference::registry::ProviderModelMetadata;
 
-    crate::inference::registry::ChatModelEntry {
+    crate::inference::registry::ChatModelEntry::<crate::inference::registry::ProviderContext> {
         build: Arc::new(move |_| Ok((Arc::new(NamedModel(name)), name.to_string()))),
         probe: None,
         models: Some(ProviderModelMetadata {
@@ -192,7 +192,7 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
     crate::inference::registry::register_chat_model_in(
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        crate::inference::registry::ChatModelEntry {
+        crate::inference::registry::ChatModelEntry::<crate::inference::registry::ProviderContext> {
             build: Arc::new(|_| {
                 Ok((
                     Arc::new(NamedModel("managed fixture")),
