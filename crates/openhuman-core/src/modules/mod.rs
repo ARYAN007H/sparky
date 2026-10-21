@@ -102,7 +102,6 @@ pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
 mod storage_host_linked;
 #[cfg(all(test, feature = "modules"))]
-#[cfg(test)]
 mod storage_host_watching;
 #[cfg(feature = "modules")]
 mod storage_import_support;
