@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::agent::subagent_host::types::SubagentRunError;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::storage::StorageBackend;
 use tinyagents_session::transcript::{TranscriptLocator, TranscriptMessage, TranscriptTurn};
 
 use super::dispatch::AggregatedUsage;
