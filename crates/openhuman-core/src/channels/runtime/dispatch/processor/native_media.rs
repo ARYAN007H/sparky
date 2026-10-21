@@ -31,6 +31,7 @@ pub(super) fn requires_typed_preparation(envelope: &ChannelInboundEnvelope) -> b
 /// Provider URLs and paths are never used as a filesystem or network source.
 pub(super) async fn resolve_typed_message(
     ctx: &ChannelRuntimeContext,
+    config: &crate::config::Config,
     envelope: &ChannelInboundEnvelope,
     thread_id: &str,
 ) -> Result<Option<Message>, String> {
@@ -39,10 +40,6 @@ pub(super) async fn resolve_typed_message(
     }
     validate_native_parts(&envelope.parts)?;
     let scope = media_scope(envelope)?;
-    let config = ctx
-        .config
-        .as_deref()
-        .ok_or_else(|| "native media requires runtime configuration".to_owned())?;
     let mut parts = envelope.parts.clone();
     let mut image_count = 0usize;
     let mut file_count = 0usize;
