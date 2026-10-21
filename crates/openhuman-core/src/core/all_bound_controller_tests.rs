@@ -39,6 +39,15 @@ fn staged_bound_methods() -> Vec<&'static str> {
         "voice.live_test_provider",
     ]);
     methods.push("threads.upsert");
+    methods.extend([
+        "profiles.provision",
+        "profiles.deprovision",
+        "profiles.list",
+        "profiles.status",
+        "profiles.set_credential",
+        "profiles.clear_credential",
+        "profiles.release",
+    ]);
     #[cfg(feature = "modules")]
     methods.push("modules.computer_status");
     methods
@@ -663,3 +672,5 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
         }
     }
 }
+#[path = "all_profiles_controller_tests.rs"]
+mod profiles_controller_tests;
