@@ -67,7 +67,7 @@ pub(super) fn managed_chat_model_for(
         return Err(managed_unavailable_error());
     };
     let model = match entry.models.as_ref() {
-        Some(models) => (models.resolve_model)(role, config, model_override),
+        Some(models) => (models.resolve_model)(role, &crate::inference::registry::ProviderContext { config: config.clone(), egress: egress.clone() }, model_override),
         None => model_override
             .or(config.default_model.as_deref())
             .map(str::trim)
@@ -86,14 +86,15 @@ pub(super) fn managed_chat_model_for(
         config: config.clone(),
         egress: egress.clone(),
     };
-    (entry.build)(&crate::inference::registry::ChatModelRequest {
+    let built = (entry.build)(&crate::inference::registry::ChatModelRequest {
         role,
         model_override: Some(&model),
         default_model,
         native_tool_calling,
         thread_id,
         context: &context,
-    })
+    })?;
+    Ok(built)
 }
 
 /// Construct a managed turn model with the explicit OpenHuman thread attached.
@@ -188,12 +189,13 @@ pub(crate) fn make_openhuman_backend_model_for_options(
         config: config.clone(),
         egress,
     };
-    (entry.build)(&crate::inference::registry::ChatModelRequest {
+    let built = (entry.build)(&crate::inference::registry::ChatModelRequest {
         role: "delegate",
         model_override: Some(model),
         default_model: Some(model),
         native_tool_calling: true,
         thread_id,
         context: &context,
-    })
+    })?;
+    Ok(built)
 }

@@ -505,10 +505,14 @@ pub async fn probe_inference_readiness(
         log::debug!("[flows][inference-probe] role={role} managed provider registered no probe");
         return Ok(());
     };
+    let provider_context = crate::inference::registry::ProviderContext {
+        config: config.clone(),
+        egress: crate::security::egress::EgressLedger::none(),
+    };
     let model_id = entry
         .models
         .as_ref()
-        .and_then(|models| (models.resolve_model)(role, config, None))
+        .and_then(|models| (models.resolve_model)(role, &provider_context, None))
         .or_else(|| {
             config
                 .default_model
@@ -518,7 +522,11 @@ pub async fn probe_inference_readiness(
                 .map(str::to_string)
         })
         .ok_or_else(|| format!("provider {PROVIDER_OPENHUMAN} has no model for role {role}"))?;
-    let result = probe(role.to_string(), model_id.clone(), config.clone()).await;
+    let result = probe(tinyinference_llm::providers::overrides::ReadinessRequest {
+        role: role.to_string(),
+        model: model_id.clone(),
+        context: provider_context,
+    }).await;
     log::debug!(
         "[flows][inference-probe] role={role} model={model_id} probe result: {}",
         if result.is_ok() { "ready" } else { "not ready" }
