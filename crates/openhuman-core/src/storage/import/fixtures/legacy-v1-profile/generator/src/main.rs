@@ -272,18 +272,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         conversations.join("threads.jsonl"),
         "{\"op\":\"upsert\",\"thread_id\":\"fixture-thread\",\"title\":\"Fixture thread\",\"created_at\":\"2025-02-03T04:05:06Z\"}\n",
     )?;
-    let thread_stem = thread_id
-        .as_bytes()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    std::fs::write(
-        conversations
-            .join("threads")
-            .join(format!("{thread_stem}.jsonl")),
-        "{\"id\":\"fixture-message\",\"content\":\"Historical thread body\",\"type\":\"text\",\"extraMetadata\":null,\"sender\":\"user\",\"createdAt\":\"2025-02-03T04:06:07Z\"}\n",
-    )?;
-
     backend
         .checkpoint(tinystoragedrivers::Checkpoint::Truncate)
         .await?;

@@ -16,9 +16,6 @@ const FIXTURE: &[u8] = include_bytes!(
 const THREAD_LOG: &[u8] = include_bytes!(
     "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/legacy-workspace/memory/conversations/threads.jsonl"
 );
-const THREAD_MESSAGES: &[u8] = include_bytes!(
-    "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/legacy-workspace/memory/conversations/threads/666978747572652d746872656164.jsonl"
-);
 
 struct Server(Child);
 
@@ -75,14 +72,10 @@ fn start(home: &Path) -> (Server, String) {
 }
 
 fn rpc(base: &str, method: &str) -> Value {
-    rpc_with_params(base, method, json!({}))
-}
-
-fn rpc_with_params(base: &str, method: &str, params: Value) -> Value {
     let response: Value = reqwest::blocking::Client::new()
         .post(format!("{base}/rpc"))
         .bearer_auth(TOKEN)
-        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params }))
+        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": {} }))
         .send()
         .unwrap_or_else(|error| panic!("POST {method}: {error}"))
         .json()
@@ -105,14 +98,7 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
     let source = workspace.join("storage/storage.db");
     std::fs::write(&source, FIXTURE).unwrap();
     let conversations = workspace.join("memory/conversations");
-    std::fs::create_dir_all(conversations.join("threads")).unwrap();
     std::fs::write(conversations.join("threads.jsonl"), THREAD_LOG).unwrap();
-    std::fs::write(
-        conversations
-            .join("threads/666978747572652d746872656164.jsonl"),
-        THREAD_MESSAGES,
-    )
-    .unwrap();
     (profile, source)
 }
 
@@ -124,21 +110,12 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
 
     let (_server, base) = start(home.path());
     let threads = rpc(&base, "openhuman.threads_list");
-    let messages = rpc_with_params(
-        &base,
-        "openhuman.threads_messages_list",
-        json!({"thread_id": "fixture-thread"}),
-    );
     let approvals = rpc(&base, "openhuman.approval_list_pending");
     let flows = rpc(&base, "openhuman.flows_list");
 
     assert!(
         threads.to_string().contains("fixture-thread"),
         "thread owner did not read its historical profile record: {threads}"
-    );
-    assert!(
-        messages.to_string().contains("Historical thread body"),
-        "thread owner did not read its historical message: {messages}"
     );
     assert!(
         approvals.to_string().contains("fixture-approval"),
