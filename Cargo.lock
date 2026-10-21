@@ -5435,6 +5435,7 @@ dependencies = [
  "tinyagents-registry",
  "tinyagents-runtime",
  "tinyagents-session",
+ "tinyagents-storage-kit",
  "tinyagents-tasks",
  "tinybox-bus 0.1.40",
  "tinybox-core",
