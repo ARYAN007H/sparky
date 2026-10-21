@@ -172,8 +172,7 @@ where
     let history_len =
         durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
             .await;
-    let (route_scope, configured_channel) =
-        configured_control_channel(ctx, reset_scope.as_ref());
+    let (route_scope, configured_channel) = configured_control_channel(ctx, reset_scope.as_ref());
     let client = super::context::module_client(ctx).await;
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
@@ -248,7 +247,6 @@ where
             let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
             let _ = channel
                 .send_with_outbound_intent(
-                    &SendMessage::new(&copy, &msg.reply_target).in_thread(msg.thread_ts.clone()),
                     &SendMessage::new(&copy, &msg.reply_target).in_thread(reply_thread.clone()),
                 )
                 .await;
@@ -312,12 +310,10 @@ fn configured_control_channel(
 
     let mut trusted_scope = scope.clone();
     trusted_scope.channel.account_id = Some(channel.name().to_owned());
-    let configured = Box::new(
-        tinychannels_bus::module_control::ConfiguredControlChannel {
-            name: channel.name().to_owned(),
-            capabilities: channel.capabilities(),
-        },
-    );
+    let configured = Box::new(tinychannels_bus::module_control::ConfiguredControlChannel {
+        name: channel.name().to_owned(),
+        capabilities: channel.capabilities(),
+    });
     (Some(trusted_scope), Some(configured))
 }
 
