@@ -3,7 +3,7 @@ use super::*;
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
 use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tinytools::{PermissionLevel, Tool, ToolResult};
@@ -255,6 +255,9 @@ async fn relay_provider() -> MockServer {
 #[tokio::test]
 async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let _slot = host_agents::tests::lock();
+    let _ = tracing_subscriber::fmt().with_test_writer().try_init();
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .expect("hosted authority definitions should be initialized");
     let tmp = tempfile::tempdir().unwrap();
     let server = relay_provider().await;
     let mut config = config(&tmp);
@@ -286,6 +289,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let _resolver = ResolverInstallGuard::new(resolver);
     let workspace = config.workspace_dir.clone();
     let mut events = crate::web_chat::subscribe_web_channel_events();
+    let mut observed_events = Vec::new();
 
     for (id, text) in [("m1", "first question"), ("m2", "second question")] {
         let p = params(id, text);
@@ -302,9 +306,24 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
             format!("req-{id}"),
         )
         .await;
+        while let Ok(event) = events.try_recv() {
+            observed_events.push(event);
+        }
+        let provider_requests = server.received_requests().await.unwrap();
+        let provider_paths: Vec<&str> = provider_requests
+            .iter()
+            .map(|request| request.url.path())
+            .collect();
+        let relay_event_names: Vec<&str> = observed_events
+            .iter()
+            .filter(|event| event.context().client_id == "gw-ops-test")
+            .map(|event| event.event_name())
+            .collect();
         assert_eq!(
             replies,
-            vec![format!("answer {}", if id == "m1" { 1 } else { 2 })]
+            vec![format!("answer {}", if id == "m1" { 1 } else { 2 })],
+            "relay turn {id} returned no answer; provider paths={provider_paths:?}, \
+             scoped relay event names={relay_event_names:?}"
         );
     }
 
@@ -357,21 +376,15 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         .iter()
         .filter_map(|message| Some((message["role"].as_str()?, message["content"].as_str()?)))
         .collect();
-    assert!(
-        second_content
-            .iter()
-            .any(|(role, text)| *role == "user" && text.contains("first question"))
-    );
-    assert!(
-        second_content
-            .iter()
-            .any(|(role, text)| *role == "assistant" && *text == "answer 1")
-    );
-    assert!(
-        second_content
-            .iter()
-            .any(|(role, text)| *role == "user" && text.contains("second question"))
-    );
+    assert!(second_content
+        .iter()
+        .any(|(role, text)| *role == "user" && text.contains("first question")));
+    assert!(second_content
+        .iter()
+        .any(|(role, text)| *role == "assistant" && *text == "answer 1"));
+    assert!(second_content
+        .iter()
+        .any(|(role, text)| *role == "user" && text.contains("second question")));
 
     let thread = params("m1", "x").thread_id();
     let messages =
@@ -383,23 +396,17 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     );
     assert_eq!(messages[1].content, "answer 1");
 
-    let mut outbound = Vec::new();
-    while let Ok(event) = events.try_recv() {
-        if event.context().client_id == "gw-ops-test" {
-            outbound.push(event);
-        }
-    }
+    let outbound: Vec<_> = observed_events
+        .into_iter()
+        .filter(|event| event.context().client_id == "gw-ops-test")
+        .collect();
     assert_eq!(outbound.len(), 2, "one channel_outbound per reply");
-    assert!(
-        outbound
-            .iter()
-            .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT)
-    );
-    assert!(
-        outbound
-            .iter()
-            .all(|event| event.context().thread_id == thread)
-    );
+    assert!(outbound
+        .iter()
+        .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT));
+    assert!(outbound
+        .iter()
+        .all(|event| event.context().thread_id == thread));
     assert_eq!(outbound[0].context().request_id, "req-m1");
     assert!(matches!(
         outbound[0].wire_event(),
