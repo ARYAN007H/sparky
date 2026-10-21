@@ -17,7 +17,7 @@ use crate::core::runtime::DispatchCtx;
 mod narration;
 #[cfg(test)]
 use narration::interim_narration_text;
-use narration::{flush_interim_narration, publish_seq_stamped};
+use narration::{flush_interim_narration, publish_seq_stamped, MIN_INTERIM_NARRATION_CHARS};
 #[path = "progress_bridge_subagent_events.rs"]
 mod subagent_events;
 #[path = "progress_bridge_text_events.rs"]

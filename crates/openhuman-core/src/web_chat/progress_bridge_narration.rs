@@ -15,7 +15,7 @@ use super::super::event_bus::publish_web_channel_event_in;
 /// resets its live preview for the next round. A short "Let me check." that
 /// was never flushed stayed in the preview and the next round's text was
 /// appended straight onto it ("Let me check.Here's the answer").
-const MIN_INTERIM_NARRATION_CHARS: usize = 1;
+pub(super) const MIN_INTERIM_NARRATION_CHARS: usize = 1;
 
 /// Flush the parent agent's accumulated leading narration (streamed before a
 /// tool call in the current round) as an interim `chat_interim` event, so it
