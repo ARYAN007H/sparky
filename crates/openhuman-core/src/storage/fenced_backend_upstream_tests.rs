@@ -10,7 +10,7 @@ use crate::storage::{Storage, StorageBackend};
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-use tinystoragedrivers_types::{Capabilities, Capability, CollectionSpec, ErrorKind, Precondition, Scope, Version};
+use tinystoragedrivers_types::{Capability, CollectionSpec, ErrorKind, Precondition, Scope, Version};
 
 const TTL: Duration = Duration::from_secs(30);
 const MARGIN_MS: u64 = 5_000;
@@ -68,7 +68,11 @@ impl Node {
         self.storage.for_scope(&Scope::new(scope).unwrap()).unwrap()
     }
 
-    async fn put(&self, scope: &str, id: &str) -> Result<Version> {
+    async fn put(
+        &self,
+        scope: &str,
+        id: &str,
+    ) -> std::result::Result<Version, tinystoragedrivers_types::StorageError> {
         self.scoped(scope)
             .documents()
             .put("notes", id, json!({"by": self.name}), Precondition::None)
@@ -291,8 +295,10 @@ async fn paused_holder(
 /// B takes over, A's write lands. The driver re-reads the lease record in
 /// the write's own atomic step and refuses it.
 async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn StorageBackend>) {
-    assert!(shared.capabilities().contains(Capability::Fencing));
-    let (a, fence, leases) = paused_holder(shared).await;
+    assert!(shared
+        .capabilities()
+        .contains(Capability::ConditionalWrites));
+    let (a, fence, leases) = paused_holder(&shared).await;
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     scoped
         .documents()
@@ -507,7 +513,7 @@ async fn expiring_blob_writes_are_fenced() {
 /// refused every conversation append on the default (SQLite) backend.
 async fn conditional_append_passes_through(inner: Arc<dyn StorageBackend>) {
     let wrapped = wrap(inner);
-    let scoped = wrapped.for_scope(&Scope::local()).unwrap();
+    let scoped = wrapped.for_scope(&Scope::new("local").unwrap()).unwrap();
     let streams = scoped.streams();
     assert_eq!(
         streams
