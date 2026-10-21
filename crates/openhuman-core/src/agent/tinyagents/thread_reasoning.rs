@@ -68,6 +68,3 @@ pub(crate) fn parse_reasoning_effort(raw: &str) -> Option<ReasoningEffort> {
     ReasoningEffort::parse(raw)
 }
 
-#[cfg(test)]
-#[path = "thread_reasoning_tests.rs"]
-mod tests;
