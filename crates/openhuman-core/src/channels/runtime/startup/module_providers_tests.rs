@@ -726,6 +726,10 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         })
         .expect("voice part reaches the scoped provider terminal");
     let voice_gateway_wire = serde_json::to_value(voice_gateway).expect("gateway voice wire");
+    assert_eq!(voice_gateway.context().client_id, client_id);
+    assert_eq!(voice_gateway.context().thread_id, thread_id);
+    assert!(voice_gateway.belongs_to("relay-typed-output-agent"));
+    assert!(voice_gateway.belongs_to_profile("relay-typed-output-profile"));
     assert!(
         voice_gateway_wire["structured"]["parts"]
             .as_array()
@@ -737,6 +741,14 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
                     && part["voice"]["media"]["opaqueId"]
                         == "media:tenant7/thread42/voice1"
             })
+    );
+    assert_eq!(
+        voice_gateway_wire["structured"]["channel_ref"]["accountId"],
+        "trusted-account-7"
+    );
+    assert_eq!(
+        voice_gateway_wire["structured"]["conversation_ref"]["threadId"],
+        "topic-3"
     );
     assert_eq!(
         image_gateway_wire["structured"]["channel_ref"]["accountId"],
@@ -751,11 +763,25 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
             .iter()
             .filter(|event| {
                 serde_json::to_value(event)
-                    .is_ok_and(|wire| wire["full_response"] == "Generated image")
+                    .is_ok_and(|wire| {
+                        wire.to_string()
+                            .contains("media:tenant7/thread42/image1")
+                    })
             })
             .count(),
         1,
         "image delivery has one provider terminal"
+    );
+    assert!(
+        image_gateway_wire["structured"]["parts"]
+            .as_array()
+            .expect("typed provider parts")
+            .iter()
+            .any(|part| {
+                part["part"]["kind"] == "text"
+                    && part["part"]["text"] == "Generated image"
+            }),
+        "the media caption remains a typed text part in the provider terminal"
     );
     assert_eq!(
         gateway_terminals
@@ -794,6 +820,13 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         .close()
         .await
         .expect("hosted projection runtime closes");
+    while let Ok(event) = web_events.try_recv() {
+        assert_ne!(
+            event.context().request_id,
+            request_id,
+            "no duplicate typed projection or provider terminal"
+        );
+    }
 }
 
 async fn run_hosted_compiled_turn(
