@@ -5,6 +5,7 @@
 
 use super::*;
 use tinyinference_llm::model::discover::DiscoveryRequest;
+use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
 
 /// The discovery request for `provider` (a role's resolved provider string)
 /// serving `model`, or `None` when the route has no listing to ask:
@@ -83,15 +84,25 @@ pub(crate) fn model_limits_request_for(
         return None;
     }
     let spec = super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model);
-    super::cloud_spec::cloud_discovery_request(
-        &spec,
+    let options = ProviderBuildOptions {
+        auth_style: Some(resolution.entry.auth_style.into()),
+        codex: Some(&resolution.codex),
+        ..ProviderBuildOptions::default()
+    };
+    match ProviderRegistry::new(super::cloud_spec::CloudCredentialResolver(
         &resolution.key,
-        resolution.entry.auth_style,
-        &[],
-        &[],
-        None,
-        Some(&resolution.codex),
-    )
+    ))
+    .discovery_request(&spec, &options)
+    {
+        Ok(request) => request,
+        Err(error) => {
+            log::debug!(
+                "[model_limits] registry discovery unavailable slug={}: {error}",
+                spec.provider
+            );
+            None
+        }
+    }
 }
 
 /// The managed backend's catalogue listing request, from the registered
