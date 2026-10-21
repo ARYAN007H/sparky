@@ -11,6 +11,7 @@
 //! - Channel origin: the reply is sent to the origin's reply target, then
 //!   appended to its durable agent transcript so the next turn sees it.
 
+#[cfg(feature = "channels")]
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
