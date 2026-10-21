@@ -417,7 +417,9 @@ fn run_call_command(args: &[String]) -> Result<()> {
     let value = rt
         .block_on(async {
             let dispatch = DispatchCtx::process_default();
-            let dispatch = if method == crate::inference::schemas::INFERENCE_AGENT_CHAT {
+            let dispatch = if crate::core::legacy_aliases::resolve_legacy(&method)
+                == crate::inference::INFERENCE_AGENT_CHAT
+            {
                 dispatch.with_headless_agent_chat()
             } else {
                 dispatch
