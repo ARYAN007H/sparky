@@ -28,8 +28,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::Target;
 use super::state::LayoutError;
+use super::Target;
 use crate::config::Config;
 use crate::storage::{self, StorageBackend};
 
@@ -140,9 +140,9 @@ pub async fn migrate(target: &Target) -> Result<(), LayoutError> {
         .map_err(|e| LayoutError::Other(anyhow::anyhow!("schema migration: {e}")))?;
     drop(backend);
     log::debug!(
-        scopes = report.scopes,
-        collections = report.collections,
-        "[storage::layout] owner collections prepared"
+        "[storage::layout] owner collections prepared: scopes={}, collections={}",
+        report.scopes,
+        report.collections
     );
     if db.is_file() {
         super::db::checkpoint(&db)?;

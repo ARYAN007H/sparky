@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tinyagents_harness::store::SchemaAdmission;
-use tinyagents_session::DriverSessionStores;
 use tinyagents_session::port::{AgentStorageFactory, AgentStores, SessionStoreProvider};
+use tinyagents_session::DriverSessionStores;
 use tinyagents_storage_kit::{Blocking, Scope as PortScope, ScopedStorage};
 use tinystoragedrivers::{StorageBackend, StorageError};
 
@@ -94,14 +94,15 @@ impl TenantSessionStores {
             return (Arc::clone(provider), agent);
         }
         let backend = Arc::clone(&self.backend);
+        let tenant_for_factory = tenant.clone();
         let factory: AgentStorageFactory = Arc::new(move |agent_id| {
             let owner_scope =
-                crate::storage::scope::Scope::new(tenant.as_str())?.agent(agent_id)?;
+                crate::storage::scope::Scope::new(tenant_for_factory.as_str())?.agent(agent_id)?;
             let scope = PortScope::new(owner_scope.as_str())?;
             let storage = backend.for_scope(&owner_scope)?;
-            super::super::block_on(async {
-                crate::storage::boot::prepare_scope(&storage).await?;
-                Ok(())
+            let prepare_storage = storage.clone();
+            super::super::block_on(async move {
+                crate::storage::boot::prepare_scope(&prepare_storage).await
             })?;
             Ok(ScopedStorage::new(storage, scope))
         });
