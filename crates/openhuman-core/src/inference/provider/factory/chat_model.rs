@@ -479,61 +479,17 @@ pub(super) fn create_chat_model_from_string_with_model_id_inner(
     ))
 }
 
-pub(super) struct DefaultTemperatureChatModel {
-    inner: Arc<dyn ChatModel<()>>,
-    temperature: f64,
-}
-
-#[async_trait::async_trait]
-impl ChatModel<()> for DefaultTemperatureChatModel {
-    fn profile(&self) -> Option<&tinyinference_llm::model::ModelProfile> {
-        self.inner.profile()
-    }
-
-    fn supports_input(
-        &self,
-        modality: tinyinference_llm::model::InputModality,
-        mime: &str,
-        source: tinyinference_llm::model::InputSource,
-    ) -> bool {
-        self.inner.supports_input(modality, mime, source)
-    }
-
-    fn cache_identity(&self) -> Option<String> {
-        self.inner.cache_identity()
-    }
-
-    async fn invoke(
-        &self,
-        state: &(),
-        mut request: ModelRequest,
-    ) -> tinyinference_llm::Result<ModelResponse> {
-        if request.temperature.is_none() {
-            request.temperature = Some(self.temperature);
-        }
-        self.inner.invoke(state, request).await
-    }
-
-    async fn stream(
-        &self,
-        state: &(),
-        mut request: ModelRequest,
-    ) -> tinyinference_llm::Result<ModelStream> {
-        if request.temperature.is_none() {
-            request.temperature = Some(self.temperature);
-        }
-        self.inner.stream(state, request).await
-    }
-}
-
 pub(super) fn with_default_temperature(
     model: Arc<dyn ChatModel<()>>,
     temperature: f64,
 ) -> Arc<dyn ChatModel<()>> {
-    Arc::new(DefaultTemperatureChatModel {
-        inner: model,
-        temperature,
-    })
+    let profile = model.profile().cloned().unwrap_or_default();
+    Arc::new(
+        ProfileOverrideModel::new(model, profile).with_defaults(ModelRequestDefaults {
+            model: None,
+            temperature: Some(temperature),
+        }),
+    )
 }
 
 /// Reproduce the legacy provider factory's access gates and diagnostics for a
