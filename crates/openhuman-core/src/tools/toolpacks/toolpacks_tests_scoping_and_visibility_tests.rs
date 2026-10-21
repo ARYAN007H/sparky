@@ -277,7 +277,7 @@ fn a_listing_with_nothing_callable_names_the_route_out() {
         "workflows",
         &handle,
         &|_| false,
-        &route,
+        route,
     )
     .expect_err("nothing callable must not render a menu");
 

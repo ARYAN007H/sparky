@@ -10,10 +10,7 @@ fn the_single_openhuman_spawn_tool_is_protected_from_nested_runs() {
 
 #[test]
 fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
-    let spawn_names = tinyagents_definition::SPAWN_TOOL_NAMES
-        .iter()
-        .copied()
-        .collect::<Vec<_>>();
+    let spawn_names = tinyagents_definition::SPAWN_TOOL_NAMES.to_vec();
     for name in &spawn_names {
         assert!(
             crate::agent::tinyagents::is_subagent_spawn_tool(name),

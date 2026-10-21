@@ -246,12 +246,10 @@ fn master_agent_has_coding_hint_and_named_tools() {
     match def.tools {
         ToolScope::Named(tools) => {
             // Specialist routing uses the single asynchronous spawn tool.
-            for required in ["spawn_subagent"] {
-                assert!(
-                    tools.iter().any(|t| t == required),
-                    "orchestrator must have sub-agent tool `{required}`"
-                );
-            }
+            assert!(
+                tools.iter().any(|t| t == "spawn_subagent"),
+                "orchestrator must have the asynchronous sub-agent tool"
+            );
             // The collection/fan-out/fleet surface these replaced. Each was
             // either a second way to say "spawn again" or a way to stall
             // the turn waiting for a result that arrives on its own.
