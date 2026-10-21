@@ -3,9 +3,6 @@
 use super::*;
 use crate::cron::client::testing as cron_store;
 use crate::storage::test_support::sqlite_backend;
-use std::ops::Deref;
-use std::sync::Arc;
-use crate::storage::StorageBackend;
 
 fn copy_tree(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
