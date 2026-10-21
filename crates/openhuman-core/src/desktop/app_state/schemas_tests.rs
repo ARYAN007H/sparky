@@ -53,6 +53,7 @@ pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
                         "consentedAtMs": null
                     }
                 }),
+                json!({"onboardingTasks": [], "keyringConsent": []}),
             ],
         },
     ]
@@ -183,7 +184,7 @@ fn update_local_state_patch_preserves_camel_case_tristate_and_nested_defaults() 
 fn update_local_state_patch_rejects_wrong_nested_and_outer_types() {
     for value in [
         serde_json::json!({"encryptionKey": false}),
-        serde_json::json!({"onboardingTasks": []}),
+        serde_json::json!({"onboardingTasks": "not-an-object"}),
         serde_json::json!({"keyringConsent": {"consentedAtMs": "17"}}),
     ] {
         assert!(
@@ -191,4 +192,21 @@ fn update_local_state_patch_rejects_wrong_nested_and_outer_types() {
             "malformed app_state patch types are rejected"
         );
     }
+}
+
+#[test]
+fn update_local_state_patch_preserves_array_to_struct_defaults() {
+    let params: UpdateLocalStateParams = serde_json::from_value(serde_json::json!({
+        "onboardingTasks": [],
+        "keyringConsent": []
+    }))
+    .unwrap();
+    let tasks = params.onboarding_tasks.as_ref().unwrap().as_ref().unwrap();
+    assert!(!tasks.accessibility_permission_granted);
+    assert!(tasks.enabled_tools.is_empty());
+    assert!(tasks.connected_sources.is_empty());
+    assert_eq!(tasks.updated_at_ms, None);
+    let consent = params.keyring_consent.as_ref().unwrap().as_ref().unwrap();
+    assert_eq!(consent.storage_mode, "");
+    assert_eq!(consent.consented_at_ms, None);
 }
