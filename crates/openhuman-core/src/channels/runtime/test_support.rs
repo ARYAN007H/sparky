@@ -24,6 +24,8 @@ use tinychannels_bus::{ChannelMessage, SendMessage};
 use tinychannels_runtime::Channel;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
+use wiremock::matchers::method;
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[derive(Debug, Clone)]
 pub struct DispatchHarnessOptions {
@@ -130,6 +132,85 @@ pub struct DispatchHarnessObservation {
     pub handler_provider_name: String,
     pub handler_channel_name: String,
     pub handler_had_progress: bool,
+}
+
+/// A real linked TinyChannels runtime backed by a loopback provider endpoint.
+///
+/// Tests that need to exercise host policy together with channel operations
+/// should use this fixture rather than a synthetic `Channel` implementation.
+pub(crate) struct LinkedTelegramRuntime {
+    _env: crate::config::test_env::EnvVarGuard,
+    _storage: crate::channels::module_fixture_tests::MemoryStorageGuard,
+    _workspace: tempfile::TempDir,
+    server: MockServer,
+    runtime: crate::channels::runtime::startup::ModuleRuntimeTestGuard,
+}
+
+impl LinkedTelegramRuntime {
+    pub(crate) fn channels(
+        &self,
+    ) -> Arc<HashMap<String, Arc<crate::channels::runtime::ChannelHandle>>> {
+        self.runtime.channels()
+    }
+
+    pub(crate) async fn provider_request_paths(&self) -> Vec<String> {
+        self.server
+            .received_requests()
+            .await
+            .expect("mock provider should expose received requests")
+            .into_iter()
+            .map(|request| request.url.path().to_owned())
+            .collect()
+    }
+}
+
+/// Prepare an actual linked TinyChannels module with mocked Telegram HTTP.
+pub(crate) async fn linked_telegram_runtime(
+) -> LinkedTelegramRuntime {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": true
+        })))
+        .mount(&server)
+        .await;
+    let env = crate::config::test_env::EnvVarGuard::locked_async()
+        .await
+        .with("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri());
+    let storage = crate::channels::module_fixture_tests::install_memory_storage();
+    crate::channels::module_fixture_tests::client().await;
+
+    let workspace = tempfile::tempdir().expect("temporary module workspace");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.action_dir = workspace.path().to_path_buf();
+    config.modules.allow_download = false;
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    config.channels_config.telegram = Some(tinychannels_bus::config::TelegramConfig {
+        bot_token: "token".into(),
+        chat_id: None,
+        allowed_users: vec!["42".into()],
+        stream_mode: Default::default(),
+        draft_update_interval_ms: 1,
+        silent_streaming: true,
+        mention_only: false,
+    });
+    let (dispatch, _receiver) = tokio::sync::mpsc::channel(4);
+    let runtime = crate::channels::runtime::startup::prepare_module_runtime_for_test(
+        Arc::new(config),
+        dispatch,
+    )
+    .await
+    .expect("linked TinyChannels runtime should prepare");
+
+    LinkedTelegramRuntime {
+        _env: env,
+        _storage: storage,
+        _workspace: workspace,
+        server,
+        runtime,
+    }
 }
 
 #[derive(Default)]

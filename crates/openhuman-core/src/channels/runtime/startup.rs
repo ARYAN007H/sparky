@@ -155,6 +155,39 @@ pub use start_channels::start_channels;
 pub(crate) use start_channels::start_channels_with_session;
 pub(crate) use turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};
 
+/// Owns a real module-backed channel runtime for channel policy tests.
+///
+/// The module remains leased until the guard is dropped, so calls made through
+/// its channel handles exercise the same TinyBus adapter used by production.
+#[cfg(test)]
+pub(crate) struct ModuleRuntimeTestGuard(module_providers::ModuleChannelRuntime);
+
+#[cfg(test)]
+impl ModuleRuntimeTestGuard {
+    pub(crate) fn channels(
+        &self,
+    ) -> std::sync::Arc<std::collections::HashMap<String, std::sync::Arc<ChannelHandle>>> {
+        self.0.channels()
+    }
+}
+
+/// Prepare a linked TinyChannels runtime for a host policy test.
+#[cfg(test)]
+pub(crate) async fn prepare_module_runtime_for_test(
+    config: std::sync::Arc<Config>,
+    dispatch: tokio::sync::mpsc::Sender<crate::channels::runtime::dispatch::RuntimeChannelMessage>,
+) -> Result<ModuleRuntimeTestGuard> {
+    let context = std::sync::Arc::new(std::sync::OnceLock::new());
+    let runtime = module_providers::ModuleChannelRuntime::prepare(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        config,
+        context,
+        dispatch,
+    )
+    .await?;
+    Ok(ModuleRuntimeTestGuard(runtime))
+}
+
 // Re-exported at module scope (rather than left as private `pub(super)`
 // items reached only through their owning submodule) so the `#[path]` test
 // modules below — which share this module's scope via `super::*` — can see
