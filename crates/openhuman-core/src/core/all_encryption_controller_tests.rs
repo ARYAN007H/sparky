@@ -4,12 +4,7 @@ use super::*;
 fn raw_encryption_security_registry_matches_its_independent_contract() {
     let entries: Vec<_> = registry()
         .iter()
-        .filter(|row| {
-            matches!(
-                row.controller.schema.method_name().as_str(),
-                "encrypt.secret" | "decrypt.secret"
-            )
-        })
+        .filter(|row| matches!(row.controller.schema.namespace, "encrypt" | "decrypt"))
         .collect();
     let contracts = crate::security::encryption::encryption_parameter_contracts();
 
@@ -26,12 +21,9 @@ fn raw_encryption_security_registry_matches_its_independent_contract() {
         row.group == DomainGroup::Security
             && ["encrypt", "decrypt"].contains(&row.controller.schema.namespace)
     }));
-    assert!(internal_registry().iter().all(|row| {
-        !matches!(
-            row.controller.schema.method_name().as_str(),
-            "encrypt.secret" | "decrypt.secret"
-        )
-    }));
+    assert!(internal_registry()
+        .iter()
+        .all(|row| !matches!(row.controller.schema.namespace, "encrypt" | "decrypt")));
     assert_eq!(
         entries
             .iter()
@@ -54,12 +46,7 @@ fn bound_encryption_decoders_preserve_required_strings_and_ignore_extra_fields()
 
     let entries = registry()
         .iter()
-        .filter(|row| {
-            matches!(
-                row.controller.schema.method_name().as_str(),
-                "encrypt.secret" | "decrypt.secret"
-            )
-        })
+        .filter(|row| matches!(row.controller.schema.namespace, "encrypt" | "decrypt"))
         .map(|row| row.controller.clone())
         .collect::<Vec<_>>();
 
