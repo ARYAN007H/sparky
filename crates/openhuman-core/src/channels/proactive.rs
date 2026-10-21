@@ -21,8 +21,6 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tinybus::EventHandler;
-#[cfg(test)]
-use tinychannels_runtime::ChannelSendExt;
 
 #[cfg(not(test))]
 fn proactive_approval_gate() -> Option<Arc<crate::security::approval::ApprovalGate>> {

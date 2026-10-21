@@ -6,8 +6,6 @@ use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
 use crate::modules::channel_runtime::ChannelRuntimeLease;
 use anyhow::{Context, Result};
-#[cfg(test)]
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
@@ -15,13 +13,8 @@ use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
 };
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
-#[cfg(test)]
-use tinychannels_bus::ChannelMessage;
 use tinychannels_bus::SendMessage;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
-#[cfg(test)]
-use tinychannels_runtime::Channel;
-use tokio::sync::mpsc;
 
 /// Channel objects sharing one captured config, callback object and module lease.
 pub(super) struct ModuleChannelRuntime {
@@ -31,9 +24,6 @@ pub(super) struct ModuleChannelRuntime {
     proxy: tinychannels_bus::HttpProxyPolicy,
     infos: Vec<ConfiguredChannelInfo>,
     relay: Option<tinychannels_bus::module_relay::RelayReservation>,
-    #[cfg(test)]
-    channels: Arc<HashMap<String, Arc<dyn Channel>>>,
-    #[cfg(not(test))]
     channels: Arc<HashMap<String, Arc<super::ChannelHandle>>>,
     closed: bool,
 }
@@ -144,9 +134,6 @@ impl ModuleChannelRuntime {
                         .any(|identity| identity.platform == channel)
             })
         };
-        #[cfg(test)]
-        let mut channels: HashMap<String, Arc<dyn Channel>> = HashMap::new();
-        #[cfg(not(test))]
         let mut channels: HashMap<String, Arc<super::ChannelHandle>> = HashMap::new();
         let mut progressive = HashMap::new();
         for info in &infos {
@@ -158,9 +145,6 @@ impl ModuleChannelRuntime {
                 relay_fronted: relay_fronts(&info.name),
             };
             let channel = Arc::new(channel);
-            #[cfg(test)]
-            channels.insert(info.name.clone(), channel.clone() as Arc<dyn Channel>);
-            #[cfg(not(test))]
             channels.insert(
                 info.name.clone(),
                 Arc::new(super::ChannelHandle::Module((*channel).clone())),
@@ -185,12 +169,6 @@ impl ModuleChannelRuntime {
         })
     }
 
-    #[cfg(test)]
-    pub(super) fn channels(&self) -> Arc<HashMap<String, Arc<dyn Channel>>> {
-        Arc::clone(&self.channels)
-    }
-
-    #[cfg(not(test))]
     pub(super) fn channels(&self) -> Arc<HashMap<String, Arc<super::ChannelHandle>>> {
         Arc::clone(&self.channels)
     }
@@ -447,65 +425,6 @@ impl ModuleChannel {
 
     pub(super) fn supports_reactions(&self) -> bool {
         self.interaction.supports_reactions
-    }
-}
-
-#[cfg(test)]
-#[async_trait]
-impl Channel for ModuleChannel {
-    fn name(&self) -> &str {
-        ModuleChannel::name(self)
-    }
-
-    fn proactive_target(&self) -> Option<String> {
-        ModuleChannel::proactive_target(self)
-    }
-
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
-        ModuleChannel::send(self, message).await
-    }
-
-    async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
-        anyhow::bail!("TinyChannels module owns provider listeners")
-    }
-
-    async fn send_typed_with_receipt(
-        &self,
-        message: &tinychannels_bus::channel::ChannelOutboundMessage,
-    ) -> anyhow::Result<tinychannels_bus::channel::ChannelSendOutcome> {
-        ModuleChannel::send_typed_with_receipt(self, message).await
-    }
-
-    async fn health_check(&self) -> bool {
-        ModuleChannel::health_check(self).await
-    }
-
-    async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
-        ModuleChannel::start_typing(self, recipient).await
-    }
-
-    async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
-        ModuleChannel::stop_typing(self, recipient).await
-    }
-
-    async fn begin_typing_refresh(
-        &self,
-        recipient: &str,
-        interval_secs: u64,
-    ) -> anyhow::Result<Option<String>> {
-        ModuleChannel::begin_typing_refresh(self, recipient, interval_secs).await
-    }
-
-    async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
-        ModuleChannel::end_typing_refresh(self, handle).await
-    }
-
-    fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
-        ModuleChannel::capabilities(self)
-    }
-
-    fn supports_reactions(&self) -> bool {
-        ModuleChannel::supports_reactions(self)
     }
 }
 

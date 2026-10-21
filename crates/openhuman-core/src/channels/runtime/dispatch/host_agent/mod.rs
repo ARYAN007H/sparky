@@ -26,10 +26,6 @@ use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use tinychannels_bus as traits;
-#[cfg(test)]
-#[cfg(test)]
-use tinychannels_runtime::ChannelSendExt;
-
 pub(crate) mod posture;
 mod turn;
 

@@ -14,38 +14,20 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tinychannels_bus as traits;
-use tinychannels_runtime::Channel;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-#[derive(Default)]
-struct Telegram {
-    sent: Mutex<Vec<String>>,
-}
-
-#[async_trait::async_trait]
-impl Channel for Telegram {
-    fn name(&self) -> &str {
-        "telegram"
-    }
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
-        self.sent.lock().unwrap().push(message.content.clone());
-        Ok(())
-    }
-    async fn listen(
-        &self,
-        _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
-
-fn context(channel: Arc<Telegram>, config: Config) -> Arc<ChannelRuntimeContext> {
-    let channel: Arc<dyn Channel> = channel;
+fn context(
+    channel: Arc<crate::channels::runtime::TestChannel>,
+    config: Config,
+) -> Arc<ChannelRuntimeContext> {
     Arc::new(ChannelRuntimeContext {
         relay_thread: None,
-        channels_by_name: Arc::new(HashMap::from([("telegram".to_string(), channel)])),
+        channels_by_name: Arc::new(HashMap::from([(
+            "telegram".to_string(),
+            Arc::new(crate::channels::runtime::ChannelHandle::Test(channel)),
+        )])),
         module_objects: Arc::new(HashMap::new()),
         turn_model_source: None,
         default_provider: Arc::new("test-provider".to_string()),
@@ -117,7 +99,7 @@ async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
     })
     .await;
     let tmp = tempfile::tempdir().unwrap();
-    let channel = Arc::new(Telegram::default());
+    let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
     let ctx = context(
         Arc::clone(&channel),
         config(&tmp, Some("nobody-registered")),
@@ -130,7 +112,13 @@ async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
         0,
         "never widened to the orchestrator"
     );
-    let sent = channel.sent.lock().unwrap().clone();
+    let sent = channel
+        .sent
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|message| message.content.clone())
+        .collect::<Vec<_>>();
     assert_eq!(sent.len(), 1, "{sent:?}");
     assert!(sent[0].contains("not available"), "{sent:?}");
 }
@@ -151,13 +139,13 @@ async fn an_unbound_channel_still_runs_the_orchestrator() {
         .agent
         .channel_agents
         .insert("discord".into(), "some-agent".into());
-    let channel = Arc::new(Telegram::default());
+    let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
 
     process_channel_message(context(Arc::clone(&channel), config), message("hello")).await;
 
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
-        channel.sent.lock().unwrap().clone(),
+        channel.sent.lock().unwrap().iter().map(|message| message.content.clone()).collect::<Vec<_>>(),
         vec!["orchestrator answered".to_string()]
     );
 }
@@ -341,7 +329,7 @@ async fn bound_channel_runs_its_host_agent() {
         writes: Arc::clone(&writes),
         origins: Arc::clone(&origins),
     });
-    let channel = Arc::new(Telegram::default());
+    let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
     let ctx = context(Arc::clone(&channel), config(&tmp, Some("teeny-chat")));
 
     let outcome = {
@@ -353,7 +341,7 @@ async fn bound_channel_runs_its_host_agent() {
     };
 
     assert_eq!(
-        channel.sent.lock().unwrap().clone(),
+        channel.sent.lock().unwrap().iter().map(|message| message.content.clone()).collect::<Vec<_>>(),
         vec!["teeny says hi".to_string()],
         "the host agent's reply goes back to the chat"
     );

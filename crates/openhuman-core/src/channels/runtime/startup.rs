@@ -13,24 +13,60 @@ mod turn_parts;
 use anyhow::Result;
 use tinybus::module::{ModuleCallError, ModuleClient};
 
-#[cfg(test)]
-pub(crate) type ChannelHandle = dyn tinychannels_runtime::Channel;
-
 /// Host-owned handle to a configured channel instance. Production operations
 /// are dispatched through the loaded TinyChannels module's bus object.
-#[cfg(not(test))]
 #[derive(Clone)]
 pub(crate) enum ChannelHandle {
     Module(module_providers::ModuleChannel),
     Relay(std::sync::Arc<crate::channels::providers::relay::RelayChannel>),
+    /// Test-only sink for narrow policy tests that do not need the linked module.
+    #[cfg(test)]
+    Test(std::sync::Arc<TestChannel>),
 }
 
-#[cfg(not(test))]
+#[cfg(test)]
+pub(crate) struct TestChannel {
+    pub(crate) name: String,
+    pub(crate) proactive_target: Option<String>,
+    pub(crate) supports_reactions: bool,
+    pub(crate) sent: std::sync::Arc<std::sync::Mutex<Vec<tinychannels_bus::SendMessage>>>,
+    pub(crate) sent_messages: tokio::sync::Mutex<Vec<String>>,
+    pub(crate) send_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(crate) outbound_intent_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(crate) start_typing_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(crate) stop_typing_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(crate) send_error: Option<String>,
+    pub(crate) begin_typing_refresh: Option<
+        std::sync::Arc<
+            dyn Fn(
+                    String,
+                    u64,
+                ) -> futures::future::BoxFuture<'static, anyhow::Result<Option<String>>>
+                + Send
+                + Sync,
+        >,
+    >,
+    pub(crate) end_typing_refresh: Option<
+        std::sync::Arc<
+            dyn Fn(String) -> futures::future::BoxFuture<'static, anyhow::Result<()>>
+                + Send
+                + Sync,
+        >,
+    >,
+}
+
 impl ChannelHandle {
+    #[cfg(test)]
+    pub(crate) fn test(channel: TestChannel) -> Self {
+        Self::Test(std::sync::Arc::new(channel))
+    }
+
     pub(crate) fn name(&self) -> &str {
         match self {
             Self::Module(channel) => &channel.name,
             Self::Relay(channel) => channel.name(),
+            #[cfg(test)]
+            Self::Test(channel) => &channel.name,
         }
     }
 
@@ -38,6 +74,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.proactive_target(),
             Self::Relay(_) => None,
+            #[cfg(test)]
+            Self::Test(channel) => channel.proactive_target.clone(),
         }
     }
 
@@ -45,6 +83,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.capabilities(),
             Self::Relay(_) => tinychannels_bus::ChannelCapabilities::unknown(),
+            #[cfg(test)]
+            Self::Test(channel) => tinychannels_bus::ChannelCapabilities::unknown(),
         }
     }
 
@@ -52,6 +92,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.interaction.supports_reactions,
             Self::Relay(_) => false,
+            #[cfg(test)]
+            Self::Test(channel) => channel.supports_reactions,
         }
     }
 
@@ -59,6 +101,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.send_prepared(message).await,
             Self::Relay(channel) => channel.send(message).await,
+            #[cfg(test)]
+            Self::Test(channel) => channel.send(message).await,
         }
     }
 
@@ -66,7 +110,17 @@ impl ChannelHandle {
         &self,
         message: &tinychannels_bus::SendMessage,
     ) -> anyhow::Result<()> {
-        self.send(message).await
+        match self {
+            Self::Module(channel) => channel.send_prepared(message).await,
+            Self::Relay(channel) => channel.send(message).await,
+            #[cfg(test)]
+            Self::Test(channel) => {
+                channel
+                    .outbound_intent_count
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                channel.send(message).await
+            }
+        }
     }
 
     pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
@@ -79,6 +133,12 @@ impl ChannelHandle {
                     .await
             }
             Self::Relay(_) => Ok(()),
+            #[cfg(test)]
+            Self::Test(channel) => {
+                let _ = recipient;
+                channel.start_typing_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            }
         }
     }
 
@@ -92,6 +152,12 @@ impl ChannelHandle {
                     .await
             }
             Self::Relay(_) => Ok(()),
+            #[cfg(test)]
+            Self::Test(channel) => {
+                let _ = recipient;
+                channel.stop_typing_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            }
         }
     }
 
@@ -103,6 +169,11 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.begin_typing_refresh(recipient, interval_secs).await,
             Self::Relay(_) => Ok(None),
+            #[cfg(test)]
+            Self::Test(channel) => match &channel.begin_typing_refresh {
+                Some(begin) => begin(recipient.to_owned(), interval_secs).await,
+                None => Ok(None),
+            },
         }
     }
 
@@ -110,7 +181,56 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.end_typing_refresh(handle).await,
             Self::Relay(_) => Ok(()),
+            #[cfg(test)]
+            Self::Test(channel) => match &channel.end_typing_refresh {
+                Some(end) => end(handle.to_owned()).await,
+                None => Ok(()),
+            },
         }
+    }
+}
+
+#[cfg(test)]
+impl TestChannel {
+    pub(crate) fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            proactive_target: None,
+            supports_reactions: false,
+            sent: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+            sent_messages: tokio::sync::Mutex::new(Vec::new()),
+            send_count: Default::default(),
+            outbound_intent_count: Default::default(),
+            start_typing_calls: Default::default(),
+            stop_typing_calls: Default::default(),
+            send_error: None,
+            begin_typing_refresh: None,
+            end_typing_refresh: None,
+        }
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    async fn send(&self, message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
+        self.send_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if let Some(error) = &self.send_error {
+            anyhow::bail!(error.clone());
+        }
+        self.sent.lock().expect("test send lock").push(message.clone());
+        self.sent_messages
+            .lock()
+            .await
+            .push(format!("{}:{}", message.recipient, message.content));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+impl Default for TestChannel {
+    fn default() -> Self {
+        Self::new("test-channel")
     }
 }
 

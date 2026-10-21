@@ -20,8 +20,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinyagents_harness::progress::AgentProgress;
-use tinychannels_bus::{ChannelMessage, SendMessage};
-use tinychannels_runtime::Channel;
+use tinychannels_bus::ChannelMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 use wiremock::matchers::{method, path};
@@ -224,54 +223,6 @@ pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
     }
 }
 
-#[derive(Default)]
-struct HarnessState {
-    sends: tokio::sync::Mutex<Vec<ObservedSend>>,
-    start_typing_calls: AtomicUsize,
-    stop_typing_calls: AtomicUsize,
-}
-
-struct HarnessChannel {
-    name: String,
-    supports_reactions: bool,
-    state: Arc<HarnessState>,
-}
-
-#[async_trait]
-impl Channel for HarnessChannel {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    async fn send(&self, message: &SendMessage) -> Result<()> {
-        self.state.sends.lock().await.push(ObservedSend {
-            kind: "send",
-            recipient: message.recipient.clone(),
-            content: message.content.clone(),
-            thread_ts: message.thread_ts.clone(),
-        });
-        Ok(())
-    }
-
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> Result<()> {
-        Ok(())
-    }
-
-    async fn start_typing(&self, _recipient: &str) -> Result<()> {
-        self.state.start_typing_calls.fetch_add(1, Ordering::SeqCst);
-        Ok(())
-    }
-
-    async fn stop_typing(&self, _recipient: &str) -> Result<()> {
-        self.state.stop_typing_calls.fetch_add(1, Ordering::SeqCst);
-        Ok(())
-    }
-
-    fn supports_reactions(&self) -> bool {
-        self.supports_reactions
-    }
-}
-
 struct HarnessModel;
 
 #[async_trait]
@@ -412,24 +363,14 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
             }
         });
 
-    let state = Arc::new(HarnessState::default());
-    let channel_impl = Arc::new(HarnessChannel {
-        name: options.channel_name.clone(),
-        supports_reactions: options.supports_reactions,
-        state: Arc::clone(&state),
-    });
-    #[cfg(test)]
-    let channel: Arc<dyn Channel> = channel_impl;
-    #[cfg(test)]
+    let state = Arc::new(crate::channels::runtime::TestChannel::new(
+        options.channel_name.clone(),
+    ));
+    state.supports_reactions = options.supports_reactions;
     let mut channels_by_name = HashMap::new();
-    #[cfg(test)]
-    channels_by_name.insert(options.channel_name.clone(), channel);
-    #[cfg(not(test))]
-    let mut channels_by_name = HashMap::new();
-    #[cfg(not(test))]
     channels_by_name.insert(
         options.channel_name.clone(),
-        Arc::new(crate::channels::runtime::ChannelHandle::Test(channel_impl)),
+        Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::clone(&state))),
     );
 
     let model: Arc<dyn ChatModel<()>> = Arc::new(HarnessModel);
@@ -511,7 +452,18 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         }
     };
 
-    let sends = state.sends.lock().await.clone();
+    let sends = state
+        .sent
+        .lock()
+        .expect("test sends lock")
+        .iter()
+        .map(|message| ObservedSend {
+            kind: "send",
+            recipient: message.recipient.clone(),
+            content: message.content.clone(),
+            thread_ts: message.thread_ts.clone(),
+        })
+        .collect();
     let handler_history_roles = handler_roles.lock().expect("roles lock").clone();
     let handler_history_text = handler_text.lock().expect("text lock").clone();
     let handler_provider_name = handler_provider.lock().expect("provider lock").clone();

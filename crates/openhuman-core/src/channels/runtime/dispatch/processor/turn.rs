@@ -11,9 +11,6 @@ use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::Instant;
-#[cfg(test)]
-#[cfg(test)]
-use tinychannels_runtime::ChannelSendExt;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 

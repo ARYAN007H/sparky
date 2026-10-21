@@ -5,21 +5,22 @@ use super::super::context::{
 use super::super::runtime::process_channel_message;
 use super::common::{
     IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
-    TelegramRecordingChannel, ToolCallingModel,
+    ToolCallingModel,
 };
+use crate::channels::runtime::TestChannel;
 use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tinychannels_bus as traits;
-use tinychannels_runtime::Channel;
+use crate::channels::runtime::ChannelHandle;
 use tinyinference_llm::model::ChatModel;
 
 #[tokio::test]
 async fn process_channel_message_executes_native_tool_calls() {
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -78,8 +79,8 @@ async fn process_channel_message_executes_native_tool_calls() {
 #[tokio::test]
 async fn process_channel_message_handles_models_command_without_llm_call() {
     let _bus_guard = super::common::use_real_agent_handler().await;
-    let channel_impl = Arc::new(TelegramRecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_impl = Arc::new(TestChannel::new("telegram"));
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -162,8 +163,8 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
 #[tokio::test]
 async fn process_channel_message_uses_route_override_provider_and_model() {
     let _bus_guard = super::common::use_real_agent_handler().await;
-    let channel_impl = Arc::new(TelegramRecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_impl = Arc::new(TestChannel::new("telegram"));
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -250,7 +251,7 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
 async fn process_channel_message_respects_configured_max_tool_iterations_above_default() {
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -312,7 +313,7 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
 async fn process_channel_message_reports_configured_max_tool_iterations_limit() {
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);

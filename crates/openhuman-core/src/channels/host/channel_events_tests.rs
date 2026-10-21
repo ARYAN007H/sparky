@@ -2,41 +2,22 @@
 
 use super::*;
 use std::path::Path;
-use std::sync::Mutex as StdMutex;
 #[cfg(feature = "e2e-test-support")]
 use tempfile::tempdir;
-use tinychannels_bus::{ChannelMessage, SendMessage};
+use crate::channels::runtime::{ChannelHandle, TestChannel};
 
-struct RecordingChannel {
-    name: String,
-    sent: StdMutex<Vec<SendMessage>>,
+fn recording(name: &str) -> (Arc<ChannelHandle>, Arc<TestChannel>) {
+    let channel = Arc::new(TestChannel::new(name));
+    (
+        Arc::new(ChannelHandle::Test(Arc::clone(&channel))),
+        channel,
+    )
 }
 
-#[async_trait]
-impl Channel for RecordingChannel {
-    fn name(&self) -> &str {
-        &self.name
-    }
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
-        self.sent.lock().unwrap().push(message.clone());
-        Ok(())
-    }
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
-
-fn recording(name: &str) -> Arc<RecordingChannel> {
-    Arc::new(RecordingChannel {
-        name: name.into(),
-        sent: StdMutex::new(Vec::new()),
-    })
-}
-
-fn approval_subscriber(channels: &[Arc<RecordingChannel>]) -> ChannelApprovalSurfaceSubscriber {
-    let map: HashMap<String, Arc<dyn Channel>> = channels
+fn approval_subscriber(channels: &[(&str, Arc<ChannelHandle>)]) -> ChannelApprovalSurfaceSubscriber {
+    let map: HashMap<String, Arc<ChannelHandle>> = channels
         .iter()
-        .map(|c| (c.name.clone(), Arc::clone(c) as Arc<dyn Channel>))
+        .map(|(name, channel)| ((*name).to_owned(), Arc::clone(channel)))
         .collect();
     ChannelApprovalSurfaceSubscriber::new(Arc::new(map))
 }
@@ -126,8 +107,8 @@ async fn approval_prompts_reach_every_chat_channel() {
         ("discord", None, "discord_alice_chat-1"),
         ("slack", Some("1700.1"), "slack_alice_chat-1_thread:1700.1"),
     ] {
-        let ch = recording(channel);
-        let sub = approval_subscriber(&[Arc::clone(&ch)]);
+        let (handle, ch) = recording(channel);
+        let sub = approval_subscriber(&[(channel, handle)]);
         assert_eq!(sub.name(), "channels::approval_surface");
         assert_eq!(sub.domains(), Some(&["channel", "approval"][..]));
         sub.handle(&received(channel, "chat-1", thread_ts, &ws))
@@ -145,9 +126,9 @@ async fn approval_prompts_reach_every_chat_channel() {
 #[tokio::test]
 async fn approvals_for_web_email_or_unrouted_requests_are_ignored() {
     let ws = PathBuf::from("/tmp");
-    let email = recording("email");
-    let discord = recording("discord");
-    let sub = approval_subscriber(&[Arc::clone(&email), Arc::clone(&discord)]);
+    let (email_handle, email) = recording("email");
+    let (discord_handle, discord) = recording("discord");
+    let sub = approval_subscriber(&[("email", email_handle), ("discord", discord_handle)]);
     sub.handle(&received("email", "a@b.c", None, &ws)).await;
     sub.handle(&approval(Some("email_alice_a@b.c"), Some("email")))
         .await;

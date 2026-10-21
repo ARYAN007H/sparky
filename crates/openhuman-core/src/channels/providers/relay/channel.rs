@@ -10,13 +10,7 @@ use std::sync::Mutex;
 use serde_json::json;
 
 use crate::web_chat::{publish_web_channel_event, publish_web_channel_event_in, WebChannelEvent};
-#[cfg(test)]
-use async_trait::async_trait;
-#[cfg(test)]
-use tinychannels_bus::ChannelMessage;
 use tinychannels_bus::SendMessage;
-#[cfg(test)]
-use tinychannels_runtime::Channel;
 
 /// The event name a relayed reply is published under.
 pub const CHANNEL_OUTBOUND_EVENT: &str = "channel_outbound";
@@ -147,24 +141,6 @@ impl RelayChannel {
                 })),
             },
         );
-    }
-}
-
-#[cfg(test)]
-#[async_trait]
-impl Channel for RelayChannel {
-    fn name(&self) -> &str {
-        &self.channel
-    }
-
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
-        RelayChannel::send(self, message).await
-    }
-
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
-        anyhow::bail!(
-            "a relayed channel has no listener: its messages arrive through channel_relay_inbound"
-        )
     }
 }
 

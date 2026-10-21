@@ -10,8 +10,6 @@ use std::sync::{Arc, Mutex};
 use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
 use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
-#[cfg(test)]
-use tinychannels_runtime::ChannelSendExt;
 
 /// Captures the account configuration and reply addresses used by approvals.
 pub struct ChannelApprovalSurfaceSubscriber {

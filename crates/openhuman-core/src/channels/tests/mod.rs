@@ -6,9 +6,8 @@
 //!
 //! `common.rs` holds the shared fixtures the files below build on: fake
 //! models per scenario (`DummyModel`, `SlowModel`, `ToolCallingModel`,
-//! `IterativeToolModel`, `HistoryCaptureModel`, `ModelCaptureModel`), fake
-//! `Channel` implementations that record sends or always fail
-//! (`RecordingChannel`, `TelegramRecordingChannel`, `AlwaysFailChannel`), a
+//! `IterativeToolModel`, `HistoryCaptureModel`, `ModelCaptureModel`), a
+//! concrete test channel handle that records sends and typing calls,
 //! `MockPriceTool`, `make_workspace` for identity-file
 //! fixtures, and a re-export of `agent::bus::use_real_agent_handler`.
 //!

@@ -35,26 +35,7 @@ impl Tool for DummyTool {
     }
 }
 
-#[derive(Default)]
-struct RecordingChannel {
-    sent: Mutex<Vec<SendMessage>>,
-}
-
-#[async_trait]
-impl Channel for RecordingChannel {
-    fn name(&self) -> &str {
-        "recording"
-    }
-
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
-        self.sent.lock().unwrap().push(message.clone());
-        Ok(())
-    }
-
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
+use crate::channels::runtime::{ChannelHandle, TestChannel};
 
 pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
@@ -302,8 +283,8 @@ async fn load_cached_model_preview_returns_empty_when_cache_json_is_invalid() {
 #[tokio::test]
 async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -326,7 +307,7 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
     .await;
     assert!(handled);
 
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(sent[0]
         .content
@@ -338,8 +319,8 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 async fn clear_history_command_uses_reset_callback_and_persists_route_override() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let key = "telegram_alice_room";
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -380,7 +361,7 @@ async fn clear_history_command_uses_reset_callback_and_persists_route_override()
         }
     );
 
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(sent[0].content.contains("Model switched to `gpt-5-mini`"));
 }
@@ -394,8 +375,8 @@ async fn failed_history_reset_does_not_apply_requested_route() {
         model: "reasoning-v1".into(),
     };
     set_route_selection(&ctx, key, before.clone());
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -423,7 +404,7 @@ async fn failed_history_reset_does_not_apply_requested_route() {
 
     assert!(handled);
     assert_eq!(get_route_selection(&ctx, key), before);
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].content, "Something went wrong. Please try again.");
     assert!(!sent[0].content.contains("durable reset failed"));
@@ -432,8 +413,8 @@ async fn failed_history_reset_does_not_apply_requested_route() {
 #[tokio::test]
 async fn handle_runtime_command_telegram_status_replies_without_agent() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -456,7 +437,7 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
     .await;
     assert!(handled);
 
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(
         sent[0].content.contains("**Status**"),
@@ -490,8 +471,8 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
 #[tokio::test]
 async fn handle_runtime_command_telegram_help_replies_with_remote_command_list() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -514,7 +495,7 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
     .await;
     assert!(handled);
 
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(sent[0].content.contains("Remote control:"));
     assert!(sent[0].content.contains("`/status`"));
@@ -529,8 +510,8 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
 async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -553,7 +534,7 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
     .await;
     assert!(handled);
 
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(sent[0]
         .content
@@ -566,8 +547,8 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let sender_key = "telegram_alice_chat-remote";
 
     let new_msg = ChannelMessage {
@@ -658,7 +639,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         .await
     );
 
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
     assert!(sent[0].content.contains("Started new session"));
     assert!(sent[0]
@@ -683,8 +664,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_state = Arc::new(TestChannel::new("recording"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -706,7 +687,7 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
         )
         .await
     );
-    let sent = channel_impl.sent.lock().unwrap();
+    let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(
         sent[0].content.contains("Created thread"),

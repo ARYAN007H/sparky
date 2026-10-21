@@ -9,8 +9,6 @@ use tinychannels_bus as traits;
 use tinychannels_bus::module_control::{
     ChannelControlRequest, ChannelControlResult, ProviderDescriptor,
 };
-#[cfg(test)]
-use tinychannels_runtime::ChannelSendExt;
 
 fn provider_descriptors() -> Vec<ProviderDescriptor> {
     provider::list_providers()

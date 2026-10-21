@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinychannels_bus as traits;
-use tinychannels_runtime::Channel;
+use crate::channels::runtime::ChannelHandle;
 use tokio::sync::Barrier;
 
 #[tokio::test]
@@ -113,7 +113,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
 
     let build_runtime = || {
         let channel_impl = Arc::new(RecordingChannel::default());
-        let channel: Arc<dyn Channel> = channel_impl.clone();
+        let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
         let mut channels_by_name = HashMap::new();
         channels_by_name.insert(channel.name().to_string(), channel);
@@ -302,7 +302,7 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
     .await;
 
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -428,7 +428,7 @@ fn unrelated_processed_event(n: usize) -> DomainEvent {
 
 async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl;
+    let channel = Arc::new(ChannelHandle::Test(channel_impl));
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
 
@@ -555,7 +555,7 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
     .await;
 
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
 
@@ -651,7 +651,7 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
     .await;
 
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
 
