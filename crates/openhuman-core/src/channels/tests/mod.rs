@@ -23,8 +23,8 @@
 //!   through `process_channel_message`.
 
 mod common;
-mod identity;
 mod host_pipeline;
+mod identity;
 mod prompt;
 mod runtime_dispatch;
 mod runtime_tool_calls;

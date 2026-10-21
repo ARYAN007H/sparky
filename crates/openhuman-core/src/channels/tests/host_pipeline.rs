@@ -1,7 +1,7 @@
-use super::common::{use_real_agent_handler, HistoryCaptureModel};
 use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
-use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessOptions};
 use super::super::runtime::process_channel_message;
+use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessOptions};
+use super::common::{use_real_agent_handler, HistoryCaptureModel};
 use crate::channels::runtime::ChannelHandle;
 use crate::inference::provider;
 use std::collections::HashMap;
@@ -261,4 +261,3 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
     drop(calls);
     assert_eq!(channel_state.sent_messages.lock().await.len(), 2);
 }
-
