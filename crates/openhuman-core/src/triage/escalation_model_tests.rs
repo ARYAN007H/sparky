@@ -280,7 +280,7 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
                     None,
                     None,
                     crate::inference::host_runtime::ops::AgentChatEnv::default(),
-                    Some((source, model_marker.to_string())),
+                    (source, model_marker.to_string()),
                 ),
             ),
         )

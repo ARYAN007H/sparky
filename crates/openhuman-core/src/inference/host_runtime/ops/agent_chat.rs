@@ -354,7 +354,7 @@ pub fn agent_chat_for<'a>(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> futures::future::BoxFuture<'a, Result<Outcome<String>, String>> {
-    Box::pin(async {
+    Box::pin(async move {
         agent_chat_reply_for_inner(
             config,
             target,

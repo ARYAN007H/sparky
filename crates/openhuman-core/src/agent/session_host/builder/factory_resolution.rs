@@ -41,10 +41,6 @@ pub(crate) fn provider_role_for_definition(
     provider_role_for(master_hint.as_deref().or(default_model))
 }
 
-#[cfg(test)]
-#[path = "factory_resolution_tests.rs"]
-mod tests;
-
 /// Resolve the model source, workload role, and native-tool capability for a session.
 ///
 /// Session construction and triage direct turns share the same resolved source when one
@@ -100,3 +96,7 @@ pub(crate) fn resolve_session_model(
     }
     Ok((provider_role, model_name, supports_native))
 }
+
+#[cfg(test)]
+#[path = "factory_resolution_tests.rs"]
+mod tests;

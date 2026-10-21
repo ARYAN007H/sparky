@@ -302,7 +302,7 @@ async fn dispatch_target_agent(
             host: parent_ctx.host_env.clone(),
             ..Default::default()
         },
-        Some((turn_model_source, model)),
+        (turn_model_source, model),
     )
     .await
     .map_err(|e| anyhow!("agent_chat_for({agent_id}) failed: {e}"))?;

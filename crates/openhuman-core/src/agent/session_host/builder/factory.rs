@@ -864,5 +864,3 @@ pub(super) fn resolve_target_definition(
         agent_id
     ))
 }
-
-use super::factory_resolution::provider_role_for_definition;
