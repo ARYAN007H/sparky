@@ -81,7 +81,7 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let storage = claimed_backend.for_scope(&scope)?;
             Ok(tinyagents_storage_kit::ScopedStorage::new(
                 storage,
-                (**scope).clone(),
+                (*scope).clone(),
             ))
         });
         let provider = DriverSessionStores::new(factory)
