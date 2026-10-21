@@ -226,3 +226,67 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         "the parent accepted the real spawn result before the child completed"
     );
 }
+
+#[tokio::test]
+async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settles() {
+    let _inference = crate::inference::inference_test_guard_async().await;
+    let model = std::sync::Arc::new(CronChildModel {
+        spawn_calls: std::sync::atomic::AtomicUsize::new(0),
+        child_calls: std::sync::atomic::AtomicUsize::new(0),
+        child_invocation_dropped: std::sync::Arc::new(
+            std::sync::atomic::AtomicBool::new(false),
+        ),
+        accepted_followups: std::sync::atomic::AtomicUsize::new(0),
+        child_started: std::sync::Mutex::new(None),
+        child_release: tokio::sync::Notify::new(),
+    });
+    let _model =
+        crate::inference::provider::factory::test_provider_override::install_model(model.clone());
+    let (_temp, config, core, dispatch, job) = scheduled_agent_fixture(2);
+    let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
+    *model.child_started.lock().unwrap() = Some(child_started_tx);
+    let scheduler_config = config.clone();
+    let run = tokio::spawn(async move {
+        dispatch_scheduled_agent(core, dispatch, scheduler_config).await
+    });
+
+    match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => panic!("scheduled child exited before its model blocked: {error}"),
+        Err(_) => {
+            model.child_release.notify_one();
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            panic!(
+                "scheduled child never reached its blocking model (spawns: {}, accepted followups: {})",
+                model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+                model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
+            );
+        }
+    }
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), run)
+        .await
+        .expect("cron timeout should settle the blocked run")
+        .expect("cron scheduler task");
+    let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
+    assert_eq!(runs.len(), 1, "scheduler persisted one completed attempt");
+    assert_ne!(runs[0].status, "ok", "the configured deadline expired");
+    assert!(!runs[0]
+        .output
+        .as_deref()
+        .unwrap_or_default()
+        .contains("headless-cron-child-result"));
+    assert_eq!(model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(
+        model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the root accepted the child before waiting on it"
+    );
+    assert_eq!(model.child_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert!(
+        model
+            .child_invocation_dropped
+            .load(std::sync::atomic::Ordering::SeqCst),
+        "the root deadline dropped the child model future"
+    );
+}
