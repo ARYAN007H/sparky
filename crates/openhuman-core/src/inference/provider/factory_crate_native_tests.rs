@@ -1,3 +1,4 @@
+use super::local_runtime::try_create_local_runtime_chat_model;
 use super::*;
 use crate::security::egress::EgressLedger;
 

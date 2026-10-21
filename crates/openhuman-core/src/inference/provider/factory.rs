@@ -40,8 +40,6 @@ pub use routing::{provider_for_role, role_bypasses_managed_credits};
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
 #[cfg(test)]
-use chat_model::unresolved_chat_model_error_for;
-#[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model_from_string;

@@ -4,7 +4,6 @@
 use super::*;
 use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::core::runtime::DispatchCtx;
-use crate::inference::provider::factory::access_gates::verify_session_active;
 use tinyagents_harness::host::{
     BuildOpts, ModelBuildGate, ModelBuildRequest, ModelFactory, ModelPurpose,
 };
