@@ -121,6 +121,12 @@ This page walks through what happens in one turn, then zooms in on each of the m
 
 Every turn goes through the same lifecycle, whether the user just typed a message, a Telegram webhook fired or a 9am cron ticked:
 
+Messaging-channel ingress is prepared by the configured TinyChannels module
+through typed bus operations. OpenHuman applies account authorization and
+session policy, then binds the conversation to its durable TinyAgents session.
+Provider transports and normalization stay in TinyChannels; the model turn,
+tool policy, approvals, and transcript storage stay in the OpenHuman host.
+
 ```text
 ┌─ inbound ─────────────────────────────────────────────────────────┐
 │ user message · channel inbound · webhook · cron · composio event │

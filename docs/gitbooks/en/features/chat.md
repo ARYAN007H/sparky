@@ -74,6 +74,14 @@ A thread can carry a goal and a to-do list that the agent sets. They show as a p
 
 A long conversation is compacted, not truncated. Compaction seals what came before and starts a new generation that points back to the sealed one. Nothing is deleted on disk, though the model reads only the latest generation. There is no UI for browsing older generations yet.
 
+Chat attachments travel as typed content parts. The core keeps uploaded bytes
+behind scoped opaque references in the durable user row; local file paths and
+base64 data are not used as the persisted message reference. When a turn runs,
+the trusted host resolves those references and passes the supported image,
+audio, video, or file content to the model route. Voice notes retain typed
+audio and transcript metadata in the conversation, so they can be replayed
+after reload; dictation sends text only.
+
 ## Keyboard
 
 | Shortcut | Action |
