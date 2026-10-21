@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
 use serde_json::json;
-use tinystoragedrivers::{CollectionSpec, DocumentStoreExt, Precondition, Scope, StorageConfig};
+use tinystoragedrivers::{
+    Checkpoint, CollectionSpec, DocumentStoreExt, Precondition, Scope, StorageConfig,
+    StorageBackend,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    backend.checkpoint().await?;
+    backend.checkpoint(Checkpoint::Truncate).await?;
     println!("written {}", path.display());
     Ok(())
 }
