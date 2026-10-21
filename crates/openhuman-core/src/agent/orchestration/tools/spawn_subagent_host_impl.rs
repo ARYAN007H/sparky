@@ -6,7 +6,7 @@ impl SpawnSubagentTool {
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
         detached_parent: Option<
-            tinyagents_harness::context::RunContext<
+            &tinyagents_harness::context::RunContext<
                 crate::agent::tinyagents::host::OpenHumanRunContext,
             >,
         >,

@@ -58,12 +58,20 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         let context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
         let detached_parent =
             crate::agent::subagent_host::detached_subagent_parent(parent, "async-subagent")?;
+        // Headless owners wait for their children before returning, so keep
+        // the actual native root as the driver's parent. Ordinary chat keeps
+        // its detached carrier so background work outlives the turn.
+        let driver_parent = if parent.data.headless_descendant_settlement {
+            parent
+        } else {
+            &detached_parent
+        };
         SpawnSubagentTool::new()
             .execute_with_live_parent_context(
                 arguments,
                 Some(&context),
                 parent.data.child(),
-                detached_parent,
+                driver_parent,
             )
             .await
     }
@@ -329,7 +337,7 @@ impl SpawnSubagentTool {
             options,
             tool_context,
             live_parent.data.child(),
-            Some(detached_parent),
+            Some(&detached_parent),
         )
         .await
     }
@@ -339,7 +347,7 @@ impl SpawnSubagentTool {
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
-        detached_parent: RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        detached_parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
         self.execute_with_context_inner(
             args,
