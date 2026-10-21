@@ -24,7 +24,7 @@ pub(crate) use processor::{
     process_channel_runtime_message, reset_durable_channel_session, run_message_dispatch_loop,
     RuntimeChannelMessage,
 };
-#[cfg(any(test, debug_assertions))]
+#[cfg(test)]
 pub(crate) use processor::process_channel_message;
 
 // `channel_has_approval_surface` stays pub(crate) on processor; re-export so
