@@ -1,10 +1,7 @@
 //! Host-resolved cloud provider inputs for TinyInference's provider registry.
 
 use super::*;
-use tinyinference_llm::providers::openai::codex::OpenAiCodexRouting;
-use tinyinference_llm::providers::registry::{
-    CredentialResolver, ProviderBuildOptions, ProviderHttpClientBuilder, ProviderRegistry,
-};
+use tinyinference_llm::providers::registry::CredentialResolver;
 use tinyinference_llm::{ProviderKind, ProviderSpec};
 
 use crate::config::schema::cloud_providers::CloudProviderCreds;
@@ -25,10 +22,14 @@ pub(super) fn cloud_provider_spec(entry: &CloudProviderCreds, model: &str) -> Pr
     }
 }
 
-/// A credential already selected by OpenHuman's auth-profile and OAuth policy.
-pub(super) struct ResolvedCloudCredential<'a>(pub(super) &'a str);
+/// The bearer selected by OpenHuman's auth-profile and OAuth policy.
+///
+/// Resolve the host credential before creating a registry so errors and OAuth
+/// token rotation retain the existing host semantics; the registry callback
+/// then returns that exact selected credential for its provider spec.
+pub(super) struct CloudCredentialResolver<'a>(pub(super) &'a str);
 
-impl CredentialResolver for ResolvedCloudCredential<'_> {
+impl CredentialResolver for CloudCredentialResolver<'_> {
     fn resolve(&self, _spec: &ProviderSpec) -> tinyinference_llm::Result<String> {
         Ok(self.0.to_owned())
     }
@@ -40,82 +41,6 @@ impl From<AuthStyle> for tinyinference_llm::providers::openai::AuthStyle {
             AuthStyle::Bearer => Self::Bearer,
             AuthStyle::Anthropic => Self::Anthropic,
             AuthStyle::None | AuthStyle::OpenhumanJwt => Self::None,
-        }
-    }
-}
-
-/// Builds a cloud provider through the owner registry with host-resolved policy.
-pub(super) fn build_cloud_model(
-    spec: &ProviderSpec,
-    key: &str,
-    auth_style: AuthStyle,
-    temperature_override: Option<f64>,
-    temperature_unsupported_models: &[String],
-    native_tool_calling: bool,
-    extra_headers: &[(String, String)],
-    extra_query_params: &[(String, String)],
-    user_agent: Option<&str>,
-    codex: Option<&OpenAiCodexRouting>,
-    http: Option<reqwest::Client>,
-    http_builder: Option<ProviderHttpClientBuilder<'_>>,
-    ca_bundle: Option<&str>,
-) -> anyhow::Result<Arc<dyn ChatModel<()>>> {
-    log::debug!(
-        "[providers][cloud-spec] build slug={} kind={} auth={:?}",
-        spec.provider,
-        spec.kind.as_str(),
-        auth_style
-    );
-    ProviderRegistry::new(ResolvedCloudCredential(key))
-        .build_with(
-            spec,
-            ProviderBuildOptions {
-                auth_style: Some(auth_style.into()),
-                temperature_override,
-                temperature_unsupported_models,
-                native_tool_calling: Some(native_tool_calling),
-                extra_headers,
-                extra_query_params,
-                user_agent,
-                codex,
-                http,
-                http_builder,
-                ca_bundle,
-                ..ProviderBuildOptions::default()
-            },
-        )
-        .map_err(|error| anyhow::anyhow!("[chat-factory] {error}"))
-}
-
-/// The registry's listing request for a resolved route, or `None` when the
-/// route has no discoverable listing.
-pub(super) fn cloud_discovery_request(
-    spec: &ProviderSpec,
-    key: &str,
-    auth_style: AuthStyle,
-    extra_headers: &[(String, String)],
-    extra_query_params: &[(String, String)],
-    user_agent: Option<&str>,
-    codex: Option<&OpenAiCodexRouting>,
-) -> Option<tinyinference_llm::model::discover::DiscoveryRequest> {
-    match ProviderRegistry::new(ResolvedCloudCredential(key)).discovery_request(
-        spec,
-        &ProviderBuildOptions {
-            auth_style: Some(auth_style.into()),
-            extra_headers,
-            extra_query_params,
-            user_agent,
-            codex,
-            ..ProviderBuildOptions::default()
-        },
-    ) {
-        Ok(request) => Some(request),
-        Err(error) => {
-            log::debug!(
-                "[model_limits] registry discovery unavailable slug={}: {error}",
-                spec.provider
-            );
-            None
         }
     }
 }
