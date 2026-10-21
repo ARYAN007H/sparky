@@ -1,8 +1,8 @@
 use super::*;
 use crate::config::Config;
 use crate::storage::Scope;
-use crate::storage::test_support::memory_backend;
 use crate::storage::state_kv::StateKv;
+use crate::storage::test_support::memory_backend;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
