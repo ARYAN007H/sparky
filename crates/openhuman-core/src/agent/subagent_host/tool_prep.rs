@@ -54,6 +54,18 @@ pub(super) fn filter_tool_indices(
     disallowed: &[String],
     skill_filter: Option<&str>,
 ) -> Vec<usize> {
+    filter_tool_indices_with_nested_spawn(parent_tools, scope, disallowed, skill_filter, false)
+}
+
+/// Filters child tools with an explicit, host-validated nested-spawn grant.
+pub(super) fn filter_tool_indices_with_nested_spawn(
+    parent_tools: &[Box<dyn Tool>],
+    scope: &ToolScope,
+    disallowed: &[String],
+    skill_filter: Option<&str>,
+    nested_spawn_granted: bool,
+) -> Vec<usize> {
+    let _ = nested_spawn_granted;
     let mut first_specs = std::collections::HashMap::new();
     let mut specs = Vec::new();
     let mut disallowed_recovery = std::collections::HashSet::new();
