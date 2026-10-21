@@ -15,7 +15,9 @@
 //! unsupported fidelity cases fail explicitly.
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "legacy-import")]
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -190,7 +192,7 @@ pub fn run_from_config(
         let path = source.clone();
         let inventory = crate::storage::import::scope_move::LegacyScopeInventory::read(&path)
             .with_context(|| format!("read legacy scope inventory {}", path.display()))?;
-        import_inventory(backend, &source, &known, &inventory)
+        import_inventory(backend, config, &source, &known, &inventory)
     })();
 
     crate::storage::import::Report {
@@ -212,6 +214,7 @@ pub fn run_from_config(
     }
 }
 
+#[cfg(feature = "legacy-import")]
 fn legacy_scope_source(config: &crate::config::Config) -> PathBuf {
     if let Some(target) = crate::storage::layout::Target::from_config(config) {
         return crate::storage::layout::legacy::v1_db(&target);
@@ -262,6 +265,7 @@ fn known_scope_ids(config: &crate::config::Config) -> anyhow::Result<Known> {
 #[cfg(feature = "legacy-import")]
 fn import_inventory(
     backend: &Arc<dyn StorageBackend>,
+    config: &crate::config::Config,
     source_path: &Path,
     known: &Known,
     inventory: &crate::storage::import::scope_move::LegacyScopeInventory,
@@ -294,7 +298,7 @@ fn import_inventory(
                 continue;
             }
         };
-        let scope_backend = backend_for_target_scope(backend, &target_scope, known)?;
+        let scope_backend = backend_for_target_scope(backend, &target_scope, known, config)?;
         let marker = crate::storage::documents::Repo::on(
             &scope_backend,
             &target_scope,
@@ -392,6 +396,7 @@ fn backend_for_target_scope(
     backend: &Arc<dyn StorageBackend>,
     target_scope: &Scope,
     known: &Known,
+    config: &crate::config::Config,
 ) -> anyhow::Result<Arc<dyn StorageBackend>> {
     if target_scope.is_local() || target_scope.is_cluster() {
         return Ok(Arc::clone(backend));
@@ -400,19 +405,22 @@ fn backend_for_target_scope(
     let crate::storage::Tenant::User(_) = parsed.tenant else {
         anyhow::bail!("scope {} is not an admitted tenant scope", target_scope.as_str());
     };
-    let Some(host) = crate::profiles::host::host() else {
-        let config_profile = crate::storage::layout::Target::from_config(&crate::config::Config::default());
-        let _ = config_profile;
-        anyhow::bail!(
-            "cannot copy profile scope {} without its admitted profile host",
-            target_scope.as_str()
-        );
-    };
     let original_id = known
         .profiles
         .iter()
         .find(|id| crate::storage::scope_for_profile(id).tenant_scope() == target_scope.tenant_scope())
         .ok_or_else(|| anyhow::anyhow!("no known profile id maps to scope {}", target_scope.as_str()))?;
+    let Some(host) = crate::profiles::host::host() else {
+        if crate::storage::layout::Target::from_config(config)
+            .is_some_and(|target| target.user_id == *original_id)
+        {
+            return Ok(Arc::clone(backend));
+        }
+        anyhow::bail!(
+            "cannot copy profile scope {} without its admitted profile host",
+            target_scope.as_str()
+        );
+    };
     let profile_id = crate::profiles::ProfileId::parse(original_id)
         .map_err(anyhow::Error::msg)?;
     let profile = host.get(&profile_id).ok_or_else(|| {

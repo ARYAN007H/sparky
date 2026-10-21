@@ -288,6 +288,9 @@ pub fn run_all(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report
     let mut reports = run_with(backend, config, &sources());
     reports.extend(tinyflows::run_with(backend, config));
     reports.extend(sessions::run_with(backend, config));
+    reports.push(crate::storage::scope_move::run_from_config(
+        backend, config,
+    ));
     reports
 }
 
