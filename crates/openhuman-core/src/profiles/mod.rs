@@ -38,7 +38,7 @@ pub mod ops;
 mod recovery;
 pub mod registry;
 mod storage_schema;
-pub use storage_schema::storage_schema;
+pub(crate) use storage_schema::collection_specs;
 pub mod schemas;
 pub mod surface;
 pub mod tools;

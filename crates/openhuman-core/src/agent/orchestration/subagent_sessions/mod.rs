@@ -1,7 +1,7 @@
 mod ops;
 mod storage_schema;
 mod store;
-pub use storage_schema::storage_schema;
+pub(crate) use storage_schema::collection_specs;
 mod store_documents;
 mod tiny_port;
 mod types;
