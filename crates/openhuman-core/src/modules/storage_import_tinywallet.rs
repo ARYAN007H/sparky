@@ -23,7 +23,7 @@
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
-use tinystoragedrivers::ScopedStorage;
+use crate::storage::Storage;
 
 use super::storage_grant_schemas::tinywallet::{MODULE_ID, PAYMENTS_STREAM};
 use super::storage_import_support as support;
@@ -58,7 +58,7 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
 
 async fn import_into(
     ctx: &DispatchCtx,
-    scoped: &ScopedStorage,
+    scoped: &Storage,
     workspace_dir: &Path,
 ) -> Result<Outcome> {
     let marker = support::marker_id("x402", workspace_dir);

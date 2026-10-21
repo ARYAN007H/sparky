@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use tinyjuice_bus::savings::SavingsAggregate;
-use tinystoragedrivers::ScopedStorage;
+use crate::storage::Storage;
 
 use super::storage_grant_schemas::tinyjuice::MODULE_ID;
 use super::storage_import_support as support;
@@ -69,7 +69,7 @@ where
     import_into(&scoped, file, adopt).await
 }
 
-async fn import_into<F, Fut>(scoped: &ScopedStorage, file: &Path, adopt: F) -> Result<Outcome>
+async fn import_into<F, Fut>(scoped: &Storage, file: &Path, adopt: F) -> Result<Outcome>
 where
     F: FnOnce(SavingsAggregate) -> Fut,
     Fut: Future<Output = Result<bool>>,

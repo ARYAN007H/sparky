@@ -24,7 +24,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
-use tinystoragedrivers::{CollectionSpec, ScopedStorage};
+use crate::storage::{CollectionSpec, Storage};
 
 use super::storage_grant_schemas::tinyconnectors::{
     MODULE_ID, PREFS_COLLECTION, TRIGGER_STREAM_PREFIX,
@@ -84,7 +84,7 @@ struct Legacy {
 
 async fn import_into(
     ctx: &DispatchCtx,
-    scoped: &ScopedStorage,
+    scoped: &Storage,
     state_dir: &Path,
 ) -> Result<Outcome> {
     let docs = scoped.documents();

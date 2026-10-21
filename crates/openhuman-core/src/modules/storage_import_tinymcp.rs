@@ -32,8 +32,8 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
 use sha2::Digest;
-use tinystoragedrivers::secrets::{DocumentSecrets, SecretStore};
-use tinystoragedrivers::{CollectionSpec, DocumentStore, ErrorKind, Precondition, ScopedStorage};
+use crate::storage::{CollectionSpec, DocumentStore, ErrorKind, Precondition, Storage};
+use tinystoragedrivers_api::SecretStore;
 
 use crate::core::runtime::DispatchCtx;
 use crate::storage::rusqlite::{self, Connection, OpenFlags};
@@ -81,13 +81,13 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
     let keys = crate::storage::secrets::keys()
         .map_err(|error| anyhow!("no key provider for module secrets: {:?}", error.kind()))?;
-    let secrets = DocumentSecrets::new(&scoped, keys);
+    let secrets = scoped.secrets();
     import_into(ctx, &scoped, &secrets, data_dir).await
 }
 
 async fn import_into(
     ctx: &DispatchCtx,
-    scoped: &ScopedStorage,
+    scoped: &Storage,
     secrets: &dyn SecretStore,
     data_dir: &Path,
 ) -> Result<Outcome> {
