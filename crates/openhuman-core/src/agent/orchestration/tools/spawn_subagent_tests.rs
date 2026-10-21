@@ -78,13 +78,10 @@ async fn unknown_agent_id_lists_available() {
     // Drive the real lookup under a detached parent and its scoped registry;
     // the ordinary Tool::execute path refuses earlier because it has no turn.
     let workspace = tempfile::tempdir().expect("workspace");
-    let parent = super::tests::parent_context(workspace.path());
-    let (live, core) = super::tests::core_backed_live_parent(
-        workspace.path(),
-        parent,
-        "unknown-agent-session",
-        "unknown-agent-thread",
-    );
+    let mut parent = super::tests::parent_context(workspace.path());
+    parent.session_id = "unknown-agent-session".into();
+    let (live, core) =
+        super::tests::headless_core_backed_parent(workspace.path(), parent);
     let result = crate::core::runtime::CoreContext::scope(core, async {
         let detached = crate::agent::subagent_host::detached_subagent_parent(
             &live,

@@ -370,7 +370,7 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
     assert_eq!(finished.output.as_deref(), Some("done"));
 }
 
-fn headless_core_backed_parent(
+pub(super) fn headless_core_backed_parent(
     workspace: &Path,
     mut parent: ParentExecutionContext,
 ) -> (
@@ -406,7 +406,7 @@ fn headless_core_backed_parent(
     )
 }
 
-fn parent_context(workspace_dir: &Path) -> ParentExecutionContext {
+pub(super) fn parent_context(workspace_dir: &Path) -> ParentExecutionContext {
     ParentExecutionContext {
         workspace_descriptor: None,
         agent_definition_id: "orchestrator".into(),

@@ -29,7 +29,11 @@ impl tinytools::Tool for RoutingFakeTool {
         "fake"
     }
     fn parameters_schema(&self) -> serde_json::Value {
-        json!({ "type": "object" })
+        if self.0 == "spawn_subagent" {
+            json!({"type":"object","properties":{"agent_id":{"type":"string","enum":["workflow_builder","flow_discovery"]}}})
+        } else {
+            json!({ "type": "object" })
+        }
     }
     async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
         Ok(ToolResult::success("ok"))
@@ -52,8 +56,7 @@ fn allow(name: &str) -> (String, ToolPolicyDecision) {
 }
 
 /// A non-owner session: it holds the whole `workflows` pack in its registry and
-/// a `build_workflow` route, but may only call that route and the pack
-/// tool — exactly the orchestrator's shape. Anything not named here is denied,
+/// the canonical `spawn_subagent` route to its owners. Anything not named here is denied,
 /// because `decision_for` defaults to `Deny`.
 fn non_owner_middleware() -> ToolPolicyMiddleware {
     non_owner_middleware_at(PermissionLevel::Dangerous)
@@ -64,7 +67,7 @@ fn non_owner_middleware() -> ToolPolicyMiddleware {
 /// for an inner name it cannot resolve (#6302).
 fn non_owner_middleware_at(allowed: PermissionLevel) -> ToolPolicyMiddleware {
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![
-        Box::new(RoutingFakeTool("build_workflow")),
+        Box::new(RoutingFakeTool("spawn_subagent")),
         Box::new(RoutingFakeTool("propose_workflow")),
     ];
     append_pack_tools(&mut tools);
@@ -80,10 +83,10 @@ fn non_owner_middleware_at(allowed: PermissionLevel) -> ToolPolicyMiddleware {
             allowed_permission: allowed,
         },
         capabilities: vec![ToolCapability {
-            name: "build_workflow".to_string(),
+            name: "spawn_subagent".to_string(),
             required_permission: PermissionLevel::ReadOnly,
         }],
-        allowed_tool_names: ["build_workflow", USE_SKILL]
+        allowed_tool_names: ["spawn_subagent", USE_SKILL]
             .into_iter()
             .map(str::to_string)
             .collect(),
@@ -92,7 +95,7 @@ fn non_owner_middleware_at(allowed: PermissionLevel) -> ToolPolicyMiddleware {
             .map(str::to_string)
             .collect(),
         hidden_tool_names: Default::default(),
-        decisions: [allow("build_workflow"), allow(USE_SKILL)]
+        decisions: [allow("spawn_subagent"), allow(USE_SKILL)]
             .into_iter()
             .collect(),
     };
