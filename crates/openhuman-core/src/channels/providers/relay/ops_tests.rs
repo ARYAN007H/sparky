@@ -3,12 +3,12 @@ use super::*;
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
 use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
+use wiremock::{Mock, MockServer, Request, Respond, Response, ResponseTemplate};
 
 #[tokio::test]
 async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
@@ -99,7 +99,7 @@ struct Seen {
     turns: AtomicUsize,
     origins: Mutex<Vec<Option<AgentTurnOrigin>>>,
     threads: Mutex<Vec<Option<String>>>,
-    busy: Vec<bool>,
+    busy: Mutex<Vec<bool>>,
 }
 
 struct RelayProbe {
@@ -110,17 +110,38 @@ struct RelayProbe {
 
 #[async_trait::async_trait]
 impl Tool for RelayProbe {
-    fn name(&self) -> &str { "relay_probe" }
-    fn description(&self) -> &str { "Record trusted relay turn context." }
-    fn parameters_schema(&self) -> Value { json!({"type":"object","properties":{}}) }
-    fn permission_level(&self) -> PermissionLevel { PermissionLevel::ReadOnly }
+    fn name(&self) -> &str {
+        "relay_probe"
+    }
+    fn description(&self) -> &str {
+        "Record trusted relay turn context."
+    }
+    fn parameters_schema(&self) -> Value {
+        json!({"type":"object","properties":{}})
+    }
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
     async fn execute(&self, _args: Value) -> anyhow::Result<ToolResult> {
         self.seen.turns.fetch_add(1, Ordering::SeqCst);
-        self.seen.origins.lock().unwrap().push(CoreContext::current_turn_origin());
-        self.seen.threads.lock().unwrap().push(CoreContext::current_channel_thread());
-        self.seen.busy.lock().unwrap().push(
-            crate::agent::orchestration::busy_guard::is_busy(&self.dispatch_ctx, &self.thread_id),
-        );
+        self.seen
+            .origins
+            .lock()
+            .unwrap()
+            .push(CoreContext::current_turn_origin());
+        self.seen
+            .threads
+            .lock()
+            .unwrap()
+            .push(CoreContext::current_channel_thread());
+        self.seen
+            .busy
+            .lock()
+            .unwrap()
+            .push(crate::agent::orchestration::busy_guard::is_busy(
+                &self.dispatch_ctx,
+                &self.thread_id,
+            ));
         Ok(ToolResult::success("relay context recorded"))
     }
 }
@@ -143,9 +164,8 @@ impl HostAgentResolver for RelayAgentResolver {
                     .expect("the orchestrator is built in");
             definition.id = agent_id.to_owned();
             definition.subagents.clear();
-            definition.system_prompt = tinyagents_definition::PromptSource::Inline(
-                "Relay integration test".into(),
-            );
+            definition.system_prompt =
+                tinyagents_definition::PromptSource::Inline("Relay integration test".into());
             definition.tools = tinyagents_definition::ToolScope::Named(vec!["relay_probe".into()]);
             let dispatch_ctx = self.dispatch_ctx.clone();
             let thread_id = self.thread_id.clone();
@@ -184,22 +204,26 @@ fn answer(text: &str) -> Value {
     })
 }
 
+struct RelayResponses(AtomicUsize);
+
+impl Respond for RelayResponses {
+    fn respond(&self, _request: &Request) -> Response {
+        let response = match self.0.fetch_add(1, Ordering::SeqCst) {
+            0 | 2 => tool_call(),
+            1 => answer("answer 1"),
+            _ => answer("answer 2"),
+        };
+        ResponseTemplate::new(200).set_body_json(response).into()
+    }
+}
+
 async fn relay_provider() -> MockServer {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(tool_call()))
-        .up_to_n_times(2)
+        .respond_with(RelayResponses(AtomicUsize::new(0)))
         .mount(&server)
         .await;
-    for text in ["answer 1", "answer 2"] {
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(answer(text)))
-            .up_to_n_times(1)
-            .mount(&server)
-            .await;
-    }
     server
 }
 
@@ -209,18 +233,23 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let tmp = tempfile::tempdir().unwrap();
     let server = relay_provider().await;
     let mut config = config(&tmp);
-    config.agent.channel_agents.insert("telegram".into(), "relay-agent".into());
+    config
+        .agent
+        .channel_agents
+        .insert("telegram".into(), "relay-agent".into());
     config.default_model = Some("fixture".into());
     let route = crate::config::schema::EphemeralRoute::from_params(
-        Some(format!("{}/v1", server.uri())), Some("sk-fixture".into()),
-    ).unwrap();
+        Some(format!("{}/v1", server.uri())),
+        Some("sk-fixture".into()),
+    )
+    .unwrap();
     crate::config::schema::ephemeral_route::apply(&mut config, route);
     let core_context = CoreContext::for_test(DomainSet::full(), None).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
             .session_agent("relay-agent"),
     );
     let dispatch_ctx = crate::core::runtime::DispatchCtx::new(core_context);
-    let seen = Arc::new(Mutex::new(Seen::default()));
+    let seen = Arc::new(Seen::default());
     let relayed_thread = params("m1", "x").thread_id();
     let resolver: Arc<dyn HostAgentResolver> = Arc::new(RelayAgentResolver {
         config: config.clone(),
@@ -248,11 +277,18 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
             format!("req-{id}"),
         )
         .await;
-        assert_eq!(replies, vec![format!("answer {}", if id == "m1" { 1 } else { 2 })]);
+        assert_eq!(
+            replies,
+            vec![format!("answer {}", if id == "m1" { 1 } else { 2 })]
+        );
     }
 
     assert!(host_agents::clear_if(&resolver));
-    assert_eq!(seen.turns.load(Ordering::SeqCst), 2, "one tool execution per agent turn");
+    assert_eq!(
+        seen.turns.load(Ordering::SeqCst),
+        2,
+        "one tool execution per agent turn"
+    );
     assert_eq!(
         *seen.busy.lock().unwrap(),
         vec![true, true],
@@ -276,10 +312,14 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
             other => panic!("relayed turns run as an external channel, got {other:?}"),
         }
     }
-    assert_eq!(*seen.threads.lock().unwrap(), vec![Some(relayed_thread.clone()); 2]);
+    assert_eq!(
+        *seen.threads.lock().unwrap(),
+        vec![Some(relayed_thread.clone()); 2]
+    );
 
     let requests = server.received_requests().await.unwrap();
-    let chats: Vec<Value> = requests.iter()
+    let chats: Vec<Value> = requests
+        .iter()
         .filter(|request| request.url.path().ends_with("/chat/completions"))
         .map(|request| serde_json::from_slice(&request.body).unwrap())
         .collect();
@@ -306,12 +346,16 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         }
     }
     assert_eq!(outbound.len(), 2, "one channel_outbound per reply");
-    assert!(outbound
-        .iter()
-        .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT));
-    assert!(outbound
-        .iter()
-        .all(|event| event.context().thread_id == thread));
+    assert!(
+        outbound
+            .iter()
+            .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT)
+    );
+    assert!(
+        outbound
+            .iter()
+            .all(|event| event.context().thread_id == thread)
+    );
     assert_eq!(outbound[0].context().request_id, "req-m1");
     assert!(matches!(
         outbound[0].wire_event(),
