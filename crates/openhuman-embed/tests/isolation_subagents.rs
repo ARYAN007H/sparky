@@ -232,11 +232,32 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                         )]),
                 )
                 .expect("host-only agent with declared helper builds");
-            host_only
+            let host_outcome = host_only
                 .run("try the helper")
                 .await
                 .expect("host-only turn returns");
             let host_requests = chat_requests(&host_only_provider).await;
+            let host_tool_results = host_requests
+                .iter()
+                .map(common::tool_results)
+                .collect::<Vec<_>>()
+                .join("\n");
+            eprintln!(
+                "host-only fixture outcome reply={:?} request_count={} request_shapes={:?} tool_results={:?}",
+                host_outcome.reply,
+                host_requests.len(),
+                host_requests.iter().map(|request| {
+                    let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
+                    body.get("messages")
+                        .and_then(|messages| messages.as_array())
+                        .map(|messages| messages.iter().map(|message| (
+                            message.get("role").and_then(serde_json::Value::as_str),
+                            message.get("content").map_or(0, |content| content.to_string().len()),
+                        )).collect::<Vec<_>>())
+                        .unwrap_or_default()
+                }).collect::<Vec<_>>(),
+                host_tool_results,
+            );
             assert!(!host_requests.is_empty());
             assert!(!tool_names(&host_requests[0])
                 .iter()
@@ -245,11 +266,6 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .iter()
                 .all(|request| !String::from_utf8_lossy(&request.body)
                     .contains("HOST-ONLY-HELPER-MARK")));
-            let host_tool_results = host_requests
-                .iter()
-                .map(common::tool_results)
-                .collect::<Vec<_>>()
-                .join("\n");
             assert_refused_without_async_reference(&host_tool_results);
 
             let denied_provider = scripted_provider(
