@@ -316,18 +316,16 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
         "scope migration must not replay the archived v1 database: {moved:?}"
     );
 
-    let profile_scope = backend
-        .for_scope(&crate::storage::scope_for_profile("u1"))
-        .unwrap();
-    let profile_docs = Arc::clone(profile_scope.documents());
+    let local_scope = backend.for_scope(&Scope::local()).unwrap();
+    let local_docs = Arc::clone(local_scope.documents());
     let (cost, artifact, args) = storage::block_on(async move {
-        let cost = profile_docs
+        let cost = local_docs
             .query_all("cost.records", &Query::all())
             .await?;
-        let artifact = profile_docs
+        let artifact = local_docs
             .query_all("artifacts.records", &Query::all())
             .await?;
-        let args = profile_docs
+        let args = local_docs
             .query_all("artifacts.args", &Query::all())
             .await?;
         Ok::<_, crate::storage::StorageError>((cost, artifact, args))
