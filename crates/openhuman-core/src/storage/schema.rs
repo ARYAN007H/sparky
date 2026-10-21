@@ -1,113 +1,104 @@
-//! The composed storage schema: every owner's `storage_schema()` in one
-//! [`Registry`].
+//! The host's composed v2 owner collection declarations.
 //!
-//! Each crate that stores records declares what it stores (collections,
-//! streams, blob prefixes, and the v1 -> v2 steps that bring older data
-//! forward). The host composes them once, `prepare`s the backend from the
-//! result, migrates every scope ([`super::boot`]) and generates each module's
-//! storage grant from the module-scoped items
-//! ([`crate::modules::storage_grants`]). Composition refuses a name outside its
-//! owner's prefix, a name claimed twice, a version that goes down and a step
-//! gap, so a collision between two owners fails here, at boot and in
-//! `scripts/ci/check-storage-schema.mjs`, never at a first write.
-//!
-//! Module owners come from their `*-bus` contract crates (optional `storage` feature),
-//! never from the implementation libraries. Owners whose crate is gated off in a build are absent from its registry, as
-//! their data is.
+//! Owner crates expose pure `CollectionSpec` values. The host prepares those
+//! declarations on each known scope before installing module grants; the
+//! owner remains responsible for its own record shapes and migrations.
 
-use std::sync::OnceLock;
+use std::collections::BTreeMap;
 
-use tinystoragedrivers::schema::{Item, Registry, Schema, ScopeClass};
+use tinystoragedrivers::CollectionSpec;
 
-/// Every owner's schema that this build links.
-pub fn owner_schemas() -> Vec<Schema> {
-    let mut schemas = vec![
-        tinyagents_harness::storage_schema(),
-        tinyagents_session::storage_schema(),
-        tinyagents_session::ledger_storage_schema(),
-        tinyagents_session::history_storage_schema(),
-        tinyagents_session::conversations_storage_schema(),
-        tinyagents_graph::storage_schema(),
-        tinyagents_tasks::storage_schema(),
-        crate::security::approval::storage_schema(),
-        crate::security::devices::storage_schema(),
-        crate::desktop::notifications::storage_schema(),
-        crate::integrations::task_sources::storage_schema(),
-        crate::artifacts::storage_schema(),
-        crate::platform::cost::storage_schema(),
-        crate::config::schema::config_storage_schema(),
-        crate::profiles::storage_schema(),
-        crate::threads::store::storage_schema(),
-        crate::agent::orchestration::subagent_sessions::storage_schema(),
-        super::agents::storage_schema(),
-    ];
-    #[cfg(feature = "skills")]
-    schemas.push(tinyskills_drivers::storage_schema());
-    #[cfg(feature = "modules")]
-    {
-        schemas.push(tinymcp_bus::storage::storage_schema());
-        schemas.push(tinychannels_bus::storage::storage_schema());
-        schemas.push(tinyconnectors_bus::storage::storage_schema());
-        schemas.push(tinybox_bus::storage::storage_schema());
-        schemas.push(tinyjuice_bus::storage::storage_schema());
-    }
-    #[cfg(feature = "web3")]
-    schemas.push(tinywallet_bus::storage::storage_schema());
-    #[cfg(feature = "tinymemes")]
-    schemas.push(tinymemes_bus::storage::storage_schema());
-    #[cfg(feature = "inbound-queues")]
-    schemas.push(tinyeventqueues_bus::storage::storage_schema());
-    schemas
-}
+use super::StorageError;
 
-/// The registry composed from [`owner_schemas`].
-///
-/// # Errors
-///
-/// The composition error naming the owner and item at fault. A build that
-/// links two owners claiming one name never gets this far in CI.
-pub fn registry() -> Result<&'static Registry, super::StorageError> {
-    static REGISTRY: OnceLock<Result<Registry, String>> = OnceLock::new();
-    REGISTRY
-        .get_or_init(|| Registry::compose(owner_schemas()).map_err(|error| error.to_string()))
-        .as_ref()
-        .map_err(|message| super::StorageError::invalid_input(message.clone()))
-}
-
-/// The module-scoped declarations of owner `owner`, for the module's grant:
-/// `(collections, stream names, blob prefixes, secret prefixes)`.
-pub fn module_items(owner: &str) -> ModuleItems {
-    let mut items = ModuleItems::default();
-    for schema in owner_schemas()
-        .into_iter()
-        .filter(|schema| schema.owner.as_str() == owner)
-    {
-        for item in schema.items {
-            if item.scope() != ScopeClass::Module {
-                continue;
-            }
-            match item {
-                Item::Collection { spec, .. } => items.collections.push(spec),
-                Item::Stream { name, .. } => items.streams.push(name),
-                Item::Blobs { prefix, .. } => items.blobs.push(prefix),
-                Item::Secrets { prefix, .. } => items.secrets.push(prefix),
-            }
+/// Every collection this build links, with duplicate declarations merged and
+/// validated before any backend is touched.
+pub fn owner_collections() -> Result<Vec<CollectionSpec>, StorageError> {
+    let mut collections = BTreeMap::<String, CollectionSpec>::new();
+    for spec in declared_collections() {
+        if let Some(existing) = collections.get(&spec.name) {
+            let merged = existing.merge(&spec)?;
+            collections.insert(spec.name.clone(), merged);
+        } else {
+            spec.validate()?;
+            collections.insert(spec.name.clone(), spec);
         }
     }
-    items
+    Ok(collections.into_values().collect())
 }
 
-/// What one owner declares at module scope.
-#[derive(Debug, Default, Clone)]
-pub struct ModuleItems {
-    /// Collections, with their indexes.
-    pub collections: Vec<tinystoragedrivers::CollectionSpec>,
-    /// Stream family names.
-    pub streams: Vec<String>,
-    /// Blob key prefixes.
-    pub blobs: Vec<String>,
-    /// Secret key prefixes.
-    pub secrets: Vec<String>,
+fn declared_collections() -> Vec<CollectionSpec> {
+    let mut collections = Vec::new();
+    collections.extend(tinyagents_harness::storage::collections());
+    collections.extend(tinyagents_session::port::drivers::collections());
+    collections.extend(tinyagents_graph::storage::collections());
+    collections.extend(tinyagents_tasks::storage::collections());
+    collections.extend(crate::security::approval::storage_schema::collection_specs());
+    collections.extend(crate::security::devices::storage_schema::collection_specs());
+    collections.extend(crate::desktop::notifications::storage_schema::collection_specs());
+    collections.extend(crate::integrations::task_sources::storage_schema::collection_specs());
+    collections.extend(crate::artifacts::storage_schema::collection_specs());
+    collections.extend(crate::platform::cost::storage_schema::collection_specs());
+    collections.extend(crate::config::schema::load::source::storage_schema::collection_specs());
+    collections.extend(crate::profiles::storage_schema::collection_specs());
+    collections.extend(crate::threads::store::storage_schema::collection_specs());
+    collections.extend(
+        crate::agent::orchestration::subagent_sessions::storage_schema::collection_specs(),
+    );
+    collections.extend(super::agents::collection_specs());
+
+    #[cfg(feature = "skills")]
+    collections.extend(tinyskills_drivers::schema::collections());
+    #[cfg(feature = "modules")]
+    {
+        collections.extend(tinymcp_bus::storage::collection_specs());
+        collections.extend(tinychannels_bus::storage::collections());
+        collections.extend(tinyconnectors_bus::storage::collections());
+        collections.extend([
+            CollectionSpec::new("box.boxes"),
+            CollectionSpec::new("box.jail_index"),
+        ]);
+        collections.extend(tinyjuice_bus::storage::collections());
+    }
+    #[cfg(feature = "web3")]
+    collections.extend(tinywallet_bus::storage::collections());
+    #[cfg(feature = "tinymemes")]
+    collections.extend(tinymemes_bus::storage::collections());
+    #[cfg(feature = "inbound-queues")]
+    collections.extend(tinyeventqueues_bus::storage::collection_specs());
+
+    collections
+}
+
+/// Collections declared by one loadable module owner.
+pub fn module_collections(owner: &str) -> Vec<CollectionSpec> {
+    #[cfg(feature = "modules")]
+    match owner {
+        "mcp" => return tinymcp_bus::storage::collection_specs(),
+        "channels" => return tinychannels_bus::storage::collections(),
+        "connectors" => return tinyconnectors_bus::storage::collections(),
+        "box" => {
+            return vec![
+                CollectionSpec::new("box.boxes"),
+                CollectionSpec::new("box.jail_index"),
+            ];
+        }
+        "juice" => return tinyjuice_bus::storage::collections(),
+        _ => {}
+    }
+    #[cfg(feature = "web3")]
+    if owner == "wallet" {
+        return tinywallet_bus::storage::collections();
+    }
+    #[cfg(feature = "tinymemes")]
+    if owner == "memes" {
+        return tinymemes_bus::storage::collections();
+    }
+    #[cfg(feature = "inbound-queues")]
+    if owner == "teq" {
+        return tinyeventqueues_bus::storage::collection_specs();
+    }
+    let _ = owner;
+    Vec::new()
 }
 
 #[cfg(test)]
