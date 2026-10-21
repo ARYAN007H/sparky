@@ -10,10 +10,10 @@ mod attachment_input;
 #[path = "runtime_session_enrichment.rs"]
 mod enrichment;
 mod memory_ingest;
-#[path = "runtime_session_prompt.rs"]
-mod prompt;
 mod permanent;
 mod post_commit;
+#[path = "runtime_session_prompt.rs"]
+mod prompt;
 mod tool_rules;
 mod transcript;
 #[path = "runtime_session_turn.rs"]
@@ -273,6 +273,7 @@ impl OpenHumanTurnPrelude {
         })
     }
 
+    #[cfg(test)]
     fn synthesized_tool_names_for_test(&self) -> std::collections::HashSet<String> {
         self.tool_surface
             .lock()
