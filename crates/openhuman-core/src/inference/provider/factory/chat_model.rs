@@ -121,8 +121,12 @@ impl OpenHumanModelFactory<'_> {
                 CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
                 concrete,
             )
-        } else if let Some(result) = try_create_claude_code_chat_model_from_string(
-            role, &provider, self.config, (!pin.is_empty()).then_some(pin), self.egress,
+        } else if let Some(result) = build_claude_code_model(
+            role,
+            &provider,
+            self.config,
+            (!pin.is_empty()).then_some(pin),
+            self.egress,
         ) {
             let (model, _) = result?;
             (model, "claude-code".to_owned(), pin.to_owned())
