@@ -604,6 +604,10 @@ const messages: TranslationMap = {
     'अभी मेमोरी तक नहीं पहुँचा जा सकता। संग्रहीत कुछ भी खोया नहीं है; थोड़ी देर में फिर से कोशिश करें।',
   'memory.outOfCredits.title': 'क्रेडिट खत्म हो गए',
   'memory.outOfCredits.action': 'टॉप अप करें',
+  'memory.error.planRequired':
+    'आपके मौजूदा प्लान में मेमोरी शामिल नहीं है, इसलिए OpenHuman जो सीखता है उसे न सहेज सकता है, न खोज सकता है। मेमोरी चालू करने के लिए अपग्रेड करें, या सेटिंग्स में कोई दूसरा मेमोरी विकल्प चुनें।',
+  'memory.planRequired.title': 'मेमोरी आपके प्लान का हिस्सा नहीं है',
+  'memory.planRequired.action': 'प्लान देखें',
   'alerts.title': 'अलर्ट',
   'alerts.empty': 'अभी कोई अलर्ट नहीं',
   'alerts.markAllRead': 'सभी पढ़ा हुआ मार्क करें',

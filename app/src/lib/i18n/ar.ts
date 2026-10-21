@@ -591,6 +591,10 @@ const messages: TranslationMap = {
     'تعذّر الوصول إلى الذاكرة حاليًا. لم يُفقد أي شيء مخزّن؛ حاول مرة أخرى بعد قليل.',
   'memory.outOfCredits.title': 'نفد الرصيد',
   'memory.outOfCredits.action': 'اشحن الرصيد',
+  'memory.error.planRequired':
+    'خطتك الحالية لا تتضمن الذاكرة، لذا لا يستطيع OpenHuman حفظ ما يتعلّمه أو البحث فيه. قم بالترقية لتفعيل الذاكرة، أو انتقل إلى خيار ذاكرة آخر من الإعدادات.',
+  'memory.planRequired.title': 'الذاكرة ليست جزءًا من خطتك',
+  'memory.planRequired.action': 'عرض الخطط',
   'alerts.title': 'التنبيهات',
   'alerts.empty': 'لا توجد تنبيهات بعد',
   'alerts.markAllRead': 'تحديد الكل كمقروء',

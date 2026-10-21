@@ -622,6 +622,10 @@ const messages: TranslationMap = {
     "La mémoire est injoignable pour le moment. Rien de ce qui est stocké n'a été perdu ; réessayez dans un instant.",
   'memory.outOfCredits.title': 'Crédits épuisés',
   'memory.outOfCredits.action': 'Recharger',
+  'memory.error.planRequired':
+    "Votre forfait actuel n'inclut pas la mémoire : OpenHuman ne peut donc ni enregistrer ni retrouver ce qu'il apprend. Passez à un forfait supérieur pour activer la mémoire, ou choisissez une autre option de mémoire dans les Paramètres.",
+  'memory.planRequired.title': 'La mémoire ne fait pas partie de votre forfait',
+  'memory.planRequired.action': 'Voir les forfaits',
   'alerts.title': 'Alertes',
   'alerts.empty': "Aucune alerte pour l'instant",
   'alerts.markAllRead': 'Tout marquer comme lu',

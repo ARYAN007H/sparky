@@ -612,6 +612,10 @@ const messages: TranslationMap = {
     'Nie można teraz połączyć się z pamięcią. Nic z zapisanych danych nie zostało utracone; spróbuj ponownie za chwilę.',
   'memory.outOfCredits.title': 'Brak kredytów',
   'memory.outOfCredits.action': 'Doładuj',
+  'memory.error.planRequired':
+    'Twój obecny plan nie obejmuje pamięci, więc OpenHuman nie może zapisywać ani wyszukiwać tego, czego się uczy. Ulepsz plan, aby włączyć pamięć, lub przełącz się na inną opcję pamięci w Ustawieniach.',
+  'memory.planRequired.title': 'Pamięć nie wchodzi w skład Twojego planu',
+  'memory.planRequired.action': 'Zobacz plany',
   'alerts.title': 'Alerty',
   'alerts.empty': 'Brak alertów',
   'alerts.markAllRead': 'Oznacz wszystkie jako przeczytane',

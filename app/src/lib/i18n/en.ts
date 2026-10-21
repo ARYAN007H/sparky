@@ -597,6 +597,10 @@ const en: TranslationMap = {
     "Memory can't be reached right now. Nothing stored has been lost; try again in a moment.",
   'memory.outOfCredits.title': 'Out of credits',
   'memory.outOfCredits.action': 'Top up',
+  'memory.error.planRequired':
+    "Your current plan doesn't include memory, so OpenHuman can't save or look up what it learns. Upgrade to turn memory on, or switch to a different memory option in Settings.",
+  'memory.planRequired.title': "Memory isn't part of your plan",
+  'memory.planRequired.action': 'See plans',
 
   // Activity surface: Phase 3 renamed tabs
   'activity.tabs.automations': 'Automations',

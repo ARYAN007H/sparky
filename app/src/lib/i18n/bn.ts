@@ -599,6 +599,10 @@ const messages: TranslationMap = {
     'এই মুহূর্তে মেমরিতে পৌঁছানো যাচ্ছে না। সংরক্ষিত কিছুই হারায়নি; একটু পরে আবার চেষ্টা করুন।',
   'memory.outOfCredits.title': 'ক্রেডিট শেষ',
   'memory.outOfCredits.action': 'টপ আপ করুন',
+  'memory.error.planRequired':
+    'আপনার বর্তমান প্ল্যানে মেমরি অন্তর্ভুক্ত নেই, তাই OpenHuman যা শেখে তা সংরক্ষণ করতে বা খুঁজে দেখতে পারে না। মেমরি চালু করতে আপগ্রেড করুন, অথবা সেটিংস থেকে অন্য কোনো মেমরি বিকল্পে যান।',
+  'memory.planRequired.title': 'মেমরি আপনার প্ল্যানের অংশ নয়',
+  'memory.planRequired.action': 'প্ল্যানগুলো দেখুন',
   'alerts.title': 'সতর্কতা',
   'alerts.empty': 'এখনো কোনো সতর্কতা নেই',
   'alerts.markAllRead': 'সব পঠিত চিহ্নিত করুন',

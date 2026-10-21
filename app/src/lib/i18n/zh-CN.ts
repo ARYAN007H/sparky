@@ -564,6 +564,10 @@ const messages: TranslationMap = {
   'memory.error.unavailable': '暂时无法连接记忆服务。已存储的内容不会丢失，请稍后重试。',
   'memory.outOfCredits.title': '额度已用完',
   'memory.outOfCredits.action': '充值',
+  'memory.error.planRequired':
+    '你当前的套餐不包含记忆功能，因此 OpenHuman 无法保存或查找它学到的内容。升级套餐即可开启记忆功能，也可以在设置中改用其他记忆选项。',
+  'memory.planRequired.title': '记忆功能不在你的套餐中',
+  'memory.planRequired.action': '查看套餐',
   'alerts.title': '通知',
   'alerts.empty': '暂无通知',
   'alerts.markAllRead': '全部标记为已读',

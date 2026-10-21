@@ -4374,6 +4374,10 @@ const messages: TranslationMap = {
     'Belleğe şu anda ulaşılamıyor. Kayıtlı hiçbir şey kaybolmadı; biraz sonra yeniden deneyin.',
   'memory.outOfCredits.title': 'Krediniz tükendi',
   'memory.outOfCredits.action': 'Kredi yükle',
+  'memory.error.planRequired':
+    "Mevcut planınız bellek içermediği için OpenHuman öğrendiklerini kaydedemez veya bunlara bakamaz. Belleği açmak için planınızı yükseltin ya da Ayarlar'dan başka bir bellek seçeneğine geçin.",
+  'memory.planRequired.title': 'Bellek planınıza dahil değil',
+  'memory.planRequired.action': 'Planları gör',
   'memoryPage.engine.badgeDegraded': 'Kısıtlı çalışıyor',
   'memoryPage.engine.badgeDown': 'Ulaşılamıyor',
   'memoryPage.engine.connecting': 'Bağlanıyor…',

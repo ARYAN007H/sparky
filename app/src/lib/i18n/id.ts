@@ -611,6 +611,10 @@ const messages: TranslationMap = {
     'Memori tidak dapat dijangkau saat ini. Tidak ada data tersimpan yang hilang; coba lagi sebentar lagi.',
   'memory.outOfCredits.title': 'Kredit habis',
   'memory.outOfCredits.action': 'Isi ulang',
+  'memory.error.planRequired':
+    'Paket Anda saat ini tidak mencakup memori, sehingga OpenHuman tidak dapat menyimpan atau mencari apa yang dipelajarinya. Tingkatkan paket untuk mengaktifkan memori, atau beralih ke opsi memori lain di Pengaturan.',
+  'memory.planRequired.title': 'Memori tidak termasuk dalam paket Anda',
+  'memory.planRequired.action': 'Lihat paket',
   'alerts.title': 'Peringatan',
   'alerts.empty': 'Belum ada peringatan',
   'alerts.markAllRead': 'Tandai semua sudah dibaca',

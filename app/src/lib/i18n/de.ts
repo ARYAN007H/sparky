@@ -622,6 +622,10 @@ const messages: TranslationMap = {
     'Das Gedächtnis ist gerade nicht erreichbar. Nichts Gespeichertes ist verloren; versuche es gleich noch einmal.',
   'memory.outOfCredits.title': 'Kein Guthaben mehr',
   'memory.outOfCredits.action': 'Aufladen',
+  'memory.error.planRequired':
+    'Dein aktueller Tarif enthält kein Gedächtnis, daher kann OpenHuman nicht speichern oder nachschlagen, was es lernt. Wechsle zu einem höheren Tarif, um das Gedächtnis einzuschalten, oder wähle in den Einstellungen eine andere Gedächtnis-Option.',
+  'memory.planRequired.title': 'Gedächtnis ist nicht Teil deines Tarifs',
+  'memory.planRequired.action': 'Tarife ansehen',
   'alerts.title': 'Warnungen',
   'alerts.empty': 'Noch keine Benachrichtigungen',
   'alerts.markAllRead': 'Alle als gelesen markieren',

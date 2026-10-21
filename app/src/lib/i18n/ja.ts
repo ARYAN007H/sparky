@@ -4720,6 +4720,10 @@ const messages: TranslationMap = {
     '現在、メモリーに接続できません。保存済みの内容は失われていません。少し待ってから再試行してください。',
   'memory.outOfCredits.title': 'クレジット不足',
   'memory.outOfCredits.action': 'チャージする',
+  'memory.error.planRequired':
+    '現在のプランにはメモリが含まれていないため、OpenHuman は学んだことを保存したり参照したりできません。メモリを有効にするにはプランをアップグレードするか、設定で別のメモリオプションに切り替えてください。',
+  'memory.planRequired.title': 'メモリはご利用のプランに含まれていません',
+  'memory.planRequired.action': 'プランを見る',
   'onboarding.custom.search.skipForNow': '今はスキップ',
   'onboarding.custom.search.ready': 'Web検索の準備ができました。',
   'onboarding.custom.search.notReady':

@@ -612,6 +612,10 @@ const messages: TranslationMap = {
     'Não é possível acessar a memória agora. Nada do que foi guardado se perdeu; tente novamente em instantes.',
   'memory.outOfCredits.title': 'Sem créditos',
   'memory.outOfCredits.action': 'Recarregar',
+  'memory.error.planRequired':
+    'Seu plano atual não inclui memória, então o OpenHuman não consegue salvar nem consultar o que aprende. Faça upgrade para ativar a memória ou mude para outra opção de memória em Configurações.',
+  'memory.planRequired.title': 'A memória não faz parte do seu plano',
+  'memory.planRequired.action': 'Ver planos',
   'alerts.title': 'Alertas',
   'alerts.empty': 'Nenhum alerta ainda',
   'alerts.markAllRead': 'Marcar tudo como lido',
