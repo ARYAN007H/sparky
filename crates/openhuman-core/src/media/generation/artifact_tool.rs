@@ -29,6 +29,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolContent, ToolPolicy, ToolResult,
@@ -417,14 +418,15 @@ impl<T: Tool> MediaArtifactTool<T> {
             .await
             .map_err(|error| format!("failed to read generated media blob {key:?}: {error}"))?
             .ok_or_else(|| format!("generated media blob {key:?} was not found"))?;
-        copy_blob_to_file(&mut *blob.reader, dest, key).await
+        copy_blob_to_file(&mut blob.reader, dest, key).await
     }
 }
 
-async fn copy_blob_to_file<R>(reader: &mut R, dest: &Path, key: &str) -> Result<u64, String>
-where
-    R: tokio::io::AsyncRead + Unpin + ?Sized,
-{
+async fn copy_blob_to_file(
+    reader: &mut tinyagents_storage_kit::BlobReader,
+    dest: &Path,
+    key: &str,
+) -> Result<u64, String> {
     let mut file = tokio::fs::OpenOptions::new()
         .write(true)
         .truncate(true)
@@ -436,16 +438,27 @@ where
                 dest.display()
             )
         })?;
-    let size = match tokio::io::copy(reader, &mut file).await {
-        Ok(size) => size,
-        Err(error) => {
+    let mut size = 0_u64;
+    while let Some(chunk) = reader.next().await {
+        let chunk = match chunk {
+            Ok(chunk) => chunk,
+            Err(error) => {
+                drop(file);
+                let _ = tokio::fs::remove_file(dest).await;
+                return Err(format!(
+                    "failed to copy generated media blob {key:?}: {error}"
+                ));
+            }
+        };
+        if let Err(error) = file.write_all(&chunk).await {
             drop(file);
             let _ = tokio::fs::remove_file(dest).await;
             return Err(format!(
-                "failed to copy generated media blob {key:?}: {error}"
+                "failed to write generated media blob {key:?}: {error}"
             ));
         }
-    };
+        size = size.saturating_add(chunk.len() as u64);
+    }
     if let Err(error) = file.flush().await {
         drop(file);
         let _ = tokio::fs::remove_file(dest).await;
