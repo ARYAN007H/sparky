@@ -78,8 +78,7 @@ async fn process_channel_message_executes_native_tool_calls() {
 #[tokio::test]
 async fn process_channel_message_handles_models_command_without_llm_call() {
     let _bus_guard = super::common::use_real_agent_handler().await;
-    let _module_storage = crate::channels::module_fixture::install_memory_storage();
-    let _module_client = crate::channels::module_fixture::client().await;
+    let _linked = linked_telegram_runtime().await;
     crate::core::bus::init().await.expect("bus init");
     let _builtins =
         crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();

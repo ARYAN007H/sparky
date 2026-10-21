@@ -136,7 +136,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
         .clone();
 
     let mut channels_by_name = HashMap::new();
-    channels_by_name.insert("test-channel".to_string(), channel);
+    channels_by_name.insert("telegram".to_string(), channel);
 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
@@ -176,7 +176,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             sender: "alice".to_string(),
             reply_target: "42".to_string(),
             content: "hello".to_string(),
-            channel: "test-channel".to_string(),
+            channel: "telegram".to_string(),
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
@@ -673,7 +673,7 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
 #[tokio::test(start_paused = true)]
 async fn dispatch_replies_with_timeout_notice_when_handler_exceeds_deadline() {
     let timed_out = run_dispatch_harness(DispatchHarnessOptions {
-        channel_name: "email".to_string(),
+        channel_name: "test-channel".to_string(),
         content: "force timeout".to_string(),
         handler_delay_ms: 31_000,
         timeout_secs: tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,

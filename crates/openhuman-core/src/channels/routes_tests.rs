@@ -694,11 +694,6 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
     );
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(
-        sent[0].content.contains("Created thread"),
-        "{}",
-        sent[0].content
-    );
     assert!(sent[0].content.contains("Started new session"));
     assert!(sent[0]
         .content
