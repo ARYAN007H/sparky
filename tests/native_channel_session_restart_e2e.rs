@@ -147,8 +147,8 @@ async fn get_file(Json(body): Json<Value>) -> Json<Value> {
 
 async fn download_file(path: axum::extract::Path<String>) -> Response {
     let (content_type, bytes) = match path.0.as_str() {
-        "photos/native.png" => ("application/octet-stream", NATIVE_IMAGE_PNG),
-        "documents/native.txt" => ("application/octet-stream", NATIVE_FILE_BYTES),
+        "photos/native.png" => ("image/png", NATIVE_IMAGE_PNG),
+        "documents/native.txt" => ("text/plain", NATIVE_FILE_BYTES),
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
     (
@@ -248,6 +248,10 @@ fn media_update(
     document: bool,
     text: Option<&str>,
 ) -> Value {
+    assert!(
+        !(image && document),
+        "a Telegram message has one media object"
+    );
     let mut message = json!({
         "message_id": message_id,
         "date": 1_800_000_000,
@@ -271,7 +275,11 @@ fn media_update(
         });
     }
     if let Some(text) = text {
-        message["text"] = json!(text);
+        if image || document {
+            message["caption"] = json!(text);
+        } else {
+            message["text"] = json!(text);
+        }
     }
     json!({ "update_id": update_id, "message": message })
 }
@@ -766,9 +774,14 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
     wait_for_completion(&mocks.state, 2).await;
     push_media_update(
         &mocks.state,
-        media_update(202, 22, true, true, Some("before typed media after")),
+        media_update(202, 22, true, false, Some("image caption before media")),
     );
     wait_for_completion(&mocks.state, 3).await;
+    push_media_update(
+        &mocks.state,
+        media_update(203, 23, false, true, Some("file caption before media")),
+    );
+    wait_for_completion(&mocks.state, 4).await;
 
     let requests = mocks
         .state
@@ -776,24 +789,36 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         .lock()
         .expect("model requests")
         .clone();
+    assert_eq!(
+        requests.len(),
+        4,
+        "each media update reaches the model once"
+    );
     assert!(model_saw_media_bytes(&requests[0], NATIVE_IMAGE_PNG));
     assert!(model_saw_media_bytes(&requests[1], NATIVE_FILE_BYTES));
-    let mixed_content = last_user_content(&requests[2]).expect("mixed user message is present");
-    let mixed = serde_json::to_string(mixed_content).expect("serialize mixed user content");
-    let before = mixed
-        .find("before typed media")
-        .expect("caption text is present");
-    let image = mixed
+    let image_mixed = serde_json::to_string(
+        last_user_content(&requests[2]).expect("mixed image user message is present"),
+    )
+    .expect("serialize mixed image user content");
+    let image_caption = image_mixed
+        .find("image caption before media")
+        .expect("image caption text is present");
+    let image = image_mixed
         .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_IMAGE_PNG))
         .expect("mixed image bytes reach the model");
-    let file = mixed
+    assert!(image_caption < image, "image part order: {image_mixed}");
+
+    let file_mixed = serde_json::to_string(
+        last_user_content(&requests[3]).expect("mixed file user message is present"),
+    )
+    .expect("serialize mixed file user content");
+    let file_caption = file_mixed
+        .find("file caption before media")
+        .expect("file caption text is present");
+    let file = file_mixed
         .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES))
         .expect("mixed file bytes reach the model");
-    let after = mixed.find("after").expect("trailing text is present");
-    assert!(
-        before < image && image < file && file < after,
-        "typed part order: {mixed}"
-    );
+    assert!(file_caption < file, "file part order: {file_mixed}");
     for request in &requests {
         let serialized = serde_json::to_string(request).unwrap();
         assert!(!serialized.contains("typed-image-file"));
