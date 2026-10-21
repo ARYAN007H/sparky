@@ -34,6 +34,7 @@ pub(super) async fn resolve_typed_message(
     config: &crate::config::Config,
     envelope: &ChannelInboundEnvelope,
     thread_id: &str,
+    enriched_message: &str,
 ) -> Result<Option<ResolvedNativeMessage>, String> {
     if !requires_typed_preparation(envelope) {
         return Ok(None);
@@ -143,15 +144,32 @@ pub(super) async fn resolve_typed_message(
             &bytes,
         )
         .await?;
-        *part = staged.clone();
+        let opaque_id = media_opaque_id(&staged)
+            .ok_or_else(|| "staged native media has no host reference".to_owned())?;
+        let mut model_part = staged.clone();
+        let model_media = match &mut model_part {
+            ContentPart::Image { media, .. } | ContentPart::File { media, .. } => media,
+            _ => return Err("native staged media kind changed unexpectedly".into()),
+        };
+        model_media.path = Some(format!("openhuman-staged://{opaque_id}"));
+        *part = model_part;
         staged_parts.push(staged);
     }
 
-    let message = crate::agent::message_convert::user_message_from_parts("", &parts)?;
+    let message = crate::agent::message_convert::user_message_from_parts(enriched_message, &parts)?;
     Ok(Some(ResolvedNativeMessage {
         message,
         staged_parts,
     }))
+}
+
+fn media_opaque_id(part: &ContentPart) -> Option<&str> {
+    match part {
+        ContentPart::Image { media, .. } | ContentPart::File { media, .. } => {
+            media.opaque_id.as_deref()
+        }
+        _ => None,
+    }
 }
 
 pub(super) struct ResolvedNativeMessage {

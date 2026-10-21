@@ -336,7 +336,7 @@ pub(crate) async fn stage_native_channel_part(
         .ok_or_else(|| "native attachment kind cannot be staged".to_owned())?;
     let opaque_id = uuid::Uuid::new_v4().simple().to_string();
     media.opaque_id = Some(opaque_id.clone());
-    media.path = Some(format!("openhuman-staged://{opaque_id}"));
+    media.path = None;
     media.url = None;
     media.local_cache_path = None;
     media.content_type = Some(file.mime.clone());
