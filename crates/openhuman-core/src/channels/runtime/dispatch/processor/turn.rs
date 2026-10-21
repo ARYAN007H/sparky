@@ -376,8 +376,10 @@ pub(crate) async fn process_channel_runtime_message(
     };
     let native_preparation = if typed_envelope_input {
         if let Some(host) = selected_host.as_ref() {
+        let host_dispatch = crate::core::runtime::DispatchCtx::new(Arc::clone(&host.context));
         match super::native_media::resolve_typed_message(
             &ctx,
+            &host_dispatch,
             &host.config,
             &envelope,
             &prepared_thread_id,
