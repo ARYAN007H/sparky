@@ -101,14 +101,15 @@ async fn reacquire_is_reentrant_and_a_restart_is_unclean() {
 
 #[tokio::test]
 async fn bad_keys_and_corrupt_records_are_storage_errors() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let a = node(&storage, "a");
     assert!(matches!(
         a.acquire("../escape", 0).await,
         Err(LeaseError::Storage(_))
     ));
     assert!(matches!(a.holder("a/b").await, Err(LeaseError::Storage(_))));
-    let scoped = storage.backend
+    let scoped = storage
+        .backend
         .for_scope(&Scope::new(CLUSTER_SCOPE).unwrap())
         .unwrap();
     scoped
