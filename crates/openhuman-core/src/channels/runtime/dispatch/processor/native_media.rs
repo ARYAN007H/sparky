@@ -37,6 +37,7 @@ pub(super) async fn resolve_typed_message(
     if !requires_typed_preparation(envelope) {
         return Ok(None);
     }
+    validate_native_parts(&envelope.parts)?;
     let account = envelope
         .channel
         .account_id
@@ -99,17 +100,9 @@ pub(super) async fn resolve_typed_message(
                 return Err("native audio/video attachments are not supported".into());
             }
             ContentPart::VoiceNote { voice_note } => {
-                let transcript = voice_note
-                    .transcript
-                    .as_ref()
-                    .filter(|transcript| {
-                        transcript.state == tinychannels_bus::VoiceTranscriptState::Complete
-                    })
-                    .map(|transcript| transcript.text.trim())
-                    .filter(|text| !text.is_empty())
-                    .ok_or_else(|| "native voice transcript is unavailable".to_owned())?;
+                let transcript = voice_note.transcript.as_ref().expect("validated transcript");
                 let replacement = ContentPart::Text {
-                    text: transcript.to_owned(),
+                    text: transcript.text.trim().to_owned(),
                     markdown_dialect: None,
                 };
                 *part = replacement;
@@ -172,6 +165,32 @@ pub(super) async fn resolve_typed_message(
         envelope.text.clone()
     };
     crate::agent::message_convert::user_message_from_parts(&text, &parts).map(Some)
+}
+
+fn validate_native_parts(parts: &[ContentPart]) -> Result<(), String> {
+    for part in parts {
+        match part {
+            ContentPart::Text { .. } | ContentPart::Image { .. } | ContentPart::File { .. } => {}
+            ContentPart::VoiceNote { voice_note } => {
+                let transcript = voice_note
+                    .transcript
+                    .as_ref()
+                    .filter(|transcript| {
+                        transcript.state == tinychannels_bus::VoiceTranscriptState::Complete
+                    })
+                    .map(|transcript| transcript.text.trim())
+                    .filter(|text| !text.is_empty());
+                if transcript.is_none() {
+                    return Err("native voice transcript is unavailable".into());
+                }
+            }
+            ContentPart::Audio { .. } | ContentPart::Video { .. } => {
+                return Err("native audio/video attachments are not supported".into());
+            }
+            _ => return Err("native channel content kind is not supported".into()),
+        }
+    }
+    Ok(())
 }
 
 fn validate_reference(

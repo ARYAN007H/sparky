@@ -66,3 +66,36 @@ fn typed_native_media_is_selected_only_from_envelope_parts() {
     };
     assert!(!requires_typed_preparation(&text_only));
 }
+
+#[test]
+fn native_audio_video_and_incomplete_voice_are_rejected_before_media_reads() {
+    let audio = ContentPart::Audio {
+        media: reference(),
+        codec: None,
+        duration_ms: None,
+        title: None,
+        transcript: None,
+    };
+    assert!(validate_native_parts(&[audio]).is_err());
+
+    let video = ContentPart::Video {
+        media: reference(),
+        caption: None,
+        duration_ms: None,
+        thumbnail: None,
+    };
+    assert!(validate_native_parts(&[video]).is_err());
+
+    let pending_voice = ContentPart::VoiceNote {
+        voice_note: tinychannels_bus::VoiceNote {
+            transcript: Some(tinychannels_bus::VoiceTranscript {
+                text: "partial".into(),
+                language: None,
+                state: tinychannels_bus::VoiceTranscriptState::Pending,
+                source: tinychannels_bus::VoiceTranscriptSource::HostStt,
+            }),
+            ..Default::default()
+        },
+    };
+    assert!(validate_native_parts(&[pending_voice]).is_err());
+}

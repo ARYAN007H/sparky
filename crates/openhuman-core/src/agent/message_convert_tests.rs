@@ -78,7 +78,7 @@ fn typed_native_parts_preserve_text_voice_transcript_and_file_order() {
 }
 
 #[test]
-fn typed_native_parts_reject_unavailable_voice_and_unsupported_audio_video() {
+fn typed_native_parts_reject_unavailable_voice_transcripts() {
     let incomplete = tinychannels_bus::ContentPart::VoiceNote {
         voice_note: tinychannels_bus::VoiceNote {
             transcript: Some(tinychannels_bus::VoiceTranscript {
@@ -91,23 +91,6 @@ fn typed_native_parts_reject_unavailable_voice_and_unsupported_audio_video() {
         },
     };
     assert!(user_message_from_parts("", &[incomplete]).is_err());
-
-    let audio = tinychannels_bus::ContentPart::Audio {
-        media: tinychannels_bus::MediaReference::default(),
-        codec: None,
-        duration_ms: None,
-        title: None,
-        transcript: None,
-    };
-    assert!(user_message_from_parts("", &[audio]).is_err());
-
-    let video = tinychannels_bus::ContentPart::Video {
-        media: tinychannels_bus::MediaReference::default(),
-        caption: None,
-        duration_ms: None,
-        thumbnail: None,
-    };
-    assert!(user_message_from_parts("", &[video]).is_err());
 }
 
 #[test]

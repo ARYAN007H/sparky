@@ -240,9 +240,21 @@ pub(crate) fn user_message_from_parts(
                     .ok_or_else(|| "voice transcript is unavailable".to_owned())?;
                 content.push(ContentBlock::Text(transcript.to_owned()));
             }
-            tinychannels_bus::ContentPart::Audio { .. }
-            | tinychannels_bus::ContentPart::Video { .. } => {
-                return Err("resolved audio/video attachment is not supported".into());
+            tinychannels_bus::ContentPart::Audio { media, .. }
+            | tinychannels_bus::ContentPart::Video { media, .. } => {
+                let path = media
+                    .path
+                    .clone()
+                    .ok_or_else(|| "resolved media attachment has no trusted path".to_string())?;
+                let media_ref = MediaRef::Path {
+                    path,
+                    media_type: media.content_type.clone(),
+                };
+                let block = match part {
+                    tinychannels_bus::ContentPart::Audio { .. } => ContentBlock::Audio(media_ref),
+                    _ => ContentBlock::Video(media_ref),
+                };
+                content.push(block);
             }
             tinychannels_bus::ContentPart::Sticker { .. }
             | tinychannels_bus::ContentPart::Location { .. }
