@@ -104,28 +104,41 @@ fn known_scope_work(
         .collect::<Vec<_>>();
 
     if let Some(host) = crate::profiles::host::host() {
-        let now = super::fence::system_now_ms();
-        for profile in host.hosted_profiles() {
-            if profile.lease_fence().check_local(now).is_err() {
-                continue;
-            }
-            let Some(profile_backend) = host.storage_backend_for(&profile)? else {
-                // File leases have no shared storage backend to maintain.
-                continue;
-            };
-            let base = crate::storage::scope_for_profile(profile.id.as_str());
-            let mut profile_scopes = BTreeSet::from([base.clone()]);
-            for module in crate::modules::registry::ALL {
-                if let Ok(scope) = base.module(module.id) {
-                    profile_scopes.insert(scope);
-                }
-            }
-            work.extend(profile_scopes.into_iter().map(|scope| ScopeWorkItem {
-                backend: Arc::clone(&profile_backend),
-                scope,
-                _profile: Some(Arc::clone(&profile)),
-            }));
+        work.extend(captured_profile_work(
+            host.as_ref(),
+            host.hosted_profiles(),
+            super::fence::system_now_ms(),
+        )?);
+    }
+    Ok(work)
+}
+
+fn captured_profile_work(
+    host: &crate::profiles::ProfileHost,
+    profiles: Vec<Arc<crate::profiles::Profile>>,
+    now_ms: u64,
+) -> Result<Vec<ScopeWorkItem>, crate::storage::StorageError> {
+    let mut work = Vec::new();
+    for profile in profiles {
+        if profile.lease_fence().check_local(now_ms).is_err() {
+            continue;
         }
+        let Some(profile_backend) = host.storage_backend_for(&profile)? else {
+            // File leases have no shared storage backend to maintain.
+            continue;
+        };
+        let base = crate::storage::scope_for_profile(profile.id.as_str());
+        let mut profile_scopes = BTreeSet::from([base.clone()]);
+        for module in crate::modules::registry::ALL {
+            if let Ok(scope) = base.module(module.id) {
+                profile_scopes.insert(scope);
+            }
+        }
+        work.extend(profile_scopes.into_iter().map(|scope| ScopeWorkItem {
+            backend: Arc::clone(&profile_backend),
+            scope,
+            _profile: Some(Arc::clone(&profile)),
+        }));
     }
     Ok(work)
 }
