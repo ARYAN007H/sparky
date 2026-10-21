@@ -167,7 +167,7 @@ async fn records_the_module_already_wrote_are_never_replaced_or_duplicated() {
         .put(
             PREFS_COLLECTION,
             "gmail",
-            json!({"value": {"allow_write": true}}),
+            json!({"allow_write": true}),
             Precondition::Absent,
         )
         .await
@@ -198,7 +198,7 @@ async fn records_the_module_already_wrote_are_never_replaced_or_duplicated() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(gmail.doc, json!({"value": {"allow_write": true}}));
+    assert_eq!(gmail.doc, json!({"allow_write": true}));
     let day = scoped
         .streams()
         .read_window("connectors.triggers/2026-10-12", 0, 10)
