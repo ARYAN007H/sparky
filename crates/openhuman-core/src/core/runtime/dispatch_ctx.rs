@@ -144,7 +144,20 @@ impl DispatchCtx {
     pub fn ambient_turn() -> Self {
         Self {
             core: CoreContext::scoped_for_turn(),
+            headless_agent_chat: false,
         }
+    }
+
+    /// Marks this compiled one-shot call as a headless agent-chat entry point.
+    /// The marker is carried by this dispatch only; ordinary controller and
+    /// in-process chat calls remain asynchronous.
+    pub(crate) fn with_headless_agent_chat(mut self) -> Self {
+        self.headless_agent_chat = true;
+        self
+    }
+
+    pub(crate) fn is_headless_agent_chat(&self) -> bool {
+        self.headless_agent_chat
     }
 
     /// The `[components]` switches of the context this call runs under. No
