@@ -72,10 +72,14 @@ fn start(home: &Path) -> (Server, String) {
 }
 
 fn rpc(base: &str, method: &str) -> Value {
+    rpc_with_params(base, method, json!({}))
+}
+
+fn rpc_with_params(base: &str, method: &str, params: Value) -> Value {
     let response: Value = reqwest::blocking::Client::new()
         .post(format!("{base}/rpc"))
         .bearer_auth(TOKEN)
-        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": {} }))
+        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params }))
         .send()
         .unwrap_or_else(|error| panic!("POST {method}: {error}"))
         .json()
@@ -110,6 +114,17 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let source_bytes = std::fs::read(&source).unwrap();
 
     let (_server, base) = start(home.path());
+    let credential = rpc_with_params(
+        &base,
+        "openhuman.auth_set_credential",
+        json!({
+            "token": "fixture-session-token",
+            "kind": "session",
+            "userId": "u1",
+            "user": {"id": "u1", "name": "Fixture User"}
+        }),
+    );
+    assert!(credential.to_string().contains("u1"), "profile credential was not installed: {credential}");
     let threads = rpc(&base, "openhuman.threads_list");
     let approvals = rpc(&base, "openhuman.approval_list_pending");
     let flows = rpc(&base, "openhuman.flows_list");
