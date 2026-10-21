@@ -48,7 +48,7 @@ fn capture_module_storage(
     let caller_context = ctx
         .resolved()
         .ok_or_else(|| anyhow!("profile import has no admitted caller context"))?;
-    let host = crate::profiles::host()
+    let host = crate::profiles::host::host()
         .ok_or_else(|| anyhow!("profile import has no active profile host"))?;
     let id = crate::profiles::ProfileId::parse(&profile_id)
         .map_err(|error| anyhow!("invalid caller profile id: {error}"))?;

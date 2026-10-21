@@ -138,7 +138,17 @@ async fn inspect_storage_config(check_id: &str, config: StorageConfig, depth: u8
 }
 
 fn sqlite_probe(path: &std::path::Path) -> bool {
-    tinystoragedrivers::sqlite::SqliteStorage::probe_read_only(path).is_ok()
+    let file = if path.extension().is_some_and(|ext| ext == "db" || ext == "sqlite") {
+        path.to_path_buf()
+    } else {
+        path.join("storage.db")
+    };
+    let Ok(mut file) = std::fs::File::open(file) else {
+        return false;
+    };
+    let mut header = [0; 16];
+    use std::io::Read;
+    file.read_exact(&mut header).is_ok() && &header == b"SQLite format 3\0"
 }
 
 fn file_probe(path: &std::path::Path) -> bool {
