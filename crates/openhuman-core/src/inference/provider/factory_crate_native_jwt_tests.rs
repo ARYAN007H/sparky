@@ -3,6 +3,8 @@ use super::*;
 #[test]
 fn unmanaged_openhuman_jwt_route_never_builds_a_direct_unauthenticated_model() {
     let _guard = crate::inference::inference_test_guard();
+    let _env = crate::config::TEST_ENV_LOCK.blocking_lock();
+    let tmp = tempfile::TempDir::new().expect("isolated workspace");
     let extensions = crate::core::slots::Extensions::new();
     crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy_in(
         &extensions,
@@ -10,6 +12,8 @@ fn unmanaged_openhuman_jwt_route_never_builds_a_direct_unauthenticated_model() {
         Arc::new(|_| false),
     );
     let mut config = Config::default();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
     config.cloud_providers.push(CloudProviderCreds {
         id: "p_managed".to_string(),
         slug: "managed".to_string(),
