@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
-use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
+use tinybus::module::ModuleClient;
+use tinychannels_bus::{ChannelMessage, approvals::ReplyContext};
 
 /// Captures the account configuration and reply addresses used by approvals.
 pub struct ChannelApprovalSurfaceSubscriber {

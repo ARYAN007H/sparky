@@ -8,8 +8,8 @@
 //! on a process-lifetime runtime, so it outlives the short Tokio runtimes of
 //! individual tests.
 
-use crate::config::schema::ModuleSourceMode;
 use crate::config::Config;
+use crate::config::schema::ModuleSourceMode;
 use crate::modules::linked::register_linked;
 use crate::modules::{ops, runtime};
 use std::sync::Arc;
@@ -140,10 +140,10 @@ async fn linked_module_prepares_runtime_limits_over_confidential_bus_call() {
 #[cfg(feature = "e2e-test-support")]
 async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
     let _storage = install_memory_storage();
+    use tinychannels_bus::ChannelMessage;
     use tinychannels_bus::module_inbound::{
         ChannelInboundSource, PrepareChannelInboundRequest, PreparedChannelInbound,
     };
-    use tinychannels_bus::ChannelMessage;
 
     let message = ChannelMessage {
         id: "message-1".into(),
