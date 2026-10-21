@@ -71,7 +71,7 @@ fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
     let DisplayRecord::Message(answer) = &records[0] else {
         panic!("expected message record");
     };
-    assert_eq!(answer.message.request_id.as_deref(), Some("r1"));
+    assert_eq!(answer.request_id.as_deref(), Some("r1"));
     assert_eq!(answer.message.turn_usage.as_ref().unwrap().iteration, 2);
     let DisplayRecord::Message(row) = &records[1] else {
         panic!("expected typed row");
