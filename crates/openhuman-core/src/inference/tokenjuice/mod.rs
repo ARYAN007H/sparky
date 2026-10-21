@@ -117,17 +117,12 @@ pub(crate) fn install_request(config: &crate::config::Config) -> InstallRequest 
             llm_summary_threshold_tokens: config.context.summarizer_payload_threshold_tokens,
             llm_summary_max_input_tokens: config.context.summarizer_max_payload_tokens,
             repl_handle: repl_handle_active(config),
-            repl_save_dir: (repl_handle_active(config) && tj.repl_save_enabled)
-                .then(|| repl_save_dir(&config.workspace_dir)),
             ..tinyjuice_bus::types::CompressOptions::default()
         },
         max_cache_entries: tj.max_cache_entries,
         max_cache_bytes: tj.max_cache_bytes,
         ccr_ttl_secs: tj.ccr_ttl_secs,
-        disk_tier_root: tj
-            .ccr_disk_enabled
-            .then(|| config.workspace_dir.join(".tokenjuice").join("ccr"))
-            .map(|path| path.to_string_lossy().into_owned()),
+        ccr_durable: tj.ccr_disk_enabled,
     }
 }
 
@@ -153,10 +148,11 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
     let request = install_request(config);
     // The module keeps the durable tier on its blob storage; originals the old
     // disk tier wrote move across first (once per directory, best effort).
-    if let Some(root) = request.disk_tier_root.as_deref() {
+    if config.tokenjuice.ccr_disk_enabled {
+        let root = config.workspace_dir.join(".tokenjuice").join("ccr");
         crate::modules::import_legacy_tinyjuice(
             &crate::core::runtime::DispatchCtx::ambient(),
-            std::path::Path::new(root),
+            &root,
             request.ccr_ttl_secs.map(std::time::Duration::from_secs),
         )
         .await;

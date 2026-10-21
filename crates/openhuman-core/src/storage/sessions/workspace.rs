@@ -210,7 +210,11 @@ pub fn artifact_blobs_for(workspace_dir: &Path) -> Option<Arc<dyn BlobStore>> {
 /// The calling tenant's scoped storage on `workspace_dir`'s backend. `what`
 /// only labels the log line when the backend or scope is refused.
 fn tenant_scope_for(workspace_dir: &Path, what: &str) -> Option<(String, ScopedStorage)> {
-    let key = tenant_agent_key()?;
+    let key = match tenant_agent_key() {
+        Some(key) => key,
+        None if !crate::core::runtime::is_saas() => super::DEFAULT_AGENT.to_owned(),
+        None => return None,
+    };
     let backend = match crate::storage::local::backend_for(workspace_dir) {
         Ok(backend) => backend,
         Err(error) => {
