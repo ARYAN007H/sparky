@@ -395,7 +395,13 @@ fn model_limits_client_uses_provider_ca_and_falls_back_to_proxy() {
     );
     assert_eq!(
         *calls.lock().unwrap(),
-        [("ca".to_string(), "test-ca-bundle".to_string(), MODEL_LIMITS_SERVICE.to_string(), 5, 3)]
+        [(
+            "ca".to_string(),
+            "test-ca-bundle".to_string(),
+            MODEL_LIMITS_SERVICE.to_string(),
+            5,
+            3
+        )]
     );
 
     let proxy_calls = Arc::new(StdMutex::new(Vec::new()));

@@ -157,11 +157,9 @@ fn route_input(
     });
     route.discovery = match local_kind {
         None => match extensions {
-            Some(extensions) => {
-                crate::inference::provider::factory::model_limits_request_for(
-                    role, provider, model, config, extensions,
-                )
-            }
+            Some(extensions) => crate::inference::provider::factory::model_limits_request_for(
+                role, provider, model, config, extensions,
+            ),
             None => crate::inference::provider::factory::model_limits_request(
                 role, provider, model, config,
             ),
@@ -185,8 +183,7 @@ fn static_route_facts(
     let provider = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
     let managed_default = match extensions {
         Some(extensions) => crate::inference::registry::provider_default_model_for(
-            extensions,
-            provider,
+            extensions, provider,
         )
         .and_then(|managed_model| {
             crate::inference::registry::provider_model_context_window_for(
@@ -199,15 +196,15 @@ fn static_route_facts(
                 window,
             })
         }),
-        None => crate::inference::registry::provider_default_model(provider).and_then(
-            |managed_model| {
+        None => {
+            crate::inference::registry::provider_default_model(provider).and_then(|managed_model| {
                 crate::inference::registry::provider_model_context_window(provider, &managed_model)
                     .map(|window| ManagedDefaultWindow {
                         model: managed_model,
                         window,
                     })
-            },
-        ),
+            })
+        }
     };
     ContextWindowRouteInput {
         catalog_window: tinyagents_registry::pricing::lookup(model.trim())
