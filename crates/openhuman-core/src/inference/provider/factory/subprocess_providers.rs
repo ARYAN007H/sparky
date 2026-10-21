@@ -1,9 +1,7 @@
 //! OpenHuman's MCP endpoint for TinyAgents' native Claude subprocess builder.
 
-pub(super) struct OpenHumanMcpEndpoint;
-
 #[derive(Debug)]
-struct OpenHumanMcpEndpoint;
+pub(super) struct OpenHumanMcpEndpoint;
 
 #[async_trait::async_trait]
 impl tinyagents_harness::providers::claude_code::driver::McpEndpointProvider
