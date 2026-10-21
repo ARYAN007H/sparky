@@ -93,9 +93,12 @@ impl LegacyScopeInventory {
         // Admission rows are the authoritative inventory for v1 scopes that
         // happen to have no documents, streams, or blobs yet.
         if table_exists(&conn, "_tsd_scope_admissions")? {
-            let mut statement = conn.prepare("SELECT scope FROM _tsd_scope_admissions ORDER BY scope")?;
+            let mut statement =
+                conn.prepare("SELECT scope FROM _tsd_scope_admissions ORDER BY scope")?;
             let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
-            for row in rows { scopes.insert(row?); }
+            for row in rows {
+                scopes.insert(row?);
+            }
         }
 
         if table_exists(&conn, "docs")? {
@@ -106,13 +109,19 @@ impl LegacyScopeInventory {
                 }
             }
             let select = |name: &str, fallback: &str| {
-                if columns.contains(name) { format!("\"{name}\"") } else { fallback.to_owned() }
+                if columns.contains(name) {
+                    format!("\"{name}\"")
+                } else {
+                    fallback.to_owned()
+                }
             };
             let sql = format!(
                 "SELECT scope, coll, id, {}, {}, {}, {}, {}, body
                  FROM docs ORDER BY scope, coll, id",
-                select("schema", "0"), select("created_ms", "0"),
-                select("updated_ms", "0"), select("expires_ms", "NULL"),
+                select("schema", "0"),
+                select("created_ms", "0"),
+                select("updated_ms", "0"),
+                select("expires_ms", "NULL"),
                 select("deleted", "0"),
             );
             let mut statement = conn.prepare(&sql)?;
@@ -169,11 +178,16 @@ impl LegacyScopeInventory {
                 }
             }
             let select = |name: &str, fallback: &str| {
-                if columns.contains(name) { format!("\"{name}\"") } else { fallback.to_owned() }
+                if columns.contains(name) {
+                    format!("\"{name}\"")
+                } else {
+                    fallback.to_owned()
+                }
             };
             let sql = format!(
                 "SELECT scope, name, base, len, {}, {} FROM stream_heads ORDER BY scope, name",
-                select("sealed", "0"), select("sealed_ms", "NULL"),
+                select("sealed", "0"),
+                select("sealed_ms", "NULL"),
             );
             let mut statement = conn.prepare(&sql)?;
             let rows = statement.query_map([], |row| {
@@ -201,9 +215,8 @@ impl LegacyScopeInventory {
                     bail!("legacy streams table is missing required column `{required}`");
                 }
             }
-            let mut statement = conn.prepare(
-                "SELECT scope, name, seq, body FROM streams ORDER BY scope, name, seq",
-            )?;
+            let mut statement = conn
+                .prepare("SELECT scope, name, seq, body FROM streams ORDER BY scope, name, seq")?;
             let rows = statement.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -258,11 +271,16 @@ impl LegacyScopeInventory {
                 }
             }
             let select = |name: &str, fallback: &str| {
-                if columns.contains(name) { format!("\"{name}\"") } else { fallback.to_owned() }
+                if columns.contains(name) {
+                    format!("\"{name}\"")
+                } else {
+                    fallback.to_owned()
+                }
             };
             let sql = format!(
                 "SELECT scope, key, {}, {}, bytes FROM blobs ORDER BY scope, key",
-                select("content_type", "NULL"), select("expires_ms", "NULL"),
+                select("content_type", "NULL"),
+                select("expires_ms", "NULL"),
             );
             let mut statement = conn.prepare(&sql)?;
             let rows = statement.query_map([], |row| {
@@ -300,7 +318,10 @@ fn table_exists(conn: &Connection, name: &str) -> rusqlite::Result<bool> {
 }
 
 fn table_columns(conn: &Connection, table: &str) -> rusqlite::Result<HashSet<String>> {
-    let mut statement = conn.prepare(&format!("PRAGMA table_info(\"{}\")", table.replace('"', "\"\"")))?;
+    let mut statement = conn.prepare(&format!(
+        "PRAGMA table_info(\"{}\")",
+        table.replace('"', "\"\"")
+    ))?;
     let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
     rows.collect()
 }

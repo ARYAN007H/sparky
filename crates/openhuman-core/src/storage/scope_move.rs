@@ -170,9 +170,15 @@ pub async fn copy_inventory(
 
     let mut report = MoveReport::default();
     let mut source_scopes: Vec<&str> = inventory.scopes.iter().map(String::as_str).collect();
-    for row in &inventory.documents { source_scopes.push(&row.scope); }
-    for row in &inventory.streams { source_scopes.push(&row.scope); }
-    for row in &inventory.blobs { source_scopes.push(&row.scope); }
+    for row in &inventory.documents {
+        source_scopes.push(&row.scope);
+    }
+    for row in &inventory.streams {
+        source_scopes.push(&row.scope);
+    }
+    for row in &inventory.blobs {
+        source_scopes.push(&row.scope);
+    }
     source_scopes.sort_unstable();
     source_scopes.dedup();
     for source in source_scopes {
