@@ -35,7 +35,7 @@ impl Scope {
     /// Creates an opaque scope value without requiring it to follow the host
     /// grammar. This is used while reading legacy scopes before migration.
     pub fn new(value: impl AsRef<str>) -> Result<Self, StorageError> {
-        tinystoragedrivers::Scope::new(value).map(Self)
+        tinystoragedrivers::Scope::new(value.as_ref()).map(Self)
     }
 
     /// Parses an opaque stored scope without interpreting its host grammar.
