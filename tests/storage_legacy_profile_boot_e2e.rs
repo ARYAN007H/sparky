@@ -66,7 +66,10 @@ fn start(home: &Path) -> (Server, String) {
         if let Ok(Some(status)) = server.0.try_wait() {
             panic!("desktop core host exited before ready: {status}");
         }
-        assert!(Instant::now() < deadline, "desktop core host never became healthy");
+        assert!(
+            Instant::now() < deadline,
+            "desktop core host never became healthy"
+        );
         std::thread::sleep(Duration::from_millis(250));
     }
 }
@@ -124,7 +127,10 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             "user": {"id": "u1", "name": "Fixture User"}
         }),
     );
-    assert!(credential.to_string().contains("u1"), "profile credential was not installed: {credential}");
+    assert!(
+        credential.to_string().contains("u1"),
+        "profile credential was not installed: {credential}"
+    );
     let threads = rpc(&base, "openhuman.threads_list");
 
     assert!(
@@ -145,10 +151,18 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .collect::<Vec<_>>(),
         std::fs::read_to_string(home.path().join("core.stderr.log")).unwrap_or_default()
     );
-    assert!(!source.exists(), "migration should archive the old workspace storage path");
+    assert!(
+        !source.exists(),
+        "migration should archive the old workspace storage path"
+    );
     let archive_dir = profile.join("backups");
     let archive = std::fs::read_dir(&archive_dir)
-        .unwrap_or_else(|error| panic!("migration archive missing at {}: {error}", archive_dir.display()))
+        .unwrap_or_else(|error| {
+            panic!(
+                "migration archive missing at {}: {error}",
+                archive_dir.display()
+            )
+        })
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .find(|path| path.extension().is_some_and(|extension| extension == "zst"))
@@ -156,9 +170,12 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let restored = tempfile::tempdir().unwrap();
     let manifest = openhuman_core::storage::layout::archive::restore(&archive, restored.path())
         .expect("migration archive should verify and restore");
-    assert!(manifest.files.iter().any(|file| {
-        file.path == "workspace/storage/storage.db" && file.size == source_bytes.len() as u64
-    }), "archive manifest must record the historical storage.db");
+    assert!(
+        manifest.files.iter().any(|file| {
+            file.path == "workspace/storage/storage.db" && file.size == source_bytes.len() as u64
+        }),
+        "archive manifest must record the historical storage.db"
+    );
     assert_eq!(
         std::fs::read(restored.path().join("workspace/storage/storage.db")).unwrap(),
         source_bytes,
@@ -193,35 +210,44 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             openhuman_core::core::runtime::CoreContext::scope(
                 std::sync::Arc::clone(runtime.context()),
                 async {
-                let dispatch = openhuman_core::core::runtime::DispatchCtx::ambient();
-                let thread_store = openhuman_core::threads::store::ConversationStore::new(
-                    dispatch,
-                    owner_workspace,
-                );
-                assert_eq!(
-                    thread_store.transcript_key("fixture-thread").unwrap().as_deref(),
-                    Some("fixture-transcript-key"),
-                    "thread owner did not read the v1 database transcript key"
-                );
-                let messages = thread_store.get_messages("fixture-thread").unwrap();
-                assert_eq!(messages.len(), 1, "thread owner did not read the historical message");
-                assert_eq!(messages[0].id, "fixture-message");
-                assert_eq!(messages[0].content, "historical profile message");
-                let approvals =
-                    openhuman_core::security::approval::store::list_pending(&config).unwrap();
-                assert_eq!(
-                    approvals.len(),
-                    1,
-                    "approval owner did not read the v1 database record"
-                );
-                assert_eq!(approvals[0].request_id, "fixture-approval");
-                let flows = openhuman_core::flows::ops::flows_list(&config)
-                    .await
-                    .unwrap();
-                assert!(
-                    serde_json::to_string(&flows.value).unwrap().contains("fixture-flow"),
-                    "flow owner did not read the v1 database record: {flows:?}"
-                );
+                    let dispatch = openhuman_core::core::runtime::DispatchCtx::ambient();
+                    let thread_store = openhuman_core::threads::store::ConversationStore::new(
+                        dispatch,
+                        owner_workspace,
+                    );
+                    assert_eq!(
+                        thread_store
+                            .transcript_key("fixture-thread")
+                            .unwrap()
+                            .as_deref(),
+                        Some("fixture-transcript-key"),
+                        "thread owner did not read the v1 database transcript key"
+                    );
+                    let messages = thread_store.get_messages("fixture-thread").unwrap();
+                    assert_eq!(
+                        messages.len(),
+                        1,
+                        "thread owner did not read the historical message"
+                    );
+                    assert_eq!(messages[0].id, "fixture-message");
+                    assert_eq!(messages[0].content, "historical profile message");
+                    let approvals =
+                        openhuman_core::security::approval::store::list_pending(&config).unwrap();
+                    assert_eq!(
+                        approvals.len(),
+                        1,
+                        "approval owner did not read the v1 database record"
+                    );
+                    assert_eq!(approvals[0].request_id, "fixture-approval");
+                    let flows = openhuman_core::flows::ops::flows_list(&config)
+                        .await
+                        .unwrap();
+                    assert!(
+                        serde_json::to_string(&flows.value)
+                            .unwrap()
+                            .contains("fixture-flow"),
+                        "flow owner did not read the v1 database record: {flows:?}"
+                    );
                 },
             )
             .await;
@@ -233,10 +259,9 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     // Read the confidential record with TinyStorage's document-secret owner
     // API after the desktop boot has installed and migrated the profile DB.
     let url = format!("sqlite:{}", profile.join("storage.db").display());
-    let backend = openhuman_core::storage::block_on(async move {
-        openhuman_core::storage::open(&url).await
-    })
-    .unwrap();
+    let backend =
+        openhuman_core::storage::block_on(async move { openhuman_core::storage::open(&url).await })
+            .unwrap();
     let scope = openhuman_core::storage::Scope::local();
     let scoped = backend.for_scope(&scope).unwrap();
     let secrets = openhuman_core::storage::secrets::over(

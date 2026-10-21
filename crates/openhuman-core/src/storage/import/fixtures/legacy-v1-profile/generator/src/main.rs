@@ -279,7 +279,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     std::fs::write(
-        conversations.join("threads").join(format!("{thread_id_hex}.jsonl")),
+        conversations
+            .join("threads")
+            .join(format!("{thread_id_hex}.jsonl")),
         "{\"id\":\"fixture-message\",\"content\":\"historical profile message\",\"type\":\"text\",\"extraMetadata\":null,\"sender\":\"user\",\"createdAt\":\"2025-02-03T04:05:07Z\"}\n",
     )?;
     backend
