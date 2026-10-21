@@ -13,6 +13,12 @@ const TOKEN: &str = "legacy-profile-boot-e2e-token";
 const FIXTURE: &[u8] = include_bytes!(
     "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/storage.db"
 );
+const THREAD_LOG: &[u8] = include_bytes!(
+    "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/legacy-workspace/memory/conversations/threads.jsonl"
+);
+const THREAD_MESSAGES: &[u8] = include_bytes!(
+    "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/legacy-workspace/memory/conversations/threads/666978747572652d746872656164.jsonl"
+);
 
 struct Server(Child);
 
@@ -69,10 +75,14 @@ fn start(home: &Path) -> (Server, String) {
 }
 
 fn rpc(base: &str, method: &str) -> Value {
+    rpc_with_params(base, method, json!({}))
+}
+
+fn rpc_with_params(base: &str, method: &str, params: Value) -> Value {
     let response: Value = reqwest::blocking::Client::new()
         .post(format!("{base}/rpc"))
         .bearer_auth(TOKEN)
-        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": {} }))
+        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params }))
         .send()
         .unwrap_or_else(|error| panic!("POST {method}: {error}"))
         .json()
@@ -94,60 +104,16 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
     .unwrap();
     let source = workspace.join("storage/storage.db");
     std::fs::write(&source, FIXTURE).unwrap();
-    seed_legacy_session_db(&workspace);
+    let conversations = workspace.join("memory/conversations");
+    std::fs::create_dir_all(conversations.join("threads")).unwrap();
+    std::fs::write(conversations.join("threads.jsonl"), THREAD_LOG).unwrap();
+    std::fs::write(
+        conversations
+            .join("threads/666978747572652d746872656164.jsonl"),
+        THREAD_MESSAGES,
+    )
+    .unwrap();
     (profile, source)
-}
-
-fn seed_legacy_session_db(workspace: &Path) {
-    use openhuman_core::storage::rusqlite::{Connection, params};
-
-    let path = workspace.join("session_db/sessions.db");
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    let db = Connection::open(path).unwrap();
-    db.execute_batch(
-        "CREATE TABLE sessions (
-            id TEXT PRIMARY KEY, agent_definition_id TEXT NOT NULL,
-            agent_definition_name TEXT NOT NULL, session_key TEXT NOT NULL,
-            status TEXT NOT NULL, turn_count INTEGER NOT NULL,
-            input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
-            cached_input_tokens INTEGER NOT NULL, cost_usd REAL NOT NULL,
-            started_at TEXT NOT NULL);
-         CREATE TABLE session_messages (
-            id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL,
-            content TEXT NOT NULL, created_at TEXT NOT NULL);
-         CREATE TABLE session_tool_calls (
-            id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, message_id INTEGER,
-            tool_name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);",
-    )
-    .unwrap();
-    db.execute(
-        "INSERT INTO sessions VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-        params![
-            "fixture-session",
-            "default",
-            "Default",
-            "fixture-thread",
-            "completed",
-            1,
-            1,
-            1,
-            0,
-            0.0,
-            "2025-02-03T04:05:06Z"
-        ],
-    )
-    .unwrap();
-    db.execute(
-        "INSERT INTO session_messages VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![
-            1,
-            "fixture-session",
-            "assistant",
-            "Preserved fixture answer",
-            "2025-02-03T04:06:07Z"
-        ],
-    )
-    .unwrap();
 }
 
 #[test]
@@ -158,12 +124,21 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
 
     let (_server, base) = start(home.path());
     let threads = rpc(&base, "openhuman.threads_list");
+    let messages = rpc_with_params(
+        &base,
+        "openhuman.threads_messages_list",
+        json!({"thread_id": "fixture-thread"}),
+    );
     let approvals = rpc(&base, "openhuman.approval_list_pending");
     let flows = rpc(&base, "openhuman.flows_list");
 
     assert!(
         threads.to_string().contains("fixture-thread"),
         "thread owner did not read its historical profile record: {threads}"
+    );
+    assert!(
+        messages.to_string().contains("Historical thread body"),
+        "thread owner did not read its historical message: {messages}"
     );
     assert!(
         approvals.to_string().contains("fixture-approval"),
