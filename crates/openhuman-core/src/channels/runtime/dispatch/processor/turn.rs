@@ -24,12 +24,13 @@ use super::RuntimeChannelMessage;
 
 fn channel_inbound_preparation_request(
     source: tinychannels_bus::module_inbound::ChannelInboundSource,
+    preparation_mode: tinychannels_bus::module_inbound::ChannelInboundPreparationMode,
 ) -> tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
     tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
         source,
         namespace: "main".into(),
         session_policy: Default::default(),
-        preparation_mode: Default::default(),
+        preparation_mode,
     }
 }
 
@@ -66,7 +67,10 @@ pub(crate) async fn process_channel_runtime_message(
             };
             match crate::modules::channel_controller::prepare_inbound(
                 &crate::channels::context::module_client(&ctx).await,
-                channel_inbound_preparation_request(source),
+                channel_inbound_preparation_request(
+                    source,
+                    tinychannels_bus::module_inbound::ChannelInboundPreparationMode::LegacyText,
+                ),
             )
             .await
             {

@@ -42,10 +42,13 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
         ..Default::default()
     };
 
-    let request = channel_inbound_preparation_request(ChannelInboundSource::Envelope {
-        envelope: envelope.clone(),
-        timestamp: 1,
-    });
+    let request = channel_inbound_preparation_request(
+        ChannelInboundSource::Envelope {
+            envelope: envelope.clone(),
+            timestamp: 1,
+        },
+        tinychannels_bus::module_inbound::ChannelInboundPreparationMode::Typed,
+    );
     let prepared: PreparedChannelInbound = crate::modules::channel_controller::prepare_inbound(
         &crate::channels::module_fixture::client().await,
         request,
@@ -58,4 +61,17 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
     assert_eq!(prepared.envelope.conversation, envelope.conversation);
     assert_eq!(prepared.envelope.message_id, "provider-message-7");
     assert!(prepared.message.content.is_empty());
+
+    let legacy = crate::modules::channel_controller::prepare_inbound(
+        &crate::channels::module_fixture::client().await,
+        channel_inbound_preparation_request(
+            ChannelInboundSource::Envelope {
+                envelope,
+                timestamp: 1,
+            },
+            Default::default(),
+        ),
+    )
+    .await;
+    assert!(legacy.is_err(), "legacy callers must still reject rich-only input");
 }
