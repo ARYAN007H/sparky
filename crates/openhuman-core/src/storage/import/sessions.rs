@@ -47,7 +47,7 @@ use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
 use crate::config::Config;
 use crate::storage::sessions::DEFAULT_AGENT;
-use crate::storage::{Scope, StorageBackend};
+use crate::storage::StorageBackend;
 
 /// The marker name of the session import.
 pub const SESSIONS_DOMAIN: &str = "sessions";
