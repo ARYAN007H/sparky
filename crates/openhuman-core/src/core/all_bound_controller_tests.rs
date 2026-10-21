@@ -35,6 +35,11 @@ fn staged_bound_methods() -> Vec<&'static str> {
         "socket.emit",
         "socket.connect_with_session",
     ]);
+    methods.extend([
+        "tool_registry.list",
+        "tool_registry.get",
+        "tool_registry.diagnostics",
+    ]);
     #[cfg(feature = "voice")]
     methods.extend([
         "voice.status",

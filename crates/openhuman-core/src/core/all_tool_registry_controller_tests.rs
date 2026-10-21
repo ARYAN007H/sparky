@@ -55,10 +55,7 @@ fn raw_tool_registry_matches_its_independent_contract() {
     use TypeSchema::{Array, Json, String};
     let expected = [
         (vec![], vec![("tools", Array(Box::new(Json)), true)]),
-        (
-            vec![("tool_id", String, true)],
-            vec![("tool", Json, true)],
-        ),
+        (vec![("tool_id", String, true)], vec![("tool", Json, true)]),
         (vec![], vec![("diagnostics", Json, true)]),
     ];
     assert_eq!(entries.len(), expected.len());
