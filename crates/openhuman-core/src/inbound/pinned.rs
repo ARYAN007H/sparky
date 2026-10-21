@@ -105,7 +105,7 @@ pub fn render_prompt(
     source: &InboundSourceConfig,
     items: &[ExternalItem],
 ) -> String {
-    let events = serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_owned());
+    let events = serde_json::to_string(items).unwrap_or_else(|_| "[]".to_owned());
     match source.prompt.as_deref() {
         Some(prompt) if prompt.contains(EVENTS_PLACEHOLDER) => {
             prompt.replace(EVENTS_PLACEHOLDER, &events)
@@ -120,29 +120,32 @@ pub fn render_prompt(
     }
 }
 
-/// Turns this process is running, so a redelivery and a resume never run
-/// one twice at once.
-static IN_FLIGHT: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Mutex::default);
+/// Turns being run, so a redelivery and a resume never run one twice at
+/// once.
+type InFlight = Arc<Mutex<HashSet<String>>>;
+
+/// The turns this process's production runners are running.
+static IN_FLIGHT: LazyLock<InFlight> = LazyLock::new(InFlight::default);
 
 /// A claim on running one turn, released when dropped.
-struct Claim(String);
+struct Claim(InFlight, String);
 
 impl Claim {
-    fn take(turn_id: &str) -> Option<Self> {
-        IN_FLIGHT
+    fn take(in_flight: &InFlight, turn_id: &str) -> Option<Self> {
+        in_flight
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(turn_id.to_owned())
-            .then(|| Self(turn_id.to_owned()))
+            .then(|| Self(Arc::clone(in_flight), turn_id.to_owned()))
     }
 }
 
 impl Drop for Claim {
     fn drop(&mut self) {
-        IN_FLIGHT
+        self.0
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .remove(&self.0);
+            .remove(&self.1);
     }
 }
 
@@ -166,6 +169,7 @@ fn now_ms() -> u64 {
 pub struct Pinned {
     agent: Arc<dyn PinnedAgent>,
     results: Results,
+    in_flight: InFlight,
 }
 
 impl std::fmt::Debug for Pinned {
@@ -178,7 +182,23 @@ impl Pinned {
     /// Run turns with `agent`, keeping their results in `results`.
     #[must_use]
     pub fn new(agent: Arc<dyn PinnedAgent>, results: Results) -> Self {
-        Self { agent, results }
+        Self {
+            agent,
+            results,
+            in_flight: InFlight::default(),
+        }
+    }
+
+    /// The production runner: `inference.agent_chat`'s agent turn, sharing
+    /// one set of running turns across the process (deliveries and the boot
+    /// resume).
+    #[must_use]
+    pub fn production(results: Results) -> Self {
+        Self {
+            agent: Arc::new(AgentChatPinned),
+            results,
+            in_flight: Arc::clone(&IN_FLIGHT),
+        }
     }
 
     /// Deliver `turn` of source `name` (configured as `source`), waiting for
@@ -199,7 +219,7 @@ impl Pinned {
             Ok(_) => {}
             Err(error) => return Delivered::Failed(format!("results unavailable: {error:#}")),
         }
-        let Some(claim) = Claim::take(&turn.turn_id) else {
+        let Some(claim) = Claim::take(&self.in_flight, &turn.turn_id) else {
             tracing::info!(turn = %turn.turn_id, "[inbound] pinned turn already running here");
             return Delivered::Running;
         };
@@ -330,7 +350,7 @@ impl Pinned {
         let mut started = 0;
         for stored in left {
             let turn_id = stored.result.turn_id.clone();
-            let Some(claim) = Claim::take(&turn_id) else {
+            let Some(claim) = Claim::take(&self.in_flight, &turn_id) else {
                 continue;
             };
             tracing::info!(turn = %turn_id, source = %stored.result.source, "[inbound] resuming an unfinished pinned turn");
@@ -363,8 +383,7 @@ pub fn resume_at_boot(config: &crate::config::Config) {
             return;
         }
     };
-    let resumed =
-        Pinned::new(Arc::new(AgentChatPinned), results).resume(&DispatchCtx::host_default());
+    let resumed = Pinned::production(results).resume(&DispatchCtx::host_default());
     tracing::debug!(resumed, "[inbound] pinned turns resumed at boot");
 }
 

@@ -49,7 +49,7 @@ use tinyeventqueues_bus::{
 };
 
 use super::events::{digest_envelope, envelope_of};
-use super::pinned::{AgentChatPinned, Delivered, Pinned};
+use super::pinned::{Delivered, Pinned};
 use super::results::Results;
 use crate::config::schema::{InboundConfig, InboundSourceConfig};
 use crate::core::bus::BUS;
@@ -306,7 +306,7 @@ impl Deliverer {
                     }
                 };
                 match Results::open(&config) {
-                    Ok(results) => Some(Pinned::new(Arc::new(AgentChatPinned), results)),
+                    Ok(results) => Some(Pinned::production(results)),
                     Err(error) => {
                         tracing::warn!(error = %error, "[inbound] results store unavailable; pinned turns cannot run");
                         None
