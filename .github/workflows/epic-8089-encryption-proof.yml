@@ -124,12 +124,8 @@ jobs:
               new = '''comment: "Plaintext value to encrypt.",
                           required: false,'''
           elif case == "parser-wiring":
-              old = '''        parse_decrypt_secret,
-        run_decrypt_secret,'''
-              new = '''        |_params: Map<String, Value>| -> Result<String, String> {
-                      Err("mutation parser failure".to_owned())
-                  },
-                  run_decrypt_secret,'''
+              old = "        parse_decrypt_secret,\n        run_decrypt_secret,"
+              new = "        |_params: Map<String, Value>| -> Result<String, String> {\n            Err(\"mutation parser failure\".to_owned())\n        },\n        run_decrypt_secret,"
           else:
               raise SystemExit(f"unrecognized Encryption proof case: {case}")
           if source.count(old) != 1:
