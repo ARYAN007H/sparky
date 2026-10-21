@@ -56,6 +56,12 @@ pub struct QueuedPayload {
     /// this queued request. Synthetic queue placeholders deliberately do not
     /// inherit it from the currently running turn.
     pub(crate) native_message_input: Option<tinyinference_llm::message::Message>,
+    /// Host-created staged refs authorized for this exact external turn.
+    /// Requeued synthetic placeholders never inherit this grant.
+    pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    /// A preparation failure is sent through the shared runner's terminal
+    /// path without invoking the model.
+    pub(crate) native_preparation_error: Option<String>,
 }
 
 impl std::fmt::Debug for QueuedPayload {
@@ -77,6 +83,8 @@ impl std::fmt::Debug for QueuedPayload {
                 "has_native_message_input",
                 &self.native_message_input.is_some(),
             )
+            .field("native_staged_parts", &self.native_staged_parts.len())
+            .field("has_native_preparation_error", &self.native_preparation_error.is_some())
             .finish_non_exhaustive()
     }
 }

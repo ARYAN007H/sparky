@@ -152,6 +152,9 @@ impl TurnHost<QueuedPayload> for NativeHost {
         queue: Arc<RunQueue<TurnRequest<QueuedPayload>>>,
         progress: mpsc::Sender<TurnSignal>,
     ) -> Result<TurnResult, String> {
+        if let Some(error) = request.payload.native_preparation_error.as_ref() {
+            return Err(error.clone());
+        }
         let trusted = request
             .payload
             .trusted_turn
@@ -180,6 +183,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
                 event_session_id: trusted.event_session_id.clone(),
                 message: request.text.clone(),
                 message_input: request.payload.native_message_input.clone(),
+                staged_parts: request.payload.native_staged_parts.clone(),
                 origin: trusted.origin.clone(),
                 progress: Some(agent_progress),
                 run_queue: Some(queue),
@@ -553,6 +557,8 @@ pub(crate) async fn run(
     request_id: String,
     text: String,
     message_input: Option<tinyinference_llm::message::Message>,
+    staged_parts: Vec<tinychannels_bus::ContentPart>,
+    preparation_error: Option<String>,
     trusted: Arc<crate::agent::turn_host::TrustedAgentTurn>,
 ) -> NativeTurnExecution {
     let runtime = crate::core::runtime::slot_for::<NativeRuntime>(dispatch);
@@ -579,6 +585,8 @@ pub(crate) async fn run(
             ctx: Some(dispatch.clone()),
             trusted_turn: Some(trusted),
             native_message_input: message_input,
+            native_staged_parts: staged_parts,
+            native_preparation_error: preparation_error,
             ..Default::default()
         },
         host_authored: false,
