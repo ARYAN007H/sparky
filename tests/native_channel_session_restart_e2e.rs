@@ -1006,8 +1006,6 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() {
-    use base64::Engine as _;
-
     let tmp = tempfile::tempdir().expect("temporary core home");
     let home = std::fs::canonicalize(tmp.path()).expect("canonicalize temporary home");
     let workspace = home.join("workspace");
