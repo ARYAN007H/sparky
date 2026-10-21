@@ -1,5 +1,3 @@
-//! JSON-RPC controller surface for inference operations.
-
 use crate::config::rpc as config_rpc;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
@@ -7,24 +5,10 @@ use crate::core::Outcome;
 use crate::inference::host_runtime as local_runtime;
 use crate::inference::provider as providers;
 use serde_json::{json, Value};
-use tinyinference_llm::message::Message;
-use tinyinference_llm::model::ModelRequest;
-use tinyinference_llm::sentiment::{parse_sentiment_response, SentimentResult};
-use tinyinference_local::status::LocalAiStatus;
 use tracing::{debug, error, warn};
 
 const LOG_PREFIX: &str = "[inference::ops]";
 
-/// User picked a provider id (slug) that isn't registered in the cloud
-/// provider list — e.g. selecting `"ollama"` as a cloud provider when it's
-/// actually a local runtime. Matches the literal phrase emitted at
-/// `crates/openhuman-core/src/inference/provider/models/catalog_listing.rs:54`
-/// (`"no cloud provider with id or slug '{}' found"`).
-///
-/// Used by [`inference_list_models`] to demote this user-config case to
-/// `warn!` so it stops escalating to Sentry (TAURI-RUST-X, ~5740 events).
-/// The matcher is anchored on the exact phrase so unrelated sibling
-/// failures (TAURI-RUST-12 JSON parse, TAURI-RUST-2W reqwest builder,
 fn is_unknown_provider_user_config(err: &str) -> bool {
     err.contains("no cloud provider with id or slug")
 }
