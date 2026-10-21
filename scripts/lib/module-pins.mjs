@@ -222,15 +222,22 @@ export function validateTestOnlySourceParity({
       "unchangedTreeSha256",
     ];
     const singleFileProof =
-      proof && Object.hasOwn(proof, "testFile") && !Object.hasOwn(proof, "testFiles");
+      proof &&
+      Object.hasOwn(proof, "testFile") &&
+      !Object.hasOwn(proof, "testFiles");
     const fileSetProof =
-      proof && Object.hasOwn(proof, "testFiles") && !Object.hasOwn(proof, "testFile");
+      proof &&
+      Object.hasOwn(proof, "testFiles") &&
+      !Object.hasOwn(proof, "testFile");
     const expectedFields = singleFileProof
       ? [...commonFields, "testFile", "binding"]
       : fileSetProof
         ? [...commonFields, "testFiles", "bindings"]
         : [];
-    if (!proof || Object.keys(proof).sort().join(",") !== expectedFields.sort().join(",")) {
+    if (
+      !proof ||
+      Object.keys(proof).sort().join(",") !== expectedFields.sort().join(",")
+    ) {
       throw new Error("proof fields are missing or unknown");
     }
     if (!/^v\d+\.\d+\.\d+$/.test(proof.tag) || proof.tag !== `v${version}`) {
@@ -298,8 +305,15 @@ export function validateTestOnlySourceParity({
       !value.split("/").includes("..");
     const files = singleFileProof ? [proof.testFile] : proof.testFiles;
     const bindings = singleFileProof ? [proof.binding] : proof.bindings;
-    if (!Array.isArray(files) || files.length === 0 || !Array.isArray(bindings) || bindings.length !== files.length) {
-      throw new Error("test-file set and module bindings must be non-empty and have equal length");
+    if (
+      !Array.isArray(files) ||
+      files.length === 0 ||
+      !Array.isArray(bindings) ||
+      bindings.length !== files.length
+    ) {
+      throw new Error(
+        "test-file set and module bindings must be non-empty and have equal length",
+      );
     }
     const filePaths = new Set();
     const bindingsByPath = new Map();
@@ -311,7 +325,11 @@ export function validateTestOnlySourceParity({
       ) {
         throw new Error("test-file proof fields are missing or unknown");
       }
-      if (!validRepoPath(file.path) || !file.path.endsWith(".rs") || filePaths.has(file.path)) {
+      if (
+        !validRepoPath(file.path) ||
+        !file.path.endsWith(".rs") ||
+        filePaths.has(file.path)
+      ) {
         throw new Error("test-file paths must be unique safe Rust source paths");
       }
       filePaths.add(file.path);
@@ -335,7 +353,8 @@ export function validateTestOnlySourceParity({
     for (const binding of bindings) {
       if (
         !binding ||
-        Object.keys(binding).sort().join(",") !== "moduleBlob,modulePath,testPath" ||
+        Object.keys(binding).sort().join(",") !==
+          "moduleBlob,modulePath,testPath" ||
         !validRepoPath(binding.modulePath) ||
         !validRepoPath(binding.testPath) ||
         !/^[0-9a-f]{40}$/.test(binding.moduleBlob) ||
@@ -437,7 +456,9 @@ export function validateTestOnlySourceParity({
       ]);
       const declaration = `#[cfg(test)]\n#[path = "${binding.testPath.split("/").at(-1)}"]\nmod tests;`;
       if (!moduleSource.includes(declaration)) {
-        throw new Error(`the exact cfg(test) sibling module binding for ${binding.testPath} is absent`);
+        throw new Error(
+          `the exact cfg(test) sibling module binding for ${binding.testPath} is absent`,
+        );
       }
     }
     return { ok: true };

@@ -332,20 +332,30 @@ function sourceParitySetFixture({ includeNewTest = false } = {}) {
   git(["config", "commit.gpgsign", "false"]);
   git(["config", "tag.gpgsign", "false"]);
   mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "Cargo.toml"), '[package]\nname = "fixture"\nversion = "1.0.0"\n');
+  writeFileSync(
+    join(root, "Cargo.toml"),
+    '[package]\nname = "fixture"\nversion = "1.0.0"\n',
+  );
   writeFileSync(
     join(root, "src/lib.rs"),
     "pub mod alpha;\npub mod beta;\npub mod gamma;\npub mod future;\n",
   );
 
-  const paths = ["src/alpha_tests.rs", "src/beta_tests.rs", "src/gamma_tests.rs"];
+  const paths = [
+    "src/alpha_tests.rs",
+    "src/beta_tests.rs",
+    "src/gamma_tests.rs",
+  ];
   const modulePaths = ["src/alpha.rs", "src/beta.rs", "src/gamma.rs"];
   for (let index = 0; index < paths.length; index += 1) {
     writeFileSync(
       join(root, modulePaths[index]),
       `#[cfg(test)]\n#[path = "${paths[index].split("/").at(-1)}"]\nmod tests;\npub fn value() -> u8 { ${index} }\n`,
     );
-    writeFileSync(join(root, paths[index]), `#[test] fn works_${index}() {}\n`);
+    writeFileSync(
+      join(root, paths[index]),
+      `#[test] fn works_${index}() {}\n`,
+    );
   }
   const futurePath = "src/future_tests.rs";
   const futureModulePath = "src/future.rs";
@@ -428,7 +438,11 @@ function sourceParitySetFixture({ includeNewTest = false } = {}) {
         JSON.stringify({
           version: "1.0.0",
           assets: [
-            { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
+            {
+              hostKey: "linux",
+              archive: "fixture.tar.gz",
+              sha256: "a".repeat(64),
+            },
           ],
         }),
       )
@@ -437,7 +451,14 @@ function sourceParitySetFixture({ includeNewTest = false } = {}) {
     unchangedTreeSha256: createHash("sha256").update(canonicalTree).digest("hex"),
     bindings,
   };
-  return { root, git, releaseCommit, candidateCommit, parity, paths: testPaths };
+  return {
+    root,
+    git,
+    releaseCommit,
+    candidateCommit,
+    parity,
+    paths: testPaths,
+  };
 }
 const provider = {
   id: "tinyx-lang",
@@ -484,7 +505,9 @@ test("source parity proof accepts an explicit set of exact test-only files", () 
   }
 });
 
-test("multi-file source parity can attest an explicitly bound test file added after release", () => {
+test(
+  "multi-file source parity attests an explicitly bound test file added after release",
+  () => {
   const fixture = sourceParitySetFixture({ includeNewTest: true });
   try {
     const result = validateTestOnlySourceParity({
@@ -502,13 +525,18 @@ test("multi-file source parity can attest an explicitly bound test file added af
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
-});
+  },
+);
 
 test("multi-file source parity rejects omitted files, extra changes, and widened descendants", () => {
   const assets = [
     { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
   ];
-  const validate = (fixture, proof = fixture.parity, actualHead = fixture.candidateCommit) =>
+  const validate = (
+    fixture,
+    proof = fixture.parity,
+    actualHead = fixture.candidateCommit,
+  ) =>
     validateTestOnlySourceParity({
       repoPath: fixture.root,
       version: "1.0.0",
@@ -526,12 +554,16 @@ test("multi-file source parity rejects omitted files, extra changes, and widened
         cwd: fixture.root,
         encoding: "utf8",
       }).trim();
-      const result = validate(fixture, {
-        ...fixture.parity,
-        candidateCommit: head,
-      }, head);
+      const result = validate(
+        fixture,
+        { ...fixture.parity, candidateCommit: head },
+        head,
+      );
       assert.equal(result.ok, false, `${changedPath} was accepted`);
-      assert.match(result.message, /other source, manifest, lock, build input, or gitlink differs/);
+      assert.match(
+        result.message,
+        /other source, manifest, lock, build input, or gitlink differs/,
+      );
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
@@ -545,7 +577,10 @@ test("multi-file source parity rejects omitted files, extra changes, and widened
       bindings: fixture.parity.bindings.slice(0, 2),
     });
     assert.equal(omitted.ok, false, "a changed test file was omitted from the proof set");
-    assert.match(omitted.message, /other source, manifest, lock, build input, or gitlink differs/);
+    assert.match(
+      omitted.message,
+      /other source, manifest, lock, build input, or gitlink differs/,
+    );
 
     const duplicate = validate(fixture, {
       ...fixture.parity,
@@ -570,7 +605,10 @@ test("multi-file source parity rejects omitted files, extra changes, and widened
       binding: fixture.parity.bindings[0],
     });
     assert.equal(ambiguousShape.ok, false, "mixed single and set proof shapes were accepted");
-    assert.match(ambiguousShape.message, /proof fields are missing or unknown/);
+    assert.match(
+      ambiguousShape.message,
+      /proof fields are missing or unknown/,
+    );
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
