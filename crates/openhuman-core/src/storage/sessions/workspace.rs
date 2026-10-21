@@ -19,7 +19,9 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use super::tenant_router::TenantSessionStores;
 use tinyagents_harness::multimodal::BlobAttachmentStash;
-use tinyagents_session::port::{AgentStorageFactory, AgentStores, DriverSessionStores, SessionStoreProvider, TurnStates};
+use tinyagents_session::port::{
+    AgentStorageFactory, AgentStores, DriverSessionStores, SessionStoreProvider, TurnStates,
+};
 use tinyagents_session::run_ledger::{LedgerError, LedgerResult, RunLedgerStore};
 use tinyagents_storage_kit::ScopedStorage;
 use tinystoragedrivers_api::{BlobStore, DocumentStore, StorageBackend};
@@ -110,9 +112,10 @@ fn refusing_provider(message: String) -> Arc<dyn SessionStoreProvider> {
             message.clone(),
         ))
     });
-    Arc::new(DriverSessionStores::new(factory).unwrap_or_else(|error| {
-        panic!("could not start refusal-only session bridge: {error}")
-    }))
+    Arc::new(
+        DriverSessionStores::new(factory)
+            .unwrap_or_else(|error| panic!("could not start refusal-only session bridge: {error}")),
+    )
 }
 
 /// The key the calling tenant's stores are under, or `None` for a SaaS task
@@ -201,10 +204,7 @@ pub fn artifact_blobs_for(workspace_dir: &Path) -> Option<Arc<dyn BlobStore>> {
 
 /// The calling tenant's scoped storage on `workspace_dir`'s backend. `what`
 /// only labels the log line when the backend or scope is refused.
-fn tenant_scope_for(
-    workspace_dir: &Path,
-    what: &str,
-) -> Option<(String, ScopedStorage)> {
+fn tenant_scope_for(workspace_dir: &Path, what: &str) -> Option<(String, ScopedStorage)> {
     let key = tenant_agent_key()?;
     let backend = match crate::storage::local::backend_for(workspace_dir) {
         Ok(backend) => backend,

@@ -28,8 +28,8 @@ use anyhow::Result;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tinystoragedrivers_types::{Capability, CollectionSpec, Query, StorageError};
 use tinystoragedrivers_api::DocumentStore;
+use tinystoragedrivers_types::{Capability, CollectionSpec, Query, StorageError};
 
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
@@ -165,15 +165,18 @@ pub(crate) async fn migrate_legacy_state(scoped: &Storage) -> Result<usize, Stor
     }
     let store = StateKv::over(scoped, KV_OWNER, KV_NS);
     let mut moved = 0;
-    for legacy in docs
-        .query_all(LEGACY_STATE, &Query::all())
-        .await?
-    {
+    for legacy in docs.query_all(LEGACY_STATE, &Query::all()).await? {
         let Some(value) = legacy.doc.get("value") else {
             continue;
         };
-        if store.get::<Value>(&legacy.id).map_err(|error| StorageError::backend(error.to_string()))?.is_none() {
-            store.put(&legacy.id, value).map_err(|error| StorageError::backend(error.to_string()))?;
+        if store
+            .get::<Value>(&legacy.id)
+            .map_err(|error| StorageError::backend(error.to_string()))?
+            .is_none()
+        {
+            store
+                .put(&legacy.id, value)
+                .map_err(|error| StorageError::backend(error.to_string()))?;
             moved += 1;
         }
     }
