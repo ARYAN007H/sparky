@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelHooks};
+use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelMetadata};
 use std::sync::Arc;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
@@ -36,7 +36,7 @@ fn model_fixture_entry() -> ChatModelEntry {
             Ok((Arc::new(SessionFixtureModel), model.to_string()))
         }),
         probe: None,
-        models: Some(ProviderModelHooks {
+        models: Some(ProviderModelMetadata {
             default_model: Arc::new(|| Some("test/session-fixture".into())),
             role_for_model: Arc::new(|model| {
                 if model == "fixture-reasoning" {

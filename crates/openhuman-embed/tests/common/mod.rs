@@ -260,7 +260,7 @@ pub struct PointedInference;
 impl PointedInference {
     pub fn install(base_url: &str) {
         use openhuman_embed::__host::inference_registry::{
-            register_chat_model, ChatModelEntry, ChatModelRequest, ProviderModelHooks,
+            register_chat_model, ChatModelEntry, ChatModelRequest, ProviderModelMetadata,
             PROVIDER_OPENHUMAN,
         };
         use tinyinference_llm::providers::openai::OpenAiModel;
@@ -289,7 +289,7 @@ impl PointedInference {
             ChatModelEntry {
                 build: std::sync::Arc::new(build),
                 probe: None,
-                models: Some(ProviderModelHooks {
+                models: Some(ProviderModelMetadata {
                     default_model: std::sync::Arc::new(|| Some("embed-test-model".to_string())),
                     role_for_model: std::sync::Arc::new(|_| None),
                     is_alias: std::sync::Arc::new(|_| false),

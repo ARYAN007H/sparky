@@ -4,7 +4,7 @@ use super::*;
 async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
+    use crate::inference::registry::{ChatModelEntry, ProviderModelMetadata};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
@@ -28,7 +28,7 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
                     Ok(())
                 })
             })),
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(move || Some(name.to_string())),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),
@@ -134,7 +134,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        register_catalog_in, CatalogEntry, ChatModelEntry, ProviderModelHooks,
+        register_catalog_in, CatalogEntry, ChatModelEntry, ProviderModelMetadata,
     };
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
@@ -151,7 +151,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
                 ))
             }),
             probe: None,
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(move || Some(name.to_string())),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),

@@ -7,7 +7,7 @@ use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use super::*;
 use crate::inference::provider::factory::test_provider_override;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelHooks};
+use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelMetadata};
 use crate::web_chat::subscribe_web_channel_events;
 
 // ── parse_suggestions / strip_markdown_fence: pure unit tests ──────────────
@@ -101,7 +101,7 @@ fn install_suggestions_model_fixture() {
                 ))
             }),
             probe: None,
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(|| Some("fixture/suggestions".to_string())),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),

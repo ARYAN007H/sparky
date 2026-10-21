@@ -32,12 +32,12 @@ fn scoped_model_entry(
     name: &'static str,
     supports_vision: bool,
 ) -> crate::inference::registry::ChatModelEntry {
-    use crate::inference::registry::ProviderModelHooks;
+    use crate::inference::registry::ProviderModelMetadata;
 
     crate::inference::registry::ChatModelEntry {
         build: Arc::new(move |_| Ok((Arc::new(NamedModel(name)), name.to_string()))),
         probe: None,
-        models: Some(ProviderModelHooks {
+        models: Some(ProviderModelMetadata {
             default_model: Arc::new(move || Some(name.to_string())),
             role_for_model: Arc::new(move |model| {
                 if model == "fixture-role" {
@@ -200,7 +200,7 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
                 ))
             }),
             probe: None,
-            models: Some(crate::inference::registry::ProviderModelHooks {
+            models: Some(crate::inference::registry::ProviderModelMetadata {
                 default_model: Arc::new(|| Some("fixture/managed-default".into())),
                 role_for_model: Arc::new(|model| {
                     model

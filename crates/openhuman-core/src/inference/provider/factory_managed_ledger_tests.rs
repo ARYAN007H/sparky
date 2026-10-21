@@ -44,7 +44,7 @@ async fn managed_construction_ledger_collapses_repeat_disclosures() {
                 Ok((Arc::new(LedgerTestModel), model))
             }),
             probe: None,
-            models: Some(crate::inference::registry::ProviderModelHooks {
+            models: Some(crate::inference::registry::ProviderModelMetadata {
                 default_model: Arc::new(|| Some("fixture-model".to_string())),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),

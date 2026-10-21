@@ -41,7 +41,7 @@ impl ChatModel<()> for ManagedRouteFixtureModel {
 
 fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
     use crate::config::schema::cloud_providers::AuthStyle;
-    use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
+    use crate::inference::registry::{ChatModelEntry, ProviderModelMetadata};
     use std::sync::Mutex;
 
     let native_modes = Arc::new(Mutex::new(Vec::new()));
@@ -61,7 +61,7 @@ fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
                 ))
             }),
             probe: None,
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(|| Some("fixture/managed-default".into())),
                 role_for_model: Arc::new(|model| {
                     (model == "hint:reasoning").then(|| "reasoning".into())

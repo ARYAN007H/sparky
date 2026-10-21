@@ -28,7 +28,7 @@ use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::inference_registry::{
     register_backend_error_classifier, register_catalog, register_chat_model,
     register_config_normalizer, register_embedding, BoxFuture, ChatModelEntry, ChatModelFactory,
-    ChatModelRequest, ProviderContext, ProviderModelHooks, ReadinessProbe, PROVIDER_OPENHUMAN,
+    ChatModelRequest, ProviderContext, ProviderModelMetadata, ReadinessProbe, PROVIDER_OPENHUMAN,
 };
 use tinyinference_llm::model::ChatModel;
 
@@ -120,7 +120,7 @@ pub(crate) fn register(_options: &InstallOptions) {
         ChatModelEntry {
             build,
             probe: Some(readiness_probe()),
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(tiers::default_model),
                 role_for_model: Arc::new(tiers::role_for_model),
                 is_alias: Arc::new(tiers::is_alias),

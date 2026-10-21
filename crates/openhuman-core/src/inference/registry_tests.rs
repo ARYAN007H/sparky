@@ -37,7 +37,7 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
             ))
         }),
         probe: None,
-        models: Some(ProviderModelHooks {
+        models: Some(ProviderModelMetadata {
             default_model: Arc::new(|| Some("host/fake-default".to_string())),
             role_for_model: Arc::new(|model| {
                 (model == "hint:reasoning").then(|| "reasoning".to_string())

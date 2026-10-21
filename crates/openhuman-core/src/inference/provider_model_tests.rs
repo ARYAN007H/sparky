@@ -33,7 +33,7 @@ fn abstract_hint_markers_do_not_become_raw_model_ids() {
 #[test]
 fn registered_model_defaults_and_aliases_are_context_scoped() {
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelHooks};
+    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelMetadata};
     use std::sync::Arc;
 
     let extensions = Extensions::new();
@@ -43,7 +43,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
         ChatModelEntry {
             build: Arc::new(|_| Err(anyhow::anyhow!("test factory"))),
             probe: None,
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(|| Some("scoped/model".to_string())),
                 role_for_model: Arc::new(|model| {
                     (model == "scoped-alias").then(|| "reasoning".to_string())
@@ -224,7 +224,7 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
         register_chat_model, register_chat_model_in, unregister_chat_model, ChatModelEntry,
-        ProviderContext, ProviderModelHooks,
+        ProviderContext, ProviderModelMetadata,
     };
     use serde_json::json;
     use std::sync::Arc;
@@ -233,7 +233,7 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
         ChatModelEntry {
             build: Arc::new(|_| panic!("metadata lookup must not build a model")),
             probe: None,
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(move || Some(format!("{label}/default"))),
                 role_for_model: Arc::new(move |model| {
                     (model == format!("{label}/alias")).then(|| format!("{label}/role"))
