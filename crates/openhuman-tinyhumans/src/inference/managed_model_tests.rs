@@ -69,11 +69,7 @@ fn managed_native_model_exposes_tool_vision_and_physical_attempt_capabilities() 
     assert!(profile.tool_calling);
     assert!(profile.modalities.image_in);
     assert!(model.tracks_physical_attempts());
-    assert!(model.supports_input(
-        InputModality::Image,
-        "image/png",
-        InputSource::Base64
-    ));
+    assert!(model.supports_input(InputModality::Image, "image/png", InputSource::Base64));
 }
 
 #[test]

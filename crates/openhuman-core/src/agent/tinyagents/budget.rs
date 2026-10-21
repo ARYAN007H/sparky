@@ -94,9 +94,8 @@ impl crate::inference::turn_models::TurnModels {
             return self;
         }
         if let Some(models) = self.native_model_set.take() {
-            let models = models.map_models(|_, model| {
-                ModelBudget::control(model, budget, admission.clone())
-            });
+            let models = models
+                .map_models(|_, model| ModelBudget::control(model, budget, admission.clone()));
             let mut registrations = models.registrations("primary").into_iter();
             self.primary = registrations
                 .next()
