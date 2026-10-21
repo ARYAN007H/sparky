@@ -37,14 +37,14 @@ fn leaves_legacy_transcript_and_markdown_source_bytes_unchanged() {
 }
 
 #[test]
-fn removes_only_the_retired_workspace_profile_file() {
+fn preserves_workspace_profile_source_file() {
     let workspace = TempDir::new().unwrap();
     let profile = workspace.path().join("PROFILE.md");
     fs::write(&profile, "profile content").unwrap();
 
     let stats = run(workspace.path()).unwrap();
 
-    assert!(stats.profile_md_removed);
-    assert!(!profile.exists());
+    assert!(!stats.profile_md_removed);
+    assert_eq!(fs::read_to_string(profile).unwrap(), "profile content");
     assert_eq!(stats.errors, 0);
 }

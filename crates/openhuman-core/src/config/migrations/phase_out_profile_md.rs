@@ -1,30 +1,22 @@
 //! Phase-out migration: retires workspace `PROFILE.md` without modifying
 //! legacy transcript source files.
 //!
-//! `PROFILE.md` is being retired as a system-prompt injection. Earlier
-//! builds wrote the file into the system prompt of every session and
-//! froze those bytes inside `session_raw/{stem}.jsonl` (see
-//! [`tinyagents_session::transcript`]). Without
-//! Transcript source bytes are preserved. The session importer strips that
-//! block from a temporary in-memory copy before importing it into the new
-//! session store.
+//! `PROFILE.md` is no longer injected into new prompts. Older transcripts may
+//! still contain its section; the session importer removes that section from
+//! imported bytes in memory while preserving all source files.
 //!
 //! ## What it does
 //!
-//! 1. **Deletes `{workspace}/PROFILE.md`** if it exists. With the file
-//!    gone, the renderer's `inject_workspace_file_capped` short-circuits
-//!    silently — agents that still have `omit_profile = false`
-//!    (orchestrator, welcome, trigger_*, help) produce a clean prompt
-//!    on every new session without any source-code change.
-//! 2. Leaves JSONL transcripts and Markdown companions byte-for-byte intact.
-//!    `storage::import::sessions` removes the block only from imported bytes.
+//! 1. Leaves `PROFILE.md`, JSONL transcripts, and Markdown companions
+//!    byte-for-byte intact.
+//! 2. `storage::import::sessions` strips the old prompt section from imported
+//!    JSONL bytes through TinyAgents' format-aware pure transformer.
 //!
 //! ## Idempotency
 //!
 //! Gated externally by [`Config::schema_version`] — once the migration
 //! succeeds and the bump is persisted, future launches skip it.
-//! The file deletion is idempotent; the import-time byte transform is also
-//! idempotent.
+//! The import-time byte transform is idempotent.
 //!
 //! ## Fresh installs
 //!
@@ -33,7 +25,6 @@
 //! `schema_version` so future launches don't re-check.
 
 use anyhow::Result;
-use std::fs;
 use std::path::Path;
 
 /// Line that opens a `PROFILE.md` block in a system prompt. Matches the
@@ -47,8 +38,8 @@ pub struct PhaseOutStats {
     pub cleaned: usize,
     pub skipped: usize,
     pub errors: usize,
-    /// True when the legacy `PROFILE.md` file at the workspace root was
-    /// deleted by this run. `false` when no file was present.
+    /// Retained for report compatibility. Source profile files are preserved,
+    /// so this is always false.
     pub profile_md_removed: bool,
     /// Retained for migration report compatibility. Source companions are
     /// never rewritten, so this is always zero.
@@ -58,16 +49,8 @@ pub struct PhaseOutStats {
 /// Run the migration over `workspace_dir`. Returns aggregate stats.
 ///
 /// Legacy transcript files are handled by the read-only session importer.
-pub fn run(workspace_dir: &Path) -> Result<PhaseOutStats> {
-    let mut stats = PhaseOutStats::default();
-
-    // Final piece of the consumer-side phase-out: delete the legacy
-    // `PROFILE.md` file at the workspace root. With the file gone the
-    // renderer's `inject_workspace_file_capped` short-circuits silently,
-    // so even the agents whose `omit_profile = false` still want it will
-    // produce a clean prompt. This is intentionally done *before* the
-    // transcript walk so that a partial run still removes the file.
-    stats.profile_md_removed = remove_workspace_profile_md(workspace_dir, &mut stats);
+pub fn run(_workspace_dir: &Path) -> Result<PhaseOutStats> {
+    let stats = PhaseOutStats::default();
 
     // Transcript JSONL and Markdown companions are immutable source
     // evidence. The session importer applies the pure TinyAgents rewrite to
@@ -85,32 +68,6 @@ pub fn run(workspace_dir: &Path) -> Result<PhaseOutStats> {
     );
 
     Ok(stats)
-}
-
-/// Delete `{workspace_dir}/PROFILE.md` if it exists. Errors are folded
-/// into `stats.errors`. Returns `true` when a file was removed.
-fn remove_workspace_profile_md(workspace_dir: &Path, stats: &mut PhaseOutStats) -> bool {
-    let path = workspace_dir.join("PROFILE.md");
-    if !path.exists() {
-        return false;
-    }
-    match fs::remove_file(&path) {
-        Ok(()) => {
-            log::info!(
-                "[migration:phase-out-profile-md] removed legacy file path={}",
-                path.display()
-            );
-            true
-        }
-        Err(err) => {
-            stats.errors += 1;
-            log::warn!(
-                "[migration:phase-out-profile-md] failed to remove {}: {err:#}",
-                path.display()
-            );
-            false
-        }
-    }
 }
 
 /// Strip a `### PROFILE.md` block from a string.
