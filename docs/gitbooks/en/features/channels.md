@@ -9,23 +9,35 @@ icon: messages-square
 
 A channel is a messaging app the agent uses to talk to you. You message the agent on a platform you already use, and it replies there. A channel is the opposite of an [integration](integrations/README.md). An integration is mostly something the agent reads from, such as your inbox, calendar or CRM. A channel is a two-way conversation.
 
-Every channel follows the same small contract: one path to send messages and one to listen. That is why the same agent loop can serve Telegram, Discord, the built-in web chat and a dozen others without per-platform code.
+Channel providers normalize platform messages into typed envelopes and send
+typed replies through the configured provider. OpenHuman keeps account policy,
+authorization, agent execution, and durable conversation sessions in the host;
+provider transport runs in the TinyChannels module behind its bus contract.
 
 ## What a channel does
 
 A channel handles two directions.
 
-**Inbound.** When a message arrives, the channel turns it into a standard message (sender, reply target, content, optional thread id) and hands it to the dispatch loop. Dispatch starts or resumes an agent run, limits its tools, and the agent works on the request. Some platforms support `/models` and `/model` to switch the model for that sender's session. Telegram also supports remote-control commands.
+**Inbound.** The provider module normalizes the message, address, sender, and
+ordered content into a typed envelope. The OpenHuman host applies authorization
+and routing policy, then starts or resumes the durable conversation session.
+Some platforms support `/models` and `/model` to switch the model for that
+sender's session. Telegram also supports remote-control commands.
 
-**Outbound.** The agent's reply goes back through the same channel to your reply target, in a thread when the platform supports it. A channel can also send proactively, with no incoming message, when a [trigger](integrations/triggers.md) or a cron job fires. A channel receives proactive messages only if it has a default delivery target. Channels without one are skipped.
+**Outbound.** Typed reply content goes through the provider module to the
+original reply target, using a thread address when the platform supports it.
+Agent progress is projected through the shared TinyChannels web-output module
+for Web chat, TUI, and relayed web events; a gateway may also deliver its
+provider-specific terminal event. A channel can also send proactively, with no
+incoming message, when a [trigger](integrations/triggers.md) or cron job fires.
+A channel receives proactive messages only if it has a default delivery
+target. Channels without one are skipped.
 
 Where the platform allows it, channels can show a typing indicator, stream draft updates, post threaded replies and add emoji reactions. Each channel declares what it supports.
 
 ## Supported channels
 
 OpenHuman has 15 channel providers. 14 are built into the shipped desktop app. WhatsApp Web sits behind the `whatsapp-web` build feature, which the shipped app does not enable, so you can't switch it on. The in-app Web chat is built in and is not a provider. A separate `cli` channel serves the `openhuman-core` terminal binary. Eight channels have a setup flow in the app: Telegram, Discord, Web, iMessage, Lark/Feishu, DingTalk, Email and 元宝 (Yuanbao). You turn on the rest by hand in `config.toml`.
-
-Matrix is no longer supported. The config parser still accepts a `[channels.matrix]` section, but the provider was removed, so it is logged and skipped.
 
 | Channel            | Direction     | Inbound transport            | Credentials                                                        | In Settings UI |
 | ------------------ | ------------- | ---------------------------- | ------------------------------------------------------------------ | -------------- |
