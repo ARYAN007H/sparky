@@ -5,8 +5,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::doctor::{
-    register_check_source, register_check_source_in, ComponentId, DoctorCheck,
-    DoctorCheckSource, DoctorCtx, DoctorTier, Finding, FindingSeverity,
+    register_check_source, register_check_source_in, ComponentId, DoctorCheck, DoctorCheckSource,
+    DoctorCtx, DoctorTier, Finding, FindingSeverity,
 };
 use openhuman_embed::__host::platform::socket::{global_socket_manager, ConnectionStatus};
 use openhuman_embed::__host::security::credentials::api_key::get_api_key_read_only;
