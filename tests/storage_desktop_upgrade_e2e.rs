@@ -400,6 +400,9 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
     let mut total = 0;
     // The importers write the v2 collections of the owners behind each source.
     for spec in openhuman_core::storage::schema::owner_collections().unwrap() {
+        if spec.name == "tsd.migrations" {
+            continue;
+        }
         docs.documents().ensure_collection(&spec).await.unwrap();
         total += count(&docs, &spec.name).await;
     }
