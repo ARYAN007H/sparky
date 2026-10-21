@@ -71,7 +71,7 @@ fn scopes_do_not_see_each_others_state() {
 
 #[test]
 fn insert_if_absent_keeps_the_first_value() {
-    let kv = state(&MemoryStorage::new(), "local");
+    let kv = state("local");
     assert!(kv.insert_if_absent("root", &"first").unwrap());
     assert!(!kv.insert_if_absent("root", &"second").unwrap());
     assert_eq!(kv.get::<String>("root").unwrap().as_deref(), Some("first"));
@@ -79,7 +79,7 @@ fn insert_if_absent_keeps_the_first_value() {
 
 #[test]
 fn update_applies_the_change_and_skips_an_unchanged_write() {
-    let kv = state(&MemoryStorage::new(), "local");
+    let kv = state("local");
     let total = kv
         .update::<u32, u32>("n", |n| {
             *n += 2;
@@ -97,7 +97,7 @@ fn import_file_copies_a_legacy_file_once_and_leaves_it_in_place() {
     let dir = tempfile::tempdir().unwrap();
     let legacy = dir.path().join("jobs.json");
     std::fs::write(&legacy, r#"{"a": 1}"#).unwrap();
-    let kv = state(&MemoryStorage::new(), "local");
+    let kv = state("local");
     kv.import_file("jobs", &legacy).unwrap();
     assert_eq!(
         kv.get::<BTreeMap<String, u32>>("jobs").unwrap().unwrap()["a"],
@@ -124,7 +124,7 @@ fn import_file_does_not_replace_an_existing_value() {
     let dir = tempfile::tempdir().unwrap();
     let legacy = dir.path().join("x.json");
     std::fs::write(&legacy, "7").unwrap();
-    let kv = state(&MemoryStorage::new(), "local");
+    let kv = state("local");
     kv.put("x", &1u32).unwrap();
     kv.import_file("x", &legacy).unwrap();
     assert_eq!(kv.get::<u32>("x").unwrap(), Some(1));
@@ -133,7 +133,7 @@ fn import_file_does_not_replace_an_existing_value() {
 #[test]
 fn import_file_records_a_missing_or_corrupt_file_without_failing() {
     let dir = tempfile::tempdir().unwrap();
-    let kv = state(&MemoryStorage::new(), "local");
+    let kv = state("local");
     kv.import_file("none", &dir.path().join("missing.json"))
         .unwrap();
     let corrupt = dir.path().join("bad.json");
@@ -150,8 +150,7 @@ fn import_file_records_a_missing_or_corrupt_file_without_failing() {
 #[test]
 fn typed_import_quarantines_invalid_json_and_wrong_legacy_shapes() {
     let dir = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
-    let kv = state(&storage, "local");
+    let kv = state("local");
     let cases: [(&str, &[u8]); 2] = [
         ("malformed", b"{not json"),
         ("wrong_shape", br#"{"a":"not a number"}"#),
@@ -179,7 +178,7 @@ fn typed_import_keeps_valid_legacy_file_and_does_not_resurrect_deleted_value() {
     let legacy = dir.path().join("valid.json");
     let bytes = br#"{"a":7}"#;
     std::fs::write(&legacy, bytes).unwrap();
-    let kv = state(&MemoryStorage::new(), "local");
+    let kv = state("local");
 
     kv.import_file_quarantining::<BTreeMap<String, u32>>("valid", &legacy)
         .unwrap();
