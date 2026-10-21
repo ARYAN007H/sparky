@@ -107,7 +107,7 @@ use tinyinference_llm::providers::openai::codex::{
 /// OpenHuman endpoints may carry credentials in path segments. Keep this host
 /// log policy origin-only and never fall back to the unparsed input.
 pub fn redact_endpoint_origin(endpoint: &str) -> String {
-    let Ok(url) = url::Url::parse(endpoint.trim()) else {
+    let Ok(url) = reqwest::Url::parse(endpoint.trim()) else {
         return "<endpoint>".to_string();
     };
     tinyinference_core::sanitize::redact_url(&url.origin().ascii_serialization())
