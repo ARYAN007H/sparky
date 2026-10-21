@@ -461,6 +461,6 @@ fn now_ms() -> u64 {
         .min(u128::from(u64::MAX)) as u64
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "storage-sqlite"))]
 #[path = "storage_import_tinymcp_tests.rs"]
 mod tests;

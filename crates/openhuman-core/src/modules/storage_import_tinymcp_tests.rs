@@ -241,10 +241,7 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
 async fn a_data_dir_with_no_legacy_files_is_a_no_op() {
     let empty = tempfile::tempdir().unwrap();
     let rig = rig();
-    assert_eq!(
-        import(&rig, empty.path()).await.unwrap(),
-        Outcome::NoSource
-    );
+    assert_eq!(import(&rig, empty.path()).await.unwrap(), Outcome::NoSource);
 }
 
 #[tokio::test]
@@ -258,9 +255,7 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
     )
     .unwrap();
     let rig = rig();
-    assert!(
-        import(&rig, dir.path()).await.is_err()
-    );
+    assert!(import(&rig, dir.path()).await.is_err());
     let done = crate::storage::import_state::host_import_done(
         &rig.scoped(),
         MARKER_COLLECTION,
