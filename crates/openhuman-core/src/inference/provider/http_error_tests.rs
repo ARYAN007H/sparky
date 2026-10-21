@@ -15,7 +15,7 @@ const FIXTURE_BACKEND: &str = "fixture-managed-provider";
 
 fn install_fixture_backend_classifier() {
     use crate::inference::registry::{
-        BackendErrorClassification, register_backend_error_classifier,
+        register_backend_error_classifier, BackendErrorClassification,
     };
     register_backend_error_classifier(std::sync::Arc::new(|provider, _message| {
         BackendErrorClassification {
@@ -86,11 +86,10 @@ async fn api_error_replaces_no_model_loaded_body_with_guidance() {
         ),
     )
     .await;
-    assert!(
-        err.to_string()
-            .to_ascii_lowercase()
-            .contains("load a model")
-    );
+    assert!(err
+        .to_string()
+        .to_ascii_lowercase()
+        .contains("load a model"));
 }
 
 #[tokio::test]
@@ -362,7 +361,7 @@ fn skips_sentry_report_for_transient_upstream_statuses() {
 fn provider_http_policy_uses_registered_error_ownership_metadata() {
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        BackendErrorClassification, BackendErrorKind, register_backend_error_classifier_in,
+        register_backend_error_classifier_in, BackendErrorClassification, BackendErrorKind,
     };
     use std::sync::Arc;
 
@@ -402,7 +401,7 @@ fn provider_http_policy_uses_registered_error_ownership_metadata() {
 fn quota_demotion_precedes_backend_owned_error_code_guard() {
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        BackendErrorClassification, register_backend_error_classifier_in,
+        register_backend_error_classifier_in, BackendErrorClassification,
     };
     use std::sync::Arc;
     use tinyinference_llm::failure::demotion::DemotionKind;
@@ -456,7 +455,7 @@ fn quota_demotion_precedes_backend_owned_error_code_guard() {
 
 #[test]
 fn managed_unknown_model_remains_user_configuration_state() {
-    use tinyinference_llm::failure::demotion::{DemotionKind, demote_decision};
+    use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
     let facts = tinyinference_llm::failure::http::classify_http_failure(
         "openhuman",
         StatusCode::BAD_REQUEST.as_u16(),
@@ -470,7 +469,7 @@ fn managed_unknown_model_remains_user_configuration_state() {
 
 #[test]
 fn managed_provider_config_phrase_remains_reportable_but_unknown_model_demotes() {
-    use tinyinference_llm::failure::demotion::{DemotionKind, demote_decision};
+    use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
     let config_phrase = tinyinference_llm::failure::http::classify_http_failure(
         "openhuman",
         StatusCode::BAD_REQUEST.as_u16(),
@@ -491,7 +490,7 @@ fn managed_provider_config_phrase_remains_reportable_but_unknown_model_demotes()
 
 #[test]
 fn config_rejection_demotion_keeps_provider_status_and_polarity() {
-    use tinyinference_llm::failure::demotion::{DemotionKind, demote_decision};
+    use tinyinference_llm::failure::demotion::{demote_decision, DemotionKind};
     let cases = [
         (
             "custom_openai",
