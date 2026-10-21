@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
+use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc::Receiver;
 use tokio_util::sync::CancellationToken;
@@ -22,10 +23,23 @@ use tokio_util::sync::CancellationToken;
 use crate::progress::AgentProgress;
 use crate::storage::StorageError;
 
-pub use tinyskills::run_log::{detect_repeated_line, RunLogSlice, RunOutcome, ScannedRun};
-use tinyskills::run_log::{parse_runs, parse_terminal_outcome, short, slice, truncate};
+pub use tinyskills::run_log::{detect_repeated_line, RunLogSlice, RunOutcome};
+use tinyskills::run_log::{parse_runs, parse_terminal_outcome, short, truncate};
 
 type RunLogStore = tinyskills_drivers::StreamRunLogStore;
+
+/// One host-visible run. `log_path` is an opaque stream identifier retained
+/// under the historical JSON field name for clients that tail a run.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ScannedRun {
+    pub run_id: String,
+    pub workflow_id: String,
+    pub started: String,
+    pub status: String,
+    pub duration_ms: Option<u64>,
+    pub finished: Option<String>,
+    pub log_path: String,
+}
 
 fn run_log_store(workspace: &Path) -> anyhow::Result<RunLogStore> {
     let opened = crate::storage::local::open("skills::run_log", workspace)?;
@@ -131,6 +145,17 @@ pub fn scan_runs(workspace: &Path, workflow_id: Option<&str>, limit: usize) -> V
         })
         .collect::<Vec<_>>();
     parse_runs(entries, workflow_id, limit)
+        .into_iter()
+        .map(|run| ScannedRun {
+            run_id: run.run_id,
+            workflow_id: run.workflow_id,
+            started: run.started,
+            status: run.status,
+            duration_ms: run.duration_ms,
+            finished: run.finished,
+            log_path: run.stream_id,
+        })
+        .collect()
 }
 
 /// Read a byte-offset slice from a persisted run stream.
@@ -231,9 +256,21 @@ pub async fn write_header(
         .and_then(|tail| tail.split('.').nth(1))
         .ok_or_else(|| io_error("invalid run-log stream id"))?;
     let store = run_log_store(workspace).map_err(io_error)?;
+    let workflow_id = workflow_id.to_owned();
+    let run_id = run_id.to_owned();
+    let timestamp = timestamp.to_owned();
+    let inputs = inputs.clone();
+    let task_prompt = task_prompt.to_owned();
     let created = crate::storage::block_on(async move {
         store
-            .start(workflow_id, run_id, timestamp, &started, inputs, task_prompt)
+            .start(
+                &workflow_id,
+                &run_id,
+                &timestamp,
+                &started,
+                &inputs,
+                &task_prompt,
+            )
             .await
             .map_err(|error| StorageError::backend(error.to_string()))
     })
@@ -255,9 +292,11 @@ pub async fn write_footer(
     let finished = chrono::Utc::now().to_rfc3339();
     let id = stream_id(path).map_err(io_error)?.to_owned();
     let store = run_log_store(workspace).map_err(io_error)?;
+    let status = status.to_owned();
+    let output = output.to_owned();
     crate::storage::block_on(async move {
         store
-            .finish(&id, status, elapsed_ms, &finished, output)
+            .finish(&id, &status, elapsed_ms, &finished, &output)
             .await
             .map_err(|error| StorageError::backend(error.to_string()))
     })
