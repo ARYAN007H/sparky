@@ -199,11 +199,7 @@ fn load_config(ctx: DispatchCtx) -> ControllerTask<Config> {
     Box::pin(async move { ctx.load_config().await })
 }
 
-fn run_create_pairing(
-    ctx: DispatchCtx,
-    config: Config,
-    label: Option<String>,
-) -> ControllerFuture {
+fn run_create_pairing(ctx: DispatchCtx, config: Config, label: Option<String>) -> ControllerFuture {
     Box::pin(async move {
         to_json(crate::security::devices::rpc::devices_create_pairing(&ctx, &config, label).await?)
     })

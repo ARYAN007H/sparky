@@ -637,10 +637,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     #[rustfmt::skip]
     push(&mut controllers, DomainGroup::Config, crate::storage::layout::schemas::all_registered_controllers());
     // Mobile device pairing and management
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Security,
-        crate::security::devices::all_devices_registered_controllers(),
+        crate::security::devices::all_controller_entries(),
     );
     // Durable agent/workflow run ledger — read surface over run state, lineage, events, telemetry
     push(

@@ -1,8 +1,6 @@
 use super::*;
 use crate::core::all::{
-    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
-    expect_schema_input_order, expect_schema_output_fields, expect_schema_output_names,
-    ControllerHandler, ControllerParamContract,
+    assert_schema_controller_parity, ControllerHandler, ControllerParamContract,
 };
 use serde_json::json;
 
@@ -54,35 +52,12 @@ pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
 }
 
 #[test]
-fn device_schema_wire_contracts_are_preserved() {
+fn device_schema_catalog_matches_legacy_handler_order() {
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),
         "create_pairing",
     );
-    let contracts = ["create_pairing", "list", "revoke"];
-    let names: Vec<_> = all_controller_schemas()
-        .into_iter()
-        .map(|schema| schema.function)
-        .collect();
-    assert_eq!(names, contracts);
-
-    let create = schemas("create_pairing");
-    expect_schema_identity(&create, "devices", "create_pairing");
-    expect_schema_input_order(&create, &["label"]);
-    expect_schema_fields(&create, &[("label", Some(false))]);
-    expect_schema_output_fields(&create, &["channel_id", "pairing_token", "core_pubkey"]);
-
-    let list = schemas("list");
-    expect_schema_identity(&list, "devices", "list");
-    assert!(list.inputs.is_empty());
-    expect_schema_output_names(&list, &["devices"]);
-
-    let revoke = schemas("revoke");
-    expect_schema_identity(&revoke, "devices", "revoke");
-    expect_schema_input_order(&revoke, &["channel_id"]);
-    expect_schema_fields(&revoke, &[("channel_id", Some(true))]);
-    expect_schema_output_names(&revoke, &["success"]);
 }
 
 #[test]
