@@ -77,7 +77,7 @@ fn legacy_approval_rows_are_upgraded_before_copy_to_the_profile_store() {
             "expires_at": "2099-01-01T00:00:00Z",
             "pending": true
         }),
-        created_ms: Some(1_738_548_306_000),
+        created_ms: Some(1_738_555_506_000),
         schema: Some(1),
         expires_ms: None,
         updated_ms: None,
@@ -86,7 +86,7 @@ fn legacy_approval_rows_are_upgraded_before_copy_to_the_profile_store() {
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].collection, "approvals.requests");
     assert_eq!(records[0].id, "fixture-approval");
-    assert_eq!(records[0].doc["created_ms"], 1_738_548_306_000_i64);
+    assert_eq!(records[0].doc["created_ms"], 1_738_555_506_000_i64);
     assert_eq!(records[0].doc["deadline_ms"], 4_070_908_800_000_i64);
     assert_eq!(records[0].doc["pending"], true);
     assert!(specs.iter().any(|spec| spec.name == "approvals.requests"));
