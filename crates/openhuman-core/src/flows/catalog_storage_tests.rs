@@ -284,6 +284,8 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         CatalogStorageReply, DocDeleteWhereRequest,
     };
 
+    let _slot_lock = crate::storage::test_support::lock_storage_slot();
+
     let workspace = tempfile::tempdir().expect("isolated workspace");
     let config = Config {
         workspace_dir: workspace.path().to_path_buf(),
@@ -293,7 +295,7 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
     let registration = register(&context, &config).await.unwrap();
     let proxy = callback_proxy(&registration).await;
 
-    let backend_a: Arc<dyn StorageBackend> = Arc::new(crate::storage::MemoryStorage::new());
+    let backend_a = crate::storage::test_support::memory_backend();
     let previous = crate::storage::install(Arc::clone(&backend_a));
     struct RestoreBackend(Option<Arc<dyn StorageBackend>>);
     impl Drop for RestoreBackend {
@@ -486,7 +488,7 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         CatalogStorageReply::Value { ref value } if value == &Value::Bool(true)
     ));
 
-    let backend_b: Arc<dyn StorageBackend> = Arc::new(crate::storage::MemoryStorage::new());
+    let backend_b = crate::storage::test_support::memory_backend();
     crate::storage::install(Arc::clone(&backend_b));
     let ensured: CatalogStorageReply = proxy
         .call(

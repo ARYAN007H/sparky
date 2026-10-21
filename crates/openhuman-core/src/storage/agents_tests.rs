@@ -22,7 +22,7 @@ fn live_agent(agent: &str) -> Arc<CoreContext> {
 static CACHE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn memory_backend() -> Arc<dyn StorageBackend> {
-    Arc::new(crate::storage::MemoryStorage::new())
+    crate::storage::test_support::memory_backend()
 }
 
 fn visited(

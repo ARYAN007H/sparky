@@ -1,6 +1,8 @@
 //! The host checks local lease state on cached handles; native conditions
 //! independently fence each storage port against cross-process takeover.
 
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
 use crate::storage::fence::{FenceError, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore};
@@ -11,7 +13,6 @@ use std::sync::{
 };
 use std::time::Duration;
 use tinystoragedrivers_api::StorageBackend as _;
-use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::{NewMessage, Precondition, QueueSpec, Scope};
 
 const TTL: Duration = Duration::from_secs(30);
@@ -70,14 +71,14 @@ impl Node {
     }
 }
 
-fn shared() -> Arc<dyn StorageBackend> {
-    Arc::new(MemoryBackend::new())
+fn shared() -> crate::storage::test_support::SqliteBackend {
+    crate::storage::test_support::sqlite_backend().unwrap()
 }
 
 #[tokio::test]
 async fn cached_handles_enforce_local_expiry_margin_and_accept_same_epoch_renewal() {
     let shared = shared();
-    let node = Node::new("node-a", Arc::clone(&shared));
+    let node = Node::new("node-a", Arc::clone(&shared.backend));
     let (grant, fence) = node.acquire("alice").await;
     let storage = node.storage();
     storage
@@ -125,8 +126,8 @@ async fn cached_handles_enforce_local_expiry_margin_and_accept_same_epoch_renewa
 #[tokio::test]
 async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port() {
     let shared = shared();
-    let a = Node::new("node-a", Arc::clone(&shared));
-    let b = Node::new("node-b", Arc::clone(&shared));
+    let a = Node::new("node-a", Arc::clone(&shared.backend));
+    let b = Node::new("node-b", Arc::clone(&shared.backend));
     let (_grant, _fence) = a.acquire("alice").await;
     let storage = a.storage();
     storage
@@ -181,6 +182,7 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
     assert!(storage.queues().ack("work", &receipt).await.is_err());
 
     let raw = shared
+        .backend
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap();
     assert!(
@@ -206,7 +208,7 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
 #[tokio::test]
 async fn a_manually_latched_cached_fence_refuses_mutations_before_driver_io() {
     let shared = shared();
-    let node = Node::new("node-a", Arc::clone(&shared));
+    let node = Node::new("node-a", Arc::clone(&shared.backend));
     let (_grant, fence) = node.acquire("alice").await;
     let storage = node.storage();
     storage
@@ -224,6 +226,7 @@ async fn a_manually_latched_cached_fence_refuses_mutations_before_driver_io() {
     );
     assert!(
         shared
+            .backend
             .for_scope(&Scope::new("profile:alice").unwrap())
             .unwrap()
             .documents()
@@ -237,11 +240,11 @@ async fn a_manually_latched_cached_fence_refuses_mutations_before_driver_io() {
 #[tokio::test]
 async fn captured_profile_sweeps_cannot_follow_a_replacement_epoch() {
     let shared = shared();
-    let a = Node::new("node-a", Arc::clone(&shared));
-    let b = Node::new("node-b", Arc::clone(&shared));
+    let a = Node::new("node-a", Arc::clone(&shared.backend));
+    let b = Node::new("node-b", Arc::clone(&shared.backend));
     let (_grant, fence) = a.acquire("alice").await;
     let captured = FencedBackend::for_fence(
-        Arc::clone(&shared),
+        Arc::clone(&shared.backend),
         Arc::clone(&a.fences),
         Arc::clone(&fence),
     );
@@ -265,7 +268,7 @@ async fn captured_profile_sweeps_cannot_follow_a_replacement_epoch() {
         super::super::blob_sweep::sweep_scope(&captured, &scope).await,
         0
     );
-    let raw = shared.for_scope(&scope).unwrap();
+    let raw = shared.backend.for_scope(&scope).unwrap();
     assert_eq!(
         raw.blobs().get("aging").await.unwrap().unwrap().bytes,
         b"preserve"
