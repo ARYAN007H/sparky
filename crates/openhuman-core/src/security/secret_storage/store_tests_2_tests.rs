@@ -1,4 +1,4 @@
-use super::{BackendKind, effective_backend_kind_for};
+use super::{effective_backend_kind_for, BackendKind};
 
 #[test]
 fn explicit_file_backend_wins_over_staging_environment() {
@@ -91,19 +91,15 @@ fn explicit_os_backend_requires_a_host_provider() {
     let _env =
         crate::config::test_env::EnvVarGuard::locked().with("OPENHUMAN_KEYRING_BACKEND", "os");
     let dir = tempfile::tempdir().unwrap();
-    assert!(
-        super::validate_backend_selection()
-            .unwrap_err()
-            .contains("host-installed OS")
-    );
+    assert!(super::validate_backend_selection()
+        .unwrap_err()
+        .contains("host-installed OS"));
     let backend = super::build_backend_at(dir.path());
-    assert!(
-        backend
-            .get("user:key")
-            .unwrap_err()
-            .to_string()
-            .contains("host-installed OS")
-    );
+    assert!(backend
+        .get("user:key")
+        .unwrap_err()
+        .to_string()
+        .contains("host-installed OS"));
     assert!(backend.set("user:key", "value").is_err());
     assert!(backend.delete("user:key").is_err());
 }

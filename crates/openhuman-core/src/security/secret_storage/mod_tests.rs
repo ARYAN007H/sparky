@@ -367,7 +367,7 @@ fn get_or_create_random_idempotent_file_backend() {
     // Manually implement the get_or_create_random logic using FileBackend.
     let first = {
         let mut bytes = vec![0u8; 32];
-        use chacha20poly1305::aead::{OsRng, rand_core::RngCore};
+        use chacha20poly1305::aead::{rand_core::RngCore, OsRng};
         OsRng.fill_bytes(&mut bytes);
         let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
         fb.set(&nk, &hex).unwrap();

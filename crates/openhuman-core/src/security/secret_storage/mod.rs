@@ -24,19 +24,19 @@ pub mod store;
 // ── Public re-exports ─────────────────────────────────────────────────────────
 
 pub use backend::SecretBackend;
-pub use encrypted_file_backend::EncryptedFileBackend;
 pub use encrypted_file_backend::init_master_key;
 pub use encrypted_file_backend::key_source::{
-    MasterKeySource, clear_master_key_source, install_master_key_source,
-    installed_master_key_source,
+    clear_master_key_source, install_master_key_source, installed_master_key_source,
+    MasterKeySource,
 };
+pub use encrypted_file_backend::EncryptedFileBackend;
 pub use encrypted_store::SecretStore;
 pub use error::SecretStorageError;
 pub use install::{clear_secret_backend, install_secret_backend, installed_secret_backend};
 pub use memory_backend::MemoryBackend;
 pub use ops::{
-    MigrationOutcome, backend_name, delete, get, get_or_create_random, is_available,
-    migrate_from_file, reset_availability_cache, set,
+    backend_name, delete, get, get_or_create_random, is_available, migrate_from_file,
+    reset_availability_cache, set, MigrationOutcome,
 };
 pub use store::init_workspace;
 

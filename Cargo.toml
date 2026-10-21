@@ -64,6 +64,14 @@ tinybus = { path = "vendor/tinybus/crates/tinybus" }
 tinybus-macros = { path = "vendor/tinybus/crates/tinybus-macros" }
 tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 
+[patch."https://github.com/senamakel/tinybus"]
+# The v2 storage and TinyBox modules depend on the migration fork URL. Patch
+# that source identity to the same checkout as the canonical dependency above
+# so all bus interfaces share one Rust type identity.
+tinybus = { path = "vendor/tinybus/crates/tinybus" }
+tinybus-macros = { path = "vendor/tinybus/crates/tinybus-macros" }
+tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
+
 [patch."https://github.com/tinyhumansai/tinystoragedrivers"]
 # One editable checkout every module resolves onto. The v2 repository splits
 # the public facade, API, types and primitive implementations into separate

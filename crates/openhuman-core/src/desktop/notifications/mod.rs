@@ -36,8 +36,8 @@ pub(crate) use store_documents::import_source;
 pub mod types;
 
 pub use bus::{
-    NotificationBridgeSubscriber, publish_core_notification,
-    register_notification_bridge_subscriber, subscribe_core_notifications,
+    publish_core_notification, register_notification_bridge_subscriber,
+    subscribe_core_notifications, NotificationBridgeSubscriber,
 };
 pub use schemas::{
     all_controller_schemas as all_notifications_controller_schemas,

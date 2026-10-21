@@ -7,8 +7,8 @@ use std::sync::Arc;
 use tinystoragedrivers::secrets::{DerivedKeys, SecretStore as _};
 use zeroize::Zeroizing;
 
-use crate::security::secret_storage::SecretBackend;
 use crate::security::secret_storage::backend::MockBackend;
+use crate::security::secret_storage::SecretBackend;
 use crate::storage::{MemoryStorage, Scope, StorageBackend};
 
 #[test]

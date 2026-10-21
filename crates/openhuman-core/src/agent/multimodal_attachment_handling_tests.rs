@@ -56,11 +56,9 @@ async fn rehydrate_missing_stash_id_keeps_placeholder_text() {
         "see [Image: image #att:deadbeefdeadbeef]".to_string(),
     )];
     let out = rehydrate_image_placeholders(&messages).await;
-    assert!(
-        out[0]
-            .content
-            .contains("[Image: image #att:deadbeefdeadbeef]")
-    );
+    assert!(out[0]
+        .content
+        .contains("[Image: image #att:deadbeefdeadbeef]"));
     assert!(!out[0].content.contains("[IMAGE:data:"));
 }
 

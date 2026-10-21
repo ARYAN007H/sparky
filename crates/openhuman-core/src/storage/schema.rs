@@ -43,6 +43,7 @@ fn declared_collections() -> Vec<CollectionSpec> {
     collections.extend(crate::threads::store::collection_specs());
     collections.extend(crate::agent::orchestration::subagent_sessions::collection_specs());
     collections.extend(super::agents::collection_specs());
+    collections.extend(super::journal_maintenance::collection_specs());
 
     #[cfg(feature = "skills")]
     collections.extend(tinyskills_drivers::collections());
