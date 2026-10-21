@@ -316,7 +316,9 @@ fn calls_recorded_after_their_results_project_as_settled() {
     );
 
     let provider = memory_session_provider();
-    let locator = provider.for_agent(crate::storage::sessions::DEFAULT_AGENT).transcripts;
+    let locator = provider
+        .for_agent(crate::storage::sessions::DEFAULT_AGENT)
+        .transcripts;
     crate::storage::import::sessions::import_transcript_groups(provider.as_ref(), dir.path())
         .unwrap();
     let items = project_thread_in(locator.as_ref(), thread, None, None)

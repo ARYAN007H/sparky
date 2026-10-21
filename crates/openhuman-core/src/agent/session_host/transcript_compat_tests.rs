@@ -181,9 +181,9 @@ fn store_provider(root: &Path) -> Arc<dyn SessionStoreProvider> {
         LazyLock::new(Mutex::default);
     let mut stores = STORES.lock().unwrap_or_else(|e| e.into_inner());
     Arc::clone(
-        stores
-            .entry(root.to_path_buf())
-            .or_insert_with(crate::storage::sessions::splice_fixture_tests::memory_session_provider),
+        stores.entry(root.to_path_buf()).or_insert_with(
+            crate::storage::sessions::splice_fixture_tests::memory_session_provider,
+        ),
     )
 }
 
