@@ -213,8 +213,7 @@ fn native_typed_message_keeps_context_prefix_and_interleaved_part_order() {
         "[Channel context] Telegram private chat",
         &parts,
     )
-    .unwrap()
-    else {
+    .unwrap() else {
         panic!("user message expected")
     };
     assert_eq!(user.content.len(), 6);

@@ -623,12 +623,16 @@ fn assert_model_received_file_content(request: &Value) {
 
 fn find_block_type<'a>(value: &'a Value, expected: &str) -> Option<&'a Value> {
     match value {
-        Value::Array(items) => items.iter().find_map(|item| find_block_type(item, expected)),
+        Value::Array(items) => items
+            .iter()
+            .find_map(|item| find_block_type(item, expected)),
         Value::Object(fields) => {
             if fields.get("type").and_then(Value::as_str) == Some(expected) {
                 return Some(value);
             }
-            fields.values().find_map(|item| find_block_type(item, expected))
+            fields
+                .values()
+                .find_map(|item| find_block_type(item, expected))
         }
         _ => None,
     }
@@ -974,7 +978,10 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         file_mixed.find(std::str::from_utf8(NATIVE_FILE_BYTES).expect("fixture is UTF-8"))
     });
     let file_position = file_position.expect("file reaches model as a document or extracted text");
-    assert!(file_caption < file_position, "file part order: {file_mixed}");
+    assert!(
+        file_caption < file_position,
+        "file part order: {file_mixed}"
+    );
     for request in &requests {
         let serialized = serde_json::to_string(request).unwrap();
         assert!(!serialized.contains("typed-image-file"));

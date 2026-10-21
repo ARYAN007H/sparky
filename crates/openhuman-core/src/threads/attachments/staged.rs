@@ -466,8 +466,8 @@ pub(crate) async fn read_authorized_native_attachment(
     let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
         .await
         .map_err(|_| "native attachment workspace path is invalid".to_owned())?;
-    let media = opaque_media(&entry.part)
-        .ok_or_else(|| "native attachment kind is invalid".to_owned())?;
+    let media =
+        opaque_media(&entry.part).ok_or_else(|| "native attachment kind is invalid".to_owned())?;
     let mime = media
         .content_type
         .clone()
@@ -487,15 +487,18 @@ fn validate_native_attachment_policy(
     entry: &StoredAttachment,
     config: &crate::config::Config,
 ) -> Result<(), String> {
-    let media = opaque_media(&entry.part)
-        .ok_or_else(|| "native attachment kind is invalid".to_owned())?;
+    let media =
+        opaque_media(&entry.part).ok_or_else(|| "native attachment kind is invalid".to_owned())?;
     let mime = media
         .content_type
         .as_deref()
         .ok_or_else(|| "native attachment MIME is unavailable".to_owned())?;
     let is_image = matches!(entry.part, ContentPart::Image { .. });
     let allowed = if is_image {
-        matches!(mime, "image/png" | "image/jpeg" | "image/webp" | "image/gif")
+        matches!(
+            mime,
+            "image/png" | "image/jpeg" | "image/webp" | "image/gif"
+        )
     } else {
         config
             .multimodal_files
@@ -514,8 +517,7 @@ fn validate_native_attachment_size(
     actual_bytes: usize,
     config: &crate::config::Config,
 ) -> Result<(), String> {
-    let media = opaque_media(part)
-        .ok_or_else(|| "native attachment kind is invalid".to_owned())?;
+    let media = opaque_media(part).ok_or_else(|| "native attachment kind is invalid".to_owned())?;
     let is_image = matches!(part, ContentPart::Image { .. });
     let declared = media
         .size_bytes
