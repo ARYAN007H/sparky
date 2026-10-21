@@ -25,14 +25,12 @@ use tinyinference_llm::failure::is_empty_provider_response_text;
 use tokio::sync::{mpsc, watch, Mutex as AsyncMutex};
 
 use super::ops::{self, BudgetCorrelation};
-use super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
+use super::progress::ProgressProjection;
 use super::runner::{Admission, Shared};
 use super::session::{
     checkin_session_agent, checkout_session_agent, normalize_model_override, CheckoutPolicy,
 };
 use super::surface::TurnIds;
-use super::turn_activity::TurnActivity;
-use super::types::WebChatTaskResult;
 use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
@@ -44,9 +42,9 @@ use tinyagents_harness::progress::AgentProgress;
 
 #[path = "turn_host_progress.rs"]
 mod progress_helpers;
-use progress_helpers::{
-    settle_turn_snapshot, spawn_heartbeat, spawn_heartbeat_with_interval, tap_progress, AbortOnDrop,
-};
+#[cfg(test)]
+use progress_helpers::spawn_heartbeat_with_interval;
+use progress_helpers::{settle_turn_snapshot, spawn_heartbeat, tap_progress, AbortOnDrop};
 
 /// How long a finished turn waits for its progress tap to forward every event
 /// the turn queued before the terminal `chat_done`/`chat_error` is published.
