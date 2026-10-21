@@ -10,9 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
-use tinystoragedrivers_api::{
-    async_trait, DocumentStore, DocumentWatch, Storage, StorageBackend,
-};
+use tinystoragedrivers_api::{DocumentStore, DocumentWatch, Storage, StorageBackend, async_trait};
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::{
     Capabilities, Capability, CollectionSpec, Filter, Page, Precondition, Query, Result, Scope,
@@ -42,13 +40,28 @@ impl StorageBackend for WatchingStorage {
 
     fn for_scope(&self, scope: &Scope) -> Result<Storage> {
         let scoped = self.inner.for_scope(scope)?;
+        Ok(self.wrap_scope(scope, scoped))
+    }
+
+    fn for_scope_conditioned(
+        &self,
+        scope: &Scope,
+        condition: &tinystoragedrivers_types::WriteCondition,
+    ) -> Result<Storage> {
+        let scoped = self.inner.for_scope_conditioned(scope, condition)?;
+        Ok(self.wrap_scope(scope, scoped))
+    }
+}
+
+impl WatchingStorage {
+    fn wrap_scope(&self, scope: &Scope, scoped: Storage) -> Storage {
         let sender = {
             let mut hub = self.hub.lock().unwrap();
             hub.entry(scope.as_str().to_string())
                 .or_insert_with(|| broadcast::channel(64).0)
                 .clone()
         };
-        Ok(Storage::new(
+        Storage::new(
             Arc::new(Documents {
                 inner: Arc::clone(scoped.documents()),
                 changed: sender,
@@ -58,7 +71,7 @@ impl StorageBackend for WatchingStorage {
             Arc::clone(scoped.blobs()),
             Arc::clone(scoped.queues()),
             Arc::clone(scoped.secrets()),
-        ))
+        )
     }
 }
 
@@ -100,6 +113,10 @@ impl DocumentStore for Documents {
 
     async fn ensure_collection(&self, spec: &CollectionSpec) -> Result<()> {
         self.inner.ensure_collection(spec).await
+    }
+
+    async fn validate_collection_spec(&self, spec: &CollectionSpec) -> Result<()> {
+        self.inner.validate_collection_spec(spec).await
     }
 
     async fn get(&self, c: &str, id: &str) -> Result<Option<Versioned<Value>>> {

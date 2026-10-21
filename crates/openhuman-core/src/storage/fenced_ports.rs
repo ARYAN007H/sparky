@@ -13,10 +13,10 @@ use tinystoragedrivers_api::{
     DocumentWatch, Enqueued, KvStore, NewMessage, QueueStore, Receipt, Retry, Storage, StreamStore,
 };
 use tinystoragedrivers_types::{
-    Capabilities, CollectionSpec, Cursor, Filter, Page, Precondition, Query, QueueFeatures,
-    QueueSpec, QueueStats, ReadCheck, Result, SealOutcome, SearchHit, Sort, StreamEntry,
-    StreamInfo, TreeEntry, TreeFile, Version, Versioned, WatchOptions, WriteOp, WriteOptions,
-    WriteResult,
+    Capabilities, Capability, CollectionSpec, Cursor, Filter, Page, Precondition, Query,
+    QueueFeatures, QueueSpec, QueueStats, ReadCheck, Result, SealOutcome, SearchHit, Sort,
+    StreamEntry, StreamInfo, TreeEntry, TreeFile, Version, Versioned, WatchOptions, WriteOp,
+    WriteOptions, WriteResult,
 };
 
 use super::{
@@ -336,7 +336,11 @@ impl BlobStore for GuardedBlobs {
         self.inner.presign_get(k, t).await
     }
     async fn presign_put(&self, k: &str, t: Duration) -> Result<String> {
-        self.inner.presign_put(k, t).await
+        let _ = (k, t);
+        Err(StorageError::unsupported(
+            Capability::PresignedUrls,
+            "condition-bound storage cannot issue a write URL that outlives its lease check",
+        ))
     }
     async fn list_dir(&self, d: &str) -> Result<Vec<TreeEntry>> {
         self.inner.list_dir(d).await
