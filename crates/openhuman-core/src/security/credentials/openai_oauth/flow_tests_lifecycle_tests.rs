@@ -596,7 +596,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
     let routing = resolve_codex_routing(
         &config,
         "openai",
-        "https://api.openai.com/v1",
+        "https://api.openai.com/v1/",
         // A stale bearer that does NOT equal the stored access token: the pre-fix
         // equality check mis-routed on exactly this.
         "oauth-access-stale",
@@ -605,7 +605,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
     .unwrap();
     assert!(routing.using_oauth, "OAuth-only openai must route to Codex");
     assert_ne!(
-        routing.endpoint, "https://api.openai.com/v1",
+        routing.endpoint, "https://api.openai.com/v1/",
         "must re-target the Codex backend, not standard OpenAI"
     );
 
@@ -621,7 +621,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
     let routing = resolve_codex_routing(
         &config,
         "openai",
-        "https://api.openai.com/v1",
+        "https://api.openai.com/v1/",
         "sk-api-key",
         openai_bearer_is_oauth(&config),
     )
@@ -630,7 +630,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
         !routing.using_oauth,
         "a stored API key routes to standard OpenAI"
     );
-    assert_eq!(routing.endpoint, "https://api.openai.com/v1");
+    assert_eq!(routing.endpoint, "https://api.openai.com/v1/");
 }
 
 #[test]
