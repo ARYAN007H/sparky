@@ -179,7 +179,10 @@ pub(crate) fn apply_retry_backoff_override(policy: &mut RunPolicy, raw: Option<&
     };
     policy.retry.initial_backoff_ms = ms;
     policy.retry.max_backoff_ms = ms.saturating_mul(10);
-    tracing::debug!(initial_backoff_ms = ms, "[turn_policy] model retry backoff overridden");
+    tracing::debug!(
+        initial_backoff_ms = ms,
+        "[turn_policy] model retry backoff overridden"
+    );
 }
 
 /// Default per-turn tool budget, narrowed by an explicit host cap.
