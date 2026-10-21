@@ -338,39 +338,48 @@ pub(crate) async fn stage_native_channel_part(
     )
     .await
     .map_err(|_| "native attachment could not be staged safely".to_owned())?;
-    let mut part = input.clone();
-    let media = opaque_media_mut(&mut part)
-        .ok_or_else(|| "native attachment kind cannot be staged".to_owned())?;
-    let opaque_id = uuid::Uuid::new_v4().simple().to_string();
-    media.opaque_id = Some(opaque_id.clone());
-    media.path = None;
-    media.url = None;
-    media.local_cache_path = None;
-    media.content_type = Some(file.mime.clone());
-    media.size_bytes = Some(file.size_bytes as u64);
+    let file_path = file.path.clone();
+    let result = async {
+        let mut part = input.clone();
+        let media = opaque_media_mut(&mut part)
+            .ok_or_else(|| "native attachment kind cannot be staged".to_owned())?;
+        let opaque_id = uuid::Uuid::new_v4().simple().to_string();
+        media.opaque_id = Some(opaque_id.clone());
+        media.path = None;
+        media.url = None;
+        media.local_cache_path = None;
+        media.content_type = Some(file.mime.clone());
+        media.size_bytes = Some(file.size_bytes as u64);
 
-    let tenant = tenant_for(ctx)?;
-    let repo = staged_repo(ctx, &config.workspace_dir)?;
-    let id = staged_doc_id(&opaque_id)?;
-    let manifest = StagedAttachment {
-        tenant,
-        thread_id: thread_id.to_owned(),
-        attachment: StoredAttachment {
-            part: part.clone(),
-            path: file.path,
-        },
-        expires_at: chrono::Utc::now().timestamp() + STAGED_TTL_SECS,
-        claim: None,
-    };
-    let body = serde_json::to_value(&manifest)
-        .map_err(|error| format!("serialize native attachment record: {error}"))?;
-    repo.run(|docs| async move {
-        docs.put(STAGED_COLLECTION, &id, body, Precondition::Absent)
-            .await?;
-        Ok(())
-    })
-    .map_err(|error| format!("persist native attachment record: {error}"))?;
-    Ok(part)
+        let tenant = tenant_for(ctx)?;
+        let repo = staged_repo(ctx, &config.workspace_dir)?;
+        let id = staged_doc_id(&opaque_id)?;
+        let manifest = StagedAttachment {
+            tenant,
+            thread_id: thread_id.to_owned(),
+            attachment: StoredAttachment {
+                part: part.clone(),
+                path: file.path,
+            },
+            expires_at: chrono::Utc::now().timestamp() + STAGED_TTL_SECS,
+            claim: None,
+        };
+        let body = serde_json::to_value(&manifest)
+            .map_err(|error| format!("serialize native attachment record: {error}"))?;
+        repo.run(|docs| async move {
+            docs.put(STAGED_COLLECTION, &id, body, Precondition::Absent)
+                .await?;
+            Ok(())
+        })
+        .map_err(|error| format!("persist native attachment record: {error}"))?;
+        Ok(part)
+    }
+    .await;
+    if result.is_err() {
+        let path = staged_config.action_dir.join(file_path);
+        let _ = tokio::fs::remove_file(path).await;
+    }
+    result
 }
 
 pub(crate) async fn commit_native_channel_parts(
