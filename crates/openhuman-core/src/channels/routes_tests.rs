@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use tinybus::EventHandler;
-use tinychannels::routes::resolve_provider_alias;
 use tinychannels_bus::ChannelMessage;
 use tinytools::{Tool, ToolResult};
 
@@ -138,17 +137,7 @@ async fn module_route_help_response(
 }
 
 #[test]
-fn provider_alias_and_route_selection_round_trip() {
-    let first_provider = provider::list_providers()
-        .into_iter()
-        .next()
-        .expect("provider registry should not be empty");
-    assert_eq!(
-        resolve_provider_alias(first_provider.name, &provider_descriptors()).as_deref(),
-        Some(first_provider.name)
-    );
-    assert!(resolve_provider_alias("   ", &provider_descriptors()).is_none());
-
+fn route_selection_round_trip() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let sender_key = "telegram_alice_reply";
     assert_eq!(

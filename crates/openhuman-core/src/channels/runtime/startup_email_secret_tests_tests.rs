@@ -2,7 +2,7 @@ use super::*;
 use crate::security::credentials::AuthService;
 use std::collections::HashMap;
 use tempfile::tempdir;
-use tinychannels::providers::email_channel::EmailConfig;
+use tinychannels_bus::config::EmailConfig;
 
 use crate::channels::credentials::resolve_email_password;
 fn isolated_config() -> (tempfile::TempDir, Config) {

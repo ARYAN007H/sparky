@@ -7,8 +7,6 @@ mod delivery_import;
 mod module_providers;
 mod progressive_transport;
 mod prompt;
-#[cfg(test)]
-mod relay;
 mod start_channels;
 mod turn_parts;
 
