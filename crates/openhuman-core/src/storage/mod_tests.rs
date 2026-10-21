@@ -89,14 +89,14 @@ fn install_installed_and_clear() {
     // test's storage calls while this one runs.
     let slot = Slot::default();
     assert!(slot.installed().is_none());
-    let backend: Arc<dyn StorageBackend> = Arc::new(tinystoragedrivers::MemoryStorage::new());
+    let backend = test_support::memory_backend();
     assert!(slot.install(Arc::clone(&backend)).is_none());
     assert!(
         slot.installed()
             .is_some_and(|got| Arc::ptr_eq(&got, &backend))
     );
     assert!(
-        slot.install(Arc::new(tinystoragedrivers::MemoryStorage::new()))
+        slot.install(test_support::memory_backend())
             .is_some()
     );
     assert!(slot.clear());

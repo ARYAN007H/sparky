@@ -1,19 +1,27 @@
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
 
 use std::time::Duration;
 
-use crate::storage::MemoryStorage;
-use tinystoragedrivers::Precondition;
+use crate::storage::test_support::SqliteBackend;
+use tinystoragedrivers_types::Precondition;
 
 const TTL: Duration = Duration::from_millis(1_000);
 
-fn node(storage: &MemoryStorage, id: &str) -> DocumentLeases {
-    DocumentLeases::cluster(storage, id, Some(format!("http://{id}")), TTL).unwrap()
+fn node(storage: &SqliteBackend, id: &str) -> DocumentLeases {
+    DocumentLeases::cluster(
+        storage.backend.as_ref(),
+        id,
+        Some(format!("http://{id}")),
+        TTL,
+    )
+    .unwrap()
 }
 
 #[tokio::test]
 async fn acquire_contend_expire_and_take_over() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let (a, b) = (node(&storage, "a"), node(&storage, "b"));
 
     let first = a.acquire("user-1", 0).await.unwrap();
@@ -47,7 +55,7 @@ async fn acquire_contend_expire_and_take_over() {
 
 #[tokio::test]
 async fn renew_extends_and_keeps_the_epoch() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let (a, b) = (node(&storage, "a"), node(&storage, "b"));
     let grant = a.acquire("k", 0).await.unwrap();
     let renewed = a.renew(&grant, 900).await.unwrap();
@@ -66,7 +74,7 @@ async fn renew_extends_and_keeps_the_epoch() {
 
 #[tokio::test]
 async fn a_clean_release_hands_over_cleanly() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let (a, b) = (node(&storage, "a"), node(&storage, "b"));
     let grant = a.acquire("k", 0).await.unwrap();
     a.release(grant).await.unwrap();
@@ -78,7 +86,7 @@ async fn a_clean_release_hands_over_cleanly() {
 
 #[tokio::test]
 async fn reacquire_is_reentrant_and_a_restart_is_unclean() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let a = node(&storage, "a");
     let grant = a.acquire("k", 0).await.unwrap();
     let again = a.acquire("k", 10).await.unwrap();
@@ -100,14 +108,14 @@ async fn bad_keys_and_corrupt_records_are_storage_errors() {
         Err(LeaseError::Storage(_))
     ));
     assert!(matches!(a.holder("a/b").await, Err(LeaseError::Storage(_))));
-    let scoped = storage
+    let scoped = storage.backend
         .for_scope(&Scope::new(CLUSTER_SCOPE).unwrap())
         .unwrap();
     scoped
         .documents()
         .put(
             LEASE_COLLECTION,
-            tinystoragedrivers::Key::of([LEASE_OWNER, "k"])
+            tinystoragedrivers_types::Key::of([LEASE_OWNER, "k"])
                 .unwrap()
                 .as_str(),
             serde_json::json!({ "holder": 7 }),
@@ -123,7 +131,7 @@ async fn bad_keys_and_corrupt_records_are_storage_errors() {
 
 #[tokio::test]
 async fn keys_are_independent() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let (a, b) = (node(&storage, "a"), node(&storage, "b"));
     a.acquire("one", 0).await.unwrap();
     let other = b.acquire("two", 0).await.unwrap();
@@ -133,7 +141,7 @@ async fn keys_are_independent() {
 
 #[tokio::test]
 async fn renew_after_expiry_is_lost_even_without_takeover() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let a = node(&storage, "a");
     let grant = a.acquire("k", 0).await.unwrap();
     assert!(matches!(
@@ -145,7 +153,7 @@ async fn renew_after_expiry_is_lost_even_without_takeover() {
 
 #[tokio::test]
 async fn another_instances_grant_cannot_renew_or_release() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let (a, b) = (node(&storage, "a"), node(&storage, "b"));
     let grant = a.acquire("k", 0).await.unwrap();
     assert!(matches!(b.renew(&grant, 10).await, Err(LeaseError::Lost)));
@@ -159,7 +167,7 @@ async fn another_instances_grant_cannot_renew_or_release() {
 
 #[tokio::test]
 async fn sub_millisecond_ttl_does_not_expire_at_acquisition() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let a = DocumentLeases::cluster(&storage, "a", None, Duration::ZERO).unwrap();
     let b = node(&storage, "b");
     let grant = a.acquire("k", 5).await.unwrap();
@@ -169,7 +177,7 @@ async fn sub_millisecond_ttl_does_not_expire_at_acquisition() {
 
 #[tokio::test]
 async fn concurrent_renewals_of_one_grant_have_one_winner() {
-    let storage = MemoryStorage::new();
+    let storage = crate::storage::test_support::sqlite_backend().unwrap();
     let a = std::sync::Arc::new(node(&storage, "a"));
     let grant = a.acquire("k", 0).await.unwrap();
     let go = || {
