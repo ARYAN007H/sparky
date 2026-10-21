@@ -52,6 +52,20 @@ pub struct QueuedPayload {
     pub(crate) deferred_user_message: bool,
     pub(crate) stored_attachments: Option<StoredAttachmentInput>,
     pub(crate) pending_attachments: Option<PendingAttachmentInput>,
+    /// Typed native-channel input resolved from the exact module envelope for
+    /// this queued request. Synthetic queue placeholders deliberately do not
+    /// inherit it from the currently running turn.
+    pub(crate) native_message_input: Option<tinyinference_llm::message::Message>,
+    /// Host-created staged refs authorized for this exact external turn.
+    /// Requeued synthetic placeholders never inherit this grant.
+    pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    /// Final-owner cleanup for uncommitted native refs, shared by all queue
+    /// clones and disarmed only after durable claim persistence.
+    pub(crate) native_staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
+    pub(crate) native_message_id: Option<String>,
+    /// A preparation failure is sent through the shared runner's terminal
+    /// path without invoking the model.
+    pub(crate) native_preparation_error: Option<String>,
 }
 
 impl std::fmt::Debug for QueuedPayload {
@@ -68,6 +82,19 @@ impl std::fmt::Debug for QueuedPayload {
             .field(
                 "has_pending_attachments",
                 &self.pending_attachments.is_some(),
+            )
+            .field(
+                "has_native_message_input",
+                &self.native_message_input.is_some(),
+            )
+            .field("native_staged_parts", &self.native_staged_parts.len())
+            .field(
+                "has_native_staged_lease",
+                &self.native_staged_lease.is_some(),
+            )
+            .field(
+                "has_native_preparation_error",
+                &self.native_preparation_error.is_some(),
             )
             .finish_non_exhaustive()
     }

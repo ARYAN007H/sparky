@@ -24,9 +24,16 @@ pub(super) struct StagedAttachmentClaim {
     pub(super) canceled: bool,
 }
 
-pub(super) const STAGED_DOMAIN: &str = "threads::attachments";
-pub(super) const STAGED_COLLECTION: &str = crate::threads::store::STAGED_ATTACHMENTS;
-pub(super) const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+pub(crate) use native::{
+    commit_native_channel_parts, native_parts_in_committed_message,
+    read_authorized_native_attachment, stage_native_channel_part, NativeStagedLease,
+};
+#[path = "staged/native.rs"]
+mod native;
+#[cfg(test)]
+pub(super) use native::read_staged_file_bounded;
+use native::STAGED_TTL_SECS;
+pub(super) use native::{STAGED_COLLECTION, STAGED_DOMAIN};
 
 pub(super) fn staged_doc_id(opaque_id: &str) -> Result<String, String> {
     let uuid = uuid::Uuid::parse_str(opaque_id)
@@ -74,6 +81,25 @@ pub(super) async fn read_staged_entries(
     requested: &[ContentPart],
     config: &crate::config::Config,
 ) -> Result<Vec<StoredAttachment>, String> {
+    read_staged_entries_with_canceled_cleanup(ctx, thread_id, requested, config, false).await
+}
+
+pub(super) async fn read_staged_entries_for_cleanup(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    requested: &[ContentPart],
+    config: &crate::config::Config,
+) -> Result<Vec<StoredAttachment>, String> {
+    read_staged_entries_with_canceled_cleanup(ctx, thread_id, requested, config, true).await
+}
+
+async fn read_staged_entries_with_canceled_cleanup(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    requested: &[ContentPart],
+    config: &crate::config::Config,
+    allow_canceled_cleanup: bool,
+) -> Result<Vec<StoredAttachment>, String> {
     validate_opaque_parts(requested)?;
     let tenant = tenant_for(ctx)?;
     let repo = staged_repo(ctx, &config.workspace_dir)?;
@@ -90,10 +116,11 @@ pub(super) async fn read_staged_entries(
         }
         if manifest.expires_at < chrono::Utc::now().timestamp()
             && manifest.claim.as_ref().is_none_or(|claim| claim.canceled)
+            && !allow_canceled_cleanup
         {
             return Err("staged attachment is missing or expired".into());
         }
-        if manifest.claim.as_ref().is_some_and(|claim| claim.canceled) {
+        if manifest.claim.as_ref().is_some_and(|claim| claim.canceled) && !allow_canceled_cleanup {
             return Err("staged attachment was canceled".into());
         }
         if &manifest.attachment.part != part {
@@ -298,6 +325,9 @@ pub(crate) async fn stage_queued_parts(
     Ok(public)
 }
 
+/// Store bytes obtained from a trusted, scoped channel-module media read as a
+/// staged attachment. The provider reference is replaced with a fresh opaque
+/// host reference; the private workspace path remains only in this record.
 pub(super) async fn validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
@@ -329,6 +359,8 @@ pub(super) async fn validate_staged_files(
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
+            thread_id: Some(thread_id.to_owned()),
+            ..Default::default()
         };
         let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
             .await
@@ -403,6 +435,8 @@ pub(super) async fn discard_staged_entries(
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
+            thread_id: Some(thread_id.to_owned()),
+            ..Default::default()
         };
         let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
             .await

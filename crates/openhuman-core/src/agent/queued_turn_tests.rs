@@ -178,6 +178,9 @@ fn requeue_adopts_context_but_never_predecessor_message_or_attachment_state() {
             persisted_message_id: "user:prior-image".into(),
             parts: vec![],
         }),
+        native_message_input: Some(tinyinference_llm::message::Message::user(
+            "prior request typed content",
+        )),
         ..Default::default()
     };
     let mut next = QueuedPayload {
@@ -194,4 +197,5 @@ fn requeue_adopts_context_but_never_predecessor_message_or_attachment_state() {
     assert!(!next.deferred_user_message);
     assert!(next.pending_attachments.is_none());
     assert!(next.stored_attachments.is_none());
+    assert!(next.native_message_input.is_none());
 }

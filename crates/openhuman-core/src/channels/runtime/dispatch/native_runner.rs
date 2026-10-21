@@ -152,6 +152,9 @@ impl TurnHost<QueuedPayload> for NativeHost {
         queue: Arc<RunQueue<TurnRequest<QueuedPayload>>>,
         progress: mpsc::Sender<TurnSignal>,
     ) -> Result<TurnResult, String> {
+        if let Some(error) = request.payload.native_preparation_error.as_ref() {
+            return Err(error.clone());
+        }
         let trusted = request
             .payload
             .trusted_turn
@@ -179,6 +182,10 @@ impl TurnHost<QueuedPayload> for NativeHost {
                 session_key: session.session_id.clone(),
                 event_session_id: trusted.event_session_id.clone(),
                 message: request.text.clone(),
+                message_input: request.payload.native_message_input.clone(),
+                staged_parts: request.payload.native_staged_parts.clone(),
+                staged_lease: request.payload.native_staged_lease.clone(),
+                staged_message_id: request.payload.native_message_id.clone(),
                 origin: trusted.origin.clone(),
                 progress: Some(agent_progress),
                 run_queue: Some(queue),
@@ -551,6 +558,11 @@ pub(crate) async fn run(
     thread_id: String,
     request_id: String,
     text: String,
+    message_input: Option<tinyinference_llm::message::Message>,
+    staged_parts: Vec<tinychannels_bus::ContentPart>,
+    staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
+    staged_message_id: Option<String>,
+    preparation_error: Option<String>,
     trusted: Arc<crate::agent::turn_host::TrustedAgentTurn>,
 ) -> NativeTurnExecution {
     let runtime = crate::core::runtime::slot_for::<NativeRuntime>(dispatch);
@@ -576,6 +588,11 @@ pub(crate) async fn run(
         payload: QueuedPayload {
             ctx: Some(dispatch.clone()),
             trusted_turn: Some(trusted),
+            native_message_input: message_input,
+            native_staged_parts: staged_parts,
+            native_staged_lease: staged_lease.clone(),
+            native_message_id: staged_message_id,
+            native_preparation_error: preparation_error,
             ..Default::default()
         },
         host_authored: false,
@@ -589,6 +606,15 @@ pub(crate) async fn run(
         Err(tinyagents_harness::turn_runner::TurnRunnerError::Queued)
     );
     let result = runner_result.map_err(|error| error.to_string());
+    if !queued && result.is_err() {
+        if let Some(staged_lease) = staged_lease.as_ref() {
+            if staged_lease.discard().await.is_err() {
+                tracing::warn!(
+                    "[channels::dispatch] failed to clean rejected native media staging"
+                );
+            }
+        }
+    }
     if queued {
         runtime.shared.abandon_delivery_wait(&request_id);
     }

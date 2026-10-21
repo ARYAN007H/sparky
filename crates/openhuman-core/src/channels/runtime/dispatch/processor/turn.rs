@@ -22,6 +22,18 @@ use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
 
+fn channel_inbound_preparation_request(
+    source: tinychannels_bus::module_inbound::ChannelInboundSource,
+    preparation_mode: tinychannels_bus::module_inbound::ChannelInboundPreparationMode,
+) -> tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+    tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+        source,
+        namespace: "main".into(),
+        session_policy: Default::default(),
+        preparation_mode,
+    }
+}
+
 fn inbound_console_preview(
     envelope: &tinychannels_bus::ChannelInboundEnvelope,
     text: &str,
@@ -44,7 +56,7 @@ pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
     runtime_msg: RuntimeChannelMessage,
 ) {
-    use tinychannels_bus::module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest};
+    use tinychannels_bus::module_inbound::ChannelInboundSource;
     let RuntimeChannelMessage {
         message,
         inbound_envelope,
@@ -54,6 +66,10 @@ pub(crate) async fn process_channel_runtime_message(
         legacy_history,
         progressive_target,
     } = runtime_msg;
+    let typed_envelope_input = message.channel.is_empty()
+        && inbound_envelope
+            .as_ref()
+            .is_some_and(super::native_media::requires_typed_preparation);
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
         None => {
@@ -73,12 +89,14 @@ pub(crate) async fn process_channel_runtime_message(
             };
             match crate::modules::channel_controller::prepare_inbound(
                 &crate::channels::context::module_client(&ctx).await,
-                PrepareChannelInboundRequest {
+                channel_inbound_preparation_request(
                     source,
-                    namespace: "main".into(),
-                    preparation_mode: Default::default(),
-                    session_policy: Default::default(),
-                },
+                    if typed_envelope_input {
+                        tinychannels_bus::module_inbound::ChannelInboundPreparationMode::Typed
+                    } else {
+                        tinychannels_bus::module_inbound::ChannelInboundPreparationMode::LegacyText
+                    },
+                ),
             )
             .await
             {
@@ -387,6 +405,39 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None => None,
     };
+    let native_preparation = if typed_envelope_input {
+        if let Some(host) = selected_host.as_ref() {
+            let host_dispatch = crate::core::runtime::DispatchCtx::new(Arc::clone(&host.context));
+            match super::native_media::resolve_typed_message(
+                &ctx,
+                &host_dispatch,
+                &host.config,
+                &envelope,
+                &canonical_session_key,
+                &channel_context,
+            )
+            .await
+            {
+                Ok(input) => Some(Ok(input)),
+                Err(error) => Some(Err(error)),
+            }
+        } else {
+            Some(Err("native media has no selected host agent".to_owned()))
+        }
+    } else {
+        None
+    };
+    let (native_message_input, native_staged_parts, native_staged_lease, native_preparation_error) =
+        match native_preparation {
+            Some(Ok(Some(prepared))) => (
+                Some(prepared.message),
+                prepared.staged_parts,
+                Some(prepared.staged_lease),
+                None,
+            ),
+            Some(Ok(None)) | None => (None, Vec::new(), None, None),
+            Some(Err(error)) => (None, Vec::new(), None, Some(error)),
+        };
     let channel_session = selected_host.as_ref().and_then(|host| {
         let account_id = envelope
             .channel
@@ -439,6 +490,11 @@ pub(crate) async fn process_channel_runtime_message(
                 session_key.clone(),
                 request_id,
                 enriched_message.clone(),
+                native_message_input,
+                native_staged_parts,
+                native_staged_lease,
+                Some(envelope.message_id.clone()),
+                native_preparation_error,
                 trusted,
             )
             .await

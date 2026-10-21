@@ -122,6 +122,7 @@ pub(crate) async fn run_channel_turn_via_graph(
                     Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
                 ),
                 workspace: workspace.clone(),
+                ..Default::default()
             };
             row.content =
                 crate::agent::attachments::stage(&row.content, "channel", config, &scope).await?;

@@ -123,7 +123,7 @@ pub fn fold_into_message(text: &str, parts: &[ContentPart]) -> Result<String, At
                 return Err(AttachmentPartError::UnsupportedKind {
                     index,
                     kind: kind_name(other),
-                })
+                });
             }
         }
     }
