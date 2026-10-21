@@ -23,11 +23,11 @@ mod managed_backend;
 mod routing;
 mod subprocess_providers;
 
-pub(crate) use chat_model::{resolves_to_managed_backend, OpenHumanModelFactory};
 pub use chat_model::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
 };
+pub(crate) use chat_model::{resolves_to_managed_backend, OpenHumanModelFactory};
 pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
 pub(crate) use credentials::{
     openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
@@ -55,9 +55,7 @@ pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
     make_openhuman_backend_model_in,
 };
-use subprocess_providers::{
-    build_claude_code_model, claude_agent_sdk_model_from_string,
-};
+use subprocess_providers::{build_claude_code_model, claude_agent_sdk_model_from_string};
 use tinyinference_providers::route::split_model_and_temperature;
 
 /// Test-only seam: inject a mock [`ChatModel`] so e2e tests can drive the

@@ -203,7 +203,10 @@ async fn one_shot_chat_models_preserve_factory_temperature_as_request_default() 
         .await
         .expect("explicit-temperature invoke");
 
-    assert_eq!(*seen.lock().expect("probe lock"), vec![Some(0.3), Some(0.9)]);
+    assert_eq!(
+        *seen.lock().expect("probe lock"),
+        vec![Some(0.3), Some(0.9)]
+    );
 }
 
 // ── Motion B (#4727): managed-backend crate-native routing ──────────────────

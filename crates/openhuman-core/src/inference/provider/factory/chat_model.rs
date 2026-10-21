@@ -90,19 +90,28 @@ impl OpenHumanModelFactory<'_> {
             let extensions = resolved
                 .as_deref()
                 .map(crate::core::runtime::CoreContext::extensions);
-            let (model, concrete) = super::managed_backend::make_openhuman_backend_model_for_thread_in(
-                extensions,
-                role,
-                self.config,
-                (!pin.is_empty()).then_some(pin),
-                request.opts.native_tools,
-                self.thread_id,
-                self.egress,
-            )?;
-            let concrete = if concrete.trim().is_empty() { pin } else { &concrete };
+            let (model, concrete) =
+                super::managed_backend::make_openhuman_backend_model_for_thread_in(
+                    extensions,
+                    role,
+                    self.config,
+                    (!pin.is_empty()).then_some(pin),
+                    request.opts.native_tools,
+                    self.thread_id,
+                    self.egress,
+                )?;
+            let concrete = if concrete.trim().is_empty() {
+                pin
+            } else {
+                &concrete
+            };
             return Ok((
                 model,
-                ResolvedModelRoute::new(PROVIDER_OPENHUMAN, concrete, request.route.as_deref().unwrap_or(role)),
+                ResolvedModelRoute::new(
+                    PROVIDER_OPENHUMAN,
+                    concrete,
+                    request.route.as_deref().unwrap_or(role),
+                ),
             ));
         }
 
@@ -112,7 +121,9 @@ impl OpenHumanModelFactory<'_> {
             .map(crate::core::runtime::CoreContext::extensions);
         let mut parsed_route = ProviderRoute::parse(&provider);
         if parsed_route.is_none()
-            && provider.trim().eq_ignore_ascii_case(CLAUDE_AGENT_SDK_PROVIDER)
+            && provider
+                .trim()
+                .eq_ignore_ascii_case(CLAUDE_AGENT_SDK_PROVIDER)
         {
             parsed_route = Some(ProviderRoute {
                 provider: CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
@@ -127,13 +138,19 @@ impl OpenHumanModelFactory<'_> {
         }
         if let Some(route) = parsed_route.as_mut() {
             if !pin.is_empty()
-                && matches!(route.kind(), RouteKind::ClaudeCode | RouteKind::ClaudeAgentSdk)
+                && matches!(
+                    route.kind(),
+                    RouteKind::ClaudeCode | RouteKind::ClaudeAgentSdk
+                )
             {
                 route.model = pin.to_owned();
             }
         }
         if let Some(route) = parsed_route.as_ref().filter(|route| {
-            matches!(route.kind(), RouteKind::ClaudeCode | RouteKind::ClaudeAgentSdk)
+            matches!(
+                route.kind(),
+                RouteKind::ClaudeCode | RouteKind::ClaudeAgentSdk
+            )
         }) {
             if route.temperature.is_some() && matches!(route.kind(), RouteKind::ClaudeCode) {
                 log::warn!(
@@ -148,7 +165,11 @@ impl OpenHumanModelFactory<'_> {
             );
             let route_kind = route.kind();
             let egress_name = match route_kind {
-                RouteKind::ClaudeCode => format!("{}{}", tinyagents_harness::providers::claude_code::PROVIDER_PREFIX, effective_model),
+                RouteKind::ClaudeCode => format!(
+                    "{}{}",
+                    tinyagents_harness::providers::claude_code::PROVIDER_PREFIX,
+                    effective_model
+                ),
                 RouteKind::ClaudeAgentSdk => format!("{CLAUDE_AGENT_SDK_PREFIX}{effective_model}"),
                 _ => unreachable!("subprocess route was filtered"),
             };
@@ -174,73 +195,91 @@ impl OpenHumanModelFactory<'_> {
                 resolved_model,
                 request.route.as_deref().unwrap_or(role),
             );
-            return Ok((with_request_defaults(model, ModelRequestDefaults {
-                model: (!route.model.is_empty()).then(|| route.model.clone()),
-                temperature: request.opts.temperature,
-            }), route));
+            return Ok((
+                with_request_defaults(
+                    model,
+                    ModelRequestDefaults {
+                        model: (!route.model.is_empty()).then(|| route.model.clone()),
+                        temperature: request.opts.temperature,
+                    },
+                ),
+                route,
+            ));
         }
 
-        let (model, route_provider, resolved_model) = match parsed_route.as_ref().map(ProviderRoute::kind) {
-            Some(RouteKind::Local(_)) | None
-                if tinyinference_local::profile::kind_from_provider_string(&provider).is_some() =>
-            {
-                let local = try_create_local_runtime_chat_model_from_string(
-                    role,
-                    &provider,
-                    self.config,
-                    self.egress,
-                );
-                let (model, resolved) = match local {
-                    Some(result) => result?,
-                    None => return Err(unresolved_chat_model_error_for(
+        let (model, route_provider, resolved_model) =
+            match parsed_route.as_ref().map(ProviderRoute::kind) {
+                Some(RouteKind::Local(_)) | None
+                    if tinyinference_local::profile::kind_from_provider_string(&provider)
+                        .is_some() =>
+                {
+                    let local = try_create_local_runtime_chat_model_from_string(
+                        role,
+                        &provider,
+                        self.config,
+                        self.egress,
+                    );
+                    let (model, resolved) = match local {
+                        Some(result) => result?,
+                        None => {
+                            return Err(unresolved_chat_model_error_for(
+                                role,
+                                &provider,
+                                self.config,
+                                self.egress,
+                                context_extensions,
+                            ))
+                        }
+                    };
+                    let provider = model
+                        .profile()
+                        .and_then(|p| p.provider.clone())
+                        .unwrap_or_else(|| "local".into());
+                    (model, provider, resolved)
+                }
+                Some(RouteKind::Cloud { .. }) => {
+                    let cloud = try_create_cloud_slug_chat_model_from_string_with_native_tools_for(
+                        role,
+                        &provider,
+                        self.config,
+                        request.opts.native_tools,
+                        self.egress,
+                        context_extensions,
+                    );
+                    let (model, resolved) = match cloud {
+                        Some(result) => result?,
+                        None => {
+                            return Err(unresolved_chat_model_error_for(
+                                role,
+                                &provider,
+                                self.config,
+                                self.egress,
+                                context_extensions,
+                            ))
+                        }
+                    };
+                    let route_provider = model
+                        .profile()
+                        .and_then(|p| p.provider.clone())
+                        .unwrap_or_else(|| {
+                            parsed_route
+                                .as_ref()
+                                .expect("parsed cloud route")
+                                .provider
+                                .clone()
+                        });
+                    (model, route_provider, resolved)
+                }
+                _ => {
+                    return Err(unresolved_chat_model_error_for(
                         role,
                         &provider,
                         self.config,
                         self.egress,
                         context_extensions,
-                    )),
-                };
-                let provider = model
-                    .profile()
-                    .and_then(|p| p.provider.clone())
-                    .unwrap_or_else(|| "local".into());
-                (model, provider, resolved)
-            }
-            Some(RouteKind::Cloud { .. }) => {
-                let cloud = try_create_cloud_slug_chat_model_from_string_with_native_tools_for(
-                    role,
-                    &provider,
-                    self.config,
-                    request.opts.native_tools,
-                    self.egress,
-                    context_extensions,
-                );
-                let (model, resolved) = match cloud {
-                    Some(result) => result?,
-                    None => return Err(unresolved_chat_model_error_for(
-                        role,
-                        &provider,
-                        self.config,
-                        self.egress,
-                        context_extensions,
-                    )),
-                };
-                let route_provider = model
-                    .profile()
-                    .and_then(|p| p.provider.clone())
-                    .unwrap_or_else(|| parsed_route.as_ref().expect("parsed cloud route").provider.clone());
-                (model, route_provider, resolved)
-            }
-            _ => {
-                return Err(unresolved_chat_model_error_for(
-                    role,
-                    &provider,
-                    self.config,
-                    self.egress,
-                    context_extensions,
-                ));
-            }
-        };
+                    ));
+                }
+            };
 
         let route = ResolvedModelRoute::new(
             route_provider,
@@ -319,10 +358,12 @@ fn with_request_defaults(
     defaults: ModelRequestDefaults,
 ) -> Arc<dyn ChatModel<()>> {
     match model.profile().cloned() {
-        Some(profile) => Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(defaults)),
-        None => Arc::new(
-            ProfileOverrideModel::new_preserving_profile(model).with_defaults(defaults),
-        ),
+        Some(profile) => {
+            Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(defaults))
+        }
+        None => {
+            Arc::new(ProfileOverrideModel::new_preserving_profile(model).with_defaults(defaults))
+        }
     }
 }
 
@@ -508,10 +549,13 @@ pub(super) fn with_default_temperature(
     model: Arc<dyn ChatModel<()>>,
     temperature: f64,
 ) -> Arc<dyn ChatModel<()>> {
-    with_request_defaults(model, ModelRequestDefaults {
+    with_request_defaults(
+        model,
+        ModelRequestDefaults {
             model: None,
             temperature: Some(temperature),
-        })
+        },
+    )
 }
 
 /// Reproduce the legacy provider factory's access gates and diagnostics for a

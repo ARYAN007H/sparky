@@ -148,9 +148,7 @@ pub(crate) fn provider_uses_independent_auth(provider: &str) -> bool {
         || tinyinference_providers::route::ProviderRoute::parse(p).is_some_and(|route| {
             matches!(
                 route.kind(),
-                RouteKind::Local(_)
-                    | RouteKind::ClaudeCode
-                    | RouteKind::ClaudeAgentSdk
+                RouteKind::Local(_) | RouteKind::ClaudeCode | RouteKind::ClaudeAgentSdk
             )
         })
 }

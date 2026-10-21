@@ -151,9 +151,7 @@ fn build_turn_models_crate(
             tinyagents_harness::host::ModelBuildRequest {
                 role: role.to_owned(),
                 route: Some((*route).to_owned()),
-                purpose: tinyagents_harness::host::ModelPurpose::WorkloadTier(
-                    (*route).to_owned(),
-                ),
+                purpose: tinyagents_harness::host::ModelPurpose::WorkloadTier((*route).to_owned()),
                 model_pin: Some((*route).to_owned()),
                 opts: opts.clone(),
             }
@@ -189,7 +187,11 @@ fn build_turn_models_crate(
                 .or_else(crate::inference::provider::factory::test_provider_override::current);
             let is_injected = injected.is_some();
             let profile = model.profile().cloned().unwrap_or_default();
-            let selected_model = profile.model.as_deref().filter(|value| !value.is_empty()).unwrap_or("unknown");
+            let selected_model = profile
+                .model
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .unwrap_or("unknown");
             let provider = profile.provider.as_deref().unwrap_or("unknown");
             if is_injected {
                 crate::attachments::provider::wrap_injected(ctx, model, Arc::new(config.clone()))
@@ -540,9 +542,7 @@ impl TurnModelSource {
                 egress_tag: None,
             };
             return tinyagents_harness::host::TurnModelSet::<()>::builder(
-                &factory,
-                &factory,
-                &cn.role,
+                &factory, &factory, &cn.role,
             )
             .primary_model_pin(model)
             .primary_opts(opts.clone())
@@ -551,19 +551,20 @@ impl TurnModelSource {
             .summarization_opts(opts)
             .build()
             .map(|built| {
-                built.map_models(|_, inner| {
-                    let profile = inner.profile().cloned().unwrap_or_default();
-                    let provider = profile.provider.as_deref().unwrap_or("unknown");
-                    let resolved = profile.model.as_deref().unwrap_or(model);
-                    crate::attachments::provider::wrap(
-                        &ctx,
-                        inner,
-                        cn.config.clone(),
-                        resolved,
-                        provider,
-                    )
-                })
-                .summarizer()
+                built
+                    .map_models(|_, inner| {
+                        let profile = inner.profile().cloned().unwrap_or_default();
+                        let provider = profile.provider.as_deref().unwrap_or("unknown");
+                        let resolved = profile.model.as_deref().unwrap_or(model);
+                        crate::attachments::provider::wrap(
+                            &ctx,
+                            inner,
+                            cn.config.clone(),
+                            resolved,
+                            provider,
+                        )
+                    })
+                    .summarizer()
             });
         }
         Err(anyhow::anyhow!("turn model source is missing a model"))
