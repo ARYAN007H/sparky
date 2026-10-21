@@ -168,17 +168,29 @@ impl StorageEndpoint for DocumentsOnlyEndpoint {
                 .map_err(|denied| HostFailure::Denied(denied.label()))?;
                 match plan {
                     Plan::Answer(reply) => Ok(reply),
-                    Plan::Forward { filter, .. } => self
-                        .server
-                        .handle(
+                    Plan::Forward { filter, .. } => {
+                        if matches!(call.selector, "WatchOpen" | "WatchClose") {
+                            return Err(Self::unsupported());
+                        }
+                        let mut reply = self
+                            .server
+                            .handle(
                             Admission::Private,
                             Object::Documents.as_str(),
                             call.selector,
                             call.request,
                         )
                         .await
-                        .map(|reply| storage_grants::filter_reply(&self.grant, filter, reply))
-                        .map_err(HostFailure::Storage),
+                            .map_err(HostFailure::Storage)?;
+                        if call.selector == "Capabilities"
+                            && let Some(capabilities) = reply
+                                .get_mut("capabilities")
+                                .and_then(Value::as_array_mut)
+                        {
+                            capabilities.retain(|capability| capability.as_str() != Some("watch"));
+                        }
+                        Ok(storage_grants::filter_reply(&self.grant, filter, reply))
+                    }
                 }
             }
             (Object::Streams, "Capabilities") => Ok(json!(CapabilitiesReply::default())),

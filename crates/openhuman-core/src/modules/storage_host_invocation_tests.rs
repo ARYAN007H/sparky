@@ -134,6 +134,41 @@ async fn callback_documents_route_keeps_the_module_collection_grant() {
 }
 
 #[tokio::test]
+async fn callback_documents_route_does_not_advertise_or_open_unrelayed_watches() {
+    let (endpoint, peer) = endpoint();
+
+    let capabilities = call(
+        &endpoint,
+        Some(&peer),
+        Object::Documents,
+        "Capabilities",
+        json!(null),
+    )
+    .await
+    .unwrap();
+    assert!(!capabilities["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "watch"));
+    assert_eq!(
+        call(
+            &endpoint,
+            Some(&peer),
+            Object::Documents,
+            "WatchOpen",
+            json!({
+                "collection": "juice.savings",
+                "filter": {"kind": "all"},
+                "interval_ms": 10
+            }),
+        )
+        .await,
+        Err(DocumentsOnlyEndpoint::unsupported())
+    );
+}
+
+#[tokio::test]
 async fn dropped_invocation_refuses_calls_already_in_flight_at_endpoint() {
     let (endpoint, peer) = endpoint();
     endpoint.active.store(false, Ordering::Release);
