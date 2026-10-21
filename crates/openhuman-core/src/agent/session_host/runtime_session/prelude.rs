@@ -75,8 +75,15 @@ impl OpenHumanTurnPrelude {
         };
         let flow_archetype_text = super::prompt::flow_archetype_text(self, cold).await?;
         let prefix = if cold {
+            let connected_identities_md = crate::integrations::render_connected_identities_async(
+                &self.dispatch_ctx(),
+            )
+            .await;
             let tiered = self
-                .build_system_prompt_tiered_with_flow_archetype(flow_archetype_text.as_deref())?;
+                .build_system_prompt_tiered_with_flow_archetype_and_connected_identities(
+                    flow_archetype_text.as_deref(),
+                    &connected_identities_md,
+                )?;
             Some(tinyagents_runtime::PrefixSnapshot::new(
                 tiered
                     .system_messages()
@@ -100,6 +107,18 @@ impl OpenHumanTurnPrelude {
     pub(crate) fn build_system_prompt_tiered_with_flow_archetype(
         &self,
         flow_archetype_text: Option<&str>,
+    ) -> Result<crate::agent::prompts::TieredPrompt> {
+        let connected_identities_md = self.connected_identities_md();
+        self.build_system_prompt_tiered_with_flow_archetype_and_connected_identities(
+            flow_archetype_text,
+            &connected_identities_md,
+        )
+    }
+
+    fn build_system_prompt_tiered_with_flow_archetype_and_connected_identities(
+        &self,
+        flow_archetype_text: Option<&str>,
+        connected_identities_md: &str,
     ) -> Result<crate::agent::prompts::TieredPrompt> {
         use crate::agent::prompts::{PromptContext, PromptTool};
         let surface = self
@@ -166,7 +185,7 @@ impl OpenHumanTurnPrelude {
             visible_tool_names: &visible_tool_names,
             tool_call_format: self.tool_dispatcher.tool_call_format(),
             connected_integrations: &mutable.connected_integrations,
-            connected_identities_md: self.connected_identities_md(),
+            connected_identities_md: connected_identities_md.to_string(),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
             personality_roster: vec![],
             agents_md_global: agents_md.global,
