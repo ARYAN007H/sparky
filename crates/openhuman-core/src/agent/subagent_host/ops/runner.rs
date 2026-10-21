@@ -486,9 +486,8 @@ async fn run_typed_mode(
         nested_spawn_depth_available,
         &parent.subagent_tool_ceiling_names,
     );
-    let mut allowed_indices = filtered_tools.indices;
+    let allowed_indices = filtered_tools.indices;
     let nested_spawn_ids = filtered_tools.nested_spawn_ids;
-    let nested_spawn_granted = !filtered_tools.nested_spawn_tools.is_empty();
     let can_spawn_subagent = filtered_tools.nested_spawn_tools.contains("spawn_subagent");
 
     // Rule-withheld tools stay callable (`allowed_names`) but off the prompt.
