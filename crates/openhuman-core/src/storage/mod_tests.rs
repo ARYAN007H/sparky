@@ -79,7 +79,17 @@ fn the_default_url_is_a_directory_under_the_workspace() {
 #[tokio::test]
 async fn opens_memory_and_refuses_garbage() {
     let backend = open("memory").await.unwrap();
-    assert_eq!(backend.driver(), "memory");
+    let scope = backend.for_scope(&Scope::local()).unwrap();
+    let docs = Arc::clone(scope.documents());
+    block_on(async move {
+        docs.ensure_collection(&CollectionSpec::new("probe"))
+            .await?;
+        docs.put("probe", "opened", serde_json::json!({"ok": true}), Precondition::Absent)
+            .await?;
+        assert_eq!(docs.get("probe", "opened").await?.unwrap().doc["ok"], true);
+        Ok(())
+    })
+    .unwrap();
     assert!(open("ftp://nope").await.is_err());
 }
 
@@ -226,7 +236,7 @@ fn only_mongodb_and_sqlite_have_cross_process_cas() {
 }
 
 #[tokio::test]
-async fn the_driver_name_check_agrees_with_what_each_backend_claims() {
+async fn local_drivers_do_not_claim_cross_process_cas() {
     let dir = tempfile::tempdir().unwrap();
     for url in [
         "memory".to_string(),
@@ -234,11 +244,9 @@ async fn the_driver_name_check_agrees_with_what_each_backend_claims() {
         format!("file:{}", dir.path().join("files").display()),
     ] {
         let backend = open(&url).await.unwrap();
-        assert_eq!(
-            backend_has_cross_process_cas(backend.as_ref()),
-            driver_has_cross_process_cas(backend.driver()),
-            "{}",
-            backend.driver()
+        assert!(
+            !backend_has_cross_process_cas(backend.as_ref()),
+            "{url} is a local driver"
         );
     }
 }

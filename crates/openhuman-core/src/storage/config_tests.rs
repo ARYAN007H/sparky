@@ -78,7 +78,6 @@ async fn the_default_url_opens_in_directory_mode() {
     let backend = crate::storage::open(&default_url(dir.path()))
         .await
         .unwrap();
-    assert_eq!(backend.driver(), "sqlite");
     // Directory mode: the directory holds the database file.
     assert!(dir.path().join(DEFAULT_DIR).exists());
 }
