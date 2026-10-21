@@ -174,6 +174,7 @@ async fn maintain_work_items(
     Ok(summary)
 }
 
+#[cfg(test)]
 async fn maintain_scopes(
     backend: &Arc<dyn StorageBackend>,
     scopes: Vec<Scope>,
@@ -274,6 +275,7 @@ async fn maintain_scope(
 /// opens them; sweeping their scopes directly could mutate a profile leased
 /// by another host. Cluster scope is intentionally excluded: harness run
 /// journals have historically been tenant/local data, not cluster data.
+#[cfg(test)]
 fn known_scopes(
 ) -> Result<(Vec<Arc<crate::profiles::Profile>>, Vec<Scope>), crate::storage::StorageError> {
     let mut scopes = BTreeSet::new();
@@ -312,6 +314,7 @@ fn known_scopes(
 /// Retain only profile handles whose lease is still live and enumerate their
 /// tenant/module scopes. Keeping the handles alive prevents release while the
 /// caller is using those scopes.
+#[cfg(test)]
 fn profile_scope_snapshot(
     profiles: Vec<Arc<crate::profiles::Profile>>,
     now_ms: u64,

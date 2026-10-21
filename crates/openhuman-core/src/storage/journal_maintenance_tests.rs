@@ -256,6 +256,73 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
         .is_some());
 }
 
+#[tokio::test]
+async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_writes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let backend: Arc<dyn StorageBackend> = Arc::new(test_memory_backend());
+    let host = crate::profiles::ProfileHost::with_backend(
+        crate::core::runtime::SaasConfig::new(tmp.path()),
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None),
+        Some(Arc::clone(&backend)),
+    )
+    .unwrap();
+    let id = crate::profiles::ProfileId::for_user(
+        "journal-fence-race",
+        crate::profiles::ProfileIdMode::Raw,
+    )
+    .unwrap();
+    host.provision(&id).await.unwrap();
+    let profile = host.open(&id).await.unwrap();
+    let profile_backend = host.storage_backend_for(&profile).unwrap().unwrap();
+    let scope = crate::storage::scope_for_profile(id.as_str());
+    let profile_journal = journal_in_scope(&profile_backend, &scope);
+    seed(&profile_journal, "run.expiring", 1).await;
+    profile_journal.seal_run("run.expiring").await.unwrap();
+    let stream = format!("{JOURNAL_STREAM}/run.expiring");
+    let sealed_at = backend
+        .for_scope(&scope)
+        .unwrap()
+        .streams()
+        .info(&stream)
+        .await
+        .unwrap()
+        .unwrap()
+        .sealed_ms
+        .unwrap();
+
+    // Capture the exact admitted fence and scope list first. Expiration after
+    // that point must still prevent both conditional stream deletion and the
+    // success marker write.
+    let work = captured_profile_work(
+        &host,
+        vec![Arc::clone(&profile)],
+        super::fence::system_now_ms(),
+    )
+    .unwrap()
+    .into_iter()
+    .filter(|item| item.scope == scope)
+    .collect::<Vec<_>>();
+    assert_eq!(work.len(), 1);
+    profile.lease_fence().renewed(0);
+    let summary = maintain_work_items(work, DAY_MS, sealed_at + DAY_MS as i64 + 1)
+        .await
+        .unwrap();
+    assert_eq!(summary.deleted, 0);
+    assert_eq!(summary.scopes, 0);
+
+    let raw = backend.for_scope(&scope).unwrap();
+    assert!(raw.streams().info(&stream).await.unwrap().is_some());
+    assert!(raw
+        .documents()
+        .get(
+            BACKFILL_COLLECTION,
+            &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap(),
+        )
+        .await
+        .unwrap()
+        .is_none());
+}
+
 #[test]
 fn journal_scope_inventory_excludes_cluster() {
     let (_profiles, scopes) = known_scopes().unwrap();
