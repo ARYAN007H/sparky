@@ -60,8 +60,32 @@ pub struct CatalogHostRequest {
 }
 
 impl ProviderContext {
-    fn new(config: &Config, egress: &EgressLedger) -> Self {
+    pub(crate) fn new(config: &Config, egress: &EgressLedger) -> Self {
         Self { config: config.clone(), egress: egress.clone(), embedding: None, catalog: None }
+    }
+
+    pub(crate) fn for_embedding(
+        config: Option<&Config>,
+        chat: Option<ApprovalChatContext>,
+        state_dir: std::path::PathBuf,
+        secrets_encrypt: bool,
+    ) -> Self {
+        let base = config.cloned().unwrap_or_default();
+        Self {
+            config: base,
+            egress: EgressLedger::none(),
+            embedding: Some(EmbeddingCallContext { config: config.cloned(), chat, state_dir, secrets_encrypt }),
+            catalog: None,
+        }
+    }
+
+    pub(crate) fn for_catalog(config: &Config, request: CatalogHostRequest) -> Self {
+        Self {
+            config: config.clone(),
+            egress: EgressLedger::none(),
+            embedding: None,
+            catalog: Some(CatalogCallContext { request, logs: Arc::new(std::sync::Mutex::new(Vec::new())) }),
+        }
     }
 }
 
