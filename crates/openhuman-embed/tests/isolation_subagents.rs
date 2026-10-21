@@ -185,112 +185,109 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
 }
 
 async fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers(runtime: &Runtime) {
-            let host_only_provider = scripted_provider(
-                vec![
-                    tool_call_completion(
-                        "spawn_subagent",
-                        &serde_json::json!({
-                            "agent_id": "host_helper",
-                            "prompt": "do host-only work",
-                            "task_key": "host-helper-task"
-                        })
-                        .to_string(),
-                    ),
-                    common::chat_completion("host-only done"),
-                ],
-                "host-only done",
-            )
-            .await;
-            let host_only = runtime
-                .agent(
-                    AgentSpec::new("host-only-lead")
-                        .provider(route(&host_only_provider, "host-only-model"))
-                        .definition(
-                            AgentDefinitionSpec::new()
-                                .bare_prompt("You are a host-managed agent.")
-                                .tools(ToolScopeSpec::HostOnly),
-                        )
-                        .subagents([(
-                            "host_helper",
-                            AgentDefinitionSpec::new()
-                                .system_prompt("HOST-ONLY-HELPER-MARK")
-                                .when_to_use("host-only helper"),
-                        )]),
+    let host_only_provider = scripted_provider(
+        vec![
+            tool_call_completion(
+                "spawn_subagent",
+                &serde_json::json!({
+                    "agent_id": "host_helper",
+                    "prompt": "do host-only work",
+                    "task_key": "host-helper-task"
+                })
+                .to_string(),
+            ),
+            common::chat_completion("host-only done"),
+        ],
+        "host-only done",
+    )
+    .await;
+    let host_only = runtime
+        .agent(
+            AgentSpec::new("host-only-lead")
+                .provider(route(&host_only_provider, "host-only-model"))
+                .definition(
+                    AgentDefinitionSpec::new()
+                        .bare_prompt("You are a host-managed agent.")
+                        .tools(ToolScopeSpec::HostOnly),
                 )
-                .expect("host-only agent with declared helper builds");
-            host_only
-                .run("try the helper")
-                .await
-                .expect("host-only turn returns");
-            let host_requests = chat_requests(&host_only_provider).await;
-            assert!(!host_requests.is_empty());
-            assert!(!tool_names(&host_requests[0])
-                .iter()
-                .any(|name| name == "spawn_subagent"));
-            assert!(host_requests
-                .iter()
-                .all(|request| !String::from_utf8_lossy(&request.body)
-                    .contains("HOST-ONLY-HELPER-MARK")));
-            let host_tool_results = host_requests
-                .iter()
-                .map(common::tool_results)
-                .collect::<Vec<_>>()
-                .join("\n");
-            assert_refused_without_async_reference(&host_tool_results);
+                .subagents([(
+                    "host_helper",
+                    AgentDefinitionSpec::new()
+                        .system_prompt("HOST-ONLY-HELPER-MARK")
+                        .when_to_use("host-only helper"),
+                )]),
+        )
+        .expect("host-only agent with declared helper builds");
+    host_only
+        .run("try the helper")
+        .await
+        .expect("host-only turn returns");
+    let host_requests = chat_requests(&host_only_provider).await;
+    assert!(!host_requests.is_empty());
+    assert!(!tool_names(&host_requests[0])
+        .iter()
+        .any(|name| name == "spawn_subagent"));
+    assert!(host_requests
+        .iter()
+        .all(|request| !String::from_utf8_lossy(&request.body).contains("HOST-ONLY-HELPER-MARK")));
+    let host_tool_results = host_requests
+        .iter()
+        .map(common::tool_results)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_refused_without_async_reference(&host_tool_results);
 
-            let denied_provider = scripted_provider(
-                vec![
-                    tool_call_completion(
-                        "spawn_subagent",
-                        &serde_json::json!({
-                            "agent_id": "denied_helper",
-                            "prompt": "do denied work",
-                            "task_key": "denied-helper-task"
-                        })
-                        .to_string(),
-                    ),
-                    common::chat_completion("denied turn done"),
-                ],
-                "denied turn done",
-            )
-            .await;
-            let denied = runtime
-                .agent(
-                    AgentSpec::new("denied-lead")
-                        .provider(route(&denied_provider, "denied-model"))
-                        .definition(
-                            AgentDefinitionSpec::new()
-                                .tools(ToolScopeSpec::Named(Vec::new()))
-                                .disallow_tools(["spawn_*"]),
-                        )
-                        .subagents([(
-                            "denied_helper",
-                            AgentDefinitionSpec::new()
-                                .system_prompt("DISALLOWED-HELPER-MARK")
-                                .when_to_use("disallowed helper"),
-                        )]),
+    let denied_provider = scripted_provider(
+        vec![
+            tool_call_completion(
+                "spawn_subagent",
+                &serde_json::json!({
+                    "agent_id": "denied_helper",
+                    "prompt": "do denied work",
+                    "task_key": "denied-helper-task"
+                })
+                .to_string(),
+            ),
+            common::chat_completion("denied turn done"),
+        ],
+        "denied turn done",
+    )
+    .await;
+    let denied = runtime
+        .agent(
+            AgentSpec::new("denied-lead")
+                .provider(route(&denied_provider, "denied-model"))
+                .definition(
+                    AgentDefinitionSpec::new()
+                        .tools(ToolScopeSpec::Named(Vec::new()))
+                        .disallow_tools(["spawn_*"]),
                 )
-                .expect("agent with explicit spawn denial builds");
-            denied
-                .run("try the helper")
-                .await
-                .expect("disallowed turn returns");
-            let denied_requests = chat_requests(&denied_provider).await;
-            assert!(!denied_requests.is_empty());
-            assert!(!tool_names(&denied_requests[0])
-                .iter()
-                .any(|name| name == "spawn_subagent"));
-            assert!(denied_requests
-                .iter()
-                .all(|request| !String::from_utf8_lossy(&request.body)
-                    .contains("DISALLOWED-HELPER-MARK")));
-            let denied_tool_results = denied_requests
-                .iter()
-                .map(common::tool_results)
-                .collect::<Vec<_>>()
-                .join("\n");
-            assert_refused_without_async_reference(&denied_tool_results);
-
+                .subagents([(
+                    "denied_helper",
+                    AgentDefinitionSpec::new()
+                        .system_prompt("DISALLOWED-HELPER-MARK")
+                        .when_to_use("disallowed helper"),
+                )]),
+        )
+        .expect("agent with explicit spawn denial builds");
+    denied
+        .run("try the helper")
+        .await
+        .expect("disallowed turn returns");
+    let denied_requests = chat_requests(&denied_provider).await;
+    assert!(!denied_requests.is_empty());
+    assert!(!tool_names(&denied_requests[0])
+        .iter()
+        .any(|name| name == "spawn_subagent"));
+    assert!(denied_requests
+        .iter()
+        .all(|request| !String::from_utf8_lossy(&request.body).contains("DISALLOWED-HELPER-MARK")));
+    let denied_tool_results = denied_requests
+        .iter()
+        .map(common::tool_results)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_refused_without_async_reference(&denied_tool_results);
 }
 
 fn assert_refused_without_async_reference(result: &str) {
