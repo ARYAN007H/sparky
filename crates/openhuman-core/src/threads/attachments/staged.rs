@@ -1,5 +1,6 @@
 use super::*;
 use crate::storage::documents::compare_and_swap;
+use std::sync::atomic::{AtomicU8, Ordering};
 use tinystoragedrivers::CollectionSpec;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +34,101 @@ pub(crate) struct ResolvedNativeAttachment {
 pub(super) const STAGED_DOMAIN: &str = "threads::attachments";
 pub(super) const STAGED_COLLECTION: &str = crate::threads::store::STAGED_ATTACHMENTS;
 pub(super) const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+
+const NATIVE_STAGED_ACTIVE: u8 = 0;
+const NATIVE_STAGED_COMMITTED: u8 = 1;
+const NATIVE_STAGED_DISCARDED: u8 = 2;
+
+/// Owns staged refs from one native request until the durable transcript claim
+/// succeeds or every queued request clone is dropped.
+#[derive(Clone)]
+pub(crate) struct NativeStagedLease(std::sync::Arc<NativeStagedLeaseState>);
+
+struct NativeStagedLeaseState {
+    dispatch: crate::core::runtime::DispatchCtx,
+    thread_id: String,
+    config: crate::config::Config,
+    parts: Vec<ContentPart>,
+    state: AtomicU8,
+}
+
+impl NativeStagedLease {
+    pub(crate) fn new(
+        dispatch: crate::core::runtime::DispatchCtx,
+        thread_id: String,
+        config: crate::config::Config,
+        parts: Vec<ContentPart>,
+    ) -> Self {
+        Self(std::sync::Arc::new(NativeStagedLeaseState {
+            dispatch,
+            thread_id,
+            config,
+            parts,
+            state: AtomicU8::new(NATIVE_STAGED_ACTIVE),
+        }))
+    }
+
+    pub(crate) fn mark_committed(&self) {
+        let _ = self.0.state.compare_exchange(
+            NATIVE_STAGED_ACTIVE,
+            NATIVE_STAGED_COMMITTED,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        );
+    }
+
+    pub(crate) async fn discard(&self) -> Result<(), String> {
+        if self
+            .0
+            .state
+            .compare_exchange(
+                NATIVE_STAGED_ACTIVE,
+                NATIVE_STAGED_DISCARDED,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_err()
+        {
+            return Ok(());
+        }
+        discard_native_channel_parts(
+            &self.0.dispatch,
+            &self.0.thread_id,
+            &self.0.config,
+            &self.0.parts,
+        )
+        .await
+    }
+}
+
+impl Drop for NativeStagedLeaseState {
+    fn drop(&mut self) {
+        if self
+            .state
+            .compare_exchange(
+                NATIVE_STAGED_ACTIVE,
+                NATIVE_STAGED_DISCARDED,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_err()
+        {
+            return;
+        }
+        let dispatch = self.dispatch.clone();
+        let thread_id = self.thread_id.clone();
+        let config = self.config.clone();
+        let parts = self.parts.clone();
+        dispatch.clone().spawn(async move {
+            if discard_native_channel_parts(&dispatch, &thread_id, &config, &parts)
+                .await
+                .is_err()
+            {
+                tracing::warn!("[threads] queued native attachment cleanup failed");
+            }
+        });
+    }
+}
 
 pub(super) fn staged_doc_id(opaque_id: &str) -> Result<String, String> {
     let uuid = uuid::Uuid::parse_str(opaque_id)

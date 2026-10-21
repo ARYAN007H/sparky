@@ -21,7 +21,7 @@ use staged::*;
 pub(crate) use staged::{
     bind_staged_refs, commit_native_channel_parts, consume_staged_parts, discard_native_channel_parts,
     discard_staged_parts,
-    native_parts_in_committed_message, stage_native_channel_part, stage_queued_parts,
+    native_parts_in_committed_message, NativeStagedLease, stage_native_channel_part, stage_queued_parts,
     read_authorized_native_attachment, validate_opaque_parts,
 };
 

@@ -184,6 +184,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
                 message: request.text.clone(),
                 message_input: request.payload.native_message_input.clone(),
                 staged_parts: request.payload.native_staged_parts.clone(),
+                staged_lease: request.payload.native_staged_lease.clone(),
                 staged_message_id: request.payload.native_message_id.clone(),
                 origin: trusted.origin.clone(),
                 progress: Some(agent_progress),
@@ -575,9 +576,14 @@ pub(crate) async fn run(
         }
     };
     runtime.shared.begin_delivery_wait(&request_id);
-    let cleanup_staged_parts = staged_parts.clone();
-    let cleanup_config = trusted.host_agent.config.clone();
-    let cleanup_thread_id = thread_id.clone();
+    let staged_lease = (!staged_parts.is_empty()).then(|| {
+        crate::threads::attachments::NativeStagedLease::new(
+            dispatch.clone(),
+            thread_id.clone(),
+            trusted.host_agent.config.clone(),
+            staged_parts.clone(),
+        )
+    });
     let request = TurnRequest {
         scope: ScopeKey {
             agent_id: trusted.host_agent.definition.id.clone(),
@@ -591,6 +597,7 @@ pub(crate) async fn run(
             trusted_turn: Some(trusted),
             native_message_input: message_input,
             native_staged_parts: staged_parts,
+            native_staged_lease: staged_lease.clone(),
             native_message_id: staged_message_id,
             native_preparation_error: preparation_error,
             ..Default::default()
@@ -606,14 +613,9 @@ pub(crate) async fn run(
         Err(tinyagents_harness::turn_runner::TurnRunnerError::Queued)
     );
     let result = runner_result.map_err(|error| error.to_string());
-    if !queued && result.is_err() && !cleanup_staged_parts.is_empty() {
-        if let Err(error) = crate::threads::attachments::discard_native_channel_parts(
-            dispatch,
-            &cleanup_thread_id,
-            &cleanup_config,
-            &cleanup_staged_parts,
-        )
-        .await
+    if !queued && result.is_err() {
+        if let Some(staged_lease) = staged_lease.as_ref()
+            && staged_lease.discard().await.is_err()
         {
             tracing::warn!("[channels::dispatch] failed to clean rejected native media staging");
         }

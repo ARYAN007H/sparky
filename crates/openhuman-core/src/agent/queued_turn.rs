@@ -59,6 +59,9 @@ pub struct QueuedPayload {
     /// Host-created staged refs authorized for this exact external turn.
     /// Requeued synthetic placeholders never inherit this grant.
     pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    /// Final-owner cleanup for uncommitted native refs, shared by all queue
+    /// clones and disarmed only after durable claim persistence.
+    pub(crate) native_staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
     pub(crate) native_message_id: Option<String>,
     /// A preparation failure is sent through the shared runner's terminal
     /// path without invoking the model.
@@ -85,6 +88,7 @@ impl std::fmt::Debug for QueuedPayload {
                 &self.native_message_input.is_some(),
             )
             .field("native_staged_parts", &self.native_staged_parts.len())
+            .field("has_native_staged_lease", &self.native_staged_lease.is_some())
             .field("has_native_preparation_error", &self.native_preparation_error.is_some())
             .finish_non_exhaustive()
     }
