@@ -27,7 +27,7 @@ mod enable_session_shadow_reads;
 mod expand_autonomy_defaults;
 mod migrate_legacy_embedding_provider;
 mod normalize_default_model_tier;
-mod phase_out_profile_md;
+pub(crate) mod phase_out_profile_md;
 mod reconcile_orphaned_providers;
 mod remove_write_auto_approve;
 mod repair_http_request_limits;
