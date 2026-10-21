@@ -39,7 +39,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
     let extensions = Extensions::new();
     register_chat_model_in(
         &extensions,
-        "scoped-provider",
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ChatModelEntry {
             build: Arc::new(|_| Err(anyhow::anyhow!("test factory"))),
             probe: None,
@@ -52,7 +52,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
                 is_raw_model: Arc::new(|model| model == "scoped/model"),
                 supports_vision: Arc::new(|_| false),
                 resolve_model: Arc::new(|_, _, _| None),
-                context_window: Arc::new(|_| None),
+                context_window: Arc::new(|model| (model == "scoped/model").then_some(77_777)),
                 default_pricing: Arc::new(|| None),
                 without_reasoning: Arc::new(|request| request),
             }),
@@ -61,10 +61,17 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
     assert_eq!(
         crate::inference::registry::provider_default_model_for(
             Some(&extensions),
-            "scoped-provider"
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN
         )
         .as_deref(),
         Some("scoped/model")
+    );
+    assert_eq!(
+        crate::inference::model_context::static_context_window_for_model_in(
+            Some(&extensions),
+            "scoped/model"
+        ),
+        Some(77_777)
     );
     let context = crate::core::runtime::CoreContext::for_test_with_extensions(
         crate::core::runtime::DomainSet::full(),
@@ -73,22 +80,32 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
     );
 
     assert_eq!(
-        crate::inference::registry::provider_default_model("scoped-provider"),
+        crate::inference::registry::provider_default_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN
+        ),
         None
     );
     crate::core::runtime::CoreContext::sync_scope(context, || {
         assert_eq!(
-            crate::inference::registry::provider_default_model("scoped-provider").as_deref(),
+            crate::inference::registry::provider_default_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN
+            )
+            .as_deref(),
             Some("scoped/model")
         );
         assert_eq!(
-            crate::inference::registry::provider_model_role("scoped-provider", "scoped-alias")
-                .as_deref(),
+            crate::inference::registry::provider_model_role(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias"
+            )
+            .as_deref(),
             Some("reasoning")
         );
     });
     assert_eq!(
-        crate::inference::registry::provider_default_model("scoped-provider"),
+        crate::inference::registry::provider_default_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN
+        ),
         None
     );
 }
