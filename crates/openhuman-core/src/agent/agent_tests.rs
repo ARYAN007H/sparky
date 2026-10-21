@@ -235,7 +235,7 @@ fn build_agent_with(
     let tmp = tempfile::TempDir::new().unwrap();
     let agent = OpenHumanSessionHost::builder()
         .chat_model(provider)
-        .model_name("agent-test/mock")
+        .model_name("agent-test/mock".into())
         .tools(tools)
         .tool_dispatcher(dispatcher)
         .workspace_dir(tmp.path().to_path_buf())
@@ -252,7 +252,7 @@ fn build_agent_with_config(
     let tmp = tempfile::TempDir::new().unwrap();
     let agent = OpenHumanSessionHost::builder()
         .chat_model(provider)
-        .model_name("agent-test/mock")
+        .model_name("agent-test/mock".into())
         .tools(tools)
         .tool_dispatcher(Box::new(NativeDialect))
         .workspace_dir(tmp.path().to_path_buf())
