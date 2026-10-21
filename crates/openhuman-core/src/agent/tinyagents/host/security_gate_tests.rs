@@ -213,6 +213,17 @@ async fn cron_headless_settlement_allows_only_spawn_control() {
     .await;
     assert_eq!(opted_in, GateDecision::Allow);
 
+    let read_only = cron_decision(
+        OpenHumanSecurityGate::new(policy(AutonomyLevel::ReadOnly), registry())
+            .with_headless_descendant_settlement(true),
+        "spawn_subagent",
+    )
+    .await;
+    assert!(
+        !read_only.is_allowed(),
+        "headless settlement must not override the agent's autonomy tier"
+    );
+
     let write = cron_decision(
         gate(AutonomyLevel::Full).with_headless_descendant_settlement(true),
         "write_file",

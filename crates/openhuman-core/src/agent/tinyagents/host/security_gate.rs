@@ -537,9 +537,11 @@ impl OpenHumanSecurityGate {
         };
 
         // A scheduled prompt is data, not an open-ended approval for later
-        // actions. Keep cron agent turns within a read-only tool capability.
-        // This check precedes the shell shortcut and all approval settings,
-        // including installations where the approval gate is disabled.
+        // actions. Keep Cron turns read-only, except that a headless root which
+        // owns descendant settlement may use the canonical spawn tool as
+        // internal orchestration control. This does not permit effectful spawn
+        // implementations, shell, or any other acting tool. The check precedes
+        // shell and approval shortcuts, including when approvals are disabled.
         let is_cron_turn = matches!(
             self.turn_origin(),
             Some(
