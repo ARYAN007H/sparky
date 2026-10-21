@@ -82,14 +82,17 @@ pub(super) fn managed_chat_model_for(
         egress,
         crate::security::egress::EgressDescriptor::inference("openhuman", &model, true),
     );
+    let context = crate::inference::registry::ProviderContext {
+        config: config.clone(),
+        egress: egress.clone(),
+    };
     (entry.build)(&crate::inference::registry::ChatModelRequest {
         role,
-        config,
         model_override: Some(&model),
         default_model,
         native_tool_calling,
         thread_id,
-        egress,
+        context: &context,
     })
 }
 
@@ -180,13 +183,17 @@ pub(crate) fn make_openhuman_backend_model_for_options(
         config.config_path = dir.join("config.toml");
     }
     config.secrets.encrypt = options.secrets_encrypt;
+    let egress = EgressLedger::none();
+    let context = crate::inference::registry::ProviderContext {
+        config: config.clone(),
+        egress,
+    };
     (entry.build)(&crate::inference::registry::ChatModelRequest {
         role: "delegate",
-        config: &config,
         model_override: Some(model),
         default_model: Some(model),
         native_tool_calling: true,
         thread_id,
-        egress: &EgressLedger::none(),
+        context: &context,
     })
 }
