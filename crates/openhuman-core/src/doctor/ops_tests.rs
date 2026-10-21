@@ -34,6 +34,7 @@ async fn malformed_config_fallback_honors_exact_doctor_selectors() {
     .value;
     assert!(skipped.findings.is_empty());
     assert!(skipped.checks_run.is_empty());
+    assert!(skipped.ok);
 
     let selected_elsewhere = doctor_report_with_options(
         &config,
@@ -47,6 +48,7 @@ async fn malformed_config_fallback_honors_exact_doctor_selectors() {
     .value;
     assert!(selected_elsewhere.findings.is_empty());
     assert!(selected_elsewhere.checks_run.is_empty());
+    assert!(selected_elsewhere.ok);
 
     let unknown = doctor_report_with_options(
         &config,
@@ -60,6 +62,7 @@ async fn malformed_config_fallback_honors_exact_doctor_selectors() {
     .value;
     assert_eq!(unknown.findings.len(), 1);
     assert_eq!(unknown.findings[0].check_id, "doctor/selection");
+    assert!(!unknown.ok);
 
     let unfiltered = doctor_report_with_options(&config, DoctorOptions::default())
         .await
@@ -67,6 +70,7 @@ async fn malformed_config_fallback_honors_exact_doctor_selectors() {
         .value;
     assert_eq!(unfiltered.findings.len(), 1);
     assert_eq!(unfiltered.findings[0].check_id, "config/parse");
+    assert!(!unfiltered.ok);
 }
 
 #[tokio::test]
