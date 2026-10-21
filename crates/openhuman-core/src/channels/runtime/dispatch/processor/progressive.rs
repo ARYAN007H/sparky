@@ -36,11 +36,10 @@ impl NativeProgressiveTarget {
         turn_id: &str,
     ) -> anyhow::Result<std::sync::Arc<NativeProgressiveReply>> {
         tracing::debug!(
-            provider_matches_account = self
-                .channel
-                .account_id
-                .as_deref()
-                .is_some_and(|account| tinychannels_bus::provider_id(account) == self.channel.id),
+            provider_matches_account =
+                self.channel.account_id.as_deref().is_some_and(|account| {
+                    tinychannels_bus::provider_id(account) == self.channel.id
+                }),
             account_present = self
                 .channel
                 .account_id

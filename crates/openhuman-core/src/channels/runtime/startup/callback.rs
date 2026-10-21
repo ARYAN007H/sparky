@@ -268,7 +268,10 @@ impl ChannelHostCallbacks {
             "scoped channel voice media callback entered"
         );
         if serialized_len > MAX_VOICE_MEDIA_BYTES {
-            tracing::debug!(reason = "serialized_size", "scoped channel voice media rejected");
+            tracing::debug!(
+                reason = "serialized_size",
+                "scoped channel voice media rejected"
+            );
             return Err(Error::failed("voice media callback exceeds its limit"));
         }
         let decoded = base64::Engine::decode(
@@ -276,11 +279,17 @@ impl ChannelHostCallbacks {
             &request.audio_base64,
         )
         .map_err(|_| {
-            tracing::debug!(reason = "invalid_base64", "scoped channel voice media rejected");
+            tracing::debug!(
+                reason = "invalid_base64",
+                "scoped channel voice media rejected"
+            );
             Error::failed("voice media payload is invalid")
         })?;
         if decoded.is_empty() || decoded.len() > MAX_VOICE_MEDIA_DECODED_BYTES {
-            tracing::debug!(reason = "decoded_size", "scoped channel voice media rejected");
+            tracing::debug!(
+                reason = "decoded_size",
+                "scoped channel voice media rejected"
+            );
             return Err(Error::failed("voice media exceeds its size limit"));
         }
         let scope = &request.scope;
@@ -288,11 +297,12 @@ impl ChannelHostCallbacks {
         let Some(channel) = context.channels_by_name.get(&scope.configured_instance) else {
             tracing::debug!(
                 reason = "configured_instance_not_registered",
-                provider_adapter_registered = context.channels_by_name.contains_key(&scope.channel.id),
-                provider_matches_instance = scope.channel.id
-                    == tinychannels_bus::provider_id(&scope.configured_instance),
-                account_matches_instance = scope.channel.account_id.as_deref()
-                    == Some(scope.configured_instance.as_str()),
+                provider_adapter_registered =
+                    context.channels_by_name.contains_key(&scope.channel.id),
+                provider_matches_instance =
+                    scope.channel.id == tinychannels_bus::provider_id(&scope.configured_instance),
+                account_matches_instance =
+                    scope.channel.account_id.as_deref() == Some(scope.configured_instance.as_str()),
                 "scoped channel voice media rejected"
             );
             return Err(Error::failed("voice media account is not configured"));
@@ -306,12 +316,12 @@ impl ChannelHostCallbacks {
         {
             tracing::debug!(
                 reason = "scope_mismatch",
-                provider_matches_instance = scope.channel.id
-                    == tinychannels_bus::provider_id(&scope.configured_instance),
-                account_matches_instance = scope.channel.account_id.as_deref()
-                    == Some(scope.configured_instance.as_str()),
-                adapter_matches_provider = tinychannels_bus::provider_id(channel.name())
-                    == scope.channel.id,
+                provider_matches_instance =
+                    scope.channel.id == tinychannels_bus::provider_id(&scope.configured_instance),
+                account_matches_instance =
+                    scope.channel.account_id.as_deref() == Some(scope.configured_instance.as_str()),
+                adapter_matches_provider =
+                    tinychannels_bus::provider_id(channel.name()) == scope.channel.id,
                 conversation_present = !scope.conversation.id.trim().is_empty(),
                 turn_present = !scope.turn_id.trim().is_empty(),
                 "scoped channel voice media rejected"
@@ -329,7 +339,10 @@ impl ChannelHostCallbacks {
                     .is_some_and(|id| id.starts_with("tinychannels_media_v1_"))
             })
             .ok_or_else(|| {
-                tracing::debug!(reason = "opaque_reference", "scoped channel voice media rejected");
+                tracing::debug!(
+                    reason = "opaque_reference",
+                    "scoped channel voice media rejected"
+                );
                 Error::failed("voice media has no durable scoped reference")
             })?;
         tracing::debug!("scoped channel voice media accepted");
