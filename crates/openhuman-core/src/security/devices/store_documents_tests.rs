@@ -85,11 +85,11 @@ fn devices_list_oldest_first() {
 
 #[test]
 fn scopes_keep_devices_apart() {
-    let storage = MemoryStorage::new();
-    docs_in(&storage, "alice")
+    let storage = memory_backend();
+    docs_in(storage.as_ref(), "alice")
         .insert_device("ch-1", "a", "pk", "h")
         .unwrap();
-    let bob = docs_in(&storage, "bob");
+    let bob = docs_in(storage.as_ref(), "bob");
     assert!(bob.list_devices().unwrap().is_empty());
     assert!(!bob.revoke_device("ch-1").unwrap());
 }
