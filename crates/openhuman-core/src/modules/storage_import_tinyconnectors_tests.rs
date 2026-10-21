@@ -1,10 +1,12 @@
 use super::*;
-use crate::storage::{Precondition, Scope, Storage};
+use crate::storage::test_support::memory_backend;
+use crate::storage::{Precondition, Storage, scope_for_module};
 use sha2::Digest;
-use tinystoragedrivers_testkit::memory_storage;
 
 fn scoped() -> Storage {
-    memory_storage(&Scope::new("module:tinyconnectors@local").unwrap())
+    let backend = memory_backend();
+    let scope = scope_for_module(None, "tinyconnectors").unwrap();
+    backend.for_scope(&scope).unwrap()
 }
 
 /// A state directory as the pre-storage module left it.

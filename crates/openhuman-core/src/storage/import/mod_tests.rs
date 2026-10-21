@@ -1,12 +1,26 @@
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
+use crate::storage::Scope;
 use crate::storage::rusqlite;
-use crate::storage::{MemoryStorage, Scope};
+use crate::storage::test_support::{SqliteBackend, sqlite_backend};
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use tempfile::TempDir;
 use tinystoragedrivers::{DocumentStoreExt, Query};
 
-fn backend() -> Arc<dyn StorageBackend> {
-    Arc::new(MemoryStorage::new())
+struct TestBackend(SqliteBackend);
+
+impl Deref for TestBackend {
+    type Target = Arc<dyn StorageBackend>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.backend
+    }
+}
+
+fn backend() -> TestBackend {
+    TestBackend(sqlite_backend().unwrap())
 }
 
 fn workspace() -> (TempDir, Config) {

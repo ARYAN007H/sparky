@@ -1,10 +1,12 @@
 use super::*;
 use crate::cron::client::testing as cron_store;
-use crate::storage::{MemoryStorage, Scope};
+use crate::storage::Scope;
+use crate::storage::test_support::{SqliteBackend, sqlite_backend};
 use serde_json::Value;
 use serde_json::json;
 use sha2::Digest;
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use tempfile::TempDir;
 use tinyflows::engine::Checkpointer;
 use tinyflows_drivers::DriverCheckpointer;
@@ -42,8 +44,18 @@ fn workspace() -> (TempDir, Config) {
     (dir, config)
 }
 
-fn backend() -> Arc<dyn StorageBackend> {
-    Arc::new(MemoryStorage::new())
+struct TestBackend(SqliteBackend);
+
+impl Deref for TestBackend {
+    type Target = Arc<dyn StorageBackend>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.backend
+    }
+}
+
+fn backend() -> TestBackend {
+    TestBackend(sqlite_backend().unwrap())
 }
 
 /// Every file under `root` with a digest of its bytes. SQLite's `-shm` index
@@ -425,6 +437,7 @@ async fn fallback_backend_migrates_legacy_catalog_state_without_importing_files(
     }
 
     let (dir, mut config) = workspace();
+    let _slot = crate::storage::test_support::lock_storage_slot();
     config.components.tinyflows = true;
     let legacy_dir = dir.path().join("flows");
     let legacy_files_before = tree(&legacy_dir);

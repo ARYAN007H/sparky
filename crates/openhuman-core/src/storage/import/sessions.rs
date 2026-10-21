@@ -488,7 +488,7 @@ fn push_jsonl(out: &mut Vec<(String, PathBuf)>, path: PathBuf) {
 
 /// Imports the transcripts, each into the scope of the agent its stem names.
 /// Returns `(found, written, skipped)`.
-fn import_transcript_groups(
+pub(crate) fn import_transcript_groups(
     provider: &DriverSessionStores,
     workspace: &Path,
 ) -> Result<(usize, usize, usize)> {
