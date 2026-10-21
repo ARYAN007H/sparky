@@ -31,6 +31,7 @@ pub(super) fn requires_typed_preparation(envelope: &ChannelInboundEnvelope) -> b
 /// Provider URLs and paths are never used as a filesystem or network source.
 pub(super) async fn resolve_typed_message(
     ctx: &ChannelRuntimeContext,
+    host_dispatch: &DispatchCtx,
     config: &crate::config::Config,
     envelope: &ChannelInboundEnvelope,
     thread_id: &str,
@@ -84,7 +85,7 @@ pub(super) async fn resolve_typed_message(
         return Err("native file attachments are disabled or exceed their count limit".into());
     }
     let client = module_client(ctx).await;
-    let dispatch = ctx.dispatch_ctx();
+    let module_dispatch = ctx.dispatch_ctx();
     for part in &mut parts {
         let (media, image, name) = match part {
             ContentPart::Image { media, .. } => (
@@ -123,7 +124,7 @@ pub(super) async fn resolve_typed_message(
         let byte_limit = if image { image_limit } else { file_limit };
         let bytes = read_scoped_media(
             &client,
-            &dispatch,
+            &module_dispatch,
             envelope.channel.id.as_str(),
             &scope,
             media,
@@ -135,7 +136,7 @@ pub(super) async fn resolve_typed_message(
             .as_deref()
             .ok_or_else(|| "native media has no content type".to_owned())?;
         let staged = crate::threads::attachments::stage_native_channel_part(
-            &dispatch,
+            host_dispatch,
             thread_id,
             config,
             part,
