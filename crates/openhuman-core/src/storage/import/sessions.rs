@@ -33,10 +33,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tinyagents_session::DriverSessionStores;
-use tinyagents_session::legacy::{
-    ImportCounts, LegacyDatabaseReport, QuiescentSource, SourceOwner, import_transcripts,
-    import_turn_states,
-};
+use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{SessionRef, session_stem};
 
 use super::tinyflows::{finish, marked};
@@ -81,12 +78,23 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let ledger = provider
                 .driver_run_ledger(DEFAULT_AGENT)
                 .map_err(|error| anyhow::anyhow!("open the run ledger: {error}"))?;
-            let source = QuiescentSource::asserted_by_trusted_host(
-                snapshot.db(),
-                SourceOwner::asserted_by_trusted_host(ledger.scope().clone()),
-            );
+            let rows = super::session_db::SessionDatabase::read(snapshot.db())
+                .context("[sessions] read the session database snapshot")?;
+            let batch = LegacySessionImport {
+                sessions: rows.sessions,
+                messages: rows.messages,
+                tool_calls: rows.tool_calls,
+                agent_runs: rows.agent_runs,
+                telemetry: rows.telemetry,
+                events: rows.events,
+                workflow_runs: rows.workflows,
+                teams: rows.teams,
+                members: rows.members,
+                tasks: rows.tasks,
+                tool_effects: rows.tool_effects,
+            };
             let report = crate::storage::block_on(async move {
-                Ok(ledger.import_legacy_database(&source).await)
+                ledger.import_legacy_batch(batch).await
             })?
             .context("[sessions] import sessions.db")?;
             let (database_found, database_written) = database_totals(&report);
