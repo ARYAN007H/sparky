@@ -158,6 +158,10 @@ impl LinkedTelegramRuntime {
         &self.config
     }
 
+    pub(crate) fn provider_endpoint(&self) -> String {
+        format!("{}/v1", self.server.uri())
+    }
+
     pub(crate) async fn provider_request_paths(&self) -> Vec<String> {
         self.server
             .received_requests()
