@@ -141,8 +141,8 @@ pub async fn local_ai_transcribe_bytes(
     }
 
     let service = local_ai::global(config);
-    let output = local_ai::service::transcribe_bytes(&service, config, audio_bytes, Some(&ext))
-        .await?;
+    let output =
+        local_ai::service::transcribe_bytes(&service, config, audio_bytes, Some(&ext)).await?;
     Ok(Outcome::single_log(
         output,
         "local ai transcription completed",

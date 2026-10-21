@@ -5,7 +5,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use log::debug;
 
 use crate::config::Config;
-use crate::voice::{SttProvider, create_stt_provider, effective_stt_provider};
+use crate::voice::{create_stt_provider, effective_stt_provider, SttProvider};
 use tinyinference_local::models as model_ids;
 use tinyinference_local::status::{LocalAiSpeechResult, LocalAiTtsResult};
 
@@ -51,8 +51,9 @@ pub async fn transcribe_with_prompt(
     let provider_name = effective_stt_provider(config);
     debug!("{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path}");
     let provider = selected_stt_provider(config, &provider_name);
-    let text = tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
-        .await?;
+    let text =
+        tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
+            .await?;
     debug!(
         "{LOG_PREFIX} configured STT complete (provider={} elapsed_ms={})",
         provider_name,
@@ -74,8 +75,8 @@ pub async fn transcribe_bytes(
 ) -> Result<LocalAiSpeechResult, String> {
     let provider_name = effective_stt_provider(config);
     let provider = selected_stt_provider(config, &provider_name);
-    let text = tinyinference_voice::transcription::transcribe_bytes(audio, extension, &provider)
-        .await?;
+    let text =
+        tinyinference_voice::transcription::transcribe_bytes(audio, extension, &provider).await?;
     service.mark_stt_ready();
     Ok(LocalAiSpeechResult {
         text,
@@ -86,10 +87,7 @@ pub async fn transcribe_bytes(
 type ConfiguredProviderFactory<'a> =
     dyn Fn(&Config) -> Result<Box<dyn SttProvider>, String> + Send + Sync + 'a;
 
-fn selected_stt_provider<'a>(
-    config: &'a Config,
-    provider_name: &str,
-) -> ConfiguredSttProvider<'a> {
+fn selected_stt_provider<'a>(config: &'a Config, provider_name: &str) -> ConfiguredSttProvider<'a> {
     let provider_name = provider_name.to_owned();
     ConfiguredSttProvider {
         config,
