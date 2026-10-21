@@ -1,6 +1,6 @@
 use super::super::context::{
-    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRouteSelection, ChannelRuntimeContext,
-    conversation_history_key,
+    conversation_history_key, ChannelRouteSelection, ChannelRuntimeContext,
+    CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
 use super::super::runtime::test_support::linked_telegram_runtime;
