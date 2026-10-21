@@ -8,7 +8,7 @@
     "record already exempt cannot drift FURTHER without failing. Widening the drift",
     "is a deliberate edit to this file, which is a reviewable diff.",
     "A `sourceParity` proof binds one exact candidate commit to a release tree",
-    "except for one named test file; it does not accept descendants.",
+    "except for its explicitly named test file(s); it does not accept descendants.",
     "",
     "Delete an entry the moment the pins are reconciled. An exemption that has",
     "stopped being true fails the gate too \u2014 `expect` must still match."
@@ -36,6 +36,58 @@
           "moduleBlob": "6e9c47e86d26f299b0e8fb959839a598619ff82b",
           "testPath": "src/compress_tests.rs"
         }
+      }
+    },
+    {
+      "id": "tinychannels",
+      "expect": "v0.1.38-7-g1ca1a415",
+      "reason": "TinyChannels PR #97 is merged into senamakel/tinychannels:epic/8089-test-ownership at 1ca1a4158fd607b62e4f65194c8cdf85a9371fca. Its exact diff adds only tests in the runtime, Telegram operations, and Telegram send test modules; the release artifacts are unchanged.",
+      "sourceParity": {
+        "tag": "v0.1.38",
+        "releaseCommit": "9e1a340bf8f2cf89d5dd713a557b2c1a6c2406d6",
+        "candidateCommit": "1ca1a4158fd607b62e4f65194c8cdf85a9371fca",
+        "assetsSha256": "b3c4e7a1e593676e7998bd95702aed59ab4b1fc472bc86ccf6339b15910ae0cf",
+        "testFiles": [
+          {
+            "path": "crates/tinychannels-runtime/src/lib_tests.rs",
+            "releaseMode": "100644",
+            "releaseBlob": "813011495af5370ce03f07a32d6e97c8d7677ef1",
+            "candidateMode": "100644",
+            "candidateBlob": "4189706046da544507a9128a0f4280d67770ea0d"
+          },
+          {
+            "path": "src/providers/telegram/channel_ops_tests.rs",
+            "releaseMode": "100644",
+            "releaseBlob": "1f4024d149dd0f439d5296a9b11f70d8586fa24c",
+            "candidateMode": "100644",
+            "candidateBlob": "2ec7a77194b84966daf5d92e26c73ce1f0601891"
+          },
+          {
+            "path": "src/providers/telegram/channel_send_tests.rs",
+            "releaseMode": "100644",
+            "releaseBlob": "07798983c84464e4e18cb838854db209e11129ed",
+            "candidateMode": "100644",
+            "candidateBlob": "3eed943b87bf1746792d71091923aa5148d779f9"
+          }
+        ],
+        "unchangedTreeSha256": "7aeab7809776b6f65a8b6c5a34324e5d6a8ba46f1d32fb8b2f1cee054a4817a9",
+        "bindings": [
+          {
+            "modulePath": "crates/tinychannels-runtime/src/lib.rs",
+            "moduleBlob": "6821c6faa8681b95442c95830be449fae5dff802",
+            "testPath": "crates/tinychannels-runtime/src/lib_tests.rs"
+          },
+          {
+            "modulePath": "src/providers/telegram/channel_ops.rs",
+            "moduleBlob": "2cbc0109c51407af140a2fd9d8868cb51e2fb042",
+            "testPath": "src/providers/telegram/channel_ops_tests.rs"
+          },
+          {
+            "modulePath": "src/providers/telegram/channel_send.rs",
+            "moduleBlob": "89ff877a6b58c3078baa760db3644dcb02f4f13c",
+            "testPath": "src/providers/telegram/channel_send_tests.rs"
+          }
+        ]
       }
     }
   ]

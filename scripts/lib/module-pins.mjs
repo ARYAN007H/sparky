@@ -191,10 +191,11 @@ export function classifyPin({
 
 /**
  * Verify one reviewed, exact source-parity attestation for a test-only commit.
- * This deliberately proves a named Git pair and a named test file; it does not
- * infer Rust test-only semantics for arbitrary diffs. The asset digest covers
- * the registry version plus assets sorted by host key; the source digest covers
- * sorted `mode type oid<TAB>path<LF>` entries other than the named test file.
+ * The proof names either one test file (the original format) or an explicit
+ * set of test files. It does not infer Rust test-only semantics for arbitrary
+ * diffs. The asset digest covers the registry version plus assets sorted by
+ * host key; the source digest covers sorted `mode type oid<TAB>path<LF>` entries
+ * other than the named test file(s).
  */
 export function validateTestOnlySourceParity({
   repoPath,
@@ -213,18 +214,29 @@ export function validateTestOnlySourceParity({
     if (typeof repoPath !== "string" || repoPath.length === 0) {
       throw new Error("submodule repository path is missing");
     }
-    const required = [
+    const commonFields = [
       "tag",
       "releaseCommit",
       "candidateCommit",
       "assetsSha256",
-      "testFile",
       "unchangedTreeSha256",
-      "binding",
     ];
+    const singleFileProof =
+      proof &&
+      Object.hasOwn(proof, "testFile") &&
+      !Object.hasOwn(proof, "testFiles");
+    const fileSetProof =
+      proof &&
+      Object.hasOwn(proof, "testFiles") &&
+      !Object.hasOwn(proof, "testFile");
+    const expectedFields = singleFileProof
+      ? [...commonFields, "testFile", "binding"]
+      : fileSetProof
+        ? [...commonFields, "testFiles", "bindings"]
+        : [];
     if (
       !proof ||
-      Object.keys(proof).sort().join(",") !== required.sort().join(",")
+      Object.keys(proof).sort().join(",") !== expectedFields.sort().join(",")
     ) {
       throw new Error("proof fields are missing or unknown");
     }
@@ -286,43 +298,76 @@ export function validateTestOnlySourceParity({
       throw new Error("unchanged-tree digest is malformed");
     }
 
-    const file = proof.testFile;
-    if (
-      !file ||
-      Object.keys(file).sort().join(",") !==
-        "candidateBlob,candidateMode,path,releaseBlob,releaseMode"
-    ) {
-      throw new Error("test-file proof fields are missing or unknown");
-    }
     const validRepoPath = (value) =>
       typeof value === "string" &&
       /^[A-Za-z0-9_./-]+$/.test(value) &&
       !posix.isAbsolute(value) &&
       !value.split("/").includes("..");
+    const files = singleFileProof ? [proof.testFile] : proof.testFiles;
+    const bindings = singleFileProof ? [proof.binding] : proof.bindings;
     if (
-      !proof.binding ||
-      !validRepoPath(file.path) ||
-      !validRepoPath(proof.binding.modulePath) ||
-      !file.path.endsWith(".rs") ||
-      file.path !== proof.binding.testPath ||
-      posix.dirname(file.path) !== posix.dirname(proof.binding.modulePath)
+      !Array.isArray(files) ||
+      files.length === 0 ||
+      !Array.isArray(bindings) ||
+      bindings.length !== files.length
     ) {
       throw new Error(
-        "test path is not a safe sibling of the attested module binding",
+        "test-file set and module bindings must be non-empty and have equal length",
       );
     }
-    if (file.releaseMode !== "100644" || file.candidateMode !== "100644") {
-      throw new Error(
-        "attested test file must remain a regular non-executable file",
-      );
+    const filePaths = new Set();
+    const bindingsByPath = new Map();
+    for (const file of files) {
+      if (
+        !file ||
+        Object.keys(file).sort().join(",") !==
+          "candidateBlob,candidateMode,path,releaseBlob,releaseMode"
+      ) {
+        throw new Error("test-file proof fields are missing or unknown");
+      }
+      if (
+        !validRepoPath(file.path) ||
+        !file.path.endsWith(".rs") ||
+        filePaths.has(file.path)
+      ) {
+        throw new Error("test-file paths must be unique safe Rust source paths");
+      }
+      filePaths.add(file.path);
+      const newTestFile =
+        fileSetProof && file.releaseMode === null && file.releaseBlob === null;
+      if (
+        (!newTestFile && file.releaseMode !== "100644") ||
+        file.candidateMode !== "100644"
+      ) {
+        throw new Error("attested test file must remain a regular non-executable file");
+      }
+      if (
+        !/^[0-9a-f]{40}$/.test(file.candidateBlob) ||
+        (!newTestFile &&
+          (!/^[0-9a-f]{40}$/.test(file.releaseBlob) ||
+            file.releaseBlob === file.candidateBlob))
+      ) {
+        throw new Error("test-file blob pair is malformed or unchanged");
+      }
     }
-    if (
-      ![file.releaseBlob, file.candidateBlob].every((sha) =>
-        /^[0-9a-f]{40}$/.test(sha),
-      ) ||
-      file.releaseBlob === file.candidateBlob
-    ) {
-      throw new Error("test-file blob pair is malformed or unchanged");
+    for (const binding of bindings) {
+      if (
+        !binding ||
+        Object.keys(binding).sort().join(",") !==
+          "moduleBlob,modulePath,testPath" ||
+        !validRepoPath(binding.modulePath) ||
+        !validRepoPath(binding.testPath) ||
+        !/^[0-9a-f]{40}$/.test(binding.moduleBlob) ||
+        !filePaths.has(binding.testPath) ||
+        posix.dirname(binding.testPath) !== posix.dirname(binding.modulePath) ||
+        bindingsByPath.has(binding.testPath)
+      ) {
+        throw new Error("test path is not a safe sibling of an exact module binding");
+      }
+      bindingsByPath.set(binding.testPath, binding);
+    }
+    if (bindingsByPath.size !== filePaths.size) {
+      throw new Error("every changed test file must have exactly one module binding");
     }
     const entries = (ref) =>
       runGit(["ls-tree", "-r", "--full-tree", "-z", ref])
@@ -345,27 +390,35 @@ export function validateTestOnlySourceParity({
         });
     const releaseEntries = entries(proof.releaseCommit);
     const candidateEntries = entries(proof.candidateCommit);
-    const select = (items) => items.find((item) => item.path === file.path);
-    const releaseFile = select(releaseEntries);
-    const candidateFile = select(candidateEntries);
-    if (
-      !releaseFile ||
-      !candidateFile ||
-      releaseFile.mode !== file.releaseMode ||
-      candidateFile.mode !== file.candidateMode ||
-      releaseFile.type !== "blob" ||
-      candidateFile.type !== "blob" ||
-      releaseFile.oid !== file.releaseBlob ||
-      candidateFile.oid !== file.candidateBlob
-    ) {
-      throw new Error(
-        "attested test file path, mode, or blob does not match the Git trees",
-      );
+    for (const file of files) {
+      const releaseFile = releaseEntries.find((item) => item.path === file.path);
+      const candidateFile = candidateEntries.find((item) => item.path === file.path);
+      const newTestFile =
+        fileSetProof && file.releaseMode === null && file.releaseBlob === null;
+      if (
+        (newTestFile
+          ? releaseFile !== undefined
+          : !releaseFile ||
+            releaseFile.mode !== file.releaseMode ||
+            releaseFile.type !== "blob" ||
+            releaseFile.oid !== file.releaseBlob) ||
+        !candidateFile ||
+        candidateFile.mode !== file.candidateMode ||
+        candidateFile.type !== "blob" ||
+        candidateFile.oid !== file.candidateBlob
+      ) {
+        throw new Error(
+          singleFileProof
+            ? "attested test file path, mode, or blob does not match the Git trees"
+            : `attested test file ${file.path} path, mode, or blob does not match the Git trees`,
+        );
+      }
     }
+    const attestedPaths = new Set(files.map(({ path }) => path));
     const treeHash = (items) =>
       sha256(
         items
-          .filter((item) => item.path !== file.path)
+          .filter((item) => !attestedPaths.has(item.path))
           .map(
             ({ mode, type, oid, path }) => `${mode} ${type} ${oid}\t${path}\n`,
           )
@@ -383,35 +436,30 @@ export function validateTestOnlySourceParity({
       );
     }
 
-    const binding = proof.binding;
-    if (
-      !binding ||
-      Object.keys(binding).sort().join(",") !==
-        "moduleBlob,modulePath,testPath" ||
-      !/^[0-9a-f]{40}$/.test(binding.moduleBlob)
-    ) {
-      throw new Error("module binding proof is malformed");
-    }
-    const moduleEntry = candidateEntries.find(
-      (item) => item.path === binding.modulePath,
-    );
-    if (
-      !moduleEntry ||
-      moduleEntry.type !== "blob" ||
-      moduleEntry.mode !== "100644" ||
-      moduleEntry.oid !== binding.moduleBlob
-    ) {
-      throw new Error(
-        "test module declaration source differs from the attested blob",
+    for (const binding of bindings) {
+      const moduleEntry = candidateEntries.find(
+        (item) => item.path === binding.modulePath,
       );
-    }
-    const moduleSource = runGit([
-      "show",
-      `${proof.candidateCommit}:${binding.modulePath}`,
-    ]);
-    const declaration = `#[cfg(test)]\n#[path = "${file.path.split("/").at(-1)}"]\nmod tests;`;
-    if (!moduleSource.includes(declaration)) {
-      throw new Error("the exact cfg(test) sibling module binding is absent");
+      if (
+        !moduleEntry ||
+        moduleEntry.type !== "blob" ||
+        moduleEntry.mode !== "100644" ||
+        moduleEntry.oid !== binding.moduleBlob
+      ) {
+        throw new Error(
+          "test module declaration source differs from the attested blob",
+        );
+      }
+      const moduleSource = runGit([
+        "show",
+        `${proof.candidateCommit}:${binding.modulePath}`,
+      ]);
+      const declaration = `#[cfg(test)]\n#[path = "${binding.testPath.split("/").at(-1)}"]\nmod tests;`;
+      if (!moduleSource.includes(declaration)) {
+        throw new Error(
+          `the exact cfg(test) sibling module binding for ${binding.testPath} is absent`,
+        );
+      }
     }
     return { ok: true };
   } catch (error) {

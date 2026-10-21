@@ -321,6 +321,145 @@ function sourceParityFixture() {
     .digest("hex");
   return { root, git, releaseCommit, candidateCommit, parity };
 }
+
+function sourceParitySetFixture({ includeNewTest = false } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "module-source-parity-set-"));
+  const git = (args) =>
+    execFileSync("git", args, { cwd: root, stdio: "ignore" });
+  git(["init", "-q"]);
+  git(["config", "user.email", "pin-check@example.test"]);
+  git(["config", "user.name", "Pin Check"]);
+  git(["config", "commit.gpgsign", "false"]);
+  git(["config", "tag.gpgsign", "false"]);
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(
+    join(root, "Cargo.toml"),
+    '[package]\nname = "fixture"\nversion = "1.0.0"\n',
+  );
+  writeFileSync(
+    join(root, "src/lib.rs"),
+    "pub mod alpha;\npub mod beta;\npub mod gamma;\npub mod future;\n",
+  );
+
+  const paths = [
+    "src/alpha_tests.rs",
+    "src/beta_tests.rs",
+    "src/gamma_tests.rs",
+  ];
+  const modulePaths = ["src/alpha.rs", "src/beta.rs", "src/gamma.rs"];
+  for (let index = 0; index < paths.length; index += 1) {
+    writeFileSync(
+      join(root, modulePaths[index]),
+      `#[cfg(test)]\n#[path = "${paths[index].split("/").at(-1)}"]\nmod tests;\npub fn value() -> u8 { ${index} }\n`,
+    );
+    writeFileSync(
+      join(root, paths[index]),
+      `#[test] fn works_${index}() {}\n`,
+    );
+  }
+  const futurePath = "src/future_tests.rs";
+  const futureModulePath = "src/future.rs";
+  writeFileSync(
+    join(root, futureModulePath),
+    '#[cfg(test)]\n#[path = "future_tests.rs"]\nmod tests;\npub fn future() {}\n',
+  );
+  git(["add", "."]);
+  git(["commit", "-qm", "release"]);
+  git(["tag", "-a", "-m", "release", "v1.0.0"]);
+  const releaseCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  for (let index = 0; index < paths.length; index += 1) {
+    writeFileSync(
+      join(root, paths[index]),
+      `#[test] fn works_${index}() { assert_eq!(${index}, ${index}); }\n`,
+    );
+  }
+  if (includeNewTest) {
+    writeFileSync(join(root, futurePath), "#[test] fn future_test() {}\n");
+  }
+  git(["add", "."]);
+  git(["commit", "-qm", "owner test set"]);
+  const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  const blobAt = (commit, path) => {
+    try {
+      return execFileSync("git", ["rev-parse", `${commit}:${path}`], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return undefined;
+    }
+  };
+  const testPaths = includeNewTest ? [...paths, futurePath] : paths;
+  const testFiles = testPaths.map((path) => ({
+    path,
+    releaseMode: blobAt(releaseCommit, path) ? "100644" : null,
+    releaseBlob: blobAt(releaseCommit, path) ?? null,
+    candidateMode: "100644",
+    candidateBlob: blobAt(candidateCommit, path),
+  }));
+  const bindingPaths = includeNewTest
+    ? [...modulePaths, futureModulePath]
+    : modulePaths;
+  const bindings = bindingPaths.map((modulePath, index) => ({
+    modulePath,
+    moduleBlob: blobAt(candidateCommit, modulePath),
+    testPath: testPaths[index],
+  }));
+  const canonicalTree = execFileSync(
+    "git",
+    ["ls-tree", "-r", "--full-tree", "-z", releaseCommit],
+    { cwd: root, encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(Boolean)
+    .map((entry) => {
+      const match = entry.match(
+        /^([0-7]{6}) (blob|commit) ([0-9a-f]{40})\t([\s\S]+)$/,
+      );
+      if (testPaths.includes(match[4])) return null;
+      return `${match[1]} ${match[2]} ${match[3]}\t${match[4]}\n`;
+    })
+    .filter(Boolean)
+    .sort()
+    .join("");
+  const parity = {
+    tag: "v1.0.0",
+    releaseCommit,
+    candidateCommit,
+    assetsSha256: createHash("sha256")
+      .update(
+        JSON.stringify({
+          version: "1.0.0",
+          assets: [
+            {
+              hostKey: "linux",
+              archive: "fixture.tar.gz",
+              sha256: "a".repeat(64),
+            },
+          ],
+        }),
+      )
+      .digest("hex"),
+    testFiles,
+    unchangedTreeSha256: createHash("sha256").update(canonicalTree).digest("hex"),
+    bindings,
+  };
+  return {
+    root,
+    git,
+    releaseCommit,
+    candidateCommit,
+    parity,
+    paths: testPaths,
+  };
+}
 const provider = {
   id: "tinyx-lang",
   version: "0.2.4",
@@ -343,6 +482,133 @@ test("source parity proof accepts only its exact clean test-only Git pair", () =
       proof: fixture.parity,
     });
     assert.equal(result.ok, true, result.message);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("source parity proof accepts an explicit set of exact test-only files", () => {
+  const fixture = sourceParitySetFixture();
+  try {
+    const result = validateTestOnlySourceParity({
+      repoPath: fixture.root,
+      version: "1.0.0",
+      assets: [
+        { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
+      ],
+      actualHead: fixture.candidateCommit,
+      proof: fixture.parity,
+    });
+    assert.equal(result.ok, true, result.message);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test(
+  "multi-file source parity attests an explicitly bound test file added after release",
+  () => {
+  const fixture = sourceParitySetFixture({ includeNewTest: true });
+  try {
+    const result = validateTestOnlySourceParity({
+      repoPath: fixture.root,
+      version: "1.0.0",
+      assets: [
+        { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
+      ],
+      actualHead: fixture.candidateCommit,
+      proof: fixture.parity,
+    });
+    assert.equal(result.ok, true, result.message);
+    assert.equal(fixture.parity.testFiles.at(-1).releaseMode, null);
+    assert.equal(fixture.parity.testFiles.at(-1).releaseBlob, null);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+  },
+);
+
+test("multi-file source parity rejects omitted files, extra changes, and widened descendants", () => {
+  const assets = [
+    { hostKey: "linux", archive: "fixture.tar.gz", sha256: "a".repeat(64) },
+  ];
+  const validate = (
+    fixture,
+    proof = fixture.parity,
+    actualHead = fixture.candidateCommit,
+  ) =>
+    validateTestOnlySourceParity({
+      repoPath: fixture.root,
+      version: "1.0.0",
+      assets,
+      actualHead,
+      proof,
+    });
+  for (const changedPath of ["Cargo.toml", "src/lib.rs", "src/extra.rs"]) {
+    const fixture = sourceParitySetFixture();
+    try {
+      writeFileSync(join(fixture.root, changedPath), "unattested source change\n");
+      fixture.git(["add", changedPath]);
+      fixture.git(["commit", "-qm", `change ${changedPath}`]);
+      const head = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: fixture.root,
+        encoding: "utf8",
+      }).trim();
+      const result = validate(
+        fixture,
+        { ...fixture.parity, candidateCommit: head },
+        head,
+      );
+      assert.equal(result.ok, false, `${changedPath} was accepted`);
+      assert.match(
+        result.message,
+        /other source, manifest, lock, build input, or gitlink differs/,
+      );
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  }
+
+  const fixture = sourceParitySetFixture();
+  try {
+    const omitted = validate(fixture, {
+      ...fixture.parity,
+      testFiles: fixture.parity.testFiles.slice(0, 2),
+      bindings: fixture.parity.bindings.slice(0, 2),
+    });
+    assert.equal(omitted.ok, false, "a changed test file was omitted from the proof set");
+    assert.match(
+      omitted.message,
+      /other source, manifest, lock, build input, or gitlink differs/,
+    );
+
+    const duplicate = validate(fixture, {
+      ...fixture.parity,
+      testFiles: [...fixture.parity.testFiles, fixture.parity.testFiles[0]],
+      bindings: [...fixture.parity.bindings, fixture.parity.bindings[0]],
+    });
+    assert.equal(duplicate.ok, false, "duplicate proof paths were accepted");
+    assert.match(duplicate.message, /unique safe Rust source paths/);
+
+    const widenedFile = validate(fixture, {
+      ...fixture.parity,
+      testFiles: fixture.parity.testFiles.map((file, index) =>
+        index === 0 ? { ...file, candidateMode: "100755" } : file,
+      ),
+    });
+    assert.equal(widenedFile.ok, false, "executable test path was accepted");
+    assert.match(widenedFile.message, /regular non-executable/);
+
+    const ambiguousShape = validate(fixture, {
+      ...fixture.parity,
+      testFile: fixture.parity.testFiles[0],
+      binding: fixture.parity.bindings[0],
+    });
+    assert.equal(ambiguousShape.ok, false, "mixed single and set proof shapes were accepted");
+    assert.match(
+      ambiguousShape.message,
+      /proof fields are missing or unknown/,
+    );
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -451,6 +717,34 @@ test("TinyJuice's canonical owner merge matches its recorded release-tree attest
         ? candidateCommit
         : execFileSync("git", args, {
             cwd: join(REPO_ROOT, "vendor/tinyjuice"),
+            encoding: "utf8",
+          }).trim(),
+  });
+  assert.equal(result.ok, true, result.message);
+});
+
+test("TinyChannels' merged owner commit matches its exact test-set attestation", () => {
+  const exemption = JSON.parse(
+    readFileSync(
+      join(REPO_ROOT, "scripts/ci/module-pin-exemptions.json"),
+      "utf8",
+    ),
+  ).exemptions.find((entry) => entry.id === "tinychannels");
+  const assets = [...parseRecords(readRegistry()).values()].find(
+    (record) => record.id === "tinychannels",
+  ).assets;
+  const candidateCommit = exemption.sourceParity.candidateCommit;
+  const result = validateTestOnlySourceParity({
+    repoPath: join(REPO_ROOT, "vendor/tinychannels"),
+    version: "0.1.38",
+    assets,
+    actualHead: candidateCommit,
+    proof: exemption.sourceParity,
+    runGit: (args) =>
+      args[0] === "rev-parse" && args[1] === "HEAD"
+        ? candidateCommit
+        : execFileSync("git", args, {
+            cwd: join(REPO_ROOT, "vendor/tinychannels"),
             encoding: "utf8",
           }).trim(),
   });
