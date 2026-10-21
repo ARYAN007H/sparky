@@ -33,7 +33,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::Engine as _;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyagents_harness::tinyinference_video::WaitPolicy;
 use tinytools::Tool;
 
