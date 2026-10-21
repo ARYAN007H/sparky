@@ -23,10 +23,10 @@ use sha2::Digest;
 use tinystoragedrivers_types::{Capability, CollectionSpec, ErrorKind, WriteOptions};
 
 use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
+use crate::storage::import::Record;
 use crate::storage::{
     DocumentStore, DocumentStoreExt, Precondition, Scope, StorageBackend, StorageError,
 };
-use crate::storage::import::Record;
 
 /// The ids a hashed v1 scope can be matched against.
 #[derive(Debug, Default, Clone)]
@@ -240,7 +240,10 @@ pub async fn copy_inventory(
                 {
                     Ok(_) => report.documents += 1,
                     Err(error)
-                        if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
+                        if matches!(
+                            error.kind(),
+                            ErrorKind::Conflict | ErrorKind::AlreadyExists
+                        ) => {}
                     Err(error) => return Err(error.into()),
                 }
             }

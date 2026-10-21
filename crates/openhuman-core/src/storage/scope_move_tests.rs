@@ -126,6 +126,98 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
 
 #[tokio::test]
 #[cfg(feature = "legacy-import")]
+async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() {
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
+    let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
+        scopes: vec!["cluster".into()],
+        documents: vec![
+            crate::storage::import::scope_move::LegacyDocument {
+                scope: "cluster".into(),
+                collection: "profiles".into(),
+                id: "alice".into(),
+                body: json!({
+                    "profile_id": "alice",
+                    "created_at": 1_700_000_000_i64,
+                    "layout_version": 3
+                }),
+                meta: Meta {
+                    created_ms: 10,
+                    updated_ms: 11,
+                    ..Meta::default()
+                },
+            },
+            crate::storage::import::scope_move::LegacyDocument {
+                scope: "cluster".into(),
+                collection: "leases".into(),
+                id: "alice".into(),
+                body: json!({
+                    "owner": "worker-a",
+                    "epoch": 8,
+                    "expires_at_ms": 9_000,
+                    "endpoint": "https://worker.example",
+                    "released": false
+                }),
+                meta: Meta {
+                    schema: 2,
+                    created_ms: 20,
+                    updated_ms: 21,
+                    expires_ms: Some(10_000),
+                },
+            },
+        ],
+        ..Default::default()
+    };
+
+    let report = copy_inventory(&backend, &known(), &inventory)
+        .await
+        .unwrap();
+    assert_eq!(report.moved, 1);
+    assert_eq!(report.documents, 2);
+    assert_eq!(report.updated_times_not_restored, 2);
+
+    let cluster = backend
+        .for_scope(&crate::storage::Scope::new("cluster").unwrap())
+        .unwrap();
+    let profile = cluster
+        .documents()
+        .get("profiles.registry", "alice")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        profile.doc,
+        json!({"profile_id":"alice", "layout_version":3})
+    );
+    assert_eq!(profile.meta.created_ms, 1_700_000_000_000);
+
+    let lease_id = crate::storage::schema_support::key_of_parts(["profiles", "alice"]).unwrap();
+    let lease = cluster
+        .documents()
+        .get(crate::storage::lease::LEASE_COLLECTION, &lease_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        lease.doc,
+        json!({"holder":"worker-a", "epoch":8, "expires_ms":9000, "endpoint":"https://worker.example"})
+    );
+    assert_eq!(lease.meta.schema, 2);
+    assert_eq!(lease.meta.created_ms, 20);
+    assert_eq!(lease.meta.expires_ms, Some(10_000));
+
+    let operator = backend.for_scope(&crate::storage::Scope::local()).unwrap();
+    assert!(
+        operator
+            .documents()
+            .get("profiles.registry", "alice")
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[tokio::test]
+#[cfg(feature = "legacy-import")]
 async fn a_record_already_in_the_target_wins_a_merge() {
     let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     let target = backend.for_scope(&scope_for_agent("asha")).unwrap();
