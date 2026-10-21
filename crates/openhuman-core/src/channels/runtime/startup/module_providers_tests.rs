@@ -619,17 +619,17 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         &final_result
     ));
 
-    let mut projected = Vec::new();
+    let mut projected: Vec<crate::web_chat::ScopedWebEvent> = Vec::new();
     let mut gateway_terminals = Vec::new();
     tokio::time::timeout(Duration::from_secs(5), async {
         while projected
             .iter()
-            .filter(|e: &&crate::web_chat::WebChannelEvent| e.event_name() == "chat_message")
+            .filter(|e: &&crate::web_chat::ScopedWebEvent| e.event_name() == "chat_message")
             .count()
             < 2
             || projected
                 .iter()
-                .filter(|e: &&crate::web_chat::WebChannelEvent| e.event_name() == "chat_done")
+                .filter(|e: &&crate::web_chat::ScopedWebEvent| e.event_name() == "chat_done")
                 .count()
                 < 1
             || gateway_terminals.len() < 3
