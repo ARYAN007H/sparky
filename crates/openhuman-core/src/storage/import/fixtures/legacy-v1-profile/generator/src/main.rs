@@ -262,8 +262,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Threads predate the v1 storage database and remain in the workspace's
-    // read-only JSONL conversation files. Emit them beside storage.db so the
-    // host integration fixture exercises the real legacy thread importer.
+    // read-only JSONL conversation files. Emit a thread and its message beside
+    // storage.db so the host integration fixture exercises the real legacy
+    // thread importer while preserving a message through the boot migration.
     let conversations = path
         .parent()
         .ok_or("storage.db output must have a parent directory")?
@@ -272,6 +273,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(
         conversations.join("threads.jsonl"),
         "{\"op\":\"upsert\",\"thread_id\":\"fixture-thread\",\"title\":\"Fixture thread\",\"created_at\":\"2025-02-03T04:05:06Z\"}\n",
+    )?;
+    let thread_id_hex: String = "fixture-thread"
+        .bytes()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    std::fs::write(
+        conversations.join("threads").join(format!("{thread_id_hex}.jsonl")),
+        "{\"id\":\"fixture-message\",\"content\":\"historical profile message\",\"type\":\"text\",\"extraMetadata\":null,\"sender\":\"user\",\"createdAt\":\"2025-02-03T04:05:07Z\"}\n",
     )?;
     backend
         .checkpoint(tinystoragedrivers::Checkpoint::Truncate)

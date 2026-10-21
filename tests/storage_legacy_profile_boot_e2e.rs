@@ -145,10 +145,24 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .collect::<Vec<_>>(),
         std::fs::read_to_string(home.path().join("core.stderr.log")).unwrap_or_default()
     );
+    assert!(!source.exists(), "migration should archive the old workspace storage path");
+    let archive_dir = profile.join("backups");
+    let archive = std::fs::read_dir(&archive_dir)
+        .unwrap_or_else(|error| panic!("migration archive missing at {}: {error}", archive_dir.display()))
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|extension| extension == "zst"))
+        .expect("layout migration should archive the v1 workspace");
+    let restored = tempfile::tempdir().unwrap();
+    let manifest = openhuman_core::storage::layout::archive::restore(&archive, restored.path())
+        .expect("migration archive should verify and restore");
+    assert!(manifest.files.iter().any(|file| {
+        file.path == "workspace/storage/storage.db" && file.size == source_bytes.len() as u64
+    }), "archive manifest must record the historical storage.db");
     assert_eq!(
-        std::fs::read(&source).unwrap(),
+        std::fs::read(restored.path().join("workspace/storage/storage.db")).unwrap(),
         source_bytes,
-        "boot must leave the historical v1 storage.db byte-for-byte unchanged"
+        "migration must preserve the historical v1 storage.db bytes exactly"
     );
 
     // The profile's V2 workspace resolves its default backend to the exact
@@ -189,6 +203,10 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
                     Some("fixture-transcript-key"),
                     "thread owner did not read the v1 database transcript key"
                 );
+                let messages = thread_store.get_messages("fixture-thread").unwrap();
+                assert_eq!(messages.len(), 1, "thread owner did not read the historical message");
+                assert_eq!(messages[0].id, "fixture-message");
+                assert_eq!(messages[0].content, "historical profile message");
                 let approvals =
                     openhuman_core::security::approval::store::list_pending(&config).unwrap();
                 assert_eq!(
