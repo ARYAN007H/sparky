@@ -1,8 +1,8 @@
 use super::*;
 use std::{ops::Range, sync::Arc, time::Duration};
-use tinystoragedrivers_api::{BlobReader, BlobStore, BlobStream, Storage, StorageBackend};
+use tinystoragedrivers_api::{BlobStore, Storage, StorageBackend};
 use tinystoragedrivers_types::{
-    Blob, BlobMeta, Capabilities, Capability, Result, Scope, StorageError,
+    Blob, BlobMeta, Capabilities, Result, Scope,
 };
 
 /// The TSD testkit memory engine uses its real clock; tests wait on the
