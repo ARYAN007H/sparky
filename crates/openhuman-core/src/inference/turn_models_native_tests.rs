@@ -67,7 +67,8 @@ async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_su
         extensions,
     );
     let ctx = DispatchCtx::new(context);
-    let config = Arc::new(crate::config::Config::default());
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Arc::new(managed_fixture_config(&tmp));
     let budget = ModelBudget {
         ledger: tinyinference_llm::model::budget::Budget::new(SpendLimits {
             tokens: Some(0),
