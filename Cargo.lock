@@ -266,7 +266,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -277,7 +277,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1060,7 +1060,7 @@ dependencies = [
  "cap-primitives",
  "cap-std",
  "io-lifetimes 3.0.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1077,7 +1077,7 @@ dependencies = [
  "maybe-owned",
  "rustix 1.1.5",
  "rustix-linux-procfs",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
  "winx",
 ]
 
@@ -2218,7 +2218,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2494,7 +2494,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4829,7 +4829,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5457,10 +5457,10 @@ dependencies = [
  "tinyflows-drivers",
  "tinyflows-module",
  "tinyhosts-bus",
- "tinyinference-core 0.4.1",
- "tinyinference-decisions 0.4.1",
+ "tinyinference-core 0.5.0",
+ "tinyinference-decisions 0.5.0",
  "tinyinference-embeddings",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinyinference-local",
  "tinyinference-providers",
  "tinyinference-voice",
@@ -5479,7 +5479,7 @@ dependencies = [
  "tinystoragedrivers-bus",
  "tinystoragedrivers-busproxy",
  "tinystoragedrivers-connect",
- "tinystoragedrivers-secrets 2.1.0",
+ "tinystoragedrivers-secrets",
  "tinystoragedrivers-testkit",
  "tinystoragedrivers-types",
  "tinytools 0.6.0",
@@ -5551,8 +5551,8 @@ dependencies = [
  "tinycomputer-bus",
  "tinydocs-bus",
  "tinyeventqueues-bus",
- "tinyinference-core 0.4.1",
- "tinyinference-llm 0.4.1",
+ "tinyinference-core 0.5.0",
+ "tinyinference-llm 0.5.0",
  "tinyinference-local",
  "tinyinference-voice",
  "tinymcp-bus",
@@ -5606,7 +5606,7 @@ dependencies = [
  "tinyflows-bus",
  "tinyflows-module",
  "tinyinference-embeddings",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinymcp-bus",
  "tinymemory-api",
  "tinymemory-tools",
@@ -5670,7 +5670,7 @@ dependencies = [
  "tempfile",
  "tinyagents-harness",
  "tinyagents-session",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tinystoragedrivers",
  "tokio",
  "tokio-stream",
@@ -5713,10 +5713,10 @@ dependencies = [
  "tinybus",
  "tinychannels-bus",
  "tinyhumans-sdk",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tinyinference-embeddings",
  "tinyinference-image",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinyinference-providers",
  "tinyinference-video",
  "tinyinference-voice",
@@ -6536,7 +6536,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7171,7 +7171,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7240,7 +7240,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7895,7 +7895,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8245,7 +8245,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8258,7 +8258,7 @@ dependencies = [
  "parking_lot",
  "rustix 1.1.5",
  "signal-hook",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8469,7 +8469,7 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-storage-kit",
  "tinyagents-tasks",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinytools 0.6.0",
  "tokio",
  "tracing",
@@ -8499,10 +8499,10 @@ dependencies = [
  "thiserror 2.0.20",
  "tinyagents-definition",
  "tinyagents-storage-kit",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tinyinference-embeddings",
  "tinyinference-image",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinyinference-video",
  "tinystoragedrivers-api",
  "tinystoragedrivers-types",
@@ -8529,7 +8529,7 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-orchestration",
  "tinyagents-tasks",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinytools 0.6.0",
  "tokio",
  "tracing",
@@ -8546,7 +8546,7 @@ dependencies = [
  "serde_json",
  "tinyagents-harness",
  "tinyagents-harness-tools",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinytools 0.6.0",
  "tokio",
  "tracing",
@@ -8581,7 +8581,7 @@ dependencies = [
  "tinyagents-session",
  "tinyagents-storage-kit",
  "tinyagents-tasks",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinytools 0.6.0",
  "tokio",
  "tracing",
@@ -8598,7 +8598,7 @@ dependencies = [
  "serde_json",
  "tinyagents-definition",
  "tinyagents-harness",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinytools 0.6.0",
 ]
 
@@ -8615,7 +8615,7 @@ dependencies = [
  "tinyagents-hooks",
  "tinyagents-registry",
  "tinyagents-session",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinytools 0.6.0",
  "tokio",
  "tracing",
@@ -8669,7 +8669,7 @@ dependencies = [
  "serde_json",
  "tinyagents-harness",
  "tinyagents-storage-kit",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinytools 0.6.0",
  "tokio",
  "tracing",
@@ -9380,7 +9380,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-core"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "httpdate",
@@ -9403,7 +9403,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-decisions"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "httpdate",
@@ -9416,7 +9416,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-embeddings"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9426,7 +9426,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tokio",
  "tracing",
  "url",
@@ -9434,7 +9434,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-image"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -9443,7 +9443,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tinystoragedrivers-core",
  "tokio",
  "tracing",
@@ -9469,7 +9469,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-llm"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -9480,7 +9480,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tinyinference-providers",
  "tinytools-agent 0.6.0",
  "tokio",
@@ -9490,7 +9490,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-local"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "base64 0.23.1",
  "futures-util",
@@ -9501,9 +9501,9 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tinyinference-embeddings",
- "tinyinference-llm 0.4.1",
+ "tinyinference-llm 0.5.0",
  "tinyinference-providers",
  "tokio",
  "tracing",
@@ -9512,7 +9512,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-providers"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "base64 0.23.1",
  "rand 0.10.2",
@@ -9520,7 +9520,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
- "tinystoragedrivers-secrets 1.0.0",
+ "tinystoragedrivers-secrets",
  "tracing",
  "url",
  "zeroize",
@@ -9528,7 +9528,7 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-video"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -9541,14 +9541,14 @@ dependencies = [
 
 [[package]]
 name = "tinyinference-voice"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "base64 0.23.1",
  "reqwest 0.12.28",
  "schemars",
  "serde",
  "serde_json",
- "tinyinference-core 0.4.1",
+ "tinyinference-core 0.5.0",
  "tinyinference-local",
  "tokio",
  "uuid",
@@ -9828,7 +9828,7 @@ dependencies = [
  "tinystoragedrivers-document",
  "tinystoragedrivers-kv",
  "tinystoragedrivers-queue",
- "tinystoragedrivers-secrets 2.1.0",
+ "tinystoragedrivers-secrets",
  "tinystoragedrivers-types",
 ]
 
@@ -9974,29 +9974,6 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-secrets"
-version = "1.0.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v1.0.0#141fd9ed0ad5d14a8fb5a1b3e837a719e81ac08d"
-dependencies = [
- "async-trait",
- "atomicwrites",
- "chacha20poly1305",
- "clack-private-fs",
- "fs4",
- "hkdf 0.12.4",
- "rustix 1.1.5",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tinystoragedrivers-core",
- "tokio",
- "winapi-util",
- "windows-permissions",
- "winsafe",
- "zeroize",
-]
-
-[[package]]
-name = "tinystoragedrivers-secrets"
 version = "2.1.0"
 dependencies = [
  "async-trait",
@@ -10032,7 +10009,7 @@ dependencies = [
  "tinystoragedrivers-document",
  "tinystoragedrivers-kv",
  "tinystoragedrivers-queue",
- "tinystoragedrivers-secrets 2.1.0",
+ "tinystoragedrivers-secrets",
  "tinystoragedrivers-types",
  "tokio",
  "ulid",
@@ -11599,7 +11576,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
