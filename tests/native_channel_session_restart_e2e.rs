@@ -513,8 +513,17 @@ async fn wait_for_completion(state: &MockState, count: usize) {
 
 fn model_saw_media_bytes(request: &Value, bytes: &[u8]) -> bool {
     use base64::Engine as _;
-    serde_json::to_string(request)
-        .is_ok_and(|body| body.contains(&base64::engine::general_purpose::STANDARD.encode(bytes)))
+    last_user_content(request)
+        .and_then(|content| serde_json::to_string(content).ok())
+        .is_some_and(|body| {
+            body.contains(&base64::engine::general_purpose::STANDARD.encode(bytes))
+        })
+}
+
+fn last_user_content(request: &Value) -> Option<&Value> {
+    request["messages"].as_array()?.iter().rev().find_map(|message| {
+        (message["role"] == "user").then(|| &message["content"])
+    })
 }
 
 fn model_saw_user_text(request: &Value, text: &str) -> bool {
@@ -751,7 +760,8 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
     let requests = mocks.state.completions.lock().expect("model requests").clone();
     assert!(model_saw_media_bytes(&requests[0], NATIVE_IMAGE_PNG));
     assert!(model_saw_media_bytes(&requests[1], NATIVE_FILE_BYTES));
-    let mixed = serde_json::to_string(&requests[2]).expect("serialize model request");
+    let mixed_content = last_user_content(&requests[2]).expect("mixed user message is present");
+    let mixed = serde_json::to_string(mixed_content).expect("serialize mixed user content");
     let before = mixed.find("before typed media").expect("caption text is present");
     let image = mixed
         .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_IMAGE_PNG))
