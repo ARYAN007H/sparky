@@ -40,8 +40,9 @@ pub(super) async fn resolve_typed_message(
     if !requires_typed_preparation(envelope) {
         return Ok(None);
     }
-    validate_native_parts(&envelope.parts)?;
-    let scope = media_scope(envelope)?;
+    validate_native_parts(&envelope.parts)
+        .map_err(|error| log_rejection("part_validation", error))?;
+    let scope = media_scope(envelope).map_err(|error| log_rejection("scope", error))?;
     let mut parts = envelope.parts.clone();
     let mut staged_parts = Vec::new();
     let mut image_count = 0usize;
@@ -64,7 +65,8 @@ pub(super) async fn resolve_typed_message(
                     true,
                     image_limit,
                     &config.multimodal_files.allowed_mime_types,
-                )?;
+                )
+                .map_err(|error| log_rejection("image_reference", error))?;
             }
             ContentPart::File { media, .. } => {
                 file_count += 1;
@@ -73,16 +75,23 @@ pub(super) async fn resolve_typed_message(
                     false,
                     file_limit,
                     &config.multimodal_files.allowed_mime_types,
-                )?;
+                )
+                .map_err(|error| log_rejection("file_reference", error))?;
             }
             _ => {}
         }
     }
     if (config.multimodal.max_images == 0 && image_count > 0) || image_count > max_images {
-        return Err("native image attachments exceed their count limit".into());
+        return Err(log_rejection(
+            "image_count_limit",
+            "native image attachments exceed their count limit".into(),
+        ));
     }
     if file_count > max_files {
-        return Err("native file attachments are disabled or exceed their count limit".into());
+        return Err(log_rejection(
+            "file_count_limit",
+            "native file attachments are disabled or exceed their count limit".into(),
+        ));
     }
     let client = module_client(ctx).await;
     let module_dispatch = ctx.dispatch_ctx();
@@ -135,7 +144,8 @@ pub(super) async fn resolve_typed_message(
             &media,
             byte_limit,
         )
-        .await?;
+        .await
+        .map_err(|error| log_rejection("module_media_read", error))?;
         media_payloads.push((index, part.clone(), name, mime, bytes));
     }
     for (index, input, name, mime, bytes) in media_payloads {
@@ -159,7 +169,7 @@ pub(super) async fn resolve_typed_message(
                     &staged_parts,
                 )
                 .await;
-                return Err(error);
+                return Err(log_rejection("host_staging", error));
             }
         };
         let opaque_id = media_opaque_id(&staged)
@@ -185,7 +195,7 @@ pub(super) async fn resolve_typed_message(
                     &staged_parts,
                 )
                 .await;
-                return Err(error);
+                return Err(log_rejection("message_conversion", error));
             }
         };
     Ok(Some(ResolvedNativeMessage {
