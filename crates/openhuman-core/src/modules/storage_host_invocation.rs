@@ -182,12 +182,14 @@ impl StorageEndpoint for DocumentsOnlyEndpoint {
                         )
                         .await
                             .map_err(HostFailure::Storage)?;
-                        if call.selector == "Capabilities"
-                            && let Some(capabilities) = reply
+                        if call.selector == "Capabilities" {
+                            if let Some(capabilities) = reply
                                 .get_mut("capabilities")
                                 .and_then(Value::as_array_mut)
-                        {
-                            capabilities.retain(|capability| capability.as_str() != Some("watch"));
+                            {
+                                capabilities
+                                    .retain(|capability| capability.as_str() != Some("watch"));
+                            }
                         }
                         Ok(storage_grants::filter_reply(&self.grant, filter, reply))
                     }
