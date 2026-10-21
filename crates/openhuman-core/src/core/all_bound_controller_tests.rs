@@ -714,3 +714,6 @@ mod registry_contract_tests;
 
 #[path = "all_keyring_consent_controller_tests.rs"]
 mod keyring_consent_controller_tests;
+
+#[path = "all_tool_registry_controller_tests.rs"]
+mod tool_registry_controller_tests;
