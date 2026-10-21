@@ -188,6 +188,3 @@ pub async fn inference_diagnostics(config: &Config) -> Result<Outcome<Value>, St
     result
 }
 
-#[cfg(test)]
-#[path = "../ops_tests.rs"]
-mod tests;

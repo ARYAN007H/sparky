@@ -19,3 +19,7 @@ pub use status::{
     inference_diagnostics, inference_prompt, inference_status, inference_summarize,
     inference_test_provider_model, inference_vision_prompt,
 };
+
+#[cfg(test)]
+#[path = "ops_tests.rs"]
+mod tests;
