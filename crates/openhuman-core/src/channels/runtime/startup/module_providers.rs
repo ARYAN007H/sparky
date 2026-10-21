@@ -15,9 +15,12 @@ use tinychannels_bus::module_runtime::{
 };
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
-use tinychannels_bus::{ChannelMessage, SendMessage};
+use tinychannels_bus::SendMessage;
+#[cfg(test)]
+use tinychannels_bus::ChannelMessage;
 #[cfg(test)]
 use tinychannels_runtime::Channel;
+#[cfg(test)]
 use tokio::sync::mpsc;
 
 /// Channel objects sharing one captured config, callback object and module lease.
@@ -353,34 +356,26 @@ fn channel_proxy(config: &Config) -> tinychannels_bus::HttpProxyPolicy {
 }
 
 impl ModuleChannel {
-    fn name(&self) -> &str {
+    pub(super) fn name(&self) -> &str {
         &self.name
     }
 
-    fn proactive_target(&self) -> Option<String> {
+    pub(super) fn proactive_target(&self) -> Option<String> {
         self.interaction.proactive_target.clone()
     }
 
-    pub(super) async fn send_prepared(&self, message: &SendMessage) -> anyhow::Result<()> {
+    pub(super) async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
         self.send_prepared(message).await
     }
 
-    async fn send_idempotent(&self, message: &SendMessage) -> anyhow::Result<()> {
-        self.send_prepared(message).await
-    }
-
-    async fn send_typed_with_receipt(
+    pub(super) async fn send_typed_with_receipt(
         &self,
         message: &tinychannels_bus::channel::ChannelOutboundMessage,
     ) -> anyhow::Result<tinychannels_bus::channel::ChannelSendOutcome> {
         self.send_progressive_typed(message).await
     }
 
-    async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
-        anyhow::bail!("TinyChannels module owns provider listeners")
-    }
-
-    async fn health_check(&self) -> bool {
+    pub(super) async fn health_check(&self) -> bool {
         self.object
             .call::<String>(
                 tinychannels_bus::methods::CHANNEL_STATUS,
@@ -390,21 +385,21 @@ impl ModuleChannel {
             .is_ok_and(|state| state == "connected")
     }
 
-    async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
+    pub(super) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
         self.interact(ChannelInteraction::StartTyping {
             recipient: recipient.to_owned(),
         })
         .await
     }
 
-    async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
+    pub(super) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
         self.interact(ChannelInteraction::StopTyping {
             recipient: recipient.to_owned(),
         })
         .await
     }
 
-    async fn begin_typing_refresh(
+    pub(super) async fn begin_typing_refresh(
         &self,
         recipient: &str,
         interval_secs: u64,
@@ -433,14 +428,14 @@ impl ModuleChannel {
         }
     }
 
-    async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
+    pub(super) async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
         self.interact(ChannelInteraction::StopTypingRefresh {
             handle: handle.to_owned(),
         })
         .await
     }
 
-    fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
+    pub(super) fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
         let legacy = self.interaction.capabilities;
         let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
         capabilities.remote_control = legacy.remote_control;
@@ -450,8 +445,67 @@ impl ModuleChannel {
         capabilities
     }
 
-    fn supports_reactions(&self) -> bool {
+    pub(super) fn supports_reactions(&self) -> bool {
         self.interaction.supports_reactions
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl Channel for ModuleChannel {
+    fn name(&self) -> &str {
+        ModuleChannel::name(self)
+    }
+
+    fn proactive_target(&self) -> Option<String> {
+        ModuleChannel::proactive_target(self)
+    }
+
+    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+        ModuleChannel::send(self, message).await
+    }
+
+    async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+        anyhow::bail!("TinyChannels module owns provider listeners")
+    }
+
+    async fn send_typed_with_receipt(
+        &self,
+        message: &tinychannels_bus::channel::ChannelOutboundMessage,
+    ) -> anyhow::Result<tinychannels_bus::channel::ChannelSendOutcome> {
+        ModuleChannel::send_typed_with_receipt(self, message).await
+    }
+
+    async fn health_check(&self) -> bool {
+        ModuleChannel::health_check(self).await
+    }
+
+    async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
+        ModuleChannel::start_typing(self, recipient).await
+    }
+
+    async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
+        ModuleChannel::stop_typing(self, recipient).await
+    }
+
+    async fn begin_typing_refresh(
+        &self,
+        recipient: &str,
+        interval_secs: u64,
+    ) -> anyhow::Result<Option<String>> {
+        ModuleChannel::begin_typing_refresh(self, recipient, interval_secs).await
+    }
+
+    async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
+        ModuleChannel::end_typing_refresh(self, handle).await
+    }
+
+    fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
+        ModuleChannel::capabilities(self)
+    }
+
+    fn supports_reactions(&self) -> bool {
+        ModuleChannel::supports_reactions(self)
     }
 }
 
@@ -515,7 +569,7 @@ impl ModuleChannel {
         })
     }
 
-    async fn send_prepared(&self, message: &SendMessage) -> anyhow::Result<()> {
+    pub(super) async fn send_prepared(&self, message: &SendMessage) -> anyhow::Result<()> {
         let prepared: tinychannels_bus::module_runtime::PreparedChannelIntent = self
             .object
             .call_confidential(
