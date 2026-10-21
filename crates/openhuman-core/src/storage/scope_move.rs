@@ -303,7 +303,12 @@ pub async fn run_from_source(
     source_db: &std::path::Path,
     known: &Known,
 ) -> anyhow::Result<MoveReport> {
-    let inventory = crate::storage::import::scope_move::LegacyScopeInventory::read(source_db)?;
+    let path = source_db.to_owned();
+    let inventory = tokio::task::spawn_blocking(move || {
+        crate::storage::import::scope_move::LegacyScopeInventory::read(&path)
+    })
+    .await
+    .context("join the legacy scope inventory reader")??;
     copy_inventory(backend, known, &inventory).await
 }
 

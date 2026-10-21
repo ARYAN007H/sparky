@@ -63,6 +63,7 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
     let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
     let source = "alice~asha";
     let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
+        scopes: vec![source.into()],
         documents: vec![crate::storage::import::scope_move::LegacyDocument {
             scope: source.into(),
             collection: "notes".into(),
@@ -131,6 +132,7 @@ async fn a_record_already_in_the_target_wins_a_merge() {
         .await
         .unwrap();
     let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
+        scopes: vec!["asha".into()],
         documents: vec![crate::storage::import::scope_move::LegacyDocument {
             scope: "asha".into(),
             collection: "notes".into(),
