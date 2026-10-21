@@ -159,6 +159,9 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     }
 
     let cell = workspace_backend(workspace_dir);
+    if let Some(backend) = cell.get() {
+        return Ok(Arc::clone(backend));
+    }
     #[cfg(test)]
     signal_test_sync_backend_entry();
 
