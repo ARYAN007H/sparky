@@ -120,3 +120,20 @@ fn raw_tool_registry_decoders_keep_ignored_maps_and_tool_id_errors() {
         );
     }
 }
+
+#[test]
+fn raw_tool_registry_get_rejects_invalid_id_before_lookup() {
+    let get = tool_registry_entries()
+        .into_iter()
+        .find(|entry| entry.schema.function == "get")
+        .expect("raw get entry");
+    for params in [
+        Map::new(),
+        Map::from_iter([("tool_id".into(), json!(false))]),
+        Map::from_iter([("tool_id".into(), json!("  "))]),
+    ] {
+        let error = futures::executor::block_on(get.invoke(DispatchCtx::unbound(), params))
+            .expect_err("invalid id must stop before tool lookup");
+        assert_eq!(error, "tool_id must be a non-empty string");
+    }
+}
