@@ -377,9 +377,10 @@ pub mod inference_registry {
         register_embedding_in, resolve_provider_model, unregister_backend_error_classifier,
         unregister_catalog, unregister_chat_model, unregister_embedding,
         BackendErrorClassification, BackendErrorClassifier, BackendErrorKind, BoxFuture,
-        CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest, ChatModelEntry,
-        ChatModelFactory, ChatModelRequest, ConfigNormalizer, EmbeddingFactory, EmbeddingRequest,
-        ProviderContext, ProviderModelHooks, ReadinessProbe,
+        CatalogCallContext, CatalogEntry, CatalogHostRequest, CatalogLimits, CatalogRequest,
+        ChatModelEntry, ChatModelFactory, ChatModelRequest, ConfigNormalizer, EmbeddingCallContext,
+        EmbeddingFactory, EmbeddingRequest, ProviderContext, ProviderModelMetadata,
+        ProviderOverrides, ReadinessProbe,
     };
 }
 

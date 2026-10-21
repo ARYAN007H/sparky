@@ -81,7 +81,7 @@ pub(crate) fn provider_overrides(extensions: Option<Extensions>) -> ProviderOver
     )
 }
 
-fn ambient_provider_overrides() -> ProviderOverrides<ProviderContext> {
+pub(crate) fn ambient_provider_overrides() -> ProviderOverrides<ProviderContext> {
     ProviderOverrides::new(
         |provider_id| CHAT_MODELS.get(provider_id),
         |provider_id| EMBEDDINGS.get(provider_id),
@@ -168,7 +168,7 @@ pub fn register_chat_model(provider_id: impl Into<String>, entry: ChatModelEntry
 pub fn register_chat_model_in(
     extensions: &Extensions,
     provider_id: impl Into<String>,
-    entry: ChatModelEntry,
+    entry: ChatModelEntry<ProviderContext>,
 ) {
     CHAT_MODELS.register_in(extensions, provider_id, entry);
 }
@@ -425,7 +425,7 @@ pub fn register_catalog(provider_id: impl Into<String>, entry: CatalogEntry<Prov
 pub fn register_catalog_in(
     extensions: &Extensions,
     provider_id: impl Into<String>,
-    entry: CatalogEntry,
+    entry: CatalogEntry<ProviderContext>,
 ) {
     CATALOGS.register_in(extensions, provider_id, entry);
 }
