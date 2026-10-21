@@ -1,8 +1,8 @@
 //! Per-sender routing and runtime command handling.
 
+use super::SendMessage;
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::runtime::ChannelHandle;
-use super::SendMessage;
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
@@ -172,7 +172,7 @@ where
     let history_len =
         durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
             .await;
-    let (route_scope, configured_channel) = configured_control_channel(ctx, reset_scope.as_ref());
+    let configured_channel = configured_control_channel(ctx, reset_scope.as_ref());
     let client = super::context::module_client(ctx).await;
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
@@ -180,7 +180,7 @@ where
             RouteCallbacks::new(
                 ctx.clone(),
                 super::runtime::session::channel_session(),
-                route_scope
+                reset_scope
                     .clone()
                     .zip(durable_session_key)
                     .map(|(scope, durable_session_key)| {
@@ -206,7 +206,7 @@ where
                         model: current.model,
                     },
                     history_len,
-                    session_scope: route_scope.map(Box::new),
+                    session_scope: reset_scope.map(Box::new),
                     configured_channel,
                     providers: provider_descriptors(),
                 },),
@@ -282,39 +282,25 @@ where
     true
 }
 
-/// Resolve the configured instance for a route callback. Provider envelopes
-/// can omit an account id; in that case we may infer it only when the host has
-/// exactly one configured instance for the exact provider id. Ambiguous or
-/// mismatched scopes stay fail-closed.
+/// Resolve the configured instance only from the account identity prepared by
+/// the owning channel module. Missing or mismatched identities stay fail-closed.
 fn configured_control_channel(
     ctx: &ChannelRuntimeContext,
     scope: Option<&tinychannels_bus::module_remote::RemoteSessionScope>,
-) -> (
-    Option<tinychannels_bus::module_remote::RemoteSessionScope>,
-    Option<Box<tinychannels_bus::module_control::ConfiguredControlChannel>>,
-) {
+) -> Option<Box<tinychannels_bus::module_control::ConfiguredControlChannel>> {
     let Some(scope) = scope else {
-        return (None, None);
+        return None;
     };
-    let account = scope.channel.account_id.as_deref();
-    let mut candidates = ctx.channels_by_name.values().filter(|channel| {
-        tinychannels_bus::provider_id(channel.name()) == scope.channel.id
-            && account.is_none_or(|account| channel.name() == account)
-    });
-    let Some(channel) = candidates.next() else {
-        return (Some(scope.clone()), None);
-    };
-    if candidates.next().is_some() {
-        return (Some(scope.clone()), None);
+    let account = scope.channel.account_id.as_deref()?;
+    let channel = ctx.channels_by_name.get(account)?;
+    if tinychannels_bus::provider_id(channel.name()) != scope.channel.id {
+        return None;
     }
-
-    let mut trusted_scope = scope.clone();
-    trusted_scope.channel.account_id = Some(channel.name().to_owned());
     let configured = Box::new(tinychannels_bus::module_control::ConfiguredControlChannel {
         name: channel.name().to_owned(),
         capabilities: channel.capabilities(),
     });
-    (Some(trusted_scope), Some(configured))
+    Some(configured)
 }
 
 async fn durable_channel_history_len(

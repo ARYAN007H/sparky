@@ -1,6 +1,6 @@
 use super::*;
 use crate::channels::context::{
-    conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap,
+    ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap, conversation_history_key,
 };
 use crate::channels::host::ChannelTurnStateSubscriber;
 use crate::core::events::DomainEvent;
@@ -69,7 +69,7 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
 }
 
 #[test]
-fn configured_control_channel_requires_a_unique_provider_when_account_is_missing() {
+fn configured_control_channel_requires_the_prepared_account_identity() {
     use tinychannels_bus::module_remote::RemoteSessionScope;
 
     let mut ctx = runtime_context(PathBuf::from("/tmp"));
@@ -90,43 +90,23 @@ fn configured_control_channel_requires_a_unique_provider_when_account_is_missing
         "telegram:bot-a".into(),
         handle("telegram:bot-a"),
     )]));
-    let (resolved_scope, configured) = configured_control_channel(&ctx, Some(&scope));
-    assert_eq!(
-        resolved_scope
-            .as_ref()
-            .and_then(|scope| scope.channel.account_id.as_deref()),
-        Some("telegram:bot-a")
-    );
-    assert_eq!(
-        configured.as_deref().map(|channel| channel.name.as_str()),
-        Some("telegram:bot-a")
-    );
+    assert!(configured_control_channel(&ctx, Some(&scope)).is_none());
 
     ctx.channels_by_name = Arc::new(HashMap::from([
         ("telegram:bot-a".into(), handle("telegram:bot-a")),
         ("telegram:bot-b".into(), handle("telegram:bot-b")),
     ]));
-    let (resolved_scope, configured) = configured_control_channel(&ctx, Some(&scope));
-    assert!(configured.is_none());
-    assert_eq!(
-        resolved_scope
-            .as_ref()
-            .and_then(|scope| scope.channel.account_id.as_deref()),
-        None
-    );
+    assert!(configured_control_channel(&ctx, Some(&scope)).is_none());
 
     scope.channel.account_id = Some("telegram:bot-b".into());
-    let (resolved_scope, configured) = configured_control_channel(&ctx, Some(&scope));
-    assert_eq!(
-        resolved_scope
-            .as_ref()
-            .and_then(|scope| scope.channel.account_id.as_deref()),
-        Some("telegram:bot-b")
-    );
+    let configured = configured_control_channel(&ctx, Some(&scope));
     assert_eq!(
         configured.as_deref().map(|channel| channel.name.as_str()),
         Some("telegram:bot-b")
     );
+    scope.channel.account_id = Some("telegram:bot-a".into());
+    scope.channel.id = "discord".into();
+    assert!(configured_control_channel(&ctx, Some(&scope)).is_none());
 }
 
 async fn handle_linked_runtime_command(
@@ -141,6 +121,12 @@ async fn handle_linked_runtime_command(
     ctx.channels_by_name = linked.channels();
     let _core =
         crate::channels::runtime::test_support::bind_test_core_context(ctx, linked.config());
+    let account_id = linked
+        .channels()
+        .keys()
+        .find(|name| tinychannels_bus::provider_id(name) == msg.channel)
+        .cloned()
+        .expect("linked runtime should expose the configured provider instance");
     let prepared = crate::modules::channel_controller::prepare_inbound(
         &crate::channels::context::module_client(ctx).await,
         PrepareChannelInboundRequest {
@@ -148,7 +134,7 @@ async fn handle_linked_runtime_command(
                 envelope: tinychannels_bus::ChannelInboundEnvelope {
                     channel: tinychannels_bus::ChannelRef {
                         id: msg.channel.clone(),
-                        account_id: None,
+                        account_id: Some(account_id),
                     },
                     message_id: msg.id.clone(),
                     reply_to_id: msg.reply_to_id.clone(),
@@ -439,9 +425,11 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0]
-        .content
-        .contains("Unknown provider `definitely-not-a-provider`"));
+    assert!(
+        sent[0]
+            .content
+            .contains("Unknown provider `definitely-not-a-provider`")
+    );
     assert_eq!(sent[0].thread_ts.as_deref(), Some("thread-1"));
 }
 
@@ -621,9 +609,11 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
     assert!(sent[0].content.contains("`/status`"));
     assert!(sent[0].content.contains("`/sessions`"));
     assert!(sent[0].content.contains("`/new`"));
-    assert!(sent[0]
-        .content
-        .contains("Model routing: `/model`, `/models`"));
+    assert!(
+        sent[0]
+            .content
+            .contains("Model routing: `/model`, `/models`")
+    );
 }
 
 #[tokio::test]
@@ -651,17 +641,19 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0]
-        .content
-        .contains("No conversation threads yet. Send `/new` to create one."));
+    assert!(
+        sent[0]
+            .content
+            .contains("No conversation threads yet. Send `/new` to create one.")
+    );
     assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
 }
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
-    let tempdir = tempfile::tempdir().unwrap();
-    let mut ctx = runtime_context(tempdir.path().to_path_buf());
+    let workspace = linked.config().workspace_dir.clone();
+    let mut ctx = runtime_context(workspace.clone());
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let sender_key = "telegram_alice_chat-remote";
@@ -688,7 +680,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         },
     );
 
-    let subscriber = ChannelTurnStateSubscriber::new(tempdir.path().to_path_buf());
+    let subscriber = ChannelTurnStateSubscriber::with_config(Arc::new(linked.config().clone()));
     subscriber
         .handle(&DomainEvent::ChannelMessageReceived {
             channel: "telegram".into(),
@@ -698,7 +690,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
             content: "work".into(),
             thread_ts: Some("42".into()),
             inbound_envelope: None,
-            workspace_dir: tempdir.path().to_path_buf(),
+            workspace_dir: workspace.clone(),
         })
         .await;
 
@@ -733,9 +725,11 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
     assert!(sent[0].content.contains("Started new session"));
-    assert!(sent[0]
-        .content
-        .contains("Durable conversation history reset for this chat."));
+    assert!(
+        sent[0]
+            .content
+            .contains("Durable conversation history reset for this chat.")
+    );
 
     assert!(sent[1].content.contains("**Status**"));
     assert!(sent[1].content.contains("Thread: `Telegram"));
@@ -746,9 +740,10 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     assert!(sent[2].content.contains("**Recent sessions**"));
     assert!(sent[2].content.contains("→ `Telegram"));
-    assert!(sent
-        .iter()
-        .all(|message| message.thread_ts.as_deref() == Some("42")));
+    assert!(
+        sent.iter()
+            .all(|message| message.thread_ts.as_deref() == Some("42"))
+    );
 }
 
 #[tokio::test]
@@ -774,8 +769,10 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(sent[0].content.contains("Started new session"));
-    assert!(sent[0]
-        .content
-        .contains("Durable conversation history reset"));
+    assert!(
+        sent[0]
+            .content
+            .contains("Durable conversation history reset")
+    );
     assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
 }
