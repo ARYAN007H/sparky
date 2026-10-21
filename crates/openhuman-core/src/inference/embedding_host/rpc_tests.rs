@@ -94,7 +94,7 @@ fn resolve_api_key_normalizes_custom_prefix_to_custom_slug() {
 /// Bearer key, `{"input":[…],"model":…}` body) verifies successfully. Builds
 /// the live custom provider with the endpoint's known width and drives it
 /// against a mock that echoes the OpenAI embeddings wire shape, asserting the
-/// captured request AND that the probe classifies it as a pass.
+/// captured request and a usable returned vector.
 #[tokio::test]
 async fn conformant_custom_endpoint_verifies_and_sends_expected_request() {
     use std::sync::{Arc, Mutex};
