@@ -6,7 +6,7 @@
 
 use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Duration;
 
