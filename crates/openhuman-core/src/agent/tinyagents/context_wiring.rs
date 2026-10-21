@@ -19,7 +19,6 @@ use tinyagents_harness::summarization::{
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::memory_summarizer::MemoryRecallSummarizer;
-use crate::inference::turn_models::TurnChatModel;
 use tinyagents_harness::turn_outcome::ToolOutcomeSink;
 
 /// Fractions of a capped turn's model-call budget at which the model is told
@@ -56,7 +55,7 @@ pub(super) fn install_context_ladder(
     compaction_trigger_tokens: Option<u64>,
     compaction_strategy: crate::config::CompactionStrategy,
     microcompact_keep_recent: usize,
-    summarizer_model: TurnChatModel,
+    summarizer_model: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     wrap_up_at_cap: bool,
     tool_outcome_sink: &ToolOutcomeSink,
     memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
@@ -123,7 +122,7 @@ fn compression_middleware(
     policy: SummarizationPolicy,
     strategy: crate::config::CompactionStrategy,
     context_window: Option<u64>,
-    summarizer_model: TurnChatModel,
+    summarizer_model: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     model: &str,
     memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
 ) -> ContextCompressionMiddleware {

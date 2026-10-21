@@ -6,6 +6,24 @@ use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
+fn managed_fixture_config(tmp: &tempfile::TempDir) -> crate::config::Config {
+    let config = crate::config::Config {
+        config_path: tmp.path().join("config.toml"),
+        workspace_dir: tmp.path().join("workspace"),
+        ..Default::default()
+    };
+    crate::security::credentials::AuthService::from_config(&config)
+        .store_provider_token(
+            crate::security::credentials::APP_SESSION_PROVIDER,
+            "default",
+            "fixture-session-token",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated fixture session");
+    config
+}
+
 use super::TurnModels;
 use crate::agent::tinyagents::TurnModelSource;
 use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
@@ -61,8 +79,12 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
         provider,
         scoped_model_entry("context-a-model", true),
     );
-    let context_a =
-        CoreContext::for_test_with_extensions(DomainSet::full(), None, context_a_extensions);
+    let context_a = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        context_a_extensions,
+    );
 
     let context_b_extensions = Extensions::new();
     crate::inference::registry::register_chat_model_in(
@@ -70,11 +92,16 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
         provider,
         scoped_model_entry("context-b-model", false),
     );
-    let context_b =
-        CoreContext::for_test_with_extensions(DomainSet::full(), None, context_b_extensions);
+    let context_b = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        context_b_extensions,
+    );
 
     let dispatch = DispatchCtx::new(Arc::clone(&context_a));
-    let config = Arc::new(crate::config::Config::default());
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Arc::new(managed_fixture_config(&tmp));
     CoreContext::scope(context_b, async {
         let source = TurnModelSource::new_crate_native(&dispatch, "chat", config);
         let models = source
@@ -122,19 +149,28 @@ async fn explicit_turn_context_without_provider_does_not_borrow_ambient_provider
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
 
-    let context_a =
-        CoreContext::for_test_with_extensions(DomainSet::full(), None, Extensions::new());
+    let context_a = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        Extensions::new(),
+    );
     let context_b_extensions = Extensions::new();
     crate::inference::registry::register_chat_model_in(
         &context_b_extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         scoped_model_entry("context-b-model", false),
     );
-    let context_b =
-        CoreContext::for_test_with_extensions(DomainSet::full(), None, context_b_extensions);
+    let context_b = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        context_b_extensions,
+    );
 
     let dispatch = DispatchCtx::new(context_a);
-    let config = Arc::new(crate::config::Config::default());
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Arc::new(managed_fixture_config(&tmp));
     CoreContext::scope(context_b, async {
         let source = TurnModelSource::new_crate_native(&dispatch, "chat", config);
         let error = source
@@ -150,7 +186,8 @@ async fn explicit_turn_context_without_provider_does_not_borrow_ambient_provider
 async fn role_pins_apply_when_the_primary_uses_config_routing() {
     use crate::agent::host_overrides::HostOverrides;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
-    let config = crate::config::Config::default();
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = managed_fixture_config(&tmp);
     let extensions = crate::core::slots::Extensions::new();
     crate::inference::registry::register_chat_model_in(
         &extensions,
@@ -195,7 +232,12 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
         "summarization".into(),
         Arc::new(NamedModel("pinned summary")),
     );
-    let root = CoreContext::for_test_with_extensions(DomainSet::full(), None, extensions);
+    let root = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        extensions,
+    );
     let context = root.derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
             .host_overrides(Arc::new(overrides)),
@@ -545,3 +587,6 @@ async fn a_sub_agents_route_success_does_not_clear_the_leads_slot() {
         "a child's route success cleared the lead's recorded failure"
     );
 }
+
+#[path = "turn_models_native_tests.rs"]
+mod native_tests;

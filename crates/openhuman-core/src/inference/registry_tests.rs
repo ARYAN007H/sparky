@@ -1,7 +1,7 @@
 use super::*;
+use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
-    create_chat_model_from_string, make_openhuman_backend_model_for_thread, model_limits_request,
-    PROVIDER_OPENHUMAN,
+    create_chat_model_from_string, make_openhuman_backend_model_for_thread, PROVIDER_OPENHUMAN,
 };
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -84,8 +84,15 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
         Some("thread-1"),
         &EgressLedger::none(),
     );
-    let one_shot =
-        create_chat_model_from_string("chat", PROVIDER_OPENHUMAN, &Config::default(), 0.5);
+    let library = crate::core::runtime::CoreContext::for_test_with_host_kind(
+        crate::core::types::HostKind::Library,
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
+    let one_shot = crate::core::runtime::CoreContext::scope(library, async {
+        create_chat_model_from_string("chat", PROVIDER_OPENHUMAN, &Config::default(), 0.5)
+    })
+    .await;
     unregister_chat_model(PROVIDER_OPENHUMAN);
 
     let (model, resolved) = built.expect("registered model builds");

@@ -3,11 +3,56 @@ use crate::security::egress::EgressLedger;
 
 use crate::inference::provider::factory::cloud_slug::try_create_cloud_slug_chat_model_from_string_with_native_tools;
 
+fn isolated_config() -> (tempfile::TempDir, Config) {
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Config {
+        config_path: tmp.path().join("config.toml"),
+        workspace_dir: tmp.path().join("workspace"),
+        ..Default::default()
+    };
+    (tmp, config)
+}
+
+fn store_fixture_session(config: &Config) {
+    crate::security::credentials::AuthService::from_config(config)
+        .store_provider_token(
+            crate::security::credentials::APP_SESSION_PROVIDER,
+            "default",
+            "fixture-session-token",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated fixture session");
+}
+
+fn store_fixture_cloud_key(config: &Config, slug: &str) {
+    crate::security::credentials::AuthService::from_config(config)
+        .store_provider_token(
+            &format!("provider:{slug}"),
+            "default",
+            "sk-fixture-provider",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated provider credential");
+}
+
+fn fixture_library_dispatch() -> crate::core::runtime::DispatchCtx {
+    crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_host_kind(
+            crate::core::types::HostKind::Library,
+            crate::core::runtime::DomainSet::full(),
+            None,
+        ),
+    )
+}
+
 #[test]
 fn custom_ca_bundle_builds_a_provider_scoped_chat_client() {
     let _guard = crate::inference::inference_test_guard();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config.cloud_providers.push(openai_entry("p_team", "team"));
+    store_fixture_cloud_key(&config, "team");
     config.cloud_provider_ca_certs.insert(
         "team".into(),
         include_str!("../../util/tls/test-ca.pem").into(),
@@ -203,40 +248,37 @@ async fn one_shot_chat_models_preserve_factory_temperature_as_request_default() 
         .await
         .expect("explicit-temperature invoke");
 
-    let turn_model = create_turn_chat_model(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "chat",
-        &config,
-        "hint:chat",
-        0.2,
-    )
-    .expect("turn model");
-    turn_model
-        .invoke(&(), ModelRequest::new(vec![Message::user("turn default")]))
-        .await
-        .expect("turn default-temperature invoke");
-
-    let explicit_turn_model = create_turn_chat_model_from_string(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "chat",
-        "openhuman",
-        &config,
-        "hint:chat",
-        0.4,
-    )
-    .expect("explicit turn model");
-    explicit_turn_model
-        .invoke(
-            &(),
-            ModelRequest::new(vec![Message::user("turn explicit")]).with_temperature(0.8),
-        )
-        .await
-        .expect("turn explicit-temperature invoke");
-
     assert_eq!(
         *seen.lock().expect("probe lock"),
-        vec![Some(0.3), Some(0.9), Some(0.2), Some(0.8)]
+        vec![Some(0.3), Some(0.9)]
     );
+}
+
+#[tokio::test]
+async fn one_shot_cloud_sentinel_resolves_the_configured_byok_provider() {
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _env = crate::config::TEST_ENV_LOCK.lock().await;
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let mut provider = openai_entry("p_openai", "openai");
+    provider.default_model = Some("gpt-4o-mini".into());
+    let mut config = config_with_providers_in_tempdir(&tmp, vec![provider]);
+    config.primary_cloud = Some("p_openai".into());
+    store_byo_key(&config, "openai", "sk-fixture");
+    let library = crate::core::runtime::CoreContext::for_test_with_host_kind(
+        crate::core::types::HostKind::Library,
+        crate::core::runtime::DomainSet::full(),
+        Some(tmp.path().join("library")),
+    );
+
+    crate::core::runtime::CoreContext::scope(library, async {
+        for provider in ["cloud", ""] {
+            let (_, model) =
+                create_chat_model_from_string_with_model_id("chat", provider, &config, 0.2)
+                    .expect("sentinel resolves to the configured BYOK route");
+            assert_eq!(model, "gpt-4o-mini");
+        }
+    })
+    .await;
 }
 
 // ── Motion B (#4727): managed-backend crate-native routing ──────────────────
@@ -262,14 +304,13 @@ fn resolves_to_managed_backend_for_default_config_but_not_for_local() {
 fn create_chat_model_routes_managed_backend_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
-    let config = Config::default();
-    let (_model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "chat",
-        &config,
-        0.7,
-    )
-    .expect("managed create_chat_model must build");
+    let (tmp, mut config) = isolated_config();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+    store_fixture_session(&config);
+    let (_model, model_id) =
+        create_chat_model_with_model_id_in(&fixture_library_dispatch(), "chat", &config, 0.7)
+            .expect("managed create_chat_model must build");
     assert_eq!(model_id, "fixture/managed-default");
     crate::inference::registry::unregister_chat_model(
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
@@ -322,16 +363,23 @@ fn explicit_local_provider_string_routes_to_crate_native_model() {
 fn try_create_local_runtime_returns_none_for_managed_and_cloud() {
     let _guard = crate::inference::inference_test_guard();
     // Default config resolves to the managed backend, not a local runtime.
-    assert!(
-        try_create_local_runtime_chat_model("chat", &Config::default(), &EgressLedger::none())
-            .is_none()
-    );
+    assert!(super::local_runtime::try_create_local_runtime_chat_model(
+        "chat",
+        &Config::default(),
+        &EgressLedger::none(),
+    )
+    .is_none());
     // A BYOK cloud slug is not a local runtime either — it falls through to the
     // `Provider` path.
     let mut cloud = Config::default();
     cloud.cloud_providers.push(openai_entry("p_oai", "openai"));
     cloud.chat_provider = Some("openai:gpt-4o-mini".to_string());
-    assert!(try_create_local_runtime_chat_model("chat", &cloud, &EgressLedger::none()).is_none());
+    assert!(super::local_runtime::try_create_local_runtime_chat_model(
+        "chat",
+        &cloud,
+        &EgressLedger::none(),
+    )
+    .is_none());
 }
 
 #[test]
@@ -340,16 +388,13 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
     // DeepSeek is a built-in chat-completions-only Bearer provider: no
     // `/v1/responses` fallback and no codex-oauth, so it is wire-equivalent and
     // flips crate-native.
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config.cloud_providers.push(deepseek_entry("p_ds"));
     config.chat_provider = Some("deepseek:deepseek-reasoner".to_string());
-    let (model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "chat",
-        &config,
-        0.7,
-    )
-    .expect("bearer cloud create_chat_model must build");
+    store_fixture_cloud_key(&config, "deepseek");
+    let (model, model_id) =
+        create_chat_model_with_model_id_in(&fixture_library_dispatch(), "chat", &config, 0.7)
+            .expect("bearer cloud create_chat_model must build");
     assert_eq!(model_id, "deepseek-reasoner");
     let profile = model
         .profile()
@@ -361,39 +406,25 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
 }
 
 #[test]
-fn turn_model_route_metadata_uses_post_remap_cloud_model() {
-    let _guard = crate::inference::inference_test_guard();
-    let mut config = Config::default();
-    config.cloud_providers.push(deepseek_entry("p_ds"));
-    config.chat_provider = Some("deepseek:hint:chat".to_string());
-
-    let (_model, provider, resolved_model) = create_turn_chat_model_with_native_tools_and_route(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "chat",
-        &config,
-        "hint:chat",
-        0.7,
-        true,
-        &EgressLedger::none(),
-    )
-    .expect("abstract BYOK tier must build");
-
-    assert_eq!(provider, "deepseek");
-    assert_eq!(resolved_model, "deepseek-chat");
-}
-
-#[test]
 fn explicit_cloud_provider_string_routes_to_crate_native_model() {
     let _guard = crate::inference::inference_test_guard();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config.cloud_providers.push(deepseek_entry("p_ds"));
-    let (model, model_id) = create_chat_model_from_string_with_model_id(
-        "chat",
-        "deepseek:deepseek-reasoner",
-        &config,
-        0.7,
-    )
-    .expect("explicit cloud model must build");
+    store_fixture_cloud_key(&config, "deepseek");
+    let model_and_id = crate::core::runtime::CoreContext::sync_scope(
+        fixture_library_dispatch()
+            .resolved()
+            .expect("library context"),
+        || {
+            create_chat_model_from_string_with_model_id(
+                "chat",
+                "deepseek:deepseek-reasoner",
+                &config,
+                0.7,
+            )
+        },
+    );
+    let (model, model_id) = model_and_id.expect("explicit cloud model must build");
     assert_eq!(model_id, "deepseek-reasoner");
     assert_eq!(
         model
@@ -408,18 +439,15 @@ fn create_chat_model_routes_anthropic_auth_cloud_slug_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     // Anthropic-auth cloud slugs are always wire-equivalent (their endpoints have
     // no `/v1/responses`, so the host's dormant fallback is behavior-neutral).
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(anthropic_entry("p_anth", "anthropic"));
     config.chat_provider = Some("anthropic:claude-sonnet-4-6".to_string());
-    let (model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "chat",
-        &config,
-        0.7,
-    )
-    .expect("anthropic cloud create_chat_model must build");
+    store_fixture_cloud_key(&config, "anthropic");
+    let (model, model_id) =
+        create_chat_model_with_model_id_in(&fixture_library_dispatch(), "chat", &config, 0.7)
+            .expect("anthropic cloud create_chat_model must build");
     assert_eq!(model_id, "claude-sonnet-4-6");
     assert_eq!(
         model.profile().and_then(|p| p.provider.as_deref()),
@@ -446,10 +474,11 @@ fn create_chat_model_routes_anthropic_auth_cloud_slug_to_crate_native() {
 #[test]
 fn anthropic_auth_cloud_slug_in_text_mode_keeps_the_compat_client() {
     let _guard = crate::inference::inference_test_guard();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(anthropic_entry("p_anth", "anthropic"));
+    store_fixture_cloud_key(&config, "anthropic");
     let (model, model_id) = try_create_cloud_slug_chat_model_from_string_with_native_tools(
         "chat",
         "anthropic:claude-sonnet-4-6",
@@ -472,7 +501,7 @@ fn anthropic_auth_cloud_slug_in_text_mode_keeps_the_compat_client() {
 fn configured_openhuman_jwt_slug_routes_to_managed_chat_model() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -508,7 +537,7 @@ async fn openhuman_jwt_slug_discloses_pinned_model() {
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
     let marker = "egress-jwt-pinned-marker-v1";
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -571,14 +600,13 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
     let pinned_sdk = "egress-sdk-pinned-marker";
     let mut sdk_config = Config::default();
     sdk_config.chat_provider = Some(format!("claude_agent_sdk:{configured_sdk}"));
-    create_turn_chat_model(
+    crate::inference::turn_models::TurnModelSource::new_crate_native(
         &crate::core::runtime::DispatchCtx::ambient(),
         "chat",
-        &sdk_config,
-        pinned_sdk,
-        0.0,
+        Arc::new(sdk_config),
     )
-    .expect("Claude Agent SDK turn model should build");
+    .build(pinned_sdk, 0.0, None, None)
+    .expect("Claude Agent SDK turn set should build");
 
     let configured_code = "egress-code-configured-marker";
     let pinned_code = "egress-code-pinned-marker";
@@ -587,13 +615,12 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
     // Egress is disclosed once the effective model is selected, before the
     // environment probe. The test therefore remains valid on hosts without the
     // Claude Code CLI.
-    let _ = create_turn_chat_model(
+    let _ = crate::inference::turn_models::TurnModelSource::new_crate_native(
         &crate::core::runtime::DispatchCtx::ambient(),
         "chat",
-        &code_config,
-        pinned_code,
-        0.0,
-    );
+        Arc::new(code_config),
+    )
+    .build(pinned_code, 0.0, None, None);
 
     let sentinel = "egress-native-claude-sentinel-end";
     BUS.publish(DomainEvent::ExternalTransferPending {
@@ -649,7 +676,7 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
 fn openhuman_jwt_slug_preserves_forced_text_mode() {
     let _guard = crate::inference::inference_test_guard();
     let native_modes = install_test_managed_provider();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -674,7 +701,7 @@ fn openhuman_jwt_slug_preserves_forced_text_mode() {
 fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -694,36 +721,5 @@ fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
     );
 }
 
-#[test]
-fn try_create_cloud_slug_flips_openai_but_declines_non_cloud() {
-    let _guard = crate::inference::inference_test_guard();
-    // `openai` (API-key Bearer, no codex OAuth) now flips crate-native on Chat
-    // Completions — the legacy `/v1/responses` fallback is not replicated.
-    let mut openai = Config::default();
-    openai.cloud_providers.push(openai_entry("p_oai", "openai"));
-    openai.chat_provider = Some("openai:gpt-4o-mini".to_string());
-    let (model, model_id) =
-        try_create_cloud_slug_chat_model("chat", &openai, &EgressLedger::none())
-            .expect("openai should flip crate-native")
-            .expect("build");
-    assert_eq!(model_id, "gpt-4o-mini");
-    assert_eq!(
-        model.profile().and_then(|p| p.provider.as_deref()),
-        Some("openai")
-    );
-
-    // Managed (default), local runtimes, and unconfigured slugs are not cloud
-    // slugs — they decline and fall through to their own paths.
-    assert!(
-        try_create_cloud_slug_chat_model("chat", &Config::default(), &EgressLedger::none())
-            .is_none()
-    );
-    let mut local = Config::default();
-    local.chat_provider = Some("ollama:qwen2.5".to_string());
-    assert!(try_create_cloud_slug_chat_model("chat", &local, &EgressLedger::none()).is_none());
-    let mut unconfigured = Config::default();
-    unconfigured.chat_provider = Some("deepseek:deepseek-chat".to_string());
-    assert!(
-        try_create_cloud_slug_chat_model("chat", &unconfigured, &EgressLedger::none()).is_none()
-    );
-}
+#[path = "factory_crate_native_cloud_tests.rs"]
+mod cloud_tests;

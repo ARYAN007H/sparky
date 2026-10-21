@@ -8,7 +8,7 @@ use crate::config::schema::cloud_providers::CloudProviderCreds;
 
 /// Maps a configured cloud entry and its effective model onto the registry's
 /// spec without resolving credentials or changing the configured endpoint.
-pub(super) fn cloud_provider_spec(entry: &CloudProviderCreds, model: &str) -> ProviderSpec {
+pub(crate) fn cloud_provider_spec(entry: &CloudProviderCreds, model: &str) -> ProviderSpec {
     ProviderSpec {
         kind: match entry.auth_style {
             AuthStyle::Anthropic => ProviderKind::Anthropic,
@@ -27,7 +27,7 @@ pub(super) fn cloud_provider_spec(entry: &CloudProviderCreds, model: &str) -> Pr
 /// Resolve the host credential before creating a registry so errors and OAuth
 /// token rotation retain the existing host semantics; the registry callback
 /// then returns that exact selected credential for its provider spec.
-pub(super) struct CloudCredentialResolver<'a>(pub(super) &'a str);
+pub(crate) struct CloudCredentialResolver<'a>(pub(crate) &'a str);
 
 impl CredentialResolver for CloudCredentialResolver<'_> {
     fn resolve(&self, _spec: &ProviderSpec) -> tinyinference_llm::Result<String> {

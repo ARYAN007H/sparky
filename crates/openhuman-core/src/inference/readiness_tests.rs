@@ -55,19 +55,23 @@ async fn cached_probe_serves_definitive_negative_results() {
             }),
         },
     );
-    let core = CoreContext::for_test_with_extensions(
+    let core = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
         DomainSet::full(),
         Some(config.workspace_dir.clone()),
         extensions,
     );
     let ctx = DispatchCtx::new(core);
 
-    let first = cached_probe(&ctx, "summarization", &config).await;
-    assert!(first
-        .unwrap_err()
-        .to_ascii_lowercase()
-        .contains("api key not configured for provider"));
-    assert_eq!(hit_count.load(Ordering::SeqCst), 1);
-    assert!(cached_probe(&ctx, "summarization", &config).await.is_err());
-    assert_eq!(hit_count.load(Ordering::SeqCst), 1);
+    CoreContext::scope(ctx.resolved().expect("test context"), async {
+        let first = cached_probe(&ctx, "summarization", &config).await;
+        assert!(first
+            .unwrap_err()
+            .to_ascii_lowercase()
+            .contains("api key not configured for provider"));
+        assert_eq!(hit_count.load(Ordering::SeqCst), 1);
+        assert!(cached_probe(&ctx, "summarization", &config).await.is_err());
+        assert_eq!(hit_count.load(Ordering::SeqCst), 1);
+    })
+    .await;
 }

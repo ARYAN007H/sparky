@@ -52,16 +52,40 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         provider,
         entry("context-a-one-shot", Arc::clone(&a_probed)),
     );
-    let context_a = CoreContext::for_test_with_extensions(DomainSet::full(), None, a_extensions);
+    let context_a = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        a_extensions,
+    );
     let b_extensions = Extensions::new();
     crate::inference::registry::register_chat_model_in(
         &b_extensions,
         provider,
         entry("context-b-one-shot", Arc::clone(&b_probed)),
     );
-    let context_b = CoreContext::for_test_with_extensions(DomainSet::full(), None, b_extensions);
+    let context_b = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        b_extensions,
+    );
     let dispatch = DispatchCtx::new(context_a);
-    let config = Config::default();
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Config {
+        config_path: tmp.path().join("config.toml"),
+        workspace_dir: tmp.path().join("workspace"),
+        ..Default::default()
+    };
+    crate::security::credentials::AuthService::from_config(&config)
+        .store_provider_token(
+            crate::security::credentials::APP_SESSION_PROVIDER,
+            "default",
+            "fixture-session-token",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated fixture session");
 
     CoreContext::scope(context_b, async {
         let (_, model) = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
@@ -78,35 +102,19 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         .await
         .expect("simple chat uses its explicit model entry");
         assert_eq!(simple_chat.value, "context-a-one-shot");
-        for (chat, _, _) in [
-            create_turn_chat_model_with_native_tools_and_route(
-                &dispatch,
-                "chat",
-                &config,
-                "hint:chat",
-                0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
-            )
-            .expect("role-routed turn uses explicit model entry"),
-            create_turn_chat_model_from_string_with_native_tools_and_route(
-                &dispatch,
-                "chat",
-                "openhuman",
-                &config,
-                "hint:chat",
-                0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
-            )
-            .expect("explicit managed turn uses explicit model entry"),
-        ] {
-            let response = chat
-                .invoke(&(), ModelRequest::new(vec![Message::user("probe")]))
-                .await
-                .expect("fixture response");
-            assert_eq!(response.text(), "context-a-one-shot");
-        }
+        let turn = crate::inference::turn_models::TurnModelSource::new_crate_native(
+            &dispatch,
+            "chat",
+            Arc::new(config.clone()),
+        )
+        .build("hint:chat", 0.0, None, None)
+        .expect("turn set uses explicit model entry");
+        let response = turn
+            .primary
+            .invoke(&(), ModelRequest::new(vec![Message::user("probe")]))
+            .await
+            .expect("fixture response");
+        assert_eq!(response.text(), "context-a-one-shot");
         probe_inference_readiness(&dispatch, "chat", &config)
             .await
             .expect("explicit model entry is ready");
@@ -201,8 +209,12 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             Arc::new(|slug| slug == "p_hosted"),
             Arc::new(|style| style == AuthStyle::OpenhumanJwt),
         );
-        let context_a =
-            CoreContext::for_test_with_extensions(DomainSet::full(), None, a_extensions);
+        let context_a = CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            DomainSet::full(),
+            None,
+            a_extensions,
+        );
 
         let b_extensions = Extensions::new();
         crate::inference::registry::register_chat_model_in(
@@ -216,11 +228,29 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             Arc::new(move |slug| ambient_owns_auth && slug == "p_hosted"),
             Arc::new(move |style| ambient_owns_auth && style == AuthStyle::OpenhumanJwt),
         );
-        let context_b =
-            CoreContext::for_test_with_extensions(DomainSet::full(), None, b_extensions);
+        let context_b = CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            DomainSet::full(),
+            None,
+            b_extensions,
+        );
 
-        let dispatch = DispatchCtx::new(context_a);
-        let mut config = Config::default();
+        let dispatch = DispatchCtx::new(Arc::clone(&context_a));
+        let tmp = tempfile::tempdir().expect("isolated workspace");
+        let mut config = Config {
+            config_path: tmp.path().join("config.toml"),
+            workspace_dir: tmp.path().join("workspace"),
+            ..Default::default()
+        };
+        crate::security::credentials::AuthService::from_config(&config)
+            .store_provider_token(
+                crate::security::credentials::APP_SESSION_PROVIDER,
+                "default",
+                "fixture-session-token",
+                Default::default(),
+                true,
+            )
+            .expect("store isolated fixture session");
         config.chat_provider = Some("p_hosted:fixture/model-v1".to_string());
         config.cloud_providers.push(CloudProviderCreds {
             id: "p_hosted_fixture".to_string(),
@@ -233,7 +263,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
 
         let observed = CoreContext::scope(context_b, async {
             let resolved = dispatch.resolved().expect("bound dispatch context");
-            let request = crate::inference::provider::factory::model_limits_request_for(
+            let request = crate::inference::context_window::model_limits_request_for(
                 "chat",
                 "openhuman",
                 "fixture/model-v1",
@@ -244,58 +274,60 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             let one_shot = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
                 .map(|(_, model)| model)
                 .unwrap_or_else(|error| format!("ERR: {error}"));
-            let role_turn = create_turn_chat_model_with_native_tools_and_route(
+            let turn = crate::inference::turn_models::TurnModelSource::new_crate_native(
                 &dispatch,
                 "chat",
-                &config,
-                "hint:chat",
-                0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
+                Arc::new(config.clone()),
             )
+            .build("hint:chat", 0.0, None, None)
             .ok()
-            .map(|(model, _, _)| model);
-            let string_turn = create_turn_chat_model_from_string_with_native_tools_and_route(
-                &dispatch,
+            .map(|models| models.primary);
+            let turn_response = match turn {
+                Some(model) => response(model).await,
+                None => "ERR: turn set construction failed".to_string(),
+            };
+            (one_shot, turn_response, request.endpoint)
+        })
+        .await;
+        let explicit_string = CoreContext::scope(Arc::clone(&context_a), async {
+            let (model, model_id) = create_chat_model_from_string_with_model_id(
                 "chat",
                 "p_hosted:fixture/model-v1",
                 &config,
-                "hint:chat",
                 0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
             )
-            .ok()
-            .map(|(model, _, _)| model);
-            let role_turn = match role_turn {
-                Some(model) => response(model).await,
-                None => "ERR: role turn construction failed".to_string(),
-            };
-            let string_turn = match string_turn {
-                Some(model) => response(model).await,
-                None => "ERR: explicit turn construction failed".to_string(),
-            };
-            (one_shot, role_turn, string_turn, request.endpoint)
+            .expect("explicit hosted cloud string builds from the ambient owner context");
+            (model_id, response(model).await)
         })
         .await;
-        outcomes.push(observed);
+        outcomes.push((observed, explicit_string));
     }
 
     assert_eq!(
         outcomes,
         vec![
             (
-                "context-a-hosted-slug".to_string(),
-                "context-a-hosted-slug".to_string(),
-                "context-a-hosted-slug".to_string(),
-                "https://context-a-catalog.example.test/v1".to_string()
+                (
+                    "context-a-hosted-slug".to_string(),
+                    "context-a-hosted-slug".to_string(),
+                    "https://context-a-catalog.example.test/v1".to_string(),
+                ),
+                (
+                    "context-a-hosted-slug".to_string(),
+                    "context-a-hosted-slug".to_string(),
+                ),
             ),
             (
-                "context-a-hosted-slug".to_string(),
-                "context-a-hosted-slug".to_string(),
-                "context-a-hosted-slug".to_string(),
-                "https://context-a-catalog.example.test/v1".to_string()
-            )
+                (
+                    "context-a-hosted-slug".to_string(),
+                    "context-a-hosted-slug".to_string(),
+                    "https://context-a-catalog.example.test/v1".to_string(),
+                ),
+                (
+                    "context-a-hosted-slug".to_string(),
+                    "context-a-hosted-slug".to_string(),
+                ),
+            ),
         ]
     );
 }

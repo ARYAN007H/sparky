@@ -18,14 +18,14 @@ use tinyinference_llm::providers::registry::{
 /// `cloud_providers` entry, the effective model id (with `default_model`
 /// fallback + abstract-tier remapping), the resolved API key, and the OpenAI
 /// codex-oauth routing shared by every cloud `ChatModel` constructor.
-pub(super) struct CloudSlugResolution<'a> {
-    pub(super) entry: &'a crate::config::schema::cloud_providers::CloudProviderCreds,
-    pub(super) effective_model: String,
-    pub(super) key: String,
-    pub(super) codex: tinyinference_llm::providers::openai::codex::OpenAiCodexRouting,
+pub(crate) struct CloudSlugResolution<'a> {
+    pub(crate) entry: &'a crate::config::schema::cloud_providers::CloudProviderCreds,
+    pub(crate) effective_model: String,
+    pub(crate) key: String,
+    pub(crate) codex: tinyinference_llm::providers::openai::codex::OpenAiCodexRouting,
 }
 
-pub(super) fn resolve_cloud_slug_for<'a>(
+pub(crate) fn resolve_cloud_slug_for<'a>(
     role: &str,
     slug: &str,
     model: &str,

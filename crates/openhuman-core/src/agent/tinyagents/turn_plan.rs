@@ -23,7 +23,6 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::tool_registration::host_tool_set_builder_for_turn;
 use crate::agent::tinyagents::turn_policy::run_policy_for_provider;
-use crate::inference::turn_models::TurnChatModel;
 
 /// The run policy for one turn, and whether it carries a cross-route fallback.
 ///
@@ -84,12 +83,12 @@ pub(super) fn turn_run_policy(
 /// capability profile; the primary stays the default and dispatch target.
 pub(super) fn turn_models_for_plan(
     model: &str,
-    primary: TurnChatModel,
-    tier_routes: Vec<(String, TurnChatModel)>,
+    primary: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
+    tier_routes: Vec<(String, Arc<dyn tinyinference_llm::model::ChatModel<()>>)>,
     error_slot: &tinyinference_llm::model::ModelErrorSlot,
     hosted_security_gate: bool,
-) -> Vec<(String, TurnChatModel)> {
-    let slotted = |model: TurnChatModel| -> TurnChatModel {
+) -> Vec<(String, Arc<dyn tinyinference_llm::model::ChatModel<()>>)> {
+    let slotted = |model: Arc<dyn tinyinference_llm::model::ChatModel<()>>| -> Arc<dyn tinyinference_llm::model::ChatModel<()>> {
         if hosted_security_gate {
             model
         } else {
@@ -104,7 +103,7 @@ pub(super) fn turn_models_for_plan(
 
 /// Everything the planner decides a turn from.
 pub(super) struct OpenHumanTurnPlanner {
-    pub(super) models: Vec<(String, TurnChatModel)>,
+    pub(super) models: Vec<(String, Arc<dyn tinyinference_llm::model::ChatModel<()>>)>,
     pub(super) policy: RunPolicy,
     pub(super) tool_sets: Vec<SharedToolSet>,
     pub(super) allowed: Option<HashSet<String>>,
