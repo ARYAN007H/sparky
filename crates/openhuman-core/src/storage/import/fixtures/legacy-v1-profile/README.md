@@ -19,11 +19,10 @@ owner models and writer transformations from `2d3e22636e^`:
   as TSD `created_ms` metadata, matching `ProfileRegistry::body_of`.
 - The isolated desktop profile database stores owner documents in the
   historical `local` scope; the profile directory itself supplied user
-  isolation. `security/approval` writes a pending `approvals` record there;
-  the boot owner converter must retain it as `approvals.requests`.
-- The thread owner records a transcript key and a committed thread/message in
-  the historical SQLite database. The fixture uses TSD's public v1 document
-  and stream writers, and the desktop owner APIs must read those records after
+  isolation. The fixture writes a pending `approvals.requests` owner record
+  and a `threads.transcript_keys` record through the historical TSD v1 writer.
+- The thread owner also has a committed thread and message in the historical
+  SQLite database. The desktop owner APIs must read all three records after
   boot.
 - The TinyFlows catalog writes a `flows_definitions` record in the same
   per-profile database. Desktop boot must migrate it through the TinyFlows

@@ -215,15 +215,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // migration.
     put(
         user_scope.documents(),
-        "approvals",
+        "approvals.requests",
         "fixture-approval",
         json!({
             "tool_name": "shell",
             "action_summary": "Fixture approval",
             "args_redacted": "{}",
             "session_id": "fixture-session",
-            "created_at": "2025-02-03T04:05:06Z",
-            "expires_at": "2099-02-03T04:05:06Z",
+            "created_ms": 1738555506000_i64,
+            "deadline_ms": 4070908800000_i64,
             "pending": true,
             "agent_id": "default"
         }),
@@ -268,8 +268,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     put(
         user_scope.documents(),
-        "threads_transcript_keys",
-        "fixture-thread",
+        "threads.transcript_keys",
+        &Key::of([thread_id])?.as_str().to_owned(),
         json!({"transcript_key": "fixture-transcript-key"}),
     )
     .await?;
