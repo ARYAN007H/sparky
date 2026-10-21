@@ -2,12 +2,15 @@
 //! view of the shared backend are refused while B's succeed.
 
 use super::*;
+use async_trait::async_trait;
 use crate::storage::fence::{fence_error, FenceError, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore, LocalLeases};
-use crate::storage::MemoryStorage;
+use crate::storage::test_support::{memory_backend, sqlite_backend, SqliteBackend};
+use crate::storage::{Storage, StorageBackend};
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use tinystoragedrivers_types::{Capabilities, Capability, CollectionSpec, ErrorKind, Precondition, Scope, Version};
 
 #[path = "fenced_blob_stream_tests.rs"]
 mod blob_stream_tests;
@@ -64,7 +67,7 @@ impl Node {
         grant
     }
 
-    fn scoped(&self, scope: &str) -> ScopedStorage {
+    fn scoped(&self, scope: &str) -> Storage {
         self.storage.for_scope(&Scope::new(scope).unwrap()).unwrap()
     }
 
@@ -76,8 +79,8 @@ impl Node {
     }
 }
 
-fn shared() -> Arc<dyn StorageBackend> {
-    Arc::new(MemoryStorage::new())
+fn shared() -> SqliteBackend {
+    sqlite_backend().unwrap()
 }
 
 #[tokio::test]
