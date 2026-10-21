@@ -249,7 +249,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     let child_runs = snapshots
         .iter()
         .filter(|job| job.agent == "flow_worker")
-        .map(|job| (job.status.clone(), job.subagent_run_id.clone()))
+        .map(|job| (job.status, job.subagent_run_id.clone()))
         .collect::<Vec<_>>();
     let grandchild_jobs = snapshots
         .iter()

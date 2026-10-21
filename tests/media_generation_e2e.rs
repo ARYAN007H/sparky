@@ -298,7 +298,6 @@ async fn media_tools_deliver_images_and_videos_through_the_backend_proxy() {
     );
     for (id, kind) in [(&image_id, "image"), (&video_id, "video")] {
         let record = openhuman_core::artifacts::ops::ai_get_artifact(
-            &openhuman_core::core::runtime::DispatchCtx::ambient(),
             &config,
             id,
         )
