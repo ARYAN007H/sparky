@@ -75,7 +75,7 @@ for tests and the lightweight CLI surface.
 ### Orchestrator tools
 
 The orchestrator uses the single `spawn_subagent` tool, whose `agent_id` enum
-is derived from the `[subagents]` allowlist. `orchestrator_tools::collect_orchestrator_tools`
+is derived from the `[subagents]` allowlist. `integrations::composio::orchestrator_actions::collect_orchestrator_tools`
 only expands a `SubagentEntry::Skills` wildcard to
 one `ToolExposure::Deferred` `ComposioActionTool` per action of every
 connected Composio toolkit. Deferred tools never reach the wire: an agent that
@@ -120,7 +120,7 @@ step.
 | --- | --- |
 | [`mod.rs`](./mod.rs) | Cross-cutting tool modules, their built-in exports, and the `all_tools_*` controller pair. Domain factories are called explicitly from `ops.rs`; tool contracts come directly from `tinytools`. |
 | [`ops.rs`](./ops.rs) | Registry assembly (`default_tools*`, `all_tools*`), all config and feature gating, and `tool_group`. |
-| [`orchestrator_tools.rs`](./orchestrator_tools.rs) | Per-subagent `delegate_*` tools and deferred Composio action expansion. |
+| Deferred Composio action expansion | [`integrations/composio/orchestrator_actions.rs`](../integrations/composio/orchestrator_actions.rs). |
 | [`user_filter.rs`](./user_filter.rs) | `filter_tools_by_user_preference` and the UI toggle to tool-name map. |
 | [`host_extensions.rs`](./host_extensions.rs) | Readers over `tinytools`' erased host-extension slots: `pack_registry_handle`, `delegation_target`, `tool_call_id`. |
 | [`schemas.rs`](./schemas.rs), [`schemas/`](./schemas/) | The `tools.*` controllers: `registry.rs` (schemas and dispatch), `composio.rs`, `web_search.rs`. |
@@ -140,7 +140,8 @@ Where the built-in tools come from:
 | `http_request`, `web_fetch` | `tinytools_std::network`, wired with host limits, TinyJuice extraction and the x402 handler in [`impl/network/host.rs`](./impl/network/host.rs) |
 | `current_time`, `resolve_time`, `ask_user_clarification` | `tinyagents_harness_tools` |
 | `shell`, `install_tool`, `schedule`, `proxy_config`, `update_check`, `update_apply`, `retrieve_tool_output` | [`impl/system/`](./impl/system/) |
-| `gitbooks_search`, `gitbooks_get_page`, `gmail_unsubscribe`, `mcp_list_servers`, `mcp_list_tools`, `mcp_call_tool`, `mcp_<server>_<tool>` | [`impl/network/`](./impl/network/) (MCP tools behind `mcp`) |
+| `gitbooks_search`, `gitbooks_get_page`, `mcp_list_servers`, `mcp_list_tools`, `mcp_call_tool`, `mcp_<server>_<tool>` | [`impl/network/`](./impl/network/) (MCP tools behind `mcp`) |
+| `gmail_unsubscribe` | [`integrations/gmail/`](../integrations/gmail/) |
 | `browser`, `browser_open` | [`impl/browser/`](./impl/browser/) (behind `modules`) |
 | `generate_document`, `generate_presentation` | [`impl/document/`](./impl/document/), [`impl/presentation/`](./impl/presentation/) (behind `documents`) |
 | `web_search` and the other search roles | `crate::search::build_search_tools` |
@@ -153,8 +154,8 @@ Where the built-in tools come from:
   `PermissionLevel` from the curated `openhuman_embed` facade.
 - `ops::all_tools_with_runtime`: the full registry. Its last parameter,
   `approval_workspace_root`, scopes `file_write`'s approval prompts.
-- `orchestrator_tools::collect_orchestrator_tools` and
-  `collect_deferred_integration_actions`.
+- `integrations::composio::orchestrator_actions::{collect_orchestrator_tools,
+  collect_deferred_integration_actions}`.
 - `filter_tools_by_user_preference` (crate-internal, `user_filter.rs`).
 - `toolpacks::{append_pack_tools, bind_pack_registry,
   strip_packed_from_visible}` and `toolpacks::groups::{ToolGroups,
