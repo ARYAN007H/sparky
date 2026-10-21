@@ -1,8 +1,8 @@
 use super::*;
 use crate::storage::{MemoryStorage, Scope, StorageBackend};
-use std::sync::mpsc;
 use std::sync::Arc;
-use tinystoragedrivers::{CollectionSpec, Leases};
+use std::sync::mpsc;
+use tinystoragedrivers::CollectionSpec;
 
 const OWNER: &str = "claims_test";
 
@@ -15,22 +15,30 @@ fn repo() -> Repo {
     Repo::on(&backend, &Scope::local(), "claim-test", spec).unwrap()
 }
 
-fn claim_held(repo: &Repo, step: &str) -> bool {
-    let key = lease_key(OWNER, step);
+fn load_claim(repo: &Repo, owner: &str, step: &str) -> Option<Claim> {
+    let scoped = repo.scoped().clone();
+    let (owner, step) = (owner.to_owned(), step.to_owned());
     repo.run(move |docs| async move {
-        declare(&docs).await?;
-        Leases::new(&docs).current(CLAIM_OWNER, &key).await
+        ensure(&scoped).await?;
+        let id = record_key(&owner, &step, "claim");
+        match docs.get(COLLECTION, &id).await? {
+            Some(row) => decode(row, &owner, &step).map(Some),
+            None => Ok(None),
+        }
     })
     .unwrap()
-    .is_some()
 }
 
 #[test]
-fn claim_runs_the_body_and_releases() {
+fn claim_runs_the_body_and_releases_while_retaining_its_epoch() {
     let repo = repo();
     let ran = with_claim(&repo, OWNER, "m", || Ok(7)).unwrap();
     assert_eq!(ran, Some(7));
-    assert!(!claim_held(&repo, "m"));
+    let released = load_claim(&repo, OWNER, "m").unwrap();
+    assert_eq!(released.epoch, 1);
+    assert!(released.holder.is_none());
+    assert_eq!(with_claim(&repo, OWNER, "m", || Ok(8)).unwrap(), Some(8));
+    assert_eq!(load_claim(&repo, OWNER, "m").unwrap().epoch, 2);
 }
 
 #[test]
@@ -38,7 +46,7 @@ fn claim_is_released_when_the_body_fails() {
     let repo = repo();
     let result: Result<Option<()>> = with_claim(&repo, OWNER, "m", || Err(anyhow::anyhow!("boom")));
     assert!(result.is_err());
-    assert!(!claim_held(&repo, "m"));
+    assert!(load_claim(&repo, OWNER, "m").unwrap().holder.is_none());
     assert_eq!(with_claim(&repo, OWNER, "m", || Ok(1)).unwrap(), Some(1));
 }
 
@@ -97,7 +105,7 @@ fn many_racing_processes_run_the_body_once_at_a_time() {
                     if active.fetch_add(1, SeqCst) != 0 {
                         overlap.store(true, SeqCst);
                     }
-                    std::thread::sleep(std::time::Duration::from_millis(30));
+                    std::thread::sleep(Duration::from_millis(30));
                     active.fetch_sub(1, SeqCst);
                     Ok(())
                 })
@@ -108,41 +116,24 @@ fn many_racing_processes_run_the_body_once_at_a_time() {
         .collect();
     let ran = handles
         .into_iter()
-        .map(|h| h.join().unwrap())
-        .filter(|r| *r)
+        .filter(|handle| handle.join().unwrap())
         .count();
     assert!(ran >= 1, "somebody imports");
-    assert!(
-        !overlap.load(std::sync::atomic::Ordering::SeqCst),
-        "two bodies held the claim at once"
-    );
+    assert!(!overlap.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 #[test]
-fn a_stale_claim_is_taken_over() {
+fn a_stale_claim_is_taken_over_with_a_new_epoch() {
     let repo = repo();
-    let key = lease_key(OWNER, "m");
-    repo.run(move |docs| async move {
-        declare(&docs).await?;
-        let clock: tinystoragedrivers::Clock = Arc::new(|| 1_000);
-        Leases::new(&docs)
-            .with_clock(clock)
-            .acquire(CLAIM_OWNER, &key, "dead-process", 100)
-            .await
-            .map(|_| ())
-    })
-    .unwrap();
-
-    // Fresh: still held.
-    let held = with_claim_at(&repo, OWNER, "m", 1_000 + 10, 100, || Ok(())).unwrap();
-    assert_eq!(held, None);
-    // Past the lease: taken over, run, released.
-    let taken = with_claim_at(&repo, OWNER, "m", 1_000 + 200, 100, || Ok(())).unwrap();
-    assert_eq!(taken, Some(()));
+    let first = acquire(&repo, OWNER, "m", 1_000, 100).unwrap().unwrap();
+    assert!(acquire(&repo, OWNER, "m", 1_010, 100).unwrap().is_none());
+    let second = acquire(&repo, OWNER, "m", 1_200, 100).unwrap().unwrap();
+    assert_eq!(second.epoch, first.epoch + 1);
+    release(&repo, &second).unwrap();
 }
 
 #[test]
-fn completion_is_a_migrations_entry_in_the_scope() {
+fn completion_is_an_immutable_host_owned_record_in_the_scope() {
     let repo = repo();
     assert!(!is_done(&repo, "threads", "legacy-conversations").unwrap());
     set_done(&repo, "threads", "legacy-conversations").unwrap();
@@ -157,46 +148,43 @@ fn a_legacy_marker_row_is_honoured_and_removed() {
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     let owned = scoped.clone();
     crate::storage::block_on(async move {
-        let scoped = owned;
-        let docs = scoped.documents();
+        let docs = owned.documents();
         docs.ensure_collection(&CollectionSpec::new("storage_import"))
             .await?;
         docs.put(
             "storage_import",
             "approval@abcd",
             serde_json::json!({ "version": 1, "domain": "approval" }),
-            tinystoragedrivers::Precondition::Absent,
+            Precondition::Absent,
         )
         .await?;
         docs.put(
             "storage_import",
             "approval@abcd#claim",
             serde_json::json!({ "claimed_at_ms": 1 }),
-            tinystoragedrivers::Precondition::Absent,
+            Precondition::Absent,
         )
         .await?;
-        let moved = migrate_legacy_markers(&scoped).await?;
+        let moved = migrate_legacy_markers(&owned).await?;
         assert_eq!(moved, 1);
         assert!(
             done(
-                &scoped,
+                &owned,
                 "storage",
                 &step_id("storage_import", "approval@abcd")
             )
             .await?
         );
-        assert!(!done(&scoped, "storage", &step_id("storage_import", "other@x")).await?);
+        assert!(!done(&owned, "storage", &step_id("storage_import", "other@x")).await?);
         assert!(
             docs.query_all("storage_import", &tinystoragedrivers::Query::all())
-                .await
-                .map_or(true, |rows| rows.is_empty()),
-            "the marker rows are gone"
+                .await?
+                .is_empty()
         );
-        // A second sweep has nothing to do and keeps the entry.
-        assert_eq!(migrate_legacy_markers(&scoped).await?, 0);
+        assert_eq!(migrate_legacy_markers(&owned).await?, 0);
         assert!(
             done(
-                &scoped,
+                &owned,
                 "storage",
                 &step_id("storage_import", "approval@abcd")
             )
@@ -215,16 +203,16 @@ fn a_waiting_process_runs_once_the_holder_releases() {
     let holder = std::thread::spawn(move || {
         with_claim(&holder_repo, OWNER, "m", || {
             started_tx.send(()).unwrap();
-            std::thread::sleep(std::time::Duration::from_millis(400));
+            std::thread::sleep(Duration::from_millis(400));
             Ok("first")
         })
         .unwrap()
     });
     started_rx.recv().unwrap();
-    let began = std::time::Instant::now();
+    let began = Instant::now();
     let second = with_claim(&repo, OWNER, "m", || Ok("second")).unwrap();
     assert_eq!(second, Some("second"));
-    assert!(began.elapsed() >= std::time::Duration::from_millis(200));
+    assert!(began.elapsed() >= Duration::from_millis(200));
     assert_eq!(holder.join().unwrap(), Some("first"));
 }
 
@@ -232,12 +220,11 @@ fn a_waiting_process_runs_once_the_holder_releases() {
 fn a_long_import_keeps_its_claim_alive() {
     let repo = repo();
     let now = chrono::Utc::now().timestamp_millis();
-    // 90ms lease, body runs 400ms: without renewal a rival would take over.
     let rival_repo = repo.clone();
     let rival_ran = with_claim_at(&repo, OWNER, "m", now, 90, || {
         let mut took_over = false;
         for _ in 0..8 {
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            std::thread::sleep(Duration::from_millis(50));
             let at = chrono::Utc::now().timestamp_millis();
             took_over |= with_claim_at(&rival_repo, OWNER, "m", at, 90, || Ok(()))
                 .unwrap()
