@@ -37,6 +37,16 @@ use tinyagents_runtime::{
 };
 use tinyinference_llm::message::Message;
 
+fn concurrent_turn_diagnostic(stage: usize) {
+    if std::env::var_os("OH_DIAG_CONCURRENT").is_none() {
+        return;
+    }
+    static COUNTS: [std::sync::atomic::AtomicUsize; 5] =
+        [const { std::sync::atomic::AtomicUsize::new(0) }; 5];
+    let count = COUNTS[stage].fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    eprintln!("OpenHuman concurrent diagnostic stage={stage} count={count}");
+}
+
 use super::types::OpenHumanSessionHost;
 use crate::agent::{
     message_convert::{user_message_from_text, user_text_with_markers},
@@ -342,6 +352,7 @@ impl OpenHumanSessionHost {
                 let resume_target = resume_target.clone();
                 let state = self.runtime_state.clone();
                 move |_, options, _| {
+                    concurrent_turn_diagnostic(0);
                     let resume_target = resume_target.clone();
                     begin_turn_resume(
                         &mut state
@@ -359,6 +370,7 @@ impl OpenHumanSessionHost {
             {
                 let state = self.runtime_state.clone();
                 move |request, options, view| {
+                    concurrent_turn_diagnostic(1);
                     let state = state.clone();
                     let request_base_len = view.history.len()
                         + usize::from(view.history.last() != Some(&request.input));
@@ -386,12 +398,14 @@ impl OpenHumanSessionHost {
                         // its completion; settle it before this turn reads the goal.
                         post_commit::await_pending(pending_post_commit).await;
                         let new_session = !view.resumed && view.history.is_empty();
+                        concurrent_turn_diagnostic(2);
                         prelude
                             .refresh_turn_boundary(new_session)
                             .await
                             .map_err(|error| {
                                 tinyagents_runtime::RuntimeError::Driver(error.to_string())
                             })?;
+                        concurrent_turn_diagnostic(3);
                         let context_window = prelude
                             .turn_model_source
                             .effective_context_window(&prelude.model_name)
