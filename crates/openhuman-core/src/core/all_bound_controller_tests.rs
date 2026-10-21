@@ -13,6 +13,7 @@ fn staged_bound_methods() -> Vec<&'static str> {
     let mut methods = vec!["composio.execute"];
     #[cfg(feature = "mcp")]
     methods.push("mcp_clients.registry_get");
+    methods.extend(["doctor.report", "doctor.models"]);
     methods.extend(["encrypt.secret", "decrypt.secret"]);
     methods.extend([
         "socket.connect",
@@ -678,3 +679,6 @@ mod profiles_controller_tests;
 
 #[path = "all_encryption_controller_tests.rs"]
 mod encryption_controller_tests;
+
+#[path = "all_doctor_controller_tests.rs"]
+mod doctor_controller_tests;

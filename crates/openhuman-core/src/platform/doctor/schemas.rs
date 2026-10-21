@@ -23,6 +23,11 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
     ]
 }
 
+#[cfg(test)]
+pub(crate) fn doctor_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::doctor_parameter_contracts()
+}
+
 pub fn schemas(function: &str) -> ControllerSchema {
     match function {
         "report" => ControllerSchema {
