@@ -30,7 +30,7 @@ pub use chat_model::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
 };
-pub(crate) use credentials::openai_bearer_is_oauth;
+pub(crate) use credentials::{openai_bearer_is_oauth, resolve_codex_routing};
 pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
 pub(crate) use discovery::{model_limits_request, model_limits_request_for};
 pub(crate) use local_runtime::create_local_chat_model_from_string;

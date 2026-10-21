@@ -63,7 +63,10 @@ pub(crate) fn resolve_codex_routing(
     endpoint: &str,
     bearer_key: &str,
     bearer_is_oauth: bool,
-) -> Result<tinyinference_llm::providers::openai::codex::OpenAiCodexRouting, String> {
+) -> std::result::Result<
+    tinyinference_llm::providers::openai::codex::OpenAiCodexRouting,
+    String,
+> {
     let credentials = if slug == "openai" {
         match crate::security::credentials::openai_oauth::lookup_openai_oauth_credentials(config) {
             Ok(credentials) => credentials,
