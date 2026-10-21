@@ -262,7 +262,7 @@ fn preauthorize_parser_preserves_flow_and_tool_strings_without_normalizing() {
         parse_preauthorize_flow(Map::from_iter([("tool_names".into(), json!([]))])).unwrap_err(),
         "missing required param 'flow_id'"
     );
-    for value in [json!(null), json!(true), json!("tools"), json!({})] {
+    for value in [json!(null), json!(true), json!(7), json!("tools"), json!({})] {
         let kind = value_kind(&value);
         assert_eq!(
             parse_preauthorize_flow(Map::from_iter([
@@ -273,7 +273,7 @@ fn preauthorize_parser_preserves_flow_and_tool_strings_without_normalizing() {
             format!("invalid 'tool_names': expected array of strings, got {kind}")
         );
     }
-    for value in [json!(null), json!(false), json!(0), json!({})] {
+    for value in [json!(null), json!(false), json!(0), json!([]), json!({})] {
         let kind = value_kind(&value);
         assert_eq!(
             parse_preauthorize_flow(Map::from_iter([
