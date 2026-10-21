@@ -725,6 +725,42 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         "voice_note"
     );
     assert_eq!(
+        voice_gateway_wire["structured"]["parts"][0]["part"]["voiceNote"]["media"]["opaqueId"],
+        "media:tenant7/thread42/voice1"
+    );
+    assert_eq!(
+        image_gateway_wire["structured"]["channel_ref"]["account_id"],
+        "trusted-account-7"
+    );
+    assert_eq!(
+        image_gateway_wire["structured"]["conversation_ref"]["thread_id"],
+        "topic-3"
+    );
+    assert_eq!(
+        gateway_terminals
+            .iter()
+            .filter(|event| event.full_response().is_some_and(|text| text == "Generated image"))
+            .count(),
+        1,
+        "image delivery has one provider terminal"
+    );
+    assert_eq!(
+        gateway_terminals
+            .iter()
+            .filter(|event| event.full_response().is_some_and(|text| text.is_empty()))
+            .count(),
+        1,
+        "voice delivery has one provider terminal"
+    );
+    assert_eq!(
+        gateway_terminals
+            .iter()
+            .filter(|event| event.full_response().is_some_and(|text| text == "Final hosted reply"))
+            .count(),
+        1,
+        "final text has one provider terminal"
+    );
+    assert_eq!(
         relay.sent().len(),
         3,
         "provider output is delivered once per send"
