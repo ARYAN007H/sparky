@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use crate::storage::sessions::splice_fixture_tests::{memory_locator, memory_session_provider};
 use tempfile::TempDir;
+use tinyagents_session::port::SessionStoreProvider;
 use tinyagents_session::transcript::view::{
     project_records, project_thread_in, DisplayItem, ToolCallStatus,
 };

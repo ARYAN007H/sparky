@@ -19,7 +19,8 @@ pub(crate) fn memory_session_provider() -> Arc<dyn SessionStoreProvider> {
 
     let backend = crate::storage::test_support::memory_backend();
     let factory: AgentStorageFactory = Arc::new(move |_| {
-        let scope = tinystoragedrivers_types::Scope::new("transcript-fixture")?;
+        let scope = tinystoragedrivers_types::Scope::new("transcript-fixture")
+            .expect("valid fixture scope");
         let storage = backend.for_scope(&scope)?;
         Ok(tinyagents_storage_kit::ScopedStorage::new(storage, scope))
     });
