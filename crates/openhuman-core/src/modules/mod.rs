@@ -98,6 +98,8 @@ pub(crate) mod storage_grant_schemas;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
 #[cfg(feature = "modules")]
+pub(crate) mod storage_queue_manifest;
+#[cfg(feature = "modules")]
 pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
 mod storage_host_linked;

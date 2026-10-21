@@ -84,6 +84,40 @@ fn a_queue_call_without_a_queue_name_is_malformed() {
 }
 
 #[test]
+fn queue_names_and_specs_are_confined_to_the_host_manifest() {
+    assert_eq!(
+        authorize(
+            &with_queues(),
+            Object::Queues,
+            "Stats",
+            &json!({"queue": "other"})
+        ),
+        Err(Denied::QueueNotGranted)
+    );
+    assert_eq!(
+        authorize(
+            &with_queues(),
+            Object::Queues,
+            "EnsureQueue",
+            &json!({"queue": "inbox", "spec": {"max_attempts": 4, "dedupe_window_ms": 60000}})
+        ),
+        Err(Denied::QueueSpec)
+    );
+}
+
+#[test]
+fn kv_connection_probe_is_empty_but_data_access_is_not_granted() {
+    assert_eq!(
+        authorize(&with_queues(), Object::Kv, "Capabilities", &json!(null)),
+        Ok(Plan::Answer(json!({ "capabilities": [] })))
+    );
+    assert_eq!(
+        authorize(&with_queues(), Object::Kv, "Get", &json!({"key":"x"})),
+        Err(Denied::Object)
+    );
+}
+
+#[test]
 fn a_grant_without_queues_answers_features_and_refuses_the_rest() {
     // `BusStorage::connect` asks for queue features on every connect, so a
     // module with no queues must still get an answer, and an empty one.

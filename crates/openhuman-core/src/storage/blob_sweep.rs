@@ -2,8 +2,8 @@
 //!
 //! A blob written with a lifetime reads as absent once it lapses, but its
 //! bytes stay in the backend until something sweeps them
-//! (`StorageBackend::sweep_expired_blobs`, the trait-level hook the
-//! tinystoragedrivers drivers implement). The host owns the schedule: this
+//! (`BlobStore::sweep_expired`, the primitive hook the
+//! tinystoragedrivers blob engines implement). The host owns the schedule: this
 //! module visits every storage scope background work covers
 //! ([`super::agents::for_each_scope`]) on a fixed tick and asks the installed
 //! backend to reclaim that scope's lapsed blobs.
@@ -42,7 +42,18 @@ pub(crate) async fn sweep_scope_within(
     scope: &Scope,
     limit: Duration,
 ) -> u64 {
-    let outcome = match tokio::time::timeout(limit, backend.sweep_expired_blobs(scope)).await {
+    let outcome = match backend.for_scope(scope) {
+        Ok(storage) => tokio::time::timeout(limit, storage.blobs().sweep_expired()).await,
+        Err(error) => {
+            tracing::warn!(
+                scope = scope.as_str(),
+                %error,
+                "[storage::blob_sweep] could not open scope; retrying on the next tick"
+            );
+            return 0;
+        }
+    };
+    let outcome = match outcome {
         Ok(outcome) => outcome,
         Err(_) => {
             tracing::warn!(
