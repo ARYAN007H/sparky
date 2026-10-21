@@ -723,7 +723,7 @@ test("TinyJuice's canonical owner merge matches its recorded release-tree attest
   assert.equal(result.ok, true, result.message);
 });
 
-test("TinyChannels' canonical owner merge matches its exact test-set attestation", () => {
+test("TinyChannels' merged owner commit matches its exact test-set attestation", () => {
   const exemption = JSON.parse(
     readFileSync(
       join(REPO_ROOT, "scripts/ci/module-pin-exemptions.json"),

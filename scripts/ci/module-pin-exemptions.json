@@ -41,7 +41,7 @@
     {
       "id": "tinychannels",
       "expect": "v0.1.38-7-g1ca1a415",
-      "reason": "TinyChannels PR #97 is merged upstream at 1ca1a4158fd607b62e4f65194c8cdf85a9371fca. Its exact diff adds only tests in the runtime, Telegram operations, and Telegram send test modules; the release artifacts are unchanged.",
+      "reason": "TinyChannels PR #97 is merged into senamakel/tinychannels:epic/8089-test-ownership at 1ca1a4158fd607b62e4f65194c8cdf85a9371fca. Its exact diff adds only tests in the runtime, Telegram operations, and Telegram send test modules; the release artifacts are unchanged.",
       "sourceParity": {
         "tag": "v0.1.38",
         "releaseCommit": "9e1a340bf8f2cf89d5dd713a557b2c1a6c2406d6",
