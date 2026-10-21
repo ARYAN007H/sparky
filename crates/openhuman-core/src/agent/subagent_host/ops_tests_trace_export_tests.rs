@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::subagent_host::spawn_async_via_driver_tool_with_jobs;
 
 /// The native journal tree must preserve the exact run identity handed to the
 /// prepared child by Tiny's driver, including the host lifecycle link and the
