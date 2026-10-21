@@ -121,71 +121,73 @@ async fn handle_linked_runtime_command(
 
     ctx.channels_by_name = linked.channels();
     ctx.module_objects = linked.module_objects();
-    let _core =
-        crate::channels::runtime::test_support::bind_test_core_context(ctx, linked.config());
-    let account_id = linked
-        .channels()
-        .keys()
-        .find(|name| tinychannels_bus::provider_id(name) == msg.channel)
-        .cloned()
-        .expect("linked runtime should expose the configured provider instance");
-    let prepared = crate::modules::channel_controller::prepare_inbound(
-        &crate::channels::context::module_client(ctx).await,
-        PrepareChannelInboundRequest {
-            source: ChannelInboundSource::Envelope {
-                envelope: tinychannels_bus::ChannelInboundEnvelope {
-                    channel: tinychannels_bus::ChannelRef {
-                        id: msg.channel.clone(),
-                        account_id: Some(account_id),
-                    },
-                    message_id: msg.id.clone(),
-                    reply_to_id: msg.reply_to_id.clone(),
-                    conversation: tinychannels_bus::ConversationRef {
-                        id: canonical_conversation_id
-                            .unwrap_or(&msg.reply_target)
-                            .to_owned(),
-                        thread_id: msg.thread_ts.clone(),
-                        topic_id: msg.topic_id.clone(),
-                        ..Default::default()
-                    },
-                    sender: tinychannels_bus::SenderRef {
-                        id: msg.sender.clone(),
-                        name: msg.sender_name.clone(),
-                        ..Default::default()
-                    },
-                    timestamp_unix_ms: Some(msg.timestamp.saturating_mul(1000)),
-                    text: msg.content.clone(),
-                    parts: vec![tinychannels_bus::ContentPart::Text {
+    let core = crate::channels::runtime::test_support::bind_test_core_context(ctx, linked.config());
+    crate::core::runtime::CoreContext::scope(core, async {
+        let account_id = linked
+            .channels()
+            .keys()
+            .find(|name| tinychannels_bus::provider_id(name) == msg.channel)
+            .cloned()
+            .expect("linked runtime should expose the configured provider instance");
+        let prepared = crate::modules::channel_controller::prepare_inbound(
+            &crate::channels::context::module_client(ctx).await,
+            PrepareChannelInboundRequest {
+                source: ChannelInboundSource::Envelope {
+                    envelope: tinychannels_bus::ChannelInboundEnvelope {
+                        channel: tinychannels_bus::ChannelRef {
+                            id: msg.channel.clone(),
+                            account_id: Some(account_id),
+                        },
+                        message_id: msg.id.clone(),
+                        reply_to_id: msg.reply_to_id.clone(),
+                        conversation: tinychannels_bus::ConversationRef {
+                            id: canonical_conversation_id
+                                .unwrap_or(&msg.reply_target)
+                                .to_owned(),
+                            thread_id: msg.thread_ts.clone(),
+                            topic_id: msg.topic_id.clone(),
+                            ..Default::default()
+                        },
+                        sender: tinychannels_bus::SenderRef {
+                            id: msg.sender.clone(),
+                            name: msg.sender_name.clone(),
+                            ..Default::default()
+                        },
+                        timestamp_unix_ms: Some(msg.timestamp.saturating_mul(1000)),
                         text: msg.content.clone(),
-                        markdown_dialect: None,
-                    }],
-                    ..Default::default()
+                        parts: vec![tinychannels_bus::ContentPart::Text {
+                            text: msg.content.clone(),
+                            markdown_dialect: None,
+                        }],
+                        ..Default::default()
+                    },
+                    timestamp: msg.timestamp,
                 },
-                timestamp: msg.timestamp,
+                namespace: "main".into(),
+                session_policy: Default::default(),
+                preparation_mode: Default::default(),
             },
-            namespace: "main".into(),
-            session_policy: Default::default(),
-            preparation_mode: Default::default(),
-        },
-    )
-    .await
-    .expect("linked TinyChannels should prepare the command's trusted scope");
-    let session_key = prepared.session_key.clone();
-    let scope = RemoteSessionScope {
-        channel: prepared.envelope.channel,
-        conversation: prepared.envelope.conversation,
-        session_key: session_key.clone(),
-    };
-    handle_runtime_command_with_reset(
-        ctx,
-        &prepared.message,
-        target_channel,
-        &prepared.history_key,
-        Some(scope),
-        Some(session_key),
-        &prepared.message,
-        || async { Ok(()) },
-    )
+        )
+        .await
+        .expect("linked TinyChannels should prepare the command's trusted scope");
+        let session_key = prepared.session_key.clone();
+        let scope = RemoteSessionScope {
+            channel: prepared.envelope.channel,
+            conversation: prepared.envelope.conversation,
+            session_key: session_key.clone(),
+        };
+        handle_runtime_command_with_reset(
+            ctx,
+            &prepared.message,
+            target_channel,
+            &prepared.history_key,
+            Some(scope),
+            Some(session_key),
+            &prepared.message,
+            || async { Ok(()) },
+        )
+        .await
+    })
     .await
 }
 
