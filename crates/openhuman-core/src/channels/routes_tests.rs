@@ -145,6 +145,7 @@ async fn handle_linked_runtime_command(
                         id: canonical_conversation_id
                             .unwrap_or(&msg.reply_target)
                             .to_owned(),
+                        thread_id: msg.thread_ts.clone(),
                         topic_id: msg.topic_id.clone(),
                         ..Default::default()
                     },

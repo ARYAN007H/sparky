@@ -10,7 +10,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let sender_key = "telegram_alice_chat-remote";
 
     let new_msg = ChannelMessage {
-        reply_to_id: Some("42".into()),
+        reply_to_id: None,
         topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
@@ -19,6 +19,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         channel: "telegram".into(),
         timestamp: 0,
         thread_ts: None,
+        topic_id: Some("42".into()),
         sender_name: None,
     };
     assert!(handle_linked_runtime_command(&mut ctx, &new_msg, Some(&channel), &linked, None).await);
@@ -46,7 +47,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         .await;
 
     let status_msg = ChannelMessage {
-        reply_to_id: Some("42".into()),
+        reply_to_id: None,
         topic_id: None,
         id: "3".into(),
         sender: "alice".into(),
@@ -55,6 +56,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         channel: "telegram".into(),
         timestamp: 0,
         thread_ts: None,
+        topic_id: Some("42".into()),
         sender_name: None,
     };
     assert!(
@@ -62,7 +64,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     );
 
     let sessions_msg = ChannelMessage {
-        reply_to_id: Some("42".into()),
+        reply_to_id: None,
         topic_id: None,
         id: "4".into(),
         sender: "alice".into(),
@@ -71,6 +73,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         channel: "telegram".into(),
         timestamp: 0,
         thread_ts: None,
+        topic_id: Some("42".into()),
         sender_name: None,
     };
     assert!(
@@ -97,7 +100,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     assert!(sent[2].content.contains("→ `Telegram"));
     assert!(
         sent.iter()
-            .all(|message| message.thread_ts.as_deref() == Some("42"))
+            .all(|message| message.topic_id.as_deref() == Some("42"))
     );
 }
 
@@ -117,9 +120,8 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
         topic_id: Some("42".into()),
         id: "100".into(),
         sender: "alice".into(),
-        // This fixture supplies the same canonical conversation reference the
-        // inbound module preparation boundary provides to command handling.
-        reply_target: "-200:42".into(),
+        // The module prepares the chat and topic as distinct canonical fields.
+        reply_target: "-200".into(),
         content: "/new".into(),
         channel: "telegram".into(),
         timestamp: 0,

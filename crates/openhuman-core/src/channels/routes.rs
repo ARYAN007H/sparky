@@ -168,10 +168,10 @@ where
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
-    // The prepared envelope keeps reply authority separately from its
-    // conversation/topic reference. `SendMessage::thread_ts` is the legacy
-    // owner-adapter field that TinyChannels maps to `reply_to_id`.
-    let reply_thread = msg.reply_to_id.clone().or_else(|| msg.thread_ts.clone());
+    // Telegram's legacy `thread_ts` is the inbound provider message id used
+    // for reply targeting; forum topic routing is already encoded in
+    // `reply_target` and must not be reused as a reply-to id.
+    let reply_thread = msg.thread_ts.clone();
     let reply_recipient = reset_scope
         .as_ref()
         .map(|scope| scope.conversation.id.clone())
