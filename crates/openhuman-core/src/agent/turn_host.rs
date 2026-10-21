@@ -6,7 +6,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use tinyagents_harness::{run_queue::RunQueue, CancellationToken};
+use tinyagents_harness::{CancellationToken, run_queue::RunQueue};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
         queued_turn::QueuedTurn,
         session_host::OpenHumanSessionHost,
         turn_env::HostTurnEnv,
-        turn_origin::{with_origin, AgentTurnOrigin},
+        turn_origin::{AgentTurnOrigin, with_origin},
     },
     security::approval::ApprovalTurnContext,
 };
@@ -46,17 +46,18 @@ pub(crate) struct TrustedAgentTurn {
 
 impl std::fmt::Debug for TrustedAgentTurn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TrustedAgentTurn")
+        let mut debug = f.debug_struct("TrustedAgentTurn");
+        debug
             .field("agent_id", &self.host_agent.definition.id)
             .field("channel", &self.channel)
             .field("session_scoped", &!self.session_key.is_empty())
             .field("relay_thread", &self.relay_thread)
-            .field("imported_history_rows", &self.imported_history.len())
-            #[cfg(feature = "channels")]
-            .field("has_legacy_history", &self.legacy_history.is_some())
-            #[cfg(feature = "channels")]
-            .field("native_target", &self.native_target.is_some())
-            .finish_non_exhaustive()
+            .field("imported_history_rows", &self.imported_history.len());
+        #[cfg(feature = "channels")]
+        debug.field("has_legacy_history", &self.legacy_history.is_some());
+        #[cfg(feature = "channels")]
+        debug.field("native_target", &self.native_target.is_some());
+        debug.finish_non_exhaustive()
     }
 }
 
