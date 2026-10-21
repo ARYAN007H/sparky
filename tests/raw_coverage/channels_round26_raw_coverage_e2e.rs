@@ -14,6 +14,7 @@ use axum::{
     Json, Router,
 };
 use tinychannels::providers::telegram::TelegramChannel;
+#[allow(deprecated, reason = "this fixture covers the v21 compatibility send adapter")]
 use tinychannels::{Channel, SendMessage};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
