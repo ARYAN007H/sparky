@@ -1,9 +1,7 @@
 use super::*;
-use crate::storage::test_support::memory_backend;
-use crate::storage::{CollectionSpec, MemoryStorage, Scope, StorageBackend};
-use tinystoragedrivers::Precondition;
-use crate::storage::{CollectionSpec, MemoryStorage, Scope, StorageBackend};
-use tinystoragedrivers::Precondition;
+use crate::storage::test_support::{memory_backend, sqlite_backend};
+use crate::storage::StorageBackend;
+use tinystoragedrivers_types::{CollectionSpec, Precondition, Scope};
 
 fn meta(id: &str, created_at: u64) -> ProfileMeta {
     ProfileMeta {
@@ -84,8 +82,8 @@ async fn an_empty_root_lists_nothing() {
 
 #[tokio::test]
 async fn doctor_lookup_of_an_unknown_profile_does_not_declare_cluster_schema() {
-    let storage = MemoryStorage::new();
-    let registry = ProfileRegistry::cluster(&storage).unwrap();
+    let storage = memory_backend();
+    let registry = ProfileRegistry::cluster(storage.as_ref()).unwrap();
     let docs = storage
         .for_scope(&Scope::new(crate::storage::lease::CLUSTER_SCOPE).unwrap())
         .unwrap();
@@ -99,12 +97,10 @@ async fn doctor_lookup_of_an_unknown_profile_does_not_declare_cluster_schema() {
         .is_none());
 
     assert!(docs
-        .documents()
         .validate_collection_spec(&registry_spec)
         .await
         .is_err());
     assert!(docs
-        .documents()
         .validate_collection_spec(&lease_spec)
         .await
         .is_err());
@@ -112,9 +108,9 @@ async fn doctor_lookup_of_an_unknown_profile_does_not_declare_cluster_schema() {
 
 #[tokio::test]
 async fn doctor_lookup_does_not_migrate_legacy_profile_or_lease_records() {
-    let storage = MemoryStorage::new();
-    let registry = ProfileRegistry::cluster(&storage).unwrap();
-    let scoped = storage
+    let storage = sqlite_backend().unwrap();
+    let registry = ProfileRegistry::cluster(storage.backend.as_ref()).unwrap();
+    let scoped = storage.backend
         .for_scope(&Scope::new(crate::storage::lease::CLUSTER_SCOPE).unwrap())
         .unwrap();
     let docs = scoped.documents();
