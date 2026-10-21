@@ -340,12 +340,9 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
             None => panic!("event bus closed before egress sentinel"),
         }
     }
-    println!(
-        "direct source inference egress count={disclosures}, destinations={observed_destinations:?}"
-    );
     assert_eq!(
         disclosures, 1,
-        "one direct inference turn should disclose its model destination once"
+        "one direct inference turn should disclose its model destination once; observed {observed_destinations:?}"
     );
 }
 
