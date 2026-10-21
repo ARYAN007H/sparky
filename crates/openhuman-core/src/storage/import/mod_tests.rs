@@ -273,37 +273,47 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     std::fs::copy(&fixture, &source_db).unwrap();
     let source_hash = sha2::Sha256::digest(std::fs::read(&source_db).unwrap());
 
+    let config = Config {
+        config_path,
+        workspace_dir: target.workspace(),
+        ..Config::default()
+    };
+
+    // Run the profile migration that boot's auto-migrate hook invokes. This
+    // must copy the already-existing v1 profile database into the profile's
+    // actual v2 `storage.db`; importing the fixture into an unrelated test
+    // destination would not prove what a subsequent boot opens.
+    let migration = storage::block_on_anyhow(async {
+        crate::storage::layout::migrate(
+            &target,
+            &config,
+            &crate::storage::layout::Options {
+                allow_live: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .map_err(anyhow::Error::msg)
+    })
+    .unwrap();
+    assert!(matches!(migration, crate::storage::layout::Outcome::Migrated(_)));
+    assert!(target.storage_db().is_file(), "profile storage.db is bootable");
+
     let destination_url = format!("sqlite:{}", target.storage_db().display());
     let destination =
         crate::storage::test_support::sqlite_backend_in(root, destination_url.clone()).unwrap();
     let backend = Arc::clone(&destination.backend);
     let _installed =
         crate::storage::test_support::install_for_test(&destination_url, Arc::clone(&backend));
-    let config = Config {
-        config_path,
-        workspace_dir: target.workspace(),
-        storage: crate::config::schema::StorageConfig {
-            url: Some(destination_url),
-            ..Default::default()
-        },
-        ..Config::default()
-    };
 
-    // The boot pipeline includes scope_move. The other importers have no
-    // source files in this fixture; this proof covers only historical TSD
-    // documents and the schema owners they enter through scope_move.
+    // A subsequent boot importer sees the preserved v1 source marker and
+    // does not duplicate or resurrect data in the profile database.
     let first = run_all(&backend, &config);
     let moved = first
         .iter()
         .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
         .expect("boot importer includes legacy scope movement");
-    assert_eq!(
-        moved.outcome.as_ref().unwrap(),
-        &Outcome::Imported {
-            found: 4,
-            written: 4
-        }
-    );
+    assert_eq!(moved.outcome.as_ref().unwrap(), &Outcome::AlreadyDone);
 
     let profile_scope = backend.for_scope(&scope_for_profile("u1")).unwrap();
     let profile_docs = Arc::clone(profile_scope.documents());
