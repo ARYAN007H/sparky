@@ -36,13 +36,10 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
     )
     .await
     .expect("detached driver spawn should register");
-    let (outcome, _effects) = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        completed_rx,
-    )
-    .await
-    .expect("detached driver should complete")
-    .expect("completion callback sends the host result");
+    let (outcome, _effects) = tokio::time::timeout(std::time::Duration::from_secs(5), completed_rx)
+        .await
+        .expect("detached driver should complete")
+        .expect("completion callback sends the host result");
     let outcome = outcome.expect("driver-backed child should complete");
 
     assert!(matches!(outcome.status, SubagentRunStatus::Completed));
@@ -253,10 +250,12 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         !leader.final_history.is_empty(),
         "winner history is preserved"
     );
-    assert!(leader
-        .final_history
-        .iter()
-        .any(|row| { row.role == "tool" && row.tool_call_id.as_deref() == Some("call-1") }));
+    assert!(
+        leader
+            .final_history
+            .iter()
+            .any(|row| { row.role == "tool" && row.tool_call_id.as_deref() == Some("call-1") })
+    );
     assert_eq!(leader.usage.input_tokens, follower.usage.input_tokens);
     assert!(leader.usage.input_tokens > 0, "winner usage is preserved");
     assert_eq!(leader.artifact_paths, follower.artifact_paths);
@@ -403,19 +402,21 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     );
     let owner_scope: std::sync::Arc<dyn Fn(u64) -> String + Send + Sync> =
         std::sync::Arc::new(move |_| owner.clone());
-    assert!(port
-        .close("close-driver-session")
-        .await
-        .expect("Tiny close adapter cancels then closes the durable row"));
+    assert!(
+        port.close("close-driver-session")
+            .await
+            .expect("Tiny close adapter cancels then closes the durable row")
+    );
     assert_eq!(
         jobs.get(job_id.as_str()).unwrap().status,
         SubAgentJobStatus::Running,
         "the job remains visible while cooperative cancellation unwinds"
     );
-    assert!(port
-        .close("close-driver-session")
-        .await
-        .expect("repeated close is idempotent without re-cancelling"));
+    assert!(
+        port.close("close-driver-session")
+            .await
+            .expect("repeated close is idempotent without re-cancelling")
+    );
     assert!(!parent_cancellation.is_cancelled(), "parent stays live");
 
     let tiny_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());
@@ -537,14 +538,14 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     )
     .await
     .expect("sibling driver remains usable");
-    let (sibling, _effects) = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        sibling_rx,
-    )
-    .await
-    .expect("sibling driver should complete")
-    .expect("sibling completion callback sends the result");
-    assert!(matches!(sibling.expect("sibling child completes").status, SubagentRunStatus::Completed));
+    let (sibling, _effects) = tokio::time::timeout(std::time::Duration::from_secs(5), sibling_rx)
+        .await
+        .expect("sibling driver should complete")
+        .expect("sibling completion callback sends the result");
+    assert!(matches!(
+        sibling.expect("sibling child completes").status,
+        SubagentRunStatus::Completed
+    ));
     assert_eq!(provider.captured.lock().len(), 2);
 }
 

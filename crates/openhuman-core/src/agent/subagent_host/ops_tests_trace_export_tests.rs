@@ -8,7 +8,7 @@ use super::*;
 async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     use tinyagents_harness::events::AgentEvent;
     use tinyagents_harness::observability::trace_export::{
-        collector::SpanCollector, serialize::spans_to_ndjson, TraceContext,
+        TraceContext, collector::SpanCollector, serialize::spans_to_ndjson,
     };
 
     let scratch = tempfile::tempdir().expect("isolated native trace fixture");
@@ -85,10 +85,11 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     )
     .await
     .expect("detached driver child registers");
-    let (outcome, _effects) = tokio::time::timeout(std::time::Duration::from_secs(5), completion_rx)
-        .await
-        .expect("detached child completes")
-        .expect("completion callback sends the host outcome");
+    let (outcome, _effects) =
+        tokio::time::timeout(std::time::Duration::from_secs(5), completion_rx)
+            .await
+            .expect("detached child completes")
+            .expect("completion callback sends the host outcome");
     let outcome = outcome.expect("driver-backed child run completes");
     assert!(matches!(outcome.status, SubagentRunStatus::Completed));
     assert_eq!(provider.captured.lock().len(), 1);
@@ -244,9 +245,11 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         .expect("native projection preserves the provider-reported charge");
     assert_eq!(generation.attributes["gen_ai.usage.input_tokens"], 120);
     assert_eq!(generation.attributes["gen_ai.usage.output_tokens"], 8);
-    assert!(generation
-        .attributes
-        .contains_key("gen_ai.pricing.input_per_mtok_usd"));
+    assert!(
+        generation
+            .attributes
+            .contains_key("gen_ai.pricing.input_per_mtok_usd")
+    );
     let exported = spans_to_ndjson(
         tinyagents_harness::observability::trace_export::serialize::SpanEnvelope::Otel,
         spans,
