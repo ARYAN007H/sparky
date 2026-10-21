@@ -104,7 +104,7 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
 fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let home = tempfile::tempdir().unwrap();
     let (profile, source) = seed_existing_profile(home.path());
-    let (_server, base) = start(home.path());
+    let (server, base) = start(home.path());
     let credential = rpc_with_params(
         &base,
         "openhuman.auth_set_credential",
@@ -231,6 +231,18 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
                             .contains("fixture-flow"),
                         "flow owner did not read the v1 database record: {flows:?}"
                     );
+                    openhuman_core::flows::ops::flows_delete(&config, "fixture-flow")
+                        .await
+                        .unwrap();
+                    let deleted = openhuman_core::flows::ops::flows_list(&config)
+                        .await
+                        .unwrap();
+                    assert!(
+                        !serde_json::to_string(&deleted.value)
+                            .unwrap()
+                            .contains("fixture-flow"),
+                        "flow owner did not persist the fixture deletion: {deleted:?}"
+                    );
                     let listed = thread_store.list_threads().unwrap();
                     assert_eq!(
                         listed.len(),
@@ -278,4 +290,59 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         .unwrap()
         .unwrap();
     assert_eq!(secret.as_slice(), b"historical-secret-value");
+
+    // A second desktop boot must not replay the archived v1 database over an
+    // owner deletion made after migration.
+    drop(server);
+    let (rebooted, _) = start(home.path());
+    let workspace = profile.join("files");
+    let mut config = openhuman_core::config::Config::default();
+    config.config_path = profile.join("config.toml");
+    config.workspace_dir = workspace;
+    config.storage.url = Some(format!("sqlite:{}", profile.join("storage.db").display()));
+    std::thread::spawn(move || {
+        let storage_url = config.storage.url.as_deref().unwrap().to_owned();
+        let owner_runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        owner_runtime.block_on(async move {
+            let runtime = openhuman_core::core::runtime::CoreBuilder::new(
+                openhuman_core::core::types::HostKind::TauriShell,
+            )
+            .boot_mode(openhuman_core::core::runtime::CoreBootMode::Inspection)
+            .token(openhuman_core::core::runtime::TokenSource::Fixed(
+                std::sync::Arc::new("legacy-profile-reboot-token".to_owned()),
+            ))
+            .services(openhuman_core::core::runtime::ServiceSet::none())
+            .config(config.clone())
+            .build()
+            .await
+            .unwrap();
+            let open_url = storage_url.clone();
+            let owner_backend = openhuman_core::storage::block_on(async move {
+                openhuman_core::storage::open(&open_url).await
+            })
+            .unwrap();
+            openhuman_core::storage::install_for_url(&storage_url, owner_backend);
+            openhuman_core::core::runtime::CoreContext::scope(
+                std::sync::Arc::clone(runtime.context()),
+                async {
+                    let flows = openhuman_core::flows::ops::flows_list(&config)
+                        .await
+                        .unwrap();
+                    assert!(
+                        !serde_json::to_string(&flows.value)
+                            .unwrap()
+                            .contains("fixture-flow"),
+                        "desktop reboot resurrected the deleted flow: {flows:?}"
+                    );
+                },
+            )
+            .await;
+        });
+    })
+    .join()
+    .unwrap();
+    drop(rebooted);
 }
