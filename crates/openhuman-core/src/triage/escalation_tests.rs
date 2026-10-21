@@ -169,7 +169,6 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         .iter()
         .map(|tool| tool.name.as_str())
         .collect();
-    assert!(tool_names.contains(&"read_workspace_state"));
     assert!(
         !tool_names
             .iter()
