@@ -64,7 +64,13 @@ static BACKEND_OPEN_TEST_GATE: LazyLock<Mutex<Option<BackendOpenTestGate>>> =
     LazyLock::new(Mutex::default);
 
 #[cfg(test)]
-static SYNC_BACKEND_ENTRY_TEST_SIGNAL: LazyLock<Mutex<Option<std::sync::mpsc::Sender<()>>>> =
+struct SyncBackendEntryTestSignal {
+    workspace_dir: PathBuf,
+    sender: std::sync::mpsc::Sender<()>,
+}
+
+#[cfg(test)]
+static SYNC_BACKEND_ENTRY_TEST_SIGNAL: LazyLock<Mutex<Option<SyncBackendEntryTestSignal>>> =
     LazyLock::new(Mutex::default);
 
 #[cfg(test)]
@@ -78,10 +84,16 @@ pub(super) fn install_test_backend_open_gate(
 }
 
 #[cfg(test)]
-pub(super) fn arm_test_sync_backend_entry_signal(sender: std::sync::mpsc::Sender<()>) {
+pub(super) fn arm_test_sync_backend_entry_signal(
+    workspace_dir: &Path,
+    sender: std::sync::mpsc::Sender<()>,
+) {
     *SYNC_BACKEND_ENTRY_TEST_SIGNAL
         .lock()
-        .unwrap_or_else(PoisonError::into_inner) = Some(sender);
+        .unwrap_or_else(PoisonError::into_inner) = Some(SyncBackendEntryTestSignal {
+        workspace_dir: workspace_dir.to_path_buf(),
+        sender,
+    });
 }
 
 #[cfg(test)]
@@ -97,13 +109,17 @@ async fn await_test_backend_open_gate() {
 }
 
 #[cfg(test)]
-fn signal_test_sync_backend_entry() {
-    if let Some(sender) = SYNC_BACKEND_ENTRY_TEST_SIGNAL
+fn signal_test_sync_backend_entry(workspace_dir: &Path) {
+    let mut signal = SYNC_BACKEND_ENTRY_TEST_SIGNAL
         .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .take()
+        .unwrap_or_else(PoisonError::into_inner);
+    if signal
+        .as_ref()
+        .is_some_and(|signal| signal.workspace_dir == workspace_dir)
     {
-        let _ = sender.send(());
+        if let Some(signal) = signal.take() {
+            let _ = signal.sender.send(());
+        }
     }
 }
 
@@ -163,7 +179,7 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
         return Ok(Arc::clone(backend));
     }
     #[cfg(test)]
-    signal_test_sync_backend_entry();
+    signal_test_sync_backend_entry(workspace_dir);
 
     let workspace_dir = workspace_dir.to_path_buf();
     super::block_on_anyhow(async move { initialized_backend(cell, workspace_dir).await })
