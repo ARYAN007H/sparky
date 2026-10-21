@@ -1,7 +1,8 @@
 //! Provider-neutral helpers for resolving model ids against registered model
 //! vocabularies.
 
-use crate::config::{Config, WORKLOAD_ROLES};
+use crate::config::Config;
+use tinyagents_registry::router::RouteSource;
 
 /// The workload role represented by a provider-specific model alias, defaulting
 /// to the generic `chat` role for concrete and unknown ids.
@@ -28,18 +29,18 @@ fn role_for_provider_model_with(
     model: &str,
     extensions: Option<Option<&crate::core::slots::Extensions>>,
 ) -> &'static str {
-    let role = model
-        .strip_prefix("hint:")
-        .filter(|role| WORKLOAD_ROLES.contains(role))
-        .map(str::to_string)
-        .or_else(|| match extensions {
-            Some(extensions) => {
-                crate::inference::registry::provider_model_role_for(extensions, provider_id, model)
-            }
-            None => crate::inference::registry::provider_model_role(provider_id, model),
-        });
-    role.as_deref()
-        .and_then(|role| WORKLOAD_ROLES.iter().copied().find(|known| *known == role))
+    let config = Config::default();
+    let source = crate::inference::provider::factory::ConfigRouteSource::with_extension_selection(
+        &config,
+        provider_id,
+        extensions,
+    );
+    let role =
+        crate::inference::provider::factory::workload_router().role_for_model_tier(model, &source);
+    crate::config::WORKLOAD_ROLES
+        .iter()
+        .copied()
+        .find(|known| *known == role)
         .unwrap_or("chat")
 }
 
@@ -91,30 +92,17 @@ fn resolve_provider_model_hint_with(
     if trimmed.is_empty() {
         return trimmed.to_string();
     }
-    let role = trimmed
-        .strip_prefix("hint:")
-        .filter(|role| WORKLOAD_ROLES.contains(role))
-        .map(str::to_string)
-        .or_else(|| match extensions {
-            Some(extensions) => crate::inference::registry::provider_model_role_for(
-                extensions,
-                provider_id,
-                trimmed,
-            ),
-            None => crate::inference::registry::provider_model_role(provider_id, trimmed),
-        });
-    let Some(role) = role else {
-        return trimmed.to_string();
-    };
-
-    let route = crate::inference::provider::factory::provider_for_role(&role, config);
-    let route = route.trim();
-    if route.is_empty()
-        || route == "cloud"
-        || route == provider_id
-        || route == crate::inference::provider::factory::BYOK_INCOMPLETE_SENTINEL
-    {
-        let resolved = match extensions {
+    let router = crate::inference::provider::factory::workload_router();
+    let base_source =
+        crate::inference::provider::factory::ConfigRouteSource::with_extension_selection(
+            config,
+            provider_id,
+            extensions,
+        );
+    let role = router.role_for_model_tier(trimmed, &base_source);
+    let route = router.provider_for_role(&role, &base_source);
+    let managed_default_model = if base_source.is_managed_route(&route) {
+        match extensions {
             Some(extensions) => crate::inference::registry::resolve_provider_model_for(
                 extensions,
                 provider_id,
@@ -128,13 +116,14 @@ fn resolve_provider_model_hint_with(
                 config,
                 Some(trimmed),
             ),
-        };
-        return resolved.unwrap_or_else(|| trimmed.to_string());
-    }
-    if let Some((_, model)) = route.split_once(':') {
-        return tinyinference_providers::route::split_model_and_temperature(model).0;
-    }
-    route.to_string()
+        }
+    } else {
+        None
+    };
+    let source = base_source.with_managed_default_model(managed_default_model);
+    router
+        .resolve_model_for_hint(trimmed, &source)
+        .unwrap_or_else(|| trimmed.to_string())
 }
 
 #[cfg(test)]

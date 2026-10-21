@@ -243,14 +243,10 @@ fn implicit_cloud_fallback_is_claimed_only_when_the_role_has_no_route_of_its_own
 
 #[test]
 fn cloud_fallback_roles_match_the_roles_provider_for_role_actually_falls_back() {
-    // `factory_tests` is a child module of `factory`, so `super` is `factory`,
-    // not `provider` — reach the sibling module by its crate path.
-    use crate::inference::provider::fallback_diagnostics::role_falls_back_to_cloud;
-    let mut config = Config::default();
-    config.chat_provider = Some("ollama:gemma3:1b".to_string());
+    let router = crate::inference::provider::factory::workload_router();
 
-    // The diagnostics module carries its own role list; if the two drift, users
-    // get either a missing explanation or one that names the wrong knob.
+    // The native router's metadata is the source of truth for roles that may
+    // fall back to the primary cloud provider.
     for role in [
         "vision",
         "embeddings",
@@ -260,13 +256,13 @@ fn cloud_fallback_roles_match_the_roles_provider_for_role_actually_falls_back() 
         "burst",
     ] {
         assert!(
-            role_falls_back_to_cloud(role),
-            "'{role}' falls back in provider_for_role but is missing from CLOUD_FALLBACK_ROLES"
+            router.cloud_fallback_role(role).is_some(),
+            "'{role}' falls back in provider_for_role but is missing native fallback metadata"
         );
     }
     for role in ["chat", "reasoning", "coding"] {
         assert!(
-            !role_falls_back_to_cloud(role),
+            router.cloud_fallback_role(role).is_none(),
             "'{role}' is a chat-tier role and must not be described as a cloud fallback"
         );
     }

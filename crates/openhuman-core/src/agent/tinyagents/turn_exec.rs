@@ -35,7 +35,7 @@ use crate::agent::tinyagents::turn_plan::{
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
 use crate::agent::tinyagents::NativeSubagentRunContext;
-use crate::agent::tinyagents::{journal, routes, steering_forwarder};
+use crate::agent::tinyagents::{journal, steering_forwarder};
 use crate::inference::turn_models::TurnModels;
 use tinyagents_harness::events::EventSink;
 use tinyagents_harness::observability::turn_observer;
@@ -553,7 +553,10 @@ async fn drive_turn(
             context_mw,
             host_policy: run_context.harness_host_policy(),
             tool_policy: tool_policy.clone(),
-            required_capabilities: routes::turn_required_capabilities(model),
+            required_capabilities: tinyagents_registry::WorkloadRouter::from_workload_routes(
+                "hint:vision",
+            )
+            .required_capabilities(model),
             deterministic_cacheable,
             has_route_fallback,
             dispatch: run_context.dispatch_ctx(),

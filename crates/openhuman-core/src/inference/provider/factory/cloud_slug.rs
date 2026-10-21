@@ -133,7 +133,8 @@ pub(crate) fn resolve_cloud_slug_for<'a>(
     // Only an *implicit* fallback is explained as one. A role with its own
     // explicit cloud route can fail key lookup here too, and telling that user
     // their local chat model caused it would be a lie.
-    let implicit_fallback = role_uses_implicit_cloud_fallback(role, config);
+    let fallback_diagnostic = super::fallback_diagnostics_for_role(role, config);
+    let implicit_fallback = fallback_diagnostic.is_some();
     let local_chat = if implicit_fallback {
         config
             .chat_provider
@@ -152,7 +153,14 @@ pub(crate) fn resolve_cloud_slug_for<'a>(
             entry.auth_style.as_str(),
             implicit_fallback
         );
-        fallback_diagnostics::missing_provider_credentials_message(role, slug, local_chat)
+        fallback_diagnostic.as_ref().map_or_else(
+            || format!("No usable credentials for '{slug}'. Add a key in Connections → LLM."),
+            |diagnostic| {
+                fallback_diagnostics::missing_provider_credentials_message(
+                    diagnostic, slug, local_chat,
+                )
+            },
+        )
     };
 
     let key = lookup_key_for_slug(slug, config)
