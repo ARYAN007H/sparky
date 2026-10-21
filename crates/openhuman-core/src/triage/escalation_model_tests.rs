@@ -145,38 +145,39 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
 
     // Prove that the requested route reached the model before checking the
     // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
-    let requests = requests.lock().unwrap();
-    assert_eq!(requests.len(), 1, "triage should make one model request");
-    assert_eq!(
-        requests[0].0, "agentic",
-        "the trigger reactor should use its configured model role"
-    );
-    assert_eq!(
-        requests[0].1,
-        crate::config::MODEL_MANAGED_DEFAULT,
-        "the configured managed model pin should reach the actual turn model"
-    );
-    assert!(
-        requests[0]
+    {
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 1, "triage should make one model request");
+        assert_eq!(
+            requests[0].0, "agentic",
+            "the trigger reactor should use its configured model role"
+        );
+        assert_eq!(
+            requests[0].1,
+            crate::config::MODEL_MANAGED_DEFAULT,
+            "the configured managed model pin should reach the actual turn model"
+        );
+        assert!(
+            requests[0]
+                .2
+                .messages
+                .iter()
+                .any(|message| message.text().contains("handle this trigger inline")),
+            "the target agent should receive the triage prompt"
+        );
+        let tool_names: Vec<_> = requests[0]
             .2
-            .messages
+            .tools
             .iter()
-            .any(|message| message.text().contains("handle this trigger inline")),
-        "the target agent should receive the triage prompt"
-    );
-    let tool_names: Vec<_> = requests[0]
-        .2
-        .tools
-        .iter()
-        .map(|tool| tool.name.as_str())
-        .collect();
-    assert!(tool_names.contains(&"read_workspace_state"));
-    assert!(!tool_names
-        .iter()
-        .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
-    assert!(!tool_names.contains(&"shell"));
-    assert!(!tool_names.contains(&"file_write"));
-    drop(requests);
+            .map(|tool| tool.name.as_str())
+            .collect();
+        assert!(tool_names.contains(&"read_workspace_state"));
+        assert!(!tool_names
+            .iter()
+            .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
+        assert!(!tool_names.contains(&"shell"));
+        assert!(!tool_names.contains(&"file_write"));
+    }
     let captured = events::test_events_for_external_id("esc-react-inline");
     assert!(captured.iter().any(|event| matches!(
         event,
@@ -287,18 +288,19 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
         .await
         .expect("direct target turn should complete");
 
-    let requests = requests.lock().unwrap();
-    assert_eq!(requests.len(), 1, "the model turn ran");
-    assert_eq!(
-        requests[0].1, model_marker,
-        "the expected model served the turn"
-    );
-    assert!(requests[0]
-        .2
-        .messages
-        .iter()
-        .any(|message| { message.text().contains("send this trigger reply") }));
-    drop(requests);
+    {
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 1, "the model turn ran");
+        assert_eq!(
+            requests[0].1, model_marker,
+            "the expected model served the turn"
+        );
+        assert!(requests[0]
+            .2
+            .messages
+            .iter()
+            .any(|message| { message.text().contains("send this trigger reply") }));
+    }
     let sentinel = "triage-direct-source-egress-sentinel";
     BUS.publish(crate::core::events::DomainEvent::ExternalTransferPending {
         descriptor: EgressDescriptor::network_fetch(sentinel),
