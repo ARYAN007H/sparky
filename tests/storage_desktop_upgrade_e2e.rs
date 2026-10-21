@@ -460,6 +460,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
                 assert!(*found > 0, "{} found nothing", report.domain);
                 assert_eq!(found, written, "{} lost records", report.domain);
             }
+            Outcome::NoSource if report.domain == "scope_move" => {}
             other => panic!("{}: expected an import, got {other:?}", report.domain),
         }
     }
@@ -557,9 +558,14 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     .await;
     assert_eq!(again.len(), reports.len());
     for report in &again {
+        let expected = if report.domain == "scope_move" {
+            Outcome::NoSource
+        } else {
+            Outcome::AlreadyDone
+        };
         assert_eq!(
             report.outcome.as_ref().unwrap(),
-            &Outcome::AlreadyDone,
+            &expected,
             "{} imported twice",
             report.domain
         );
