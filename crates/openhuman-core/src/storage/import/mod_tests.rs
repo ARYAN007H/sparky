@@ -282,7 +282,7 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     let config = Config {
         config_path,
         workspace_dir: target.workspace(),
-        storage: crate::config::StorageConfig {
+        storage: crate::config::schema::StorageConfig {
             url: Some(destination_url),
             ..Default::default()
         },
