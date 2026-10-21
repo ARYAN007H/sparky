@@ -503,7 +503,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     );
     let stored = mcp
         .documents()
-        .get("mcp.servers", "srv-1")
+        .get("mcp_servers", "srv-1")
         .await
         .unwrap()
         .unwrap();
