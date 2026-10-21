@@ -469,18 +469,23 @@ async fn wait_until(label: &str, mut condition: impl FnMut() -> bool) {
 async fn wait_for_new_session_reply(state: &MockState) {
     let deadline = Instant::now() + Duration::from_secs(45);
     loop {
-        let sent = state.sent_messages.lock().expect("Telegram sent messages");
-        if sent.iter().any(|body| {
-            body["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("Started new session"))
-        }) {
+        let (has_reply, sent_snapshot) = {
+            let sent = state.sent_messages.lock().expect("Telegram sent messages");
+            (
+                sent.iter().any(|body| {
+                    body["text"]
+                        .as_str()
+                        .is_some_and(|text| text.contains("Started new session"))
+                }),
+                sent.clone(),
+            )
+        };
+        if has_reply {
             return;
         }
         if Instant::now() >= deadline {
-            panic!("timed out waiting for Telegram /new reply; outbound bodies: {sent:#?}");
+            panic!("timed out waiting for Telegram /new reply; outbound bodies: {sent_snapshot:#?}");
         }
-        drop(sent);
         sleep(Duration::from_millis(50)).await;
     }
 }
