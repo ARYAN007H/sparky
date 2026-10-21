@@ -2,15 +2,17 @@
 //! view of the shared backend are refused while B's succeed.
 
 use super::*;
-use async_trait::async_trait;
 use crate::storage::fence::{fence_error, FenceError, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore, LocalLeases};
 use crate::storage::test_support::{memory_backend, sqlite_backend, SqliteBackend};
 use crate::storage::{Storage, StorageBackend};
+use async_trait::async_trait;
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-use tinystoragedrivers_types::{Capability, CollectionSpec, ErrorKind, Precondition, Scope, Version};
+use tinystoragedrivers_types::{
+    Capability, CollectionSpec, ErrorKind, Precondition, Scope, Version,
+};
 
 const TTL: Duration = Duration::from_secs(30);
 const MARGIN_MS: u64 = 5_000;
@@ -134,7 +136,8 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
 
     // The new holder writes, and its write is the one that stands.
     b.put("profile:alice", "n2").await.unwrap();
-    let stored = backend.backend
+    let stored = backend
+        .backend
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap()
         .documents()
@@ -262,7 +265,6 @@ impl LeaseStore for PausedAfterCheck {
     > {
         self.inner.holder_readonly(key).await
     }
-
 }
 
 /// Node A holds `alice` on `shared`; returns A's fenced view, its fence,
@@ -353,7 +355,8 @@ async fn stream_and_blob_writes_are_driver_fenced() {
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     leases.armed.store(true, Ordering::SeqCst);
     assert!(scoped.streams().append("log", json!(1)).await.is_err());
-    let raw = backend.backend
+    let raw = backend
+        .backend
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap();
     assert_eq!(raw.streams().len("log").await.unwrap(), 0);
@@ -459,7 +462,8 @@ async fn fenced_blobs_forward_expiry_and_capabilities() {
     assert!(!blobs.capabilities().contains(Capability::PresignedUrls));
     assert_eq!(
         blobs.max_key_len(),
-        backend.backend
+        backend
+            .backend
             .for_scope(&Scope::new("profile:alice").unwrap())
             .unwrap()
             .blobs()
@@ -502,7 +506,8 @@ async fn expiring_blob_writes_are_fenced() {
         .put_expiring("k", b"x".to_vec(), None, Duration::from_secs(60))
         .await
         .is_err());
-    assert!(backend.backend
+    assert!(backend
+        .backend
         .for_scope(&Scope::new("alice~default").unwrap())
         .unwrap()
         .blobs()
