@@ -156,6 +156,15 @@ fn module_media_scope_preserves_account_full_conversation_and_provider_turn() {
         ..envelope
     };
     assert!(media_scope(&missing_account).is_err());
+
+    let mismatched_account = ChannelInboundEnvelope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("discord:work".into()),
+        },
+        ..envelope
+    };
+    assert!(media_scope(&mismatched_account).is_err());
 }
 
 #[test]

@@ -550,7 +550,7 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
     assert_eq!(replay, first_chunk);
     let handle = read.handle.clone();
     crate::channels::runtime::dispatch::drop_media_read_lease_for_test(
-        runtime.client.clone(),
+        runtime.lease.object().clone(),
         dispatch_ctx,
         read.handle,
     );

@@ -273,6 +273,9 @@ fn media_scope(envelope: &ChannelInboundEnvelope) -> Result<HostVoiceScope, Stri
     {
         return Err("native media has an incomplete conversation scope".into());
     }
+    if tinychannels_bus::provider_id(configured_instance) != envelope.channel.id {
+        return Err("native media account does not match its provider".into());
+    }
     Ok(HostVoiceScope {
         configured_instance: configured_instance.to_owned(),
         channel: envelope.channel.clone(),
@@ -531,7 +534,6 @@ impl Drop for MediaReadLease {
         self.dispatch.spawn(async move {
             let _ = client
                 .call_confidential::<()>(
-                    "tinychannels",
                     tinychannels_bus::methods::ABORT_MEDIA_READ,
                     (MediaReadFinish(handle),),
                 )
