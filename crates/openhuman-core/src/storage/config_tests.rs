@@ -73,6 +73,7 @@ fn the_default_differs_per_workspace() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn the_default_url_opens_in_directory_mode() {
     let dir = tempfile::tempdir().unwrap();
     let url = default_url(dir.path());
@@ -163,6 +164,7 @@ fn an_explicit_url_wins_over_the_v2_default() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn the_v2_default_opens_one_storage_db_file_beside_config_toml() {
     let tmp = tempfile::tempdir().unwrap();
     let layout = v2_layout(tmp.path());

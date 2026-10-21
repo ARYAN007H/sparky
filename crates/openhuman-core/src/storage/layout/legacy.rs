@@ -150,6 +150,6 @@ pub async fn migrate(target: &Target) -> Result<(), LayoutError> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "storage-sqlite"))]
 #[path = "legacy_tests.rs"]
 mod tests;

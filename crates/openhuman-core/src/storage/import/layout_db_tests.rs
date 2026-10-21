@@ -4,6 +4,7 @@ use crate::storage::layout::{Target, legacy};
 use tempfile::TempDir;
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn the_copy_has_the_sources_counts_and_leaves_the_source_alone() {
     let fx = v1_profile();
     let source = legacy::v1_db(&fx.target);
@@ -24,6 +25,7 @@ fn the_copy_has_the_sources_counts_and_leaves_the_source_alone() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn a_matching_copy_is_kept_and_a_stale_one_replaced() {
     let fx = v1_profile();
     let source = legacy::v1_db(&fx.target);
