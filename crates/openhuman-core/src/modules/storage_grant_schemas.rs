@@ -135,13 +135,35 @@ pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     secret_prefixes.extend(items.secrets);
     Some(StorageGrant {
         collections: items.collections,
-        stream_prefixes: items.streams,
-        blob_prefixes: items.blobs,
+        // v2 owner bus crates expose their collection declarations, but not
+        // every non-document name. Keep those capabilities explicit at the
+        // host boundary until the owner contracts publish them. Connectors
+        // already has a pure storage-needs contract, so consume it directly.
+        stream_prefixes: stream_prefixes(row.owner),
+        blob_prefixes: blob_prefixes(row.owner),
         secret_prefixes,
         writable: true,
         queues: queues.as_ref().map(|grant| Arc::clone(&grant.manifest)),
         queue_backend: queues.map(|grant| grant.backend),
     })
+}
+
+fn stream_prefixes(owner: &str) -> Vec<String> {
+    match owner {
+        "mcp" => vec![tinymcp_bus::storage::AUDIT_STREAM.to_owned()],
+        "connectors" => tinyconnectors_bus::storage::storage_needs().stream_prefixes,
+        // TinyWallet's module still reads and appends this released ledger
+        // stream while its bus contract currently declares collections only.
+        "wallet" => vec!["wallet.payments".to_owned()],
+        _ => Vec::new(),
+    }
+}
+
+fn blob_prefixes(owner: &str) -> Vec<String> {
+    match owner {
+        "juice" => vec![format!("{}/", tinyjuice_bus::storage::CCR_PREFIX)],
+        _ => Vec::new(),
+    }
 }
 
 pub(super) mod tinychannels {

@@ -109,12 +109,55 @@ fn tinyjuice_reaches_only_its_blob_prefix() {
         &grant,
         Object::Blobs,
         "Get",
-        json!({"key": "juice/ccr/abc"})
+        json!({"key": "tinyjuice_ccr/abc"})
     ));
     assert!(!allowed(
         &grant,
         Object::Blobs,
         "Get",
-        json!({"key": "other/abc"})
+        json!({"key": "juice/ccr/abc"})
     ));
+}
+
+#[test]
+fn non_document_grants_match_the_owner_contracts_without_broad_prefixes() {
+    let connectors = declared("tinyconnectors").unwrap();
+    assert!(allowed(
+        &connectors,
+        Object::Streams,
+        "Append",
+        json!({"stream": "connectors.triggers/2026-10-21"})
+    ));
+    assert!(allowed(
+        &connectors,
+        Object::Streams,
+        "Append",
+        json!({"stream": "triggers/2026-10-21"})
+    ));
+    assert_eq!(
+        authorize(
+            &connectors,
+            Object::Streams,
+            "Append",
+            &json!({"stream": "other/2026-10-21"})
+        ),
+        Err(Denied::Target)
+    );
+
+    let wallet = declared("tinywallet").unwrap();
+    assert!(allowed(
+        &wallet,
+        Object::Streams,
+        "Append",
+        json!({"stream": "wallet.payments"})
+    ));
+    assert_eq!(
+        authorize(
+            &wallet,
+            Object::Streams,
+            "Append",
+            &json!({"stream": "other.payments"})
+        ),
+        Err(Denied::Target)
+    );
 }
