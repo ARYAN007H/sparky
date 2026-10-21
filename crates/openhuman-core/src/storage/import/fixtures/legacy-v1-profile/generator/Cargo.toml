@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[workspace]
+
 [dependencies]
 tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers.git", rev = "0c6dcfce57201fadd830431f36fd759c3baa897a", features = ["sqlite"] }
 serde_json = "1"
