@@ -61,15 +61,21 @@ pub async fn agent_chat_simple(
         temperature = effective.default_temperature,
         "[inference] agent_chat_simple invoking crate-native chat model"
     );
-    let run = model.invoke(
-        &(),
-        tinyinference_llm::model::ModelRequest::new(vec![
-            tinyinference_llm::message::Message::user(message.to_string()),
-        ])
-        .with_model(resolved_model.clone())
-        .with_temperature(effective.default_temperature),
-    );
-    let response = run.await.map_err(|e| e.to_string())?.text();
+    let model: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>> =
+        std::sync::Arc::new(
+            tinyinference_llm::model::ProfileOverrideModel::new_preserving_profile(model)
+                .with_defaults(tinyinference_llm::model::ModelRequestDefaults {
+                    model: Some(resolved_model),
+                    temperature: Some(effective.default_temperature),
+                }),
+        );
+    let response = tinyagents_harness::oneshot::simple_chat(
+        model,
+        Vec::new(),
+        message.to_string(),
+    )
+    .await?
+    .text();
 
     Ok(Outcome::single_log(response, "agent simple chat completed"))
 }
