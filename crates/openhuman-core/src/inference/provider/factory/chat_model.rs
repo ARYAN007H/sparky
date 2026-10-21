@@ -110,66 +110,77 @@ impl OpenHumanModelFactory<'_> {
         let context_extensions = resolved
             .as_deref()
             .map(crate::core::runtime::CoreContext::extensions);
-        let route = ProviderRoute::parse(&provider);
-        let (model, route_provider, resolved_model) = match route.as_ref().map(ProviderRoute::kind) {
-            Some(RouteKind::ClaudeAgentSdk) if !provider.trim().eq_ignore_ascii_case(CLAUDE_AGENT_SDK_PROVIDER) => {
-                let configured = claude_agent_sdk_model_from_string(&provider, self.config)
-                    .ok_or_else(|| unresolved_chat_model_error_for(
-                        role,
-                        &provider,
-                        self.config,
-                        self.egress,
-                        context_extensions,
-                    ))?;
-            let concrete = if pin.is_empty() { configured } else { pin.to_owned() };
-            emit_inference_egress(
-                role,
-                &format!("{CLAUDE_AGENT_SDK_PREFIX}{concrete}"),
-                self.egress,
-            );
-                (
-                    Arc::new(ClaudeAgentSdkProvider::for_model(
-                    (&self.config.claude_agent_sdk).into(),
-                    concrete.clone(),
-                    )) as Arc<dyn ChatModel<()>>,
-                    CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
-                    concrete,
-                )
+        let mut parsed_route = ProviderRoute::parse(&provider);
+        if parsed_route.is_none()
+            && provider.trim().eq_ignore_ascii_case(CLAUDE_AGENT_SDK_PROVIDER)
+        {
+            parsed_route = Some(ProviderRoute {
+                provider: CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
+                model: self
+                    .config
+                    .claude_agent_sdk
+                    .default_model
+                    .clone()
+                    .unwrap_or_default(),
+                temperature: None,
+            });
+        }
+        if let Some(route) = parsed_route.as_mut() {
+            if !pin.is_empty()
+                && matches!(route.kind(), RouteKind::ClaudeCode | RouteKind::ClaudeAgentSdk)
+            {
+                route.model = pin.to_owned();
             }
-            _ if provider.trim().eq_ignore_ascii_case(CLAUDE_AGENT_SDK_PROVIDER) => {
-                let configured = claude_agent_sdk_model_from_string(&provider, self.config)
-                    .ok_or_else(|| unresolved_chat_model_error_for(
-                        role,
-                        &provider,
-                        self.config,
-                        self.egress,
-                        context_extensions,
-                    ))?;
-                emit_inference_egress(
-                    role,
-                    &format!("{CLAUDE_AGENT_SDK_PREFIX}{configured}"),
-                    self.egress,
+        }
+        if let Some(route) = parsed_route.as_ref().filter(|route| {
+            matches!(route.kind(), RouteKind::ClaudeCode | RouteKind::ClaudeAgentSdk)
+        }) {
+            if route.temperature.is_some() && matches!(route.kind(), RouteKind::ClaudeCode) {
+                log::warn!(
+                    "[providers][chat-factory] claude-code provider: per-model temperature override \
+                     is accepted but not wired through to the CLI — the @<temp> suffix is ignored"
                 );
-                (
-                    Arc::new(ClaudeAgentSdkProvider::for_model(
-                        (&self.config.claude_agent_sdk).into(),
-                        configured.clone(),
-                    )) as Arc<dyn ChatModel<()>>,
-                    CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
-                    configured,
-                )
             }
-            Some(RouteKind::ClaudeCode) => {
-                let (model, resolved) = build_claude_code_model(
-                    role,
-                    &provider,
-                    self.config,
-                    (!pin.is_empty()).then_some(pin),
-                    self.egress,
-                )
-                .expect("route kind was checked")?;
-                (model, "claude-code".to_owned(), resolved)
-            }
+            let effective_model = route.model.trim();
+            anyhow::ensure!(
+                !effective_model.is_empty(),
+                "subprocess model route for role '{role}' has an empty model"
+            );
+            let route_kind = route.kind();
+            let egress_name = match route_kind {
+                RouteKind::ClaudeCode => format!("{}{}", tinyagents_harness::providers::claude_code::PROVIDER_PREFIX, effective_model),
+                RouteKind::ClaudeAgentSdk => format!("{CLAUDE_AGENT_SDK_PREFIX}{effective_model}"),
+                _ => unreachable!("subprocess route was filtered"),
+            };
+            emit_inference_egress(role, &egress_name, self.egress);
+            let workspace = self
+                .config
+                .config_path
+                .parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_else(|| self.config.workspace_dir.clone());
+            let context = tinyagents_harness::host::SubprocessProviderContext {
+                workspace_dir: workspace,
+                action_dir: self.config.action_dir.clone(),
+                claude_agent_sdk: (&self.config.claude_agent_sdk).into(),
+                mcp_provider: Some(Arc::new(OpenHumanMcpEndpoint)),
+            };
+            let model = tinyagents_harness::host::build_claude_subprocess_model(route, &context)?
+                .ok_or_else(|| anyhow::anyhow!("unsupported subprocess route"))?;
+            let route_provider = route.provider.clone();
+            let resolved_model = effective_model.to_owned();
+            let route = ResolvedModelRoute::new(
+                route_provider,
+                resolved_model,
+                request.route.as_deref().unwrap_or(role),
+            );
+            return Ok((with_request_defaults(model, ModelRequestDefaults {
+                model: (!route.model.is_empty()).then(|| route.model.clone()),
+                temperature: request.opts.temperature,
+            }), route));
+        }
+
+        let (model, route_provider, resolved_model) = match parsed_route.as_ref().map(ProviderRoute::kind) {
             Some(RouteKind::Local(_)) | None
                 if tinyinference_local::profile::kind_from_provider_string(&provider).is_some() =>
             {
@@ -182,11 +193,11 @@ impl OpenHumanModelFactory<'_> {
                 let (model, resolved) = match local {
                     Some(result) => result?,
                     None => return Err(unresolved_chat_model_error_for(
-                    role,
-                    &provider,
-                    self.config,
-                    self.egress,
-                    context_extensions,
+                        role,
+                        &provider,
+                        self.config,
+                        self.egress,
+                        context_extensions,
                     )),
                 };
                 let provider = model
@@ -207,17 +218,17 @@ impl OpenHumanModelFactory<'_> {
                 let (model, resolved) = match cloud {
                     Some(result) => result?,
                     None => return Err(unresolved_chat_model_error_for(
-                    role,
-                    &provider,
-                    self.config,
-                    self.egress,
-                    context_extensions,
+                        role,
+                        &provider,
+                        self.config,
+                        self.egress,
+                        context_extensions,
                     )),
                 };
                 let route_provider = model
                     .profile()
                     .and_then(|p| p.provider.clone())
-                    .unwrap_or_else(|| provider_route.as_ref().expect("parsed cloud route").provider.clone());
+                    .unwrap_or_else(|| parsed_route.as_ref().expect("parsed cloud route").provider.clone());
                 (model, route_provider, resolved)
             }
             _ => {
