@@ -551,8 +551,8 @@ impl OpenHumanSecurityGate {
                 }
             )
         );
-        let is_headless_spawn_control = self.headless_descendant_settlement
-            && call.tool_name == "spawn_subagent";
+        let is_headless_spawn_control =
+            self.headless_descendant_settlement && call.tool_name == "spawn_subagent";
         let is_cron_denial = is_cron_turn
             && (call.tool_name == SHELL_TOOL
                 || tool.external_effect_with_args(&call.arguments)

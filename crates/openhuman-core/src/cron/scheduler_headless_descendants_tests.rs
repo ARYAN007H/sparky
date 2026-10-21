@@ -23,7 +23,9 @@ struct CronChildModel {
     child_release: tokio::sync::Notify,
 }
 
-fn scheduled_agent_fixture(timeout_secs: u64) -> (
+fn scheduled_agent_fixture(
+    timeout_secs: u64,
+) -> (
     TempDir,
     Config,
     std::sync::Arc<crate::core::runtime::CoreContext>,
@@ -40,9 +42,8 @@ fn scheduled_agent_fixture(timeout_secs: u64) -> (
     config.reliability.scheduler_retries = 0;
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace");
 
-    let definitions = Arc::new(
-        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(),
-    );
+    let definitions =
+        Arc::new(crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only());
     let core = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
         config.clone(),
@@ -143,8 +144,7 @@ impl ChatModel<()> for CronChildModel {
                 response.finish_reason = Some("tool_calls".into());
                 return Ok(response);
             }
-            let _drop =
-                ChildInvocationDrop(std::sync::Arc::clone(&self.child_invocation_dropped));
+            let _drop = ChildInvocationDrop(std::sync::Arc::clone(&self.child_invocation_dropped));
             self.child_release.notified().await;
             return Ok(ModelResponse::assistant("headless-cron-child-result"));
         }
@@ -189,9 +189,7 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     let model = std::sync::Arc::new(CronChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
-        child_invocation_dropped: std::sync::Arc::new(
-            std::sync::atomic::AtomicBool::new(false),
-        ),
+        child_invocation_dropped: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: false,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
@@ -205,9 +203,10 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
     let scheduler_config = config.clone();
-    let run = tokio::spawn(async move {
-        dispatch_scheduled_agent(core, dispatch, scheduler_config).await
-    });
+    let run =
+        tokio::spawn(
+            async move { dispatch_scheduled_agent(core, dispatch, scheduler_config).await },
+        );
     match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("child-start observation disconnected: {error}"),
@@ -240,9 +239,14 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
         1
     );
-    assert_eq!(model.child_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(
-        model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
+        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    assert_eq!(
+        model
+            .accepted_followups
+            .load(std::sync::atomic::Ordering::SeqCst),
         1,
         "the parent accepted the real spawn result before the child completed"
     );
@@ -254,9 +258,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     let model = std::sync::Arc::new(CronChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
-        child_invocation_dropped: std::sync::Arc::new(
-            std::sync::atomic::AtomicBool::new(false),
-        ),
+        child_invocation_dropped: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: false,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
@@ -269,9 +271,10 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
     let scheduler_config = config.clone();
-    let run = tokio::spawn(async move {
-        dispatch_scheduled_agent(core, dispatch, scheduler_config).await
-    });
+    let run =
+        tokio::spawn(
+            async move { dispatch_scheduled_agent(core, dispatch, scheduler_config).await },
+        );
 
     match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
         Ok(Ok(())) => {}
@@ -299,17 +302,99 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         .as_deref()
         .unwrap_or_default()
         .contains("headless-cron-child-result"));
-    assert_eq!(model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(
-        model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
+        model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    assert_eq!(
+        model
+            .accepted_followups
+            .load(std::sync::atomic::Ordering::SeqCst),
         1,
         "the root accepted the child before waiting on it"
     );
-    assert_eq!(model.child_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(
+        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
     assert!(
         model
             .child_invocation_dropped
             .load(std::sync::atomic::Ordering::SeqCst),
         "the root deadline dropped the child model future"
     );
+}
+
+#[tokio::test]
+async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
+    let _inference = crate::inference::inference_test_guard_async().await;
+    let model = std::sync::Arc::new(CronChildModel {
+        spawn_calls: std::sync::atomic::AtomicUsize::new(0),
+        child_calls: std::sync::atomic::AtomicUsize::new(0),
+        child_invocation_dropped: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        accepted_followups: std::sync::atomic::AtomicUsize::new(0),
+        child_attempts_dangerous_tool: true,
+        child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
+        child_started: std::sync::Mutex::new(None),
+        child_release: tokio::sync::Notify::new(),
+    });
+    let _model =
+        crate::inference::provider::factory::test_provider_override::install_model(model.clone());
+    let (_temp, config, core, dispatch, job) = scheduled_agent_fixture(900);
+    let inspect_dispatch = dispatch.clone();
+    let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
+    *model.child_started.lock().unwrap() = Some(child_started_tx);
+    let scheduler_config = config.clone();
+    let run =
+        tokio::spawn(
+            async move { dispatch_scheduled_agent(core, dispatch, scheduler_config).await },
+        );
+    match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => panic!("scheduled child exited before its model call: {error}"),
+        Err(_) => {
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            panic!("scheduled child never reached its model");
+        }
+    }
+    tokio::time::timeout(std::time::Duration::from_secs(5), run)
+        .await
+        .expect("Cron should settle the denied child result")
+        .expect("Cron scheduler task");
+
+    assert_eq!(
+        model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    assert_eq!(
+        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    assert!(
+        model
+            .child_dangerous_tool_schema_seen
+            .load(std::sync::atomic::Ordering::SeqCst),
+        "the real child model request exposed the declared destructive tool"
+    );
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &config.workspace_dir,
+        &format!("cron:{}", job.id),
+        None,
+    );
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(&inspect_dispatch)
+    .try_list_owned(owner)
+    .expect("inspect the exact Cron session owner");
+    assert_eq!(jobs.len(), 1, "one native child belongs to this Cron job");
+    assert_eq!(
+        jobs[0].status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Failed,
+        "Cron admits only the orchestration control call, not child actions"
+    );
+    assert!(jobs[0]
+        .error
+        .as_deref()
+        .unwrap_or_default()
+        .contains("Scheduled agent turns may use read-only tools only"));
 }

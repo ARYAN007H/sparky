@@ -1,7 +1,7 @@
 //! A one-shot compiled CLI call waits for its registered async child and
 //! reports child failure as a failed call.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::fs::File;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};

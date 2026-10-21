@@ -180,14 +180,9 @@ async fn a_read_only_tool_is_allowed_in_every_tier() {
     }
 }
 
-async fn cron_decision(
-    gate: OpenHumanSecurityGate,
-    tool_name: &str,
-) -> GateDecision {
-    let core = crate::core::runtime::CoreContext::for_test(
-        crate::core::runtime::DomainSet::full(),
-        None,
-    );
+async fn cron_decision(gate: OpenHumanSecurityGate, tool_name: &str) -> GateDecision {
+    let core =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     let origin = crate::security::turn_origin::AgentTurnOrigin::TrustedAutomation {
         job_id: "cron-security-test".into(),
         source: crate::security::turn_origin::TrustedAutomationSource::Cron,
@@ -248,7 +243,10 @@ async fn cron_headless_settlement_does_not_allow_effectful_spawn_aliases() {
         "spawn_subagent",
     )
     .await;
-    assert!(!decision.is_allowed(), "external-effect classification wins");
+    assert!(
+        !decision.is_allowed(),
+        "external-effect classification wins"
+    );
 }
 
 #[tokio::test]
