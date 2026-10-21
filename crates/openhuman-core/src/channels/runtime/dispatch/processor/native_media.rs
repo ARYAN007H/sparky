@@ -2,7 +2,7 @@
 
 use tinybus::module::ModuleClient;
 use tinychannels_bus::{
-    ChannelInboundEnvelope, ContentPart, HostVoiceScope, MediaReference,
+    ChannelInboundEnvelope, ContentPart, HostVoiceScope, MediaKind, MediaReference,
     module_media::{MediaReadBegin, MediaReadChunk, MediaReadFinish},
 };
 use tinyinference_llm::message::Message;
@@ -64,6 +64,37 @@ pub(super) async fn resolve_typed_message(
     } else {
         configured_files
     };
+    let image_limit = image_mb.saturating_mul(1024 * 1024).min(MAX_MEDIA_BYTES);
+    let file_limit = file_mb.saturating_mul(1024 * 1024).min(MAX_MEDIA_BYTES);
+    for part in &parts {
+        match part {
+            ContentPart::Image { media, .. } => {
+                image_count += 1;
+                validate_reference(
+                    media,
+                    true,
+                    image_limit,
+                    &config.multimodal_files.allowed_mime_types,
+                )?;
+            }
+            ContentPart::File { media, .. } => {
+                file_count += 1;
+                validate_reference(
+                    media,
+                    false,
+                    file_limit,
+                    &config.multimodal_files.allowed_mime_types,
+                )?;
+            }
+            _ => {}
+        }
+    }
+    if image_count > max_images {
+        return Err("native image attachments exceed their count limit".into());
+    }
+    if file_count > max_files {
+        return Err("native file attachments are disabled or exceed their count limit".into());
+    }
     let client = module_client(ctx).await;
     let dispatch = ctx.dispatch_ctx();
     let scope = HostVoiceScope {
@@ -75,32 +106,29 @@ pub(super) async fn resolve_typed_message(
 
     for part in &mut parts {
         let (media, image, name) = match part {
-            ContentPart::Image { media, .. } => {
-                image_count += 1;
-                (
-                    media,
-                    true,
-                    media.file_name.clone().unwrap_or_else(|| "image".into()),
-                )
-            }
+            ContentPart::Image { media, .. } => (
+                media,
+                true,
+                media.file_name.clone().unwrap_or_else(|| "image".into()),
+            ),
             ContentPart::File {
                 media, file_name, ..
-            } => {
-                file_count += 1;
-                (
-                    media,
-                    false,
-                    file_name
-                        .clone()
-                        .or_else(|| media.file_name.clone())
-                        .unwrap_or_else(|| "attachment".into()),
-                )
-            }
+            } => (
+                media,
+                false,
+                file_name
+                    .clone()
+                    .or_else(|| media.file_name.clone())
+                    .unwrap_or_else(|| "attachment".into()),
+            ),
             ContentPart::Audio { .. } | ContentPart::Video { .. } => {
                 return Err("native audio/video attachments are not supported".into());
             }
             ContentPart::VoiceNote { voice_note } => {
-                let transcript = voice_note.transcript.as_ref().expect("validated transcript");
+                let transcript = voice_note
+                    .transcript
+                    .as_ref()
+                    .expect("validated transcript");
                 let replacement = ContentPart::Text {
                     text: transcript.text.trim().to_owned(),
                     markdown_dialect: None,
@@ -111,25 +139,7 @@ pub(super) async fn resolve_typed_message(
             ContentPart::Text { .. } => continue,
             _ => return Err("native channel content kind is not supported".into()),
         };
-        let byte_limit = if image {
-            image_mb.saturating_mul(1024 * 1024).min(MAX_MEDIA_BYTES)
-        } else {
-            if max_files == 0 || file_count > max_files {
-                return Err(
-                    "native file attachments are disabled or exceed their count limit".into(),
-                );
-            }
-            file_mb.saturating_mul(1024 * 1024).min(MAX_MEDIA_BYTES)
-        };
-        if image_count > max_images {
-            return Err("native image attachments exceed their count limit".into());
-        }
-        validate_reference(
-            media,
-            image,
-            byte_limit,
-            &config.multimodal_files.allowed_mime_types,
-        )?;
+        let byte_limit = if image { image_limit } else { file_limit };
         let bytes = read_scoped_media(
             &client,
             &dispatch,
@@ -223,14 +233,22 @@ fn validate_reference(
         .filter(|mime| !mime.trim().is_empty())
         .ok_or_else(|| "native media has no content type".to_owned())?;
     if image {
+        if media.kind != MediaKind::Image {
+            return Err("native media kind does not match its image part".into());
+        }
         if !matches!(
             mime,
             "image/png" | "image/jpeg" | "image/webp" | "image/gif"
         ) {
             return Err("native image MIME type is unsupported".into());
         }
-    } else if !allowed_file_mimes.iter().any(|allowed| allowed == mime) {
-        return Err("native file MIME type is unsupported".into());
+    } else {
+        if !matches!(media.kind, MediaKind::Document | MediaKind::Unknown) {
+            return Err("native media kind does not match its file part".into());
+        }
+        if !allowed_file_mimes.iter().any(|allowed| allowed == mime) {
+            return Err("native file MIME type is unsupported".into());
+        }
     }
     Ok(())
 }
@@ -325,7 +343,7 @@ impl MediaReadLease {
     }
 
     async fn abort(&mut self) -> Result<(), String> {
-        let Some(handle) = self.handle.take() else {
+        let Some(handle) = self.handle.as_ref().cloned() else {
             return Ok(());
         };
         self.client
@@ -335,7 +353,9 @@ impl MediaReadLease {
                 (MediaReadFinish(handle),),
             )
             .await
-            .map_err(|_| "native media read cleanup failed".to_owned())
+            .map_err(|_| "native media read cleanup failed".to_owned())?;
+        self.handle = None;
+        Ok(())
     }
 }
 
