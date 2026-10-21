@@ -476,20 +476,7 @@ async fn run_typed_mode(
     };
 
     // ── Filter tools per definition + per-spawn override ───────────────
-    let mut allowed_indices = filter_tool_indices(
-        &parent.all_tools,
-        &definition.tools,
-        &definition.disallowed_tools,
-        options
-            .skill_filter_override
-            .as_deref()
-            .or(definition.skill_filter.as_deref()),
-    );
-
-    // Sub-agents are leaves unless their own definition explicitly declares a
-    // spawn tool, and the host's checked depth budget admits another child.
-    // Keep the normal definition scope, denylist, and inherited ceiling as
-    // independent constraints on that opt-in.
+    let nested_spawn_ids = definition.allowed_subagent_ids();
     let explicitly_declares_nested_spawn = |name: &str| {
         is_subagent_spawn_tool(name)
             && (definition.extra_tools.iter().any(|tool| tool == name)
@@ -499,12 +486,30 @@ async fn run_typed_mode(
                         if names.iter().any(|tool| tool == name)
                 ))
     };
-    let nested_spawn_ids = definition.allowed_subagent_ids();
     let nested_spawn_allowed = |name: &str| {
         nested_spawn_depth_available
             && !nested_spawn_ids.is_empty()
             && explicitly_declares_nested_spawn(name)
     };
+    let nested_spawn_granted = parent
+        .all_tools
+        .iter()
+        .any(|tool| nested_spawn_allowed(tool.name()));
+    let mut allowed_indices = filter_tool_indices_with_nested_spawn(
+        &parent.all_tools,
+        &definition.tools,
+        &definition.disallowed_tools,
+        options
+            .skill_filter_override
+            .as_deref()
+            .or(definition.skill_filter.as_deref()),
+        nested_spawn_granted,
+    );
+
+    // Sub-agents are leaves unless their own definition explicitly declares a
+    // spawn tool, and the host's checked depth budget admits another child.
+    // Keep the normal definition scope, denylist, and inherited ceiling as
+    // independent constraints on that opt-in.
     let before = allowed_indices.len();
     allowed_indices.retain(|&i| {
         let name = parent.all_tools[i].name();
@@ -541,6 +546,7 @@ async fn run_typed_mode(
         &mut allowed_indices,
         &parent.all_tools,
         &parent.subagent_tool_ceiling_names,
+        nested_spawn_granted,
     );
 
     // Rule-withheld tools stay callable (`allowed_names`) but off the prompt.

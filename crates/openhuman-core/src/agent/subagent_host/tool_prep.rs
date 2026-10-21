@@ -65,7 +65,6 @@ pub(super) fn filter_tool_indices_with_nested_spawn(
     skill_filter: Option<&str>,
     nested_spawn_granted: bool,
 ) -> Vec<usize> {
-    let _ = nested_spawn_granted;
     let mut first_specs = std::collections::HashMap::new();
     let mut specs = Vec::new();
     let mut disallowed_recovery = std::collections::HashSet::new();
@@ -91,7 +90,11 @@ pub(super) fn filter_tool_indices_with_nested_spawn(
     };
     let restricted = restrict_tools_with_scope(
         &snapshot,
-        SubagentRole::Leaf,
+        if nested_spawn_granted {
+            SubagentRole::Orchestrator
+        } else {
+            SubagentRole::Leaf
+        },
         None,
         &delegation_tools,
         Some(scope),
@@ -131,6 +134,7 @@ pub(super) fn retain_parent_visible_tool_indices(
     indices: &mut Vec<usize>,
     parent_tools: &[Box<dyn Tool>],
     parent_visible: &std::collections::HashSet<String>,
+    nested_spawn_granted: bool,
 ) {
     if parent_visible.is_empty() {
         return;
@@ -159,7 +163,11 @@ pub(super) fn retain_parent_visible_tool_indices(
     };
     let narrowed = restrict_tools_with_scope(
         &snapshot,
-        SubagentRole::Leaf,
+        if nested_spawn_granted {
+            SubagentRole::Orchestrator
+        } else {
+            SubagentRole::Leaf
+        },
         Some(&ceiling),
         &[],
         None,
