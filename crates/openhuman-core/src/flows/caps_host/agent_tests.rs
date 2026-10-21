@@ -349,6 +349,18 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         )
     });
     let grandchild_output = grandchild_jobs[0].output.as_deref().unwrap_or_default();
+    eprintln!(
+        "HEADLESS_NESTED_FLOW_COUNTS root_spawn={} worker_calls={} manager_calls={} grandchild_calls={} nested_spawn_calls={} jobs={:?}",
+        model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model.manager_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model.grandchild_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        snapshots
+            .iter()
+            .map(|job| (&job.agent, job.status))
+            .collect::<Vec<_>>(),
+    );
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
         1,
