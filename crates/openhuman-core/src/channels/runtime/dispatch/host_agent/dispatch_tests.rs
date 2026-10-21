@@ -661,60 +661,77 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
             .is_some_and(|path| path.ends_with("/chat/completions")),
         "the delayed request is a model completion: {request_path:?}"
     );
-    tokio::time::pause();
-
-    // The model response is delayed to timeout + 1s. Advancing two extra
-    // virtual seconds lets the old backstop-only behavior complete too, so
-    // the assertion distinguishes a missing channel timeout from setup.
-    tokio::time::advance(std::time::Duration::from_secs(timeout)).await;
-    let completed_at_deadline = tokio::select! {
-        biased;
-        result = &mut turn => Some(result),
-        _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => None,
-    };
-    if let Some(result) = completed_at_deadline {
-        result.expect("native channel turn task completes");
-    } else {
-        tokio::time::advance(std::time::Duration::from_secs(2)).await;
-        turn.await.expect("native channel turn task completes");
-    }
+    // The linked module and mock inference server perform I/O on their own
+    // runtimes. Use real time here: pausing this test runtime does not pause
+    // those requests and can fire the unrelated web backstop first.
+    let turn_result = tokio::time::timeout(std::time::Duration::from_secs(timeout + 15), &mut turn)
+        .await
+        .expect("native channel turn completes within the real-time test bound");
+    turn_result.expect("native channel turn task completes");
     let provider_requests = provider_server
         .received_requests()
         .await
         .expect("mock Telegram requests");
-    let provider_paths = provider_requests
+    let provider_observations = provider_requests
         .iter()
-        .map(|request| request.url.path().to_owned())
+        .map(|request| {
+            (
+                request.url.path().to_owned(),
+                serde_json::from_slice::<serde_json::Value>(&request.body).ok(),
+            )
+        })
         .collect::<Vec<_>>();
-    let terminal_sends = provider_requests
-        .into_iter()
-        .filter(|request| request.url.path() == "/bottoken/sendMessage")
+    let timeout_notice = "past its time budget";
+    let late_model_reply = "this response arrives after the channel deadline";
+    let terminal_sends = provider_observations
+        .iter()
+        .filter(|(path, body)| {
+            matches!(
+                path.as_str(),
+                "/bottoken/sendMessage" | "/bottoken/editMessageText"
+            ) && body
+                .as_ref()
+                .and_then(|body| body["text"].as_str())
+                .is_some_and(|text| {
+                    text.contains(timeout_notice) || text.contains(late_model_reply)
+                })
+        })
         .collect::<Vec<_>>();
     assert_eq!(
         terminal_sends.len(),
         1,
-        "the timed-out turn emits exactly one terminal provider send; observed requests: {provider_paths:?}"
+        "the turn emits one terminal timeout or late-model message; progressive placeholders are allowed: {provider_observations:#?}"
     );
-    let terminal_body: serde_json::Value =
-        serde_json::from_slice(&terminal_sends[0].body).expect("Telegram send JSON");
+    let terminal_text = terminal_sends[0]
+        .1
+        .as_ref()
+        .and_then(|body| body["text"].as_str())
+        .expect("terminal Telegram output has text");
     assert!(
-        terminal_body["text"]
-            .as_str()
-            .is_some_and(|text| text.contains("past its time budget")),
-        "the actual module provider receives the classified timeout notice: {terminal_body:#}"
+        terminal_text.contains(timeout_notice),
+        "the actual module provider receives the classified timeout notice; observed terminal text: {terminal_text:?}"
     );
 
-    tokio::time::advance(std::time::Duration::from_secs(2)).await;
-    tokio::task::yield_now().await;
+    // Let the delayed model response itself finish before checking that the
+    // cancelled turn cannot publish a second terminal provider request.
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    let late_model_deliveries = provider_server
+        .received_requests()
+        .await
+        .expect("mock Telegram requests")
+        .iter()
+        .filter(|request| {
+            matches!(
+                request.url.path(),
+                "/bottoken/sendMessage" | "/bottoken/editMessageText"
+            ) && serde_json::from_slice::<serde_json::Value>(&request.body)
+                .ok()
+                .and_then(|body| body["text"].as_str().map(str::to_owned))
+                .is_some_and(|text| text.contains(late_model_reply))
+        })
+        .count();
     assert_eq!(
-        provider_server
-            .received_requests()
-            .await
-            .expect("mock Telegram requests")
-            .iter()
-            .filter(|request| request.url.path() == "/bottoken/sendMessage")
-            .count(),
-        1,
+        late_model_deliveries, 0,
         "the delayed model response cannot deliver after timeout cleanup"
     );
     module_runtime
