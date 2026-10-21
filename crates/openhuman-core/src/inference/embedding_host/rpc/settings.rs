@@ -9,15 +9,11 @@ use tinyinference_providers::route::{custom_provider_string, split_custom_provid
 
 use super::{resolve_api_key, LOG_PREFIX};
 use tinyinference_embeddings::catalog;
-use tinyinference_embeddings::probe::{
-    classify_embed_probe, final_probe_dims, probe_custom_embeddings, EmbedProbe,
-    EmbeddingProbeRejection,
-};
-use tinyinference_embeddings::served_models::{
-    check_requested_model_served, fetch_served_model_ids, ModelNotServed,
+use tinyinference_embeddings::verify::{
+    effective_embedder_slug, verify_custom_endpoint, VerifyRejection,
 };
 
-fn probe_rejection_outcome(reject: EmbeddingProbeRejection) -> Outcome<serde_json::Value> {
+fn probe_rejection_outcome(reject: tinyinference_embeddings::probe::EmbeddingProbeRejection) -> Outcome<serde_json::Value> {
     let mut body = serde_json::json!({ "error": reject.error, "message": reject.message });
     if let Some(detail) = reject.detail {
         body["detail"] = serde_json::Value::String(detail);
@@ -25,7 +21,7 @@ fn probe_rejection_outcome(reject: EmbeddingProbeRejection) -> Outcome<serde_jso
     Outcome::new(body, vec![reject.summary.to_string()])
 }
 
-fn model_rejection_outcome(reject: ModelNotServed) -> Outcome<serde_json::Value> {
+fn model_rejection_outcome(reject: tinyinference_embeddings::served_models::ModelNotServed) -> Outcome<serde_json::Value> {
     let mut body = serde_json::json!({
         "error": reject.error,
         "message": reject.message,
@@ -36,49 +32,6 @@ fn model_rejection_outcome(reject: ModelNotServed) -> Outcome<serde_json::Value>
         body["suggested_model"] = serde_json::Value::String(suggestion);
     }
     Outcome::new(body, vec![reject.summary.to_string()])
-}
-
-/// Slug naming the embedder ingestion will actually use, resolved host-side
-/// from the `Config` fields the resolution ladder reads.
-///
-/// Resolution order:
-/// 1. Deliberate opt-out — `embeddings_provider` trimmed equals `"none"` → `"none"`.
-/// 2. Local Ollama via unified workload setting — `workload_local_model("embeddings")`
-///    is `Some` → `"ollama"`.
-/// 3. User OpenAI-compatible endpoint — `memory.embedding_provider` is
-///    `"openai"`, `"custom"`, or starts with `"custom:"` → `"custom"`.
-/// 4. Managed cloud session — `auth-profiles.json` exists next to the config
-///    file → `"cloud"`.
-/// 5. Nothing usable → `"unconfigured"`.
-fn effective_embedder_slug_from_config(config: &Config) -> &'static str {
-    // 1. Deliberate opt-out.
-    if config
-        .embeddings_provider
-        .as_deref()
-        .map(str::trim)
-        .is_some_and(|s| s == "none")
-    {
-        return "none";
-    }
-    // 2. Local Ollama via unified workload setting.
-    if config.workload_local_model("embeddings").is_some() {
-        return "ollama";
-    }
-    // 3. User OpenAI-compatible endpoint.
-    let picker = config.memory.embedding_provider.trim();
-    if picker == "openai" || split_custom_provider(picker).0 == "custom" {
-        return "custom";
-    }
-    // 4. Managed cloud session.
-    let session_exists = config
-        .config_path
-        .parent()
-        .map(|dir| dir.join("auth-profiles.json").exists())
-        .unwrap_or(false);
-    if session_exists {
-        return "cloud";
-    }
-    "unconfigured"
 }
 
 fn active_custom_profile(config: &Config) -> Option<crate::config::schema::CustomEmbeddingsConfig> {
@@ -162,7 +115,22 @@ pub async fn get_settings(config: &Config) -> Result<Outcome<serde_json::Value>,
     // routes to local Ollama without rewriting it. Additive field — callers that only need the picker
     // value are unaffected; callers asking "does this bill the managed budget?"
     // must read this one (#5402).
-    let effective_provider = effective_embedder_slug_from_config(config);
+    let local_model = config.workload_local_model("embeddings");
+    let session_exists = config
+        .config_path
+        .parent()
+        .map(|dir| dir.join("auth-profiles.json").exists())
+        .unwrap_or(false);
+    let effective_provider = effective_embedder_slug(
+        config
+            .embeddings_provider
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|provider| provider == "none"),
+        local_model.as_deref(),
+        Some(&config.memory.embedding_provider),
+        session_exists,
+    );
 
     let payload = serde_json::json!({
         "provider": provider,
