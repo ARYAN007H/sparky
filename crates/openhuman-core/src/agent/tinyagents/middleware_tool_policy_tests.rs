@@ -30,7 +30,15 @@ impl tinytools::Tool for RoutingFakeTool {
     }
     fn parameters_schema(&self) -> serde_json::Value {
         if self.0 == "spawn_subagent" {
-            json!({"type":"object","properties":{"agent_id":{"type":"string","enum":["workflow_builder","flow_discovery"]}}})
+            json!({
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "string",
+                        "enum": ["workflow_builder", "flow_discovery"]
+                    }
+                }
+            })
         } else {
             json!({ "type": "object" })
         }
