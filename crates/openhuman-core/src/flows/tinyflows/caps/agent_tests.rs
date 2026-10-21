@@ -71,6 +71,10 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             {
                 self.grandchild_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if let Some(started) = self.child_started.lock().unwrap().take() {
+                    let _ = started.send(());
+                }
+                self.child_release.notified().await;
                 return Ok(ModelResponse::assistant("headless-flow-grandchild-result"));
             }
             if request
@@ -85,9 +89,6 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
                     return Ok(ModelResponse::assistant(
                         "headless-flow-worker-result-with-grandchild",
                     ));
-                }
-                if let Some(started) = self.child_started.lock().unwrap().take() {
-                    let _ = started.send(());
                 }
                 self.nested_spawn_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -110,7 +111,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             if request.messages.iter().any(|message| {
                 message
                     .text()
-                    .contains("Accepted async sub-agent `task_manager_agent`")
+                    .contains("Accepted async sub-agent `flow_worker`")
             }) {
                 self.accepted_followups
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -127,7 +128,6 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
                 ));
             }
             let mut response = ModelResponse::assistant("");
-            self.child_release.notified().await;
             response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
                 "headless-flow-spawn",
                 "spawn_subagent",
@@ -221,8 +221,8 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     });
     tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx)
         .await
-        .expect("the real detached child reaches its model")
-        .expect("child-start observation remains connected");
+        .expect("the real native grandchild reaches its model")
+        .expect("grandchild-start observation remains connected");
     tokio::time::timeout(
         std::time::Duration::from_secs(5),
         model.root_followup.notified(),
