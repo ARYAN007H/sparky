@@ -270,6 +270,8 @@ fn unusable_default_config_outcome(
             "Use a registered exact check id from the doctor report.",
         ));
     }
+    let summary = DoctorSummary::from_findings(&findings);
+    let ok = summary.error == 0;
     let (layout_version, resolution_source) = config.doctor_profile_metadata();
     let report = DoctorReport {
         schema_version: 2,
@@ -287,9 +289,9 @@ fn unusable_default_config_outcome(
             Vec::new()
         },
         checks_skipped: Vec::new(),
-        summary: DoctorSummary::from_findings(&findings),
+        summary,
         findings,
-        ok: false,
+        ok,
     };
     Ok(Some(Outcome::single_log(
         report,
