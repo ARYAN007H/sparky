@@ -256,6 +256,19 @@ pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
         && provider_model_hooks(provider_id).is_none_or(|hooks| (hooks.is_raw_model)(model))
 }
 
+pub(crate) fn provider_model_is_raw_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+    model: &str,
+) -> bool {
+    let model = model.trim();
+    !model.is_empty()
+        && !model.starts_with("hint:")
+        && chat_model_for(extensions, provider_id)
+            .and_then(|entry| entry.models)
+            .is_none_or(|hooks| (hooks.is_raw_model)(model))
+}
+
 /// Whether the provider says `model` supports image input.
 pub fn provider_model_supports_vision(provider_id: &str, model: &str) -> bool {
     provider_model_hooks(provider_id).is_some_and(|hooks| (hooks.supports_vision)(model))

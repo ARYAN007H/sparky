@@ -267,7 +267,7 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
         assert_eq!(crate::inference::registry::provider_default_model_for(extensions, provider).as_deref(), Some(format!("{label}/default").as_str()));
         assert_eq!(crate::inference::registry::provider_model_role_for(extensions, provider, &format!("{label}/alias")).as_deref(), Some(format!("{label}/role").as_str()));
         assert!(crate::inference::registry::provider_model_is_alias_for(extensions, provider, &format!("{label}/alias")));
-        assert!(crate::inference::registry::provider_model_is_raw(provider, &format!("{label}/raw")) || extensions.is_some());
+        assert!(crate::inference::registry::provider_model_is_raw_for(extensions, provider, &format!("{label}/raw")));
         assert!(crate::inference::registry::provider_model_supports_vision_for(extensions, provider, &format!("{label}/vision")));
         let config = Config { default_model: Some(format!("{label}/config")), ..Config::default() };
         assert_eq!(crate::inference::registry::resolve_provider_model_for(extensions, provider, "chat", &config, Some("pin")), Some(format!("{label}:{label}/config:pin")));
