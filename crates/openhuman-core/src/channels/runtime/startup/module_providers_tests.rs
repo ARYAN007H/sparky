@@ -763,10 +763,7 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
             .iter()
             .filter(|event| {
                 serde_json::to_value(event)
-                    .is_ok_and(|wire| {
-                        wire.to_string()
-                            .contains("media:tenant7/thread42/image1")
-                    })
+                    .is_ok_and(|wire| wire.to_string().contains("media:tenant7/thread42/image1"))
             })
             .count(),
         1,
@@ -778,8 +775,7 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
             .expect("typed provider parts")
             .iter()
             .any(|part| {
-                part["part"]["kind"] == "text"
-                    && part["part"]["text"] == "Generated image"
+                part["part"]["kind"] == "text" && part["part"]["text"] == "Generated image"
             }),
         "the media caption remains a typed text part in the provider terminal"
     );
