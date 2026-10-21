@@ -98,7 +98,10 @@ async fn build_runtime(backend: &MockServer) -> Runtime {
         .backend_url(backend.uri())
         .build()
         .await
-        .expect("runtime")
+        .unwrap_or_else(|error| {
+            eprintln!("structured-turn runtime build failed: {error:?}");
+            panic!("runtime")
+        })
 }
 
 fn routed(spec: AgentSpec, provider: &MockServer) -> AgentSpec {

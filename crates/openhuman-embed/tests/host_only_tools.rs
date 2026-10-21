@@ -164,7 +164,10 @@ fn host_only_advertises_exactly_the_host_tools_under_a_bare_prompt() {
                 .backend_url(backend.uri())
                 .build()
                 .await
-                .expect("runtime");
+                .unwrap_or_else(|error| {
+                    eprintln!("host-only refusal runtime build failed: {error:?}");
+                    panic!("runtime");
+                });
             let calls = Arc::new(AtomicUsize::new(0));
             let agent = runtime
                 .agent(host_only_spec("analyst", &provider, calls))
@@ -213,7 +216,10 @@ fn host_only_refuses_builtin_tools_the_model_names() {
                 .backend_url(backend.uri())
                 .build()
                 .await
-                .expect("runtime");
+                .unwrap_or_else(|error| {
+                    eprintln!("host-only readonly runtime build failed: {error:?}");
+                    panic!("runtime");
+                });
             let calls = Arc::new(AtomicUsize::new(0));
             let agent = runtime
                 .agent(host_only_spec("refuser", &provider, calls.clone()))
