@@ -17,6 +17,13 @@ fn staged_bound_methods() -> Vec<&'static str> {
     methods.extend(["doctor.report", "doctor.models"]);
     methods.extend(["encrypt.secret", "decrypt.secret"]);
     methods.extend([
+        "approval.list_pending",
+        "approval.list_recent_decisions",
+        "approval.decide",
+        "approval.get_gate_state",
+        "approval.preauthorize_flow",
+    ]);
+    methods.extend([
         "socket.connect",
         "socket.disconnect",
         "socket.state",
@@ -690,3 +697,6 @@ mod app_state_controller_tests;
 
 #[path = "all_devices_controller_tests.rs"]
 mod devices_controller_tests;
+
+#[path = "all_approval_controller_tests.rs"]
+mod approval_controller_tests;
