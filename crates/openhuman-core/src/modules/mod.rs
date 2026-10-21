@@ -100,6 +100,8 @@ pub mod storage_grants;
 #[cfg(feature = "modules")]
 pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
+pub(crate) mod storage_host_invocation;
+#[cfg(feature = "modules")]
 mod storage_host_linked;
 #[cfg(all(test, feature = "modules"))]
 mod storage_host_watching;
