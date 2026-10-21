@@ -585,25 +585,29 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
         .definitions(definitions),
     );
     let dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core));
-    let mut agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
-        &dispatch,
-        &config,
-        "orchestrator",
-    )
-    .expect("build the headless depth-cap root");
-    agent.set_agent_definition_name("orchestrator".to_string());
-    let mut host_env = agent.host_env().clone();
-    host_env.spawn_depth_limit = Some(1);
-    agent.set_host_env(host_env);
-    agent.enable_headless_descendant_settlement();
 
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
     let run_core = std::sync::Arc::clone(&core);
+    let run_dispatch = dispatch.clone();
+    let run_config = config.clone();
     let run = tokio::spawn(async move {
         crate::core::runtime::CoreContext::scope(
             run_core,
-            Box::pin(agent.run_single("Run the depth-cap regression.")),
+            Box::pin(async move {
+                let mut agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+                    &run_dispatch,
+                    &run_config,
+                    "orchestrator",
+                )
+                .expect("build the headless depth-cap root");
+                agent.set_agent_definition_name("orchestrator".to_string());
+                let mut host_env = agent.host_env().clone();
+                host_env.spawn_depth_limit = Some(1);
+                agent.set_host_env(host_env);
+                agent.enable_headless_descendant_settlement();
+                agent.run_single("Run the depth-cap regression.").await
+            }),
         )
         .await
     });
