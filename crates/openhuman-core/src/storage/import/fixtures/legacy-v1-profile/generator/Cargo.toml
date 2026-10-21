@@ -7,6 +7,8 @@ publish = false
 [workspace]
 
 [dependencies]
+openhuman = { path = "../../../../../../../../crates/openhuman-core", default-features = false, features = ["storage-sqlite"] }
 tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers.git", rev = "0c6dcfce57201fadd830431f36fd759c3baa897a", features = ["sqlite"] }
+chrono = { version = "0.4", features = ["serde"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
