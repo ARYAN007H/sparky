@@ -1,10 +1,7 @@
 use std::path::PathBuf;
 
 use serde_json::json;
-use tinystoragedrivers::{
-    Checkpoint, CollectionSpec, DocumentStoreExt, Precondition, Scope, StorageConfig,
-    StorageBackend,
-};
+use tinystoragedrivers::{Checkpoint, CollectionSpec, Precondition, Scope, StorageConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         (
             "cost_records",
             "cost-0001",
-            json!({"usage": {"timestamp": "2025-02-03T04:05:06.789+02:00", "input_tokens": 12, "output_tokens": 3}, "model": "fixture-model", "ts_ms": 1738548306789}),
+            json!({"usage": {"timestamp": "2025-02-03T04:05:06.789+02:00", "input_tokens": 12, "output_tokens": 3}, "model": "fixture-model", "ts_ms": 1738548306789_i64}),
         ),
         (
             "artifacts",
