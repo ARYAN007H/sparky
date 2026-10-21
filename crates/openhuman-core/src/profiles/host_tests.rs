@@ -1,7 +1,8 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 use crate::profiles::doctor::DoctorProfileState;
-use crate::storage::{CollectionSpec, MemoryStorage, Scope, StorageBackend};
+use crate::storage::test_support::{memory_backend, sqlite_backend};
+use crate::storage::{CollectionSpec, Scope, StorageBackend};
 use std::collections::BTreeMap;
 
 fn snapshot_tree(root: &std::path::Path) -> BTreeMap<std::path::PathBuf, Vec<u8>> {
@@ -33,7 +34,8 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<std::path::PathBuf, Vec<u8>
 #[tokio::test]
 async fn inspecting_an_unprovisioned_profile_does_not_run_storage_migrations() {
     let tmp = tempfile::tempdir().unwrap();
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let fixture = sqlite_backend().unwrap();
+    let backend = Arc::clone(&fixture.backend);
     let saas = SaasConfig::new(tmp.path());
     let host = ProfileHost::with_backend(
         saas,
@@ -184,7 +186,7 @@ async fn selected_doctor_context_keeps_config_storage_credentials_and_provider_b
     );
     assert_eq!(target_a.config.agent.max_tool_iterations_override, Some(7));
     assert_eq!(target_b.config.cron.min_interval_secs, 900);
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     assert!(storage.for_scope(&a_observed.1).is_ok());
     assert!(storage.for_scope(&b_observed.1).is_ok());
     assert_eq!(
