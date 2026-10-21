@@ -29,7 +29,7 @@
 //! * **Audit.** One line per call: module id, scope, object, operation, target
 //!   (a collection or a granted prefix) and outcome. Never a payload.
 //!
-//! The reference `StorageServer` of `tinystoragedrivers-client` answers the
+//! The reference `StorageServer` of `tinystoragedrivers-busproxy` answers the
 //! messages once a call is allowed; this file adds only the host's decisions.
 //!
 //! Blobs over a bus stream (`PutStream`/`GetStream`) and watches (`WatchOpen`)
