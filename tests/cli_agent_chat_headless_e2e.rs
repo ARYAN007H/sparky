@@ -310,7 +310,7 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
         .expect("agent_chat CLI response result string");
     assert!(
         result.contains(CHILD_RESULT),
-        "successful CLI result must include the awaited child result, got {result}"
+        "successful CLI result must include the awaited child result, got {result}; probes: {probes:#?}"
     );
     assert!(
         result.contains(ROOT_RESULT),
