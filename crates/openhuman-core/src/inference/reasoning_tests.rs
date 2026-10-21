@@ -1,6 +1,7 @@
 use super::*;
 use crate::agent::tinyagents::thread_reasoning::{
-    apply_requested_effort, set_thread_effort, thread_effort, turn_reasoning, turn_reasoning_for,
+    apply_requested_effort, set_thread_effort, store, thread_effort, turn_reasoning,
+    turn_reasoning_for,
 };
 
 #[test]
@@ -138,17 +139,46 @@ fn unknown_requested_effort_is_rejected_and_keeps_the_prior_choice() {
         Some("off"),
     )
     .expect("valid effort");
-    assert!(apply_requested_effort(
+    let error = apply_requested_effort(
         &crate::core::runtime::DispatchCtx::ambient(),
         thread,
-        Some("turbo")
+        Some(" turbo "),
     )
-    .is_err());
+    .expect_err("unknown effort is rejected");
+    assert_eq!(error, "unknown reasoning_effort 'turbo'");
     assert_eq!(
         thread_effort(&crate::core::runtime::DispatchCtx::ambient(), thread),
         Some(ReasoningEffort::None)
     );
     set_thread_effort(&crate::core::runtime::DispatchCtx::ambient(), thread, None);
+}
+
+#[test]
+fn cloned_harness_store_shares_effort_and_turn_snapshots_are_frozen() {
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let thread = tinyagents_harness::ids::ThreadId::new("reasoning-snapshot-thread");
+    let store = store(&ctx);
+    let explicitly_shared = store.clone();
+
+    explicitly_shared
+        .apply_requested(Some(&thread), Some("high"))
+        .expect("valid request");
+    assert_eq!(store.get(&thread), Some(ReasoningEffort::High));
+    let turn_snapshot = store.reasoning_for_turn(Some(&thread), Some(4_000));
+    explicitly_shared
+        .apply_requested(Some(&thread), Some("low"))
+        .expect("next turn choice");
+
+    assert_eq!(store.get(&thread), Some(ReasoningEffort::Low));
+    assert_eq!(
+        turn_snapshot,
+        Some(ReasoningConfig {
+            effort: Some(ReasoningEffort::High),
+            budget_tokens: Some(2_200),
+            summary: None,
+        })
+    );
+    store.clear(&thread);
 }
 
 #[test]
