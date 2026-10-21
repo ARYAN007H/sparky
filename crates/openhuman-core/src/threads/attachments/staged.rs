@@ -538,7 +538,7 @@ pub(crate) async fn read_authorized_native_attachment(
             && claim.thread_id == thread_id
             && claim.part == record.attachment.part
     });
-    if !current_authority && !(allow_committed_history && committed_authority) {
+    if !(current_authority || allow_committed_history && committed_authority) {
         return Err("native attachment lacks a current or committed host grant".into());
     }
     validate_native_attachment_policy(&record.attachment, config)?;
