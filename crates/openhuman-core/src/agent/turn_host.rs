@@ -62,6 +62,7 @@ pub(crate) struct AgentTurnRequest {
     /// Trusted typed message assembled after validating attachment refs at the
     /// owning persistence boundary. `None` retains the normal text conversion.
     pub(crate) message_input: Option<tinyinference_llm::message::Message>,
+    pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
     pub(crate) thread_id: Option<String>,
     pub(crate) origin: AgentTurnOrigin,
     pub(crate) approval: ApprovalTurnContext,
@@ -129,10 +130,12 @@ impl AgentTurnHost {
         let scoped_origin = origin.clone();
         let message = request.message;
         let input = request.message_input;
+        let native_staged_parts = request.native_staged_parts;
         let approval = request.approval;
         let turn = async move {
             match input {
                 Some(input) => {
+                    session.set_native_staged_parts(native_staged_parts);
                     session
                         .run_single_with_approval_and_message(
                             &message,
