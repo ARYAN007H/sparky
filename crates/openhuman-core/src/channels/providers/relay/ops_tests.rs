@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer, Request, Respond, Response, ResponseTemplate};
+use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
 
 #[tokio::test]
 async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
@@ -207,13 +207,13 @@ fn answer(text: &str) -> Value {
 struct RelayResponses(AtomicUsize);
 
 impl Respond for RelayResponses {
-    fn respond(&self, _request: &Request) -> Response {
+    fn respond(&self, _request: &Request) -> ResponseTemplate {
         let response = match self.0.fetch_add(1, Ordering::SeqCst) {
             0 | 2 => tool_call(),
             1 => answer("answer 1"),
             _ => answer("answer 2"),
         };
-        ResponseTemplate::new(200).set_body_json(response).into()
+        ResponseTemplate::new(200).set_body_json(response)
     }
 }
 
