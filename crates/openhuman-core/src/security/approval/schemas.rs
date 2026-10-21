@@ -182,7 +182,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 
 fn handle_list_pending(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let agent_id = read_optional_string(&params, "agent_id")?;
+        let agent_id = parse_list_pending(params)?;
         let outcome = approval_rpc::approval_list_pending(&ctx, agent_id.as_deref())
             .await
             .map_err(|e| e.to_string())?;
@@ -192,7 +192,7 @@ fn handle_list_pending(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
 
 fn handle_list_recent_decisions(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let limit = read_optional_u64(&params, "limit")?.map(|value| value as usize);
+        let limit = parse_list_recent_decisions(params)?.map(|value| value as usize);
         let outcome = approval_rpc::approval_list_recent_decisions(limit)
             .await
             .map_err(|e| e.to_string())?;
@@ -211,15 +211,7 @@ fn handle_get_gate_state(_ctx: DispatchCtx, _params: Map<String, Value>) -> Cont
 
 fn handle_decide(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let request_id = read_required_string(&params, "request_id")?;
-        let decision_str = read_required_string(&params, "decision")?;
-        let decision = ApprovalDecision::from_str(decision_str.trim()).ok_or_else(|| {
-            format!(
-                "invalid 'decision': expected \
-                 approve_once|approve_always_for_tool|approve_always_for_flow|deny, got '{decision_str}'"
-            )
-        })?;
-        let agent_id = read_optional_string(&params, "agent_id")?;
+        let (request_id, decision, agent_id) = parse_decide(params)?;
         let outcome =
             approval_rpc::approval_decide(&ctx, request_id.trim(), decision, agent_id.as_deref())
                 .await
@@ -230,8 +222,44 @@ fn handle_decide(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
 
 fn handle_preauthorize_flow(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let flow_id = read_required_string(&params, "flow_id")?;
-        let tool_names = match params.get("tool_names") {
+        let (flow_id, tool_names) = parse_preauthorize_flow(params)?;
+        let outcome = approval_rpc::approval_preauthorize_flow(flow_id.trim(), tool_names)
+            .await
+            .map_err(|e| e.to_string())?;
+        to_json(outcome)
+    })
+}
+
+fn parse_list_pending(params: Map<String, Value>) -> Result<Option<String>, String> {
+    read_optional_string(&params, "agent_id")
+}
+
+fn parse_list_recent_decisions(params: Map<String, Value>) -> Result<Option<u64>, String> {
+    read_optional_u64(&params, "limit")
+}
+
+fn parse_get_gate_state(_params: Map<String, Value>) -> Result<(), String> {
+    Ok(())
+}
+
+fn parse_decide(
+    params: Map<String, Value>,
+) -> Result<(String, ApprovalDecision, Option<String>), String> {
+    let request_id = read_required_string(&params, "request_id")?;
+    let decision_str = read_required_string(&params, "decision")?;
+    let decision = ApprovalDecision::from_str(decision_str.trim()).ok_or_else(|| {
+        format!(
+            "invalid 'decision': expected \
+             approve_once|approve_always_for_tool|approve_always_for_flow|deny, got '{decision_str}'"
+        )
+    })?;
+    let agent_id = read_optional_string(&params, "agent_id")?;
+    Ok((request_id, decision, agent_id))
+}
+
+fn parse_preauthorize_flow(params: Map<String, Value>) -> Result<(String, Vec<String>), String> {
+    let flow_id = read_required_string(&params, "flow_id")?;
+    let tool_names = match params.get("tool_names") {
             Some(Value::Array(items)) => items
                 .iter()
                 .map(|v| match v {
@@ -250,11 +278,7 @@ fn handle_preauthorize_flow(_ctx: DispatchCtx, params: Map<String, Value>) -> Co
             }
             None => return Err("missing required param 'tool_names'".to_string()),
         };
-        let outcome = approval_rpc::approval_preauthorize_flow(flow_id.trim(), tool_names)
-            .await
-            .map_err(|e| e.to_string())?;
-        to_json(outcome)
-    })
+    Ok((flow_id, tool_names))
 }
 
 fn read_optional_u64(params: &Map<String, Value>, key: &str) -> Result<Option<u64>, String> {
@@ -306,6 +330,11 @@ fn type_name(value: &Value) -> &'static str {
         Value::Array(_) => "array",
         Value::Object(_) => "object",
     }
+}
+
+#[cfg(test)]
+pub(crate) fn approval_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::parameter_contracts()
 }
 
 #[cfg(test)]
