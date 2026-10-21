@@ -10,14 +10,14 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
-#[cfg(test)]
-use tinychannels_bus::ChannelMessage;
-use tinychannels_bus::SendMessage;
 use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
 };
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
+use tinychannels_bus::SendMessage;
+#[cfg(test)]
+use tinychannels_bus::ChannelMessage;
 #[cfg(test)]
 use tinychannels_runtime::Channel;
 #[cfg(test)]

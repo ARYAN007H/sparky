@@ -1,6 +1,6 @@
 use super::*;
 use crate::channels::context::{
-    ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap, conversation_history_key,
+    conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap,
 };
 use crate::channels::host::ChannelTurnStateSubscriber;
 use crate::core::events::DomainEvent;
@@ -339,11 +339,9 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(
-        sent[0]
-            .content
-            .contains("Unknown provider `definitely-not-a-provider`")
-    );
+    assert!(sent[0]
+        .content
+        .contains("Unknown provider `definitely-not-a-provider`"));
     assert_eq!(sent[0].thread_ts.as_deref(), Some("thread-1"));
 }
 
@@ -533,11 +531,9 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
     assert!(sent[0].content.contains("`/status`"));
     assert!(sent[0].content.contains("`/sessions`"));
     assert!(sent[0].content.contains("`/new`"));
-    assert!(
-        sent[0]
-            .content
-            .contains("Model routing: `/model`, `/models`")
-    );
+    assert!(sent[0]
+        .content
+        .contains("Model routing: `/model`, `/models`"));
 }
 
 #[tokio::test]
@@ -570,11 +566,9 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(
-        sent[0]
-            .content
-            .contains("No conversation threads yet. Send `/new` to create one.")
-    );
+    assert!(sent[0]
+        .content
+        .contains("No conversation threads yet. Send `/new` to create one."));
     assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
 }
 
@@ -678,11 +672,9 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
     assert!(sent[0].content.contains("Started new session"));
-    assert!(
-        sent[0]
-            .content
-            .contains("In-memory channel history cleared for this chat.")
-    );
+    assert!(sent[0]
+        .content
+        .contains("In-memory channel history cleared for this chat."));
 
     assert!(sent[1].content.contains("**Status**"));
     assert!(sent[1].content.contains("Thread: `Telegram"));
@@ -693,10 +685,9 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     assert!(sent[2].content.contains("**Recent sessions**"));
     assert!(sent[2].content.contains("→ `Telegram"));
-    assert!(
-        sent.iter()
-            .all(|message| message.thread_ts.as_deref() == Some("42"))
-    );
+    assert!(sent
+        .iter()
+        .all(|message| message.thread_ts.as_deref() == Some("42")));
 }
 
 #[tokio::test]
@@ -733,11 +724,9 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
         "{}",
         sent[0].content
     );
-    assert!(
-        sent[0]
-            .content
-            .contains("failed to persist the chat binding")
-    );
+    assert!(sent[0]
+        .content
+        .contains("failed to persist the chat binding"));
     assert!(sent[0].content.contains("host storage is unavailable"));
     assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
 }

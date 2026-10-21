@@ -9,12 +9,12 @@ use std::sync::Mutex;
 
 use serde_json::json;
 
-use crate::web_chat::{WebChannelEvent, publish_web_channel_event, publish_web_channel_event_in};
-#[cfg(test)]
-use async_trait::async_trait;
+use crate::web_chat::{publish_web_channel_event, publish_web_channel_event_in, WebChannelEvent};
+use tinychannels_bus::SendMessage;
 #[cfg(test)]
 use tinychannels_bus::ChannelMessage;
-use tinychannels_bus::SendMessage;
+#[cfg(test)]
+use async_trait::async_trait;
 #[cfg(test)]
 use tinychannels_runtime::Channel;
 

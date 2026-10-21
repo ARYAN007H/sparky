@@ -8,8 +8,8 @@ use crate::core::Outcome;
 use crate::modules::channel_controller::{self, DiscordReply};
 use crate::security::credentials;
 use tinychannels_bus::{
-    ChannelControllerRequest,
     controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
+    ChannelControllerRequest,
 };
 
 use super::connect::shared::credential_provider;

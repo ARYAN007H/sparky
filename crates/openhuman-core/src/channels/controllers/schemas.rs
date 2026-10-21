@@ -1,28 +1,27 @@
 //! RPC controller schemas and handlers for the channels domain.
 
 use crate::core::runtime::DispatchCtx;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::config::Config;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::ControllerSchema;
 use crate::core::Outcome;
-use crate::core::all::{ControllerFuture, RegisteredController};
 
 use super::backend::OpenHumanChannelBackend;
 use crate::channels::contract_schema::from_channel_controller_schema;
 use crate::security::credentials::channel_credential_provider;
 use tinychannels_bus::controllers::{
-    ChannelAuthMode, ChannelConnectRequest as ConnectParams,
-    ChannelCreateThreadRequest as CreateThreadParams, ChannelDescribeRequest as DescribeParams,
-    ChannelDisconnectRequest as DisconnectParams, ChannelListThreadsRequest as ListThreadsParams,
-    ChannelSendMessageRequest as SendMessageParams,
+    all_channel_controller_schemas, channel_controller_schema, ChannelAuthMode,
+    ChannelConnectRequest as ConnectParams, ChannelCreateThreadRequest as CreateThreadParams,
+    ChannelDescribeRequest as DescribeParams, ChannelDisconnectRequest as DisconnectParams,
+    ChannelListThreadsRequest as ListThreadsParams, ChannelSendMessageRequest as SendMessageParams,
     ChannelSendReactionRequest as SendReactionParams, ChannelStatusRequest as StatusParams,
     ChannelTestRequest as TestParams, ChannelUpdateThreadRequest as UpdateThreadParams,
     DiscordCheckPermissionsRequest as DiscordCheckPermissionsParams,
-    DiscordListChannelsRequest as DiscordListChannelsParams, all_channel_controller_schemas,
-    channel_controller_schema,
+    DiscordListChannelsRequest as DiscordListChannelsParams,
 };
 
 // ---------------------------------------------------------------------------

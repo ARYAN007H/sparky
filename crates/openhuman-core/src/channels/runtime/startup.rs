@@ -14,8 +14,6 @@ mod turn_parts;
 
 use anyhow::Result;
 use tinybus::module::{ModuleCallError, ModuleClient};
-#[cfg(all(not(test), debug_assertions))]
-use tinychannels_runtime::Channel as _;
 
 #[cfg(test)]
 pub(crate) type ChannelHandle = dyn tinychannels_runtime::Channel;
@@ -69,7 +67,10 @@ impl ChannelHandle {
         }
     }
 
-    pub(crate) async fn send(&self, message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
+    pub(crate) async fn send(
+        &self,
+        message: &tinychannels_bus::SendMessage,
+    ) -> anyhow::Result<()> {
         match self {
             Self::Module(channel) => channel.send_prepared(message).await,
             Self::Relay(channel) => channel.send(message).await,
@@ -87,13 +88,11 @@ impl ChannelHandle {
 
     pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => {
-                channel
-                    .interact(tinychannels_bus::ChannelInteraction::StartTyping {
-                        recipient: recipient.to_owned(),
-                    })
-                    .await
-            }
+            Self::Module(channel) => channel
+                .interact(tinychannels_bus::ChannelInteraction::StartTyping {
+                    recipient: recipient.to_owned(),
+                })
+                .await,
             Self::Relay(_) => Ok(()),
             #[cfg(debug_assertions)]
             Self::Test(channel) => channel.start_typing(recipient).await,
@@ -102,13 +101,11 @@ impl ChannelHandle {
 
     pub(crate) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => {
-                channel
-                    .interact(tinychannels_bus::ChannelInteraction::StopTyping {
-                        recipient: recipient.to_owned(),
-                    })
-                    .await
-            }
+            Self::Module(channel) => channel
+                .interact(tinychannels_bus::ChannelInteraction::StopTyping {
+                    recipient: recipient.to_owned(),
+                })
+                .await,
             Self::Relay(_) => Ok(()),
             #[cfg(debug_assertions)]
             Self::Test(channel) => channel.stop_typing(recipient).await,

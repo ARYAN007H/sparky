@@ -20,10 +20,10 @@
 use std::sync::Arc;
 
 use crate::agent::host_agents::HostAgent;
-use crate::channels::SendMessage;
 use crate::channels::context::ChannelRuntimeContext;
+use crate::channels::SendMessage;
 #[cfg(test)]
-use crate::channels::{Channel, ChannelSendExt};
+use crate::channels::ChannelSendExt;
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
@@ -32,7 +32,7 @@ use tinychannels_bus as traits;
 pub(crate) mod posture;
 mod turn;
 
-pub(crate) use turn::{HostChannelTurn, run_host_agent_turn};
+pub(crate) use turn::{run_host_agent_turn, HostChannelTurn};
 
 /// Resolve the config-owned target selected for an unbound channel into the
 /// same trusted host-agent carrier used by channel bindings. The effective

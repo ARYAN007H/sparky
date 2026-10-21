@@ -21,8 +21,8 @@
 //! bytes, which is the whole point.
 
 use crate::agent::context::channels_prompt::{
-    ProjectContextPlacement, PromptIdentityOverride, build_system_prompt_with_identity,
-    render_project_context,
+    build_system_prompt_with_identity, render_project_context, ProjectContextPlacement,
+    PromptIdentityOverride,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};

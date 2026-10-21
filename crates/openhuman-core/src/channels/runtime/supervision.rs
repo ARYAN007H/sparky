@@ -86,7 +86,7 @@ pub(crate) fn spawn_supervised_listener(
 }
 
 #[cfg(test)]
-pub(crate) use tinychannels::runtime::{MAX_JITTER_MS, jitter_millis};
+pub(crate) use tinychannels::runtime::{jitter_millis, MAX_JITTER_MS};
 
 #[cfg(test)]
 #[path = "supervision_tests.rs"]

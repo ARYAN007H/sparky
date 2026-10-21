@@ -5,13 +5,13 @@
 //! of directly constructing channel instances. The [`CronDeliverySubscriber`]
 //! picks up those events and dispatches to the appropriate channel, keeping
 //! channel construction out of the scheduler.
-use crate::channels::runtime::ChannelHandle;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tinybus::EventHandler;
 use tinychannels_bus::SendMessage;
+use crate::channels::runtime::ChannelHandle;
 
 /// Subscribes to `CronDeliveryRequested` events and dispatches
 /// the output to the named channel.
