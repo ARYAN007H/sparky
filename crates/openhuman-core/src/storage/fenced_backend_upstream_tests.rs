@@ -334,6 +334,7 @@ async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn Storag
         .unwrap();
 
     leases.armed.store(true, Ordering::SeqCst);
+    assert!(fence.check(leases.base_ms).await.is_ok());
     let refused = scoped
         .documents()
         .put("notes", "n1", json!({"v": 2}), Precondition::None)
@@ -364,9 +365,10 @@ async fn memory_driver_refuses_a_write_after_a_takeover_the_check_missed() {
 #[tokio::test]
 async fn stream_and_blob_writes_are_driver_fenced() {
     let backend = shared();
-    let (a, _fence, leases) = paused_holder(&backend.backend).await;
+    let (a, fence, leases) = paused_holder(&backend.backend).await;
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     leases.armed.store(true, Ordering::SeqCst);
+    assert!(fence.check(leases.base_ms).await.is_ok());
     assert!(scoped.streams().append("log", json!(1)).await.is_err());
     let raw = backend
         .backend
@@ -375,9 +377,10 @@ async fn stream_and_blob_writes_are_driver_fenced() {
     assert_eq!(raw.streams().len("log").await.unwrap(), 0);
 
     let backend = shared();
-    let (b, _fence, leases) = paused_holder(&backend.backend).await;
+    let (b, fence, leases) = paused_holder(&backend.backend).await;
     let scoped = b.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     leases.armed.store(true, Ordering::SeqCst);
+    assert!(fence.check(leases.base_ms).await.is_ok());
     assert!(scoped.blobs().put("k", b"x".to_vec(), None).await.is_err());
 }
 
