@@ -238,15 +238,15 @@ fn only_mongodb_and_sqlite_have_cross_process_cas() {
 #[tokio::test]
 async fn local_drivers_do_not_claim_cross_process_cas() {
     let dir = tempfile::tempdir().unwrap();
-    for url in [
-        "memory".to_string(),
-        format!("sqlite:{}", dir.path().join("cas.db").display()),
-        format!("file:{}", dir.path().join("files").display()),
+    for (url, expected) in [
+        ("memory".to_string(), false),
+        (format!("sqlite:{}", dir.path().join("cas.db").display()), true),
+        (format!("file:{}", dir.path().join("files").display()), false),
     ] {
         let backend = open(&url).await.unwrap();
         assert!(
-            !backend_has_cross_process_cas(backend.as_ref()),
-            "{url} is a local driver"
+            backend_has_cross_process_cas(backend.as_ref()) == expected,
+            "unexpected CAS capability for {url}"
         );
     }
 }

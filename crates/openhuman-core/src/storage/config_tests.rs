@@ -75,11 +75,38 @@ fn the_default_differs_per_workspace() {
 #[tokio::test]
 async fn the_default_url_opens_in_directory_mode() {
     let dir = tempfile::tempdir().unwrap();
-    let backend = crate::storage::open(&default_url(dir.path()))
+    let url = default_url(dir.path());
+    let backend = crate::storage::open(&url).await.unwrap();
+    let scoped = backend.for_scope(&crate::storage::Scope::local()).unwrap();
+    let docs = scoped.documents();
+    docs.ensure_collection(&crate::storage::CollectionSpec::new("reopen_probe"))
         .await
         .unwrap();
+    docs.put(
+        "reopen_probe",
+        "persisted",
+        serde_json::json!({"ok": true}),
+        crate::storage::Precondition::Absent,
+    )
+    .await
+    .unwrap();
+    drop(docs);
+    drop(scoped);
+    drop(backend);
     // Directory mode: the directory holds the database file.
     assert!(dir.path().join(DEFAULT_DIR).exists());
+    let reopened = crate::storage::open(&url).await.unwrap();
+    let scoped = reopened.for_scope(&crate::storage::Scope::local()).unwrap();
+    assert_eq!(
+        scoped
+            .documents()
+            .get("reopen_probe", "persisted")
+            .await
+            .unwrap()
+            .unwrap()
+            .doc["ok"],
+        true
+    );
 }
 
 fn v2_layout(root: &Path) -> crate::config::schema::ProfileLayout {
