@@ -43,8 +43,10 @@ impl WatcherStateStore {
     pub fn open(db_path: &Path) -> Result<Self> {
         let url = format!("sqlite:{}", db_path.display());
         let config = StorageConfig::parse(&url).context("parse watcher storage URL")?;
-        let backend = crate::storage::block_on(tinystoragedrivers::open(&config))
-            .context("open watcher storage backend")?;
+        let backend = crate::storage::block_on(async move {
+            tinystoragedrivers::open(&config).await
+        })
+        .context("open watcher storage backend")?;
         Self::from_backend(backend)
     }
 
