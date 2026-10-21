@@ -96,19 +96,28 @@ impl Snapshot {
         // `table` and `body_column` are selected from the fixed names above;
         // collection names remain SQL parameters. Both the v0 document table
         // and layout-2 table are only read from the scratch snapshot.
+        let metadata = |name: &str| {
+            if columns.contains(name) {
+                format!("\"{name}\"")
+            } else {
+                "NULL".to_owned()
+            }
+        };
+        let deleted = if columns.contains("deleted") {
+            " AND COALESCE(deleted, 0) = 0"
+        } else {
+            ""
+        };
         let sql = format!(
-            "SELECT coll, id, {body_column} FROM \"{table}\" WHERE scope = ?1 AND coll = ?2 AND COALESCE(deleted, 0) = 0 ORDER BY id"
+            "SELECT coll, id, \"{body_column}\", {}, {}, {}, {} FROM \"{table}\" WHERE scope = ?1 AND coll = ?2{deleted} ORDER BY id",
+            metadata("schema"),
+            metadata("created_ms"),
+            metadata("updated_ms"),
+            metadata("expires_ms"),
         );
         let mut out = Vec::new();
         for spec in collections() {
-            if !table_has_column(&columns, "deleted") {
-                let sql = format!(
-                    "SELECT coll, id, {body_column} FROM \"{table}\" WHERE scope = ?1 AND coll = ?2 ORDER BY id"
-                );
-                read_collection(&conn, &sql, &spec.name, &mut out)?;
-            } else {
-                read_collection(&conn, &sql, &spec.name, &mut out)?;
-            }
+            read_collection(&conn, &sql, &spec.name, &mut out)?;
         }
         Ok(out)
     }
@@ -138,10 +147,6 @@ fn table_columns(
     Ok(columns)
 }
 
-fn table_has_column(columns: &std::collections::HashSet<String>, name: &str) -> bool {
-    columns.contains(name)
-}
-
 fn read_collection(
     conn: &rusqlite::Connection,
     sql: &str,
@@ -159,16 +164,24 @@ fn read_collection(
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, SqlValue>(2)?,
+                row.get::<_, Option<i64>>(3)?,
+                row.get::<_, Option<i64>>(4)?,
+                row.get::<_, Option<i64>>(5)?,
+                row.get::<_, Option<i64>>(6)?,
             ))
         })
         .context("query legacy driver documents")?;
     for row in rows {
-        let (stored_collection, id, body) = row.context("read legacy driver document")?;
+        let (stored_collection, id, body, schema, created_ms, updated_ms, expires_ms) =
+            row.context("read legacy driver document")?;
         out.push(Record {
             collection: stored_collection,
             id,
             doc: decode_legacy_body(body)?,
-            created_ms: None,
+            created_ms,
+            schema: schema.and_then(|value| u32::try_from(value).ok()),
+            expires_ms,
+            updated_ms,
         });
     }
     Ok(())

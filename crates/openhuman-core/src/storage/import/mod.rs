@@ -135,6 +135,13 @@ pub struct Record {
     /// The import writer uses this as document metadata; owner converters keep
     /// semantic event times in the body when the old format did so.
     pub created_ms: Option<i64>,
+    /// Source collection schema metadata when imported from a driver table.
+    pub schema: Option<u32>,
+    /// Absolute document expiry from the source driver's metadata.
+    pub expires_ms: Option<i64>,
+    /// Source update timestamp retained as provenance when the target driver
+    /// cannot set it independently of its own write clock.
+    pub updated_ms: Option<i64>,
 }
 
 impl From<ImportDoc> for Record {
@@ -144,6 +151,9 @@ impl From<ImportDoc> for Record {
             id: doc.id,
             doc: doc.doc,
             created_ms: None,
+            schema: None,
+            expires_ms: None,
+            updated_ms: None,
         }
     }
 }
