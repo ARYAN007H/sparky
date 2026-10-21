@@ -127,6 +127,12 @@ pub(super) fn filter_tool_indices_with_nested_spawn(
         .collect()
 }
 
+pub(super) struct DefinitionToolFilter {
+    pub indices: Vec<usize>,
+    pub nested_spawn_ids: Vec<String>,
+    pub nested_spawn_tools: std::collections::HashSet<String>,
+}
+
 /// Applies a child's definition scope, denylist, and checked host grant to
 /// the parent's registered tools before the inherited visibility ceiling.
 pub(super) fn filter_definition_tool_indices(
@@ -134,7 +140,7 @@ pub(super) fn filter_definition_tool_indices(
     definition: &AgentDefinition,
     skill_filter: Option<&str>,
     nested_spawn_depth_available: bool,
-) -> (Vec<usize>, bool) {
+) -> DefinitionToolFilter {
     let nested_spawn_ids = definition.allowed_subagent_ids();
     let explicitly_declares_nested_spawn = |name: &str| {
         is_subagent_spawn_tool(name)
@@ -144,14 +150,17 @@ pub(super) fn filter_definition_tool_indices(
                     ToolScope::Named(names) if names.iter().any(|tool| tool == name)
                 ))
     };
-    let nested_spawn_allowed = |name: &str| {
-        nested_spawn_depth_available
-            && !nested_spawn_ids.is_empty()
-            && explicitly_declares_nested_spawn(name)
-    };
-    let nested_spawn_granted = parent_tools
+    let nested_spawn_tools: std::collections::HashSet<String> = parent_tools
         .iter()
-        .any(|tool| nested_spawn_allowed(tool.name()));
+        .map(|tool| tool.name())
+        .filter(|name| {
+            nested_spawn_depth_available
+                && !nested_spawn_ids.is_empty()
+                && explicitly_declares_nested_spawn(name)
+        })
+        .map(str::to_owned)
+        .collect();
+    let nested_spawn_granted = !nested_spawn_tools.is_empty();
     let mut allowed = filter_tool_indices_with_nested_spawn(
         parent_tools,
         &definition.tools,
@@ -163,7 +172,7 @@ pub(super) fn filter_definition_tool_indices(
     let before = allowed.len();
     allowed.retain(|&index| {
         let name = parent_tools[index].name();
-        !is_subagent_spawn_tool(name) || nested_spawn_allowed(name)
+        !is_subagent_spawn_tool(name) || nested_spawn_tools.contains(name)
     });
     let stripped = before - allowed.len();
     if stripped > 0 {
@@ -179,13 +188,17 @@ pub(super) fn filter_definition_tool_indices(
         if definition.extra_tools.iter().any(|extra| extra == name)
             && !allowed.contains(&index)
             && !crate::tools::rules::glob_list_matches(&definition.disallowed_tools, name)
-            && (!is_subagent_spawn_tool(name) || nested_spawn_allowed(name))
+            && (!is_subagent_spawn_tool(name) || nested_spawn_tools.contains(name))
         {
             allowed.push(index);
         }
     }
 
-    (allowed, nested_spawn_granted)
+    DefinitionToolFilter {
+        indices: allowed,
+        nested_spawn_ids,
+        nested_spawn_tools,
+    }
 }
 
 /// Intersect a child definition's tool indices with the tools the parent turn
