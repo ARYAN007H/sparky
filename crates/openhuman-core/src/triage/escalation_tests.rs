@@ -9,7 +9,9 @@ use tinyinference_llm::model::{
 use tokio::time::{sleep, timeout, Duration};
 
 struct TriageReplyModel {
-    requests: Arc<Mutex<Vec<ModelRequest>>>,
+    requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
+    role: String,
+    model: String,
 }
 
 #[async_trait::async_trait]
@@ -31,7 +33,11 @@ impl ChatModel<()> for TriageReplyModel {
         _state: &(),
         request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
-        self.requests.lock().unwrap().push(request);
+        self.requests.lock().unwrap().push((
+            self.role.clone(),
+            self.model.clone(),
+            request,
+        ));
         Ok(ModelResponse::assistant("handled inline"))
     }
 
@@ -40,7 +46,11 @@ impl ChatModel<()> for TriageReplyModel {
         _state: &(),
         request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelStream> {
-        self.requests.lock().unwrap().push(request);
+        self.requests.lock().unwrap().push((
+            self.role.clone(),
+            self.model.clone(),
+            request,
+        ));
         let response = ModelResponse::assistant("handled inline");
         Ok(ModelStream::new(Box::pin(futures::stream::iter([
             ModelStreamItem::Started,
@@ -53,13 +63,21 @@ impl ChatModel<()> for TriageReplyModel {
 }
 
 fn triage_test_model(
-    requests: Arc<Mutex<Vec<ModelRequest>>>,
+    requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
 ) -> crate::inference::registry::ChatModelEntry {
     crate::inference::registry::ChatModelEntry {
-        build: Arc::new(move |_| {
+        build: Arc::new(move |build_request| {
+            let role = build_request.role.to_string();
+            let model = build_request
+                .model_override
+                .or(build_request.default_model)
+                .unwrap_or("unknown-test-model")
+                .to_string();
             Ok((
                 Arc::new(TriageReplyModel {
                     requests: Arc::clone(&requests),
+                    role,
+                    model,
                 }) as Arc<dyn ChatModel<()>>,
                 "triage-test-model".to_string(),
             ))
@@ -123,19 +141,26 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
     let requests = requests.lock().unwrap();
     assert_eq!(requests.len(), 1, "triage should make one model request");
+    assert_eq!(requests[0].0, "agentic", "the trigger reactor should use its configured model role");
+    assert_eq!(
+        requests[0].1,
+        crate::config::MODEL_MANAGED_DEFAULT,
+        "the configured managed model pin should reach the actual turn model"
+    );
     assert!(
         requests[0]
+            .2
             .messages
             .iter()
             .any(|message| message.text().contains("handle this trigger inline")),
         "the target agent should receive the triage prompt"
     );
     assert_eq!(
-        requests[0].model.as_deref(),
-        Some("triage-test-model"),
-        "the target's agentic route should reach the configured provider"
+        requests[0].2.model.is_none(),
+        "the managed model pin belongs to provider resolution, not a per-request override"
     );
     let tool_names: Vec<_> = requests[0]
+        .2
         .tools
         .iter()
         .map(|tool| tool.name.as_str())
