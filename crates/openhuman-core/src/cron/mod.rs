@@ -16,7 +16,8 @@
     deprecated,
     reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content"
 )]
-pub mod bus;
+#[cfg(feature = "channels")]
+pub(crate) mod bus;
 pub(crate) mod bus_host;
 #[allow(
     deprecated,
