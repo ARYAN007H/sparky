@@ -55,7 +55,7 @@ pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
     make_openhuman_backend_model_in,
 };
-use subprocess_providers::{build_claude_code_model, claude_agent_sdk_model_from_string};
+use subprocess_providers::OpenHumanMcpEndpoint;
 use tinyinference_providers::route::split_model_and_temperature;
 
 /// Test-only seam: inject a mock [`ChatModel`] so e2e tests can drive the
@@ -82,7 +82,6 @@ use crate::config::Config;
 use crate::security::credentials::AuthService;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
-use tinyagents_harness::providers::claude_agent_sdk::ClaudeAgentSdkProvider;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
 use tinyinference_llm::providers::openai::codex::{
     openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
