@@ -114,7 +114,7 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
             held: 1,
             stored: Some(2)
         })
-    ));
+    ), "{refused:?}");
     // Every write port, and every session scope of the profile, is fenced.
     let session = a.scoped("alice~default");
     assert!(session.streams().append("log", json!(1)).await.is_err());
@@ -274,6 +274,15 @@ impl LeaseStore for PausedAfterCheck {
     > {
         self.inner.holder_readonly(key).await
     }
+
+    fn write_condition(
+        &self,
+        key: &str,
+        node: &str,
+        epoch: u64,
+    ) -> Option<tinystoragedrivers_types::WriteCondition> {
+        self.inner.write_condition(key, node, epoch)
+    }
 }
 
 /// Node A holds `alice` on `shared`; returns A's fenced view, its fence,
@@ -312,8 +321,11 @@ async fn paused_holder(
 /// the write's own atomic step and refuses it.
 async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn StorageBackend>) {
     assert!(shared
+        .for_scope(&Scope::new("profile:alice").unwrap())
+        .unwrap()
+        .documents()
         .capabilities()
-        .contains(Capability::ConditionalWrites));
+        .contains(Capability::CrossProcessCas));
     let (a, fence, leases) = paused_holder(&shared).await;
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     scoped
