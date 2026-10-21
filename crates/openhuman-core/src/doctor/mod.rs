@@ -17,7 +17,7 @@ pub use contract::{
 pub use core::{ModelProbeEntry, ModelProbeOutcome, ModelProbeReport, ModelProbeSummary};
 pub use ops::*;
 pub use registry::{
-    register_check_source, register_check_source_in, registered_checks_for, DoctorCheckSource,
+    DoctorCheckSource, register_check_source, register_check_source_in, registered_checks_for,
 };
 pub(crate) use schemas::all_controller_entries as all_doctor_controller_entries;
 #[cfg(test)]

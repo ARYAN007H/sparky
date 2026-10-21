@@ -8,13 +8,13 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
-use crate::core::{runtime::CoreContext, Outcome};
+use crate::core::{Outcome, runtime::CoreContext};
 use crate::doctor::{
     contract::{DoctorCheck, DoctorCtx, DoctorTier, Finding, FindingSeverity},
     core::{ModelProbeEntry, ModelProbeOutcome, ModelProbeReport, ModelProbeSummary},
 };
 use crate::inference::registry::{
-    inspection_catalog, CatalogRequest, InspectionCatalogError, PreparedInspectionCatalog,
+    CatalogRequest, InspectionCatalogError, PreparedInspectionCatalog, inspection_catalog,
 };
 
 const CACHE_TTL: Duration = Duration::from_secs(60);

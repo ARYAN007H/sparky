@@ -1,6 +1,6 @@
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use crate::config::Config;
@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use super::contract::{
     DoctorCheck, DoctorConfigSource, DoctorCtx, DoctorOptions, DoctorTier, Finding, FindingSeverity,
 };
-use super::registry::{register_check_source_in, DoctorCheckSource};
+use super::registry::{DoctorCheckSource, register_check_source_in};
 use super::runner;
 use super::test_support::{FakeCheck, FakeCheckSource};
 
@@ -124,10 +124,12 @@ async fn a_context_check_source_is_reported_with_its_check_id() {
     let config_source: DoctorConfigSource = report.config_source;
     assert_eq!(config_source, DoctorConfigSource::Profile);
     assert!(report.checks_run.iter().any(|id| id == "hosted/ready"));
-    assert!(report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "hosted/ready"));
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "hosted/ready")
+    );
 }
 
 #[tokio::test]
@@ -156,10 +158,12 @@ async fn hierarchical_check_ids_are_registered_and_selected_exactly() {
     .expect("hierarchical id is valid and selected as one exact id");
 
     assert_eq!(report.checks_run, vec!["inference/live/role".to_owned()]);
-    assert!(report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "inference/live/role"));
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "inference/live/role")
+    );
 }
 
 #[tokio::test]
@@ -393,10 +397,10 @@ async fn native_checks_use_the_selected_config_and_respect_its_component_gates()
 
 #[tokio::test]
 async fn connect_tier_skips_live_embedding_without_calling_the_provider() {
-    use axum::{extract::State, routing::post, Json, Router};
+    use axum::{Json, Router, extract::State, routing::post};
     use std::sync::atomic::AtomicUsize;
     use tempfile::TempDir;
-    use tinymemory_api::{conformance::ReferenceEngine, MemoryEngine};
+    use tinymemory_api::{MemoryEngine, conformance::ReferenceEngine};
 
     let tmp = TempDir::new().expect("temporary config and workspace");
     let workspace = tmp.path().join("workspace");
@@ -471,12 +475,16 @@ async fn connect_tier_skips_live_embedding_without_calling_the_provider() {
         0,
         "live memory was not bound"
     );
-    assert!(report
-        .checks_skipped
-        .contains(&"embeddings/live".to_owned()));
-    assert!(report
-        .checks_skipped
-        .contains(&"memory/roundtrip".to_owned()));
+    assert!(
+        report
+            .checks_skipped
+            .contains(&"embeddings/live".to_owned())
+    );
+    assert!(
+        report
+            .checks_skipped
+            .contains(&"memory/roundtrip".to_owned())
+    );
 }
 
 #[tokio::test]
@@ -512,11 +520,13 @@ async fn only_filters_exact_ids_and_unknown_ids_get_a_selection_finding() {
     .expect("unknown selection is a report finding");
 
     assert_eq!(report.checks_run, vec!["config/temperature".to_owned()]);
-    assert!(report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "doctor/selection"
-            && finding.severity == FindingSeverity::Error));
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "doctor/selection"
+                && finding.severity == FindingSeverity::Error)
+    );
     assert_eq!(report.schema_version, 2);
     assert_eq!(report.summary.pass, 1);
     assert_eq!(report.summary.error, 1);
@@ -546,10 +556,12 @@ async fn module_status_checks_are_registered_with_their_native_id() {
         report.findings
     );
     assert!(report.checks_run.iter().any(|id| id == "modules/tinymcp"));
-    assert!(report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "modules/tinymcp"));
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "modules/tinymcp")
+    );
 }
 
 #[tokio::test]
@@ -601,14 +613,18 @@ async fn mcp_server_check_ids_come_from_the_selected_config() {
         report.checks_skipped.iter().any(|id| id == "mcp/server-b")
             || report.checks_run.iter().any(|id| id == "mcp/server-b")
     );
-    assert!(report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "mcp/server-b"));
-    assert!(!report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "mcp/server-a"));
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "mcp/server-b")
+    );
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "mcp/server-a")
+    );
 }
 
 #[tokio::test]

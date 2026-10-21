@@ -1,17 +1,17 @@
-use super::{ops::doctor_report_with_options, DoctorOptions, FindingSeverity};
-use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+use super::{DoctorOptions, FindingSeverity, ops::doctor_report_with_options};
 use crate::config::Config;
+use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::security::credentials::{AuthService, DEFAULT_AUTH_PROFILE_NAME};
 use axum::{
+    Json, Router,
     extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::time::Duration;
 
@@ -193,8 +193,8 @@ fn register_test_inspection_catalog(
     endpoint: String,
 ) -> Arc<AtomicUsize> {
     use crate::inference::registry::{
-        register_inspection_catalog_in, InspectionCatalogError, InspectionCatalogListing,
-        PreparedInspectionCatalog,
+        InspectionCatalogError, InspectionCatalogListing, PreparedInspectionCatalog,
+        register_inspection_catalog_in,
     };
 
     let requests = Arc::new(AtomicUsize::new(0));
@@ -306,31 +306,37 @@ async fn process_auth_error_is_not_attributed_across_desktop_workspaces() {
         },
     )
     .await;
-    assert!(report_b_without_failure
-        .value
-        .checks_run
-        .iter()
-        .any(|id| id == "inference/auth-errors"));
-    assert!(report_b_without_failure
-        .value
-        .findings
-        .iter()
-        .all(|finding| {
-            finding.check_id != "inference/auth-errors"
-                || finding.severity != FindingSeverity::Error
-        }));
-    assert!(report_b_without_failure
-        .value
-        .findings
-        .iter()
-        .all(|finding| {
-            !finding
-                .message
-                .contains(config_a.workspace_dir.to_string_lossy().as_ref())
-                && !finding
+    assert!(
+        report_b_without_failure
+            .value
+            .checks_run
+            .iter()
+            .any(|id| id == "inference/auth-errors")
+    );
+    assert!(
+        report_b_without_failure
+            .value
+            .findings
+            .iter()
+            .all(|finding| {
+                finding.check_id != "inference/auth-errors"
+                    || finding.severity != FindingSeverity::Error
+            })
+    );
+    assert!(
+        report_b_without_failure
+            .value
+            .findings
+            .iter()
+            .all(|finding| {
+                !finding
                     .message
-                    .contains(config_b.workspace_dir.to_string_lossy().as_ref())
-        }));
+                    .contains(config_a.workspace_dir.to_string_lossy().as_ref())
+                    && !finding
+                        .message
+                        .contains(config_b.workspace_dir.to_string_lossy().as_ref())
+            })
+    );
 
     let report_a = report_for_context(
         &config_a,
@@ -375,14 +381,16 @@ async fn process_auth_error_is_not_attributed_across_desktop_workspaces() {
         },
     )
     .await;
-    assert!(report_a_after_b_failure
-        .value
-        .findings
-        .iter()
-        .any(|finding| {
-            finding.check_id == "inference/auth-errors"
-                && finding.severity == FindingSeverity::Error
-        }));
+    assert!(
+        report_a_after_b_failure
+            .value
+            .findings
+            .iter()
+            .any(|finding| {
+                finding.check_id == "inference/auth-errors"
+                    && finding.severity == FindingSeverity::Error
+            })
+    );
     assert_eq!(
         crate::inference::auth_error_registry::snapshot()
             .iter()
@@ -492,26 +500,32 @@ async fn process_auth_error_is_attributed_to_the_matching_saas_profile() {
         },
     )
     .await;
-    assert!(report_b_without_failure
-        .value
-        .checks_run
-        .iter()
-        .any(|id| id == "inference/auth-errors"));
-    assert!(report_b_without_failure
-        .value
-        .findings
-        .iter()
-        .all(|finding| {
-            finding.check_id != "inference/auth-errors"
-                || finding.severity != FindingSeverity::Error
-        }));
-    assert!(report_b_without_failure
-        .value
-        .findings
-        .iter()
-        .all(|finding| {
-            !finding.message.contains("tenant-a") && !finding.message.contains("tenant-b")
-        }));
+    assert!(
+        report_b_without_failure
+            .value
+            .checks_run
+            .iter()
+            .any(|id| id == "inference/auth-errors")
+    );
+    assert!(
+        report_b_without_failure
+            .value
+            .findings
+            .iter()
+            .all(|finding| {
+                finding.check_id != "inference/auth-errors"
+                    || finding.severity != FindingSeverity::Error
+            })
+    );
+    assert!(
+        report_b_without_failure
+            .value
+            .findings
+            .iter()
+            .all(|finding| {
+                !finding.message.contains("tenant-a") && !finding.message.contains("tenant-b")
+            })
+    );
 
     let report_a = report_for_profile(
         &config,
@@ -553,14 +567,16 @@ async fn process_auth_error_is_attributed_to_the_matching_saas_profile() {
         },
     )
     .await;
-    assert!(report_a_after_b_failure
-        .value
-        .findings
-        .iter()
-        .any(|finding| {
-            finding.check_id == "inference/auth-errors"
-                && finding.severity == FindingSeverity::Error
-        }));
+    assert!(
+        report_a_after_b_failure
+            .value
+            .findings
+            .iter()
+            .any(|finding| {
+                finding.check_id == "inference/auth-errors"
+                    && finding.severity == FindingSeverity::Error
+            })
+    );
     assert_eq!(
         crate::inference::auth_error_registry::snapshot()
             .iter()
@@ -588,11 +604,13 @@ async fn an_unscoped_legacy_auth_error_is_reported_without_blame_to_profile_b() 
     )
     .await;
 
-    assert!(report
-        .value
-        .checks_run
-        .iter()
-        .any(|id| id == "inference/auth-errors"));
+    assert!(
+        report
+            .value
+            .checks_run
+            .iter()
+            .any(|id| id == "inference/auth-errors")
+    );
     assert!(report.value.findings.iter().any(|finding| {
         finding.check_id == "inference/auth-errors"
             && finding.severity == FindingSeverity::Info

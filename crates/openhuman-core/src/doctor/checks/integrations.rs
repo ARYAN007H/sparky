@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyconnectors_bus::{
-    names::methods, ComposioConnectedIntegrationsMode, ComposioConnectedIntegrationsResponse,
-    ComposioListConnectedIntegrationsRequest,
+    ComposioConnectedIntegrationsMode, ComposioConnectedIntegrationsResponse,
+    ComposioListConnectedIntegrationsRequest, names::methods,
 };
 
 use crate::config::Config;

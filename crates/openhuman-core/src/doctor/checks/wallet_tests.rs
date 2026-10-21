@@ -2,8 +2,8 @@ use super::*;
 use crate::doctor::contract::{DoctorCtx, FindingSeverity};
 #[cfg(feature = "web3")]
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 #[cfg(feature = "web3")]

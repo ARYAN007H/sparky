@@ -1,4 +1,4 @@
-use super::{failure_finding, MemoryRoundtripCheck, Operation};
+use super::{MemoryRoundtripCheck, Operation, failure_finding};
 use crate::config::Config;
 use crate::core::runtime::{CoreContext, DomainSet};
 use crate::core::slots::Extensions;
@@ -6,8 +6,8 @@ use crate::doctor::contract::{DoctorCheck, DoctorCtx, FindingSeverity};
 use crate::memory::test_fixtures::stored;
 use async_trait::async_trait;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
 };
 use tempfile::TempDir;
 use tinymemory_api::conformance::ReferenceEngine;
@@ -270,9 +270,11 @@ async fn fetch_failure_still_cleans_the_unique_service_scoped_item() {
         let (scratch_id, namespace) = &calls.stored[0];
         assert_ne!(scratch_id, &real_id);
         assert_ne!(scratch_id.as_str(), "doctor:probe");
-        assert!(namespace
-            .to_string()
-            .starts_with("service:openhuman-doctor-"));
+        assert!(
+            namespace
+                .to_string()
+                .starts_with("service:openhuman-doctor-")
+        );
         assert!(!Reach::subtree(Namespace::ROOT).admits(namespace));
         assert_eq!(calls.scoped_forgets.len(), 1);
         assert_eq!(calls.scoped_forgets[0].0, vec![scratch_id.clone()]);
@@ -347,17 +349,23 @@ fn plan_required_memory_failure_has_safe_plan_guidance_and_cleanup_warning() {
     );
 
     assert_eq!(finding.severity, FindingSeverity::Error);
-    assert!(finding
-        .message
-        .contains("not included in the selected account's plan"));
+    assert!(
+        finding
+            .message
+            .contains("not included in the selected account's plan")
+    );
     assert!(!finding.message.contains("MEMORY_PLAN_REQUIRED"));
     assert!(!finding.message.contains("private-host.example"));
-    assert!(finding
-        .fix_hint
-        .contains("Upgrade to a plan that includes memory"));
-    assert!(finding
-        .fix_hint
-        .contains("could not confirm scratch cleanup"));
+    assert!(
+        finding
+            .fix_hint
+            .contains("Upgrade to a plan that includes memory")
+    );
+    assert!(
+        finding
+            .fix_hint
+            .contains("could not confirm scratch cleanup")
+    );
 }
 
 #[tokio::test]

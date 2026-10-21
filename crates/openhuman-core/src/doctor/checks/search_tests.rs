@@ -4,8 +4,8 @@ use crate::config::{
 };
 use crate::doctor::contract::{DoctorCtx, FindingSeverity};
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 struct FixedManagedResolver {
