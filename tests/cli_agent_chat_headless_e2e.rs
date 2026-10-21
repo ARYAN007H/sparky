@@ -81,10 +81,8 @@ fn set_mock_behavior(origin: &str, behavior: Value) {
         .json(&json!({ "behavior": behavior, "mode": "replace" }))
         .send()
         .expect("configure mock behavior");
-    assert!(
-        response.status().is_success(),
-        "mock behavior setup: {response}"
-    );
+    let status = response.status();
+    assert!(status.is_success(), "mock behavior setup returned {status}");
 }
 
 fn mock_requests(origin: &str) -> Value {
