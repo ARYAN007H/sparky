@@ -6,6 +6,9 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
+use tinystoragedrivers::secrets::DerivedKeys;
+use tinystoragedrivers::StorageBackend;
+use zeroize::Zeroizing;
 
 const TOKEN: &str = "legacy-profile-boot-e2e-token";
 const FIXTURE: &[u8] = include_bytes!(
@@ -92,7 +95,60 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
     .unwrap();
     let source = workspace.join("storage/storage.db");
     std::fs::write(&source, FIXTURE).unwrap();
+    seed_legacy_session_db(&workspace);
     (profile, source)
+}
+
+fn seed_legacy_session_db(workspace: &Path) {
+    use openhuman_core::storage::rusqlite::{Connection, params};
+
+    let path = workspace.join("session_db/sessions.db");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let db = Connection::open(path).unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions (
+            id TEXT PRIMARY KEY, agent_definition_id TEXT NOT NULL,
+            agent_definition_name TEXT NOT NULL, session_key TEXT NOT NULL,
+            status TEXT NOT NULL, turn_count INTEGER NOT NULL,
+            input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+            cached_input_tokens INTEGER NOT NULL, cost_usd REAL NOT NULL,
+            started_at TEXT NOT NULL);
+         CREATE TABLE session_messages (
+            id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL,
+            content TEXT NOT NULL, created_at TEXT NOT NULL);
+         CREATE TABLE session_tool_calls (
+            id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, message_id INTEGER,
+            tool_name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);",
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO sessions VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        params![
+            "fixture-session",
+            "default",
+            "Default",
+            "fixture-thread",
+            "completed",
+            1,
+            1,
+            1,
+            0,
+            0.0,
+            "2025-02-03T04:05:06Z"
+        ],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO session_messages VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            1,
+            "fixture-session",
+            "assistant",
+            "Preserved fixture answer",
+            "2025-02-03T04:06:07Z"
+        ],
+    )
+    .unwrap();
 }
 
 #[test]
@@ -125,4 +181,23 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         source_bytes,
         "boot must leave the historical v1 storage.db byte-for-byte unchanged"
     );
+
+    // Read the confidential record with TinyStorage's document-secret owner
+    // API after the desktop boot has installed and migrated the profile DB.
+    let url = format!("sqlite:{}", profile.join("storage.db").display());
+    let backend = openhuman_core::storage::block_on(async {
+        openhuman_core::storage::open(&url).await
+    })
+    .unwrap();
+    let scope = openhuman_core::storage::Scope::new("u:u1").unwrap();
+    let scoped = backend.for_scope(&scope).unwrap();
+    let secrets = openhuman_core::storage::secrets::over(
+        &scoped,
+        scope,
+        std::sync::Arc::new(DerivedKeys::new(Zeroizing::new([0x5a; 32]))),
+    );
+    let secret = openhuman_core::storage::secrets::get_blocking(&secrets, "fixture-secret")
+        .unwrap()
+        .unwrap();
+    assert_eq!(secret.as_slice(), b"historical-secret-value");
 }

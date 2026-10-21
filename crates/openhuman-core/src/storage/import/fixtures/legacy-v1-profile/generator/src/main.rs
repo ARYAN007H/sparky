@@ -1,9 +1,12 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tinystoragedrivers::secrets::{DerivedKeys, DocumentSecrets, SecretStore};
 use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageConfig, WriteOptions};
+use zeroize::Zeroizing;
 
 const PROFILE_ID: &str = "u1";
 const CREATED_AT_MS: i64 = 1_738_548_306_000;
@@ -204,6 +207,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         WriteOptions::new().created_ms(CREATED_AT_MS),
     )
     .await?;
+
+    // Legacy profile-owned records whose public owners must continue to read
+    // them after the profile's real v1-to-v2 boot migration.
+    put(
+        profile_scope.documents(),
+        "approvals",
+        "fixture-approval",
+        json!({
+            "tool_name": "shell",
+            "action_summary": "Fixture approval",
+            "args_redacted": "{}",
+            "session_id": "fixture-session",
+            "created_at": "2025-02-03T04:05:06Z",
+            "expires_at": "2099-02-03T04:05:06Z",
+            "pending": true,
+            "agent_id": "default"
+        }),
+    )
+    .await?;
+    put(
+        profile_scope.documents(),
+        "threads_transcript_keys",
+        "fixture-thread",
+        json!({"transcript_key": "fixture-transcript-key"}),
+    )
+    .await?;
+
+    let legacy_flow_scope = backend.for_scope(&Scope::local())?;
+    put(
+        legacy_flow_scope.documents(),
+        "flows_definitions",
+        "fixture-flow",
+        json!({
+            "name": "Fixture flow",
+            "graph_json": "{\"nodes\":[{\"id\":\"trigger\",\"kind\":\"trigger\",\"name\":\"Manual\"}],\"edges\":[]}",
+            "enabled": false,
+            "created_at": "2025-02-03T04:05:06Z",
+            "updated_at": "2025-02-03T04:05:06Z",
+            "require_approval": false,
+            "incarnation": "fixture-incarnation"
+        }),
+    )
+    .await?;
+
+    let secret_store = DocumentSecrets::new(
+        &profile_scope,
+        Arc::new(DerivedKeys::new(Zeroizing::new([0x5a; 32]))),
+    );
+    secret_store
+        .set("fixture-secret", b"historical-secret-value")
+        .await?;
 
     backend
         .checkpoint(tinystoragedrivers::Checkpoint::Truncate)
