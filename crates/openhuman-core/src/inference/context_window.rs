@@ -177,9 +177,12 @@ fn route_input(
         tinyinference_local::profile::context_window_with_local_fallback(model, None, Some(kind))
     });
     route.discovery = match local_kind {
-        None => Some(extensions).and_then(|extensions| {
-            model_limits_request_for(role, provider, model, config, extensions)
-        }),
+        None => match extensions {
+            Some(extensions) => {
+                model_limits_request_for(role, provider, model, config, extensions)
+            }
+            None => model_limits_request(role, provider, model, config),
+        },
         Some(LocalProviderKind::Ollama) => None,
         Some(_) => None,
     };
