@@ -9604,7 +9604,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.19.5"
+version = "0.20.0"
 dependencies = [
  "base64 0.23.1",
  "dirs 7.0.0",
@@ -9624,7 +9624,6 @@ dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-secrets",
  "tinytools 0.6.0",
- "tinytools-std",
  "tokio",
  "tracing",
  "url",
@@ -9634,7 +9633,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.19.5"
+version = "0.20.0"
 dependencies = [
  "base64 0.23.1",
  "schemars",
