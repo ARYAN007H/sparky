@@ -273,7 +273,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 .filter(|_| !response.served_from_cache)
             {
                 let host_usage =
-                    crate::inference::provider::model::usage_info_from_response(response)
+                    tinyinference_llm::usage::usage_info_from_response(response)
                         .unwrap_or(
                             crate::inference::provider::BilledUsage::from_counts(
                                 usage.input_tokens,

@@ -55,7 +55,7 @@ impl ChatModel<()> for RecordingProvider {
             }
         };
         Ok(
-            crate::inference::provider::model::native_model_response_for_request(
+            tinyinference_llm::model::response_to_model_response(
                 &response, &request,
             ),
         )

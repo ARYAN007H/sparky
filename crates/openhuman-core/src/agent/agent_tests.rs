@@ -88,7 +88,7 @@ impl ChatModel<()> for ScriptedProvider {
             guard.remove(0)
         };
         Ok(
-            crate::inference::provider::model::native_model_response_for_request(
+            tinyinference_llm::model::response_to_model_response(
                 &response, &request,
             ),
         )

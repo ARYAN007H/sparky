@@ -86,7 +86,7 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
                         &response,
                     );
                 }
-                let usage = crate::inference::provider::model::usage_info_from_response(&response);
+                let usage = tinyinference_llm::usage::usage_info_from_response(&response);
                 *self
                     .usage
                     .lock()

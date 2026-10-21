@@ -85,7 +85,7 @@ impl RepairUsage {
         trace: Option<&SupplementalTrace>,
     ) {
         self.record(
-            response.and_then(crate::inference::provider::model::usage_info_from_response),
+            response.and_then(tinyinference_llm::usage::usage_info_from_response),
             kind != tinyagents_harness::close::CloseRequestKind::Verification,
             trace,
         );
