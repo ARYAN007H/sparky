@@ -30,17 +30,19 @@ owner models and writer transformations from `2d3e22636e^`:
 - `secrets` contains an encrypted `fixture-secret` document in the same scope
   using the fixture-only master key `[0x5a; 32]`; the integration test reads it
   with TinyStorage's `DocumentSecrets` API after desktop boot.
-- The generator also emits the retired workspace conversation log at
-  `legacy-workspace/memory/conversations/threads.jsonl`; the host E2E copies it
-  to the profile workspace and confirms the thread owner imports it read-only.
+- The generator also emits the retired workspace conversation log and its
+  `fixture-thread` message under `legacy-workspace/memory/conversations/`; the
+  host E2E copies them to the profile workspace and confirms the thread owner
+  imports both through its read-only legacy importer.
 
 The host E2E test copies this database to an existing profile's
 `users/u1/workspace/storage/storage.db`, boots the desktop host with layout
-auto-migration enabled, and reads threads, approvals, secrets, and flows
-through their owner APIs. It compares the legacy database bytes before and
-after boot. The focused core import test continues to verify the owner schema
-conversions for cost, artifacts, and profile metadata, as well as
-non-resurrection after deletion.
+auto-migration enabled, then restores the migration archive to a separate
+temporary directory and compares the archived database byte-for-byte with the
+fixture. It reads thread messages, approvals, secrets, and flows from the
+migrated profile through their owner APIs. The focused core import test
+continues to verify the owner schema conversions for cost, artifacts, and
+profile metadata, as well as non-resurrection after deletion.
 
 The standalone generator is under `generator/`; it is not a workspace member
 or product dependency. Regenerate a fresh database at a caller-selected path:
@@ -49,6 +51,4 @@ or product dependency. Regenerate a fresh database at a caller-selected path:
 cargo run --locked --manifest-path crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/generator/Cargo.toml -- /absolute/path/to/storage.db
 ```
 
-The checked-in database SHA-256 is
-`49b66df6c281f1991323440ada78fe0925bc260963258920758ce64be4093ac8`.
-Regenerate and verify it with `sha256sum` when updating the fixture.
+Regenerate the fixture and verify its SHA-256 with `sha256sum` when updating it.
