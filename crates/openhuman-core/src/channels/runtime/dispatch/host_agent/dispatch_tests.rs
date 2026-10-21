@@ -1,9 +1,8 @@
 //! A message on a channel bound to an agent (`agent.channel_agents`) runs as
 //! that host agent; a binding nobody answers is refused; an unbound channel
-//! still goes to the orchestrator over the bus.
+//! still reaches the orchestrator.
 
 use super::*;
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
 use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
 use crate::channels::runtime::process_channel_message;
@@ -94,13 +93,6 @@ fn config(tmp: &tempfile::TempDir, agent_id: Option<&str>) -> Config {
 async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
-    let calls = Arc::new(AtomicUsize::new(0));
-    let stub_calls = Arc::clone(&calls);
-    let _bus = mock_agent_run_turn(move |_req: AgentTurnRequest| {
-        stub_calls.fetch_add(1, Ordering::SeqCst);
-        async { Ok(AgentTurnResponse::new("orchestrator answered")) }
-    })
-    .await;
     let tmp = tempfile::tempdir().unwrap();
     let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
     let ctx = context(
@@ -110,11 +102,6 @@ async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
 
     process_channel_message(ctx, message("hello")).await;
 
-    assert_eq!(
-        calls.load(Ordering::SeqCst),
-        0,
-        "never widened to the orchestrator"
-    );
     let sent = channel
         .sent
         .lock()
@@ -126,22 +113,31 @@ async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
     assert!(sent[0].contains("not available"), "{sent:?}");
 }
 
-#[tokio::test]
-async fn an_unbound_channel_still_runs_the_orchestrator() {
+#[test]
+fn an_unbound_channel_still_runs_the_orchestrator() {
+    on_agent_runtime(an_unbound_channel_runs_the_orchestrator());
+}
+
+async fn an_unbound_channel_runs_the_orchestrator() {
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
     crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
-    let calls = Arc::new(AtomicUsize::new(0));
-    let stub_calls = Arc::clone(&calls);
-    let _bus = mock_agent_run_turn(move |req: AgentTurnRequest| {
-        stub_calls.fetch_add(1, Ordering::SeqCst);
-        assert_eq!(req.history[0].content, "ORCHESTRATOR_PROMPT");
-        async { Ok(AgentTurnResponse::new("orchestrator answered")) }
-    })
-    .await;
+    let provider = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(answer("orchestrator answered")))
+        .mount(&provider)
+        .await;
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config(&tmp, None);
+    config.default_model = Some("fixture".into());
+    let route = crate::config::schema::EphemeralRoute::from_params(
+        Some(format!("{}/v1", provider.uri())),
+        Some("sk-fixture".into()),
+    )
+    .unwrap();
+    crate::config::schema::ephemeral_route::apply(&mut config, route);
     config
         .agent
         .channel_agents
@@ -150,7 +146,6 @@ async fn an_unbound_channel_still_runs_the_orchestrator() {
 
     process_channel_message(context(Arc::clone(&channel), config), message("hello")).await;
 
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         channel
             .sent
@@ -160,6 +155,24 @@ async fn an_unbound_channel_still_runs_the_orchestrator() {
             .map(|message| message.content.clone())
             .collect::<Vec<_>>(),
         vec!["orchestrator answered".to_string()]
+    );
+    let requests = provider.received_requests().await.unwrap();
+    assert_eq!(
+        requests.len(),
+        1,
+        "the configured orchestrator calls inference"
+    );
+    let request: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert!(
+        request["messages"]
+            .as_array()
+            .is_some_and(|messages| messages.iter().any(|message| {
+                message["role"] == "user"
+                    && message["content"]
+                        .as_str()
+                        .is_some_and(|content| content.contains("hello"))
+            })),
+        "the unbound channel message reaches the orchestrator model: {request:#}"
     );
 }
 

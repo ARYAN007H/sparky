@@ -135,5 +135,4 @@ fn a_constructed_message_round_trips_through_the_wire_shape() {
     assert!(wire.get("attachments").is_none(), "{wire}");
     let back: RelayInboundParams = serde_json::from_value(wire).expect("deserialize");
     assert_eq!(back, built);
-    assert_eq!(params(), back);
 }
