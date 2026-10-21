@@ -49,7 +49,7 @@ fn spec_keeps_the_slug_as_provider_name_and_picks_the_kind_from_auth() {
 }
 
 #[test]
-fn managed_jwt_style_never_maps_onto_the_registry() {
+fn auth_style_conversion_maps_managed_jwt_to_the_registry_neutral_style() {
     let _: tinyinference_llm::providers::openai::AuthStyle = AuthStyle::Bearer.into();
     assert_eq!(
         tinyinference_llm::providers::openai::AuthStyle::from(AuthStyle::OpenhumanJwt),

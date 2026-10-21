@@ -12,6 +12,18 @@ pub fn auth_key_for_slug(slug: &str) -> String {
     format!("provider:{slug}")
 }
 
+/// Redact a configured endpoint to its origin for host diagnostics.
+///
+/// TinyInference's sanitizer keeps URL paths for routing diagnostics, while
+/// OpenHuman endpoints may carry credentials in path segments. Keep this host
+/// log policy origin-only and never fall back to the unparsed input.
+pub(crate) fn redact_endpoint_origin(endpoint: &str) -> String {
+    let Ok(url) = reqwest::Url::parse(endpoint.trim()) else {
+        return "<endpoint>".to_string();
+    };
+    tinyinference_core::sanitize::redact_url(&url.origin().ascii_serialization())
+}
+
 /// Whether the openai bearer that [`lookup_key_for_slug`] resolves is an OAuth
 /// (Codex-subscription) credential rather than a standard API key.
 ///
