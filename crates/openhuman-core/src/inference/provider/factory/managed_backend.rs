@@ -94,7 +94,7 @@ pub(super) fn managed_chat_model_for(
         thread_id,
         context: &context,
     };
-    Ok(overrides.build_chat(PROVIDER_OPENHUMAN, &request, |_| unreachable!("provider override was selected"))?)
+    Ok((entry.build)(&request)?)
 }
 
 /// Construct a managed turn model with the explicit OpenHuman thread attached.
@@ -176,7 +176,7 @@ pub(crate) fn make_openhuman_backend_model_for_options(
     model: &str,
     thread_id: Option<&str>,
 ) -> anyhow::Result<ManagedChatModel> {
-    let overrides = crate::inference::registry::provider_overrides(None);
+    let overrides = crate::inference::registry::ambient_provider_overrides();
     let Some(entry) = overrides.chat_entry(PROVIDER_OPENHUMAN) else {
         return Err(managed_unavailable_error());
     };
@@ -198,5 +198,5 @@ pub(crate) fn make_openhuman_backend_model_for_options(
         thread_id,
         context: &context,
     };
-    Ok(overrides.build_chat(PROVIDER_OPENHUMAN, &request, |_| unreachable!("provider override was selected"))?)
+    Ok((entry.build)(&request)?)
 }
