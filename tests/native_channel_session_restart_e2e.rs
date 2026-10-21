@@ -604,6 +604,12 @@ fn assert_model_received_file_content(request: &Value) {
     {
         let encoded = serde_json::to_string(document).expect("serialize typed document");
         assert!(encoded.contains("text/plain"), "typed file MIME: {encoded}");
+        let base64 = base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES);
+        assert!(
+            encoded.contains(&base64)
+                || encoded.contains(std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+            "typed document carries the downloaded file bytes: {encoded}"
+        );
     } else {
         assert!(
             content_has_text_block(content, std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
