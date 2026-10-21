@@ -640,8 +640,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     );
     tokio::select! {
         result = &mut turn => panic!(
-            "channel pipeline completed before a model request: result={result:?}, sent={:#?}, provider_requests={:#?}",
-            channel.sent.lock().unwrap(),
+            "channel pipeline completed before a model request: result={result:?}, provider_requests={:#?}",
             server.received_requests().await.unwrap(),
         ),
         arrived = tokio::time::timeout(
@@ -649,8 +648,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
             request_arrived.notified(),
         ) => if arrived.is_err() {
             panic!(
-                "no model request reached the delayed provider; sent={:#?}, provider_requests={:#?}",
-                channel.sent.lock().unwrap(),
+                "no model request reached the delayed provider; provider_requests={:#?}",
                 server.received_requests().await.unwrap(),
             );
         },
