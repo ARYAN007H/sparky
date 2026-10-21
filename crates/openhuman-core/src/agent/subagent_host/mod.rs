@@ -36,8 +36,8 @@
 //! | `ops/`            | typed/fork mode and TinyAgents graph route                 |
 //! | `tool_prep.rs`    | Tool filtering + prompt loading + prompt protocol block     |
 
-mod fork_context;
 mod autonomous;
+mod fork_context;
 mod lifecycle;
 mod ops;
 mod tool_prep;
