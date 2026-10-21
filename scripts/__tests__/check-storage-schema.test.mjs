@@ -61,20 +61,26 @@ test('indexed time fields must be epoch milliseconds', () => {
   assert.match(problems[1], /expires_at/);
 });
 
-test('the rendering is stable and lists the composed collection declarations', () => {
+test('the rendering is stable and inventories CollectionSpecs by owner namespace', () => {
   const dump = {
     collections: [
-      collection('b.x'),
       collection('a.y', {
         indexes: [{ name: 'by_created', fields: ['created_ms'], unique: true }],
         search: { fields: ['title'] },
       }),
+      collection('b.x'),
+      collection('a.z', { ttl_field: 'expires_ms' }),
     ],
   };
   const text = render(dump);
   assert.ok(text.indexOf('`a.y`') < text.indexOf('`b.x`'));
+  assert.ok(text.indexOf('`a.y`') < text.indexOf('`a.z`'));
+  assert.match(text, /## a\n/);
+  assert.match(text, /## b\n/);
+  assert.doesNotMatch(text, /composed registry/i);
   assert.match(text, /by_created/);
-  assert.match(text, /Search fields/);
+  assert.match(text, /`expires_ms`/);
+  assert.match(text, /`title`/);
   assert.equal(render(dump), text);
 });
 
