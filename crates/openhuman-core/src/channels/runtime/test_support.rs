@@ -368,7 +368,11 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         reliability: Arc::new(ReliabilityConfig::default()),
         provider_runtime_options: ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(harness_workspace_dir),
-        message_timeout_secs: options.timeout_secs,
+        // Mirror the owning TinyChannels runtime's validated floor even when
+        // a test supplies an undersized value directly.
+        message_timeout_secs: options
+            .timeout_secs
+            .max(tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
         multimodal: MultimodalConfig::default(),
         multimodal_files: MultimodalFileConfig::default(),
         config: None,

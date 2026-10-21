@@ -670,13 +670,13 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
     assert!(!observed.allow_remote_fetch);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn dispatch_replies_with_timeout_notice_when_handler_exceeds_deadline() {
     let timed_out = run_dispatch_harness(DispatchHarnessOptions {
         channel_name: "email".to_string(),
         content: "force timeout".to_string(),
-        handler_delay_ms: 1_200,
-        timeout_secs: 1,
+        handler_delay_ms: 31_000,
+        timeout_secs: tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
         ..Default::default()
     })
     .await;
