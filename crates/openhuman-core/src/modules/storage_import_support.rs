@@ -19,10 +19,10 @@ use tinystoragedrivers_types::WriteOptions;
 /// Storage and profile admission captured from the import caller's context.
 /// Keeping the profile alive prevents eviction until all writes using the
 /// captured lease fence have completed.
-struct CapturedModuleStorage {
-    backend: Arc<dyn crate::storage::StorageBackend>,
-    scope: crate::storage::Scope,
-    _profile: Option<Arc<crate::profiles::Profile>>,
+pub(super) struct CapturedModuleStorage {
+    pub(super) backend: Arc<dyn crate::storage::StorageBackend>,
+    pub(super) scope: crate::storage::Scope,
+    pub(super) _profile: Option<Arc<crate::profiles::Profile>>,
 }
 
 fn capture_module_storage(
@@ -61,7 +61,7 @@ fn capture_module_storage(
     )?))
 }
 
-fn capture_profile_module_storage(
+pub(super) fn capture_profile_module_storage(
     host: &crate::profiles::ProfileHost,
     id: &crate::profiles::ProfileId,
     profile_id: &str,

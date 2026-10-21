@@ -288,3 +288,57 @@ fn a_context_from_before_profile_takeover_cannot_import_under_the_new_lease() {
     .unwrap_err();
     assert!(error.to_string().contains("currently admitted context"));
 }
+
+#[tokio::test]
+async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
+    use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
+    use crate::profiles::{ProfileHost, ProfileId, ProfileIdMode};
+
+    let root = tempfile::tempdir().unwrap();
+    let fixture = crate::storage::test_support::sqlite_backend().unwrap();
+    let backend: Arc<dyn StorageBackend> = Arc::clone(&fixture.backend);
+    let id = ProfileId::for_user("import-takeover", ProfileIdMode::Raw).unwrap();
+    let host = ProfileHost::with_backend(
+        SaasConfig::new(root.path()),
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(Arc::clone(&backend)),
+    )
+    .unwrap()
+    .with_fences(Arc::new(crate::storage::fence::FenceRegistry::new(
+        crate::profiles::lease::now_ms,
+    )));
+    host.provision(&id).await.unwrap();
+
+    let old_profile = host.open(&id).await.unwrap();
+    let old_context = Arc::clone(old_profile.context());
+    drop(old_profile);
+    assert!(host.release(&id).await.unwrap());
+    let current_profile = host.open(&id).await.unwrap();
+    let current_context = Arc::clone(current_profile.context());
+    assert!(!Arc::ptr_eq(&old_context, &current_context));
+
+    let module_scope = crate::storage::scope_for_module(Some(id.as_str()), MODULE_ID).unwrap();
+    let stale = super::super::storage_import_support::capture_profile_module_storage(
+        &host,
+        &id,
+        id.as_str(),
+        &old_context,
+        module_scope.clone(),
+    );
+    assert!(
+        stale.is_err(),
+        "old dispatch context cannot borrow the new fence"
+    );
+
+    let captured = super::super::storage_import_support::capture_profile_module_storage(
+        &host,
+        &id,
+        id.as_str(),
+        &current_context,
+        module_scope,
+    )
+    .unwrap();
+    // The capture retains the profile object as long as its claim/payload
+    // closure owns it. Its backend is the exact context's fence wrapper.
+    let _scoped = captured.backend.for_scope(&captured.scope).unwrap();
+}
