@@ -2,42 +2,21 @@ use super::*;
 
 #[test]
 fn raw_encryption_security_registry_matches_its_independent_contract() {
-    let entries: Vec<_> = registry()
-        .iter()
-        .filter(|row| matches!(row.controller.schema.namespace, "encrypt" | "decrypt"))
-        .collect();
-    let contracts = crate::security::encryption::encryption_parameter_contracts();
-
-    assert_eq!(entries.len(), 2, "complete raw encryption inventory");
-    assert_eq!(
-        entries
-            .iter()
-            .map(|row| row.controller.schema.method_name())
-            .collect::<Vec<_>>(),
-        ["encrypt.secret", "decrypt.secret"],
-        "encryption registration order is a wire contract"
-    );
-    assert!(entries.iter().all(|row| {
-        row.group == DomainGroup::Security
-            && ["encrypt", "decrypt"].contains(&row.controller.schema.namespace)
-    }));
-    assert!(internal_registry()
-        .iter()
-        .all(|row| !matches!(row.controller.schema.namespace, "encrypt" | "decrypt")));
-    assert_eq!(
-        entries
-            .iter()
-            .map(|row| row.controller.rpc_method_name())
-            .collect::<Vec<_>>(),
-        ["openhuman.encrypt_secret", "openhuman.decrypt_secret"]
-    );
-
-    let entries = entries
-        .into_iter()
-        .map(|row| row.controller.clone())
-        .collect::<Vec<_>>();
-    verify_parameter_contracts(&entries, &contracts)
-        .expect("raw encryption entries use their declared schemas and runtime decoders");
+    let contract = super::registry_test_support::BoundFamilyWireContract {
+        namespaces: &["encrypt", "decrypt"],
+        group: DomainGroup::Security,
+        methods: &[
+            ("encrypt.secret", "openhuman.encrypt_secret"),
+            ("decrypt.secret", "openhuman.decrypt_secret"),
+        ],
+    };
+    super::registry_test_support::verify_family_contract(
+        registry(),
+        internal_registry(),
+        &contract,
+        &crate::security::encryption::encryption_parameter_contracts(),
+    )
+    .expect("raw Encryption entries retain their ordered wire contracts");
 }
 
 #[test]

@@ -1,56 +1,53 @@
 use super::*;
-use crate::core::TypeSchema;
 
 #[test]
 fn raw_app_state_desktop_registry_matches_its_independent_contract() {
+    let contract = super::registry_test_support::BoundFamilyWireContract {
+        namespaces: &["app_state"],
+        group: DomainGroup::Desktop,
+        methods: &[
+            ("app_state.snapshot", "openhuman.app_state_snapshot"),
+            (
+                "app_state.update_local_state",
+                "openhuman.app_state_update_local_state",
+            ),
+        ],
+    };
+    super::registry_test_support::verify_family_contract(
+        registry(),
+        internal_registry(),
+        &contract,
+        &crate::desktop::app_state::app_state_parameter_contracts(),
+    )
+    .expect("raw AppState entries retain their ordered wire contracts");
     let entries: Vec<_> = registry()
         .iter()
         .filter(|row| row.controller.schema.namespace == "app_state")
         .collect();
-    let methods = ["app_state.snapshot", "app_state.update_local_state"];
-    let contracts = crate::desktop::app_state::app_state_parameter_contracts();
-
+    let result = [("result", TypeSchema::Json, true)];
     assert_eq!(
-        entries.len(),
-        methods.len(),
-        "complete raw app_state inventory"
+        crate::core::all::verify_wire_fields(&entries[0].controller.schema.inputs, &[]),
+        Ok(())
     );
     assert_eq!(
-        entries
-            .iter()
-            .map(|row| row.controller.schema.method_name())
-            .collect::<Vec<_>>(),
-        methods,
-        "app_state registration order is a wire contract"
+        crate::core::all::verify_wire_fields(&entries[0].controller.schema.outputs, &result),
+        Ok(())
     );
-    assert!(entries.iter().all(|row| row.group == DomainGroup::Desktop));
-    assert!(internal_registry()
-        .iter()
-        .all(|row| row.controller.schema.namespace != "app_state"));
     assert_eq!(
-        entries
-            .iter()
-            .map(|row| row.controller.rpc_method_name())
-            .collect::<Vec<_>>(),
-        [
-            "openhuman.app_state_snapshot",
-            "openhuman.app_state_update_local_state"
-        ]
+        crate::core::all::verify_wire_fields(
+            &entries[1].controller.schema.inputs,
+            &[
+                ("encryptionKey", TypeSchema::Json, false),
+                ("onboardingTasks", TypeSchema::Json, false),
+                ("keyringConsent", TypeSchema::Json, false),
+            ]
+        ),
+        Ok(())
     );
-    for entry in &entries {
-        let outputs = &entry.controller.schema.outputs;
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].name, "result");
-        assert!(outputs[0].required);
-        assert!(matches!(&outputs[0].ty, TypeSchema::Json));
-    }
-
-    let entries: Vec<_> = entries
-        .into_iter()
-        .map(|row| row.controller.clone())
-        .collect();
-    crate::core::all::verify_parameter_contracts(&entries, &contracts)
-        .expect("raw app_state entries use their declared schemas and runtime decoders");
+    assert_eq!(
+        crate::core::all::verify_wire_fields(&entries[1].controller.schema.outputs, &result),
+        Ok(())
+    );
 }
 
 #[test]

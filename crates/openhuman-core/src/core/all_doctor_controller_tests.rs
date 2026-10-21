@@ -1,57 +1,52 @@
 use super::*;
-use crate::core::TypeSchema;
 
 #[test]
 fn raw_doctor_platform_registry_matches_its_independent_contract() {
+    let contract = super::registry_test_support::BoundFamilyWireContract {
+        namespaces: &["doctor"],
+        group: DomainGroup::Platform,
+        methods: &[
+            ("doctor.report", "openhuman.doctor_report"),
+            ("doctor.models", "openhuman.doctor_models"),
+        ],
+    };
+    super::registry_test_support::verify_family_contract(
+        registry(),
+        internal_registry(),
+        &contract,
+        &crate::platform::doctor::doctor_parameter_contracts(),
+    )
+    .expect("raw Doctor entries retain their ordered wire contracts");
     let entries: Vec<_> = registry()
         .iter()
         .filter(|row| row.controller.schema.namespace == "doctor")
         .collect();
-    let contracts = crate::platform::doctor::doctor_parameter_contracts();
-    let methods = ["doctor.report", "doctor.models"];
-
+    let use_cache = TypeSchema::Option(Box::new(TypeSchema::Bool));
     assert_eq!(
-        entries.len(),
-        methods.len(),
-        "complete raw Doctor inventory"
+        crate::core::all::verify_wire_fields(&entries[0].controller.schema.inputs, &[]),
+        Ok(())
     );
     assert_eq!(
-        entries
-            .iter()
-            .map(|row| row.controller.schema.method_name())
-            .collect::<Vec<_>>(),
-        methods,
-        "Doctor registration order is a wire contract"
+        crate::core::all::verify_wire_fields(
+            &entries[0].controller.schema.outputs,
+            &[("report", TypeSchema::Ref("DoctorReport"), true)]
+        ),
+        Ok(())
     );
-    assert!(entries.iter().all(|row| row.group == DomainGroup::Platform));
-    assert!(internal_registry()
-        .iter()
-        .all(|row| row.controller.schema.namespace != "doctor"));
     assert_eq!(
-        entries
-            .iter()
-            .map(|row| row.controller.rpc_method_name())
-            .collect::<Vec<_>>(),
-        ["openhuman.doctor_report", "openhuman.doctor_models"]
+        crate::core::all::verify_wire_fields(
+            &entries[1].controller.schema.inputs,
+            &[("use_cache", use_cache, false)]
+        ),
+        Ok(())
     );
-
-    for (entry, output_type) in entries.iter().zip(["DoctorReport", "ModelProbeReport"]) {
-        let outputs = &entry.controller.schema.outputs;
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].name, "report");
-        assert!(outputs[0].required);
-        assert!(matches!(
-            &outputs[0].ty,
-            TypeSchema::Ref(name) if *name == output_type
-        ));
-    }
-
-    let entries: Vec<_> = entries
-        .into_iter()
-        .map(|row| row.controller.clone())
-        .collect();
-    crate::core::all::verify_parameter_contracts(&entries, &contracts)
-        .expect("raw Doctor entries use their declared schemas and runtime decoders");
+    assert_eq!(
+        crate::core::all::verify_wire_fields(
+            &entries[1].controller.schema.outputs,
+            &[("report", TypeSchema::Ref("ModelProbeReport"), true)]
+        ),
+        Ok(())
+    );
 }
 
 #[test]
