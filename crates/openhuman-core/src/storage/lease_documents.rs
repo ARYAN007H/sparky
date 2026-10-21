@@ -8,10 +8,11 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageBackend};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Key, Precondition, Scope, StorageBackend};
 use tinystoragedrivers_api::DocumentStore;
 use tinystoragedrivers_types::{
-    Filter, Key, Scope as DriverScope, Version, Versioned, WriteCondition, WriteOptions,
+    Filter, Scope as DriverScope, Version, Versioned, WriteCondition, WriteOptions,
+};
 };
 
 use super::StorageError;
@@ -399,6 +400,27 @@ impl LeaseStore for DocumentLeases {
         validate_key(key)?;
         self.declare().await?;
         Ok(self.read(key).await?.map(|record| record_of(record.doc)))
+    }
+
+    async fn holder_readonly(&self, key: &str) -> Result<Option<LeaseRecord>, LeaseError> {
+        validate_key(key)?;
+        match self.docs.validate_collection_spec(&CollectionSpec::new(LEASE_COLLECTION)).await {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                match self.docs.validate_collection_spec(&CollectionSpec::new("leases")).await {
+                    Ok(()) => return Err(LeaseError::Storage(StorageError::backend(
+                        "legacy profile leases require explicit storage migration",
+                    ))),
+                    Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+                    Err(error) => return Err(LeaseError::Storage(error.into())),
+                }
+            }
+            Err(error) => return Err(LeaseError::Storage(error.into())),
+        }
+        self.read(key)
+            .await
+            .map(|record| record.map(|record| record_of(record.doc)))
+            .map_err(LeaseError::from)
     }
 
     fn write_condition(&self, key: &str, node: &str, epoch: u64) -> Option<WriteCondition> {

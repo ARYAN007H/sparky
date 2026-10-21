@@ -531,6 +531,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     '保留中のデスクトップ承認を読み込めませんでした。更新して再試行してください。',
   'desktop.unsupported': 'このランタイムではデスクトップ制御は利用できません。',
+  'desktop.unsupportedWindows':
+    'Windows ではデスクトップ制御はまだ利用できません。ブラウザ制御は Windows でも利用できます。',
   'desktop.localOnly': 'この設定はこのコンピュータにのみ適用されます。',
   'desktop.permissions': 'システム権限',
   'desktop.openSettings': '設定を開く',
@@ -711,6 +713,15 @@ const messages: TranslationMap = {
 
   // Developer Options / Developer & Diagnostics
   'devOptions.titleDiagnostics': '開発者向けと診断',
+  'devOptions.doctor.run': '診断を実行',
+  'devOptions.doctor.runLive': 'ライブチェックを実行',
+  'devOptions.doctor.liveWarning':
+    'ライブチェックではモデルまたは埋め込みの呼び出しにトークンを消費する場合があります。続行しますか？',
+  'devOptions.doctor.severity.pass': '合格',
+  'devOptions.doctor.severity.info': '情報',
+  'devOptions.doctor.severity.warn': '警告',
+  'devOptions.doctor.severity.error': 'エラー',
+  'devOptions.doctor.severity.skipped': 'スキップ',
   'devOptions.diagnostics': '診断',
   'devOptions.toolPolicyDiagnosticsDesc':
     'ツールインベントリ、ポリシー状態、MCP 許可リスト、および最近のブロック',
@@ -1481,6 +1492,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'メッセージの読み込みに失敗しました',
   'chat.thinkingDots': '思考中...',
   'chat.status.thinkingElapsed': '思考中 · {elapsed}',
+  'chat.status.compacting': 'これまでの会話を要約中…',
+  'chat.status.compactingElapsed': 'これまでの会話を要約中 · {elapsed}',
   'chat.status.waitingApproval': '承認を待っています',
   'chat.status.waitingReview': 'レビューを待っています',
   'chat.status.waitingAnswer': '回答を待っています',
@@ -4716,6 +4729,10 @@ const messages: TranslationMap = {
     '現在、メモリーに接続できません。保存済みの内容は失われていません。少し待ってから再試行してください。',
   'memory.outOfCredits.title': 'クレジット不足',
   'memory.outOfCredits.action': 'チャージする',
+  'memory.error.planRequired':
+    '現在のプランにはメモリが含まれていないため、OpenHuman は学んだことを保存したり参照したりできません。メモリを有効にするにはプランをアップグレードするか、設定で別のメモリオプションに切り替えてください。',
+  'memory.planRequired.title': 'メモリはご利用のプランに含まれていません',
+  'memory.planRequired.action': 'プランを見る',
   'onboarding.custom.search.skipForNow': '今はスキップ',
   'onboarding.custom.search.ready': 'Web検索の準備ができました。',
   'onboarding.custom.search.notReady':

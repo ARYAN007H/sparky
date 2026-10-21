@@ -596,6 +596,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Impossibile caricare le approvazioni desktop in attesa. Aggiorna per riprovare.',
   'desktop.unsupported': 'Il controllo desktop non è disponibile in questo ambiente.',
+  'desktop.unsupportedWindows':
+    'Il controllo desktop non è ancora disponibile su Windows. Il controllo del browser funziona già su Windows.',
   'desktop.localOnly': 'Questa impostazione vale solo per questo computer.',
   'desktop.permissions': 'Autorizzazioni di sistema',
   'desktop.openSettings': 'Apri impostazioni',
@@ -616,6 +618,10 @@ const messages: TranslationMap = {
     'Al momento la memoria non è raggiungibile. Nulla di quanto salvato è andato perso; riprova tra poco.',
   'memory.outOfCredits.title': 'Crediti esauriti',
   'memory.outOfCredits.action': 'Ricarica',
+  'memory.error.planRequired':
+    "Il tuo piano attuale non include la memoria, quindi OpenHuman non può salvare né consultare ciò che impara. Passa a un piano superiore per attivare la memoria, oppure scegli un'altra opzione di memoria nelle Impostazioni.",
+  'memory.planRequired.title': 'La memoria non fa parte del tuo piano',
+  'memory.planRequired.action': 'Vedi i piani',
   'alerts.title': 'Avvisi',
   'alerts.empty': 'Nessun avviso',
   'alerts.markAllRead': 'Segna tutti come letti',
@@ -679,6 +685,15 @@ const messages: TranslationMap = {
   'invites.title': 'Inviti',
   'invites.noInvites': 'Nessun invito in sospeso',
   'devOptions.titleDiagnostics': 'Sviluppatore e Diagnostica',
+  'devOptions.doctor.run': 'Esegui diagnostica',
+  'devOptions.doctor.runLive': 'Esegui controlli dal vivo',
+  'devOptions.doctor.liveWarning':
+    'I controlli dal vivo possono consumare token per le chiamate a modelli o embedding. Continuare?',
+  'devOptions.doctor.severity.pass': 'Superato',
+  'devOptions.doctor.severity.info': 'Info',
+  'devOptions.doctor.severity.warn': 'Avviso',
+  'devOptions.doctor.severity.error': 'Errore',
+  'devOptions.doctor.severity.skipped': 'Saltato',
   'devOptions.diagnostics': 'Diagnostica',
   'devOptions.toolPolicyDiagnosticsDesc':
     'Inventario degli strumenti, posizione della politica, allowlist MCP e blocchi recenti',
@@ -1318,6 +1333,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'Impossibile caricare i messaggi',
   'chat.thinkingDots': 'Sto pensando...',
   'chat.status.thinkingElapsed': 'Sto pensando · {elapsed}',
+  'chat.status.compacting': 'Riassumo la conversazione precedente…',
+  'chat.status.compactingElapsed': 'Riassumo la conversazione precedente · {elapsed}',
   'chat.status.waitingApproval': 'In attesa della tua approvazione',
   'chat.status.waitingReview': 'In attesa della tua revisione',
   'chat.status.waitingAnswer': 'In attesa della tua risposta',

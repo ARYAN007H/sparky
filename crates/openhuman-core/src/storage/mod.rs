@@ -35,6 +35,7 @@ mod fenced_ports;
 mod host_importers;
 pub mod import;
 pub mod import_state;
+mod inspection;
 pub mod journal_maintenance;
 pub mod layout;
 pub mod lease;
@@ -44,6 +45,7 @@ pub mod local;
 pub mod rebind;
 pub mod schema;
 pub mod schema_support;
+pub(crate) use inspection::probe_directory_writable;
 pub mod scope;
 #[cfg(feature = "legacy-import")]
 pub mod scope_move;

@@ -265,3 +265,6 @@ async fn captured_profile_sweeps_cannot_follow_a_replacement_epoch() {
         b"preserve"
     );
 }
+
+#[path = "fenced_backend_upstream_tests.rs"]
+mod upstream_tests;
