@@ -1,6 +1,6 @@
 use super::*;
-use crate::storage::rusqlite;
 use crate::storage::MemoryStorage;
+use crate::storage::rusqlite;
 use crate::util::classic_transcript_fixture::write_classic;
 use sha2::Digest as _;
 use std::collections::BTreeMap;
@@ -19,6 +19,38 @@ fn workspace() -> (TempDir, Config) {
 
 fn backend() -> Arc<dyn StorageBackend> {
     Arc::new(MemoryStorage::new())
+}
+
+#[test]
+fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
+    use tinyagents_session::transcript::DisplayRecord;
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("thread.orchestrator.jsonl");
+    std::fs::write(
+        &path,
+        concat!(
+            "{\"_meta\":{\"agent\":\"Orchestrator\",\"agent_id\":\"orchestrator\",\"dispatcher\":\"native\",\"created\":\"2026-01-01T00:00:00Z\",\"updated\":\"2026-01-02T00:00:00Z\",\"turn_count\":2,\"input_tokens\":7,\"output_tokens\":3,\"cached_input_tokens\":1,\"charged_amount_usd\":0.25,\"thread_id\":\"thread\"}}\n",
+            "{\"kind\":\"tools\",\"tools\":[{\"name\":\"lookup\"}]}\n",
+            "{\"role\":\"assistant\",\"content\":\"answer\",\"provider\":\"local\",\"model\":\"m1\",\"usage\":{\"input\":7,\"output\":3,\"cost_usd\":0.25},\"ts\":\"2026-01-02T00:00:00Z\",\"request_id\":\"r1\",\"iteration\":2}\n",
+            "{\"role\":\"user\",\"content\":\"old envelope\",\"tool_call_id\":\"call-1\"}\n"
+        ),
+    )
+    .unwrap();
+
+    let (meta, tools, records) = super::decode_transcript(&path).unwrap();
+    assert_eq!(meta.agent_name, "Orchestrator");
+    assert_eq!(meta.input_tokens, 7);
+    assert_eq!(tools.unwrap()[0]["name"], "lookup");
+    let DisplayRecord::Message(answer) = &records[0] else {
+        panic!("expected message record");
+    };
+    assert_eq!(answer.message.request_id.as_deref(), Some("r1"));
+    assert_eq!(answer.message.turn_usage.as_ref().unwrap().iteration, 2);
+    let DisplayRecord::Message(row) = &records[1] else {
+        panic!("expected typed row");
+    };
+    assert_eq!(row.message.tool_call_id.as_deref(), Some("call-1"));
 }
 
 /// Every file under `root` with a digest of its bytes.

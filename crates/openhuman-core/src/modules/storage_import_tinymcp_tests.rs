@@ -1,7 +1,7 @@
 use super::*;
-use tinystoragedrivers::secrets::DerivedKeys;
-use tinystoragedrivers::{MemoryStorage, Scope, StorageBackend};
-use zeroize::Zeroizing;
+use crate::storage::{Scope, Storage};
+use tinystoragedrivers_api::SecretStore;
+use tinystoragedrivers_testkit::memory_storage;
 
 /// The first-generation schema: no `transport`, `deployment_url`, `enabled` or
 /// `catalog_managed` column, which older installs never gained.
@@ -53,20 +53,13 @@ fn legacy_dir() -> tempfile::TempDir {
 }
 
 struct Rig {
-    scoped: ScopedStorage,
-    secrets: DocumentSecrets,
+    scoped: Storage,
 }
 
 fn rig() -> Rig {
-    let backend = MemoryStorage::new();
-    let scoped = backend
-        .for_scope(&Scope::new("module:tinymcp@local").unwrap())
-        .unwrap();
-    let secrets = DocumentSecrets::new(
-        &scoped,
-        Arc::new(DerivedKeys::new(Zeroizing::new([3u8; 32]))),
-    );
-    Rig { scoped, secrets }
+    Rig {
+        scoped: memory_storage(&Scope::new("module:tinymcp@local").unwrap()),
+    }
 }
 
 fn digest(path: &Path) -> Vec<u8> {
@@ -80,7 +73,7 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     let outcome = import_into(
         &DispatchCtx::host_default(),
         &rig.scoped,
-        &rig.secrets,
+        rig.scoped.secrets().as_ref(),
         legacy.path(),
     )
     .await
@@ -113,7 +106,8 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     // Env values only ever land in the secret, never in a document.
     assert!(!body.to_string().contains("sk-secret"));
     let stored = rig
-        .secrets
+        .scoped
+        .secrets()
         .get("mcp_client_env/srv-1")
         .await
         .unwrap()
@@ -121,12 +115,14 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     let env: std::collections::BTreeMap<String, String> = serde_json::from_slice(&stored).unwrap();
     assert_eq!(env["API_KEY"], "sk-secret");
     assert_eq!(env["REGION"], "eu");
-    assert!(rig
-        .secrets
-        .get("mcp_client_env/srv-2")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        rig.scoped
+            .secrets()
+            .get("mcp_client_env/srv-2")
+            .await
+            .unwrap()
+            .is_none()
+    );
 
     let audit = rig
         .scoped
@@ -149,7 +145,7 @@ async fn the_import_runs_once_and_never_resurrects_a_deleted_server() {
     import_into(
         &DispatchCtx::host_default(),
         &rig.scoped,
-        &rig.secrets,
+        rig.scoped.secrets().as_ref(),
         legacy.path(),
     )
     .await
@@ -163,7 +159,7 @@ async fn the_import_runs_once_and_never_resurrects_a_deleted_server() {
     let again = import_into(
         &DispatchCtx::host_default(),
         &rig.scoped,
-        &rig.secrets,
+        rig.scoped.secrets().as_ref(),
         legacy.path(),
     )
     .await
@@ -185,17 +181,19 @@ async fn the_legacy_files_are_left_untouched() {
     import_into(
         &DispatchCtx::host_default(),
         &rig.scoped,
-        &rig.secrets,
+        rig.scoped.secrets().as_ref(),
         legacy.path(),
     )
     .await
     .unwrap();
     let after = [CLIENTS_DB, AUDIT_DB].map(|path| digest(&legacy.path().join(path)));
     assert_eq!(before, after);
-    assert!(!legacy
-        .path()
-        .join("mcp_clients/mcp_clients.db-wal")
-        .exists());
+    assert!(
+        !legacy
+            .path()
+            .join("mcp_clients/mcp_clients.db-wal")
+            .exists()
+    );
 }
 
 #[tokio::test]
@@ -214,7 +212,8 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
     )
     .await
     .unwrap();
-    rig.secrets
+    rig.scoped
+        .secrets()
         .set("mcp_client_env/srv-1", b"{\"API_KEY\":\"rotated\"}")
         .await
         .unwrap();
@@ -222,7 +221,7 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
     let outcome = import_into(
         &DispatchCtx::host_default(),
         &rig.scoped,
-        &rig.secrets,
+        rig.scoped.secrets().as_ref(),
         legacy.path(),
     )
     .await
@@ -238,7 +237,8 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
     let kept = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
     assert_eq!(kept.doc["newer"], true);
     let secret = rig
-        .secrets
+        .scoped
+        .secrets()
         .get("mcp_client_env/srv-1")
         .await
         .unwrap()
@@ -254,7 +254,7 @@ async fn a_data_dir_with_no_legacy_files_is_a_no_op() {
         import_into(
             &DispatchCtx::host_default(),
             &rig.scoped,
-            &rig.secrets,
+            rig.scoped.secrets().as_ref(),
             empty.path()
         )
         .await
@@ -274,14 +274,16 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
     )
     .unwrap();
     let rig = rig();
-    assert!(import_into(
-        &DispatchCtx::host_default(),
-        &rig.scoped,
-        &rig.secrets,
-        dir.path()
-    )
-    .await
-    .is_err());
+    assert!(
+        import_into(
+            &DispatchCtx::host_default(),
+            &rig.scoped,
+            rig.scoped.secrets().as_ref(),
+            dir.path()
+        )
+        .await
+        .is_err()
+    );
     let done = crate::storage::import_state::host_import_done(
         &rig.scoped,
         MARKER_COLLECTION,

@@ -1,6 +1,6 @@
 use super::*;
 use crate::storage::layout::test_fixtures::{fixture_docs, v1_profile};
-use crate::storage::layout::{legacy, Target};
+use crate::storage::layout::{Target, legacy};
 use tempfile::TempDir;
 
 #[test]

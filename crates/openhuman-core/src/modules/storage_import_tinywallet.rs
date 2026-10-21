@@ -22,8 +22,8 @@
 
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
-use tinystoragedrivers::ScopedStorage;
+use crate::storage::Storage;
+use anyhow::{Context, Result, anyhow};
 
 use super::storage_grant_schemas::tinywallet::{MODULE_ID, PAYMENTS_STREAM};
 use super::storage_import_support as support;
@@ -56,11 +56,7 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
     import_into(ctx, &scoped, workspace_dir).await
 }
 
-async fn import_into(
-    ctx: &DispatchCtx,
-    scoped: &ScopedStorage,
-    workspace_dir: &Path,
-) -> Result<Outcome> {
+async fn import_into(ctx: &DispatchCtx, scoped: &Storage, workspace_dir: &Path) -> Result<Outcome> {
     let marker = support::marker_id("x402", workspace_dir);
     if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
         return Ok(Outcome::AlreadyDone);

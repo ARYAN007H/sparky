@@ -23,8 +23,10 @@
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-use anyhow::{anyhow, Context, Result};
-use tinystoragedrivers::{Capability, ScopedStorage};
+use anyhow::{Context, Result, anyhow};
+use tinystoragedrivers_types::Capability;
+
+use crate::storage::Storage;
 
 use super::storage_grant_schemas::tinyjuice::{CCR_BLOB_PREFIX, MODULE_ID};
 use super::storage_import_support as support;
@@ -78,7 +80,7 @@ struct LegacyOriginal {
 
 async fn import_into(
     ctx: &DispatchCtx,
-    scoped: &ScopedStorage,
+    scoped: &Storage,
     root: &Path,
     ttl: Option<Duration>,
     now: SystemTime,

@@ -117,7 +117,7 @@ pub(crate) fn import_legacy_into(
         DriverConversationStore::prepare_append_schema(docs.as_ref()).await
     })
     .map_err(|e| format!("{LOG_PREFIX} declare the conversation schema: {e}"))?;
-    super::legacy_import::import_once(workspace_dir, &repo, &store)
+    super::legacy_import::import_once(workspace_dir, &repo)
         .map_err(|e| format!("{LOG_PREFIX} legacy import: {e:#}"))
 }
 
@@ -160,7 +160,7 @@ impl ConversationStore {
             .map_err(|e| anyhow::anyhow!("declare the conversation schema: {e}"))
         })
         .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
-        super::legacy_import::import_once(&self.workspace_dir, &repo, &store)
+        super::legacy_import::import_once(&self.workspace_dir, &repo)
             .map_err(|e| format!("{LOG_PREFIX} legacy import: {e:#}"))?;
         Ok(store)
     }

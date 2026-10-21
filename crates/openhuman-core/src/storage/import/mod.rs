@@ -22,7 +22,7 @@
 //!   so a record that already exists in the backend (a resumed import, or one
 //!   the new code has since changed) is never overwritten.
 //! - **Runs once.** After a domain's documents are written, the importer is
-//!   recorded as done in `tsd.migrations` of the backend's local scope
+//!   recorded as done in `storage.import_state` of the backend's tenant scope
 //!   ([`super::import_state`], step `storage_import/<domain>@<workspace
 //!   digest>`). A later boot sees it and does nothing, so a record deleted
 //!   since is not resurrected from the untouched legacy file. A marker row an
@@ -43,21 +43,29 @@
 //!
 //! # What is not here
 //!
-//! Sessions, transcripts, turn states and the run ledger are read by
-//! TinyAgents' importer, which owns those formats; see [`sessions`]. The
+//! Sessions, transcripts, turn states and the run ledger are decoded by the
+//! host's read-only compatibility importer; see [`sessions`]. The
 //! tinyflows stores (cron jobs, the flow catalog and checkpoints) are copied
 //! with `tinyflows-import`; see [`tinyflows`].
 
 #[cfg(feature = "legacy-import")]
+pub(crate) mod layout_db;
+#[cfg(feature = "legacy-import")]
 pub(crate) mod layout_status;
 pub mod live;
 mod schemas;
+#[cfg(feature = "legacy-import")]
+pub mod scope_move;
+#[cfg(feature = "legacy-import")]
+pub(crate) mod session_db;
 #[cfg(feature = "legacy-import")]
 pub mod sessions;
 #[cfg(feature = "legacy-import")]
 mod snapshot;
 #[cfg(feature = "legacy-import")]
 pub mod tinyflows;
+#[cfg(feature = "legacy-import")]
+mod tinyflows_reader;
 
 pub use schemas::{
     all_session_import_controller_schemas, all_session_import_registered_controllers,
@@ -74,7 +82,7 @@ use anyhow::{anyhow, Context};
 use sha2::Digest;
 use tinystoragedrivers::CollectionSpec;
 #[cfg(feature = "legacy-import")]
-use tinystoragedrivers::{ErrorKind, Precondition};
+use tinystoragedrivers::{ErrorKind, Precondition, WriteOptions};
 
 #[cfg(feature = "legacy-import")]
 use super::block_on;
@@ -131,6 +139,13 @@ pub struct Record {
     /// The import writer uses this as document metadata; owner converters keep
     /// semantic event times in the body when the old format did so.
     pub created_ms: Option<i64>,
+    /// Source collection schema metadata when imported from a driver table.
+    pub schema: Option<u32>,
+    /// Absolute document expiry from the source driver's metadata.
+    pub expires_ms: Option<i64>,
+    /// Source update timestamp retained as provenance when the target driver
+    /// cannot set it independently of its own write clock.
+    pub updated_ms: Option<i64>,
 }
 
 impl From<ImportDoc> for Record {
@@ -140,6 +155,9 @@ impl From<ImportDoc> for Record {
             id: doc.id,
             doc: doc.doc,
             created_ms: None,
+            schema: None,
+            expires_ms: None,
+            updated_ms: None,
         }
     }
 }
@@ -431,9 +449,11 @@ fn import_one(
         return Ok(Outcome::NoSource);
     }
 
-    let claimed = super::import_state::with_claim(&markers, MARKER_OWNER, &step, || {
+    let claimed = super::import_state::with_claim(&markers, MARKER_OWNER, &step, |condition| {
+        let claimed_markers = markers.conditioned(condition)?;
+        let claimed_repo = repo.conditioned(condition)?;
         // Another process may have finished between our check and the claim.
-        if super::import_state::is_done(&markers, MARKER_OWNER, &step)? {
+        if super::import_state::is_done(&claimed_markers, MARKER_OWNER, &step)? {
             return Ok(Outcome::AlreadyDone);
         }
         let snapshot = Snapshot::of(&legacy, source.db)
@@ -461,18 +481,29 @@ fn import_one(
         let total = found.len();
         let (found, specs) = upgrade(source.owner, found)
             .with_context(|| format!("[{domain}] bring the legacy records to schema v2"))?;
-        let written = repo.run(move |docs| async move {
+        let written = claimed_repo.run(move |docs| async move {
             for spec in &specs {
                 docs.ensure_collection(spec).await?;
             }
             let mut written = 0usize;
             for record in found {
+                let mut options = WriteOptions::new();
+                if let Some(schema) = record.schema {
+                    options = options.schema(schema);
+                }
+                if let Some(created_ms) = record.created_ms {
+                    options = options.created_ms(created_ms);
+                }
+                if let Some(expires_ms) = record.expires_ms {
+                    options = options.expires_ms(expires_ms);
+                }
                 match docs
-                    .put(
+                    .put_with(
                         &record.collection,
                         &record.id,
                         record.doc,
                         Precondition::Absent,
+                        options,
                     )
                     .await
                 {
@@ -484,7 +515,7 @@ fn import_one(
             Ok(written)
         })?;
 
-        super::import_state::set_done(&markers, MARKER_OWNER, &step)?;
+        super::import_state::set_done(&claimed_markers, MARKER_OWNER, &step)?;
         Ok(Outcome::Imported {
             found: total,
             written,
