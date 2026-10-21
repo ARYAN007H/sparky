@@ -21,7 +21,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
@@ -133,7 +133,10 @@ async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Valu
 }
 
 async fn get_file(Json(body): Json<Value>) -> Json<Value> {
-    let file_id = body.get("file_id").and_then(Value::as_str).unwrap_or_default();
+    let file_id = body
+        .get("file_id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let (path, bytes) = match file_id {
         "typed-image-file" => ("photos/native.png", NATIVE_IMAGE_PNG),
         "typed-document-file" => ("documents/native.txt", NATIVE_FILE_BYTES),
@@ -148,7 +151,11 @@ async fn download_file(path: axum::extract::Path<String>) -> Response {
         "documents/native.txt" => ("application/octet-stream", NATIVE_FILE_BYTES),
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
-    ([(axum::http::header::CONTENT_TYPE, content_type)], bytes.to_vec()).into_response()
+    (
+        [(axum::http::header::CONTENT_TYPE, content_type)],
+        bytes.to_vec(),
+    )
+        .into_response()
 }
 
 async fn ok() -> Json<Value> {
@@ -505,7 +512,9 @@ async fn wait_for_completion(state: &MockState, count: usize) {
             break;
         }
         if Instant::now() >= deadline {
-            panic!("timed out waiting for final Telegram reply {count}; captured outbound bodies: {sent_messages:#?}");
+            panic!(
+                "timed out waiting for final Telegram reply {count}; captured outbound bodies: {sent_messages:#?}"
+            );
         }
         sleep(Duration::from_millis(50)).await;
     }
@@ -515,15 +524,15 @@ fn model_saw_media_bytes(request: &Value, bytes: &[u8]) -> bool {
     use base64::Engine as _;
     last_user_content(request)
         .and_then(|content| serde_json::to_string(content).ok())
-        .is_some_and(|body| {
-            body.contains(&base64::engine::general_purpose::STANDARD.encode(bytes))
-        })
+        .is_some_and(|body| body.contains(&base64::engine::general_purpose::STANDARD.encode(bytes)))
 }
 
 fn last_user_content(request: &Value) -> Option<&Value> {
-    request["messages"].as_array()?.iter().rev().find_map(|message| {
-        (message["role"] == "user").then(|| &message["content"])
-    })
+    request["messages"]
+        .as_array()?
+        .iter()
+        .rev()
+        .find_map(|message| (message["role"] == "user").then(|| &message["content"]))
 }
 
 fn model_saw_user_text(request: &Value, text: &str) -> bool {
@@ -733,7 +742,11 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
     let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
         .map(std::path::PathBuf::from)
         .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
-    assert!(module_source_dir.join("tinychannels/modules.toml").is_file());
+    assert!(
+        module_source_dir
+            .join("tinychannels/modules.toml")
+            .is_file()
+    );
 
     let mocks = start_mock_servers().await;
     write_config(&home, &workspace, &mocks.inference);
@@ -757,12 +770,19 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
     );
     wait_for_completion(&mocks.state, 3).await;
 
-    let requests = mocks.state.completions.lock().expect("model requests").clone();
+    let requests = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .clone();
     assert!(model_saw_media_bytes(&requests[0], NATIVE_IMAGE_PNG));
     assert!(model_saw_media_bytes(&requests[1], NATIVE_FILE_BYTES));
     let mixed_content = last_user_content(&requests[2]).expect("mixed user message is present");
     let mixed = serde_json::to_string(mixed_content).expect("serialize mixed user content");
-    let before = mixed.find("before typed media").expect("caption text is present");
+    let before = mixed
+        .find("before typed media")
+        .expect("caption text is present");
     let image = mixed
         .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_IMAGE_PNG))
         .expect("mixed image bytes reach the model");
@@ -770,7 +790,10 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES))
         .expect("mixed file bytes reach the model");
     let after = mixed.find("after").expect("trailing text is present");
-    assert!(before < image && image < file && file < after, "typed part order: {mixed}");
+    assert!(
+        before < image && image < file && file < after,
+        "typed part order: {mixed}"
+    );
     for request in &requests {
         let serialized = serde_json::to_string(request).unwrap();
         assert!(!serialized.contains("typed-image-file"));
