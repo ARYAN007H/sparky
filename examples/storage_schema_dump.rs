@@ -13,5 +13,8 @@ use serde_json::json;
 
 fn main() {
     let collections = owner_collections().expect("owner collection declarations compose");
-    println!("{}", serde_json::to_string_pretty(&json!({ "collections": collections })).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({ "collections": collections })).unwrap()
+    );
 }
