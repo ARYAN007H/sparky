@@ -123,9 +123,11 @@ Every turn goes through the same lifecycle, whether the user just typed a messag
 
 Messaging-channel ingress is prepared by the configured TinyChannels module
 through typed bus operations. OpenHuman applies account authorization and
-session policy, then binds the conversation to its durable TinyAgents session.
-Provider transports and normalization stay in TinyChannels; the model turn,
-tool policy, approvals, and transcript storage stay in the OpenHuman host.
+host policy, then supplies the persistence ports used by TinyAgents' session
+and transcript machinery. TinyAgents owns generic turn execution, session
+identity, and transcript replay. Provider transport and normalization stay in
+TinyChannels; OpenHuman owns account authorization, approvals, and the host
+adapters and persistence implementations.
 
 ```text
 ┌─ inbound ─────────────────────────────────────────────────────────┐

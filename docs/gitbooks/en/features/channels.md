@@ -60,7 +60,7 @@ OpenHuman has 15 channel providers. 14 are built into the shipped desktop app. W
 | WhatsApp       | Two-way       | Meta Cloud webhook           | Your own access token                                          | `config.toml`  |
 | IRC            | Two-way       | Persistent socket            | Your own server and nick                                       | `config.toml`  |
 | Signal         | Two-way       | signal-cli REST events       | Your own linked signal-cli account                             | `config.toml`  |
-| Mattermost     | Two-way       | WebSocket                    | Your own bot token                                             | `config.toml`  |
+| Mattermost     | Two-way       | REST API polling             | Your own bot token                                             | `config.toml`  |
 | QQ             | Two-way       | WebSocket                    | Your own bot credentials                                       | `config.toml`  |
 | Linq           | Two-way (SMS) | Webhook                      | Your own API token                                             | `config.toml`  |
 | Email          | Two-way       | IMAP IDLE and SMTP           | Your own mailbox credentials                                   | Yes            |
