@@ -128,7 +128,7 @@ pub async fn get_settings(config: &Config) -> Result<Outcome<serde_json::Value>,
             .map(str::trim)
             .is_some_and(|provider| provider == "none"),
         local_model.as_deref(),
-        Some(&config.memory.embedding_provider),
+        Some(config.memory.embedding_provider.as_str()),
         session_exists,
     );
 

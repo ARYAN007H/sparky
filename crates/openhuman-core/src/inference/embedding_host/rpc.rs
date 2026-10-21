@@ -13,9 +13,6 @@ pub use embed::{embed, test_connection};
 pub use settings::{get_settings, update_settings};
 
 #[cfg(test)]
-use tinyinference_embeddings::probe::redact_secrets;
-
-#[cfg(test)]
 use settings::remember_active_custom_profile;
 
 use crate::config::Config;

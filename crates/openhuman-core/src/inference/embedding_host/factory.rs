@@ -10,7 +10,6 @@ use tinyinference_embeddings::factory::{
 use tinyinference_embeddings::{EmbeddingModel, UnavailableEmbeddingModel};
 use tinyinference_providers::route::custom_provider_string;
 
-use super::cloud::UnavailableEmbeddingModel;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
 use crate::inference::registry::EmbeddingRequest;
 use crate::security::approval::ApprovalChatContext;
