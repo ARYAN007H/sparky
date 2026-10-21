@@ -81,9 +81,9 @@ fn triage_test_model(
                 Arc::new(TriageReplyModel {
                     requests: Arc::clone(&requests),
                     role,
-                    model,
+                    model: model.clone(),
                 }) as Arc<dyn ChatModel<()>>,
-                "triage-test-model".to_string(),
+                model,
             ))
         }),
         probe: None,
@@ -283,7 +283,7 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
 }
 
 #[tokio::test]
-async fn react_dispatch_inherits_the_parent_model_role_for_inherit_targets() {
+async fn react_dispatch_preserves_the_parent_model_role_for_hint_targets() {
     let _events_guard = test_events_guard().await;
     let temp = tempfile::tempdir().expect("isolated triage workspace");
     let workspace = temp.path().join("workspace");
