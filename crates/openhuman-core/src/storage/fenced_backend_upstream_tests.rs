@@ -361,31 +361,17 @@ async fn stream_and_blob_writes_are_driver_fenced() {
 
 /// A driver without fencing gets the host check only, and writes through.
 #[tokio::test]
-async fn a_driver_without_fencing_falls_back_to_the_host_check() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(NoFencing(MemoryStorage::new()));
-    let (a, _fence, _leases) = paused_holder(&backend).await;
-    let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
-    scoped
-        .documents()
-        .put("notes", "n", json!({}), Precondition::None)
-        .await
-        .unwrap();
-}
-
-/// The memory driver, reporting no fencing (MongoDB without transactions).
-#[derive(Debug)]
-struct NoFencing(MemoryStorage);
-
-impl StorageBackend for NoFencing {
-    fn driver(&self) -> &'static str {
-        "no-fencing"
-    }
-    fn capabilities(&self) -> Capabilities {
-        self.0.capabilities().without(Capability::Fencing)
-    }
-    fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage> {
-        self.0.for_scope(scope)
-    }
+async fn memory_backend_rejects_conditioned_storage() {
+    let backend = memory_backend();
+    let scope = Scope::new("profile:alice").unwrap();
+    let condition = tinystoragedrivers_types::WriteCondition::always();
+    assert_eq!(
+        backend
+            .for_scope_conditioned(&scope, &condition)
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Unsupported(Capability::ConditionalWrites)
+    );
 }
 
 /// The run ledger claims team tasks with `atomic_batch_checked`. The fenced
@@ -393,10 +379,10 @@ impl StorageBackend for NoFencing {
 /// method answers `Unsupported`), and still refuse it for a stale lease.
 #[tokio::test]
 async fn a_checked_batch_reaches_the_driver_through_the_fenced_view() {
-    use tinystoragedrivers::{ExpectedDocument, ReadCheck};
+    use tinystoragedrivers_types::{ExpectedDocument, ReadCheck, WriteOp};
 
-    let shared: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
-    let a = Node::new("a", &shared);
+    let shared = shared();
+    let a = Node::new("a", &shared.backend);
     let docs = Arc::clone(a.scoped("plain").documents());
     docs.ensure_collection(&CollectionSpec::new("things"))
         .await
