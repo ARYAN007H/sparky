@@ -385,7 +385,7 @@ pub(crate) async fn process_channel_runtime_message(
         )
         .await
         {
-            Ok(input) => input,
+            Ok(input) => Some(Ok(input)),
             Err(error) => {
                 tracing::warn!("[dispatch] typed native media was rejected safely");
                 Some(Err(error))
