@@ -96,7 +96,10 @@ pub(super) fn require_profile_context(
     caller: &Arc<crate::core::runtime::CoreContext>,
     profile_id: &str,
 ) -> Result<()> {
-    if Arc::ptr_eq(admitted, caller) {
+    if admitted.profile() == Some(profile_id)
+        && caller.profile() == Some(profile_id)
+        && admitted.shares_profile_admission(caller)
+    {
         Ok(())
     } else {
         Err(anyhow!(

@@ -63,7 +63,8 @@ struct Rig {
 fn rig() -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let url = format!("sqlite:{}", dir.path().join("storage.sqlite").display());
-    let backend = crate::storage::block_on(crate::storage::open(&url)).unwrap();
+    let backend =
+        crate::storage::block_on(async move { crate::storage::open(&url).await }).unwrap();
     Rig {
         _dir: dir,
         backend,
@@ -268,21 +269,42 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
 
 #[test]
 fn a_context_from_before_profile_takeover_cannot_import_under_the_new_lease() {
-    use crate::core::runtime::{CoreContext, DomainSet};
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 
-    let old_context = CoreContext::for_test(DomainSet::full(), None);
-    let reopened_context = CoreContext::for_test(DomainSet::full(), None);
+    fn profile_context() -> Arc<CoreContext> {
+        CoreContext::for_test(DomainSet::full(), None).derive_with(
+            ContextOverlay::new(
+                crate::config::Config::default(),
+                DomainSet::full(),
+                Default::default(),
+            )
+            .profile("profile-1"),
+        )
+    }
+
+    let old_context = profile_context();
+    let old_turn = old_context.derive_with(ContextOverlay::new(
+        crate::config::Config::default(),
+        DomainSet::full(),
+        Default::default(),
+    ));
+    let reopened_context = profile_context();
+    let current_turn = reopened_context.derive_with(ContextOverlay::new(
+        crate::config::Config::default(),
+        DomainSet::full(),
+        Default::default(),
+    ));
     assert!(
         super::super::storage_import_support::require_profile_context(
             &reopened_context,
-            &reopened_context,
+            &current_turn,
             "profile-1"
         )
         .is_ok()
     );
     let error = super::super::storage_import_support::require_profile_context(
         &reopened_context,
-        &old_context,
+        &old_turn,
         "profile-1",
     )
     .unwrap_err();
@@ -311,6 +333,11 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
 
     let old_profile = host.open(&id).await.unwrap();
     let old_context = Arc::clone(old_profile.context());
+    let old_turn = old_context.derive_with(crate::core::runtime::ContextOverlay::new(
+        crate::config::Config::default(),
+        DomainSet::full(),
+        Default::default(),
+    ));
     drop(old_profile);
     assert!(host.release(&id).await.unwrap());
     let current_profile = host.open(&id).await.unwrap();
@@ -322,7 +349,7 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
         &host,
         &id,
         id.as_str(),
-        &old_context,
+        &old_turn,
         module_scope.clone(),
     );
     assert!(
@@ -330,11 +357,16 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
         "old dispatch context cannot borrow the new fence"
     );
 
+    let current_turn = current_context.derive_with(crate::core::runtime::ContextOverlay::new(
+        crate::config::Config::default(),
+        DomainSet::full(),
+        Default::default(),
+    ));
     let captured = super::super::storage_import_support::capture_profile_module_storage(
         &host,
         &id,
         id.as_str(),
-        &current_context,
+        &current_turn,
         module_scope,
     )
     .unwrap();
