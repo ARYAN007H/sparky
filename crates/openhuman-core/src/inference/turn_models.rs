@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 pub(crate) type TurnChatModel = Arc<dyn tinyinference_llm::model::ChatModel<()>>;
 pub(crate) type TierRoutes = Vec<(String, TurnChatModel)>;
-pub(crate) type BuiltTurnModels = (TurnChatModel, TierRoutes, TurnChatModel);
 
 use crate::core::runtime::DispatchCtx;
 
@@ -146,17 +145,38 @@ fn build_turn_models_crate(
         .summarization(role, Some(model.to_owned()))
         .summarization_opts(opts)
         .build()?
-        .map_models(|_, model| {
+        .map_models(|purpose, model| {
+            let injected = ctx.host_overrides().and_then(|local| match purpose {
+                tinyagents_harness::host::ModelPurpose::Primary => local.model_for(role),
+                tinyagents_harness::host::ModelPurpose::Summarization => local
+                    .role_models
+                    .get("summarization")
+                    .cloned()
+                    .or_else(|| local.model_for(role)),
+                tinyagents_harness::host::ModelPurpose::WorkloadTier(route) => local
+                    .role_models
+                    .get(route)
+                    .or_else(|| {
+                        local
+                            .role_models
+                            .get(route.strip_prefix("hint:").unwrap_or(route))
+                    })
+                    .cloned(),
+            });
             let profile = model.profile().cloned().unwrap_or_default();
             let selected_model = profile.model.as_deref().filter(|value| !value.is_empty()).unwrap_or("unknown");
             let provider = profile.provider.as_deref().unwrap_or("unknown");
-            crate::attachments::provider::wrap(
-                ctx,
-                model,
-                Arc::new(config.clone()),
-                selected_model,
-                provider,
-            )
+            if let Some(injected) = injected {
+                crate::attachments::provider::wrap_injected(ctx, injected, Arc::new(config.clone()))
+            } else {
+                crate::attachments::provider::wrap(
+                    ctx,
+                    model,
+                    Arc::new(config.clone()),
+                    selected_model,
+                    provider,
+                )
+            }
         });
     let mut registrations = built.registrations("primary").into_iter();
     let primary = registrations.next().expect("turn set contains a primary").1;
