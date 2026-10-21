@@ -14,6 +14,7 @@ use crate::progress::AgentProgress;
 use crate::threads::store::{self as conversations, ConversationMessage};
 use async_trait::async_trait;
 use serde_json::json;
+use std::borrow::Borrow;
 use std::sync::Arc;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
@@ -25,34 +26,6 @@ pub struct SpawnSubagentTool {
     /// The ids this instance advertises in its `agent_id` enum. Empty means
     /// the whole registry. See [`SpawnSubagentTool::scoped`].
     advertised_ids: Vec<String>,
-}
-
-enum DriverParent<'a> {
-    Borrowed(&'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>),
-    Owned(RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>),
-}
-
-impl DriverParent<'_> {
-    fn as_ref(&self) -> &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext> {
-        match self {
-            Self::Borrowed(parent) => parent,
-            Self::Owned(parent) => parent,
-        }
-    }
-}
-
-impl<'a> From<&'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>>
-    for DriverParent<'a>
-{
-    fn from(parent: &'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>) -> Self {
-        Self::Borrowed(parent)
-    }
-}
-
-impl From<RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>> for DriverParent<'_> {
-    fn from(parent: RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>) -> Self {
-        Self::Owned(parent)
-    }
 }
 
 /// Harness dispatch for the detached child path. It owns the typed parent run
@@ -370,20 +343,22 @@ impl SpawnSubagentTool {
         .await
     }
 
-    pub(crate) async fn execute_with_live_parent_context<'a>(
+    pub(crate) async fn execute_with_live_parent_context<P>(
         &self,
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
-        detached_parent: impl Into<DriverParent<'a>>,
-    ) -> anyhow::Result<ToolResult> {
-        let detached_parent = detached_parent.into();
+        detached_parent: P,
+    ) -> anyhow::Result<ToolResult>
+    where
+        P: Borrow<RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>>,
+    {
         self.execute_with_context_inner(
             args,
             ToolCallOptions::default(),
             tool_context,
             run_context,
-            Some(detached_parent.as_ref()),
+            Some(detached_parent.borrow()),
         )
         .await
     }
