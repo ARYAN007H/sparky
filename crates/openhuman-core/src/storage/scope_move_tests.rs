@@ -323,15 +323,14 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
 
 #[test]
 #[cfg(feature = "legacy-import")]
-fn boot_import_reports_no_source_for_a_new_mongodb_target() {
+fn boot_import_reports_no_source_for_a_workspace_without_legacy_storage() {
     let workspace = tempfile::tempdir().unwrap();
     let config = crate::config::Config {
         workspace_dir: workspace.path().to_path_buf(),
         ..Default::default()
     };
     // This is the actual boot importer pipeline. With no legacy SQLite file,
-    // the current destination URL is not evidence of a legacy Mongo source.
-    // No backend is installed and the driver is never opened here.
+    // the destination backend is not treated as a legacy source.
     let backend = crate::storage::test_support::memory_backend();
     let reports = crate::storage::import::run_all(&backend, &config);
     let report = reports
