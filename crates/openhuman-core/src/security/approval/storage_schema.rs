@@ -17,8 +17,8 @@ use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, IndexSpec};
 
 use crate::storage::schema_support::{
-    key_of, key_of_parts, map_legacy_collection, time_ms, Body,
-    LegacySourceRecord as SourceRecord, LegacyTargetRecord as TargetRecord,
+    Body, LegacySourceRecord as SourceRecord, LegacyTargetRecord as TargetRecord, key_of,
+    key_of_parts, map_legacy_collection, time_ms,
 };
 
 /// The v2 request collection: one document per request id.
@@ -74,8 +74,7 @@ pub(super) fn legacy_collections() -> Vec<CollectionSpec> {
 /// refused.
 pub(super) fn trust_id(flow_id: &str, tool_name: &str) -> String {
     #[allow(clippy::expect_used)]
-    key_of_parts([flow_id, tool_name])
-        .expect("a two-part key is valid")
+    key_of_parts([flow_id, tool_name]).expect("a two-part key is valid")
 }
 
 fn requests_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {

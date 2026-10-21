@@ -621,7 +621,9 @@ impl ApprovalGate {
             Err(resolution) => {
                 return (
                     GateOutcome::Deny {
-                        reason: format!("{POLICY_DENIED_MARKER} Agent approval registration closed: {resolution}"),
+                        reason: format!(
+                            "{POLICY_DENIED_MARKER} Agent approval registration closed: {resolution}"
+                        ),
                     },
                     None,
                 );
@@ -633,7 +635,9 @@ impl ApprovalGate {
                 tracing::error!(error = %err, tool = tool_name, "[approval::gate] failed to persist pending row — failing closed");
                 return (
                     GateOutcome::Deny {
-                        reason: format!("{POLICY_DENIED_MARKER} Approval gate could not persist the request — denying for safety: {err}"),
+                        reason: format!(
+                            "{POLICY_DENIED_MARKER} Approval gate could not persist the request — denying for safety: {err}"
+                        ),
                     },
                     None,
                 );
