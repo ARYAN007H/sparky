@@ -35,4 +35,3 @@ async fn the_operators_cron_limits_bind_every_profile_whatever_its_config_says()
         assert_eq!(config.cron.max_active_jobs, 3);
     }
 }
-
