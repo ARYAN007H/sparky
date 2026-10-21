@@ -92,3 +92,7 @@ fn unavailable() -> SecretStorageError {
         "encrypted file secret backend is disabled; enable the secret-file feature".into(),
     )
 }
+
+#[cfg(test)]
+#[path = "encrypted_file_backend_disabled_tests.rs"]
+mod tests;
