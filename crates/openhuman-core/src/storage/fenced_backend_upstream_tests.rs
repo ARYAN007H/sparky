@@ -322,6 +322,11 @@ async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn Storag
         .contains(Capability::CrossProcessCas));
     let (a, fence, leases) = paused_holder(&shared).await;
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
+    assert!(fence.write_condition().is_some());
+    assert!(scoped
+        .documents()
+        .capabilities()
+        .contains(Capability::ConditionalWrites));
     scoped
         .documents()
         .put("notes", "n1", json!({"v": 1}), Precondition::None)
