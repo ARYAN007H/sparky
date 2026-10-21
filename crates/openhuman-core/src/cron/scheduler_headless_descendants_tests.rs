@@ -17,6 +17,8 @@ struct CronChildModel {
     child_calls: std::sync::atomic::AtomicUsize,
     child_invocation_dropped: std::sync::Arc<std::sync::atomic::AtomicBool>,
     accepted_followups: std::sync::atomic::AtomicUsize,
+    child_attempts_dangerous_tool: bool,
+    child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool,
     child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     child_release: tokio::sync::Notify,
 }
@@ -124,6 +126,23 @@ impl ChatModel<()> for CronChildModel {
             if let Some(started) = self.child_started.lock().unwrap().take() {
                 let _ = started.send(());
             }
+            if self.child_attempts_dangerous_tool {
+                self.child_dangerous_tool_schema_seen.store(
+                    request
+                        .tools
+                        .iter()
+                        .any(|tool| tool.name == "delete_artifact"),
+                    std::sync::atomic::Ordering::SeqCst,
+                );
+                let mut response = ModelResponse::assistant("");
+                response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                    "headless-cron-forbidden-write",
+                    "delete_artifact",
+                    serde_json::json!({"artifact_id": "missing-headless-cron-artifact"}),
+                )];
+                response.finish_reason = Some("tool_calls".into());
+                return Ok(response);
+            }
             let _drop =
                 ChildInvocationDrop(std::sync::Arc::clone(&self.child_invocation_dropped));
             self.child_release.notified().await;
@@ -174,6 +193,8 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
             std::sync::atomic::AtomicBool::new(false),
         ),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
+        child_attempts_dangerous_tool: false,
+        child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
@@ -237,6 +258,8 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
             std::sync::atomic::AtomicBool::new(false),
         ),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
+        child_attempts_dangerous_tool: false,
+        child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
