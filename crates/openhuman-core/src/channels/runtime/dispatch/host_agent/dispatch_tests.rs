@@ -529,6 +529,11 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .account_id
         .clone()
         .expect("prepared native channel has an account identity");
+    assert_eq!(
+        tinychannels_bus::provider_id(&account_id),
+        prepared.envelope.channel.id,
+        "the prepared account selects the configured provider"
+    );
     let channel_object = fixture_client
         .object_client("tinychannels", tinychannels_module::OBJECT_PATH)
         .await
