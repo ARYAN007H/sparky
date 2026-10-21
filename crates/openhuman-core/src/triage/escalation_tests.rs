@@ -98,17 +98,21 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     let envelope = envelope("esc-react-inline");
     crate::core::bus::init().await.expect("bus init");
 
-    apply_decision(
-        &ctx,
-        run_with_target(
-            TriageAction::React,
-            "trigger_reactor",
-            "handle this trigger inline",
-        ),
-        &envelope,
-    )
-    .await
-    .expect("react escalation should complete");
+    runtime
+        .run_in(
+            Arc::clone(runtime.context()),
+            apply_decision(
+                &ctx,
+                run_with_target(
+                    TriageAction::React,
+                    "trigger_reactor",
+                    "handle this trigger inline",
+                ),
+                &envelope,
+            ),
+        )
+        .await
+        .expect("react escalation should complete");
 
     // Prove that the requested route reached the model before checking the
     // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
