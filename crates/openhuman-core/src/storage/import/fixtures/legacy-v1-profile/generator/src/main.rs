@@ -259,6 +259,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set("fixture-secret", b"historical-secret-value")
         .await?;
 
+    // Threads predate the v1 storage database and remain in the workspace's
+    // read-only JSONL conversation files. Emit them beside storage.db so the
+    // host integration fixture exercises the real legacy thread importer.
+    let conversations = path
+        .parent()
+        .ok_or("storage.db output must have a parent directory")?
+        .join("legacy-workspace/memory/conversations");
+    let thread_id = "fixture-thread";
+    std::fs::create_dir_all(conversations.join("threads"))?;
+    std::fs::write(
+        conversations.join("threads.jsonl"),
+        "{\"op\":\"upsert\",\"thread_id\":\"fixture-thread\",\"title\":\"Fixture thread\",\"created_at\":\"2025-02-03T04:05:06Z\"}\n",
+    )?;
+    let thread_stem = thread_id
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    std::fs::write(
+        conversations
+            .join("threads")
+            .join(format!("{thread_stem}.jsonl")),
+        "{\"id\":\"fixture-message\",\"content\":\"Historical thread body\",\"type\":\"text\",\"extraMetadata\":null,\"sender\":\"user\",\"createdAt\":\"2025-02-03T04:06:07Z\"}\n",
+    )?;
+
     backend
         .checkpoint(tinystoragedrivers::Checkpoint::Truncate)
         .await?;
