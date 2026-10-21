@@ -45,7 +45,7 @@ pub(crate) use system_prompt::ChannelSystemPrompt;
 #[cfg(all(feature = "channels", test))]
 mod tests;
 
-#[cfg(all(feature = "channels", any(test, debug_assertions)))]
+#[cfg(all(feature = "channels", test))]
 pub use runtime::test_support;
 
 #[cfg(feature = "channels")]

@@ -18,7 +18,7 @@ pub(crate) use dispatch::process_channel_message;
 pub(crate) use dispatch::{process_channel_runtime_message, RuntimeChannelMessage};
 pub(crate) use startup::{build_channel_turn_parts, runtime_context, PromptToolDescs};
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(test)]
 pub mod test_support;
 
 // Re-exported for `channels::tests` only; omit in normal lib builds to avoid unused-import warnings.
