@@ -346,7 +346,10 @@ fn boot_import_reports_no_source_for_a_new_mongodb_target() {
         .iter()
         .find(|report| report.domain == IMPORT_DOMAIN)
         .expect("scope migration is in the boot importer pipeline");
-    assert_eq!(report.outcome, Ok(crate::storage::import::Outcome::NoSource));
+    assert_eq!(
+        report.outcome,
+        Ok(crate::storage::import::Outcome::NoSource)
+    );
 }
 
 #[cfg(feature = "legacy-import")]

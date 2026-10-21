@@ -1,7 +1,7 @@
 use super::*;
+use crate::storage::test_support::sqlite_backend;
 use serde_json::json;
 use std::sync::Arc;
-use crate::storage::test_support::sqlite_backend;
 use tinystoragedrivers::{Meta, Precondition, Scope};
 
 #[test]
@@ -55,13 +55,16 @@ async fn migrate_cluster_moves_the_v1_registry_into_the_v2_collection() {
 
 #[test]
 fn the_schema_composes_under_its_owner() {
-    assert_eq!(collection_specs(), vec![CollectionSpec::new(REGISTRY_COLLECTION)]);
+    assert_eq!(
+        collection_specs(),
+        vec![CollectionSpec::new(REGISTRY_COLLECTION)]
+    );
 }
 
 #[tokio::test]
 #[cfg(feature = "storage-sqlite")]
 async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch() {
-    use crate::storage::lease::{DocumentLeases, LEASE_OWNER, LeaseStore};
+    use crate::storage::lease::{DocumentLeases, LeaseStore, LEASE_OWNER};
     let fixture = sqlite_backend().unwrap();
     let backend = Arc::clone(&fixture.backend);
     let scoped = backend.for_scope(&Scope::cluster()).unwrap();
