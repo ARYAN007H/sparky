@@ -35,9 +35,8 @@ impl OpenHumanModelFactory<'_> {
     }
 
     fn injected(&self, request: &ModelBuildRequest) -> Option<Arc<dyn ChatModel<()>>> {
-        let local = self.ctx.host_overrides()?;
         let route = request.route.as_deref();
-        let host_model = match &request.purpose {
+        let host_model = self.ctx.host_overrides().and_then(|local| match &request.purpose {
             ModelPurpose::Primary => local.model_for(&request.role),
             ModelPurpose::Summarization => local
                 .role_models
@@ -48,7 +47,7 @@ impl OpenHumanModelFactory<'_> {
                 .and_then(|route| local.role_models.get(route))
                 .or_else(|| local.role_models.get(&request.role))
                 .cloned(),
-        };
+        });
         if host_model.is_some() {
             return host_model;
         }
