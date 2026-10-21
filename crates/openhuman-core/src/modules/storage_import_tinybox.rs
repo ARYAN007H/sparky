@@ -24,8 +24,9 @@ use std::path::Path;
 use crate::storage::{CollectionSpec, Storage};
 use anyhow::{Context, Result};
 use serde_json::Value;
+use tinystoragedrivers_types::WriteOptions;
 
-use super::storage_grant_schemas::tinybox::{JAIL_INDEX_COLLECTION, MODULE_ID};
+use super::storage_grant_schemas::tinybox::MODULE_ID;
 use super::storage_import_support as support;
 use crate::core::runtime::DispatchCtx;
 
@@ -81,12 +82,22 @@ async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {
     let mut written = false;
     match serde_json::from_str::<Value>(&text) {
         Ok(doc) if doc.is_object() => {
-            docs.ensure_collection(&CollectionSpec::new(JAIL_INDEX_COLLECTION))
+            let collection = tinybox_bus::storage::JAIL_INDEX_COLLECTION;
+            docs.ensure_collection(&CollectionSpec::new(collection))
                 .await
                 .map_err(|error| {
-                    anyhow::anyhow!("declare {JAIL_INDEX_COLLECTION}: {:?}", error.kind())
+                    anyhow::anyhow!("declare {collection}: {:?}", error.kind())
                 })?;
-            written = support::put_absent(docs, JAIL_INDEX_COLLECTION, &registry, doc).await?;
+            let body = tinybox_bus::storage::jail_index::to_body(doc)
+                .context("convert the jail index into the current owner body")?;
+            written = support::put_absent_with(
+                docs,
+                collection,
+                &registry,
+                body,
+                WriteOptions::new().schema(tinybox_bus::storage::BODY_VERSION),
+            )
+            .await?;
         }
         _ => tracing::warn!("{LOG_PREFIX} skipped an index file that is not a JSON object"),
     }

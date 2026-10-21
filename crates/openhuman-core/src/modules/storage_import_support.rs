@@ -13,6 +13,7 @@ use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use sha2::Digest;
+use tinystoragedrivers_types::WriteOptions;
 
 /// The module's scope of the installed backend, or `None` when the process
 /// runs without a storage backend (the module is then not using this storage).
@@ -62,6 +63,27 @@ pub(super) async fn put_absent(
     doc: Value,
 ) -> Result<bool> {
     match docs.put(collection, id, doc, Precondition::Absent).await {
+        Ok(_) => Ok(true),
+        Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {
+            Ok(false)
+        }
+        Err(error) => Err(anyhow!("write {collection}: {:?}", error.kind())),
+    }
+}
+
+/// Writes `doc` with owner metadata only when `id` is absent; `true` when it
+/// was written.
+pub(super) async fn put_absent_with(
+    docs: &Arc<dyn DocumentStore>,
+    collection: &str,
+    id: &str,
+    doc: Value,
+    options: WriteOptions,
+) -> Result<bool> {
+    match docs
+        .put_with(collection, id, doc, Precondition::Absent, options)
+        .await
+    {
         Ok(_) => Ok(true),
         Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {
             Ok(false)
