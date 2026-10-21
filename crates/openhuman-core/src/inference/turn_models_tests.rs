@@ -53,6 +53,86 @@ async fn native_turn_factory_applies_default_temperature_and_preserves_explicit_
     assert_eq!(*seen.lock().unwrap(), vec![Some(0.3), Some(0.9)]);
 }
 
+#[tokio::test]
+async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_summary() {
+    use crate::agent::tinyagents::budget::{CallBudget, ModelBudget, SpendLimits};
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use crate::core::slots::Extensions;
+
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        scoped_model_entry("budget-owner-model", false),
+    );
+    let context = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        extensions,
+    );
+    let ctx = DispatchCtx::new(context);
+    let config = Arc::new(crate::config::Config::default());
+    let budget = ModelBudget {
+        ledger: tinyinference_llm::model::budget::Budget::new(SpendLimits {
+            tokens: Some(0),
+            cost_micros: None,
+        }),
+        call: CallBudget {
+            input_tokens: 10_000,
+            output_tokens: 1,
+            cost_micros: 1,
+        },
+    };
+    let models = TurnModelSource::new_crate_native(&ctx, "chat", config)
+        .build("hint:chat", 0.0, None, None)
+        .expect("native model set")
+        .with_budget(Some(&budget));
+    let owner = models
+        .native_model_set
+        .as_ref()
+        .expect("native owner set retained");
+    let primary_slot = owner.primary_error_slot();
+    let tier_slot = owner
+        .workload_error_slot("hint:coding")
+        .expect("coding route owns its error slot");
+    let summary_slot = owner.summarizer_error_slot();
+    let resolver = models.resolver();
+
+    for (request, expected_slot) in [
+        (ModelResolveRequest::new("chat"), primary_slot),
+        (
+            ModelResolveRequest::new("worker").with_model_pin("hint:coding"),
+            tier_slot,
+        ),
+    ] {
+        let model = resolver.resolve(&request).await.expect("route resolves");
+        let result = model
+            .invoke(
+                &(),
+                ModelRequest::new(vec![tinyinference_llm::message::Message::user(
+                    "budget this call",
+                )]),
+            )
+            .await;
+        assert!(result.is_err(), "zero token budget rejects each route");
+        assert!(expected_slot.lock().unwrap().is_some());
+    }
+
+    let result = owner
+        .summarizer()
+        .invoke(
+            &(),
+            ModelRequest::new(vec![tinyinference_llm::message::Message::user(
+                "budget this summary",
+            )]),
+        )
+        .await;
+    assert!(result.is_err(), "zero token budget rejects summary");
+    assert!(summary_slot.lock().unwrap().is_some());
+}
+
 use super::TurnModels;
 use crate::agent::tinyagents::TurnModelSource;
 use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
