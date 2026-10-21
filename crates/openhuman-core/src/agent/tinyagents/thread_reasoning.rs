@@ -42,20 +42,6 @@ pub(crate) fn apply_requested_effort(
     Ok(())
 }
 
-/// The user's explicit thread choice, otherwise the effective runtime config.
-pub(crate) fn turn_reasoning(
-    dispatch: &DispatchCtx,
-    thread_id: Option<&str>,
-    config: Option<&crate::config::Config>,
-) -> Option<ReasoningConfig> {
-    if let Some(effort) =
-        thread_id.and_then(|thread_id| store(dispatch).get(&ThreadId::new(thread_id)))
-    {
-        return Some(ReasoningConfig::effort(effort));
-    }
-    config.and_then(crate::inference::reasoning::reasoning_for_config)
-}
-
 /// Snapshots root-turn reasoning, keeping child turns at the provider default.
 pub(crate) fn turn_reasoning_for(
     ctx: &crate::agent::tinyagents::host::OpenHumanRunContext,
