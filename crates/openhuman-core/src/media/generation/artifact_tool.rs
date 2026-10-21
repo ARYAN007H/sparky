@@ -237,7 +237,7 @@ impl<T: Tool> MediaArtifactTool<T> {
         total: usize,
         call_id: Option<&str>,
         chat: Option<&ApprovalChatContext>,
-        ctx: &crate::core::runtime::DispatchCtx,
+        _ctx: &crate::core::runtime::DispatchCtx,
     ) -> Option<String> {
         let ext = src
             .extension()
@@ -252,8 +252,7 @@ impl<T: Tool> MediaArtifactTool<T> {
         // Reserve the file in the files folder (the card shows
         // "generating…", tied to this tool call's bubble) and open the
         // versioned artifact under the same id.
-        let production = match Production::start_in(
-            ctx,
+        let production = match Production::start(
             &self.workspace_dir,
             self.files_dir.clone(),
             kind,

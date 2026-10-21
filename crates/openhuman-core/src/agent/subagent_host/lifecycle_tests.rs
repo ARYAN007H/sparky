@@ -64,6 +64,7 @@ fn driver_error_accepts_only_matching_nonterminal_lifecycle_snapshots() {
             "incomplete",
             SubagentRunStatus::Incomplete {
                 reason: "iteration limit".into(),
+                failure_cause: None,
             },
         ),
         ("cancelled", SubagentRunStatus::Cancelled),

@@ -239,6 +239,47 @@ async fn one_shot_chat_models_preserve_factory_temperature_as_request_default() 
     );
 }
 
+#[test]
+fn default_temperature_wrapper_preserves_physical_attempt_tracking() {
+    use async_trait::async_trait;
+    use std::sync::Arc;
+    use tinyinference_llm::model::{ModelRequest, ModelResponse};
+
+    struct TrackedModel;
+
+    #[async_trait]
+    impl ChatModel<()> for TrackedModel {
+        fn tracks_physical_attempts(&self) -> bool {
+            true
+        }
+
+        fn has_pre_invocation_admission_gate(&self) -> bool {
+            true
+        }
+
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            Ok(ModelResponse::assistant("ok"))
+        }
+    }
+
+    let _guard = crate::inference::inference_test_guard();
+    let _override = test_provider_override::install_model(Arc::new(TrackedModel));
+    let wrapped = create_chat_model_in(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "chat",
+        &Config::default(),
+        0.3,
+    )
+    .expect("test override model");
+
+    assert!(wrapped.tracks_physical_attempts());
+    assert!(wrapped.has_pre_invocation_admission_gate());
+}
+
 // ── Motion B (#4727): managed-backend crate-native routing ──────────────────
 // `create_chat_model` must route the managed OpenHuman backend through the
 // crate-native `OpenHumanBackendModel`, whose concrete `managed` profile
@@ -688,36 +729,5 @@ fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
     assert_eq!(model_id, crate::config::MODEL_MANAGED_DEFAULT);
 }
 
-#[test]
-fn try_create_cloud_slug_flips_openai_but_declines_non_cloud() {
-    let _guard = crate::inference::inference_test_guard();
-    // `openai` (API-key Bearer, no codex OAuth) now flips crate-native on Chat
-    // Completions — the legacy `/v1/responses` fallback is not replicated.
-    let mut openai = Config::default();
-    openai.cloud_providers.push(openai_entry("p_oai", "openai"));
-    openai.chat_provider = Some("openai:gpt-4o-mini".to_string());
-    let (model, model_id) =
-        try_create_cloud_slug_chat_model("chat", &openai, &EgressLedger::none())
-            .expect("openai should flip crate-native")
-            .expect("build");
-    assert_eq!(model_id, "gpt-4o-mini");
-    assert_eq!(
-        model.profile().and_then(|p| p.provider.as_deref()),
-        Some("openai")
-    );
-
-    // Managed (default), local runtimes, and unconfigured slugs are not cloud
-    // slugs — they decline and fall through to their own paths.
-    assert!(
-        try_create_cloud_slug_chat_model("chat", &Config::default(), &EgressLedger::none())
-            .is_none()
-    );
-    let mut local = Config::default();
-    local.chat_provider = Some("ollama:qwen2.5".to_string());
-    assert!(try_create_cloud_slug_chat_model("chat", &local, &EgressLedger::none()).is_none());
-    let mut unconfigured = Config::default();
-    unconfigured.chat_provider = Some("deepseek:deepseek-chat".to_string());
-    assert!(
-        try_create_cloud_slug_chat_model("chat", &unconfigured, &EgressLedger::none()).is_none()
-    );
-}
+#[path = "factory_crate_native_fallback_tests.rs"]
+mod fallback_tests;

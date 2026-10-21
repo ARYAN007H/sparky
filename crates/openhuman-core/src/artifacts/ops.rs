@@ -31,7 +31,6 @@ const MAX_LIMIT: usize = 200;
 ///
 /// Returns `{ "artifacts": [...], "total": N, "offset": M, "limit": L }`.
 pub async fn ai_list_artifacts(
-    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     offset: Option<usize>,
     limit: Option<usize>,
@@ -45,14 +44,8 @@ pub async fn ai_list_artifacts(
         thread_id,
     );
 
-    let (artifacts, total) = ctx
-        .enter(store::list_artifacts(
-            &config.workspace_dir,
-            offset,
-            limit,
-            thread_id,
-        ))
-        .await?;
+    let (artifacts, total) =
+        store::list_artifacts(&config.workspace_dir, offset, limit, thread_id).await?;
 
     log::debug!(
         "[artifacts] ai_list_artifacts: returning {} of {total} total",
@@ -72,11 +65,7 @@ pub async fn ai_list_artifacts(
 ///
 /// Returns the serialized `ArtifactMeta` plus an `absolute_path` field
 /// pointing to the full on-disk location of the artifact files.
-pub async fn ai_get_artifact(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-    artifact_id: &str,
-) -> Result<Outcome<Value>, String> {
+pub async fn ai_get_artifact(config: &Config, artifact_id: &str) -> Result<Outcome<Value>, String> {
     log::debug!(
         "[artifacts] ai_get_artifact: id={artifact_id} workspace={:?}",
         config.workspace_dir
@@ -86,22 +75,14 @@ pub async fn ai_get_artifact(
         return Err("[artifacts] artifact_id must not be empty".to_string());
     }
 
-    let meta = ctx
-        .enter(store::get_artifact(&config.workspace_dir, artifact_id))
-        .await?;
+    let meta = store::get_artifact(&config.workspace_dir, artifact_id).await?;
 
     // Resolve through the escape guard (#5505): a record's `file` must sit
     // inside its recorded files folder, a legacy `meta.path` inside the
     // artifacts root. A Ready record whose file was moved or deleted outside
     // OpenHuman is an error rather than a path that points at nothing.
     let roots = super::files::FileRoots::from_config(config);
-    let resolved = ctx
-        .enter(super::files::resolve_file(
-            &config.workspace_dir,
-            &meta,
-            &roots,
-        ))
-        .await?;
+    let resolved = super::files::resolve_file(&config.workspace_dir, &meta, &roots).await?;
     if matches!(meta.status, super::types::ArtifactStatus::Ready)
         && !tokio::fs::try_exists(&resolved).await.unwrap_or(false)
     {
@@ -128,7 +109,6 @@ pub async fn ai_get_artifact(
 ///
 /// Returns `{ "artifact_id": "...", "deleted": true }`.
 pub async fn ai_delete_artifact(
-    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     artifact_id: &str,
 ) -> Result<Outcome<Value>, String> {
@@ -141,11 +121,11 @@ pub async fn ai_delete_artifact(
         return Err("[artifacts] artifact_id must not be empty".to_string());
     }
 
-    ctx.enter(store::delete_artifact(
+    store::delete_artifact(
         &config.workspace_dir,
         super::files::FileRoots::from_config(config),
         artifact_id,
-    ))
+    )
     .await?;
 
     log::debug!("[artifacts] ai_delete_artifact: deleted id={artifact_id}");
@@ -198,9 +178,7 @@ pub async fn ai_regenerate(
         );
     }
 
-    let meta = ctx
-        .enter(store::get_artifact(&config.workspace_dir, artifact_id))
-        .await?;
+    let meta = store::get_artifact(&config.workspace_dir, artifact_id).await?;
     if meta.kind != ArtifactKind::Presentation {
         return Err(format!(
             "[artifacts] regenerate is only supported for presentations (artifact id={artifact_id} is {})",
@@ -223,12 +201,7 @@ async fn regenerate_presentation(
     thread_id: &str,
     client_id: &str,
 ) -> Result<Outcome<Value>, String> {
-    let args = ctx
-        .enter(store::read_artifact_args(
-            &config.workspace_dir,
-            artifact_id,
-        ))
-        .await?;
+    let args = store::read_artifact_args(&config.workspace_dir, artifact_id).await?;
 
     // A fresh policy from the live config — cheap, sync, and mirrors how
     // the agent harness builds the same tool (see `tools::ops`).
@@ -311,14 +284,13 @@ pub async fn ai_save_artifact_version(
     config: &Config,
     artifact_id: &str,
     body: &str,
-    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<Outcome<Value>, String> {
     let saved = super::tiny_store::save_operator_version(
         &config.workspace_dir,
         super::files::FileRoots::from_config(config),
         artifact_id,
         body,
-        ctx,
+        &crate::core::runtime::DispatchCtx::ambient(),
     )
     .await?;
     log::debug!(
@@ -341,16 +313,14 @@ pub async fn ai_share_artifact(
     artifact_id: &str,
     version: Option<u32>,
     public: bool,
-    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<Outcome<Value>, String> {
-    let publisher = super::artifact_publisher_in(config, ctx)
+    let publisher = super::artifact_publisher(config)
         .ok_or_else(|| "sign in to share artifacts".to_string())?;
     let artifacts = super::tiny_store::artifacts_service_with_publisher(
         &config.workspace_dir,
         super::files::FileRoots::from_config(config),
         None,
         None,
-        ctx,
         Some(&publisher),
     );
     let options = tiny_artifacts::PublishOptions {

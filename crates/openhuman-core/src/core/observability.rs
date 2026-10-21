@@ -27,7 +27,7 @@ use std::fmt::Display;
 #[path = "observability_release_tag.rs"]
 mod release_tag;
 #[cfg(feature = "crash-reporting")]
-use release_tag::{parse_release_tag, parse_version};
+pub use release_tag::is_stale_release_event;
 
 #[path = "observability_availability.rs"]
 mod availability;
@@ -542,7 +542,7 @@ pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     if tinyinference_llm::failure::is_ollama_cloud_internal_500_message(message) {
         return Some(ExpectedErrorKind::TransientUpstreamHttp);
     }
-    if is_backend_user_error_message(&lower) {
+    if is_backend_user_error_message(&lower) || is_plan_required_message(message) {
         return Some(ExpectedErrorKind::BackendUserError);
     }
     // Check `is_session_expired_message` BEFORE `is_embedding_backend_auth_failure`:
@@ -900,6 +900,25 @@ fn is_embedding_model_rejected(lower: &str) -> bool {
     tinyinference_embeddings::probe::is_embedding_model_rejected(lower)
 }
 
+/// Whether `msg` is the hosted backend refusing a feature the account's plan
+/// does not include (#8081): a `[…_PLAN_REQUIRED]` code in the head
+/// TinyMemory gives a hosted failure, `[CODE] memory API {route} …`. Matched
+/// as that delimited code, so a description that merely mentions the code
+/// is not a plan refusal. User state, never an expired session.
+pub fn is_plan_required_message(msg: &str) -> bool {
+    // The code runs from the nearest `[` before the head and is all
+    // `A-Z0-9_`, as TinyMemory cleans it.
+    msg.match_indices(PLAN_REQUIRED_HEAD).any(|(at, _)| {
+        msg[..at].rsplit_once('[').is_some_and(|(_, code)| {
+            code.chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        })
+    })
+}
+
+/// What follows a plan code in TinyMemory's hosted failure head.
+const PLAN_REQUIRED_HEAD: &str = "_PLAN_REQUIRED] memory API ";
+
 /// Detect **app-session-expired** boundary errors that bubble up from any
 /// backend-touching call site (agent, web channel, cron, integrations).
 ///
@@ -953,6 +972,14 @@ fn is_embedding_model_rejected(lower: &str) -> bool {
 /// `DomainEvent::SessionExpired` publication, so downstream/provider 401s stay
 /// recoverable and do not clear the stored app session.
 pub fn is_session_expired_message(msg: &str) -> bool {
+    // #8081: tinymemory's hosted mapping words every 403, including
+    // `[MEMORY_PLAN_REQUIRED]` (memory not in the account's plan), as "the
+    // session expired or the API key was rejected (HTTP 403 …)". A 403 or a
+    // plan refusal never means the session expired, and signing out on one
+    // logged a valid user out on opening a Memory tab.
+    if is_plan_required_message(msg) || msg.contains("(HTTP 403") {
+        return false;
+    }
     let lower = msg.to_ascii_lowercase();
     lower.contains("session expired")
         || lower.contains("no backend session token")
@@ -3394,34 +3421,6 @@ pub fn is_connectivity_event(event: &sentry::protocol::Event<'_>) -> bool {
     }
 
     false
-}
-
-/// Filter out events from **stale releases** — releases older than
-/// `MAX_AGE_MINOR_VERSIONS` minor versions behind the current build.
-///
-/// Ancient-client errors are not actionable against the current codebase.
-/// Target: ~4 issues from releases like v0.54.0 against current v0.58+.
-#[cfg(feature = "crash-reporting")]
-pub fn is_stale_release_event(event: &sentry::protocol::Event<'_>) -> bool {
-    // Maximum number of minor versions behind the current release to accept.
-    // Events from clients on releases older than this are dropped.
-    const MAX_AGE_MINOR_VERSIONS: u32 = 6;
-
-    let Some(release) = event.release.as_ref() else {
-        return false;
-    };
-
-    let current = env!("CARGO_PKG_VERSION");
-    parse_version(current).is_some_and(|(current_major, current_minor)| {
-        parse_release_tag(release).is_some_and(|(event_major, event_minor)| {
-            if event_major != current_major {
-                // Different major version = definitely stale (or from the future)
-                return event_major < current_major;
-            }
-            // Same major: check minor version gap
-            current_minor.saturating_sub(event_minor) > MAX_AGE_MINOR_VERSIONS
-        })
-    })
 }
 
 #[cfg(test)]

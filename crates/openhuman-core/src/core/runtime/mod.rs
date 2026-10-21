@@ -64,7 +64,7 @@ pub mod tenant;
 
 pub use agent_scope::{agent_scope_dir, slot_for, AgentContextRegistry, AgentScopedState};
 pub use builder::{CoreBuilder, CoreRuntime, DomainSet, ServiceSet, TokenSource};
-pub use context::{ContextOverlay, CoreContext};
+pub use context::{AutonomyTierSource, ContextOverlay, CoreContext};
 pub use dispatch_ctx::DispatchCtx;
 #[cfg(test)]
 pub(crate) use mode::lock_mode;

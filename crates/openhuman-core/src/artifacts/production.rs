@@ -18,11 +18,12 @@
 //! always has its versioned record.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use tiny_artifacts::{ArtifactKind, Artifacts, Author, Content};
 
 use super::files::FileRoots;
-use super::tiny_store::legacy_kind_for_extension;
+use super::tiny_store::{artifacts_service_current, legacy_kind_for_extension};
 use super::types::ArtifactKind as LegacyArtifactKind;
 use crate::security::approval::ApprovalChatContext;
 
@@ -34,11 +35,9 @@ pub const SAVED_NOT_SHOWN: &str = "saved-not-shown:";
 /// A file being produced as an artifact.
 pub struct Production {
     artifacts: Artifacts,
-    ctx: crate::core::runtime::DispatchCtx,
     workspace_dir: PathBuf,
     files: FileRoots,
     chat: Option<ApprovalChatContext>,
-    file_store: Option<std::sync::Arc<dyn tiny_artifacts::FileStore>>,
     id: String,
     path: PathBuf,
     /// Whether this adds a version to an artifact that already has one: its
@@ -76,96 +75,30 @@ impl Production {
         revise: Option<&str>,
         chat: Option<&ApprovalChatContext>,
     ) -> Result<Self, String> {
-        Self::start_in(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            workspace_dir,
-            files,
-            kind,
-            title,
-            extension,
-            tool_call_id,
-            revise,
-            chat,
-        )
-        .await
-    }
-
-    /// Start production using the explicit dispatch scope of the producing turn.
-    pub async fn start_in(
-        ctx: &crate::core::runtime::DispatchCtx,
-        workspace_dir: &Path,
-        files: FileRoots,
-        kind: ArtifactKind,
-        title: &str,
-        extension: &str,
-        tool_call_id: Option<&str>,
-        revise: Option<&str>,
-        chat: Option<&ApprovalChatContext>,
-    ) -> Result<Self, String> {
-        let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
-        Self::start_with_scoped_storage(
-            ctx,
-            workspace_dir,
-            files,
-            kind,
-            title,
-            extension,
-            tool_call_id,
-            revise,
-            chat,
-            scoped,
-        )
-        .await
-    }
-
-    async fn start_with_scoped_storage(
-        ctx: &crate::core::runtime::DispatchCtx,
-        workspace_dir: &Path,
-        files: FileRoots,
-        kind: ArtifactKind,
-        title: &str,
-        extension: &str,
-        tool_call_id: Option<&str>,
-        revise: Option<&str>,
-        chat: Option<&ApprovalChatContext>,
-        scoped: Option<crate::storage::ScopedStorage>,
-    ) -> Result<Self, String> {
         let legacy_kind = if kind == ArtifactKind::Image {
             LegacyArtifactKind::Image
         } else {
             legacy_kind_for_extension(&extension.to_ascii_lowercase())
         };
         let target = revise.filter(|id| !id.trim().is_empty());
-        let (artifacts, file_store) = super::tiny_store::build_artifacts_service_with_scope(
+        let (meta, path) = super::store::create_artifact_regenerating(
             workspace_dir,
             files.clone(),
-            None,
+            legacy_kind,
+            title,
+            extension,
+            tool_call_id,
+            target,
             chat,
-            ctx,
-            scoped,
-            None,
-        );
-        let file_store =
-            file_store.ok_or_else(|| "artifact tenant storage is unavailable".to_string())?;
-        let (meta, path) = ctx
-            .enter(super::store::create_artifact_regenerating(
-                workspace_dir,
-                files.clone(),
-                legacy_kind,
-                title,
-                extension,
-                tool_call_id,
-                target,
-                chat,
-            ))
-            .await?;
+        )
+        .await?;
+
+        let artifacts = artifacts_service_current(workspace_dir, files.clone(), None, chat);
         let mut production = Self {
             artifacts,
-            ctx: ctx.clone(),
             workspace_dir: workspace_dir.to_path_buf(),
             files,
             chat: chat.cloned(),
-            file_store: Some(file_store),
             id: meta.id.clone(),
             path,
             revision: false,
@@ -304,13 +237,23 @@ impl Production {
             Ok(Some(record)) if record.latest().is_some() => record,
             _ => return self.fail_card(reason).await,
         };
+        let ctx = crate::core::runtime::DispatchCtx::ambient();
+        let scoped = crate::storage::sessions::artifact_scoped_for_in(&self.workspace_dir, &ctx);
+        let file_store = scoped.as_ref().map(|scoped| {
+            Arc::new(tiny_artifacts::BlobFileStore::new(scoped))
+                as Arc<dyn tiny_artifacts::FileStore>
+        });
         let bridge = super::tiny_store::LegacyUiBridge::new(
             &self.workspace_dir,
             self.files.clone(),
-            super::tiny_store::guarded_roots(self.files.trusted().to_vec()),
-            self.file_store.clone(),
+            super::tiny_store::guarded_roots(super::tiny_store::file_roots(
+                &self.workspace_dir,
+                &self.files,
+                None,
+            )),
+            file_store,
             self.chat.as_ref(),
-            &self.ctx,
+            &ctx,
         );
         if let Err(err) = bridge.show_newest(&record).await {
             tracing::warn!(
@@ -325,16 +268,14 @@ impl Production {
 
     /// Fail the card directly (when the record could not take the change).
     async fn fail_card(&self, reason: &str) {
-        let _ = self
-            .ctx
-            .enter(super::store::fail_artifact(
-                &self.workspace_dir,
-                self.files.clone(),
-                &self.id,
-                reason,
-                self.chat.as_ref(),
-            ))
-            .await;
+        let _ = super::store::fail_artifact(
+            &self.workspace_dir,
+            self.files.clone(),
+            &self.id,
+            reason,
+            self.chat.as_ref(),
+        )
+        .await;
     }
 }
 

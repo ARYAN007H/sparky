@@ -5,16 +5,17 @@
 //! runs where the artifact lives.
 //!
 //! * Text kinds (`text`, `markdown`, `html`) return their stored content.
-//! * File and image bytes are read from the acting tenant's scoped artifact
-//!   store, and only up to [`PREVIEW_MAX_BYTES`]. Legacy path references are
-//!   imported through the host's guarded file roots. A UTF-8 file comes back
-//!   as text; a DOCX, PPTX, XLSX or PDF is converted to Markdown through the
-//!   TinyDocs module. Anything else comes back as its visible file path.
+//! * A file or image version is opened only when its path is inside the
+//!   folders file artifacts may point into (the agent's working folder and the
+//!   files folders), and only up to [`PREVIEW_MAX_BYTES`]. A UTF-8 file comes
+//!   back as text; a DOCX, PPTX, XLSX or PDF is converted to Markdown through
+//!   the TinyDocs module. Anything else comes back as its path, for the panel
+//!   to show as a file.
 
 use std::path::Path;
 
 use serde::Serialize;
-use tiny_artifacts::{ArtifactKind, ArtifactRecord, FileRef, FileStore};
+use tiny_artifacts::{ArtifactKind, ArtifactRecord};
 
 use crate::config::Config;
 
@@ -45,42 +46,52 @@ pub struct ArtifactBody {
 ///
 /// Returns an error when the artifact does not exist or its record cannot be
 /// read.
-pub async fn read_body(
-    config: &Config,
-    id: &str,
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> Result<ArtifactBody, String> {
+pub async fn read_body(config: &Config, id: &str) -> Result<ArtifactBody, String> {
     let files = super::files::FileRoots::from_config(config);
-    let (artifacts, file_store) = super::tiny_store::artifacts_service_with_file_store(
+    let mut roots =
+        super::tiny_store::file_roots(&config.workspace_dir, &files, Some(&config.action_dir));
+    let versioned = super::tiny_store::artifacts_service_current(
         &config.workspace_dir,
         files.clone(),
         Some(&config.action_dir),
         None,
-        ctx,
-    );
-    let versioned = artifacts.get(id).await.map_err(|e| e.to_string())?;
-    let record = match versioned {
+    )
+    .get(id)
+    .await
+    .map_err(|e| e.to_string())?;
+    let mut record = match versioned {
         Some(record) => record,
         // An artifact made before versioning has only its legacy record: show
         // the file that record vouches for.
-        None => legacy_record(&config.workspace_dir, &files, id, file_store.as_ref(), ctx).await?,
-    };
-    let converter = DocumentConverter::for_config(config);
-    let display_path = ctx
-        .enter(async {
-            match super::store::get_artifact(&config.workspace_dir, id).await {
-                Ok(meta) => super::files::resolve_file(&config.workspace_dir, &meta, &files)
-                    .await
-                    .ok()
-                    .map(|path| path.to_string_lossy().into_owned()),
-                Err(_) => None,
+        None => {
+            let record = legacy_record(&config.workspace_dir, &files, id).await?;
+            if let Some(folder) = record
+                .latest()
+                .and_then(|v| v.file.as_ref())
+                .and_then(|f| Path::new(&f.key).parent())
+            {
+                roots.push(folder.to_path_buf());
             }
-        })
-        .await;
+            record
+        }
+    };
+    if let Some(file) = record.versions.last_mut().and_then(|v| v.file.as_mut()) {
+        // Version bytes live in the acting tenant's blob store. The legacy
+        // card bridge materializes the current version into its guarded,
+        // user-visible file path; preview reads that same path.
+        if let Ok(path) = super::files::resolve_ready_file(&config.workspace_dir, &files, id).await
+        {
+            file.key = path.display().to_string();
+        } else {
+            file.key = super::tiny_store::stored_file_path(&config.workspace_dir, file)
+                .display()
+                .to_string();
+        }
+    }
+    let converter = DocumentConverter::for_config(config);
     Ok(body_of(
         &record,
-        file_store.as_ref(),
-        display_path.as_deref(),
+        &super::tiny_store::guarded_roots(roots),
         &converter,
     )
     .await)
@@ -93,51 +104,25 @@ async fn legacy_record(
     workspace_dir: &Path,
     files: &super::files::FileRoots,
     id: &str,
-    file_store: Option<&std::sync::Arc<dyn FileStore>>,
-    ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<ArtifactRecord, String> {
-    let meta = ctx
-        .enter(super::store::get_artifact(workspace_dir, id))
+    let meta = super::store::get_artifact(workspace_dir, id)
         .await
         .map_err(|_| format!("artifact {id} not found"))?;
-    let path = ctx
-        .enter(super::files::resolve_ready_file(workspace_dir, files, id))
-        .await?;
+    let path = super::files::resolve_ready_file(workspace_dir, files, id).await?;
     let path = path.display().to_string();
     let at = u64::try_from(meta.created_at.timestamp_millis()).unwrap_or(0);
-    let legacy_ref = FileRef {
-        key: path.clone(),
-        size_bytes: meta.size_bytes,
-        media_type: None,
-    };
-    let file_store =
-        file_store.ok_or_else(|| "artifact file storage is unavailable".to_string())?;
-    let parent = Path::new(&path)
-        .parent()
-        .ok_or_else(|| "legacy artifact file has no parent folder".to_string())?;
-    let roots = super::tiny_store::guarded_roots(vec![parent.to_path_buf()]);
-    let imported = tiny_artifacts::import_legacy_file(
-        file_store.as_ref(),
-        &roots,
-        &legacy_ref,
-        &format!(
-            "artifacts/files/{id}/v1.{}",
-            Path::new(&path)
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .unwrap_or("bin")
-        ),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
     let mut version = tiny_artifacts::ArtifactVersion::new(
         1,
-        imported.key.clone(),
+        path.clone(),
         tiny_artifacts::ArtifactAuthor::Agent,
         super::tiny_store::AGENT_AUTHOR_ID,
         at,
     );
-    version.file = Some(imported);
+    version.file = Some(tiny_artifacts::FileRef {
+        size_bytes: meta.size_bytes,
+        media_type: None,
+        key: path,
+    });
     let mut record = ArtifactRecord::pending(id, meta.title, ArtifactKind::File, at);
     record.versions.push(version);
     Ok(record)
@@ -194,11 +179,11 @@ impl<'a> DocumentConverter<'a> {
     }
 }
 
-/// The preview of `record`'s newest version, reading file bytes by storage key.
+/// The preview of `record`'s newest version, opening files only inside
+/// `roots`.
 pub(crate) async fn body_of(
     record: &ArtifactRecord,
-    file_store: Option<&std::sync::Arc<dyn FileStore>>,
-    display_path: Option<&str>,
+    roots: &tiny_artifacts::FileRoots,
     converter: &DocumentConverter<'_>,
 ) -> ArtifactBody {
     let latest = record.latest();
@@ -214,23 +199,19 @@ pub(crate) async fn body_of(
     if !record.holds_file() {
         return preview;
     }
-    let Some(file) = latest.and_then(|v| v.file.as_ref()) else {
-        preview.body = stored;
+    let path = latest
+        .and_then(|v| v.file.as_ref())
+        .map_or(stored, |f| f.key.clone());
+    preview.body = path.clone();
+    // Inside the trusted folders, an existing regular file: anything else is
+    // shown by its path only.
+    let Ok(file) = roots.resolve(&path).await else {
         return preview;
     };
-    preview.body = display_path
-        .map(str::to_string)
-        .unwrap_or_else(|| file.file_name().unwrap_or(&file.key).to_string());
-    let Some(file_store) = file_store else {
-        return preview;
-    };
-    let Ok(Some(metadata)) = file_store.metadata(&file.key).await else {
-        return preview;
-    };
-    if metadata.size_bytes > PREVIEW_MAX_BYTES {
+    if file.size_bytes > PREVIEW_MAX_BYTES {
         return preview;
     }
-    let Ok(bytes) = file_store.read(&file.key).await else {
+    let Ok(bytes) = tokio::fs::read(Path::new(&file.path)).await else {
         return preview;
     };
     let probe = &bytes[..bytes.len().min(8192)];

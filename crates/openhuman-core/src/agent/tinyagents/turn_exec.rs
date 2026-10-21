@@ -8,10 +8,9 @@
 //! finalize the run into a [`TinyagentsTurnOutcome`].
 
 use std::collections::{BTreeSet, HashSet};
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use anyhow::Result;
-use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
 use tinyagents_harness::tool::ToolSnapshot;
@@ -45,18 +44,8 @@ use tinyagents_harness::turn_outcome::ToolOutcomeSink;
 use tinyagents_session::transcript::TranscriptMessage;
 
 use super::ToolPolicyEnforcement;
-
-/// The durable root entry point for hosted turns.  It intentionally carries no
-/// product authority: models, tools, middleware, progress and host capabilities
-/// are attached through an [`InvocationRuntime`] and [`AgentInvocation`] for
-/// each root.  That prevents concurrent sessions from replacing one another's
-/// security or workspace state on a shared harness.
-static ROOT_HOSTED_HARNESS: LazyLock<AgentHarness<(), OpenHumanRunContext>> =
-    LazyLock::new(AgentHarness::new);
-
-fn root_hosted_harness() -> &'static AgentHarness<(), OpenHumanRunContext> {
-    &ROOT_HOSTED_HARNESS
-}
+mod root_hosted_harness;
+use root_hosted_harness::root_hosted_harness;
 
 #[cfg(test)]
 #[path = "turn_exec_tests.rs"]
@@ -203,7 +192,10 @@ async fn drive_turn(
     let hosted_security_gate = is_hosted_root || native_security_gate.is_some();
     let is_local = turn_models.is_local();
     // Wrap concrete routes before the invocation-local hosted resolver captures them.
-    let turn_models = turn_models.with_budget(run_context.model_budget.as_ref());
+    let turn_models = turn_models.with_host_controls(
+        run_context.model_budget.as_ref(),
+        run_context.dispatch_admission.clone(),
+    );
     let hosted_model_resolver = hosted_root.as_ref().map(|_| {
         Arc::new(turn_models.resolver()) as Arc<dyn tinyagents_harness::host::ModelResolver<()>>
     });
@@ -593,6 +585,10 @@ async fn drive_turn(
                 .map(|parent| {
                     crate::storage::sessions::stores_or_ephemeral(&parent.workspace_dir).kv
                 }),
+            compaction_notice: Some({
+                let bridge = bridge.clone();
+                Arc::new(move || bridge.announce_compaction())
+            }),
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {

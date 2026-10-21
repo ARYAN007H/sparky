@@ -233,7 +233,7 @@ async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
     let (_, bundle) = super::super::invoke_driver_tool_with_request(
         &parent,
         super::super::driver_adapter::HostRequest {
-            invocation: definition,
+            invocation: super::super::HostInvocation::Agent(definition),
             options,
         },
         "finish".into(),

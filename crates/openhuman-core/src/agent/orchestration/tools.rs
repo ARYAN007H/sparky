@@ -6,6 +6,8 @@ pub(crate) mod awaiting_user;
 mod dispatch;
 #[path = "tools/spawn_subagent_surface.rs"]
 mod spawn_subagent;
+#[path = "tools/structured_payload.rs"]
+pub(crate) mod structured_payload;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
 #[cfg(test)]

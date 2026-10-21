@@ -2,10 +2,24 @@ use std::path::PathBuf;
 
 use tiny_artifacts::{
     ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactStore, ArtifactVersion, Author, Content,
-    FileRef, FileStore,
+    FileRef, FileStore, PublishOptions, PublishedLink,
 };
 
 use super::*;
+
+struct UnusedPublisher;
+
+#[async_trait::async_trait]
+impl tiny_artifacts::ArtifactPublisher for UnusedPublisher {
+    async fn publish(
+        &self,
+        _record: &ArtifactRecord,
+        _version: &ArtifactVersion,
+        _options: &PublishOptions,
+    ) -> anyhow::Result<PublishedLink> {
+        anyhow::bail!("publisher is not used by this test")
+    }
+}
 
 fn temp_dirs() -> (PathBuf, PathBuf) {
     let root = std::env::temp_dir().join(format!("tiny-store-{}", uuid::Uuid::new_v4()));
@@ -443,14 +457,16 @@ fn share_artifact_is_offered_only_with_a_publisher() {
     let (workspace, files) = temp_dirs();
     let names = |publisher_available: bool| {
         registered_tools(
-            crate::config::Config {
-                workspace_dir: workspace.clone(),
-                action_dir: workspace.clone(),
-                ..crate::config::Config::default()
-            },
+            &workspace,
             FileRoots::new(&files),
             &workspace,
-            publisher_available,
+            publisher_available.then(|| {
+                std::sync::Arc::new(
+                    |_| -> std::sync::Arc<dyn tiny_artifacts::ArtifactPublisher> {
+                        std::sync::Arc::new(UnusedPublisher)
+                    },
+                ) as crate::artifacts::ArtifactPublisherBinder
+            }),
         )
         .iter()
         .map(|t| t.name().to_string())
@@ -553,4 +569,26 @@ fn a_protected_location_is_refused_under_its_macos_canonical_name() {
     assert!(refused_path(Path::new("/private/var/folders/x/notes.md")).is_none());
     assert!(refused_path(Path::new("/private/tmp/notes.md")).is_none());
     assert!(refused_path(Path::new("/Users/me/OpenHuman/notes.md")).is_none());
+}
+
+#[test]
+fn a_stored_file_key_resolves_under_the_version_files_folder_and_an_absolute_one_stays() {
+    let workspace = Path::new("/ws");
+    let kept = tiny_artifacts::FileRef {
+        key: "artifacts/files/a1/v2.pptx".into(),
+        size_bytes: 1,
+        media_type: None,
+    };
+    assert_eq!(
+        stored_file_path(workspace, &kept),
+        version_files_dir(workspace).join("artifacts/files/a1/v2.pptx")
+    );
+    let legacy = tiny_artifacts::FileRef {
+        key: "/elsewhere/old.pptx".into(),
+        ..kept
+    };
+    assert_eq!(
+        stored_file_path(workspace, &legacy),
+        PathBuf::from("/elsewhere/old.pptx")
+    );
 }

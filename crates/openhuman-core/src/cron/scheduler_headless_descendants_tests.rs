@@ -57,19 +57,18 @@ fn scheduled_agent_fixture(
         .definitions(definitions),
     );
     let dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core));
-    let job = crate::cron::add_agent_job(
-        &config,
-        Some("headless child test".into()),
+    let mut spec = tinyflows_bus::schedule::AgentJobSpec::new(
         tinyflows_bus::schedule::types::Schedule::Every {
             every_ms: 3_600_000,
         },
         "Delegate this scheduled task to its worker.",
-        SessionTarget::Isolated,
-        Some("test-model".into()),
-        None,
-        false,
-    )
-    .expect("persist scheduled agent job");
+    );
+    spec.name = Some("headless child test".into());
+    spec.session_target = SessionTarget::Isolated;
+    spec.model = Some("test-model".into());
+    spec.enabled = true;
+    let job =
+        crate::cron::add_agent_job_from_spec(&config, spec).expect("persist scheduled agent job");
     crate::cron::store::force_next_run_for_test(
         &config,
         &job.id,

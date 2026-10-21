@@ -62,6 +62,7 @@ pub(super) fn make_completion(
                             SubagentRunStatus::Incomplete {
                                 reason: "returned an unexecuted tool call instead of a result"
                                     .to_string(),
+                                failure_cause: None,
                             }
                         } else {
                             outcome.status.clone()
@@ -130,7 +131,7 @@ pub(super) fn make_completion(
                                         .await;
                                 }
                             }
-                            SubagentRunStatus::Incomplete { ref reason } => {
+                            SubagentRunStatus::Incomplete { ref reason, .. } => {
                                 // Async sub-agent stopped short (stuck halt / iteration
                                 // cap). Mark the session finished and deliver the PARTIAL
                                 // progress back to the parent, framed so it is not

@@ -176,10 +176,11 @@ its `AgentStores`. See [session_host/README.md](session_host/README.md).
 
 ### Sub-agents and orchestration
 
-A parent agent delegates through the always-asynchronous `spawn_subagent`
-tool ([`orchestration/tools/spawn_subagent_surface.rs`](./orchestration/tools/spawn_subagent_surface.rs)).
-The `agent_id` argument selects an allowlisted `AgentDefinition`; the same
-`task_key` resumes a clarification checkpoint or reuses a previous worker.
+A parent agent delegates by calling a tool. `spawn_subagent`
+([`orchestration/tools/spawn_subagent.rs`](./orchestration/tools/spawn_subagent.rs)) and its siblings
+(`spawn_async_subagent`, `spawn_parallel_agents`, `continue_subagent`,
+`steer_subagent`, `wait_subagent`, `close_subagent`, `delegate`) look up the
+target `AgentDefinition` and call `subagent_host::run_subagent_with_parent`.
 
 ```text
  parent harness loop
@@ -188,7 +189,7 @@ The `agent_id` argument selects an allowlisted `AgentDefinition`; the same
  orchestration/tools/spawn_subagent.rs
    | read ParentExecutionContext (run context `parent`, harness/fork_context.rs)
    v
-   registered async sub-agent dispatcher
+ subagent_host::run_subagent_with_parent
    | resolve definition, model, narrowed tools, narrowed prompt,
    | workspace/sandbox, SubagentScope for progress
    v
@@ -209,9 +210,9 @@ other `Subagent*` variants. Spawn depth is capped by
 `DetachedTaskRegistry` and can be steered through the shared
 `SteeringRegistry` ([`tinyagents/host/steering.rs`](./tinyagents/host/steering.rs)).
 
-`orchestration/` is the larger control plane on top of that: the command
-center and background completion
-delivery. See
+`orchestration/` is the larger control plane on top of that: agent teams,
+the command center, declarative workflow runs, git worktrees for parallel
+coding workers, and background completion delivery. See
 [orchestration/README.md](orchestration/README.md) and
 [subagent_host/README.md](subagent_host/README.md).
 
@@ -220,8 +221,10 @@ delivery. See
 An `AgentDefinition` ([`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs), vocabulary in `tinyagents-definition`) is an archetype: id, tier,
 prompt source, model spec, `ToolScope`, `SandboxMode`, iteration policy and
 allowed sub-agents. Built-ins live in `../agent_registry/agents/<id>/` as an
-`agent.toml` plus `prompt.md` (orchestrator, summarizer,
-trigger_triage, trigger_reactor, vision_agent and others). Custom
+`agent.toml` plus a prompt builder. Most use a sibling `prompt.md` for their
+archetype (orchestrator, planner, critic, summarizer, trigger_triage,
+trigger_reactor, vision_agent and others); the workflow builder and discovery
+agents fetch their archetypes from TinyFlows Copilot over the module bus. Custom
 definitions are TOML files under `<workspace>/agents/*.toml`, with
 `~/.openhuman/agents/*.toml` as a fallback (`tinyagents_definition::DefinitionSet::load_dirs`, driven from [`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs)).
 `AgentDefinitionRegistry` holds the merged set; `agent.reload_definitions`
@@ -238,8 +241,8 @@ display-safe `AgentDefinitionDisplay` for the UI.
 OpenHuman product content and delegates tier assembly to TinyAgents,
 optionally returning a `TieredPrompt` with cache breakpoints. `context/` holds
 the shared default for TinyAgents microcompact configuration. `debug/`
-renders the exact prompt a cold live turn would send, by building a real
-session host and calling `render_current_turn_prompt`.
+renders the exact prompt a live session would send, by building a real
+session host and calling `build_system_prompt`.
 
 ### Host agents
 
@@ -258,8 +261,8 @@ The caller wraps the event in a `TriggerEnvelope`, `run_triage` sends a
 zero-tool `trigger_triage` turn over `agent.run_turn` (cloud first, one
 retry, then a local model arm, else `Deferred`), and `apply_decision` acts
 on the parsed `drop` / `acknowledge` / `react` / `escalate` decision.
-`react` and `escalate` pass the approval gate and run `trigger_reactor` or
-`orchestrator` as direct one-shot agent turns under the triage context. Cron jobs do not go
+`react` and `escalate` pass the approval gate and then run `trigger_reactor`
+or `orchestrator` through `subagent_host::run_subagent`. Cron jobs do not go
 through triage. See [triage/README.md](triage/README.md).
 
 ## Layout
@@ -292,12 +295,12 @@ Delegation and coordination:
 | Path | What it does |
 | --- | --- |
 | `subagent_host/` | Runs a child agent: definition, model and tool narrowing, prompt, checkpoints, progress ([README](subagent_host/README.md)) |
-| `orchestration/` | Spawn/steer/wait tools and background delivery ([README](orchestration/README.md)) |
+| `orchestration/` | Spawn/steer/wait tools, teams, command center, workflow runs, worktrees, background delivery ([README](orchestration/README.md)) |
 | `triage/` | Classifies `TriggerEnvelope`s and escalates ([README](triage/README.md)) |
-| `goals/` | Context-scoped TinyAgents goal store adapter and the existing thread-goal domain events |
+| `goals/` | Host adapters around `tinyagents_graph::goals` and the `goal_*` tools ([README](goals/README.md)) |
 | `todos/` | Session-scoped todo list over the TinyAgents todo store ([README](todos/README.md)) |
 | [`../plan_review/`](../plan_review/) | `request_plan_review` gate that parks a web-chat turn until the user decides |
-| [`tools.rs`](./tools.rs), `tools/` | Loop control tools: `plan_exit`, `todo`, `run_workflow`/`await_workflow` (with `skills`) ([README](tools/README.md)) |
+| [`tools.rs`](./tools.rs), `tools/` | Loop control tools: `delegate`, `plan_exit`, `todo`, `run_workflow`/`await_workflow` (with `skills`) ([README](tools/README.md)) |
 
 Definitions, prompts and context:
 
@@ -344,8 +347,8 @@ Persistence, setup and RPC:
 - `ParentExecutionContext` ([`harness/fork_context.rs`](./harness/fork_context.rs)): explicit parent
   state a sub-agent reads from the run context (`parent`); `orchestration::parent_context::build_root_parent`
   builds one for runs with no parent turn.
-- `OpenHumanSubagentHost`, `SubagentRunOptions`
-  ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)); async delegation is dispatched through the registered subagent tools.
+- `run_subagent`, `run_subagent_with_parent`, `SubagentRunOptions`
+  ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)).
 - `run_triage`, `apply_decision`, `TriggerEnvelope` (`triage/`).
 - `SystemPromptBuilder` ([`crate::prompts::composition`](../prompts/composition.rs)) is the product adapter over TinyAgents prompt composition.
 - `AgentTurnOrigin` and `with_origin` (`turn_origin.rs`).
@@ -356,7 +359,7 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 
 | Namespace | Owner | Methods |
 | --- | --- | --- |
-| `agent` | `schemas.rs` | `chat`, `chat_simple`, `server_status`, `list_definitions`, `get_definition`, `reload_definitions`, `triage_evaluate`, `registry_snapshot`, `context_breakdown` |
+| `agent` | `schemas.rs` | `chat`, `chat_simple`, `server_status`, `list_definitions`, `get_definition`, `reload_definitions`, `triage_evaluate`, `graph_topologies`, `registry_snapshot`, `context_breakdown` |
 | `agent` | [`tinyagents/replay/`](./tinyagents/replay/) | `runs_active`, `run_status`, `run_events` (read-only journal replay) |
 | `agent` | [`../threads/run_mode.rs`](./../threads/run_mode.rs) | `set_run_mode`, `get_run_mode` |
 | `agent_registry` | `registry/` | `list`, `available_tools`, `get`, `upsert_custom`, `create_custom`, `update`, `set_enabled`, `remove` |
@@ -364,6 +367,10 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 | `ai` | `artifacts/` | `list_artifacts`, `get_artifact`, `delete_artifact`, `regenerate` |
 | `run_ledger` | `../sessions/` | `list`, `get`, `events` |
 | `session_import` | `../storage/import/` | `run` |
+| `agent_work` | [`orchestration/command_center`](./orchestration/command_center/) | `list`, `control` |
+| `workflow_run` | [`orchestration/workflow_runs`](./orchestration/workflow_runs/) | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
+| `agent_team` | [`orchestration/agent_teams`](./orchestration/agent_teams/) | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
+| `worktree` | [`orchestration/worktree_schemas.rs`](./orchestration/worktree_schemas.rs) | `list`, `status`, `diff`, `remove` |
 | `subagent` | [`orchestration/subagent_control.rs`](./orchestration/subagent_control.rs) | `cancel`, `steer` for running sub-agents |
 
 `agent.chat` and `agent.chat_simple` load config and call

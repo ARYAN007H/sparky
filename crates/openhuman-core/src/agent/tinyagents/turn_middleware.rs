@@ -44,6 +44,9 @@ use crate::agent::tinyagents::verify_before_finish;
 use crate::inference::provider::model::TurnChatModel;
 
 use super::ToolPolicyEnforcement;
+#[path = "turn_native_security.rs"]
+mod native_security;
+use native_security::NativeSubagentSecurityMiddleware;
 
 /// What the middleware stack needs to know about the turn.
 pub(super) struct TurnMiddlewareInputs {
@@ -103,6 +106,9 @@ pub(super) struct TurnMiddlewareInputs {
     /// plan-order middleware read it. `None` for a turn with no workspace or
     /// without the `todo` tool.
     pub(super) todo_store: Option<Arc<dyn tinyagents_harness::store::Store>>,
+    /// Called when the turn starts summarizing earlier conversation, so the
+    /// client can show it. `None` for a turn nobody watches.
+    pub(super) compaction_notice: Option<super::context_wiring::CompactionNotice>,
 }
 
 /// The handles the run loop reads after the drive returns.
@@ -155,6 +161,7 @@ pub(super) fn install_turn_middleware(
         provider_usage_carry,
         tool_outcome_sink,
         todo_store,
+        compaction_notice,
     } = inputs;
     let super::host::HarnessHostPolicy {
         stop_hooks,
@@ -316,12 +323,7 @@ pub(super) fn install_turn_middleware(
                         "[stop_hooks] hook voted to stop the turn — pausing run: {}",
                         report.reason
                     );
-                    *summary
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
-                        "Stopping after {} model call(s): {}",
-                        report.iteration, report.reason
-                    ));
+                    record_stop_summary(&summary, report.iteration, &report.reason);
                 }),
         ));
     }
@@ -459,6 +461,7 @@ pub(super) fn install_turn_middleware(
         pause_at_cap && subagent_scope.is_none(),
         &tool_outcome_sink,
         memory_turn,
+        compaction_notice,
     );
     let is_subagent = subagent_scope.is_some();
     let agent_id = tool_policy.as_ref().map(|p| p.agent_definition_id.as_str());
@@ -525,10 +528,9 @@ pub(super) fn install_turn_middleware(
     // block that used to live in the legacy tool adapter.
     let native_security_gate_installed = native_security_gate.is_some();
     if let Some((gate, agent_id)) = native_security_gate {
-        harness.push_tool_middleware(Arc::new(NativeSubagentSecurityMiddleware {
-            gate,
-            agent_id,
-        }));
+        harness.push_tool_middleware(Arc::new(NativeSubagentSecurityMiddleware::new(
+            gate, agent_id,
+        )));
     }
     if !hosted_security_gate {
         harness.push_tool_middleware(Arc::new(ApprovalGateMiddleware::new(
@@ -646,7 +648,7 @@ pub(super) fn install_turn_middleware(
     }
     // The turn's memory pack rides every request of the turn, after every
     // reduction step and after the transcript snapshot, so it is never
-    // compacted, trimmed or persisted (`memory::lifecycle::hooks::pre_turn`).
+    // compacted, trimmed or persisted (`memory::lifecycle::prefetch::pre_turn`).
     harness.push_middleware(Arc::new(middleware::memory_pack::memory_pack_middleware()));
 
     TurnWiring {
@@ -657,107 +659,14 @@ pub(super) fn install_turn_middleware(
     }
 }
 
-struct NativeSubagentSecurityMiddleware {
-    gate: Arc<OpenHumanSecurityGate>,
-    agent_id: String,
+fn record_stop_summary(summary: &HaltSummarySlot, iteration: u32, reason: &str) {
+    *summary
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
+        "Stopping after {iteration} model call(s): {reason}"
+    ));
 }
 
-#[async_trait]
-impl ToolMiddleware<(), OpenHumanRunContext> for NativeSubagentSecurityMiddleware {
-    fn name(&self) -> &str {
-        "openhuman_security_gate"
-    }
-
-    async fn wrap_tool(
-        &self,
-        ctx: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
-        state: &(),
-        call: tinyinference_llm::tool::ToolCall,
-        next: ToolHandler<'_, (), OpenHumanRunContext>,
-    ) -> tinyagents_harness::error::Result<MiddlewareToolOutcome> {
-        let call_id = call.id.to_string();
-        let request = ToolCallRequest::new(
-            call.name.clone(),
-            call.arguments.clone(),
-            self.agent_id.clone(),
-        )
-        .with_call_id(call_id.clone());
-        let decision = match self.gate.authorize_tool(&request).await {
-            Ok(decision) => decision,
-            Err(error) => {
-                tracing::error!(tool = %call.name, %error, "native child authorization failed closed");
-                return Ok(tinytools::ToolResult::error(
-                    "Tool authorization failed because the security check could not complete.",
-                )
-                .into());
-            }
-        };
-        match decision {
-            GateDecision::Allow | GateDecision::Prompted { approved: true } => {}
-            GateDecision::Deny { reason } => {
-                return Ok(tinytools::ToolResult::error(reason).into());
-            }
-            GateDecision::Prompted { approved: false } => {
-                return Ok(tinytools::ToolResult::error("Approval was not granted.").into());
-            }
-        }
-
-        let mut audit = self
-            .gate
-            .take_audit_request_id(&call_id)
-            .map(NativeSecurityAudit::new);
-        let result = next.run(ctx, state, call).await;
-        if let Some(audit) = &mut audit {
-            match &result {
-                Ok(MiddlewareToolOutcome::Result(result)) if result.is_error => {
-                    audit.record(
-                        crate::security::approval::ExecutionOutcome::Failure,
-                        Some(result.output()),
-                    );
-                }
-                Ok(_) => audit.record(crate::security::approval::ExecutionOutcome::Success, None),
-                Err(error) => audit.record(
-                    crate::security::approval::ExecutionOutcome::Failure,
-                    Some(error.to_string()),
-                ),
-            }
-        }
-        result
-    }
-}
-
-struct NativeSecurityAudit {
-    request_id: String,
-    recorded: bool,
-}
-
-impl NativeSecurityAudit {
-    fn new(request_id: String) -> Self {
-        Self {
-            request_id,
-            recorded: false,
-        }
-    }
-
-    fn record(
-        &mut self,
-        execution: crate::security::approval::ExecutionOutcome,
-        error: Option<String>,
-    ) {
-        if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
-            gate.record_execution(&self.request_id, execution, error.as_deref());
-        }
-        self.recorded = true;
-    }
-}
-
-impl Drop for NativeSecurityAudit {
-    fn drop(&mut self) {
-        if !self.recorded {
-            self.record(
-                crate::security::approval::ExecutionOutcome::Failure,
-                Some("tool execution ended before reporting a result".to_string()),
-            );
-        }
-    }
-}
+#[cfg(test)]
+#[path = "turn_middleware_tests.rs"]
+mod tests;

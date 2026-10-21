@@ -8,7 +8,7 @@
 use super::load_builtins;
 use crate::agent::prompts::PromptContext;
 use crate::agent_registry::host_definition::AgentDefinition;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 use tinyagents_definition::{PromptSource, SubagentEntry, ToolScope};
 use tinytools_agent::dialect::ToolCallFormat;
@@ -18,35 +18,53 @@ use tinytools_agent::dialect::ToolCallFormat;
 ///
 /// Each render gets its own workspace: building a prompt seeds identity files
 /// into it, and the tests here render in parallel.
-fn visible_tool_names(def: &AgentDefinition) -> HashSet<String> {
+fn visible_tool_names(def: &AgentDefinition, definitions: &[AgentDefinition]) -> HashSet<String> {
     let mut visible = match &def.tools {
         ToolScope::Wildcard => HashSet::new(),
         ToolScope::Named(names) => names.iter().cloned().collect(),
     };
     visible.extend(def.extra_tools.iter().cloned());
 
-    if def
-        .subagents
-        .iter()
-        .any(|entry| matches!(entry, SubagentEntry::AgentId(_)))
-    {
-        visible.insert("spawn_subagent".to_string());
+    for subagent in &def.subagents {
+        let SubagentEntry::AgentId(agent_id) = subagent else {
+            continue;
+        };
+        if agent_id == "summarizer" {
+            continue;
+        }
+        let Some(target) = definitions
+            .iter()
+            .find(|candidate| candidate.id == *agent_id)
+        else {
+            continue;
+        };
+        visible.insert(
+            target
+                .delegate_name
+                .clone()
+                .unwrap_or_else(|| format!("delegate_{}", target.id)),
+        );
     }
     visible
 }
 
-fn render(def: &AgentDefinition, _definitions: &[AgentDefinition]) -> String {
+fn render(
+    def: &AgentDefinition,
+    definitions: &[AgentDefinition],
+    flow_prompts: &HashMap<String, String>,
+) -> String {
     let (PromptSource::Dynamic(()), Some(build)) =
         (&def.system_prompt, def.extensions.prompt_builder)
     else {
         panic!("built-in `{}` must carry a dynamic prompt", def.id);
     };
     let workspace = tempfile::TempDir::new().expect("temp workspace");
-    let visible = visible_tool_names(def);
+    let visible = visible_tool_names(def, definitions);
     let ctx = PromptContext {
         workspace_dir: workspace.path(),
         model_name: "test",
         agent_id: &def.id,
+        flow_archetype_text: flow_prompts.get(&def.id).map(String::as_str),
         tools: &[],
         workflows: &[],
         dispatcher_instructions: "",
@@ -66,6 +84,37 @@ fn render(def: &AgentDefinition, _definitions: &[AgentDefinition]) -> String {
         def.id
     );
     body
+}
+
+async fn flow_prompt_texts(definitions: &[AgentDefinition]) -> HashMap<String, String> {
+    #[cfg(feature = "flows")]
+    {
+        let temp = tempfile::TempDir::new().expect("flow prompt workspace");
+        let config = crate::config::Config {
+            workspace_dir: temp.path().join("workspace"),
+            action_dir: temp.path().join("action"),
+            config_path: temp.path().join("config.toml"),
+            ..crate::config::Config::default()
+        };
+        let mut prompts = HashMap::new();
+        for agent_id in ["workflow_builder", "flow_discovery"] {
+            if definitions
+                .iter()
+                .any(|definition| definition.id == agent_id)
+            {
+                let text = crate::agent::prompts::flow_archetype::fetch_prompt(&config, agent_id)
+                    .await
+                    .unwrap_or_else(|error| panic!("fetching `{agent_id}` prompt: {error}"));
+                prompts.insert(agent_id.to_owned(), text);
+            }
+        }
+        prompts
+    }
+    #[cfg(not(feature = "flows"))]
+    {
+        let _ = definitions;
+        HashMap::new()
+    }
 }
 
 /// Every tool name the process can register, plus every packed name (some of
@@ -115,10 +164,9 @@ fn on_belt(def: &AgentDefinition, tool: &str) -> bool {
     }
 }
 
-/// Can this built-in definition call `tool` from its own (root) tool belt?
-/// Child-run spawn stripping is checked separately during child tool prep;
-/// here a parent definition such as the orchestrator may call its registered
-/// spawn and continuation tools.
+/// Can `def` call `tool`? Its belt, less what it disallows and what the pack
+/// table withholds from it — plus `use_skill`, which the harness advertises
+/// whenever the pack table withheld something (`strip_packed_from_visible`).
 fn can_call(def: &AgentDefinition, tool: &str, universe: &BTreeSet<String>) -> bool {
     use crate::tools::toolpacks::ops::is_withheld_from;
     if tool == tinyagents_harness_tools::skills::USE_SKILL {
@@ -173,6 +221,19 @@ pub(super) fn names_presented_as_callable<'a>(
             prose = prose.replace(&format!("skill `{}`, tool `{name}`", pack.id), "");
         }
     }
+    // The workflow pack is feature-gated, but its route syntax is still
+    // intentional prose when that pack is unavailable in this build.
+    for route in [
+        "skill `workflows`, tool `build_workflow`",
+        "skill `workflows`, tool `discover_workflows`",
+    ] {
+        prose = prose.replace(route, "");
+    }
+    // The generated workflow guide can also mention the routed tool on its
+    // own after the pack-specific text has been elided.
+    prose = prose
+        .replace("`build_workflow`", "")
+        .replace("`discover_workflows`", "");
     not_callable
         .into_iter()
         .filter(|name| prose.contains(&format!("`{name}`")))
@@ -183,10 +244,11 @@ pub(super) fn names_presented_as_callable<'a>(
 /// prompt really gives the route. Pin both, so a tool promoted onto the belt,
 /// or a prompt that drops the `tool_search` hint, fails here instead of
 /// leaving a stale excuse in [`KNOWN_UNCALLABLE`].
-#[test]
-fn deferred_rows_name_deferred_tools_the_prompt_routes_through_tool_search() {
+#[tokio::test]
+async fn deferred_rows_name_deferred_tools_the_prompt_routes_through_tool_search() {
     let tools = registered_tools();
     let defs = load_builtins().expect("built-ins load");
+    let flow_prompts = flow_prompt_texts(&defs).await;
     let deferred = KNOWN_UNCALLABLE
         .iter()
         .filter(|(_, _, why)| why.starts_with("`ToolExposure::Deferred`"));
@@ -204,7 +266,7 @@ fn deferred_rows_name_deferred_tools_the_prompt_routes_through_tool_search() {
             .iter()
             .find(|d| d.id == *agent)
             .unwrap_or_else(|| panic!("Deferred row names unknown agent `{agent}`"));
-        let prompt = render(def, &defs);
+        let prompt = render(def, &defs, &flow_prompts);
         assert!(
             prompt.contains("`tool_search`") && prompt.contains(&format!("`{tool}`")),
             "`{agent}`'s prompt must name `{tool}` with its route, `tool_search`"
@@ -262,8 +324,8 @@ const KNOWN_UNCALLABLE: &[(&str, &str, &str)] = &[
 /// so the prompt taught a call the model could not make: it emits the name,
 /// the harness answers "unknown tool", and the iteration is spent. This is
 /// that rule over every built-in, against each one's own callable surface.
-#[test]
-fn every_prompt_names_only_tools_its_agent_can_call() {
+#[tokio::test]
+async fn every_prompt_names_only_tools_its_agent_can_call() {
     let universe = tool_universe();
     let known = |agent: &str, tool: &str| {
         KNOWN_UNCALLABLE
@@ -271,6 +333,7 @@ fn every_prompt_names_only_tools_its_agent_can_call() {
             .any(|(a, t, _)| (*a == "*" || *a == agent) && *t == tool)
     };
     let defs = load_builtins().expect("built-ins load");
+    let flow_prompts = flow_prompt_texts(&defs).await;
     // A feature-gated agent absent from this build cannot fire its rows.
     let loaded: HashSet<&str> = defs.iter().map(|d| d.id.as_str()).collect();
     let mut fired = HashSet::new();
@@ -280,7 +343,7 @@ fn every_prompt_names_only_tools_its_agent_can_call() {
             .iter()
             .map(String::as_str)
             .filter(|name| !can_call(def, name, &universe));
-        for tool in names_presented_as_callable(&render(def, &defs), not_callable) {
+        for tool in names_presented_as_callable(&render(def, &defs, &flow_prompts), not_callable) {
             if known(&def.id, tool) {
                 fired.insert((def.id.clone(), tool));
             } else {
@@ -311,7 +374,7 @@ fn every_prompt_names_only_tools_its_agent_can_call() {
 
 /// Agents whose prompt defers to the rendered tool list instead of naming a
 /// tool; [`every_prompt_names_at_least_one_tool_it_can_call`] skips them.
-const NAMES_NO_TOOL: &[&str] = &[];
+const NAMES_NO_TOOL: &[&str] = &["critic"];
 
 const SKILL_SETUP_NAME: Option<&str> = if cfg!(feature = "skills") {
     Some("skill_setup")
@@ -388,10 +451,11 @@ fn profile_note(missing: &BTreeMap<String, Vec<String>>) -> String {
     )
 }
 
-#[test]
-fn every_prompt_names_at_least_one_tool_it_can_call() {
+#[tokio::test]
+async fn every_prompt_names_at_least_one_tool_it_can_call() {
     let universe = tool_universe();
     let defs = load_builtins().expect("built-ins load");
+    let flow_prompts = flow_prompt_texts(&defs).await;
     let expected: Vec<&str> = NAMES_NO_TOOL
         .iter()
         .copied()
@@ -402,7 +466,7 @@ fn every_prompt_names_at_least_one_tool_it_can_call() {
         .iter()
         .filter(|def| !matches!(&def.tools, ToolScope::Named(n) if n.is_empty()))
         .filter(|def| {
-            let prompt = render(def, &defs);
+            let prompt = render(def, &defs, &flow_prompts);
             !universe
                 .iter()
                 .any(|name| can_call(def, name, &universe) && prompt.contains(&format!("`{name}`")))
@@ -416,7 +480,8 @@ fn every_prompt_names_at_least_one_tool_it_can_call() {
         .filter(|id| !expected.contains(&id.as_str()))
         .filter_map(|id| {
             let def = defs.iter().find(|d| &d.id == id)?;
-            let absent = belt_tools_absent_from_build(def, &render(def, &defs), &universe);
+            let absent =
+                belt_tools_absent_from_build(def, &render(def, &defs, &flow_prompts), &universe);
             (!absent.is_empty()).then(|| (id.clone(), absent))
         })
         .collect();

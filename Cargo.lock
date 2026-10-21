@@ -3513,7 +3513,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -3567,7 +3567,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -4222,7 +4222,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "url",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -4672,7 +4672,7 @@ dependencies = [
  "tokio-util",
  "typed-builder",
  "uuid",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -4781,18 +4781,6 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "memoffset",
-]
-
-[[package]]
-name = "nix"
-version = "0.30.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
-dependencies = [
- "bitflags 2.13.2",
- "cfg-if",
- "cfg_aliases",
- "libc",
 ]
 
 [[package]]
@@ -5449,7 +5437,7 @@ dependencies = [
  "tinyagents-runtime",
  "tinyagents-session",
  "tinyagents-tasks",
- "tinybox-bus 0.1.38",
+ "tinybox-bus 0.1.40",
  "tinybox-core",
  "tinybus",
  "tinybus-module",
@@ -5460,10 +5448,10 @@ dependencies = [
  "tinycomputer-bus",
  "tinyconnectors-bus",
  "tinydocs-bus",
+ "tinyeventqueues",
+ "tinyeventqueues-bus",
  "tinyflows",
  "tinyflows-bus",
- "tinyflows-catalog",
- "tinyflows-copilot",
  "tinyflows-drivers",
  "tinyflows-import",
  "tinyflows-module",
@@ -5557,12 +5545,15 @@ dependencies = [
  "tinychannels",
  "tinycomputer-bus",
  "tinydocs-bus",
+ "tinyeventqueues-bus",
  "tinyinference-core 0.4.1",
  "tinyinference-llm 0.4.1",
  "tinyinference-local",
  "tinyinference-voice",
  "tinymcp-bus",
+ "tinymemory-tools",
  "tinysearch-bus",
+ "tinystoragedrivers",
  "tinystoragedrivers-core",
  "tinytools 0.6.0",
  "tinytools-agent 0.6.0",
@@ -5637,6 +5628,7 @@ dependencies = [
  "tinycomputer",
  "tinyconnectors",
  "tinydocs-module",
+ "tinyeventqueues",
  "tinyflows-module",
  "tinyhosts",
  "tinyjuice-module",
@@ -5667,6 +5659,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "socketioxide",
  "tempfile",
  "tinyagents-harness",
@@ -6966,7 +6959,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams 0.4.2",
  "web-sys",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -7250,9 +7243,9 @@ checksum = "eec689c0bc40ff2458a5977b6619cb718087084a18e02a131c599b62d05e1a5f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.15"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -8658,7 +8651,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "serde",
  "serde_json",
@@ -8667,17 +8660,17 @@ dependencies = [
 
 [[package]]
 name = "tinybox-core"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "async-trait",
  "serde",
  "thiserror 2.0.20",
- "tinybox-bus 0.1.38",
+ "tinybox-bus 0.1.40",
 ]
 
 [[package]]
 name = "tinybox-docker"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -8688,12 +8681,12 @@ dependencies = [
 
 [[package]]
 name = "tinybox-drivers"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "log",
  "serde",
  "serde_json",
- "tinybox-bus 0.1.38",
+ "tinybox-bus 0.1.40",
  "tinybox-core",
  "tinybox-jail",
  "tinystoragedrivers-core",
@@ -8701,13 +8694,13 @@ dependencies = [
 
 [[package]]
 name = "tinybox-host"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "async-trait",
  "cap-std",
  "command-group",
- "nix 0.30.1",
- "tinybox-bus 0.1.38",
+ "nix 0.31.3",
+ "tinybox-bus 0.1.40",
  "tinybox-core",
  "tinybox-jail",
  "tokio",
@@ -8715,20 +8708,21 @@ dependencies = [
 
 [[package]]
 name = "tinybox-jail"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "landlock",
  "log",
  "serde",
  "serde_json",
- "tinybox-bus 0.1.38",
+ "tinybox-bus 0.1.40",
  "tinybox-core",
+ "tinybox-linux",
  "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "tinybox-linux"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "async-trait",
  "tinybox-core",
@@ -8736,7 +8730,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-microvm"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "async-trait",
  "serde",
@@ -8746,12 +8740,12 @@ dependencies = [
 
 [[package]]
 name = "tinybox-module"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "log",
- "nix 0.30.1",
+ "nix 0.31.3",
  "tempfile",
- "tinybox-bus 0.1.38",
+ "tinybox-bus 0.1.40",
  "tinybox-core",
  "tinybox-docker",
  "tinybox-drivers",
@@ -8770,7 +8764,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-ssh"
-version = "0.1.38"
+version = "0.1.40"
 dependencies = [
  "async-trait",
  "tinybox-core",
@@ -8796,7 +8790,7 @@ dependencies = [
  "toml 1.1.6+spec-1.1.0",
  "tracing",
  "ureq",
- "zip 2.4.2",
+ "zip 9.0.5",
 ]
 
 [[package]]
@@ -8822,7 +8816,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels"
-version = "0.1.36"
+version = "0.1.38"
 dependencies = [
  "anyhow",
  "async-imap",
@@ -8862,7 +8856,7 @@ dependencies = [
  "urlencoding",
  "uuid",
  "wacore",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
  "whatsapp-rust",
  "whatsapp-rust-tokio-transport",
  "whatsapp-rust-ureq-http-client",
@@ -8870,7 +8864,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.36"
+version = "0.1.38"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8885,7 +8879,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-module"
-version = "0.1.36"
+version = "0.1.38"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8909,7 +8903,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-runtime"
-version = "0.1.36"
+version = "0.1.38"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8930,7 +8924,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "getrandom 0.4.3",
  "serde",
@@ -8948,7 +8942,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-accessibility"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "arboard",
  "command-group",
@@ -8963,7 +8957,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-browser"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "agent-browser",
  "base64 0.22.1",
@@ -8981,7 +8975,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-bus"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -8990,7 +8984,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-core"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -9002,7 +8996,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-cursor"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "getrandom 0.4.3",
  "serde",
@@ -9012,7 +9006,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-desktop"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "agent-desktop-core",
  "agent-desktop-linux",
@@ -9027,7 +9021,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-engine"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "getrandom 0.4.3",
  "serde",
@@ -9042,7 +9036,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors"
-version = "0.19.3"
+version = "0.21.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9065,7 +9059,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-bus"
-version = "0.19.3"
+version = "0.21.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -9074,7 +9068,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-sync"
-version = "0.19.3"
+version = "0.21.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -9122,10 +9116,38 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinyflows"
-version = "0.8.23"
+name = "tinyeventqueues"
+version = "0.1.2"
 dependencies = [
  "async-trait",
+ "log",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "thiserror 2.0.20",
+ "tinybus",
+ "tinybus-module",
+ "tinyeventqueues-bus",
+ "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-core",
+ "tokio",
+]
+
+[[package]]
+name = "tinyeventqueues-bus"
+version = "0.1.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-core",
+]
+
+[[package]]
+name = "tinyflows"
+version = "0.8.29"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
  "futures-timer",
  "futures-util",
  "getrandom 0.4.3",
@@ -9135,7 +9157,6 @@ dependencies = [
  "jaq-std",
  "serde",
  "serde_json",
- "sha2 0.11.0",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -9233,9 +9254,13 @@ dependencies = [
  "tinybus-module",
  "tinyflows",
  "tinyflows-bus",
+ "tinyflows-catalog",
+ "tinyflows-copilot",
  "tinyflows-drivers",
+ "tinyflows-import",
  "tinyflows-schedule",
  "tinystoragedrivers-core",
+ "tinytools 0.6.0",
  "tokio",
  "tracing",
  "uuid",
@@ -9579,7 +9604,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.19.2"
+version = "0.19.5"
 dependencies = [
  "base64 0.23.1",
  "dirs 7.0.0",
@@ -9609,7 +9634,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.19.2"
+version = "0.19.5"
 dependencies = [
  "base64 0.23.1",
  "schemars",
@@ -9629,7 +9654,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-api"
-version = "1.28.0"
+version = "2.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9643,7 +9668,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-integrations"
-version = "1.28.0"
+version = "2.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9662,27 +9687,33 @@ dependencies = [
  "tinyredact",
  "tokio",
  "tracing",
+ "url",
  "walkdir",
 ]
 
 [[package]]
 name = "tinymemory-tools"
-version = "1.28.0"
+version = "2.0.0"
 dependencies = [
+ "async-lock",
  "async-trait",
  "chrono",
  "futures",
  "log",
+ "schemars",
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "tempfile",
  "thiserror 2.0.20",
  "tinymemory-api",
+ "url",
+ "uuid",
 ]
 
 [[package]]
 name = "tinyredact"
-version = "1.28.0"
+version = "2.0.0"
 dependencies = [
  "log",
  "regex",
@@ -9800,7 +9831,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 2.0.20",
+ "tinystoragedrivers-schema",
  "tokio",
  "ulid",
  "zstd 0.13.3",
@@ -9840,10 +9871,22 @@ dependencies = [
  "futures-util",
  "http",
  "object_store",
+ "quick-xml 0.41.0",
+ "reqwest 0.13.5",
+ "serde",
  "tinystoragedrivers-core",
  "tokio",
  "tokio-util",
  "url",
+]
+
+[[package]]
+name = "tinystoragedrivers-schema"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -10781,7 +10824,7 @@ dependencies = [
  "socks",
  "ureq-proto",
  "utf8-zero",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -11246,14 +11289,14 @@ version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
 dependencies = [
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
 name = "webpki-roots"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
+checksum = "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -11389,7 +11432,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-websockets",
  "wacore",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -12237,6 +12280,20 @@ dependencies = [
  "memchr",
  "typed-path",
  "zopfli",
+]
+
+[[package]]
+name = "zip"
+version = "9.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "indexmap",
+ "memchr",
+ "nix 0.31.3",
+ "typed-path",
 ]
 
 [[package]]

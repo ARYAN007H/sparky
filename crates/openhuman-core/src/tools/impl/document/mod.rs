@@ -265,8 +265,7 @@ impl DocumentTool {
 
         // Reserve the file and open the artifact: a new one, or a new version
         // of `artifact_id` (same id, same file, history kept).
-        let production = Production::start_in(
-            ctx,
+        let production = Production::start(
             &self.workspace_dir,
             self.files_dir.clone(),
             tiny_artifacts::ArtifactKind::File,

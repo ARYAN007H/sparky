@@ -742,3 +742,6 @@ fn classifies_offline_local_session_refusal_as_backend_unavailable() {
     ));
     assert!(!is_session_expired_message(msg));
 }
+
+#[path = "observability_error_classification_session_plan_tests.rs"]
+mod plan_tests;

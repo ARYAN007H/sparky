@@ -28,6 +28,7 @@ mod checkpoint;
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
 pub(super) use driver_adapter::outcome_to_host;
+use driver_adapter::HostInvocation;
 
 #[path = "lifecycle/driver_result.rs"]
 mod driver_result;
@@ -220,7 +221,7 @@ async fn invoke_async_spawn_driver_tool(
     invoke_driver_tool_with_request(
         parent,
         HostRequest {
-            invocation: definition,
+            invocation: HostInvocation::Agent(definition),
             options,
         },
         input,
@@ -462,10 +463,10 @@ pub(super) fn shared_subagent_flight(
     let mut flights = flights
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    flights
-        .entry(checkpoint_dir.to_path_buf())
-        .or_default()
-        .clone()
+    // Key by the normalized root so every caller of one task, whether or not the
+    // directory exists yet, reaches the same reservation.
+    let root = checkpoint::absolute_checkpoint_dir(checkpoint_dir.to_path_buf());
+    flights.entry(root).or_default().clone()
 }
 
 impl OpenHumanSubagentHost {
@@ -522,7 +523,7 @@ impl OpenHumanSubagentHost {
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
-            invocation: self.definition,
+            invocation: HostInvocation::Agent(self.definition),
             options: self.options,
         };
         let driver = OpenHumanDriverBundle::with_in_flight_for(

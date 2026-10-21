@@ -1,13 +1,9 @@
 use std::sync::Arc;
 
-use anyhow::Result;
-use async_trait::async_trait;
 use serde_json::json;
-use std::collections::HashMap;
-use std::sync::Mutex;
 use tiny_artifacts::{
     ArtifactKind, ArtifactPublisher, ArtifactRecord, ArtifactVersion, Artifacts, Author, Content,
-    FileMetadata, FileRef, FileStore, PublishOptions,
+    FileRef, PublishOptions,
 };
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -16,76 +12,13 @@ use super::*;
 use openhuman_embed::__host::artifact_publisher::versioned_store;
 use openhuman_embed::__host::security::AutonomyLevel;
 
-#[derive(Default)]
-struct MemoryFileStore(Mutex<HashMap<String, StoredFile>>);
-
-type StoredFile = (Vec<u8>, Option<String>);
-
-impl MemoryFileStore {
-    fn add(&self, key: &str, bytes: &[u8], media_type: Option<&str>) {
-        self.0.lock().unwrap().insert(
-            key.to_string(),
-            (bytes.to_vec(), media_type.map(str::to_string)),
-        );
-    }
-}
-
-#[async_trait]
-impl FileStore for MemoryFileStore {
-    async fn put(&self, key: &str, bytes: &[u8], media_type: Option<&str>) -> Result<FileMetadata> {
-        self.add(key, bytes, media_type);
-        Ok(FileMetadata {
-            size_bytes: bytes.len() as u64,
-            media_type: media_type.map(str::to_string),
-        })
-    }
-
-    async fn read(&self, key: &str) -> Result<Vec<u8>> {
-        self.0
-            .lock()
-            .unwrap()
-            .get(key)
-            .map(|(bytes, _)| bytes.clone())
-            .ok_or_else(|| anyhow::anyhow!("missing file key"))
-    }
-
-    async fn metadata(&self, key: &str) -> Result<Option<FileMetadata>> {
-        Ok(self
-            .0
-            .lock()
-            .unwrap()
-            .get(key)
-            .map(|(bytes, media_type)| FileMetadata {
-                size_bytes: bytes.len() as u64,
-                media_type: media_type.clone(),
-            }))
-    }
-
-    async fn delete_prefix(&self, prefix: &str) -> Result<()> {
-        self.0
-            .lock()
-            .unwrap()
-            .retain(|key, _| !key.starts_with(prefix));
-        Ok(())
-    }
-}
-
 fn publisher(server_uri: String, autonomy: AutonomyLevel) -> StorageArtifactPublisher {
-    publisher_with_files(server_uri, autonomy, Arc::new(MemoryFileStore::default()))
-}
-
-fn publisher_with_files(
-    server_uri: String,
-    autonomy: AutonomyLevel,
-    files: Arc<dyn FileStore>,
-) -> StorageArtifactPublisher {
     StorageArtifactPublisher::new(
         Arc::new(IntegrationClient::new(server_uri, "tok".to_string())),
         Arc::new(SecurityPolicy {
             autonomy,
             ..SecurityPolicy::default()
         }),
-        files,
     )
 }
 
@@ -179,17 +112,18 @@ async fn a_public_file_share_uses_the_public_url_and_makes_no_link() {
         .await;
     mount_link(&server, 0).await;
 
-    let files = Arc::new(MemoryFileStore::default());
-    files.add("chart.png", b"PNG-BYTES", Some("image/png"));
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("chart.png");
+    std::fs::write(&file, b"PNG-BYTES").unwrap();
     let mut version = ArtifactVersion::new(
         1,
-        "chart.png",
+        file.display().to_string(),
         tiny_artifacts::ArtifactAuthor::Agent,
         "agent",
         1,
     );
     version.file = Some(FileRef {
-        key: "chart.png".into(),
+        key: file.display().to_string(),
         size_bytes: 9,
         media_type: Some("image/png".into()),
     });
@@ -200,7 +134,7 @@ async fn a_public_file_share_uses_the_public_url_and_makes_no_link() {
         public: true,
         ..PublishOptions::default()
     };
-    let link = publisher_with_files(server.uri(), AutonomyLevel::Full, files)
+    let link = publisher(server.uri(), AutonomyLevel::Full)
         .publish(&record, &version, &options)
         .await
         .unwrap();
@@ -406,10 +340,11 @@ async fn a_server_failure_on_the_link_is_not_retried() {
 }
 
 #[tokio::test]
-async fn a_storage_key_is_never_read_as_a_local_secret_path() {
+async fn a_file_in_a_protected_location_is_never_uploaded() {
     let dir = tempfile::tempdir().unwrap();
-    let key = dir.path().join(".ssh").join("id_ed25519");
-    std::fs::create_dir_all(key.parent().unwrap()).unwrap();
+    let ssh = dir.path().join(".ssh");
+    std::fs::create_dir_all(&ssh).unwrap();
+    let key = ssh.join("id_ed25519");
     std::fs::write(&key, b"PRIVATE").unwrap();
     let mut version = ArtifactVersion::new(
         1,
@@ -426,14 +361,10 @@ async fn a_storage_key_is_never_read_as_a_local_secret_path() {
     let mut record = ArtifactRecord::pending("k-1", "Key", ArtifactKind::File, 1);
     record.versions.push(version.clone());
 
-    // The opaque storage key is not interpreted as a host path. The supplied
-    // file store has no object at that key, so local secret bytes stay unread.
+    // An unreachable backend: an upload attempt would fail differently.
     let err = publisher("http://127.0.0.1:9".into(), AutonomyLevel::Full)
         .publish(&record, &version, &PublishOptions::default())
         .await
         .unwrap_err();
-    assert!(
-        err.to_string().contains("cannot read the artifact's file"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("protected location"), "{err}");
 }

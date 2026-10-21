@@ -5,6 +5,12 @@ use crate::config::Config;
 use crate::core::Outcome;
 use crate::inference::provider as providers;
 
+mod simple;
+#[path = "agent_chat/types.rs"]
+mod types;
+pub use simple::agent_chat_simple;
+pub use types::{AgentChatEnv, AgentChatReply, AgentChatTarget};
+
 use super::turn_guards::{
     effective_agent_chat_origin, enforce_user_prompt_or_reject, grant_turn_cwd,
     normalize_model_override, resolve_turn_cwd,
@@ -70,185 +76,6 @@ pub async fn agent_chat(
         AgentChatEnv::default(),
     )
     .await
-}
-
-/// What an in-process caller hands one [`agent_chat_for`] turn besides its
-/// request: the live progress receiver and the host environment (shared model
-/// budget, delegation depth, cancellation, deadline, hooks, tool-belt
-/// authority). Both are explicit values that travel with the call -- never an
-/// ambient scope -- so they reach exactly this turn and its child runs.
-#[derive(Clone, Default)]
-pub struct AgentChatEnv {
-    /// Live progress for the turn; `None` attaches a drain-only sink so the
-    /// model calls still stream.
-    pub progress: Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
-    /// The host environment installed on the session
-    /// ([`OpenHumanSessionHost::set_host_env`]).
-    pub host: crate::agent::turn_env::HostTurnEnv,
-    /// Messages to steer the turn while it runs
-    /// ([`OpenHumanSessionHost::set_run_queue`]). Items pushed on its
-    /// [`QueueLane::Steer`](tinyagents_harness::run_queue::QueueLane::Steer)
-    /// lane before or during the turn are injected as user messages at the
-    /// loop's next safe checkpoint; a steer that arrives while the model is
-    /// writing its final answer earns one more model call. Steers the turn
-    /// did not apply are back on the lane once this call returns.
-    pub run_queue: Option<
-        std::sync::Arc<
-            tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
-        >,
-    >,
-}
-
-/// The log line every successful agent chat turn carries.
-const AGENT_CHAT_COMPLETED_LOG: &str = "agent chat completed";
-
-/// What one agent chat turn produced: its reply and whether it stopped at the
-/// tool-iteration cap rather than finishing.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AgentChatReply {
-    /// The reply text. When `hit_cap` is set this is the turn's checkpoint.
-    pub text: String,
-    /// The turn paused at its iteration cap (see
-    /// [`OpenHumanSessionHost::last_turn_hit_cap`]).
-    pub hit_cap: bool,
-}
-
-impl AgentChatReply {
-    /// The historical `Outcome<String>` shape, for library callers.
-    pub fn into_outcome(self) -> Outcome<String> {
-        Outcome::single_log(self.text, AGENT_CHAT_COMPLETED_LOG)
-    }
-
-    /// The `inference.agent_chat` wire shape: the historical
-    /// `{"result": <text>, "logs": [...]}` envelope plus `hit_cap`, and, when
-    /// the turn was capped, `checkpoint` (the same text, named for what it is).
-    ///
-    /// Additive on purpose: existing clients keep reading the reply from
-    /// `result` (directly or through `unwrap_rpc`), and a headless caller can
-    /// now tell a capped turn from a finished one and continue it (#6958).
-    pub fn into_rpc_json(self) -> Result<serde_json::Value, String> {
-        let hit_cap = self.hit_cap;
-        let checkpoint = hit_cap.then(|| self.text.clone());
-        let mut value = self.into_outcome().into_cli_compatible_json()?;
-        let serde_json::Value::Object(map) = &mut value else {
-            return Err("agent chat envelope is not a JSON object".to_string());
-        };
-        map.insert("hit_cap".to_string(), serde_json::Value::Bool(hit_cap));
-        if let Some(checkpoint) = checkpoint {
-            map.insert(
-                "checkpoint".to_string(),
-                serde_json::Value::String(checkpoint),
-            );
-        }
-        Ok(value)
-    }
-}
-
-/// Which session [`agent_chat_for`] builds the turn on.
-#[derive(Clone, Copy)]
-pub enum AgentChatTarget<'a> {
-    /// The orchestrator — [`OpenHumanSessionHost::from_config`], today's `agent_chat`.
-    Orchestrator,
-    /// Resolve `id` the way every other id-keyed entry point does: the
-    /// process registry first, then `config.agent_registry.entries`.
-    AgentId(&'a str),
-    /// A definition the caller already holds; nothing is resolved by id. The
-    /// entry point for a library host running its own per-agent specs — see
-    /// [`OpenHumanSessionHost::from_config_with_definition`].
-    ///
-    /// `host` carries the caller's own `dyn Tool` objects. It rides the target
-    /// rather than `agent_chat_for`'s argument list because only this target
-    /// can honour it: the other two resolve a definition the caller does not
-    /// hold, so there is no agent for a host belt to belong to.
-    Definition {
-        definition: &'a crate::agent_registry::host_definition::AgentDefinition,
-        host: Option<&'a crate::agent::HostTools>,
-        /// History to seed this turn with, as `(role, content)` rows, instead
-        /// of whatever the session would otherwise resume.
-        ///
-        /// Rides the target for the same reason `host` does, and it is the
-        /// per-turn half of the same idea: a host whose history lives in its
-        /// own log -- a journal, a board, an episode -- is the only thing that
-        /// can say what this turn should have seen. Seeding is how that view
-        /// reaches the session with roles intact; passing it as prose in the
-        /// message would flatten the host's own prior turns into quoted text.
-        ///
-        /// `None` leaves resume untouched, which is every existing caller.
-        seed: Option<&'a [(String, String)]>,
-        /// Where to report what the turn spent.
-        ///
-        /// An out-parameter because this is the only target that can fill it:
-        /// the turn runs in-process here, so the session that counted the
-        /// tokens is still in hand when it ends. The other two answer over
-        /// `AGENT_CHAT`, whose reply is a string.
-        ///
-        /// Written whether the turn succeeded or failed -- a turn that ended
-        /// badly still spent what it spent, and a host that meters only
-        /// successes bills nothing for the ones that cost most.
-        usage: Option<&'a std::sync::Mutex<Option<crate::agent::tinyagents::host::LastTurnUsage>>>,
-        /// Build the session from `host` alone: no config-derived, delegation,
-        /// memory, skill or MCP tool, and a deny-by-default gate for any other
-        /// name. See [`OpenHumanSessionHost::from_config_host_only`].
-        host_only: bool,
-        /// Skip the prompt-injection guard: the message is untrusted data (a
-        /// PR diff) the agent reads, not an instruction. Refused unless
-        /// `host_only`, whose agent has nothing it could be talked into doing.
-        untrusted_input: bool,
-        /// A response format and output cap for every model call of the turn,
-        /// and the slot its final call is reported into.
-        shape: Option<&'a std::sync::Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
-        /// The observer scoped around the caller, re-established around the
-        /// turn because the dispatch may run on a worker task that does not
-        /// inherit task locals.
-        observer: Option<
-            &'a std::sync::Arc<tinyagents_harness::observability::turn_observer::ObserverScope>,
-        >,
-        /// Files the host attaches to this turn as bytes, in order.
-        ///
-        /// Rides the target for the same reason `host` does: only an
-        /// in-process caller can hand over bytes, and `AGENT_CHAT` carries a
-        /// string. Each is staged into the acting workspace and reaches the
-        /// model as an image or document block ahead of the message, under
-        /// the configured multimodal count and size limits. No local path is
-        /// read, so they are accepted whatever the turn's origin.
-        ///
-        /// Empty for every caller that attaches nothing.
-        attachments: &'a [crate::agent::HostAttachment],
-    },
-}
-
-// Hand-written because a host belt is a closure, and a closure is not `Debug`.
-// Reporting whether one is present is what a log line here is ever for; the
-// belt it would return is not known until the turn builds it.
-impl std::fmt::Debug for AgentChatTarget<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Orchestrator => f.write_str("Orchestrator"),
-            Self::AgentId(id) => f.debug_tuple("AgentId").field(id).finish(),
-            Self::Definition {
-                definition,
-                host,
-                seed,
-                usage,
-                host_only,
-                untrusted_input,
-                shape,
-                observer,
-                attachments,
-            } => f
-                .debug_struct("Definition")
-                .field("definition", &definition.id)
-                .field("host_tools", &host.is_some())
-                .field("seed_rows", &seed.map_or(0, <[(String, String)]>::len))
-                .field("meters", &usage.is_some())
-                .field("host_only", host_only)
-                .field("untrusted_input", untrusted_input)
-                .field("attachments", &attachments.len())
-                .field("shaped", &shape.is_some())
-                .field("observed", &observer.is_some())
-                .finish(),
-        }
-    }
 }
 
 // Definitions are reusable snapshots. A turn override belongs only to the
@@ -370,6 +197,40 @@ pub fn agent_chat_for<'a>(
         )
         .await
         .map(AgentChatReply::into_outcome)
+        .map_err(|error| error.to_string())
+    })
+}
+
+/// Runs a controlled direct agent turn with the caller's selected model source.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn agent_chat_for_with_turn_model_source<'a>(
+    config: &'a mut Config,
+    target: AgentChatTarget<'a>,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    thread_id: Option<String>,
+    cwd: Option<String>,
+    route: Option<crate::config::schema::EphemeralRoute>,
+    env: AgentChatEnv,
+    turn_model_source: (crate::agent::tinyagents::TurnModelSource, String),
+) -> futures::future::BoxFuture<'a, anyhow::Result<Outcome<String>>> {
+    Box::pin(async move {
+        agent_chat_reply_for_inner(
+            config,
+            target,
+            message,
+            model_override,
+            temperature,
+            thread_id,
+            cwd,
+            route,
+            env,
+            Some(turn_model_source),
+            false,
+        )
+        .await
+        .map(AgentChatReply::into_outcome)
     })
 }
 
@@ -429,6 +290,37 @@ pub(crate) async fn agent_chat_reply_for_with_headless(
         headless,
     )
     .await
+    .map_err(|error| error.to_string())
+}
+
+/// Retains typed host-policy errors for callers that need to distinguish
+/// dispatch refusal from provider failure.
+#[allow(clippy::too_many_arguments)]
+pub async fn agent_chat_reply_for_controlled(
+    config: &mut Config,
+    target: AgentChatTarget<'_>,
+    message: &str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    thread_id: Option<String>,
+    cwd: Option<String>,
+    route: Option<crate::config::schema::EphemeralRoute>,
+    env: AgentChatEnv,
+) -> anyhow::Result<AgentChatReply> {
+    agent_chat_reply_for_inner(
+        config,
+        target,
+        message,
+        model_override,
+        temperature,
+        thread_id,
+        cwd,
+        route,
+        env,
+        None,
+        false,
+    )
+    .await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -444,7 +336,7 @@ pub(super) async fn agent_chat_reply_for_inner(
     env: AgentChatEnv,
     turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
     headless: bool,
-) -> Result<AgentChatReply, String> {
+) -> anyhow::Result<AgentChatReply> {
     match target {
         AgentChatTarget::Definition {
             untrusted_input: true,
@@ -452,13 +344,16 @@ pub(super) async fn agent_chat_reply_for_inner(
             ..
         } => {
             if !host_only {
-                return Err("untrusted_input is only allowed on a host-only agent".to_string());
+                return Err(anyhow::anyhow!(
+                    "untrusted_input is only allowed on a host-only agent"
+                ));
             }
             log::debug!(
                 "[inference] agent_chat untrusted input on a host-only agent; guard skipped"
             );
         }
-        _ => enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat")?,
+        _ => enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat")
+            .map_err(anyhow::Error::msg)?,
     }
 
     // TAURI-RUST-RS: an upstream caller (frontend, JSON-RPC client) can pass
@@ -483,7 +378,7 @@ pub(super) async fn agent_chat_reply_for_inner(
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty());
-    let turn_cwd = resolve_turn_cwd(cwd)?;
+    let turn_cwd = resolve_turn_cwd(cwd).map_err(anyhow::Error::msg)?;
     // The turn's context: the host environment's bound one, else the task's.
     let turn_ctx = crate::core::runtime::DispatchCtx::from_weak(env.host.core.as_ref());
     let mut agent = match turn_cwd.as_ref() {
@@ -510,7 +405,8 @@ pub(super) async fn agent_chat_reply_for_inner(
                 turn_session_id,
                 temperature,
                 turn_model_source.clone(),
-            )?;
+            )
+            .map_err(anyhow::Error::msg)?;
             // Also thread it as the turn's workspace descriptor so acting tools
             // that read `ToolExecutionContext::workspace` (shell) resolve their
             // default cwd here, and so spawned sub-agents inherit the same root.
@@ -524,7 +420,8 @@ pub(super) async fn agent_chat_reply_for_inner(
             turn_session_id,
             temperature,
             turn_model_source,
-        )?,
+        )
+        .map_err(anyhow::Error::msg)?,
     };
     // Thread-correct resume. `OpenHumanSessionHost::turn` would otherwise auto-load the
     // newest transcript for the agent *name*, which is another thread's
@@ -566,8 +463,7 @@ pub(super) async fn agent_chat_reply_for_inner(
                 &staging_config,
                 &scope,
             )
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
             log::debug!(
                 "[inference] agent_chat staged {} host attachment(s)",
                 attachments.len()
@@ -582,7 +478,7 @@ pub(super) async fn agent_chat_reply_for_inner(
         ..
     } = target
     {
-        agent.set_untrusted_input(true).map_err(|e| e.to_string())?;
+        agent.set_untrusted_input(true)?;
     }
     // A seeded turn replaces resume rather than adding to it.
     //
@@ -600,9 +496,7 @@ pub(super) async fn agent_chat_reply_for_inner(
     } = target
     {
         agent.clear_history();
-        agent
-            .seed_resume_from_messages(seed.to_vec(), message)
-            .map_err(|e| e.to_string())?;
+        agent.seed_resume_from_messages(seed.to_vec(), message)?;
         agent.set_next_turn_overrides(crate::agent::session_host::TurnOverrides {
             suppress_transcript_autoload: true,
             ..Default::default()
@@ -698,80 +592,12 @@ pub(super) async fn agent_chat_reply_for_inner(
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = agent.last_turn_usage();
     }
-    let text = outcome.map_err(|e| e.to_string())?;
+    let text = outcome?;
     let hit_cap = agent.last_turn_hit_cap();
     if hit_cap {
         log::info!("[inference] agent_chat turn paused at its iteration cap; reporting hit_cap");
     }
     Ok(AgentChatReply { text, hit_cap })
-}
-
-/// A simplified chat interface that does not update the base configuration.
-pub async fn agent_chat_simple(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-    message: &str,
-    model_override: Option<String>,
-    temperature: Option<f64>,
-    thread_id: Option<String>,
-) -> Result<Outcome<String>, String> {
-    enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat_simple")?;
-
-    let mut effective = config.clone();
-    // TAURI-RUST-RS: see `normalize_model_override` for the rationale.
-    if let Some(model) = normalize_model_override(model_override) {
-        effective.default_model = Some(model);
-    }
-    if let Some(temp) = temperature {
-        effective.default_temperature = temp;
-    }
-
-    let default_model = effective
-        .default_model
-        .clone()
-        .unwrap_or_else(|| crate::config::DEFAULT_MODEL.to_string());
-
-    let (model, resolved_model): (
-        std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
-        String,
-    ) = if providers::factory::resolves_to_managed_backend("chat", &effective) {
-        let (backend, resolved_model) =
-            providers::factory::make_openhuman_backend_model_for_thread(
-                "chat",
-                &effective,
-                &default_model,
-                true,
-                thread_id.as_deref(),
-                &crate::security::egress::EgressLedger::none(),
-            )
-            .map_err(|e| e.to_string())?;
-        (backend, resolved_model)
-    } else {
-        providers::create_chat_model_with_model_id_in(
-            ctx,
-            "chat",
-            &effective,
-            effective.default_temperature,
-        )
-        .map_err(|e| e.to_string())?
-    };
-    tracing::debug!(
-        requested_model = %default_model,
-        resolved_model = %resolved_model,
-        temperature = effective.default_temperature,
-        "[inference] agent_chat_simple invoking crate-native chat model"
-    );
-    let run = model.invoke(
-        &(),
-        tinyinference_llm::model::ModelRequest::new(vec![
-            tinyinference_llm::message::Message::user(message.to_string()),
-        ])
-        .with_model(default_model.clone())
-        .with_temperature(effective.default_temperature),
-    );
-    let response = run.await.map_err(|e| e.to_string())?.text();
-
-    Ok(Outcome::single_log(response, "agent simple chat completed"))
 }
 
 #[cfg(test)]

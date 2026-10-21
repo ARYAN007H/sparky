@@ -15,6 +15,8 @@
 mod env_guard;
 #[path = "support/linked_modules.rs"]
 mod linked_modules;
+#[path = "support/mcp_stub_trusted.rs"]
+mod mcp_stub_trusted;
 #[path = "support/scripted_stack.rs"]
 mod scripted_stack;
 #[path = "support/tinyhumans_boot.rs"]
@@ -173,7 +175,7 @@ fn captured_requests_reject_tool_as_unknown(requests: &[Value], tool: &str) -> b
 
 // ─── Fan-out overlap barrier ────────────────────────────────────────────────
 //
-// Only `concurrent_async_subagents_overlap` arms this; every other test leaves it empty
+// Only `parallel_subagent_fanout` arms this; every other test leaves it empty
 // and the handler's fast path is a single `is_empty()` check.
 //
 // The problem it solves: "both workers eventually issued a request" is
@@ -600,19 +602,14 @@ async fn wait_for_event(
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         match tokio::time::timeout(remaining, rx.recv()).await {
             Ok(Some(v)) => {
-                let received = v.get("event").and_then(Value::as_str);
-                seen.push(received.unwrap_or("<no event>").to_string());
-                if received == Some(event_name) {
+                seen.push(
+                    v.get("event")
+                        .and_then(Value::as_str)
+                        .unwrap_or("<no event>")
+                        .to_string(),
+                );
+                if v.get("event").and_then(Value::as_str) == Some(event_name) {
                     return v;
-                }
-                if received == Some("chat_error") {
-                    let error_type = v.get("error_type").and_then(Value::as_str);
-                    let error_source = v.get("error_source").and_then(Value::as_str);
-                    let message = v.get("message").and_then(Value::as_str);
-                    let captured_requests = with_captured(|captured| captured.len());
-                    panic!(
-                        "received chat_error while waiting for {event_name}: error_type={error_type:?}, error_source={error_source:?}, message={message:?}, captured requests={captured_requests}"
-                    );
                 }
             }
             Ok(None) => {
@@ -702,16 +699,20 @@ async fn boot_stack() -> Stack {
 const SUPERVISED_AUTONOMY_CONFIG: &str = "[autonomy]\nenabled = true\nlevel = \"supervised\"\n";
 
 async fn boot_stack_with_config(extra_config: &str) -> Stack {
-    // This in-process host needs the same TinyHumans backend transport that
-    // the CLI binary receives during normal startup.
+    // This suite boots the core in-process, so install the hosted backend
+    // transport before any RPC can reach backend-backed providers.
     tinyhumans_boot::boot();
 
     // Ensure the global AgentDefinitionRegistry is populated with built-in
     // archetypes (orchestrator, vision_agent, task_manager_agent, etc.) before
-    // the RPC stack starts. Without this the session builder cannot build
-    // spawn_subagent's agent_id schema and every call becomes
+    // the RPC stack starts. Without this the session builder cannot synthesise
+    // delegation tools and every `analyze_image`/`spawn_subagent` call becomes
     // "Unknown tool: …", making delegation tests vacuous.
     init_agent_def_registry();
+    // The managed `openhuman` chat provider (and the other hosted registries)
+    // are installed by the TinyHumans layer, not built into the core; without
+    // it every turn fails with `chat_error.inference`.
+    tinyhumans_boot::boot();
 
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().to_path_buf();
@@ -985,15 +986,22 @@ async fn multi_turn_state_persistence_inner() {
 
 // ─── Task 3: Subagent delegation happy path ───────────────────────────────────
 //
-// Tool surface: the orchestrator selects vision_agent through
-// spawn_subagent({ agent_id, prompt, image_paths }).
+// Tool surface (crates/openhuman-core/src/tools/orchestrator_tools.rs,
+//   crates/openhuman-core/src/agent_registry/agents/vision_agent/agent.toml):
+//   - vision_agent has `delegate_name = "analyze_image"`, so the
+//     orchestrator LLM sees a tool named "analyze_image" synthesised by collect_orchestrator_tools.
+//   - The tool takes { "prompt": string, ... } per ArchetypeDelegationTool schema.
+//   - The orchestrator TOML lists "vision_agent" in its subagents.allowlist.
+//   - AgentDefinitionRegistry must be initialised (done in boot_stack) for the
+//     delegation tool to be synthesised; without it the call becomes "Unknown tool: analyze_image".
 //
 // Actual LLM request ordering (with registry init):
-//   request[0] = orchestrator → model returns { tool_calls: [spawn_subagent(...)] }
+//   request[0] = orchestrator → model returns { tool_calls: [analyze_image(...)] }
 //   request[1] = vision_agent subagent inner loop → model returns canary text
 //   request[2] = orchestrator synthesis → model returns final text with canary
 
-/// Orchestrator selects vision_agent through `spawn_subagent`; the subagent runs
+/// Orchestrator delegates to vision_agent via the `analyze_image`
+/// tool (delegate_name on the vision_agent definition); the subagent runs
 /// its own inner LLM call; the final orchestrator synthesis reply contains the
 /// subagent canary. Three upstream requests prove the full delegation path ran.
 #[test]
@@ -1021,13 +1029,14 @@ async fn subagent_delegation_happy_path_inner() {
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
-        // request[0]: Orchestrator selects the vision specialist.
+        // request[0]: Orchestrator calls the `analyze_image` tool
+        // (vision_agent's delegate_name).
         tool_call_completion(
-            "spawn_subagent",
+            "analyze_image",
             json!({
-                "agent_id": "vision_agent",
                 "prompt": "Find the marker phrase",
-                "image_paths": [image_path.to_string_lossy()]
+                "image_paths": [image_path.to_string_lossy()],
+                "blocking": true
             }),
         ),
         // request[1]: vision_agent subagent inner LLM call returns its canary.
@@ -1066,7 +1075,7 @@ async fn subagent_delegation_happy_path_inner() {
     );
 
     // Delegation evidenced by ≥3 captured upstream requests:
-    //   request[0] = orchestrator turn: spawn_subagent tool call returned
+    //   request[0] = orchestrator turn: analyze_image tool call returned
     //   request[1] = vision_agent subagent inner LLM call: canary text returned
     //   request[2] = orchestrator synthesis: canary forwarded in final reply
     //
@@ -1118,16 +1127,17 @@ async fn subagent_delegation_happy_path_inner() {
 
 // ─── Task 4: Delegated clarification flow ─────────────────────────────────────
 //
-// The orchestrator selects task_manager_agent through spawn_subagent, and
-// ask_user_clarification is in that agent's named tools. A child that needs a
-// detail pauses and hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
-// the spawn_subagent result (#4291). That envelope is an ordinary tool result
-// to the orchestrator — spawn_subagent is not in its `early_exit_tools`
+// `manage_tasks` is task_manager_agent's synthesised delegate (its `agent.toml`
+// `delegate_name`), and `ask_user_clarification` IS in that agent's named tools.
+// So a blocking delegation that needs a detail pauses the *child*, and
+// `dispatch_subagent` hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
+// the `manage_tasks` tool result (#4291). That envelope is an ordinary tool
+// result to the orchestrator — `manage_tasks` is not in its `early_exit_tools`
 // — so the orchestrator relays the question in its OWN next reply, and turn 1
 // ends on that text.
 //
 // Actual LLM request ordering (4 upstream calls total):
-//   request[0] = orchestrator turn 1 → spawn_subagent tool call
+//   request[0] = orchestrator turn 1 → manage_tasks (blocking) tool call
 //   request[1] = task_manager_agent → ask_user_clarification pauses the child
 //   request[2] = orchestrator, with the awaiting-user envelope in context →
 //                relays the question as text; turn 1 ends (chat_done)
@@ -1148,17 +1158,14 @@ async fn delegated_clarification_flow_inner() {
     let _lock = env_lock();
     reset_script(vec![
         // ── turn 1 ──
-        // request[0]: Orchestrator selects the task manager.
+        // request[0]: Orchestrator delegates to task_manager_agent via manage_tasks.
         tool_call_completion(
-            "spawn_subagent",
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": "Add my GitHub issues as a task source"
-            }),
+            "manage_tasks",
+            json!({ "prompt": "Add my GitHub issues as a task source", "blocking": true }),
         ),
         // request[1]: task_manager_agent asks for the missing detail. This pauses
         //   the child; the question comes back to the orchestrator inside the
-        //   `[SUBAGENT_AWAITING_USER]` envelope as the spawn_subagent result.
+        //   `[SUBAGENT_AWAITING_USER]` envelope as the manage_tasks result.
         tool_call_completion(
             "ask_user_clarification",
             json!({ "question": "WHICH_VERSION_CANARY?" }),
@@ -1232,8 +1239,11 @@ async fn delegated_clarification_flow_inner() {
     let requests = with_captured(|c| c.clone());
 
     // ── No unknown-tool result in any captured request ──
-    // The shared spawn tool is registered, and the task-manager child is
-    // reached without an unknown-tool result.
+    // Proves manage_tasks was recognised by the orchestrator. This is the guard
+    // that let the 3-completion version of this test pass vacuously: with the
+    // delegate unresolved, the engine's lowercase "unknown tool `manage_tasks`"
+    // result never matched the old `"Unknown tool:"` literal, and the
+    // orchestrator consumed the child's clarification completion itself.
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
         "found an unknown-tool result in captured requests — delegation was broken; \
@@ -1242,7 +1252,7 @@ async fn delegated_clarification_flow_inner() {
     );
 
     // ── Both turns traversed the expected four upstream requests ──
-    // request[0] = orchestrator (spawn_subagent call),
+    // request[0] = orchestrator (manage_tasks call),
     // request[1] = task_manager_agent (ask_user_clarification pause),
     // request[2] = orchestrator (relays the question; turn-1 end),
     // request[3] = orchestrator turn-2 synthesis (turn-2 end).
@@ -1255,20 +1265,20 @@ async fn delegated_clarification_flow_inner() {
     );
 
     // ── request[1] went to task_manager_agent, not the orchestrator ──
-    // Proves the async spawn really ran (the child's system prompt is
+    // Proves the blocking delegate really ran (the child's system prompt is
     // task-manager-specific; both agents share the project-context prefix, so
     // message 0 alone cannot tell them apart). Without this the flow degrades
     // to "orchestrator asks the user itself", which never exercises the pause.
     let child_request = requests.get(1).map(Value::to_string).unwrap_or_default();
     assert!(
         child_request.contains("You own the user's task-source feeds and artifacts"),
-        "request[1] did not carry the task_manager_agent prompt — spawn_subagent did not \
+        "request[1] did not carry the task_manager_agent prompt — manage_tasks did not \
          delegate; request: {child_request}"
     );
 
     // ── request[2] saw the child's pause as a `[SUBAGENT_AWAITING_USER]` envelope ──
     // Proves `dispatch_subagent` surfaced the pause the #4291 way (structured
-    // envelope carrying the question, as the spawn_subagent result) rather
+    // envelope carrying the question, as the manage_tasks tool result) rather
     // than as a plain success the model could read as "answered".
     let relay_request = requests.get(2).map(Value::to_string).unwrap_or_default();
     assert!(
@@ -2015,43 +2025,65 @@ async fn provider_error_retry_inner() {
     stack.shutdown();
 }
 
-// ─── Task 9: Concurrent async delegation + multi-hop chain ──────────────────
+// ─── Task 9: Parallel fan-out + multi-hop chain ───────────────────────────────
+//
+// parallel_subagent_fanout:
+//   spawn_parallel_agents is in the orchestrator's named tools (agent.toml:165)
+//   and is registered via ops.rs:163. Requires ≥2 tasks, each { agent_id, prompt }.
+//   The orchestrator's subagents.allowlist includes "vision_agent",
+//   so agent_id:"vision_agent" is valid. children run via join_all (spawn_parallel_agents.rs
+//   ~line 322 — "let futures = prepared.into_iter().map(…)"). Both children
+//   consume from the same global FIFO scripted-response queue. Because
+//   join_all spawns futures concurrently but the queue pop is under a Mutex,
+//   one child gets the first completion and the other gets the second. Both
+//   carry distinct canaries; the synthesis quotes both.
+//   LLM request ordering (4 upstream calls):
+//     request[0]  = orchestrator → spawn_parallel_agents tool call
+//     request[1,2] = vision_agent child 1 & child 2 (order nondeterministic,
+//                    both return distinct canaries)
+//     request[3]  = orchestrator synthesis with both canaries
 //
 // multi_hop_delegation_chain:
 //   Depth-1 subagents (vision_agent, task_manager_agent, etc.) do NOT have
 //   spawn tools in their named lists. Verified: vision_agent's agent.toml
 //   (agent_registry/agents/vision_agent/agent.toml) names only `file_read` and
 //   `image_info`. It contains no
-//   spawn_subagent. The only
+//   spawn_subagent, spawn_worker_thread, or spawn_parallel_agents. The only
 //   agents with spawn tools are orchestrator and trigger_reactor (loader.rs:383,
 //   527). trigger_reactor is not in the orchestrator's subagents.allowlist.
 //   MAX_SPAWN_DEPTH=3 (spawn_depth_context.rs:16) is structurally unreachable
 //   with the current built-in agent graph; the cap is a safety net for
 //   runtime-registered agents.
 //
-//   Fallback: orchestrator → vision_agent via spawn_subagent → vision_agent
-//   scripted to call file_write (not in
+//   Fallback (plan Task 9, step 9.2 fallback): orchestrator → vision_agent
+//   (via `analyze_image`) → vision_agent scripted to call file_write (not in
 //   vision_agent's read-only named tools → SubagentToolSource::execute returns
 //   a blocked response, tool loop continues) → vision_agent second LLM call
-//   returns DEPTH2_CANARY text → spawn_subagent forwards it
+//   returns DEPTH2_CANARY text → dispatch_subagent forwards as `analyze_image`
 //   tool result → orchestrator synthesis. The three-level synthesis path (user
 //   turn → vision_agent subagent → tool-loop continuation → orchestrator
 //   synthesis) is the deepest path reachable with built-in agents without src/
 //   changes.
 //   LLM request ordering (4 upstream calls):
-//     request[0] = orchestrator → `spawn_subagent` delegation
+//     request[0] = orchestrator → `analyze_image` delegation
 //     request[1] = vision_agent (inner loop) → file_write (blocked)
 //     request[2] = vision_agent (inner loop continuation) → DEPTH2_CANARY text
 //     request[3] = orchestrator synthesis
 
-/// Two `spawn_subagent` calls issued together really do put two workers
+/// Two `spawn_async_subagent` calls issued together really do put two workers
 /// in flight: both are dispatched and both run, concurrently.
 ///
-/// Concurrent async delegation calls keep independent workers in flight at
-/// the same time.
+/// This is the surviving half of what `spawn_parallel_agents` used to prove.
+/// #5757 (`02d81f6cf`) retired that tool on the grounds that "several spawns
+/// are already several workers in flight" (`orchestrator/agent.toml`), and
+/// `prompt.md` now teaches exactly that: "N independent subtasks means N
+/// spawns, issued together. They run concurrently." That claim is the thing
+/// worth pinning — it is the whole justification for dropping the dedicated
+/// fan-out tool, and #4754 measured what happens when fan-out silently
+/// serializes (145-200s gaps between workers).
 ///
 /// The *other* half — both results reaching the user — is deliberately not
-/// asserted here, and not because it stopped mattering. `spawn_subagent`
+/// asserted here, and not because it stopped mattering. `spawn_async_subagent`
 /// returns a task id immediately and results come back through
 /// `orchestration::background_delivery`, which is documented "idle-gated —
 /// never mid-turn" and debounced, i.e. on a LATER system turn. That subsystem
@@ -2067,14 +2099,11 @@ async fn provider_error_retry_inner() {
 /// the global FIFO and any assertion keyed on script order would be a coin
 /// flip. What each worker was asked is deterministic; when it asked is not.
 #[test]
-fn concurrent_async_subagents_overlap() {
-    run_on_agent_stack(
-        "concurrent_async_subagents_overlap",
-        concurrent_async_subagents_overlap_inner,
-    );
+fn parallel_subagent_fanout() {
+    run_on_agent_stack("parallel_subagent_fanout", parallel_subagent_fanout_inner);
 }
 
-async fn concurrent_async_subagents_overlap_inner() {
+async fn parallel_subagent_fanout_inner() {
     let _lock = env_lock();
     // Arm the overlap barrier before the stack boots: each worker's response is
     // withheld until a second worker has also arrived, so a serial
@@ -2087,16 +2116,14 @@ async fn concurrent_async_subagents_overlap_inner() {
     // the orchestrator's reply for the queue, which is why nothing below keys
     // on a script index.
     reset_script(vec![
-        // These text-only canary tasks use flow_discovery; vision_agent
-        // requires an image attachment.
         tool_calls_completion(&[
             (
-                "spawn_subagent",
-                json!({ "agent_id": "flow_discovery", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
+                "spawn_async_subagent",
+                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
             ),
             (
-                "spawn_subagent",
-                json!({ "agent_id": "flow_discovery", "prompt": "Find PARALLEL_BETA_CANARY" }),
+                "spawn_async_subagent",
+                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
             ),
         ]),
         text_completion("Spawned two workers; results will arrive as they land."),
@@ -2170,7 +2197,7 @@ async fn concurrent_async_subagents_overlap_inner() {
     // makes the test about concurrency rather than eventual dispatch: the
     // barrier only releases when a second worker joins the first, so strictly
     // serial execution cannot reach here — it parks, times out, and leaves the
-    // flag clear.
+    // flag clear. It is the claim that justified retiring `spawn_parallel_agents`.
     assert!(
         canary_overlap_observed(),
         "the two workers never overlapped — fan-out ran serially, which is the \
@@ -2188,13 +2215,14 @@ async fn concurrent_async_subagents_overlap_inner() {
     );
 }
 
-/// Orchestrator selects vision_agent through `spawn_subagent`; it calls
+/// Orchestrator delegates to vision_agent via `analyze_image`; it calls
 /// file_write (not in its read-only named tools, so SubagentToolSource
 /// returns error); vision_agent loops and returns DEPTH2_CANARY;
 /// dispatch_subagent forwards the result; orchestrator synthesizes.
 ///
 /// Depth behavior discovered: vision_agent's agent.toml names only `file_read`
-/// and `image_info` (no spawn tools). MAX_SPAWN_DEPTH=3
+/// and `image_info` (no spawn_subagent,
+/// spawn_worker_thread, spawn_parallel_agents). MAX_SPAWN_DEPTH=3
 /// (spawn_depth_context.rs:16) is unreachable with built-in agents; it guards
 /// runtime/workspace agents. The three-level synthesis (user-turn root →
 /// vision_agent subagent → orchestrator synthesis) is the deepest path
@@ -2227,13 +2255,14 @@ async fn multi_hop_delegation_chain_inner() {
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
-        // request[0]: Orchestrator selects the vision specialist.
+        // request[0]: Orchestrator delegates to vision_agent via
+        // `analyze_image` (its delegate_name, agent_registry/agents/vision_agent/agent.toml:3).
         tool_call_completion(
-            "spawn_subagent",
+            "analyze_image",
             json!({
-                "agent_id": "vision_agent",
                 "prompt": "deep question",
-                "image_paths": [image_path.to_string_lossy()]
+                "image_paths": [image_path.to_string_lossy()],
+                "blocking": true
             }),
         ),
         // request[1]: vision_agent first inner LLM call → scripts file_write.
@@ -2246,9 +2275,9 @@ async fn multi_hop_delegation_chain_inner() {
             json!({ "path": "depth-2.txt", "content": "depth-2 write?" }),
         ),
         // request[2]: vision_agent second inner LLM call → text result.
-        // This becomes the spawn_subagent result.
+        // This becomes the `analyze_image` tool result forwarded by dispatch_subagent.
         text_completion("DEPTH2_CANARY"),
-        // request[3]: Orchestrator receives the subagent result and synthesizes.
+        // request[3]: Orchestrator receives the analyze_image result and synthesizes.
         text_completion("Final answer: DEPTH2_CANARY"),
     ]);
     let mut events = spawn_sse_collector(format!(
@@ -2282,7 +2311,7 @@ async fn multi_hop_delegation_chain_inner() {
 
     // ≥4 upstream requests prove the full delegation path ran (≥3 would
     // false-pass if the subagent inner loop early-exited):
-    //   request[0] = orchestrator (spawn_subagent call),
+    //   request[0] = orchestrator (analyze_image call),
     //   request[1] = vision_agent first iter (file_write → blocked),
     //   request[2] = vision_agent second iter (DEPTH2_CANARY text),
     //   request[3] = orchestrator synthesis.
@@ -2295,13 +2324,13 @@ async fn multi_hop_delegation_chain_inner() {
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
-    // No unknown-tool result for spawn_subagent — specialist selection succeeded.
-    // Scoped to spawn_subagent: the subagent's `file_write` call IS
+    // No unknown-tool result for `analyze_image` — delegation was synthesised correctly.
+    // Scoped to `analyze_image`: the subagent's `file_write` call IS
     // rejected as unknown by design (see the ordering note above), so a blanket
     // check would fail on the very mechanic this test exercises.
     assert!(
-        !captured_requests_reject_tool_as_unknown(&requests, "spawn_subagent"),
-        "found an unknown-tool result — spawn_subagent was not available; requests: {}",
+        !captured_requests_reject_tool_as_unknown(&requests, "analyze_image"),
+        "found an unknown-tool result — `analyze_image` delegation was not synthesised; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
@@ -3382,11 +3411,8 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     reset_script(vec![
         // Orchestrator hands the install to `skill_setup` (a direct hand-off, #6302).
         tool_call_completion(
-            "spawn_subagent",
-            json!({
-                "agent_id": "skill_setup",
-                "prompt": "Install the harness registry skill"
-            }),
+            "setup_skills",
+            json!({ "prompt": "Install the harness registry skill", "blocking": true }),
         ),
         // skill_setup finds the entry, then installs it (the gate parks here).
         tool_call_completion(
@@ -3609,25 +3635,35 @@ fn use_skill_offers_pack(request: &Value, pack: &str) -> bool {
         .any(|tool| tool.to_string().contains(&quoted))
 }
 
-/// One scripted turn in which the orchestrator starts a specialist through
-/// the shared `spawn_subagent` tool.
+/// One scripted turn in which the orchestrator hands a request to a specialist
+/// by calling `hand_off` through the `use_skill` tool pack `pack`.
+///
+/// `setup_skills` is a member of the `skills` pack (#6787: it cost ~270 tokens
+/// on every orchestrator request for a family used a few times a week), so the
+/// orchestrator reaches it as `use_skill { skill: "skills", tool: "setup_skills" }`.
+///
+/// Three things must hold, all read from the captured model requests:
+/// * the orchestrator's own request offers the pack and does not advertise
+///   `hand_off` or any raw `skill_registry_*` tool on the wire;
+/// * the hand-off call returned a result (`tool_result_text` panics on
+///   `unknown tool`);
+/// * a later request came from the specialist, recognised by a tool only its
+///   belt carries.
 #[cfg(feature = "skills")]
-async fn assert_spawn_reaches_specialist(
+async fn assert_packed_hand_off_reaches_specialist(
     stack: &Stack,
     events: &mut tokio::sync::mpsc::UnboundedReceiver<Value>,
     rpc_id: i64,
     client_id: &str,
-    specialist: &str,
+    pack: &str,
+    hand_off: &str,
     specialist_only_tools: &[&str],
 ) {
     reset_script(vec![
-        tool_call_completion(
-            "spawn_subagent",
-            json!({
-                "agent_id": specialist,
-                "prompt": format!("Handle this through {specialist}"),
-                "task_key": format!("route-{specialist}")
-            }),
+        packed_tool_call_completion(
+            pack,
+            hand_off,
+            json!({ "prompt": format!("Handle this through {hand_off}"), "blocking": true }),
         ),
         text_completion("The specialist finished the task."),
         text_completion("The specialist handled it."),
@@ -3636,8 +3672,8 @@ async fn assert_spawn_reaches_specialist(
         &stack.rpc_base,
         rpc_id,
         client_id,
-        &format!("thread-{specialist}"),
-        &format!("Please hand this to {specialist}"),
+        &format!("thread-{hand_off}"),
+        &format!("Please hand this to {hand_off}"),
     )
     .await;
     let done = wait_for_terminal(events, Duration::from_secs(120)).await;
@@ -3646,21 +3682,22 @@ async fn assert_spawn_reaches_specialist(
     assert_eq!(
         done.get("event").and_then(Value::as_str),
         Some("chat_done"),
-        "the `{specialist}` turn must finish: {done}\nrequests: {}",
+        "the `{hand_off}` turn must finish: {done}\nrequests: {}",
         dump()
     );
 
     let orchestrator = requests
         .first()
-        .unwrap_or_else(|| panic!("no model request for the `{specialist}` turn"));
+        .unwrap_or_else(|| panic!("no model request for the `{hand_off}` turn"));
     let belt = advertised_tool_names(orchestrator);
     assert!(
-        belt.iter().any(|name| name == "spawn_subagent"),
-        "the orchestrator must offer spawn_subagent to reach `{specialist}`; it advertised {belt:?}"
+        belt.iter().any(|name| name == "use_skill") && use_skill_offers_pack(orchestrator, pack),
+        "the orchestrator must offer the `{pack}` pack through use_skill so it can reach \
+         `{hand_off}`; it advertised {belt:?}"
     );
     assert!(
-        !belt.iter().any(|name| name == specialist),
-        "`{specialist}` is an agent id, not a model-facing tool name: {belt:?}"
+        !belt.iter().any(|name| name == hand_off),
+        "`{hand_off}` is packed (#6787), not a direct tool on the orchestrator's wire: {belt:?}"
     );
     let raw: Vec<&String> = belt
         .iter()
@@ -3671,8 +3708,8 @@ async fn assert_spawn_reaches_specialist(
         "the orchestrator must not advertise raw registry tools: {raw:?}"
     );
 
-    tool_result_text(&requests, "spawn_subagent")
-        .unwrap_or_else(|| panic!("no spawn_subagent result; requests: {}", dump()));
+    tool_result_text(&requests, hand_off)
+        .unwrap_or_else(|| panic!("no tool result for `{hand_off}`; requests: {}", dump()));
     assert!(
         requests
             .iter()
@@ -3680,25 +3717,27 @@ async fn assert_spawn_reaches_specialist(
             .any(|request| advertised_tool_names(request)
                 .iter()
                 .any(|name| specialist_only_tools.contains(&name.as_str()))),
-        "no model request came from the specialist behind `{specialist}` (a belt with any of \
+        "no model request came from the specialist behind `{hand_off}` (a belt with any of \
          {specialist_only_tools:?}); requests: {}",
         dump()
     );
 }
 
-/// Skill installs reach `skill_setup` through the shared spawn tool; running an
-/// installed skill remains the orchestrator's own `run_workflow`.
+/// Skill installs reach `skill_setup` through its `setup_skills` hand-off,
+/// which is a member of the `skills` tool pack (#6787) and so is called through
+/// `use_skill`; running an installed skill is the orchestrator's own
+/// `run_workflow`, not a hand-off to a retired `skill_executor` (`run_skill`).
 #[cfg(feature = "skills")]
 #[test]
-fn orchestrator_spawns_skill_setup_with_agent_id() {
+fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack() {
     run_on_agent_stack(
-        "orchestrator_spawns_skill_setup_with_agent_id",
-        orchestrator_spawns_skill_setup_with_agent_id_inner,
+        "orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack",
+        orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack_inner,
     );
 }
 
 #[cfg(feature = "skills")]
-async fn orchestrator_spawns_skill_setup_with_agent_id_inner() {
+async fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack_inner() {
     let _lock = env_lock();
     reset_script(Vec::new());
     let stack = boot_stack().await;
@@ -3707,12 +3746,13 @@ async fn orchestrator_spawns_skill_setup_with_agent_id_inner() {
         stack.rpc_base
     ))
     .await;
-    assert_spawn_reaches_specialist(
+    assert_packed_hand_off_reaches_specialist(
         &stack,
         &mut events,
         910,
         "harness-skill-handoff",
-        "skill_setup",
+        "skills",
+        "setup_skills",
         &[
             "skill_registry_install",
             "skill_registry_uninstall",
@@ -3915,6 +3955,10 @@ fn peel_logs_envelope(v: &Value) -> &Value {
 /// through the orchestrator's direct registry tools; its answer reaches the model.
 #[cfg(feature = "mcp")]
 #[test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry() {
     run_on_agent_stack(
         "agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry",
@@ -4144,32 +4188,31 @@ async fn orchestrator_defers_its_mcp_registry_tools_without_a_hand_off_inner() {
     stack.shutdown();
 }
 
-/// Search discovers a connected MCP action with its schema, then the model
-/// calls that action by its own name on the same orchestrator turn.
+/// Search discovers an operator-declared MCP action with its schema, then the
+/// model calls that action by its own name on the same orchestrator turn. The
+/// stub is declared in `config.toml` as an operator-trusted stdio server (see
+/// `support/mcp_stub_trusted.rs` for why this is temporary).
 #[cfg(feature = "mcp")]
 #[test]
-fn orchestrator_calls_a_connected_mcp_tool_directly() {
+fn orchestrator_calls_an_operator_trusted_mcp_tool_directly() {
     run_on_agent_stack(
-        "orchestrator_calls_a_connected_mcp_tool_directly",
-        orchestrator_calls_a_connected_mcp_tool_directly_inner,
+        "orchestrator_calls_an_operator_trusted_mcp_tool_directly",
+        orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner,
     );
 }
 
 #[cfg(feature = "mcp")]
-async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
+async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
     let _lock = env_lock();
     let _ttl = EnvVarGuard::set("OPENHUMAN_APPROVAL_TTL_SECS", "120");
     ensure_approval_gate().await;
     let _approval_bridge = register_approval_bridge();
-    let (registry_addr, registry_join) = serve_mcp_registry_fixture().await;
-    let _registry = EnvVarGuard::set(
-        "MCP_OFFICIAL_REGISTRY_BASE",
-        format!("http://{registry_addr}"),
-    );
     reset_script(Vec::new());
-    let stack = boot_stack().await;
-    // Connecting also writes the tool cache the orchestrator's surface reads.
-    declare_and_connect_registry_echo_server(&stack.rpc_base, 940).await;
+    let stack = boot_stack_with_config(&mcp_stub_trusted::trusted_stub_toml(
+        "echo",
+        env!("CARGO_BIN_EXE_test-mcp-stub"),
+    ))
+    .await;
 
     reset_script(vec![
         tool_call_completion(
@@ -4258,7 +4301,6 @@ async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
         "the direct MCP call failed: {result}"
     );
 
-    registry_join.abort();
     stack.shutdown();
 }
 
@@ -4299,9 +4341,161 @@ fn scripted_discovered_mcp_tool_name_from_requests(requests: &[Value]) -> Option
 //
 // Lives here rather than in `tests/raw_coverage/`: `raw_coverage_all` declares
 // `required-features = ["voice", "inference"]` (`Cargo.toml:117`), so a test
-// The retired copied session-host prompt builder had two boundary-placement
-// tests here. Boundary behavior remains covered by the live policy helper and
-// session tests; the runtime turn prelude is the canonical prompt source.
+// placed there is silently SKIPPED by any default-feature run — including the
+// one a contributor does locally. This target has no required features, so the
+// assertion actually executes.
+//
+// Self-contained rather than built on `streaming_support::agent_with_s`: that
+// helper resolves a real memory store, which needs an `EmbeddingHost` seam a
+// `tests/` binary cannot install (`host_impls::install_for_tests` is
+// `#[cfg(test)]`, visible only to the crate's own unit tests). The prompt path
+// under test never touches memory, so a stub is both sufficient and steadier.
+mod tool_policy_boundary_placement {
+    use anyhow::Result;
+    use async_trait::async_trait;
+    use openhuman_core::agent::OpenHumanSessionHost;
+    use openhuman_core::config::AgentConfig;
+    use tinytools::{PermissionLevel, Tool, ToolResult};
+    use tinytools_agent::dialect::NativeDialect;
+
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
+    use super::streaming_support::ScriptedProvider;
+    use tinyinference_llm::model::{ChatModel, ModelProfile};
+
+    /// Two tools at different permission levels. A `read_only` channel
+    /// permission blocks the write one, and that restriction is what makes the
+    /// boundary render at all — `render_tool_policy_boundary` returns `None`
+    /// unless `session.has_restrictions()` (`tools/agent_policy/prompt.rs:12`).
+    struct ScopedTool {
+        name: &'static str,
+        level: PermissionLevel,
+    }
+
+    #[async_trait]
+    impl Tool for ScopedTool {
+        fn name(&self) -> &str {
+            self.name
+        }
+        fn description(&self) -> &str {
+            "tool-policy placement fixture"
+        }
+        fn parameters_schema(&self) -> serde_json::Value {
+            serde_json::json!({ "type": "object", "properties": {} })
+        }
+        fn permission_level(&self) -> PermissionLevel {
+            self.level
+        }
+        async fn execute(&self, _args: serde_json::Value) -> Result<ToolResult> {
+            Ok(ToolResult::success("ok"))
+        }
+    }
+
+    fn restricted_prompt() -> String {
+        let workspace = tempfile::TempDir::new().expect("temp workspace");
+        let provider: Arc<dyn ChatModel<()>> = Arc::new(ScriptedProvider {
+            responses: Mutex::new(VecDeque::new()),
+            stream_events: Vec::new(),
+            profile: ModelProfile::default(),
+        });
+        let mut config = AgentConfig::default();
+        config
+            .channel_permissions
+            .insert("boundary-channel".to_string(), "read_only".to_string());
+
+        let agent = OpenHumanSessionHost::builder()
+            .chat_model(provider)
+            .tools(vec![
+                Box::new(ScopedTool {
+                    name: "boundary_read",
+                    level: PermissionLevel::ReadOnly,
+                }),
+                Box::new(ScopedTool {
+                    name: "boundary_write",
+                    level: PermissionLevel::Write,
+                }),
+            ])
+            .tool_dispatcher(Box::new(NativeDialect))
+            .workspace_dir(workspace.path().to_path_buf())
+            .event_context("boundary-session", "boundary-channel")
+            .config(config)
+            .build()
+            .expect("complete builder should succeed");
+
+        agent.build_system_prompt().expect("system prompt builds")
+    }
+
+    /// #5821 (closes #5704). Every line of the boundary block is session-scoped
+    /// — agent id, channel, entry point, risk level, allowed tools — so putting
+    /// it first moves the prompt's first diverging byte to offset 0 and costs
+    /// the inference backend's automatic prefix cache everything behind it. It
+    /// also replaced each agent's opening persona line with a constant heading.
+    ///
+    /// This drives the real `OpenHumanSessionHost::build_system_prompt`. The four tests #5821
+    /// shipped exercise the extracted pure helper `append_tool_policy_boundary`
+    /// and would all still pass if `build_system_prompt` stopped calling it; the
+    /// one existing test that goes through the builder,
+    /// `turn_tests_part_01_tests::system_prompt_includes_tool_policy_boundary`,
+    /// asserts the block is PRESENT and says nothing about where.
+    #[test]
+    fn system_prompt_appends_the_tool_policy_boundary_after_the_body() {
+        let prompt = restricted_prompt();
+
+        let boundary_at = prompt
+            .find("## Tool Policy Boundary")
+            .expect("a restricted channel must render the boundary block");
+
+        assert!(
+            boundary_at > 0,
+            "the boundary must not open the prompt — prepending it moves the \
+             first diverging byte to offset 0 and defeats the backend's prefix \
+             cache (#5704). Prompt begins: {:?}",
+            prompt.chars().take(160).collect::<String>()
+        );
+        assert!(
+            !prompt.starts_with("## Tool Policy Boundary"),
+            "prepending replaced every agent's opening line with a constant heading"
+        );
+        assert!(
+            !prompt[..boundary_at].trim().is_empty(),
+            "there must be prompt body BEFORE the boundary"
+        );
+    }
+
+    /// The placement's payoff, stated exactly: the block is the LAST thing in
+    /// the prompt, so every stable byte precedes it. That is the property a
+    /// prefix cache keys on, and the one a revert to prepending destroys.
+    ///
+    /// `render_tool_policy_boundary` emits `- Restricted tools: N omitted by
+    /// policy` last whenever anything is restricted, so asserting the prompt
+    /// ENDS with that line pins the whole block to the tail rather than merely
+    /// somewhere after offset 0.
+    #[test]
+    fn the_tool_policy_boundary_is_the_last_block_in_the_prompt() {
+        let prompt = restricted_prompt();
+        let trimmed = prompt.trim_end();
+        let tail: String = trimmed
+            .chars()
+            .rev()
+            .take(220)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+
+        assert!(
+            trimmed.contains("- Restricted tools:"),
+            "the fixture must actually restrict a tool, or this asserts nothing; tail: {tail}"
+        );
+        assert!(
+            trimmed.ends_with("omitted by policy"),
+            "the boundary block must be the prompt's FINAL block — prepending \
+             puts it first and leaves the stable body trailing it (#5704). \
+             Prompt ends: {tail}"
+        );
+    }
+}
 
 // ─── Harness work state: the session todo list and the thread goal ──────────
 //
@@ -4820,7 +5014,7 @@ async fn thread_goal_is_set_read_back_and_completed_across_turns_inner() {
     // Turn 2: goal_get reads the persisted goal back — same id, same objective
     // and budget, still active. (Token accounting is not asserted here: the
     // scripted upstream returns no `usage`, so a turn charges nothing against
-    // the budget. The harness-tools goal tests cover the accounting
+    // the budget. `agent::goals::runtime`'s unit tests cover the accounting
     // and the budget-limit transition directly.)
     let request_id = send_web_chat(
         &stack.rpc_base,
@@ -4917,7 +5111,7 @@ async fn thread_goal_is_set_read_back_and_completed_across_turns_inner() {
 /// Cancel aborts the detached task, and an aborted future never reaches its own
 /// `Cancelled` branch — so before `AbortReport` the client got no terminal event
 /// and the delegation card spun forever. This drives the production path: a
-/// real `spawn_subagent` child held mid-model-call by the canary barrier,
+/// real `spawn_async_subagent` child held mid-model-call by the canary barrier,
 /// cancelled over the `openhuman.subagent_cancel` JSON-RPC, and observed on the
 /// same SSE stream the app renders from (`subagent_failed` is what settles the
 /// card's row). A second cancel then gets the RPC's "nothing running" answer
@@ -4938,8 +5132,8 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     arm_canary_barrier(&["CANCEL_E2E_CANARY", "CANCEL_E2E_NEVER"]);
     reset_script(vec![
         tool_calls_completion(&[(
-            "spawn_subagent",
-            json!({ "agent_id": "flow_discovery", "prompt": "Find CANCEL_E2E_CANARY" }),
+            "spawn_async_subagent",
+            json!({ "agent_id": "vision_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
         )]),
         text_completion("Spawned a worker; its result will arrive later."),
         text_completion("worker would have finished here"),

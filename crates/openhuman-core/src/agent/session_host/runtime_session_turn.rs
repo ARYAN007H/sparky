@@ -118,6 +118,10 @@ impl OpenHumanSessionHost {
             run_context: context.into_tinyagents(root_config),
             controls: Default::default(),
         };
+        // The runtime's neutral `RuntimeError::Driver(String)` channel cannot
+        // carry OpenHuman's typed dispatch refusal. Keep this per-turn sidecar
+        // so the driver can restore the type after recording partial usage.
+        let session_sidecar = options.run_context.data.session_sidecar.clone();
         // Load persisted state before the normal turn lifecycle so the host
         // can read native recorded declarations for both bound sessions and
         // cold, unthreaded latest-agent resumes.
@@ -190,7 +194,7 @@ impl OpenHumanSessionHost {
             Err(error) => {
                 drop(descendant_lease);
                 drop(root_cancellation);
-                return Err(anyhow::anyhow!(error.to_string()));
+                return Err(runtime_turn_error(error, &session_sidecar));
             }
         };
         let mut output = outcome.output.unwrap_or_default();
@@ -235,6 +239,25 @@ impl Drop for RootRunCancellationGuard {
     }
 }
 
+fn runtime_turn_error(
+    error: tinyagents_runtime::RuntimeError,
+    sidecar: &std::sync::Arc<
+        std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+    >,
+) -> anyhow::Error {
+    if matches!(error, tinyagents_runtime::RuntimeError::Driver(_)) {
+        let refusal = sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .dispatch_refusal
+            .take();
+        if let Some(refusal) = refusal {
+            return anyhow::Error::new(refusal);
+        }
+    }
+    anyhow::anyhow!(error.to_string())
+}
+
 /// Applies the pending one-turn overrides to this turn's resume mode.
 pub(in crate::agent::session_host) fn begin_turn_resume(
     state: &mut super::OpenHumanSessionState,
@@ -246,3 +269,7 @@ pub(in crate::agent::session_host) fn begin_turn_resume(
     }
     state.active_turn_overrides = overrides;
 }
+
+#[cfg(test)]
+#[path = "runtime_session_turn_tests.rs"]
+mod tests;
