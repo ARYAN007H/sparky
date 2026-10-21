@@ -16,7 +16,6 @@ use tinyagents_harness::middleware::{
 };
 use tinyagents_harness::no_progress::FailurePolicy;
 use tinyagents_harness::steering::SteeringHandle;
-use tinyagents_harness::turn_stop::CopyProvider;
 use tinyagents_hooks::stop::StopLatch;
 use tinyagents_hooks::stop::{self, TerminalInferenceFailureKind};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
@@ -27,30 +26,6 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::util::truncate_with_ellipsis;
 use tinyagents_harness::middleware::EphemeralInstructionMiddleware;
 use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_tool_failure;
-
-pub(crate) struct OpenHumanCopyProvider;
-
-impl CopyProvider for OpenHumanCopyProvider {
-    fn copy_override(
-        &self,
-        request: &tinyagents_harness::turn_stop::CopyRequest<'_>,
-    ) -> Option<String> {
-        use tinyagents_harness::turn_stop::{CopyRequest, TurnStopCopyKey};
-
-        match request {
-            CopyRequest::ProviderConfig { tool, last_error } => Some(format!(
-                "Stopping: the `{tool}` step failed because the configured model/provider rejected the request (e.g. an unknown model, a non-chat/embedding model, a missing credential, or a region block) — retrying will not help. Fix the model or API key in Connections → API keys → LLM. Details:\n{last_error}"
-            )),
-            CopyRequest::TurnStop { key: TurnStopCopyKey::ProviderConfig, .. } => Some(
-                "the configured model or provider rejected the request; check the model and API key in Connections".to_owned(),
-            ),
-            CopyRequest::TurnStop { key: TurnStopCopyKey::MissingConnection, .. } => Some(
-                "a service this needs isn't connected; connect it in Connections, then ask me to try again".to_owned(),
-            ),
-            _ => None,
-        }
-    }
-}
 
 pub(crate) fn user_actionable_escalation(tool: &str, error: &str) -> Option<String> {
     let lower = error.to_lowercase();
@@ -185,13 +160,23 @@ struct HaltCopy;
 
 impl FailurePolicy for HaltCopy {
     fn identical_halt_summary(&self, tool: &str, count: u32, failure_text: &str) -> String {
-        stop::halt_summary::retry_exhausted(&OpenHumanCopyProvider, tool, count, failure_text)
+        stop::halt_summary::retry_exhausted(
+            &crate::agent::tinyagents::host::OpenHumanCopyProvider,
+            tool,
+            count,
+            failure_text,
+        )
             .summary
     }
 
     fn no_progress_halt_summary(&self, consecutive: u32, tool: &str, failure_text: &str) -> String {
-        stop::halt_summary::no_progress(&OpenHumanCopyProvider, consecutive, tool, failure_text)
-            .summary
+        stop::halt_summary::no_progress(
+            &crate::agent::tinyagents::host::OpenHumanCopyProvider,
+            consecutive,
+            tool,
+            failure_text,
+        )
+        .summary
     }
 }
 
@@ -339,34 +324,28 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         let heuristic = heuristic_text(&call.name, &failure_text);
         if result.is_error && !is_command_exit_report(&failure_text) {
             if let Some(kind) = stop::terminal_inference_failure_kind(heuristic) {
-                let summary = match kind {
+                let halt = match kind {
                     TerminalInferenceFailureKind::BudgetExhausted => {
                         stop::halt_summary::budget(
-                            &OpenHumanCopyProvider,
+                            &crate::agent::tinyagents::host::OpenHumanCopyProvider,
                             &call.name,
                             &failure_text,
                         )
-                        .summary
                     }
                     TerminalInferenceFailureKind::ProviderConfig => {
                         stop::halt_summary::provider_config(
-                            &OpenHumanCopyProvider,
+                            &crate::agent::tinyagents::host::OpenHumanCopyProvider,
                             &call.name,
                             &failure_text,
                         )
-                        .summary
                     }
                 };
                 return FailureAssessment::Halt {
-                    summary: summary.clone(),
+                    summary: halt.summary.clone(),
                     cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
-                        class: match kind {
-                            TerminalInferenceFailureKind::BudgetExhausted => "out_of_credits",
-                            TerminalInferenceFailureKind::ProviderConfig => "provider_config",
-                        }
-                        .to_owned(),
+                        class: halt.class.as_str().to_owned(),
                         operation: call.name.clone(),
-                        summary,
+                        summary: halt.summary,
                     }),
                 };
             }

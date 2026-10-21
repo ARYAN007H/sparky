@@ -172,7 +172,7 @@ impl StopReasonKind {
             Self::Generic => TurnStopCopyKey::Generic,
         };
         tinyagents_harness::turn_stop::render_copy(
-            &crate::agent::tinyagents::middleware::repeated_failure::OpenHumanCopyProvider,
+            &crate::agent::tinyagents::host::OpenHumanCopyProvider,
             &CopyRequest::TurnStop {
                 key,
                 operation: None,

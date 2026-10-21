@@ -273,8 +273,9 @@ fn shared_budget_matcher_reproduces_each_legacy_matcher_on_the_corpus() {
 #[test]
 fn loop_guard_halt_summaries_are_byte_identical() {
     use crate::agent::tinyagents::middleware::repeated_failure::{
-        user_actionable_escalation, OpenHumanCopyProvider,
+        user_actionable_escalation,
     };
+    use crate::agent::tinyagents::host::OpenHumanCopyProvider;
     use tinyagents_hooks::stop;
     assert_eq!(
         stop::halt_summary::budget(&OpenHumanCopyProvider, "delegate", "boom").summary,
