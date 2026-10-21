@@ -32,15 +32,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use tinyagents_session::DriverSessionStores;
 use tinyagents_session::port::TurnStates;
 use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{
-    session_stem, CompactionMarker, DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory,
-    TranscriptLocator, TranscriptMessage, TranscriptMeta, TranscriptPartial, TranscriptTurn,
-    TurnUsage,
+    DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory, TranscriptLocator,
+    TranscriptMeta, TranscriptPartial, TranscriptTurn, TurnUsage, decode_transcript_jsonl,
+    session_stem,
 };
 use tinyagents_session::turn_state::TurnState;
-use tinyagents_session::DriverSessionStores;
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
@@ -229,192 +229,6 @@ fn turn_state_files(dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-#[derive(serde::Deserialize)]
-struct LegacyMetaLine {
-    #[serde(rename = "_meta")]
-    meta: LegacyMeta,
-}
-
-#[derive(serde::Deserialize)]
-struct LegacyMeta {
-    agent: String,
-    #[serde(default)]
-    agent_id: Option<String>,
-    #[serde(default)]
-    agent_type: Option<String>,
-    dispatcher: String,
-    #[serde(default)]
-    provider: Option<String>,
-    #[serde(default)]
-    model: Option<String>,
-    created: String,
-    updated: String,
-    #[serde(default)]
-    turn_count: usize,
-    #[serde(default)]
-    prefix_message_count: Option<usize>,
-    #[serde(default)]
-    input_tokens: u64,
-    #[serde(default)]
-    output_tokens: u64,
-    #[serde(default)]
-    cached_input_tokens: u64,
-    #[serde(default)]
-    charged_amount_usd: f64,
-    #[serde(default)]
-    thread_id: Option<String>,
-    #[serde(default)]
-    task_id: Option<String>,
-    #[serde(default)]
-    session_id: Option<String>,
-    #[serde(default)]
-    parent_session_id: Option<String>,
-}
-
-impl From<LegacyMeta> for TranscriptMeta {
-    fn from(meta: LegacyMeta) -> Self {
-        Self {
-            agent_name: meta.agent,
-            agent_id: meta.agent_id,
-            agent_type: meta.agent_type,
-            dispatcher: meta.dispatcher,
-            provider: meta.provider,
-            model: meta.model,
-            created: meta.created,
-            updated: meta.updated,
-            turn_count: meta.turn_count,
-            prefix_message_count: meta.prefix_message_count,
-            input_tokens: meta.input_tokens,
-            output_tokens: meta.output_tokens,
-            cached_input_tokens: meta.cached_input_tokens,
-            charged_amount_usd: meta.charged_amount_usd,
-            thread_id: meta.thread_id,
-            task_id: meta.task_id,
-            session_id: meta.session_id,
-            parent_session_id: meta.parent_session_id,
-        }
-    }
-}
-
-#[derive(serde::Deserialize)]
-struct LegacyMessageLine {
-    role: String,
-    content: String,
-    #[serde(default)]
-    id: Option<String>,
-    #[serde(default)]
-    extra_metadata: Option<serde_json::Value>,
-    #[serde(default)]
-    cache_breakpoints: Vec<usize>,
-    #[serde(default)]
-    provider: Option<String>,
-    #[serde(default)]
-    model: Option<String>,
-    #[serde(default)]
-    usage: Option<tinyagents_session::transcript::MessageUsage>,
-    #[serde(default)]
-    reasoning_content: Option<String>,
-    #[serde(default)]
-    tool_calls: Vec<tinyagents_session::transcript::TranscriptToolCall>,
-    #[serde(default)]
-    iteration: Option<u32>,
-    #[serde(default)]
-    ts: Option<String>,
-    #[serde(default)]
-    request_id: Option<String>,
-    #[serde(default)]
-    interrupted: bool,
-    #[serde(default)]
-    failure: bool,
-    #[serde(default)]
-    failure_detail: Option<String>,
-    #[serde(default)]
-    tool_call_id: Option<String>,
-    #[serde(default)]
-    parts: Option<Vec<tinyagents_session::transcript::TranscriptPart>>,
-    #[serde(default)]
-    background: Option<tinyagents_session::transcript::BackgroundOrigin>,
-}
-
-impl LegacyMessageLine {
-    fn into_display(self) -> DisplayMessage {
-        let turn_usage = match (self.provider, self.model, self.usage, self.ts.clone()) {
-            (Some(provider), Some(model), Some(usage), Some(ts)) if self.role == "assistant" => {
-                Some(TurnUsage {
-                    provider,
-                    model,
-                    usage,
-                    ts,
-                    reasoning_content: self.reasoning_content.clone(),
-                    tool_calls: self.tool_calls.clone(),
-                    iteration: self.iteration.unwrap_or_default(),
-                })
-            }
-            _ => None,
-        };
-        let message = TranscriptMessage {
-            id: self.id,
-            role: self.role,
-            content: self.content,
-            tool_calls: self.tool_calls,
-            tool_call_id: self.tool_call_id,
-            parts: self.parts,
-            legacy: Default::default(),
-            extra_metadata: self.extra_metadata,
-            cache_breakpoints: self.cache_breakpoints,
-            turn_usage: turn_usage.clone(),
-            request_id: self.request_id.clone(),
-            preserve_request_id: true,
-            interrupted: self.interrupted,
-            tool_failure: self
-                .failure
-                .then(|| tinyagents_session::transcript::ToolFailure {
-                    failed: true,
-                    detail: self.failure_detail.clone(),
-                }),
-        }
-        .normalized();
-        let message = if let Some(origin) = &self.background {
-            let mut message = message;
-            let mut metadata = message
-                .extra_metadata
-                .take()
-                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
-            if !metadata.is_object() {
-                let mut object = serde_json::Map::new();
-                object.insert("value".into(), metadata);
-                metadata = serde_json::Value::Object(object);
-            }
-            if let Some(object) = metadata.as_object_mut() {
-                object.insert(
-                    tinyagents_session::transcript::BACKGROUND_METADATA_KEY.into(),
-                    serde_json::to_value(origin).unwrap_or(serde_json::Value::Null),
-                );
-            }
-            message.extra_metadata = Some(metadata);
-            message
-        } else {
-            message
-        };
-        DisplayMessage {
-            message,
-            interrupted: self.interrupted,
-            request_id: self.request_id,
-            iteration: self.iteration,
-            ts: self.ts,
-            reasoning_content: self.reasoning_content.or_else(|| {
-                turn_usage
-                    .as_ref()
-                    .and_then(|usage| usage.reasoning_content.clone())
-            }),
-            turn_usage,
-            failure: self.failure,
-            failure_detail: self.failure_detail,
-            background: self.background,
-        }
-    }
-}
-
 fn decode_transcript(
     path: &Path,
 ) -> Result<(
@@ -424,98 +238,12 @@ fn decode_transcript(
 )> {
     let bytes =
         std::fs::read(path).with_context(|| format!("read transcript {}", path.display()))?;
-    let mut meta = None;
-    let mut tools = None;
-    let mut records = Vec::new();
-    let mut seen_first = false;
-    for (line_number, bytes) in bytes.split(|byte| *byte == b'\n').enumerate() {
-        let line = match std::str::from_utf8(bytes) {
-            Ok(line) => line,
-            Err(error) if !seen_first => {
-                anyhow::bail!(
-                    "first transcript record in {} is not valid UTF-8: {error}",
-                    path.display()
-                );
-            }
-            Err(error) => {
-                tracing::warn!(
-                    "[sessions] skipping invalid UTF-8 transcript line {} in {}: {error}",
-                    line_number + 1,
-                    path.display()
-                );
-                continue;
-            }
-        };
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        let first_record = !seen_first;
-        seen_first = true;
-        let value: serde_json::Value = match serde_json::from_str(line) {
-            Ok(value) => value,
-            Err(error) if first_record => return Err(error.into()),
-            Err(error) => {
-                tracing::warn!(
-                    "[sessions] skipping malformed transcript line {} in {}: {error}",
-                    line_number + 1,
-                    path.display()
-                );
-                continue;
-            }
-        };
-        if value.get("_meta").is_some() {
-            match serde_json::from_value::<LegacyMetaLine>(value) {
-                Ok(line) => meta = Some(line.meta.into()),
-                Err(error) if meta.is_none() => return Err(error.into()),
-                Err(error) => tracing::warn!(
-                    "[sessions] skipping malformed transcript metadata line {}: {error}",
-                    line_number + 1
-                ),
-            }
-        } else if value.get("kind").and_then(serde_json::Value::as_str) == Some("tools") {
-            tools = value.get("tools").cloned();
-        } else if value.get("kind").and_then(serde_json::Value::as_str) == Some("compaction") {
-            #[derive(serde::Deserialize)]
-            struct Compaction {
-                #[serde(default)]
-                replacement: Vec<LegacyMessageLine>,
-                #[serde(default)]
-                ts: Option<String>,
-                #[serde(default)]
-                request_id: Option<String>,
-            }
-            match serde_json::from_value::<Compaction>(value) {
-                Ok(compaction) => records.push(DisplayRecord::Compaction(CompactionMarker {
-                    replacement: compaction
-                        .replacement
-                        .into_iter()
-                        .collect::<Vec<_>>()
-                        .into_iter()
-                        .map(|line| line.into_display())
-                        .collect(),
-                    ts: compaction.ts,
-                    request_id: compaction.request_id,
-                })),
-                Err(error) => tracing::warn!(
-                    "[sessions] skipping malformed compaction line {}: {error}",
-                    line_number + 1
-                ),
-            }
-        } else {
-            match serde_json::from_value::<LegacyMessageLine>(value) {
-                Ok(line) => records.push(DisplayRecord::Message(Box::new(line.into_display()))),
-                Err(error) => tracing::warn!(
-                    "[sessions] skipping unknown transcript line {}: {error}",
-                    line_number + 1
-                ),
-            }
-        }
-    }
+    let decoded = decode_transcript_jsonl(&bytes)
+        .with_context(|| format!("decode transcript {}", path.display()))?;
     Ok((
-        meta.context("transcript has no _meta record")?,
-        tools,
-        records,
+        decoded.session.meta,
+        decoded.session.tools,
+        decoded.display.records,
     ))
 }
 
