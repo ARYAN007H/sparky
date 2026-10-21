@@ -2,11 +2,15 @@
 //!
 //! Follows the exact pattern from `cron/schemas.rs`.
 
+use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::all::{
+    BoundRegisteredController, ControllerEntry, ControllerFuture, ControllerTask,
+    RegisteredController,
+};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
@@ -36,6 +40,14 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             schema: schemas("revoke"),
             handler: handle_revoke,
         },
+    ]
+}
+
+pub(crate) fn all_controller_entries() -> Vec<ControllerEntry> {
+    vec![
+        ControllerEntry::bound(create_pairing_controller()),
+        ControllerEntry::bound(list_controller()),
+        ControllerEntry::bound(revoke_controller()),
     ]
 }
 
@@ -155,25 +167,54 @@ pub fn schemas(function: &str) -> ControllerSchema {
 // ---------------------------------------------------------------------------
 
 fn handle_create_pairing(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    create_pairing_controller().invoke(ctx, params)
+}
+
+fn handle_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    list_controller().invoke(ctx, params)
+}
+
+fn handle_revoke(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    revoke_controller().invoke(ctx, params)
+}
+
+fn create_pairing_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(
+        schemas("create_pairing"),
+        load_config,
+        parse_create_pairing,
+        run_create_pairing,
+    )
+}
+
+fn list_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(schemas("list"), load_config, parse_list, run_list)
+}
+
+fn revoke_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(schemas("revoke"), load_config, parse_revoke, run_revoke)
+}
+
+fn load_config(ctx: DispatchCtx) -> ControllerTask<Config> {
+    Box::pin(async move { ctx.load_config().await })
+}
+
+fn run_create_pairing(
+    ctx: DispatchCtx,
+    config: Config,
+    label: Option<String>,
+) -> ControllerFuture {
     Box::pin(async move {
-        let config = ctx.load_config().await?;
-        let label = parse_create_pairing(params)?;
         to_json(crate::security::devices::rpc::devices_create_pairing(&ctx, &config, label).await?)
     })
 }
 
-fn handle_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let config = ctx.load_config().await?;
-        parse_list(params)?;
-        to_json(crate::security::devices::rpc::devices_list(&config).await?)
-    })
+fn run_list(_ctx: DispatchCtx, config: Config, (): ()) -> ControllerFuture {
+    Box::pin(async move { to_json(crate::security::devices::rpc::devices_list(&config).await?) })
 }
 
-fn handle_revoke(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn run_revoke(_ctx: DispatchCtx, config: Config, channel_id: String) -> ControllerFuture {
     Box::pin(async move {
-        let config = ctx.load_config().await?;
-        let channel_id = parse_revoke(params)?;
         to_json(crate::security::devices::rpc::devices_revoke(&config, channel_id).await?)
     })
 }
