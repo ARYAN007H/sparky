@@ -855,12 +855,17 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
         },
         onContextCompacting: (event: ChatContextCompactingEvent) => {
           rtLog('context_compacting', { thread: event.thread_id, request: event.request_id });
-          // A parallel branch's compaction is its own; the thread's status
-          // line describes the primary turn.
-          if (store.getState().chatRuntime.parallelRequestThreads[event.request_id] !== undefined) {
+          const runtime = store.getState().chatRuntime;
+          // A parallel branch's compaction is its own, and a superseded turn's
+          // is stale: the thread's status line describes its live primary turn.
+          if (runtime.parallelRequestThreads[event.request_id] !== undefined) {
             return;
           }
-          const prev = store.getState().chatRuntime.inferenceStatusByThread[event.thread_id];
+          const live = runtime.liveRequestIdByThread[event.thread_id];
+          if (live !== undefined && live !== event.request_id) {
+            return;
+          }
+          const prev = runtime.inferenceStatusByThread[event.thread_id];
           dispatch(
             setInferenceStatusForThread({
               threadId: event.thread_id,
