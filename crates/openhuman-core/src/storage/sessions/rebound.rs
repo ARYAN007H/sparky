@@ -15,7 +15,8 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, Weak};
 
 use super::tenant_router::TenantSessionStores;
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
-use tinystoragedrivers::{Blocking, StorageBackend, StorageError};
+use tinyagents_storage_kit::Blocking;
+use tinystoragedrivers::{StorageBackend, StorageError};
 
 /// The live [`ReboundSessionStores`] of one owner, so a rebind reaches the one
 /// a host installed however it was installed (process-wide, per runtime, per
