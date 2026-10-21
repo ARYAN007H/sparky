@@ -72,10 +72,20 @@ pub use tinyinference_llm::providers::overrides::{
 };
 
 pub(crate) fn provider_overrides(extensions: Option<Extensions>) -> ProviderOverrides<ProviderContext> {
+    let chat_extensions = extensions.clone();
+    let embedding_extensions = extensions.clone();
     ProviderOverrides::new(
-        move |provider_id| CHAT_MODELS.get_for(extensions.as_ref(), provider_id),
-        move |provider_id| EMBEDDINGS.get_for(extensions.as_ref(), provider_id),
+        move |provider_id| CHAT_MODELS.get_for(chat_extensions.as_ref(), provider_id),
+        move |provider_id| EMBEDDINGS.get_for(embedding_extensions.as_ref(), provider_id),
         move |provider_id| CATALOGS.get_for(extensions.as_ref(), provider_id),
+    )
+}
+
+fn ambient_provider_overrides() -> ProviderOverrides<ProviderContext> {
+    ProviderOverrides::new(
+        |provider_id| CHAT_MODELS.get(provider_id),
+        |provider_id| EMBEDDINGS.get(provider_id),
+        |provider_id| CATALOGS.get(provider_id),
     )
 }
 
@@ -170,10 +180,7 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 
 /// The registered chat-model provider, if any.
 pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry<ProviderContext>> {
-    let overrides = tinyinference_llm::providers::overrides::ProviderOverrides::new(
-        |id| CHAT_MODELS.get(id), |_| None, |_| None,
-    );
-    overrides.chat_entry(provider_id)
+    ambient_provider_overrides().chat_entry(provider_id)
 }
 
 /// The chat-model provider selected by an explicit context, falling back only
@@ -399,7 +406,7 @@ pub fn unregister_embedding(provider_id: &str) -> bool {
 
 /// The registered embedding factory, if any.
 pub(crate) fn embedding(provider_id: &str) -> Option<EmbeddingFactory<ProviderContext>> {
-    provider_overrides(None).embedding_factory(provider_id)
+    ambient_provider_overrides().embedding_factory(provider_id)
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +437,7 @@ pub fn unregister_catalog(provider_id: &str) -> bool {
 
 /// The registered catalog, if any.
 pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry<ProviderContext>> {
-    provider_overrides(None).catalog_entry(provider_id)
+    ambient_provider_overrides().catalog_entry(provider_id)
 }
 
 pub(crate) fn catalog_for(
