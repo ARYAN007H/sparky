@@ -27,8 +27,7 @@ fn unmanaged_openhuman_jwt_route_never_builds_a_direct_unauthenticated_model() {
         &EgressLedger::none(),
         Some(&extensions),
     )
-    .expect("configured slug")
-    .unwrap_or_else(|| panic!("configured cloud slug must be handled"));
+    .expect("configured slug");
     let error = match error {
         Err(error) => error,
         Ok(_) => panic!("unmanaged JWT route must not build an unauthenticated model"),
