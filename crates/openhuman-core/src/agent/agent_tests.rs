@@ -29,12 +29,14 @@ use crate::config::AgentConfig;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
-use tinyinference_llm::model::ChatResponse;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
+use tinyinference_llm::usage::BilledUsage;
 use tinytools::{Tool, ToolResult};
 use tinytools_agent::dialect::NativeToolCall;
 use tinytools_agent::dialect::TranscriptEntry;
 use tinytools_agent::dialect::{NativeDialect, ToolDialect, XmlDialect};
+
+type ChatResponse = tinyinference_llm::model::ChatResponse<BilledUsage, NativeToolCall>;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Test Helpers — Mock Provider, Mock Tool, Mock Memory

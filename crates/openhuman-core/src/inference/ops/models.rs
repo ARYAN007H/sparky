@@ -1,10 +1,9 @@
 use crate::config::rpc as config_rpc;
-use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::inference::host_runtime as local_runtime;
 use crate::inference::provider as providers;
-use serde_json::{json, Value};
+use serde_json::Value;
 use tracing::{debug, error, warn};
 
 const LOG_PREFIX: &str = "[inference::ops]";

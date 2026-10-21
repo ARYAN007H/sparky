@@ -113,7 +113,10 @@ fn native_usage_round_trip_preserves_submicro_usd_and_charge_state_in_cost_rows(
 
     let billed = BilledUsage::from_counts(4, 2).with_charged_usd(0.00000042);
     let response = tinyinference_llm::model::response_to_model_response(
-        &tinyinference_llm::model::ChatResponse {
+        &tinyinference_llm::model::ChatResponse::<
+            tinyinference_llm::usage::BilledUsage,
+            tinytools_agent::dialect::NativeToolCall,
+        > {
             usage: Some(billed),
             ..Default::default()
         },
@@ -131,7 +134,10 @@ fn native_usage_round_trip_preserves_submicro_usd_and_charge_state_in_cost_rows(
 
     let free = tinyinference_llm::usage::usage_info_from_response(
         &tinyinference_llm::model::response_to_model_response(
-            &tinyinference_llm::model::ChatResponse {
+            &tinyinference_llm::model::ChatResponse::<
+                tinyinference_llm::usage::BilledUsage,
+                tinytools_agent::dialect::NativeToolCall,
+            > {
                 usage: Some(BilledUsage::from_counts(4, 2).with_charged_usd(0.0)),
                 ..Default::default()
             },
@@ -145,7 +151,10 @@ fn native_usage_round_trip_preserves_submicro_usd_and_charge_state_in_cost_rows(
 
     let unknown = tinyinference_llm::usage::usage_info_from_response(
         &tinyinference_llm::model::response_to_model_response(
-            &tinyinference_llm::model::ChatResponse {
+            &tinyinference_llm::model::ChatResponse::<
+                tinyinference_llm::usage::BilledUsage,
+                tinytools_agent::dialect::NativeToolCall,
+            > {
                 usage: Some(BilledUsage::from_counts(4, 2)),
                 ..Default::default()
             },
