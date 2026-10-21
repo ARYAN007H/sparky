@@ -59,7 +59,7 @@ pub async fn maintain_once(
     // Keep these handles alive for the entire pass. An open profile handle
     // keeps its host slot in use, which prevents its lease fence from being
     // retired while this pass writes to that profile's scope.
-    let (_hosted_profiles, scopes) = known_scopes().await?;
+    let (_hosted_profiles, scopes) = known_scopes()?;
     for scope in scopes {
         match maintain_scope(backend, &scope, retention_ms, now_ms).await {
             Ok(report) => {
@@ -153,21 +153,19 @@ async fn maintain_scope(
 /// opens them; sweeping their scopes directly could mutate a profile leased
 /// by another host. Cluster scope is intentionally excluded: harness run
 /// journals have historically been tenant/local data, not cluster data.
-async fn known_scopes(
+fn known_scopes(
 ) -> Result<(Vec<Arc<crate::profiles::Profile>>, Vec<Scope>), crate::storage::StorageError> {
     let mut scopes = BTreeSet::new();
     if !crate::core::runtime::mode::is_saas() {
         scopes.insert(Scope::local());
     }
 
+    let now_ms = u64::try_from(chrono::Utc::now().timestamp_millis()).unwrap_or(u64::MAX);
     let hosted_profiles = crate::profiles::host::host()
         .map(|host| host.hosted_profiles())
         .unwrap_or_default()
         .into_iter()
-        .filter(|profile| {
-            let now_ms = u64::try_from(chrono::Utc::now().timestamp_millis()).unwrap_or_default();
-            profile.lease_fence().check_local(now_ms).is_ok()
-        })
+        .filter(|profile| profile.lease_fence().check_local(now_ms).is_ok())
         .collect::<Vec<_>>();
     let profiles = hosted_profiles
         .iter()
@@ -197,9 +195,9 @@ async fn known_scopes(
     } else {
         std::iter::once(Scope::local())
             .chain(
-                profiles
+                hosted_profiles
                     .iter()
-                    .map(|profile| crate::storage::scope_for_profile(profile)),
+                    .map(|profile| crate::storage::scope_for_profile(profile.id.as_str())),
             )
             .collect()
     };
