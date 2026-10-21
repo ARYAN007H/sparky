@@ -206,14 +206,113 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
     assert_eq!(lease.meta.expires_ms, Some(10_000));
 
     let operator = backend.for_scope(&crate::storage::Scope::local()).unwrap();
+    assert!(operator
+        .documents()
+        .get("profiles.registry", "alice")
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[cfg(feature = "legacy-import")]
+#[test]
+fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
+    use crate::storage::layout::{legacy, Target};
+    use crate::storage::{self, DocumentStoreExt, Precondition, Scope};
+    use tinystoragedrivers::{CollectionSpec, Query};
+    use tinystoragedrivers_testkit::MemoryBackend;
+
+    let dir = tempfile::tempdir().unwrap();
+    let target = Target::new(dir.path(), "alice");
+    let config_path = target.profile_dir.join("config.toml");
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(&config_path, "# profile fixture\n").unwrap();
+    let config = crate::config::Config {
+        config_path,
+        workspace_dir: target.workspace(),
+        ..crate::config::Config::default()
+    };
+
+    // Use the same v1 SQLite backend and path selected by profile boot, with
+    // an actual persisted owner document in the old profile-qualified scope.
+    let source_url = legacy::v1_url(&target);
+    storage::block_on(async move {
+        let source = storage::open(&source_url).await?;
+        let old_scope = Scope::new("alice~agent").unwrap();
+        let docs = source.for_scope(&old_scope)?.documents().clone();
+        docs.ensure_collection(&CollectionSpec::new("scope_move_fixture"))
+            .await?;
+        docs.put(
+            "scope_move_fixture",
+            "stable-id",
+            json!({"payload":"kept"}),
+            Precondition::Absent,
+        )
+        .await?;
+        Ok::<_, anyhow::Error>(())
+    })
+    .unwrap();
+
+    let source_db = legacy::v1_db(&target);
+    let before = sha256(&source_db);
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
+    let first = crate::storage::import::run_all(&backend, &config);
+    let moved = first
+        .iter()
+        .find(|report| report.domain == IMPORT_DOMAIN)
+        .expect("scope move report is part of the boot importer pipeline");
     assert!(
-        operator
-            .documents()
-            .get("profiles.registry", "alice")
-            .await
-            .unwrap()
-            .is_none()
+        matches!(
+            moved.outcome,
+            Ok(crate::storage::import::Outcome::Imported {
+                found: 1,
+                written: 1
+            })
+        ),
+        "{moved:?}"
     );
+
+    let destination = backend
+        .for_scope(&scope_for_profile("alice").agent("agent").unwrap())
+        .unwrap();
+    let copied = storage::block_on(async {
+        destination
+            .documents()
+            .query_all("scope_move_fixture", &Query::all())
+            .await
+    })
+    .unwrap();
+    assert_eq!(copied.len(), 1);
+    assert_eq!(copied[0].id, "stable-id");
+    assert_eq!(copied[0].doc, json!({"payload":"kept"}));
+
+    // A completed scope claim prevents a later boot from resurrecting a row
+    // deleted by the current owner, and the source bytes remain untouched.
+    storage::block_on(async {
+        destination
+            .documents()
+            .delete("scope_move_fixture", "stable-id", Precondition::Any)
+            .await
+    })
+    .unwrap();
+    let second = crate::storage::import::run_all(&backend, &config);
+    let outcome = second
+        .iter()
+        .find(|report| report.domain == IMPORT_DOMAIN)
+        .unwrap();
+    assert_eq!(
+        outcome.outcome,
+        Ok(crate::storage::import::Outcome::AlreadyDone)
+    );
+    let after = storage::block_on(async {
+        destination
+            .documents()
+            .query_all("scope_move_fixture", &Query::all())
+            .await
+    })
+    .unwrap();
+    assert!(after.is_empty());
+    assert_eq!(sha256(&source_db), before);
 }
 
 #[tokio::test]

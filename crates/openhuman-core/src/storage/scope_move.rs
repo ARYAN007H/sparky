@@ -233,9 +233,7 @@ fn known_scope_ids(config: &crate::config::Config) -> anyhow::Result<Known> {
     }
     if let Some(host) = crate::profiles::host::host() {
         let hosted = crate::storage::block_on_anyhow(async move {
-            host.known_profiles()
-                .await
-                .map_err(anyhow::Error::msg)
+            host.known_profiles().await.map_err(anyhow::Error::msg)
         })?;
         profiles.extend(hosted);
     }
@@ -324,11 +322,7 @@ fn import_inventory(
             &step,
             move |condition| {
                 let claimed_marker = marker_for_claim.conditioned(condition)?;
-                if crate::storage::import_state::is_done(
-                    &claimed_marker,
-                    IMPORT_OWNER,
-                    &step,
-                )? {
+                if crate::storage::import_state::is_done(&claimed_marker, IMPORT_OWNER, &step)? {
                     return Ok(None);
                 }
                 let claim_bound = crate::storage::import_state::backend_with_condition(
@@ -403,13 +397,23 @@ fn backend_for_target_scope(
     }
     let parsed = target_scope.parsed()?;
     let crate::storage::Tenant::User(_) = parsed.tenant else {
-        anyhow::bail!("scope {} is not an admitted tenant scope", target_scope.as_str());
+        anyhow::bail!(
+            "scope {} is not an admitted tenant scope",
+            target_scope.as_str()
+        );
     };
     let original_id = known
         .profiles
         .iter()
-        .find(|id| crate::storage::scope_for_profile(id).tenant_scope() == target_scope.tenant_scope())
-        .ok_or_else(|| anyhow::anyhow!("no known profile id maps to scope {}", target_scope.as_str()))?;
+        .find(|id| {
+            crate::storage::scope_for_profile(id).tenant_scope() == target_scope.tenant_scope()
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "no known profile id maps to scope {}",
+                target_scope.as_str()
+            )
+        })?;
     let Some(host) = crate::profiles::host::host() else {
         if crate::storage::layout::Target::from_config(config)
             .is_some_and(|target| target.user_id == *original_id)
@@ -421,8 +425,7 @@ fn backend_for_target_scope(
             target_scope.as_str()
         );
     };
-    let profile_id = crate::profiles::ProfileId::parse(original_id)
-        .map_err(anyhow::Error::msg)?;
+    let profile_id = crate::profiles::ProfileId::parse(original_id).map_err(anyhow::Error::msg)?;
     let profile = host.get(&profile_id).ok_or_else(|| {
         anyhow::anyhow!(
             "profile {original_id} is not currently admitted on this host; refusing scope copy"
