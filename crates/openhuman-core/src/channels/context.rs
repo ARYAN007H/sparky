@@ -16,10 +16,6 @@ pub(crate) use tinychannels_bus::{
     DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
 };
 
-#[cfg(test)]
-pub(crate) use tinychannels::context::{
-    effective_channel_message_timeout_secs, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
-};
 
 pub(crate) type TurnModelSourceCacheMap = Arc<Mutex<HashMap<String, TurnModelSource>>>;
 pub(crate) type RouteSelectionMap = Arc<Mutex<HashMap<String, ChannelRouteSelection>>>;
@@ -78,11 +74,6 @@ pub(crate) async fn module_client(ctx: &ChannelRuntimeContext) -> tinybus::modul
         return super::module_fixture::client().await;
     }
     crate::modules::client(ctx.config.as_deref().cloned().unwrap_or_default())
-}
-
-#[cfg(test)]
-pub(crate) fn conversation_history_key(msg: &tinychannels_bus::ChannelMessage) -> String {
-    tinychannels::context::conversation_history_key(msg)
 }
 
 pub(crate) async fn is_context_window_overflow_error(
