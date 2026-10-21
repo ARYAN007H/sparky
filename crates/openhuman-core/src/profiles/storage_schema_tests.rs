@@ -22,6 +22,7 @@ fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn migrate_cluster_moves_the_v1_registry_into_the_v2_collection() {
     let fixture = sqlite_backend().unwrap();
     let backend = Arc::clone(&fixture.backend);
@@ -58,6 +59,7 @@ fn the_schema_composes_under_its_owner() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch() {
     use crate::storage::lease::{DocumentLeases, LEASE_OWNER, LeaseStore};
     let fixture = sqlite_backend().unwrap();

@@ -1,10 +1,10 @@
 use super::*;
 use crate::agent::orchestration::subagent_sessions::types::DurableSubagentStatus;
 use crate::agent::orchestration::subagent_sessions::types::SubagentSessionStore;
-use crate::storage::{MemoryStorage, Scope, StorageBackend};
+use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
 use serde_json::json;
 
-fn docs_in(storage: &MemoryStorage, scope: &str) -> Docs {
+fn docs_in(storage: &dyn StorageBackend, scope: &str) -> Docs {
     Docs::over(&storage.for_scope(&Scope::new(scope).unwrap()).unwrap())
 }
 
