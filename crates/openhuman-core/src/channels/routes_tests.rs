@@ -83,9 +83,33 @@ async fn handle_linked_runtime_command(
     let prepared = crate::modules::channel_controller::prepare_inbound(
         &crate::channels::context::module_client(ctx).await,
         PrepareChannelInboundRequest {
-            source: ChannelInboundSource::Legacy {
-                message: msg.clone(),
-                envelope: None,
+            source: ChannelInboundSource::Envelope {
+                envelope: tinychannels_bus::ChannelInboundEnvelope {
+                    channel: tinychannels_bus::ChannelRef {
+                        id: msg.channel.clone(),
+                        account_id: None,
+                    },
+                    message_id: msg.id.clone(),
+                    reply_to_id: msg.reply_to_id.clone(),
+                    conversation: tinychannels_bus::ConversationRef {
+                        id: msg.reply_target.clone(),
+                        topic_id: msg.topic_id.clone().or_else(|| msg.thread_ts.clone()),
+                        ..Default::default()
+                    },
+                    sender: tinychannels_bus::SenderRef {
+                        id: msg.sender.clone(),
+                        name: msg.sender_name.clone(),
+                        ..Default::default()
+                    },
+                    timestamp_unix_ms: Some(msg.timestamp.saturating_mul(1000)),
+                    text: msg.content.clone(),
+                    parts: vec![tinychannels_bus::ContentPart::Text {
+                        text: msg.content.clone(),
+                        markdown_dialect: None,
+                    }],
+                    ..Default::default()
+                },
+                timestamp: msg.timestamp,
             },
             namespace: "main".into(),
             session_policy: Default::default(),

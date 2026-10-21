@@ -168,6 +168,7 @@ where
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
+    let reply_thread = msg.thread_ts.clone().or_else(|| msg.topic_id.clone());
     let history_len =
         durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
             .await;
@@ -234,7 +235,7 @@ where
                 let _ = channel
                     .send_with_outbound_intent(
                         &SendMessage::new(&reply, &msg.reply_target)
-                            .in_thread(msg.thread_ts.clone()),
+                            .in_thread(reply_thread.clone()),
                     )
                     .await;
             }
@@ -248,6 +249,7 @@ where
             let _ = channel
                 .send_with_outbound_intent(
                     &SendMessage::new(&copy, &msg.reply_target).in_thread(msg.thread_ts.clone()),
+                    &SendMessage::new(&copy, &msg.reply_target).in_thread(reply_thread.clone()),
                 )
                 .await;
         }
@@ -271,7 +273,7 @@ where
     if let Some(channel) = target_channel {
         if channel
             .send_with_outbound_intent(
-                &SendMessage::new(reply, &msg.reply_target).in_thread(msg.thread_ts.clone()),
+                &SendMessage::new(reply, &msg.reply_target).in_thread(reply_thread),
             )
             .await
             .is_err()
