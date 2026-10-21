@@ -172,15 +172,18 @@ fn build_turn_models_crate(
                     .get("summarization")
                     .cloned()
                     .or_else(|| local.model_for(role)),
-                tinyagents_harness::host::ModelPurpose::WorkloadTier(route) => local
-                    .role_models
-                    .get(route)
-                    .or_else(|| {
-                        local
-                            .role_models
-                            .get(route.strip_prefix("hint:").unwrap_or(route))
-                    })
-                    .cloned(),
+                tinyagents_harness::host::ModelPurpose::WorkloadTier(route) => {
+                    let role = crate::inference::provider_model::role_for_provider_model_for(
+                        extensions,
+                        &provider_route,
+                        route,
+                    );
+                    local
+                        .role_models
+                        .get(route)
+                        .or_else(|| local.role_models.get(role))
+                        .cloned()
+                }
             });
             #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
             let injected = injected
