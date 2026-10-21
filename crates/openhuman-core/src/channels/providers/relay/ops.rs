@@ -230,14 +230,14 @@ pub(crate) async fn run_relay_turn(
     #[cfg(test)]
     channels_by_name.insert(params.channel.clone(), channel.clone());
     #[cfg(not(test))]
-    let mut channels_by_name: HashMap<
-        String,
-        Arc<crate::channels::runtime::ChannelHandle>,
-    > = HashMap::new();
+    let mut channels_by_name: HashMap<String, Arc<crate::channels::runtime::ChannelHandle>> =
+        HashMap::new();
     #[cfg(not(test))]
     channels_by_name.insert(
         params.channel.clone(),
-        Arc::new(crate::channels::runtime::ChannelHandle::Relay(channel.clone())),
+        Arc::new(crate::channels::runtime::ChannelHandle::Relay(
+            channel.clone(),
+        )),
     );
     let mut runtime = runtime_context(
         &dispatch_ctx,

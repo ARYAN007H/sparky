@@ -1,16 +1,16 @@
 //! Per-sender routing and runtime command handling.
 
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
-use super::SendMessage;
 use super::runtime::ChannelHandle;
-#[cfg(test)]
-use tinychannels_runtime::ChannelSendExt;
+use super::SendMessage;
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
 use tinychannels_bus::module_control::{
     ChannelControlRequest, ChannelControlResult, ProviderDescriptor,
 };
+#[cfg(test)]
+use tinychannels_runtime::ChannelSendExt;
 
 fn provider_descriptors() -> Vec<ProviderDescriptor> {
     provider::list_providers()

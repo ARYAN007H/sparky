@@ -180,9 +180,11 @@ fn to_history(
             "user" => Some(tinyagents_session::transcript::TranscriptMessage::user(
                 message.content.clone(),
             )),
-            "assistant" => Some(tinyagents_session::transcript::TranscriptMessage::assistant(
-                message.content.clone(),
-            )),
+            "assistant" => Some(
+                tinyagents_session::transcript::TranscriptMessage::assistant(
+                    message.content.clone(),
+                ),
+            ),
             _ => None,
         })
         .collect()

@@ -3,7 +3,6 @@ use super::{ProgressiveChannelTransport, ProgressiveOutputObserver};
 
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
-use tinychannels_runtime::Channel;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use tinychannels_bus::channel::{
@@ -13,6 +12,7 @@ use tinychannels_bus::module_progressive::{
     ChannelOutputEvent, ProgressiveTransportRequest, ProgressiveTransportResult,
 };
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, SendMessage};
+use tinychannels_runtime::Channel;
 
 #[derive(Default)]
 struct RecordingOutputObserver {
