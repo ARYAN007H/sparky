@@ -283,10 +283,12 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     // must copy the already-existing v1 profile database into the profile's
     // actual v2 `storage.db`; importing the fixture into an unrelated test
     // destination would not prove what a subsequent boot opens.
-    let migration = storage::block_on_anyhow(async {
+    let migration_target = target.clone();
+    let migration_config = config.clone();
+    let migration = storage::block_on_anyhow(async move {
         crate::storage::layout::migrate(
-            &target,
-            &config,
+            &migration_target,
+            &migration_config,
             &crate::storage::layout::Options {
                 allow_live: true,
                 ..Default::default()
