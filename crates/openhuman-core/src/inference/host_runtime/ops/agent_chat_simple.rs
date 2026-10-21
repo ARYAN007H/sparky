@@ -6,6 +6,7 @@ use crate::agent_runs::agent_chat::guards::{
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::inference::provider as providers;
+use tinyinference_llm::model::{ChatModel, ModelRequestDefaults, ModelResponse, ProfileOverrideModel};
 
 /// A simplified chat interface that does not update the base configuration.
 pub async fn agent_chat_simple(
@@ -61,21 +62,82 @@ pub async fn agent_chat_simple(
         temperature = effective.default_temperature,
         "[inference] agent_chat_simple invoking crate-native chat model"
     );
-    let model: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>> =
-        std::sync::Arc::new(
-            tinyinference_llm::model::ProfileOverrideModel::new_preserving_profile(model)
-                .with_defaults(tinyinference_llm::model::ModelRequestDefaults {
-                    model: Some(resolved_model),
-                    temperature: Some(effective.default_temperature),
-                }),
-        );
-    let response = tinyagents_harness::oneshot::simple_chat(
+    let response = simple_chat_with_model(
         model,
-        Vec::new(),
-        message.to_string(),
+        resolved_model,
+        effective.default_temperature,
+        message,
     )
     .await?
     .text();
 
     Ok(Outcome::single_log(response, "agent simple chat completed"))
+}
+
+async fn simple_chat_with_model(
+    model: std::sync::Arc<dyn ChatModel<()>>,
+    resolved_model: String,
+    temperature: f64,
+    prompt: &str,
+) -> Result<ModelResponse, String> {
+    let model: std::sync::Arc<dyn ChatModel<()>> =
+        std::sync::Arc::new(ProfileOverrideModel::new_preserving_profile(model).with_defaults(
+            ModelRequestDefaults {
+                model: Some(resolved_model),
+                temperature: Some(temperature),
+            },
+        ));
+    tinyagents_harness::oneshot::simple_chat(model, Vec::new(), prompt.to_string()).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use tinyinference_llm::message::Message;
+    use tinyinference_llm::model::ModelRequest;
+
+    struct RequestProbe {
+        request: Mutex<Option<ModelRequest>>,
+    }
+
+    #[async_trait::async_trait]
+    impl ChatModel<()> for RequestProbe {
+        async fn invoke(
+            &self,
+            _state: &(),
+            request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            *self.request.lock().expect("probe lock") = Some(request);
+            Ok(ModelResponse::assistant("reply"))
+        }
+    }
+
+    #[tokio::test]
+    async fn simple_chat_uses_resolved_model_and_temperature_defaults() {
+        let probe = Arc::new(RequestProbe {
+            request: Mutex::new(None),
+        });
+        let model: Arc<dyn ChatModel<()>> = probe.clone();
+
+        let response = simple_chat_with_model(
+            model,
+            "resolved/provider-model".to_string(),
+            0.37,
+            "hello",
+        )
+        .await
+        .expect("simple chat response");
+
+        assert_eq!(response.text(), "reply");
+        let request = probe
+            .request
+            .lock()
+            .expect("probe lock")
+            .take()
+            .expect("model invocation");
+        assert_eq!(request.model.as_deref(), Some("resolved/provider-model"));
+        assert_eq!(request.temperature, Some(0.37));
+        assert_eq!(request.messages, vec![Message::user("hello")]);
+    }
 }
