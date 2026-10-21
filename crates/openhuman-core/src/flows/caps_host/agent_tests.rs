@@ -333,7 +333,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     assert_eq!(grandchild_jobs.len(), 1, "one grandchild job must be admitted");
     assert_eq!(
         grandchild_jobs[0].status,
-        tinyagents_harness_tools::subagents::SubAgentJobStatus::Completed,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Completed,
         "the grandchild must reach a terminal successful state"
     );
     assert_ne!(
