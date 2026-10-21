@@ -22,7 +22,7 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use anyhow::{anyhow, Context, Result};
 
-use super::{current_scope, installed, Scope, ScopedStorage, StorageBackend};
+use super::{current_scope, installed, Scope, Storage, StorageBackend};
 
 /// A backend and the scope a store's records live under in it.
 #[derive(Clone)]
@@ -39,7 +39,7 @@ impl Opened {
     /// # Errors
     ///
     /// When the backend refuses the scope.
-    pub fn scoped(&self) -> Result<ScopedStorage> {
+    pub fn scoped(&self) -> Result<Storage> {
         self.backend
             .for_scope(&self.scope)
             .map_err(|error| anyhow!("open the storage scope: {error}"))

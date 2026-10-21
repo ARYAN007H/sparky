@@ -14,11 +14,10 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, Weak};
 
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
-use tinystoragedrivers::{CollectionSpec, Repo as TsdRepo, RetryPolicy, Versioned};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Versioned};
 
 use super::{
-    block_on, current_scope, installed, DocumentStore, Scope, ScopedStorage, StorageBackend,
-    StorageError,
+    block_on, current_scope, installed, DocumentStore, Scope, Storage, StorageBackend, StorageError,
 };
 
 /// Collections already declared, per process: `(backend address, scope,
@@ -79,7 +78,7 @@ struct Origin {
 /// One domain's document store under one storage scope.
 #[derive(Clone)]
 pub struct Repo {
-    scoped: ScopedStorage,
+    scoped: Storage,
     docs: Arc<dyn DocumentStore>,
     domain: &'static str,
     collections: fn() -> Vec<CollectionSpec>,
@@ -148,7 +147,7 @@ impl Repo {
 
     /// The repo over an already scoped handle (tests, explicit scopes).
     pub fn over(
-        scoped: &ScopedStorage,
+        scoped: &Storage,
         domain: &'static str,
         collections: fn() -> Vec<CollectionSpec>,
     ) -> Self {
@@ -163,7 +162,7 @@ impl Repo {
 
     /// The scoped storage this repo was opened on, for the primitives that
     /// bind to a whole scope (`tsd.migrations`).
-    pub fn scoped(&self) -> &ScopedStorage {
+    pub fn scoped(&self) -> &Storage {
         &self.scoped
     }
 
@@ -243,9 +242,8 @@ impl Repo {
 /// and returns what was stored, or `None` when the document is missing or
 /// `change` declines (it is no longer in the state the change requires).
 ///
-/// The loop is tsd's [`tinystoragedrivers::Repo::update`] with its default
-/// [`RetryPolicy`] (32 attempts, jittered 1 to 8 ms backoff); the host keeps
-/// no loop of its own.
+/// The operation retries a conditional write up to 32 times when another
+/// writer wins the compare-and-swap race.
 ///
 /// # Errors
 ///
@@ -257,16 +255,32 @@ pub async fn compare_and_swap(
     id: &str,
     change: impl Fn(&Value) -> Option<Value> + Send + Sync,
 ) -> Result<Option<Versioned<Value>>, StorageError> {
-    let repo = TsdRepo::<Value>::new(docs, collection)?.with_retry(RetryPolicy::default());
-    let written = repo
-        .update(id, |current| Ok(current.and_then(|doc| change(&doc))))
-        .await?;
-    Ok(written.map(|(doc, version)| Versioned {
-        id: id.to_string(),
-        version,
-        doc,
-        meta: tinystoragedrivers::Meta::unknown(),
-    }))
+    for _ in 0..32 {
+        let Some(current) = docs.get(collection, id).await? else {
+            return Ok(None);
+        };
+        let Some(next) = change(&current.doc) else {
+            return Ok(None);
+        };
+        match docs
+            .put(collection, id, next.clone(), current.unchanged())
+            .await
+        {
+            Ok(version) => {
+                return Ok(Some(Versioned {
+                    id: id.to_owned(),
+                    version,
+                    doc: next,
+                    meta: current.meta,
+                }));
+            }
+            Err(error) if error.kind() == ErrorKind::Conflict => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(StorageError::conflict(format!(
+        "document `{collection}/{id}` kept changing during compare-and-swap"
+    )))
 }
 
 /// The string field `field` of `doc`, when present.

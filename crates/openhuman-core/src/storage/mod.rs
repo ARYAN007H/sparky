@@ -71,11 +71,40 @@ use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
 pub use tinystoragedrivers::{
     CollectionSpec, Precondition, StorageBackend, StorageConfig as StorageUrl, StorageError,
 };
-pub use tinystoragedrivers_api::{DocumentStore, DocumentStoreExt, Storage};
+pub use tinystoragedrivers_api::{DocumentStore, Storage};
 
 /// SQLite is used only by the read-only compatibility importers while they
 /// consume historical per-domain files. It is not the process storage API.
 pub use tinystoragedrivers::sqlite::rusqlite;
+
+/// Typed conveniences for document consumers, including a bounded cursor
+/// walk for callers that need every matching record.
+#[async_trait::async_trait]
+pub trait DocumentStoreExt: tinystoragedrivers_api::DocumentStoreExt {
+    /// Read every record matching `query`, following the driver's cursor until
+    /// the final page. Each request is bounded to 256 documents.
+    async fn query_all(
+        &self,
+        collection: &str,
+        query: &tinystoragedrivers_types::Query,
+    ) -> Result<Vec<tinystoragedrivers_types::Versioned<serde_json::Value>>, StorageError> {
+        let mut page_query = query.clone();
+        page_query.limit = Some(256);
+        page_query.cursor = None;
+        let mut records = Vec::new();
+        loop {
+            let page = self.query(collection, &page_query).await?;
+            records.extend(page.items);
+            let Some(cursor) = page.next else {
+                break;
+            };
+            page_query.cursor = Some(cursor);
+        }
+        Ok(records)
+    }
+}
+
+impl<T: tinystoragedrivers_api::DocumentStoreExt + ?Sized> DocumentStoreExt for T {}
 
 /// Dedicated runtime for synchronous domain surfaces that bridge to the
 /// asynchronous storage ports. Keeping it on its own thread also permits a
@@ -378,7 +407,10 @@ pub fn driver_has_cross_process_cas(driver: &str) -> bool {
 /// Whether the installed backend may be shared with other processes; `false`
 /// when none is installed. See [`driver_is_shared`].
 pub fn installed_is_shared() -> bool {
-    installed().is_some_and(|backend| driver_is_shared(backend.driver()))
+    installed_url()
+        .as_deref()
+        .and_then(|url| StorageUrl::parse(url).ok())
+        .is_some_and(|config| driver_is_shared(config.driver()))
 }
 
 /// A stable key for a legacy import source (a workspace directory), for the
