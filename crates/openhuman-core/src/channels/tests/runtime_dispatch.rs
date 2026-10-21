@@ -138,6 +138,58 @@ async fn dispatch_preserves_supplied_tinychannels_inbound_envelope() {
 }
 
 #[tokio::test]
+async fn host_dispatch_preserves_thread_reply_and_reaction_targets() {
+    let threaded = run_dispatch_harness(DispatchHarnessOptions {
+        channel_name: "telegram".into(),
+        thread_ts: Some("topic-99".into()),
+        response_text: Some("thread reply".into()),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(threaded.sends.len(), 1);
+    assert_eq!(threaded.sends[0].recipient, "reply");
+    assert_eq!(threaded.sends[0].thread_ts.as_deref(), Some("topic-99"));
+
+    let unthreaded = run_dispatch_harness(DispatchHarnessOptions {
+        channel_name: "telegram".into(),
+        thread_ts: None,
+        response_text: Some("plain reply".into()),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(unthreaded.sends.len(), 1);
+    assert_eq!(unthreaded.sends[0].thread_ts, None);
+
+    let reaction = run_dispatch_harness(DispatchHarnessOptions {
+        channel_name: "telegram".into(),
+        thread_ts: Some("message-42".into()),
+        supports_reactions: true,
+        response_text: Some("[REACTION:👍]".into()),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(reaction.sends.len(), 1, "one reaction is sent");
+    assert_eq!(reaction.sends[0].content, "[REACTION:👍]");
+    assert_eq!(reaction.sends[0].thread_ts.as_deref(), Some("message-42"));
+}
+
+#[tokio::test]
+async fn discord_host_pipeline_dispatches_reply_with_thread_context() {
+    let observation = run_dispatch_harness(DispatchHarnessOptions {
+        channel_name: "discord".into(),
+        thread_ts: Some("thread-42".into()),
+        response_text: Some("hi from discord".into()),
+        ..Default::default()
+    })
+    .await;
+
+    assert_eq!(observation.sends.len(), 1);
+    assert_eq!(observation.sends[0].recipient, "reply");
+    assert!(observation.sends[0].content.contains("hi from discord"));
+    assert_eq!(observation.sends[0].thread_ts.as_deref(), Some("thread-42"));
+}
+
+#[tokio::test]
 async fn message_dispatch_processes_messages_in_parallel() {
     // Install a deterministic stub that takes 250ms per turn and records
     // the peak number of in-flight turns. This proves concurrency directly
