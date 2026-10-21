@@ -139,7 +139,7 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
     let channel_state = Arc::new(crate::channels::runtime::TestChannel::new("discord"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let model_state = Arc::new(HistoryCaptureModel::default());
-    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::clone(&model_state);
+    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = model_state.clone();
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(HashMap::from([("discord".into(), channel)])),

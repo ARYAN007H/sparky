@@ -1,6 +1,7 @@
 //! Unit tests for host-owned channel event projection.
 
 use super::*;
+use std::sync::Arc;
 #[test]
 fn typed_channel_projection_uses_the_target_message_id_not_the_event_id() {
     use tinychannels_bus::{

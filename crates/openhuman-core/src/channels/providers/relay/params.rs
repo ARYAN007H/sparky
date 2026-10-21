@@ -47,6 +47,13 @@ pub struct RelayInboundParams {
 }
 
 impl RelayInboundParams {
+    /// Fixture-only identity matching the owner operation's canonical wire form.
+    /// Production callers obtain this from `PrepareChannelIdentity`.
+    #[cfg(test)]
+    pub(crate) fn thread_id(&self) -> String {
+        format!("channel:{}/{}/{}", self.channel, self.sender_id, self.chat_id)
+    }
+
     /// A message with the five required facts and nothing optional: no
     /// sender name, the default client id and no attachments.
     pub fn new(

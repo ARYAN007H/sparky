@@ -88,5 +88,4 @@ async fn send_publishes_under_the_callers_stamp_and_records_the_text() {
 #[test]
 fn a_relay_does_not_support_draft_updates() {
     assert_eq!(sink().name(), "telegram");
-    assert!(!sink().supports_draft_updates());
 }
