@@ -243,9 +243,14 @@ pub mod session_store {
     pub use tinyagents_harness::observability::AgentObservation;
     pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};
     pub use tinyagents_session::port::{
-        AppendStore, InMemorySessionStores, InMemoryTranscriptLocator, InMemoryTurnStates, Store,
-        TurnStates,
+        AppendStore, Store, TurnStates,
     };
+    /// In-memory provider and contract suites for providers implemented by embedders.
+    #[cfg(feature = "testkit")]
+    pub use tinyagents_session::port::{
+        InMemorySessionStores, InMemoryTranscriptLocator, InMemoryTurnStates,
+    };
+    #[cfg(feature = "testkit")]
     pub use tinyagents_session::testkit::conformance::{
         session_store_conformance, session_store_isolation_conformance,
     };
@@ -263,7 +268,9 @@ pub use complete::{
     ChatMessage, Completer, CompletionObserver, CompletionRequest, CompletionResponse,
     CompletionTrace, CompletionUsage,
 };
-pub use session_store::{InMemorySessionStores, SessionStoreProvider};
+pub use session_store::SessionStoreProvider;
+#[cfg(feature = "testkit")]
+pub use session_store::InMemorySessionStores;
 pub use turn::{absolute, Route, Turn, TurnOutcome, TurnRequest};
 pub use turn_cancellation::TurnCancellation;
 pub use turn_steering::{SteerRefused, TurnSteering};
