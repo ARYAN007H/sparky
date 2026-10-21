@@ -69,15 +69,20 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             _state: &(),
             request: ModelRequest,
         ) -> tinyinference_llm::Result<ModelResponse> {
-            let contains_user_marker = |marker: &str| request.messages.iter().any(|message| {
-                matches!(message, tinyinference_llm::message::Message::User(_))
-                    && message.text().contains(marker)
-            });
+            let contains_user_marker = |marker: &str| {
+                request.messages.iter().any(|message| {
+                    matches!(message, tinyinference_llm::message::Message::User(_))
+                        && message.text().contains(marker)
+                })
+            };
             if contains_user_marker(GREAT_GRANDCHILD_PROMPT) {
-                self.leaf_schema_names.lock().unwrap().push(
-                    request.tools.iter().map(|tool| tool.name.clone()).collect(),
-                );
-                let call = self.grandchild_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.leaf_schema_names
+                    .lock()
+                    .unwrap()
+                    .push(request.tools.iter().map(|tool| tool.name.clone()).collect());
+                let call = self
+                    .grandchild_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if call == 0 {
                     if let Some(started) = self.child_started.lock().unwrap().take() {
                         let _ = started.send(());
@@ -102,15 +107,19 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
                     matches!(message, tinyinference_llm::message::Message::Tool(_))
                         && message.text().to_ascii_lowercase().contains("unknown tool")
                 });
-                self.leaf_refusal_readable.store(refusal_visible, std::sync::atomic::Ordering::SeqCst);
+                self.leaf_refusal_readable
+                    .store(refusal_visible, std::sync::atomic::Ordering::SeqCst);
                 return Ok(ModelResponse::assistant("headless-flow-grandchild-result"));
             }
             if contains_user_marker(GRANDCHILD_PROMPT) {
-                let call = self.manager_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let call = self
+                    .manager_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if call > 0 {
                     return Ok(ModelResponse::assistant("headless-flow-manager-result"));
                 }
-                self.nested_spawn_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.nested_spawn_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let mut response = ModelResponse::assistant("");
                 response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
                     "headless-flow-leaf-spawn",
@@ -415,6 +424,264 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             .contains("headless-flow-grandchild-result"),
         "the headless flow result must include its grandchild output: {output}"
     );
+}
+
+#[tokio::test]
+async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
+    use async_trait::async_trait;
+    use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
+
+    const WORKER_PROMPT: &str = "headless-depth-cap-worker-marker";
+
+    struct DepthCapModel {
+        root_calls: std::sync::atomic::AtomicUsize,
+        worker_calls: std::sync::atomic::AtomicUsize,
+        worker_schema: std::sync::Mutex<Vec<String>>,
+        refusal_visible: std::sync::atomic::AtomicBool,
+        child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+        child_release: tokio::sync::Notify,
+        root_followup: tokio::sync::Notify,
+    }
+
+    #[async_trait]
+    impl ChatModel<()> for DepthCapModel {
+        fn profile(&self) -> Option<&ModelProfile> {
+            static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+            Some(PROFILE.get_or_init(|| ModelProfile {
+                tool_calling: true,
+                ..ModelProfile::default()
+            }))
+        }
+
+        async fn invoke(
+            &self,
+            _state: &(),
+            request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            let is_worker = request.messages.iter().any(|message| {
+                matches!(message, tinyinference_llm::message::Message::User(_))
+                    && message.text().contains(WORKER_PROMPT)
+            });
+            if is_worker {
+                self.worker_schema
+                    .lock()
+                    .unwrap()
+                    .extend(request.tools.iter().map(|tool| tool.name.clone()));
+                let call = self
+                    .worker_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if call == 0 {
+                    if let Some(started) = self.child_started.lock().unwrap().take() {
+                        let _ = started.send(());
+                    }
+                    self.child_release.notified().await;
+                    let mut response = ModelResponse::assistant("");
+                    response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                        "depth-cap-hallucinated-spawn",
+                        "spawn_subagent",
+                        serde_json::json!({
+                            "agent_id": "task_manager_agent",
+                            "prompt": "must not run",
+                            "task_key": "depth-cap-must-not-run",
+                            "context": "depth cap regression",
+                            "model": "test-model"
+                        }),
+                    )];
+                    response.finish_reason = Some("tool_calls".into());
+                    return Ok(response);
+                }
+                self.refusal_visible.store(
+                    request.messages.iter().any(|message| {
+                        matches!(message, tinyinference_llm::message::Message::Tool(_))
+                            && message.text().contains("unknown tool `spawn_subagent`")
+                    }),
+                    std::sync::atomic::Ordering::SeqCst,
+                );
+                return Ok(ModelResponse::assistant("depth-cap-worker-finished"));
+            }
+
+            if request.messages.iter().any(|message| {
+                message
+                    .text()
+                    .contains("Accepted async sub-agent `depth_worker`")
+            }) {
+                self.root_followup.notify_one();
+                return Ok(ModelResponse::assistant("depth-cap-root-finished"));
+            }
+            if self
+                .root_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                > 0
+            {
+                return Ok(ModelResponse::assistant("depth-cap-root-finished"));
+            }
+            let mut response = ModelResponse::assistant("");
+            response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                "depth-cap-root-spawn",
+                "spawn_subagent",
+                serde_json::json!({
+                    "agent_id": "depth_worker",
+                    "prompt": WORKER_PROMPT,
+                    "task_key": "depth-cap-worker",
+                    "context": "depth cap regression",
+                    "model": "test-model"
+                }),
+            )];
+            response.finish_reason = Some("tool_calls".into());
+            Ok(response)
+        }
+    }
+
+    let _inference = crate::inference::inference_test_guard_async().await;
+    let model = std::sync::Arc::new(DepthCapModel {
+        root_calls: std::sync::atomic::AtomicUsize::new(0),
+        worker_calls: std::sync::atomic::AtomicUsize::new(0),
+        worker_schema: std::sync::Mutex::new(Vec::new()),
+        refusal_visible: std::sync::atomic::AtomicBool::new(false),
+        child_started: std::sync::Mutex::new(None),
+        child_release: tokio::sync::Notify::new(),
+        root_followup: tokio::sync::Notify::new(),
+    });
+    let _model =
+        crate::inference::provider::factory::test_provider_override::install_model(model.clone());
+    let workspace = tempfile::tempdir().expect("depth-cap workspace");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.action_dir = workspace.path().to_path_buf();
+    config.default_model = Some("test-model".into());
+    config.chat_provider = Some("omlx:test-model".into());
+
+    let builtin_definitions =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    let mut orchestrator = builtin_definitions
+        .get("orchestrator")
+        .expect("orchestrator definition")
+        .clone();
+    orchestrator.subagents = vec![tinyagents_definition::SubagentEntry::AgentId(
+        "depth_worker".to_string(),
+    )];
+    let mut worker = builtin_definitions
+        .get("task_manager_agent")
+        .expect("worker definition")
+        .clone();
+    worker.id = "depth_worker".to_string();
+    worker.agent_tier = tinyagents_definition::AgentTier::Reasoning;
+    worker.extra_tools.push("spawn_subagent".to_string());
+    worker.subagents = vec![tinyagents_definition::SubagentEntry::AgentId(
+        "task_manager_agent".to_string(),
+    )];
+    let definitions =
+        std::sync::Arc::new(builtin_definitions.with_definitions([orchestrator, worker]));
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    )
+    .derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config.clone(),
+            crate::core::runtime::DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
+    );
+    let dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core));
+    let mut agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &dispatch,
+        &config,
+        "orchestrator",
+    )
+    .expect("build the headless depth-cap root");
+    agent.set_agent_definition_name("orchestrator".to_string());
+    agent.set_host_env(crate::agent::turn_env::HostTurnEnv {
+        spawn_depth_limit: Some(1),
+        core: Some(std::sync::Arc::downgrade(&core)),
+        ..Default::default()
+    });
+    agent.enable_headless_descendant_settlement();
+
+    let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
+    *model.child_started.lock().unwrap() = Some(child_started_tx);
+    let run_core = std::sync::Arc::clone(&core);
+    let run = tokio::spawn(async move {
+        crate::core::runtime::CoreContext::scope(
+            run_core,
+            Box::pin(agent.run_single("Run the depth-cap regression.")),
+        )
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx)
+        .await
+        .expect("the child reaches the scripted model")
+        .expect("the child start signal is delivered");
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        model.root_followup.notified(),
+    )
+    .await
+    .expect("the parent receives spawn acceptance");
+    tokio::task::yield_now().await;
+    let returned_before_child = run.is_finished();
+    model.child_release.notify_one();
+    let output = run
+        .await
+        .expect("headless root task")
+        .expect("root completion");
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(&dispatch)
+    .list();
+    let worker_job = jobs
+        .iter()
+        .find(|job| job.agent == "depth_worker")
+        .expect("the declared worker was admitted");
+    let worker_run_id = worker_job
+        .subagent_run_id
+        .as_deref()
+        .expect("the worker job records its native run id");
+    let worker_events =
+        crate::agent::tinyagents::journal::read_run_events(&dispatch, worker_run_id, 0)
+            .await
+            .expect("read the worker journal");
+
+    assert_eq!(
+        worker_job.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
+    );
+    assert!(
+        !model
+            .worker_schema
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|name| name == "spawn_subagent"),
+        "an otherwise spawn-capable child at max depth must not advertise spawn_subagent"
+    );
+    assert!(
+        model
+            .refusal_visible
+            .load(std::sync::atomic::Ordering::SeqCst),
+        "the hallucinated call must return a readable unknown-tool result to the model"
+    );
+    assert!(
+        worker_events.iter().any(|observation| matches!(
+            &observation.event,
+            tinyagents_harness::events::AgentEvent::UnknownToolCall {
+                requested_name,
+                recovery,
+                ..
+            } if requested_name == "spawn_subagent" && recovery == "tool_error"
+        )),
+        "the journal must record the model-readable refusal"
+    );
+    assert!(
+        jobs.iter().all(|job| job.agent != "task_manager_agent"),
+        "the hallucinated at-cap spawn must not create another native job"
+    );
+    assert!(
+        !returned_before_child,
+        "headless settlement waits for the worker job"
+    );
+    assert!(output.contains("depth-cap-worker-finished"));
 }
 
 // --- host-registered agents (agent::host_agents) ---
