@@ -8,8 +8,9 @@
 
 use std::path::Path;
 use std::sync::Arc;
+use std::future::Future;
 
-use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
+use crate::storage::{DocumentStore, ErrorKind, Precondition, Scope, Storage, StorageBackend};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use sha2::Digest;
@@ -30,6 +31,79 @@ pub(super) fn module_scope(
         .for_scope(&scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
     Ok(Some(scoped))
+}
+
+/// Runs one module import under a durable host claim. The marker check, every
+/// payload write performed by `body`, and the completion marker are all made
+/// through a storage handle bound to the same claim condition. A lost claim
+/// therefore prevents late payload or completion writes.
+pub(super) fn with_module_claim<T>(
+    ctx: &crate::core::runtime::DispatchCtx,
+    module_id: &str,
+    marker_kind: &str,
+    marker_id: &str,
+    body: impl FnOnce(Storage) -> Result<T> + Send + 'static,
+) -> Result<Option<ClaimedImport<T>>>
+where
+    T: Send + 'static,
+{
+    let Some(backend) = crate::storage::installed() else {
+        return Ok(None);
+    };
+    let scope = super::storage_host::current_module_scope(ctx, module_id)
+        .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
+    let repo = crate::storage::documents::Repo::on(
+        &backend,
+        &scope,
+        "storage_import",
+        crate::storage::import_state::collection_specs,
+    )?;
+    let marker_kind = marker_kind.to_owned();
+    let marker_id = marker_id.to_owned();
+    let claim_backend = Arc::clone(&backend);
+    let claim_scope = scope.clone();
+    let claimed = crate::storage::import_state::with_claim(
+        &repo,
+        crate::storage::import_state::HOST_OWNER,
+        &crate::storage::import_state::step_id(&marker_kind, &marker_id),
+        move |condition| {
+            let scoped_backend = crate::storage::import_state::backend_with_condition(
+                claim_backend,
+                condition.clone(),
+            );
+            let scoped = scoped_backend
+                .for_scope(&claim_scope)
+                .map_err(|error| anyhow!("open claim-bound module storage: {:?}", error.kind()))?;
+            crate::storage::block_on_anyhow(async move {
+                if crate::storage::import_state::host_import_done(
+                    &scoped,
+                    &marker_kind,
+                    &marker_id,
+                )
+                .await?
+                {
+                    return Ok(ClaimedImport::AlreadyDone);
+                }
+                let result = body(scoped.clone())?;
+                crate::storage::import_state::host_import_mark(
+                    &scoped,
+                    &marker_kind,
+                    &marker_id,
+                )
+                .await?;
+                Ok(ClaimedImport::Imported(result))
+            })
+        },
+    )?;
+    Ok(claimed)
+}
+
+/// Outcome of a claim-protected import attempt.
+pub(super) enum ClaimedImport<T> {
+    /// The completion marker already existed after acquiring the claim.
+    AlreadyDone,
+    /// The payload was imported and the completion marker was committed.
+    Imported(T),
 }
 
 /// A stable marker id for one source path: `<prefix>@<16 hex of sha256(path)>`.
