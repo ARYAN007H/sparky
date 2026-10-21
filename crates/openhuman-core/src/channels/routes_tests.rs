@@ -319,7 +319,7 @@ async fn cached_models_and_help_responses_render_expected_text() {
 fn model_command_messages_use_thread_aware_history_keys() {
     let msg = ChannelMessage {
         reply_to_id: None,
-        topic_id: None,
+        topic_id: Some("42".into()),
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "room".into(),
@@ -548,7 +548,7 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
         content: "/status".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: Some("42".into()),
+        thread_ts: None,
         sender_name: None,
     };
 
@@ -654,7 +654,7 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
             .content
             .contains("No conversation threads yet. Send `/new` to create one.")
     );
-    assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
+    assert_eq!(sent[0].topic_id.as_deref(), Some("42"));
 }
 
 #[path = "routes_tests_telegram.rs"]
