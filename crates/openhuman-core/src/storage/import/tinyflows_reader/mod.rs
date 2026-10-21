@@ -10,5 +10,5 @@ mod report;
 
 pub(super) use checkpoint_reader::read_legacy_checkpoint_batches;
 pub(super) use flow_reader::read_legacy_flow_catalog;
-pub(super) use legacy_cron::{read_legacy_cron, LegacyCron};
+pub(super) use legacy_cron::read_legacy_cron;
 pub(super) use report::ImportReport;
