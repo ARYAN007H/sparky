@@ -285,34 +285,6 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             } if tool_name == "spawn_subagent"
         )
     });
-    let nested_spawn_outcomes = worker_events
-        .iter()
-        .filter_map(|observation| match &observation.event {
-            tinyagents_harness::events::AgentEvent::ToolCompleted {
-                tool_name,
-                error,
-                ..
-            } if tool_name == "spawn_subagent" => Some(error.clone()),
-            tinyagents_harness::events::AgentEvent::UnknownToolCall {
-                requested_name,
-                recovery,
-                ..
-            } if requested_name == "spawn_subagent" => Some(Some(recovery.clone())),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    eprintln!(
-        "NESTED_FLOW_POLICY_DIAGNOSTIC worker_calls={} schema={:?} nested_spawn_calls={} worker_jobs={:?} grandchild_jobs={:?} spawn_events={:?}",
-        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        model.child_schema_names.lock().unwrap(),
-        model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
-        child_runs,
-        grandchild_jobs
-            .iter()
-            .map(|job| (&job.status, job.output.as_deref().is_some_and(|s| s.contains("headless-flow-grandchild-result"))))
-            .collect::<Vec<_>>(),
-        nested_spawn_outcomes,
-    );
     let grandchild_run_id = grandchild_jobs
         .first()
         .and_then(|job| job.subagent_run_id.as_deref())
@@ -332,13 +304,6 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         )
     });
     let grandchild_output = grandchild_jobs[0].output.as_deref().unwrap_or_default();
-    eprintln!(
-        "NESTED_FLOW_TERMINAL_DIAGNOSTIC returned_before_child={returned_before_child} status={:?} error={:?} events={:?}",
-        grandchild_jobs[0].status,
-        grandchild_jobs[0].error,
-        grandchild_events.iter().map(|o| &o.event).collect::<Vec<_>>(),
-    );
-
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
         1,
@@ -348,6 +313,10 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
         2,
         "the worker must run, spawn its grandchild, and complete through the real dispatch"
+    );
+    assert!(
+        model.child_schema_names.lock().unwrap()[0].iter().any(|name| name == "spawn_subagent"),
+        "the worker's explicitly declared nested-spawn capability must reach its model schema"
     );
     assert_eq!(
         model

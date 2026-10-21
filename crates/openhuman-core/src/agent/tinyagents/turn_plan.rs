@@ -120,22 +120,6 @@ impl TurnPlanner<(), OpenHumanRunContext> for OpenHumanTurnPlanner {
     ) -> Result<TurnPlan<(), OpenHumanRunContext>, RuntimeError> {
         let mut plan = TurnPlan::new(self.models.clone());
         plan.policy = self.policy.clone();
-        #[cfg(test)]
-        if request.run_context.config.depth() > 0 {
-            eprintln!(
-                "NESTED_SPAWN_RUN_CONFIG_TRACE depth={} max_depth={} host_spawn_depth={} allowlist_contains_spawn={} grant={:?}",
-                request.run_context.config.depth(),
-                request.run_context.config.max_depth(),
-                request.run_context.data.spawn_depth,
-                self.allowed
-                    .as_ref()
-                    .is_none_or(|allowed| allowed.contains("spawn_subagent")),
-                NestedSpawnDepth::try_new(
-                    request.run_context.config.depth(),
-                    request.run_context.config.max_depth(),
-                ),
-            );
-        }
         plan.tools = host_tool_set_builder_for_turn(
             &self.tool_sets,
             &self.allowed,

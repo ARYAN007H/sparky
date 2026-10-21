@@ -580,20 +580,6 @@ async fn run_typed_mode(
         .iter()
         .map(|&i| parent.all_tools[i].name().to_string())
         .collect();
-    #[cfg(test)]
-    if active_child_depth > 0 {
-        eprintln!(
-            "NESTED_SPAWN_ADMISSION_TRACE agent={} active_child_depth={} max_depth={} depth_room={} explicit_spawn={} parent_ceiling_unrestricted={} parent_ceiling_contains_spawn={} final_allowlist_contains_spawn={}",
-            definition.id,
-            active_child_depth,
-            max_depth,
-            nested_spawn_depth_available,
-            explicitly_declares_nested_spawn("spawn_subagent"),
-            parent.subagent_tool_ceiling_names.is_empty(),
-            parent.subagent_tool_ceiling_names.contains("spawn_subagent"),
-            allowed_names.contains("spawn_subagent"),
-        );
-    }
     let filtered_specs = dedup_visible_tool_specs(filtered_specs);
 
     tracing::debug!(

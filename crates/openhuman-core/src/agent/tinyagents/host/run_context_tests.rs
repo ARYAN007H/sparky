@@ -199,6 +199,17 @@ fn detached_children_reset_turn_accounting_and_cancellation() {
     );
     assert_eq!(root.child().headless_descendant_owner.as_deref(), Some("root-owner"));
     assert!(detached.headless_descendant_owner.is_none());
+    let workspace = std::path::Path::new("/workspace");
+    assert_eq!(
+        root.child().subagent_owner_scope(workspace, "session", Some("worker-thread")),
+        "root-owner",
+        "headless descendants retain the root lease's owner across native thread ids"
+    );
+    assert_ne!(
+        detached.subagent_owner_scope(workspace, "session", Some("worker-thread")),
+        "root-owner",
+        "detached chat work keeps its own owner scope"
+    );
     assert!(detached.dispatch.is_none());
     root.cancellation.cancel();
     assert!(!detached.cancellation.is_cancelled());
