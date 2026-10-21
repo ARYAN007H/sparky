@@ -2,7 +2,69 @@ use super::*;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::events::DomainEvent;
 use serde_json::json;
+use std::sync::{Arc, Mutex};
 use tokio::time::{sleep, timeout, Duration};
+use tinyinference_llm::model::{
+    ChatModel, ModelProfile, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,
+};
+
+struct TriageReplyModel {
+    requests: Arc<Mutex<Vec<ModelRequest>>>,
+}
+
+#[async_trait::async_trait]
+impl ChatModel<()> for TriageReplyModel {
+    fn profile(&self) -> Option<&ModelProfile> {
+        static PROFILE: std::sync::LazyLock<ModelProfile> =
+            std::sync::LazyLock::new(|| ModelProfile {
+                provider: Some("triage-escalation-test".into()),
+                tool_calling: true,
+                parallel_tool_calls: true,
+                streaming: true,
+                ..ModelProfile::default()
+            });
+        Some(&PROFILE)
+    }
+
+    async fn invoke(
+        &self,
+        _state: &(),
+        request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelResponse> {
+        self.requests.lock().unwrap().push(request);
+        Ok(ModelResponse::assistant("handled inline"))
+    }
+
+    async fn stream(
+        &self,
+        _state: &(),
+        request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelStream> {
+        self.requests.lock().unwrap().push(request);
+        let response = ModelResponse::assistant("handled inline");
+        Ok(ModelStream::new(Box::pin(futures::stream::iter([
+            ModelStreamItem::Started,
+            ModelStreamItem::MessageDelta(
+                tinyinference_llm::message::MessageDelta::text("handled inline"),
+            ),
+            ModelStreamItem::Completed(response),
+        ]))))
+    }
+}
+
+fn triage_test_model(requests: Arc<Mutex<Vec<ModelRequest>>>) -> crate::inference::registry::ChatModelEntry {
+    crate::inference::registry::ChatModelEntry {
+        build: Arc::new(move |_| {
+            Ok((
+                Arc::new(TriageReplyModel {
+                    requests: Arc::clone(&requests),
+                }) as Arc<dyn ChatModel<()>>,
+                "triage-test-model".to_string(),
+            ))
+        }),
+        probe: None,
+    }
+}
 
 /// The triage parent is the shared root context with one override: nested
 /// spawns scoped to the dispatched target. Guards the #4369 collapse against
