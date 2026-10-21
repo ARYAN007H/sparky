@@ -173,20 +173,34 @@ pub use types::{LoadPolicy, ModuleRecord, ModuleSource, ModuleState, ModuleStatu
 pub async fn import_legacy_mcp(
     ctx: &crate::core::runtime::DispatchCtx,
     data_dir: &std::path::Path,
-) {
+) -> Result<(), String> {
     #[cfg(all(feature = "modules", feature = "legacy-import"))]
-    match storage_import_tinymcp::import_legacy(ctx, data_dir).await {
-        Ok(outcome) => {
+    {
+        match storage_import_tinymcp::import_legacy(ctx, data_dir).await {
+            Ok(outcome) => {
             log::debug!("[mcp] legacy storage import: {outcome:?}");
             storage_grant_schemas::migrate_imported(ctx, storage_grant_schemas::tinymcp::MODULE_ID)
                 .await;
+                Ok(())
+            }
+            Err(error) => {
+                log::warn!("[mcp] legacy storage import failed, will retry: {error:#}");
+                Err(format!("legacy TinyMCP storage import failed: {error:#}"))
+            }
         }
-        Err(error) => log::warn!("[mcp] legacy storage import failed, will retry: {error:#}"),
     }
     #[cfg(all(feature = "modules", not(feature = "legacy-import")))]
-    log::error!("[mcp] legacy storage import is unavailable: enable the `legacy-import` feature");
+    {
+        let _ = (ctx, data_dir);
+        let error = "legacy storage import is unavailable: enable the `legacy-import` feature";
+        log::error!("[mcp] {error}");
+        Err(error.to_owned())
+    }
     #[cfg(not(feature = "modules"))]
-    let _ = (ctx, data_dir);
+    {
+        let _ = (ctx, data_dir);
+        Ok(())
+    }
 }
 
 /// What an importer's outcome says about whether it may be skipped next time.
