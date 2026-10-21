@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelMetadata};
+use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderContext, ProviderModelMetadata};
 use std::sync::Arc;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
