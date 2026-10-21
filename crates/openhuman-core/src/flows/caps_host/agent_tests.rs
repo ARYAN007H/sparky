@@ -609,8 +609,24 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
         )
         .await
     });
-    tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx)
-        .await
+    let child_started =
+        tokio::time::timeout(std::time::Duration::from_secs(15), child_started_rx).await;
+    if child_started.is_err() {
+        let jobs = crate::core::runtime::slot_for::<
+            tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        >(&dispatch)
+        .list();
+        eprintln!(
+            "DEPTH_CAP_SETUP_DIAGNOSTIC root_calls={} worker_calls={} run_finished={} jobs={:?}",
+            model.root_calls.load(std::sync::atomic::Ordering::SeqCst),
+            model.worker_calls.load(std::sync::atomic::Ordering::SeqCst),
+            run.is_finished(),
+            jobs.iter()
+                .map(|job| (&job.agent, job.status))
+                .collect::<Vec<_>>(),
+        );
+    }
+    child_started
         .expect("the child reaches the scripted model")
         .expect("the child start signal is delivered");
     tokio::time::timeout(
