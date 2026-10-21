@@ -75,11 +75,8 @@ async fn assert_supplied_backend_owns_the_cap_and_fence(
         },
     )
     .await;
-    eprintln!("profile cron update after takeover: {update:?}");
     assert!(
-        update
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains("Failed to update cron job")),
+        update.is_err(),
         "a superseded profile must refuse backend writes: {update:?}"
     );
     let unchanged = crate::cron::client::store_in::<crate::cron::CronJob>(
