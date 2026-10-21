@@ -63,6 +63,7 @@ pub(crate) struct AgentTurnRequest {
     /// owning persistence boundary. `None` retains the normal text conversion.
     pub(crate) message_input: Option<tinyinference_llm::message::Message>,
     pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    pub(crate) native_staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
     pub(crate) native_message_id: Option<String>,
     pub(crate) thread_id: Option<String>,
     pub(crate) origin: AgentTurnOrigin,
@@ -118,6 +119,7 @@ impl AgentTurnHost {
         session.set_thread_id(request.thread_id);
         let mut host_env = request.host_env;
         host_env.native_staged_parts = request.native_staged_parts;
+        host_env.native_staged_lease = request.native_staged_lease;
         host_env.native_message_id = request.native_message_id;
         host_env.approval = request.approval.clone();
         host_env.cancellation = Some(request.cancellation);

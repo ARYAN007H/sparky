@@ -323,6 +323,8 @@ pub struct OpenHumanRunContext {
     pub attachment_placeholders: Arc<Vec<String>>,
     /// Opaque native media refs issued for this exact root channel turn.
     pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    /// Final-owner cleanup state for root native refs; children never inherit it.
+    pub(crate) native_staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
     /// Provider message identity for durable post-commit claims.
     pub(crate) native_message_id: Option<String>,
     /// Dispatch guard shared by synchronous delegates in this run.
@@ -462,6 +464,7 @@ impl OpenHumanRunContext {
             tool_result_artifact_index: None,
             attachment_placeholders: Arc::new(Vec::new()),
             native_staged_parts: Vec::new(),
+            native_staged_lease: None,
             native_message_id: None,
             dispatch: None,
             task_recency_window: None,
@@ -603,6 +606,7 @@ impl OpenHumanRunContext {
         self.memory_identity = env.memory_identity.clone().or(self.memory_identity);
         self.core = env.core.clone().or(self.core);
         self.native_staged_parts = env.native_staged_parts.clone();
+        self.native_staged_lease = env.native_staged_lease.clone();
         self.native_message_id = env.native_message_id.clone();
         self.stop_hooks
             .extend(env.hooks.stop_hooks().iter().cloned());
@@ -631,6 +635,7 @@ impl OpenHumanRunContext {
         child.resolved_route = Arc::new(Mutex::new(None));
         child.memory_turn = None;
         child.native_staged_parts.clear();
+        child.native_staged_lease = None;
         child.native_message_id = None;
         child.response_shape = None;
         child

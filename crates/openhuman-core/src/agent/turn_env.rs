@@ -31,6 +31,8 @@ pub struct HostTurnEnv {
     pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
     /// Provider message identity used when binding staged media after commit.
     pub(crate) native_message_id: Option<String>,
+    /// Root-only cleanup/commit state for the staged native refs above.
+    pub(crate) native_staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
     /// Exact child-process environment values supplied by the embedding host.
     ///
     /// The map is carried through the run context so module-backed shell

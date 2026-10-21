@@ -27,6 +27,7 @@ pub(crate) struct HostChannelTurn {
     pub(crate) message_input: Option<tinyinference_llm::message::Message>,
     /// Exact staged native refs issued by the host for this user turn.
     pub(crate) staged_parts: Vec<tinychannels_bus::ContentPart>,
+    pub(crate) staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
     pub(crate) staged_message_id: Option<String>,
     /// Who asked: the channel's `ExternalChannel` origin.
     pub(crate) origin: AgentTurnOrigin,
@@ -57,6 +58,7 @@ pub(crate) async fn run_host_agent_turn(
         message,
         message_input,
         staged_parts,
+        staged_lease,
         staged_message_id,
         origin,
         progress,
@@ -111,6 +113,7 @@ pub(crate) async fn run_host_agent_turn(
             &imported_history,
             legacy_history,
             staged_parts,
+            staged_lease,
             staged_message_id,
         )
         .await?;
