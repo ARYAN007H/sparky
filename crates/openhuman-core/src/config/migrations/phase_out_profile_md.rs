@@ -1,13 +1,13 @@
-//! Phase-out migration: removes legacy `### PROFILE.md` blocks from
-//! persisted session transcripts.
+//! Phase-out migration: retires workspace `PROFILE.md` without modifying
+//! legacy transcript source files.
 //!
 //! `PROFILE.md` is being retired as a system-prompt injection. Earlier
 //! builds wrote the file into the system prompt of every session and
 //! froze those bytes inside `session_raw/{stem}.jsonl` (see
 //! [`tinyagents_session::transcript`]). Without
-//! this migration, an upgrade leaves the leaked content replaying
-//! inside every resumed thread forever — the runtime loader reuses the
-//! persisted system message verbatim for KV-cache stability.
+//! Transcript source bytes are preserved. The session importer strips that
+//! block from a temporary in-memory copy before importing it into the new
+//! session store.
 //!
 //! ## What it does
 //!
@@ -16,32 +16,15 @@
 //!    silently — agents that still have `omit_profile = false`
 //!    (orchestrator, welcome, trigger_*, help) produce a clean prompt
 //!    on every new session without any source-code change.
-//! 2. **Walks every JSONL transcript** under `{workspace}/session_raw/`
-//!    (both the current flat layout and the legacy `DDMMYYYY/`
-//!    date-grouped subdirs), reads each file, and — if the first
-//!    message is a system message containing a `### PROFILE.md`
-//!    heading — removes the heading and everything beneath it up to
-//!    the next `### ` heading (or end-of-prompt). The walk and the
-//!    rewrite are TinyAgents' legacy maintenance
-//!    (`tinyagents_session::legacy::rewrite_legacy_transcripts`), which
-//!    owns the format, so the on-disk shape stays byte-compatible and this
-//!    module names no transcript file. It runs before the workspace's
-//!    one-time import into the session store.
-//! 3. **Sweeps `.md` companions** under `{workspace}/sessions/**/*.md`,
-//!    rewriting in place any file whose body still contains a
-//!    `### PROFILE.md` heading. The rest of the transcript
-//!    (conversation messages, metadata header) is preserved — only
-//!    the PROFILE.md block is removed. Supports both the new
-//!    JSONL-companion format (`## [role]` headers, `---` separators)
-//!    and the legacy HTML-comment format (`<!--MSG …-->` markers) via
-//!    the boundary set in [`strip_profile_md_block`].
+//! 2. Leaves JSONL transcripts and Markdown companions byte-for-byte intact.
+//!    `storage::import::sessions` removes the block only from imported bytes.
 //!
 //! ## Idempotency
 //!
 //! Gated externally by [`Config::schema_version`] — once the migration
 //! succeeds and the bump is persisted, future launches skip it.
-//! Internally self-idempotent too: a transcript without any
-//! `### PROFILE.md` block is detected and left unchanged.
+//! The file deletion is idempotent; the import-time byte transform is also
+//! idempotent.
 //!
 //! ## Fresh installs
 //!
@@ -67,18 +50,14 @@ pub struct PhaseOutStats {
     /// True when the legacy `PROFILE.md` file at the workspace root was
     /// deleted by this run. `false` when no file was present.
     pub profile_md_removed: bool,
-    /// Number of stale `.md` companions / legacy-format transcripts
-    /// under `sessions/**/*.md` that contained a `### PROFILE.md` block
-    /// and were rewritten in place with the block stripped (proofs
-    /// preserved).
+    /// Retained for migration report compatibility. Source companions are
+    /// never rewritten, so this is always zero.
     pub md_companions_altered: usize,
 }
 
 /// Run the migration over `workspace_dir`. Returns aggregate stats.
 ///
-/// Per-file failures are logged and counted in `stats.errors` but do
-/// not abort the walk — a single unreadable transcript shouldn't keep
-/// the rest of the fleet stuck on the old data.
+/// Legacy transcript files are handled by the read-only session importer.
 pub fn run(workspace_dir: &Path) -> Result<PhaseOutStats> {
     let mut stats = PhaseOutStats::default();
 
