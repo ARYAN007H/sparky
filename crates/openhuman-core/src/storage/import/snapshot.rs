@@ -71,7 +71,8 @@ impl Snapshot {
     ///
     /// When the copy cannot be opened with the SQLite driver or read.
     pub fn driver_docs(&self, collections: fn() -> Vec<CollectionSpec>) -> Result<Vec<Record>> {
-        use tinystoragedrivers::{DocumentStoreExt, Query, StorageBackend};
+        use crate::storage::DocumentStoreExt;
+        use tinystoragedrivers::{Query, StorageBackend};
 
         let storage = tinystoragedrivers::sqlite::SqliteStorage::open(&self.db)
             .with_context(|| format!("open the copy {}", self.db.display()))?;

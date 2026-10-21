@@ -4,16 +4,17 @@
 //! collection is deliberately separate from Tiny Storage Drivers' schemas:
 //! the host owns importer names, completion records, and claim policy.
 
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tinystoragedrivers::{
-    CollectionSpec, DocumentStore, DocumentStoreExt, ErrorKind, ExpectedDocument, Precondition,
-    ReadCheck, Storage, StorageError, Versioned, WriteOp,
+    CollectionSpec, ErrorKind, ExpectedDocument, Precondition, ReadCheck, Storage, StorageError,
+    Versioned, WriteOp,
 };
+use tinystoragedrivers_api::DocumentStore;
 
+use super::DocumentStoreExt;
 use super::documents::Repo;
 
 /// How long a claim blocks other processes before it can be taken over.
