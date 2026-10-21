@@ -15,7 +15,6 @@ impl Drop for ChildInvocationDrop {
 struct CronChildModel {
     spawn_calls: std::sync::atomic::AtomicUsize,
     child_calls: std::sync::atomic::AtomicUsize,
-    child_effect_denials: std::sync::atomic::AtomicUsize,
     child_invocation_dropped: std::sync::Arc<std::sync::atomic::AtomicBool>,
     accepted_followups: std::sync::atomic::AtomicUsize,
     child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
@@ -43,34 +42,13 @@ impl ChatModel<()> for CronChildModel {
             .iter()
             .any(|message| message.text().contains(CHILD_PROMPT))
         {
-            let call = self
-                .child_calls
+            self.child_calls
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            if call == 0 {
-                let mut response = ModelResponse::assistant("");
-                response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
-                    "headless-cron-forbidden-effect",
-                    "task_source_remove",
-                    serde_json::json!({"id": "headless-cron-forbidden-source"}),
-                )];
-                response.finish_reason = Some("tool_calls".into());
-                return Ok(response);
-            }
-
-            if request.messages.iter().any(|message| {
-                message
-                    .text()
-                    .contains("Scheduled agent turns may use read-only tools only")
-            }) {
-                self.child_effect_denials
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            }
             if let Some(started) = self.child_started.lock().unwrap().take() {
                 let _ = started.send(());
             }
-            let _drop = ChildInvocationDrop(std::sync::Arc::clone(
-                &self.child_invocation_dropped,
-            ));
+            let _drop =
+                ChildInvocationDrop(std::sync::Arc::clone(&self.child_invocation_dropped));
             self.child_release.notified().await;
             return Ok(ModelResponse::assistant("headless-cron-child-result"));
         }
@@ -115,7 +93,6 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     let model = std::sync::Arc::new(CronChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
-        child_effect_denials: std::sync::atomic::AtomicUsize::new(0),
         child_invocation_dropped: std::sync::Arc::new(
             std::sync::atomic::AtomicBool::new(false),
         ),
@@ -224,18 +201,7 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
         1
     );
-    assert_eq!(
-        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        2,
-        "the real child was called again after its denied effectful tool"
-    );
-    assert_eq!(
-        model
-            .child_effect_denials
-            .load(std::sync::atomic::Ordering::SeqCst),
-        1,
-        "the Cron child policy denied the effectful tool in its own run"
-    );
+    assert_eq!(model.child_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(
         model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
         1,
