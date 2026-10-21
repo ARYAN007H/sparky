@@ -15,7 +15,7 @@ use tinystoragedrivers::{
 };
 use tinystoragedrivers_api::DocumentStore;
 
-use super::documents::Repo;
+use super::{DocumentStoreExt, documents::Repo};
 
 /// How long a claim blocks other processes before it can be taken over.
 pub const CLAIM_TTL_MS: i64 = 10 * 60 * 1000;
@@ -324,7 +324,7 @@ struct ClaimToken {
 
 impl ClaimToken {
     fn write_condition(&self) -> Result<WriteCondition> {
-        let scope = crate::storage::Scope::new(&self.scope)?;
+        let scope = tinystoragedrivers::Scope::new(&self.scope)?;
         let filter = Filter::eq("holder", self.holder.clone())
             .and(Filter::eq("epoch", serde_json::json!(self.epoch)));
         Ok(WriteCondition::new(

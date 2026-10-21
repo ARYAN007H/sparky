@@ -144,7 +144,7 @@ async fn import_into(
 }
 
 async fn import_payload(
-    scoped: &tinystoragedrivers::ScopedStorage,
+    scoped: &crate::storage::Storage,
     path: &Path,
 ) -> anyhow::Result<Outcome> {
     let bytes = match tokio::fs::read(path).await {
