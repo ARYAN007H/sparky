@@ -169,16 +169,12 @@ pub async fn copy_inventory(
     use tinystoragedrivers::CollectionSpec;
 
     let mut report = MoveReport::default();
-    let mut source_scopes = HashSet::new();
-    for row in &inventory.documents {
-        source_scopes.insert(row.scope.as_str());
-    }
-    for row in &inventory.streams {
-        source_scopes.insert(row.scope.as_str());
-    }
-    for row in &inventory.blobs {
-        source_scopes.insert(row.scope.as_str());
-    }
+    let mut source_scopes: Vec<&str> = inventory.scopes.iter().map(String::as_str).collect();
+    for row in &inventory.documents { source_scopes.push(&row.scope); }
+    for row in &inventory.streams { source_scopes.push(&row.scope); }
+    for row in &inventory.blobs { source_scopes.push(&row.scope); }
+    source_scopes.sort_unstable();
+    source_scopes.dedup();
     for source in source_scopes {
         let target_scope = match map_scope(source, known) {
             Mapping::V2 => continue,
@@ -287,6 +283,22 @@ pub async fn copy_inventory(
         report.moved += 1;
     }
     Ok(report)
+}
+
+/// Reads an explicit SQLite source and copies its known legacy scopes.
+///
+/// The caller should run the synchronous inventory read on a blocking worker
+/// when this function is invoked from an async runtime. MongoDB and other
+/// non-SQLite legacy sources need their own read-only inventory adapter; they
+/// are not enumerated from the v2 target backend.
+#[cfg(feature = "legacy-import")]
+pub async fn run_from_source(
+    backend: &Arc<dyn StorageBackend>,
+    source_db: &std::path::Path,
+    known: &Known,
+) -> anyhow::Result<MoveReport> {
+    let inventory = crate::storage::import::scope_move::LegacyScopeInventory::read(source_db)?;
+    copy_inventory(backend, known, &inventory).await
 }
 
 /// Legacy compatibility entry point retained to produce an actionable error.

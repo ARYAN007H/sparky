@@ -5,6 +5,7 @@
 //! explicitly and decode its rows here before writing them through typed v2
 //! storage ports. This reader never changes the source file.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use crate::storage::rusqlite::{self, Connection, OpenFlags};
@@ -62,6 +63,9 @@ pub struct LegacyBlob {
 /// A complete, immutable snapshot of the v1 rows needed for a scope move.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LegacyScopeInventory {
+    /// Scope identities found in the source, including admitted scopes with
+    /// no current rows.
+    pub scopes: Vec<String>,
     /// Live document rows.
     pub documents: Vec<LegacyDocument>,
     /// Streams and their entries.
@@ -84,12 +88,34 @@ impl LegacyScopeInventory {
         )
         .with_context(|| format!("open legacy storage database {} read-only", path.display()))?;
         let mut inventory = Self::default();
+        let mut scopes = std::collections::BTreeSet::new();
+
+        // Admission rows are the authoritative inventory for v1 scopes that
+        // happen to have no documents, streams, or blobs yet.
+        if table_exists(&conn, "_tsd_scope_admissions")? {
+            let mut statement = conn.prepare("SELECT scope FROM _tsd_scope_admissions ORDER BY scope")?;
+            let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+            for row in rows { scopes.insert(row?); }
+        }
 
         if table_exists(&conn, "docs")? {
-            let mut statement = conn.prepare(
-                "SELECT scope, coll, id, schema, created_ms, updated_ms, expires_ms, deleted, body
+            let columns = table_columns(&conn, "docs")?;
+            for required in ["scope", "coll", "id", "body"] {
+                if !columns.contains(required) {
+                    bail!("legacy docs table is missing required column `{required}`");
+                }
+            }
+            let select = |name: &str, fallback: &str| {
+                if columns.contains(name) { format!("\"{name}\"") } else { fallback.to_owned() }
+            };
+            let sql = format!(
+                "SELECT scope, coll, id, {}, {}, {}, {}, {}, body
                  FROM docs ORDER BY scope, coll, id",
-            )?;
+                select("schema", "0"), select("created_ms", "0"),
+                select("updated_ms", "0"), select("expires_ms", "NULL"),
+                select("deleted", "0"),
+            );
+            let mut statement = conn.prepare(&sql)?;
             let rows = statement.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -115,6 +141,7 @@ impl LegacyScopeInventory {
                     deleted,
                     body,
                 ) = row?;
+                scopes.insert(scope.clone());
                 if deleted {
                     continue;
                 }
@@ -135,10 +162,20 @@ impl LegacyScopeInventory {
 
         let mut heads = std::collections::BTreeMap::new();
         if table_exists(&conn, "stream_heads")? {
-            let mut statement = conn.prepare(
-                "SELECT scope, name, base, len, sealed, sealed_ms
-                 FROM stream_heads ORDER BY scope, name",
-            )?;
+            let columns = table_columns(&conn, "stream_heads")?;
+            for required in ["scope", "name", "base", "len"] {
+                if !columns.contains(required) {
+                    bail!("legacy stream_heads table is missing required column `{required}`");
+                }
+            }
+            let select = |name: &str, fallback: &str| {
+                if columns.contains(name) { format!("\"{name}\"") } else { fallback.to_owned() }
+            };
+            let sql = format!(
+                "SELECT scope, name, base, len, {}, {} FROM stream_heads ORDER BY scope, name",
+                select("sealed", "0"), select("sealed_ms", "NULL"),
+            );
+            let mut statement = conn.prepare(&sql)?;
             let rows = statement.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -151,14 +188,22 @@ impl LegacyScopeInventory {
             })?;
             for row in rows {
                 let (scope, name, base, len, sealed, sealed_ms) = row?;
+                scopes.insert(scope.clone());
                 heads.insert((scope, name), (base, len, sealed, sealed_ms));
             }
         }
         let mut stream_entries: std::collections::BTreeMap<(String, String), Vec<(u64, Value)>> =
             std::collections::BTreeMap::new();
         if table_exists(&conn, "streams")? {
-            let mut statement = conn
-                .prepare("SELECT scope, name, seq, body FROM streams ORDER BY scope, name, seq")?;
+            let columns = table_columns(&conn, "streams")?;
+            for required in ["scope", "name", "seq", "body"] {
+                if !columns.contains(required) {
+                    bail!("legacy streams table is missing required column `{required}`");
+                }
+            }
+            let mut statement = conn.prepare(
+                "SELECT scope, name, seq, body FROM streams ORDER BY scope, name, seq",
+            )?;
             let rows = statement.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -169,6 +214,7 @@ impl LegacyScopeInventory {
             })?;
             for row in rows {
                 let (scope, name, seq, body) = row?;
+                scopes.insert(scope.clone());
                 stream_entries.entry((scope, name)).or_default().push((
                     seq,
                     serde_json::from_str(&body).context("decode legacy stream entry")?,
@@ -205,9 +251,20 @@ impl LegacyScopeInventory {
         }
 
         if table_exists(&conn, "blobs")? {
-            let mut statement = conn.prepare(
-                "SELECT scope, key, content_type, expires_ms, bytes FROM blobs ORDER BY scope, key",
-            )?;
+            let columns = table_columns(&conn, "blobs")?;
+            for required in ["scope", "key", "bytes"] {
+                if !columns.contains(required) {
+                    bail!("legacy blobs table is missing required column `{required}`");
+                }
+            }
+            let select = |name: &str, fallback: &str| {
+                if columns.contains(name) { format!("\"{name}\"") } else { fallback.to_owned() }
+            };
+            let sql = format!(
+                "SELECT scope, key, {}, {}, bytes FROM blobs ORDER BY scope, key",
+                select("content_type", "NULL"), select("expires_ms", "NULL"),
+            );
+            let mut statement = conn.prepare(&sql)?;
             let rows = statement.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -219,6 +276,7 @@ impl LegacyScopeInventory {
             })?;
             for row in rows {
                 let (scope, key, content_type, expires_ms, bytes) = row?;
+                scopes.insert(scope.clone());
                 inventory.blobs.push(LegacyBlob {
                     scope,
                     key,
@@ -228,6 +286,7 @@ impl LegacyScopeInventory {
                 });
             }
         }
+        inventory.scopes = scopes.into_iter().collect();
         Ok(inventory)
     }
 }
@@ -238,6 +297,12 @@ fn table_exists(conn: &Connection, name: &str) -> rusqlite::Result<bool> {
         [name],
         |row| row.get(0),
     )
+}
+
+fn table_columns(conn: &Connection, table: &str) -> rusqlite::Result<HashSet<String>> {
+    let mut statement = conn.prepare(&format!("PRAGMA table_info(\"{}\")", table.replace('"', "\"\"")))?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
+    rows.collect()
 }
 
 fn validate_stream(

@@ -8,7 +8,9 @@ fn inventory_reads_all_legacy_families_without_changing_the_database() {
     let path = dir.path().join("legacy.db");
     let conn = Connection::open(&path).unwrap();
     conn.execute_batch(
-        "CREATE TABLE docs(scope TEXT, coll TEXT, id TEXT, version INTEGER, schema INTEGER,
+        "CREATE TABLE _tsd_scope_admissions(scope TEXT PRIMARY KEY, generation INTEGER, operation TEXT);
+         INSERT INTO _tsd_scope_admissions VALUES('empty-agent',1,'write');
+         CREATE TABLE docs(scope TEXT, coll TEXT, id TEXT, version INTEGER, schema INTEGER,
              created_ms INTEGER, updated_ms INTEGER, expires_ms INTEGER, deleted INTEGER, body TEXT,
              PRIMARY KEY(scope, coll, id));
          INSERT INTO docs VALUES('alice~agent','notes','n1',1,4,100,200,900,0,'{\"x\":1}');
@@ -32,6 +34,8 @@ fn inventory_reads_all_legacy_families_without_changing_the_database() {
 
     assert_eq!(sha256(&path), before);
     assert_eq!(inventory.documents.len(), 1);
+    assert!(inventory.scopes.contains(&"alice~agent".to_owned()));
+    assert!(inventory.scopes.contains(&"empty-agent".to_owned()));
     assert_eq!(inventory.documents[0].meta.schema, 4);
     assert_eq!(inventory.documents[0].meta.created_ms, 100);
     assert_eq!(inventory.documents[0].meta.updated_ms, 200);
