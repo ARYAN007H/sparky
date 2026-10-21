@@ -7,8 +7,9 @@ pub(crate) struct ResolvedNativeAttachment {
     pub(crate) bytes: Vec<u8>,
 }
 
-pub(super) const STAGED_DOMAIN: &str = "threads::attachments";
-pub(super) const STAGED_COLLECTION: &str = crate::threads::store::STAGED_ATTACHMENTS;
+pub(in crate::threads::attachments) const STAGED_DOMAIN: &str = "threads::attachments";
+pub(in crate::threads::attachments) const STAGED_COLLECTION: &str =
+    crate::threads::store::STAGED_ATTACHMENTS;
 pub(super) const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
 const NATIVE_STAGED_ACTIVE: u8 = 0;
