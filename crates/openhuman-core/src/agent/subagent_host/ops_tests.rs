@@ -254,9 +254,11 @@ async fn run_host_from_test_options(
     let mut root_data = options.run_context.clone();
     let root_config = root_data.root_run_config("subagent-host-test");
     let parent = root_data.into_tinyagents(root_config);
-    crate::agent::subagent_host::OpenHumanSubagentHost::new(definition.clone(), options)
-        .run(&parent, input.to_owned())
-        .await
+    Box::pin(
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(definition.clone(), options)
+            .run(&parent, input.to_owned()),
+    )
+    .await
 }
 
 /// Build a minimal `ParentExecutionContext` suitable for runner tests.
