@@ -28,9 +28,9 @@ use crate::util::truncate_with_ellipsis;
 use tinyagents_harness::middleware::EphemeralInstructionMiddleware;
 use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_tool_failure;
 
-struct OpenHumanHaltCopy;
+pub(crate) struct OpenHumanCopyProvider;
 
-impl CopyProvider for OpenHumanHaltCopy {
+impl CopyProvider for OpenHumanCopyProvider {
     fn copy_override(
         &self,
         request: &tinyagents_harness::turn_stop::CopyRequest<'_>,
@@ -79,39 +79,6 @@ pub(crate) fn user_actionable_escalation(tool: &str, error: &str) -> Option<Stri
             truncate_with_ellipsis(error, 400),
         )
     })
-}
-
-pub(crate) fn terminal_inference_failure_kind(
-    result: &str,
-) -> Option<TerminalInferenceFailureKind> {
-    tinyagents_hooks::stop::terminal_inference_failure_kind(result)
-}
-
-pub(crate) fn terminal_inference_halt_summary(
-    kind: TerminalInferenceFailureKind,
-    tool: &str,
-    error: &str,
-) -> String {
-    match kind {
-        TerminalInferenceFailureKind::BudgetExhausted => {
-            stop::halt_summary::budget(&OpenHumanHaltCopy, tool, error).summary
-        }
-        TerminalInferenceFailureKind::ProviderConfig => {
-            stop::halt_summary::provider_config(&OpenHumanHaltCopy, tool, error).summary
-        }
-    }
-}
-
-pub(crate) fn recoverable_identical_halt_summary(tool: &str, count: u32, error: &str) -> String {
-    stop::halt_summary::retry_exhausted(&OpenHumanHaltCopy, tool, count, error).summary
-}
-
-pub(crate) fn recoverable_no_progress_halt_summary(
-    consecutive: u32,
-    tool: &str,
-    error: &str,
-) -> String {
-    stop::halt_summary::no_progress(&OpenHumanHaltCopy, consecutive, tool, error).summary
 }
 
 #[cfg(test)]
@@ -218,11 +185,23 @@ struct HaltCopy;
 
 impl FailurePolicy for HaltCopy {
     fn identical_halt_summary(&self, tool: &str, count: u32, failure_text: &str) -> String {
-        recoverable_identical_halt_summary(tool, count, failure_text)
+        stop::halt_summary::retry_exhausted(
+            &OpenHumanCopyProvider,
+            tool,
+            count,
+            failure_text,
+        )
+        .summary
     }
 
     fn no_progress_halt_summary(&self, consecutive: u32, tool: &str, failure_text: &str) -> String {
-        recoverable_no_progress_halt_summary(consecutive, tool, failure_text)
+        stop::halt_summary::no_progress(
+            &OpenHumanCopyProvider,
+            consecutive,
+            tool,
+            failure_text,
+        )
+        .summary
     }
 }
 
@@ -369,8 +348,25 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         let failure_text = sanitized_failure(&content);
         let heuristic = heuristic_text(&call.name, &failure_text);
         if result.is_error && !is_command_exit_report(&failure_text) {
-            if let Some(kind) = terminal_inference_failure_kind(heuristic) {
-                let summary = terminal_inference_halt_summary(kind, &call.name, &failure_text);
+            if let Some(kind) = stop::terminal_inference_failure_kind(heuristic) {
+                let summary = match kind {
+                    TerminalInferenceFailureKind::BudgetExhausted => {
+                        stop::halt_summary::budget(
+                            &OpenHumanCopyProvider,
+                            &call.name,
+                            &failure_text,
+                        )
+                        .summary
+                    }
+                    TerminalInferenceFailureKind::ProviderConfig => {
+                        stop::halt_summary::provider_config(
+                            &OpenHumanCopyProvider,
+                            &call.name,
+                            &failure_text,
+                        )
+                        .summary
+                    }
+                };
                 return FailureAssessment::Halt {
                     summary: summary.clone(),
                     cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
