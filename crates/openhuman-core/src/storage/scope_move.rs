@@ -363,6 +363,10 @@ fn upgrade_legacy_scope_document(
             crate::threads::store::upgrade_records(vec![record])?,
             crate::threads::store::collection_specs(),
         ),
+        "approvals" | "approval_flow_trust" => (
+            crate::security::approval::upgrade_records(vec![record])?,
+            crate::security::approval::collection_specs(),
+        ),
         "subagent_sessions" => (
             crate::agent::orchestration::subagent_sessions::upgrade_records(vec![record])?,
             crate::agent::orchestration::subagent_sessions::collection_specs(),

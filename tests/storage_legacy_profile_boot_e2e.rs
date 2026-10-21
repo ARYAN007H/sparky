@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use sha2::{Digest, Sha256};
 use serde_json::{Value, json};
 use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;
@@ -13,6 +14,8 @@ const TOKEN: &str = "legacy-profile-boot-e2e-token";
 const FIXTURE: &[u8] = include_bytes!(
     "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/storage.db"
 );
+const FIXTURE_PATH: &str =
+    "../../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/storage.db";
 
 struct Server(Child);
 
@@ -100,8 +103,14 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
     (profile, source)
 }
 
+fn fixture_sha256() -> Vec<u8> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURE_PATH);
+    Sha256::digest(std::fs::read(path).expect("read checked-in v1 fixture")).to_vec()
+}
+
 #[test]
 fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
+    let fixture_hash = fixture_sha256();
     let home = tempfile::tempdir().unwrap();
     let (profile, source) = seed_existing_profile(home.path());
     let (server, base) = start(home.path());
@@ -290,6 +299,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         .unwrap()
         .unwrap();
     assert_eq!(secret.as_slice(), b"historical-secret-value");
+    assert_eq!(fixture_sha256(), fixture_hash, "boot modified the checked-in source fixture");
 
     // A second desktop boot must not replay the archived v1 database over an
     // owner deletion made after migration.
@@ -346,4 +356,5 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     .join()
     .unwrap();
     drop(rebooted);
+    assert_eq!(fixture_sha256(), fixture_hash, "reboot modified the checked-in source fixture");
 }
