@@ -7,7 +7,7 @@ use tinytools::Tool;
 #[tokio::test]
 async fn discovered_parent_config_is_used_to_record_agent_overrides() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
         scoped(&storage, "tenant-internal-boot-agent"),
         Scope::new("tenant-internal-boot-agent").unwrap(),
@@ -70,7 +70,7 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
     let previous_proxy = crate::config::runtime_proxy_config();
     let _restore = RuntimeProxyRestore(previous_proxy);
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let path = tmp.path().join("config.toml");
     let workspace = tmp.path().join("workspace");
 
@@ -133,7 +133,7 @@ async fn channel_allowlist_store_loads_a_versioned_document_before_saving() {
     let tmp = tempfile::tempdir().unwrap();
     let _env = crate::config::test_env::lock_env_async().await;
     let _home = crate::config::test_env::EnvVarGuard::set("HOME", tmp.path());
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let openhuman_dir = tmp.path().join(".openhuman");
     tokio::fs::create_dir_all(&openhuman_dir).await.unwrap();
     let config_path = openhuman_dir.join("config.toml");
@@ -186,7 +186,7 @@ async fn channel_allowlist_store_loads_a_versioned_document_before_saving() {
 #[tokio::test]
 async fn recovery_restores_the_bootstrap_file_when_document_cas_conflicts() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let mut recovered = config_at(tmp.path(), "recovered-config");
     recovered.storage.url = Some("sqlite:/bootstrap-from-recovered-file".into());
     recovered.save().await.unwrap();
