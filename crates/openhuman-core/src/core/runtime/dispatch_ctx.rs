@@ -37,6 +37,14 @@ impl DispatchCtx {
         }
     }
 
+    /// Binds the resolved core while preserving call-local dispatch metadata.
+    /// Used when a registered handler's context is scoped for execution after
+    /// the transport has already attached flags to the call.
+    pub(crate) fn with_resolved_core(mut self, core: Arc<CoreContext>) -> Self {
+        self.core = Some(core);
+        self
+    }
+
     /// Dispatch with no context. Only for tests and pre-boot callers; every
     /// reader of the context treats this as "nothing configured here".
     pub fn unbound() -> Self {
