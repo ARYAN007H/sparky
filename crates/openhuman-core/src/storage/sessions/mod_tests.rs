@@ -111,9 +111,10 @@ async fn without_a_store_transcripts_come_from_the_workspace_store_not_files() {
         ))
         .expect("append a message");
     assert!(transcripts_or_files("u1", dir).session_exists(&session));
-    assert!(
-        dir.join(tinyagents_session::port::STORE_DIR).is_dir(),
-        "the workspace store lives under the workspace"
+    assert_eq!(
+        transcripts_or_files("u1", dir).destination_key(),
+        key,
+        "a second lookup reuses the same workspace storage destination"
     );
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
     let expected = provider.for_agent("u1").transcripts.destination_key();
@@ -318,13 +319,11 @@ async fn a_stashed_attachment_survives_a_restart_of_the_workspace_store() {
         resumed.read_data_uri("att-1").await.unwrap().as_deref(),
         Some(data_uri)
     );
-    assert!(
-        resumed
-            .read_data_uri("never-stashed")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(resumed
+        .read_data_uri("never-stashed")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[test]

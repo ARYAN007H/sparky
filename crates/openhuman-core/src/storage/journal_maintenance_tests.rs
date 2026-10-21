@@ -1,14 +1,16 @@
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
-use tinyagents_harness::HarnessStatusStore;
+use crate::storage::test_support::{sqlite_backend, SqliteBackend};
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
 use tinyagents_harness::observability::replay::read_run_events_page;
 use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
-use tinystoragedrivers_testkit::memory_backend as test_memory_backend;
+use tinyagents_harness::HarnessStatusStore;
 
-fn backend() -> Arc<dyn StorageBackend> {
-    Arc::new(test_memory_backend())
+fn backend() -> SqliteBackend {
+    sqlite_backend().expect("SQLite test backend")
 }
 
 fn journal(backend: &Arc<dyn StorageBackend>) -> StoreEventJournal<Arc<dyn AppendStore>> {
@@ -44,7 +46,7 @@ async fn sealed(backend: &Arc<dyn StorageBackend>, run: &str) -> bool {
         .for_scope(&Scope::local())
         .unwrap()
         .streams()
-        .info(&format!("{JOURNAL_STREAM}/{run}"))
+        .info(&format!("{}{run}", DriverAppendStore::JOURNAL_PREFIX))
         .await
         .unwrap()
         .unwrap()
@@ -77,7 +79,8 @@ async fn pages(
 
 #[tokio::test]
 async fn a_sealed_journal_serves_the_same_pages_as_an_unsealed_one() {
-    let backend = backend();
+    let fixture = backend();
+    let backend = &fixture.backend;
     let journal = journal(&backend);
     seed(&journal, "run.a", 7).await;
     let before = pages(&journal, "run.a").await;
@@ -88,7 +91,8 @@ async fn a_sealed_journal_serves_the_same_pages_as_an_unsealed_one() {
 
 #[tokio::test]
 async fn backfill_seals_finished_runs_but_not_active_ones_and_records_itself() {
-    let backend = backend();
+    let fixture = backend();
+    let backend = &fixture.backend;
     let journal = journal(&backend);
     seed(&journal, "run.done", 2).await;
     seed(&journal, "run.live", 2).await;
@@ -123,7 +127,8 @@ async fn backfill_seals_finished_runs_but_not_active_ones_and_records_itself() {
 
 #[tokio::test]
 async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
-    let backend = backend();
+    let fixture = backend();
+    let backend = &fixture.backend;
     let journal = journal(&backend);
     seed(&journal, "run.old", 2).await;
     journal.seal_run("run.old").await.unwrap();
@@ -158,19 +163,18 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
     .unwrap();
     assert_eq!(late.deleted, 1);
     let storage = backend.for_scope(&Scope::local()).unwrap();
-    assert!(
-        storage
-            .streams()
-            .info(&format!("{JOURNAL_STREAM}/run.old"))
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(storage
+        .streams()
+        .info(&format!("{}run.old", DriverAppendStore::JOURNAL_PREFIX))
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
 async fn zero_retention_days_keeps_sealed_journals_forever() {
-    let backend = backend();
+    let fixture = backend();
+    let backend = &fixture.backend;
     let journal = journal(&backend);
     seed(&journal, "run.keep", 1).await;
     journal.seal_run("run.keep").await.unwrap();
@@ -209,12 +213,13 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
     .unwrap();
     profile_host.provision(&profile_id).await.unwrap();
 
-    let backend = backend();
+    let fixture = backend();
+    let backend = &fixture.backend;
     let profile_scope = crate::storage::scope_for_profile(profile_id.as_str());
     let profile_journal = journal_in_scope(&backend, &profile_scope);
     seed(&profile_journal, "run.foreign", 1).await;
     profile_journal.seal_run("run.foreign").await.unwrap();
-    let stream = format!("{JOURNAL_STREAM}/run.foreign");
+    let stream = format!("{}run.foreign", DriverAppendStore::JOURNAL_PREFIX);
     let sealed_at = backend
         .for_scope(&profile_scope)
         .unwrap()
@@ -248,22 +253,21 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
         .await
         .unwrap();
     assert_eq!(expired.deleted, 0);
-    assert!(
-        backend
-            .for_scope(&profile_scope)
-            .unwrap()
-            .streams()
-            .info(&stream)
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(backend
+        .for_scope(&profile_scope)
+        .unwrap()
+        .streams()
+        .info(&stream)
+        .await
+        .unwrap()
+        .is_some());
 }
 
 #[tokio::test]
 async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_writes() {
     let tmp = tempfile::tempdir().unwrap();
-    let backend: Arc<dyn StorageBackend> = Arc::new(test_memory_backend());
+    let fixture = backend();
+    let backend = Arc::clone(&fixture.backend);
     let host = crate::profiles::ProfileHost::with_backend(
         crate::core::runtime::SaasConfig::new(tmp.path()),
         crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None),
@@ -282,7 +286,7 @@ async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_wri
     let profile_journal = journal_in_scope(&profile_backend, &scope);
     seed(&profile_journal, "run.expiring", 1).await;
     profile_journal.seal_run("run.expiring").await.unwrap();
-    let stream = format!("{JOURNAL_STREAM}/run.expiring");
+    let stream = format!("{}run.expiring", DriverAppendStore::JOURNAL_PREFIX);
     let sealed_at = backend
         .for_scope(&scope)
         .unwrap()
@@ -300,7 +304,7 @@ async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_wri
     let work = captured_profile_work(
         &host,
         vec![Arc::clone(&profile)],
-        super::fence::system_now_ms(),
+        crate::storage::fence::system_now_ms(),
     )
     .unwrap()
     .into_iter()
@@ -316,16 +320,15 @@ async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_wri
 
     let raw = backend.for_scope(&scope).unwrap();
     assert!(raw.streams().info(&stream).await.unwrap().is_some());
-    assert!(
-        raw.documents()
-            .get(
-                BACKFILL_COLLECTION,
-                &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap(),
-            )
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(raw
+        .documents()
+        .get(
+            BACKFILL_COLLECTION,
+            &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap(),
+        )
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[test]

@@ -59,7 +59,7 @@ async fn workspace_fd_lifetime_is_separate_from_catalog_callback_lifetime() {
     for workspace in &workspaces {
         let backend = crate::storage::local::backend_for(workspace.path())
             .expect("open the temporary workspace default backend");
-        assert_eq!(backend.driver(), "sqlite");
+        assert!(workspace.path().join("storage").exists());
         drop(backend);
     }
     let after_backend_opens = open_fd_count();

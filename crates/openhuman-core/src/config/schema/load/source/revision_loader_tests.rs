@@ -9,7 +9,7 @@ async fn discovered_parent_config_is_used_to_record_agent_overrides() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-internal-boot-agent"),
+        scoped(storage.as_ref(), "tenant-internal-boot-agent"),
         Scope::new("tenant-internal-boot-agent").unwrap(),
         keys(18),
     );
@@ -84,7 +84,7 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
     seed.proxy.http_proxy = Some("http://persisted-proxy.invalid:8080".into());
     seed.save().await.unwrap();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-proxy-tool-revision"),
+        scoped(storage.as_ref(), "tenant-proxy-tool-revision"),
         Scope::new("tenant-proxy-tool-revision").unwrap(),
         keys(19),
     );
@@ -156,7 +156,7 @@ async fn channel_allowlist_store_loads_a_versioned_document_before_saving() {
     seed.save().await.unwrap();
 
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-channel-allowlist-revision"),
+        scoped(storage.as_ref(), "tenant-channel-allowlist-revision"),
         Scope::new("tenant-channel-allowlist-revision").unwrap(),
         keys(20),
     );
@@ -194,7 +194,7 @@ async fn recovery_restores_the_bootstrap_file_when_document_cas_conflicts() {
     std::fs::rename(&recovered.config_path, &corrupted).unwrap();
 
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-recovery-cas"),
+        scoped(storage.as_ref(), "tenant-recovery-cas"),
         Scope::new("tenant-recovery-cas").unwrap(),
         keys(21),
     );

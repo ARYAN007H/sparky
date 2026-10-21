@@ -1,5 +1,5 @@
 use super::*;
-use crate::storage::MemoryStorage;
+use crate::storage::test_support::memory_backend;
 
 fn meta(id: &str, created_at: u64) -> ProfileMeta {
     ProfileMeta {
@@ -31,13 +31,13 @@ async fn exercise(registry: &ProfileRegistry) {
 
 #[tokio::test]
 async fn the_shared_registry_records_lists_and_forgets() {
-    let storage = MemoryStorage::new();
-    let registry = ProfileRegistry::cluster(&storage).unwrap();
+    let storage = memory_backend();
+    let registry = ProfileRegistry::cluster(storage.as_ref()).unwrap();
     assert!(registry.is_shared());
     exercise(&registry).await;
 
     // A second node over the same backend sees the same profiles.
-    let other = ProfileRegistry::cluster(&storage).unwrap();
+    let other = ProfileRegistry::cluster(storage.as_ref()).unwrap();
     assert_eq!(other.list().await.unwrap().len(), 2);
 
     let alice = ProfileId::parse("alice").unwrap();

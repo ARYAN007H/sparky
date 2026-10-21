@@ -1,7 +1,5 @@
 #![cfg(feature = "storage-sqlite")]
 
-#![cfg(feature = "storage-sqlite")]
-
 use super::*;
 use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
 use crate::profiles::lease::{now_ms, renew_once};
@@ -101,7 +99,9 @@ async fn a_takeover_fences_the_old_holders_writes_before_its_heartbeat_runs() {
     a.provision(&alice).await.unwrap();
     let state = a.open(&alice).await.unwrap();
     write(&a_storage, "profile:alice").await.unwrap();
-    write(&a_storage, "profile:alice/agent:default").await.unwrap();
+    write(&a_storage, "profile:alice/agent:default")
+        .await
+        .unwrap();
 
     // Another node takes the profile over (by its clock the lease ran out).
     let thief = DocumentLeases::cluster(

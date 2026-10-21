@@ -1,6 +1,7 @@
 use super::*;
 use crate::storage::test_support::memory_backend;
 use crate::storage::{Precondition, Storage, scope_for_module};
+use serde_json::json;
 use sha2::Digest;
 
 fn scoped() -> Storage {

@@ -7,7 +7,8 @@ use crate::storage::test_support::{SqliteBackend, sqlite_backend};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use tempfile::TempDir;
-use tinystoragedrivers::{DocumentStoreExt, Query};
+use crate::storage::DocumentStoreExt as _;
+use tinystoragedrivers::Query;
 
 struct TestBackend(SqliteBackend);
 
@@ -366,7 +367,8 @@ fn records_the_previous_release_wrote_as_documents_are_imported_and_win_over_leg
     let db = dir.path().join(source.db);
     {
         use tinystoragedrivers::StorageBackend as _;
-        let storage = tinystoragedrivers::sqlite::SqliteStorage::open(&db).unwrap();
+        let url = format!("sqlite:{}", db.display());
+        let storage = crate::storage::block_on(crate::storage::open(&url)).unwrap();
         let docs = Arc::clone(storage.for_scope(&Scope::local()).unwrap().documents());
         crate::storage::block_on(async move {
             docs.ensure_collection(&(source.collections)().remove(0))

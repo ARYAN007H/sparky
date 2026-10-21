@@ -17,8 +17,8 @@ use std::sync::Arc;
 use super::*;
 use crate::security::{AutonomyLevel, SecurityPolicy, TrustedAccess, TrustedRoot};
 use tinyagents_harness::artifacts::{
-    extract_artifact_paths, ArtifactKind, ArtifactPathPolicy, ARTIFACT_POINTER_PREFIX,
-    DEFAULT_OFFLOAD_THRESHOLD_BYTES,
+    ARTIFACT_POINTER_PREFIX, ArtifactKind, ArtifactPathPolicy, DEFAULT_OFFLOAD_THRESHOLD_BYTES,
+    extract_artifact_paths,
 };
 
 /// Policy with disjoint action/workspace roots, the shipped default layout
@@ -104,10 +104,11 @@ fn workspace_guard_defers_to_the_security_policy_for_internal_state() {
     }
 }
 
-fn memory_blobs() -> Arc<dyn tinystoragedrivers::BlobStore> {
+fn memory_blobs() -> Arc<dyn tinystoragedrivers_api::BlobStore> {
     use tinystoragedrivers::StorageBackend as _;
-    let scoped = tinystoragedrivers::MemoryStorage::new()
-        .for_scope(&tinystoragedrivers::Scope::local())
+    let backend = crate::storage::test_support::memory_backend();
+    let scoped = backend
+        .for_scope(&crate::storage::Scope::local())
         .expect("the memory backend binds the local scope");
     Arc::clone(scoped.blobs())
 }

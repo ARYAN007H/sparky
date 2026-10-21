@@ -68,9 +68,9 @@ fn save_upserts_sessions_and_keeps_the_others() {
 #[test]
 fn scopes_do_not_see_each_others_sessions() {
     let storage = memory_backend();
-    docs_in(&storage, "alice").save(&[session("a")]).unwrap();
-    assert!(docs_in(&storage, "bob").load().unwrap().is_empty());
-    assert_eq!(docs_in(&storage, "alice").load().unwrap().len(), 1);
+    docs_in(storage.as_ref(), "alice").save(&[session("a")]).unwrap();
+    assert!(docs_in(storage.as_ref(), "bob").load().unwrap().is_empty());
+    assert_eq!(docs_in(storage.as_ref(), "alice").load().unwrap().len(), 1);
 }
 
 #[test]
@@ -110,7 +110,7 @@ fn the_store_dispatches_to_documents_when_a_backend_is_pinned() {
     let storage = memory_backend();
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
-    let docs = docs_in(&storage, "local");
+    let docs = docs_in(storage.as_ref(), "local");
     with_override(docs.clone(), || {
         assert!(store.load().unwrap().is_empty());
         store.save(&[session("a")]).unwrap();
@@ -222,7 +222,7 @@ fn a_durable_session_keeps_its_scoped_lifecycle_key_after_document_reopen() {
         task_id: "task".into(),
     };
     saved.lifecycle_key = Some(key.clone());
-    docs_in(&storage, "local").save(&[saved]).unwrap();
-    let loaded = docs_in(&storage, "local").load().unwrap();
+    docs_in(storage.as_ref(), "local").save(&[saved]).unwrap();
+    let loaded = docs_in(storage.as_ref(), "local").load().unwrap();
     assert_eq!(loaded[0].lifecycle_key, Some(key));
 }

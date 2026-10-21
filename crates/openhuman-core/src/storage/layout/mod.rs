@@ -207,7 +207,7 @@ pub enum Outcome {
 }
 
 #[cfg(all(test, feature = "legacy-import"))]
-mod test_fixtures;
+pub(crate) mod test_fixtures;
 
 #[cfg(all(test, feature = "legacy-import"))]
 #[path = "mod_tests.rs"]

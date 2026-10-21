@@ -8,6 +8,8 @@
 //!   expires, and the taker sees `previous_unclean`;
 //! - a renew (or release) after the record moved on is always `Lost`.
 
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
 
 use std::time::Duration;
@@ -352,5 +354,3 @@ proptest! {
         runtime.block_on(run(nodes, steps))?;
     }
 }
-#![cfg(feature = "storage-sqlite")]
-

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::storage::rusqlite;
-use crate::storage::test_support::{SqliteBackend, sqlite_backend};
+use crate::storage::test_support::{sqlite_backend, SqliteBackend};
 use crate::util::classic_transcript_fixture::write_classic;
 use sha2::Digest as _;
 use std::collections::BTreeMap;
@@ -32,6 +32,19 @@ impl Deref for TestBackend {
 
 fn backend() -> TestBackend {
     TestBackend(sqlite_backend().unwrap())
+}
+
+fn session_provider(backend: &Arc<dyn StorageBackend>) -> DriverSessionStores {
+    let backend = Arc::clone(backend);
+    let factory: tinyagents_session::port::AgentStorageFactory = Arc::new(move |agent_id| {
+        let scope = crate::storage::scope_for_agent(agent_id);
+        let storage = backend.for_scope(&scope)?;
+        Ok(tinyagents_storage_kit::ScopedStorage::new(
+            storage,
+            (*scope).clone(),
+        ))
+    });
+    DriverSessionStores::new(factory).unwrap()
 }
 
 #[test]
@@ -289,7 +302,7 @@ fn a_classic_workspace_moves_into_the_backend_and_its_files_are_untouched() {
     let outcome = reports.into_iter().next().unwrap().outcome.unwrap();
     assert!(matches!(outcome, Outcome::Imported { .. }), "{outcome:?}");
 
-    let provider = DriverSessionStores::new(Arc::clone(&backend), Scope::local()).unwrap();
+    let provider = session_provider(&backend);
     // The transcript landed in the orchestrator's scope, where its session
     // resumes it.
     let orchestrator = provider.try_for_agent("orchestrator").unwrap();
@@ -348,7 +361,7 @@ fn a_transcript_naming_an_unknown_agent_lands_in_the_default_agent() {
 
     run_with(&backend, &config).remove(0).outcome.unwrap();
 
-    let provider = DriverSessionStores::new(Arc::clone(&backend), Scope::local()).unwrap();
+    let provider = session_provider(&backend);
     let default = provider.try_for_agent(DEFAULT_AGENT).unwrap();
     assert!(default.transcripts.root_for_thread("thread-9").is_some());
 }
@@ -385,6 +398,7 @@ fn database_import_totals_source_families_not_derived_fts_rows() {
         members: counts(9, 8),
         tasks: counts(10, 9),
         tool_effects: counts(11, 10),
+        entries: ImportCounts::default(),
         fts_rows: 1_000,
     };
 

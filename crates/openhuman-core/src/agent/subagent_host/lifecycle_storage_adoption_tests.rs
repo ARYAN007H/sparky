@@ -150,7 +150,7 @@ fn legacy_host_kv_pause_is_converted_without_rewriting_the_source_record() {
 fn owner_file_pause_is_imported_and_the_original_bytes_stay_unchanged() {
     let workspace = tempfile::tempdir().unwrap();
     let key = task();
-    let adapter = super::super::persistence::OpenHumanPersistence::new(workspace.path());
+    let adapter = super::super::persistence::OpenHumanPersistence::new(workspace.path().to_path_buf());
     let file = adapter.legacy_pause_path(&key);
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     let bytes = serde_json::to_vec(&paused(&key)).unwrap();

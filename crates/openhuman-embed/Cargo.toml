@@ -18,6 +18,7 @@ langfuse = ["openhuman-core/langfuse", "tinyagents-harness/langfuse"]
 # `channels` is in core's default set already; enabling it here too compiles
 # the `Runtime::channels` facade in a default build.
 default = ["openhuman-core/default", "channels", "modules"]
+testkit = ["tinyagents-session/testkit"]
 http-server = ["openhuman-core/http-server"]
 inference = ["openhuman-core/inference"]
 documents = ["openhuman-core/documents"]

@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::runtime::{ContextOverlay, DomainSet};
+use crate::storage::Scope;
 
 /// A context derived for `agent` and registered as that agent's live one,
 /// the way an embed agent is. Each test uses its own agent ids, so tests

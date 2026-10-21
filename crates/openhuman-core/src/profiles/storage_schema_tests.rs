@@ -2,7 +2,8 @@ use super::*;
 use crate::storage::test_support::sqlite_backend;
 use serde_json::json;
 use std::sync::Arc;
-use tinystoragedrivers::{Meta, Precondition, Scope};
+use crate::storage::Scope;
+use tinystoragedrivers::{Meta, Precondition};
 
 #[test]
 fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {

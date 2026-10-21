@@ -1,4 +1,4 @@
-//! A module granted a queue manifest uses `ScopedStorage::queues()` over the
+//! A module granted a queue manifest uses `Storage::queues()` over the
 //! real bus: the host declares the manifest's queues on the module's scope,
 //! refuses a queue the manifest does not name, and denies a module whose grant
 //! holds no queues at all, while that module still connects.
@@ -80,20 +80,17 @@ async fn peers() -> Peers {
     }
 }
 
-async fn queues_of(connection: &Connection) -> Arc<dyn QueueStore> {
+async fn queues_of(connection: &Connection, _module_id: &str) -> Arc<dyn QueueStore> {
     let storage = tinystoragedrivers_busproxy::connect_storage(connection.clone())
         .await
         .expect("every module connects, with or without queues");
-    let scoped = storage
-        .for_scope(&tinystoragedrivers_busproxy::module_scope_label())
-        .unwrap();
-    Arc::clone(scoped.queues())
+    Arc::clone(storage.queues())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_module_granted_a_manifest_enqueues_receives_and_acks_over_the_bus() {
     let peers = peers().await;
-    let queues = queues_of(&peers.queued).await;
+    let queues = queues_of(&peers.queued, "alpha").await;
 
     // Agreeing with the declared spec is accepted; the host already declared it.
     let declared = manifest().get("inbox").unwrap().spec();
@@ -124,7 +121,7 @@ async fn a_module_granted_a_manifest_enqueues_receives_and_acks_over_the_bus() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_queue_outside_the_manifest_is_not_found_and_a_divergent_spec_conflicts() {
     let peers = peers().await;
-    let queues = queues_of(&peers.queued).await;
+    let queues = queues_of(&peers.queued, "alpha").await;
 
     let error = queues
         .enqueue("elsewhere", &[NewMessage::new(json!({}))])
@@ -141,7 +138,7 @@ async fn a_queue_outside_the_manifest_is_not_found_and_a_divergent_spec_conflict
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_module_without_a_queue_grant_connects_but_is_denied_queues() {
     let peers = peers().await;
-    let queues = queues_of(&peers.plain).await;
+    let queues = queues_of(&peers.plain, "beta").await;
     assert_eq!(queues.features(), QueueFeatures::default());
     let error = queues
         .enqueue("inbox", &[NewMessage::new(json!({}))])

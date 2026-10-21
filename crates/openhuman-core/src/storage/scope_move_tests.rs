@@ -5,6 +5,7 @@ use crate::storage::Precondition;
 use serde_json::json;
 #[cfg(feature = "legacy-import")]
 use std::io::Read;
+use std::path::Path;
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::Meta;
 
@@ -208,20 +209,22 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
     assert_eq!(lease.meta.expires_ms, Some(10_000));
 
     let operator = backend.for_scope(&crate::storage::Scope::local()).unwrap();
-    assert!(operator
-        .documents()
-        .get("profiles.registry", "alice")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        operator
+            .documents()
+            .get("profiles.registry", "alice")
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[cfg(feature = "legacy-import")]
 #[test]
 fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
-    use crate::storage::layout::{legacy, Target};
-    use crate::storage::{self, DocumentStoreExt, Precondition, Scope};
-    use tinystoragedrivers::{CollectionSpec, Query};
+    use crate::storage::layout::{Target, legacy};
+    use crate::storage::{self, CollectionSpec, DocumentStoreExt, Precondition, Scope};
+    use tinystoragedrivers::Query;
 
     let dir = tempfile::tempdir().unwrap();
     let target = Target::new(dir.path(), "alice");
@@ -232,10 +235,6 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     let config = crate::config::Config {
         config_path,
         workspace_dir: target.files(),
-        storage: crate::config::StorageConfig {
-            url: Some(destination_url.clone()),
-            ..Default::default()
-        },
         ..crate::config::Config::default()
     };
 
@@ -255,7 +254,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
             Precondition::Absent,
         )
         .await?;
-        Ok::<_, anyhow::Error>(())
+        Ok::<_, crate::storage::StorageError>(())
     })
     .unwrap();
 
@@ -301,7 +300,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     storage::block_on(async {
         destination
             .documents()
-            .delete("scope_move_fixture", "stable-id", Precondition::Any)
+            .delete("scope_move_fixture", "stable-id", Precondition::None)
             .await
     })
     .unwrap();
@@ -311,8 +310,8 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
         .find(|report| report.domain == IMPORT_DOMAIN)
         .unwrap();
     assert_eq!(
-        outcome.outcome,
-        Ok(crate::storage::import::Outcome::AlreadyDone)
+        outcome.outcome.unwrap(),
+        crate::storage::import::Outcome::AlreadyDone
     );
     let after = storage::block_on(async {
         destination
@@ -327,19 +326,14 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
 
 #[test]
 #[cfg(feature = "legacy-import")]
-fn boot_import_reports_no_source_for_a_new_mongodb_target() {
+fn boot_import_reports_no_source_for_a_workspace_without_legacy_storage() {
     let workspace = tempfile::tempdir().unwrap();
     let config = crate::config::Config {
         workspace_dir: workspace.path().to_path_buf(),
-        storage: crate::config::StorageConfig {
-            url: Some("mongodb://127.0.0.1/openhuman".into()),
-            ..Default::default()
-        },
         ..Default::default()
     };
     // This is the actual boot importer pipeline. With no legacy SQLite file,
-    // the current destination URL is not evidence of a legacy Mongo source.
-    // No backend is installed and the driver is never opened here.
+    // the destination backend is not treated as a legacy source.
     let backend = crate::storage::test_support::memory_backend();
     let reports = crate::storage::import::run_all(&backend, &config);
     let report = reports
@@ -347,8 +341,8 @@ fn boot_import_reports_no_source_for_a_new_mongodb_target() {
         .find(|report| report.domain == IMPORT_DOMAIN)
         .expect("scope migration is in the boot importer pipeline");
     assert_eq!(
-        report.outcome,
-        Ok(crate::storage::import::Outcome::NoSource)
+        report.outcome.unwrap(),
+        crate::storage::import::Outcome::NoSource
     );
 }
 

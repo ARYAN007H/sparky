@@ -63,11 +63,11 @@ fn args_and_delete() {
 #[test]
 fn scopes_do_not_see_each_others_artifacts() {
     let storage = memory_backend();
-    docs_in(&storage, "alice")
+    docs_in(storage.as_ref(), "alice")
         .put_meta(&meta("a", 1, None))
         .unwrap();
-    assert!(docs_in(&storage, "bob").list_meta().unwrap().is_empty());
-    assert_eq!(docs_in(&storage, "alice").list_meta().unwrap().len(), 1);
+    assert!(docs_in(storage.as_ref(), "bob").list_meta().unwrap().is_empty());
+    assert_eq!(docs_in(storage.as_ref(), "alice").list_meta().unwrap().len(), 1);
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn delete_removes_the_record_before_its_arguments() {
 #[tokio::test]
 async fn the_store_dispatches_to_documents_when_a_backend_is_pinned() {
     let storage = memory_backend();
-    let docs = docs_in(&storage, "local");
+    let docs = docs_in(storage.as_ref(), "local");
     let workspace = tempfile::tempdir().unwrap();
     let ws = workspace.path();
     super::TEST_OVERRIDE.with(|slot| *slot.borrow_mut() = Some(docs.clone()));

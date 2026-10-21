@@ -539,13 +539,14 @@ async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
         return;
     }
 
+    let _storage_slot = crate::storage::test_support::lock_storage_slot();
     let first_root = tempfile::tempdir().unwrap();
     let second_root = tempfile::tempdir().unwrap();
     let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
     let registry = crate::storage::fence::registry();
     let backend: Arc<dyn crate::storage::StorageBackend> =
         Arc::new(crate::storage::fenced_backend::FencedBackend::new(
-            Arc::new(crate::storage::MemoryStorage::new()),
+            crate::storage::test_support::memory_backend(),
             Arc::clone(&registry),
         ));
     let _storage = RestoreInstalledStorage(crate::storage::install(backend));
@@ -608,12 +609,13 @@ async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
         return;
     }
 
+    let _storage_slot = crate::storage::test_support::lock_storage_slot();
     let tmp = tempfile::tempdir().unwrap();
     let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
     let registry = crate::storage::fence::registry();
     let backend: Arc<dyn crate::storage::StorageBackend> =
         Arc::new(crate::storage::fenced_backend::FencedBackend::new(
-            Arc::new(crate::storage::MemoryStorage::new()),
+            crate::storage::test_support::memory_backend(),
             Arc::clone(&registry),
         ));
     let _storage = RestoreInstalledStorage(crate::storage::install(backend));

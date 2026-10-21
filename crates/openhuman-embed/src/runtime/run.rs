@@ -82,8 +82,9 @@ impl RuntimeBuilder {
             .map_err(|error| anyhow::Error::new(RuntimeError::Invalid(error)))?;
         // The server's runtime installs the same, already opened backend
         // rather than opening the URL a second time.
-        if let Some(backend) = storage {
+        if let Some((backend, driver)) = storage {
             builder.seams.storage = Some(StorageSource::Backend(backend));
+            builder.seams.storage_driver = driver;
         }
 
         let summary = builder.summary();
@@ -140,7 +141,13 @@ impl CliGlobals {
     /// configured, now opened.
     fn install(
         mut self,
-    ) -> Result<Option<Arc<dyn openhuman_core::storage::StorageBackend>>, String> {
+    ) -> Result<
+        Option<(
+            Arc<dyn openhuman_core::storage::StorageBackend>,
+            Option<String>,
+        )>,
+        String,
+    > {
         if let Some(engine) = self.memory_engine {
             openhuman_core::memory::engine::install_host_engine(engine);
         }
@@ -150,7 +157,9 @@ impl CliGlobals {
         }
         self.seams.open_storage_blocking()?;
         let storage = match &self.seams.storage {
-            Some(StorageSource::Backend(backend)) => Some(Arc::clone(backend)),
+            Some(StorageSource::Backend(backend)) => {
+                Some((Arc::clone(backend), self.seams.storage_driver.clone()))
+            }
             _ => None,
         };
         let seams = self.seams.install()?;

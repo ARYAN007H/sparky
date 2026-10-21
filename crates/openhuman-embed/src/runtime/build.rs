@@ -162,6 +162,7 @@ impl RuntimeBuilder {
         let mut storage_info = super::StorageInfo::describe(
             self.seams.storage.as_ref(),
             config.as_ref().unwrap_or(&Config::default()),
+            self.seams.storage_driver.as_deref(),
         );
         let mut host_seams = std::mem::take(&mut self.seams);
         if host_seams.storage.is_none() {
@@ -178,6 +179,7 @@ impl RuntimeBuilder {
         // storage seam, and removed with the runtime.
         if host_seams.storage.is_none() && matches!(self.workspace, Workspace::Stateless) {
             host_seams.storage = Some(super::StorageSource::Url("memory".into()));
+            storage_info = super::StorageInfo::url("backend", "memory");
         }
         validate_storage_feature(host_seams.storage.as_ref())?;
         host_seams
@@ -192,7 +194,7 @@ impl RuntimeBuilder {
             if let Some(backend) = &storage_backend {
                 let stores = openhuman_core::storage::sessions::TenantSessionStores::new(
                     backend.clone(),
-                    !openhuman_core::storage::driver_is_shared(backend.driver()),
+                    storage_info.recover_sessions_on_open(),
                 )
                 .map_err(|e| RuntimeError::Build(e.into()))?;
                 self.session_store = Some(Arc::new(stores));
@@ -280,11 +282,8 @@ impl RuntimeBuilder {
         let storage_backend = storage_backend.or_else(openhuman_core::storage::installed);
         if !storage_info.configured {
             if let Some(backend) = &storage_backend {
-                storage_info = super::StorageInfo {
-                    source: "backend".into(),
-                    driver: Some(backend.driver().into()),
-                    configured: true,
-                };
+                let installed_url = openhuman_core::storage::installed_url();
+                storage_info = super::StorageInfo::backend(installed_url.as_deref());
             }
         }
 

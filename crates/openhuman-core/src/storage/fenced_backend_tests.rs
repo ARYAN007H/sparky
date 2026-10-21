@@ -4,16 +4,16 @@
 #![cfg(feature = "storage-sqlite")]
 
 use super::*;
-use crate::storage::fence::{FenceError, LeaseFence, ScopeMatch};
+use crate::storage::fence::{fence_error, FenceError, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore};
 use serde_json::json;
 use std::sync::{
-    Arc,
     atomic::{AtomicU64, Ordering},
+    Arc,
 };
 use std::time::Duration;
 use tinystoragedrivers_api::StorageBackend as _;
-use tinystoragedrivers_types::{NewMessage, Precondition, QueueSpec, Scope};
+use tinystoragedrivers_types::{CollectionSpec, NewMessage, Precondition, QueueSpec, Scope};
 
 const TTL: Duration = Duration::from_secs(30);
 const MARGIN_MS: u64 = 5_000;
@@ -28,7 +28,7 @@ struct Node {
 
 impl Node {
     fn new(name: &'static str, shared: Arc<dyn StorageBackend>) -> Self {
-        let now = Arc::new(AtomicU64::new(0));
+        let now = Arc::new(AtomicU64::new(crate::storage::fence::system_now_ms()));
         let clock = Arc::clone(&now);
         let fences = Arc::new(FenceRegistry::new(move || clock.load(Ordering::SeqCst)));
         let leases = Arc::new(DocumentLeases::cluster(shared.as_ref(), name, None, TTL).unwrap());
@@ -79,6 +79,7 @@ fn shared() -> crate::storage::test_support::SqliteBackend {
 async fn cached_handles_enforce_local_expiry_margin_and_accept_same_epoch_renewal() {
     let shared = shared();
     let node = Node::new("node-a", Arc::clone(&shared.backend));
+    let base = node.now.load(Ordering::SeqCst);
     let (grant, fence) = node.acquire("alice").await;
     let storage = node.storage();
     storage
@@ -87,11 +88,11 @@ async fn cached_handles_enforce_local_expiry_margin_and_accept_same_epoch_renewa
         .await
         .unwrap();
 
-    node.set_now(20_000);
-    let renewed = node.leases.renew(&grant, 20_000).await.unwrap();
+    node.set_now(base + 20_000);
+    let renewed = node.leases.renew(&grant, base + 20_000).await.unwrap();
     assert_eq!(renewed.epoch, grant.epoch);
     fence.renewed(renewed.expires_at_ms);
-    node.set_now(40_000);
+    node.set_now(base + 40_000);
     storage
         .documents()
         .put(
@@ -113,14 +114,12 @@ async fn cached_handles_enforce_local_expiry_margin_and_accept_same_epoch_renewa
         fence_error(&error),
         Some(FenceError::Expired { .. })
     ));
-    assert!(
-        storage
-            .documents()
-            .get("items", "too-late")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(storage
+        .documents()
+        .get("items", "too-late")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -128,6 +127,7 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
     let shared = shared();
     let a = Node::new("node-a", Arc::clone(&shared.backend));
     let b = Node::new("node-b", Arc::clone(&shared.backend));
+    let base = a.now.load(Ordering::SeqCst);
     let (_grant, _fence) = a.acquire("alice").await;
     let storage = a.storage();
     storage
@@ -157,27 +157,23 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
         .unwrap();
     let receipt = delivery[0].receipt.clone();
 
-    b.set_now(TTL.as_millis() as u64 + 1);
+    b.set_now(base + TTL.as_millis() as u64 + 1);
     let (stolen, _) = b.acquire("alice").await;
     assert_eq!(stolen.epoch, 2);
     // A's local clock is deliberately behind. The local precheck succeeds;
     // the driver's atomic condition is what refuses each cached-handle write.
-    a.set_now(1_000);
-    assert!(
-        storage
-            .documents()
-            .put("items", "late", json!({}), Precondition::Absent)
-            .await
-            .is_err()
-    );
+    a.set_now(base + 1_000);
+    assert!(storage
+        .documents()
+        .put("items", "late", json!({}), Precondition::Absent)
+        .await
+        .is_err());
     assert!(storage.streams().append("events", json!(1)).await.is_err());
-    assert!(
-        storage
-            .blobs()
-            .put("blob", b"x".to_vec(), None)
-            .await
-            .is_err()
-    );
+    assert!(storage
+        .blobs()
+        .put("blob", b"x".to_vec(), None)
+        .await
+        .is_err());
     assert!(storage.kv().put("key", json!(1)).await.is_err());
     assert!(storage.queues().ack("work", &receipt).await.is_err());
 
@@ -185,24 +181,22 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
         .backend
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap();
-    assert!(
-        raw.documents()
-            .get("items", "late")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(raw
+        .documents()
+        .get("items", "late")
+        .await
+        .unwrap()
+        .is_none());
     assert_eq!(raw.streams().len("events").await.unwrap(), 0);
     assert!(raw.blobs().get("blob").await.unwrap().is_none());
     assert!(raw.kv().get("key").await.unwrap().is_none());
     assert_eq!(raw.queues().stats("work").await.unwrap().leased, 1);
-    assert!(
-        raw.documents()
-            .get("items", "kept")
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(raw
+        .documents()
+        .get("items", "kept")
+        .await
+        .unwrap()
+        .is_some());
 }
 
 #[tokio::test]
@@ -217,24 +211,20 @@ async fn a_manually_latched_cached_fence_refuses_mutations_before_driver_io() {
         .await
         .unwrap();
     fence.fence();
-    assert!(
-        storage
-            .documents()
-            .put("items", "late", json!({}), Precondition::Absent)
-            .await
-            .is_err()
-    );
-    assert!(
-        shared
-            .backend
-            .for_scope(&Scope::new("profile:alice").unwrap())
-            .unwrap()
-            .documents()
-            .get("items", "late")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(storage
+        .documents()
+        .put("items", "late", json!({}), Precondition::Absent)
+        .await
+        .is_err());
+    assert!(shared
+        .backend
+        .for_scope(&Scope::new("profile:alice").unwrap())
+        .unwrap()
+        .documents()
+        .get("items", "late")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -242,6 +232,7 @@ async fn captured_profile_sweeps_cannot_follow_a_replacement_epoch() {
     let shared = shared();
     let a = Node::new("node-a", Arc::clone(&shared.backend));
     let b = Node::new("node-b", Arc::clone(&shared.backend));
+    let base = a.now.load(Ordering::SeqCst);
     let (_grant, fence) = a.acquire("alice").await;
     let captured = FencedBackend::for_fence(
         Arc::clone(&shared.backend),
@@ -261,9 +252,9 @@ async fn captured_profile_sweeps_cannot_follow_a_replacement_epoch() {
         .await
         .unwrap();
 
-    b.set_now(TTL.as_millis() as u64 + 1);
+    b.set_now(base + TTL.as_millis() as u64 + 1);
     b.acquire("alice").await;
-    a.set_now(1_000);
+    a.set_now(base + 1_000);
     assert_eq!(
         super::super::blob_sweep::sweep_scope(&captured, &scope).await,
         0
