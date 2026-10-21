@@ -24,6 +24,8 @@ fn build(entry: &CloudProviderCreds, model: &str, key: &str) {
         None,
         None,
         None,
+        None,
+        None,
     )
     .unwrap_or_else(|error| panic!("{} failed to build: {error}", entry.slug));
 }

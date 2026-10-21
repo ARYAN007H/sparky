@@ -3,7 +3,7 @@
 use super::*;
 use tinyinference_llm::providers::openai::codex::OpenAiCodexRouting;
 use tinyinference_llm::providers::registry::{
-    CredentialResolver, ProviderBuildOptions, ProviderRegistry,
+    CredentialResolver, ProviderBuildOptions, ProviderHttpClientBuilder, ProviderRegistry,
 };
 use tinyinference_llm::{ProviderKind, ProviderSpec};
 
@@ -57,6 +57,8 @@ pub(super) fn build_cloud_model(
     user_agent: Option<&str>,
     codex: Option<&OpenAiCodexRouting>,
     http: Option<reqwest::Client>,
+    http_builder: Option<ProviderHttpClientBuilder<'_>>,
+    ca_bundle: Option<&str>,
 ) -> anyhow::Result<Arc<dyn ChatModel<()>>> {
     log::debug!(
         "[providers][cloud-spec] build slug={} kind={} auth={:?}",
@@ -77,6 +79,8 @@ pub(super) fn build_cloud_model(
                 user_agent,
                 codex,
                 http,
+                http_builder,
+                ca_bundle,
                 ..ProviderBuildOptions::default()
             },
         )
