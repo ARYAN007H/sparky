@@ -438,11 +438,6 @@ impl OpenHumanRunContext {
         crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
     }
 
-    /// The connected-identities prompt section, read under this run's context.
-    pub(crate) fn connected_identities_md(&self) -> String {
-        crate::integrations::render_connected_identities(&self.dispatch_ctx())
-    }
-
     /// Sets the direct TinyTools workspace descriptor for this run.
     pub fn with_workspace(mut self, workspace: tinytools::WorkspaceDescriptor) -> Self {
         self.workspace = Some(workspace);
