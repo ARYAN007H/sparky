@@ -64,10 +64,14 @@ impl ChatModel<()> for TriageReplyModel {
 
 fn triage_test_model(
     requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
+    failing_role: Option<&'static str>,
 ) -> crate::inference::registry::ChatModelEntry {
     crate::inference::registry::ChatModelEntry {
         build: Arc::new(move |build_request| {
             let role = build_request.role.to_string();
+            if failing_role == Some(build_request.role) {
+                anyhow::bail!("test provider has no model for role {role}");
+            }
             let model = build_request
                 .model_override
                 .or(build_request.default_model)
@@ -104,7 +108,7 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     crate::inference::registry::register_chat_model_in(
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        triage_test_model(Arc::clone(&requests)),
+        triage_test_model(Arc::clone(&requests), None),
     );
     let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
         .services(crate::core::runtime::ServiceSet::none())
