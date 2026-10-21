@@ -631,6 +631,61 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
 }
 
 #[tokio::test]
+async fn native_staged_lease_retries_cleanup_for_its_canceled_tombstone() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = dir.path().join("workspace");
+    config.action_dir = dir.path().join("actions");
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let thread_id = "telegram:account-a:conversation-canceled";
+    let workspace = crate::agent::attachments::thread_action_dir(
+        &ctx,
+        &config,
+        &config.workspace_dir,
+        Some(thread_id),
+    )
+    .await
+    .unwrap();
+    tokio::fs::create_dir_all(&workspace).await.unwrap();
+    let repo = test_repo(&config.workspace_dir);
+    let opaque_id = uuid::Uuid::new_v4().simple().to_string();
+    let part = image(MediaReference {
+        opaque_id: Some(opaque_id.clone()),
+        content_type: Some("image/png".into()),
+        ..Default::default()
+    });
+    let path = "canceled-before-retry.png";
+    let file = workspace.join(path);
+    tokio::fs::write(&file, b"canceled cleanup bytes")
+        .await
+        .unwrap();
+    let mut record = staged_record(part.clone(), path);
+    record.thread_id = thread_id.into();
+    record.claim = Some(StagedAttachmentClaim {
+        tenant: crate::core::runtime::Tenant::default(),
+        thread_id: thread_id.into(),
+        message_id: String::new(),
+        part: part.clone(),
+        canceled: true,
+    });
+    insert_record(&repo, &record);
+
+    drop(NativeStagedLease::new(
+        ctx,
+        thread_id.into(),
+        config,
+        vec![part],
+    ));
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while file.exists() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("dropping the lease should retry cleanup after its exact canceled tombstone");
+}
+
+#[tokio::test]
 async fn canceling_native_media_resolution_cleans_the_first_staged_part() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
