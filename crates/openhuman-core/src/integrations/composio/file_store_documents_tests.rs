@@ -198,11 +198,11 @@ async fn v1_state_documents_move_into_kv_without_replacing_a_newer_value() {
 
     assert_eq!(migrate_legacy_state(&scoped).await.unwrap(), 1);
     assert_eq!(
-        kv.get::<serde_json::Value>("a.json").await.unwrap(),
+        kv.get::<serde_json::Value>("a.json").unwrap(),
         Some(serde_json::json!({ "n": 1 }))
     );
     assert_eq!(
-        kv.get::<serde_json::Value>("b.json").await.unwrap(),
+        kv.get::<serde_json::Value>("b.json").unwrap(),
         Some(serde_json::json!({ "n": 99 })),
         "a value already in kv is newer"
     );
