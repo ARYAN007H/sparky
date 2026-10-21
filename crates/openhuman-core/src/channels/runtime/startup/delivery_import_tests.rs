@@ -28,7 +28,7 @@ struct Rig {
 }
 
 impl Rig {
-    fn scoped(&self) -> tinystoragedrivers::ScopedStorage {
+    fn scoped(&self) -> crate::storage::Storage {
         self.backend.for_scope(&self.scope).unwrap()
     }
 }
