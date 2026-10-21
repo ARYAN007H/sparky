@@ -197,11 +197,15 @@ fn detached_children_reset_turn_accounting_and_cancellation() {
         !detached.headless_descendant_settlement,
         "detached work is outside the root's settlement lease"
     );
-    assert_eq!(root.child().headless_descendant_owner.as_deref(), Some("root-owner"));
+    assert_eq!(
+        root.child().headless_descendant_owner.as_deref(),
+        Some("root-owner")
+    );
     assert!(detached.headless_descendant_owner.is_none());
     let workspace = std::path::Path::new("/workspace");
     assert_eq!(
-        root.child().subagent_owner_scope(workspace, "session", Some("worker-thread")),
+        root.child()
+            .subagent_owner_scope(workspace, "session", Some("worker-thread")),
         "root-owner",
         "headless descendants retain the root lease's owner across native thread ids"
     );

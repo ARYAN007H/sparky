@@ -70,13 +70,10 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
                     && message.text().contains(CHILD_PROMPT)
             });
             if !contains_child_prompt
-                && request
-                    .messages
-                    .iter()
-                    .any(|message| {
-                        matches!(message, tinyinference_llm::message::Message::User(_))
-                            && message.text().contains(GRANDCHILD_PROMPT)
-                    })
+                && request.messages.iter().any(|message| {
+                    matches!(message, tinyinference_llm::message::Message::User(_))
+                        && message.text().contains(GRANDCHILD_PROMPT)
+                })
             {
                 self.grandchild_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -87,13 +84,10 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
                 return Ok(ModelResponse::assistant("headless-flow-grandchild-result"));
             }
             if contains_child_prompt {
-                self.child_schema_names.lock().unwrap().push(
-                    request
-                        .tools
-                        .iter()
-                        .map(|tool| tool.name.clone())
-                        .collect(),
-                );
+                self.child_schema_names
+                    .lock()
+                    .unwrap()
+                    .push(request.tools.iter().map(|tool| tool.name.clone()).collect());
                 let call = self
                     .child_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -261,20 +255,16 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         .iter()
         .filter(|job| job.agent == "task_manager_agent")
         .collect::<Vec<_>>();
-    let diagnostic_dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(
-        &core_for_journal,
-    ));
+    let diagnostic_dispatch =
+        crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core_for_journal));
     let worker_run_id = child_runs
         .first()
         .and_then(|(_, run_id)| run_id.as_deref())
         .expect("the worker job records its own run id");
-    let worker_events = crate::agent::tinyagents::journal::read_run_events(
-        &diagnostic_dispatch,
-        worker_run_id,
-        0,
-    )
-    .await
-    .expect("read the worker journal for the nested-spawn evidence");
+    let worker_events =
+        crate::agent::tinyagents::journal::read_run_events(&diagnostic_dispatch, worker_run_id, 0)
+            .await
+            .expect("read the worker journal for the nested-spawn evidence");
     let nested_spawn_completed = worker_events.iter().any(|observation| {
         matches!(
             &observation.event,
@@ -315,7 +305,9 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         "the worker must run, spawn its grandchild, and complete through the real dispatch"
     );
     assert!(
-        model.child_schema_names.lock().unwrap()[0].iter().any(|name| name == "spawn_subagent"),
+        model.child_schema_names.lock().unwrap()[0]
+            .iter()
+            .any(|name| name == "spawn_subagent"),
         "the worker's explicitly declared nested-spawn capability must reach its model schema"
     );
     assert_eq!(
@@ -332,8 +324,15 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         1,
         "the grandchild must run through the real model dispatch"
     );
-    assert!(grandchild_reached_model, "the grandchild must reach its model callback");
-    assert_eq!(grandchild_jobs.len(), 1, "one grandchild job must be admitted");
+    assert!(
+        grandchild_reached_model,
+        "the grandchild must reach its model callback"
+    );
+    assert_eq!(
+        grandchild_jobs.len(),
+        1,
+        "one grandchild job must be admitted"
+    );
     assert_eq!(
         grandchild_jobs[0].status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Completed,
@@ -343,8 +342,14 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         worker_run_id, grandchild_run_id,
         "worker and grandchild must have distinct native run identities"
     );
-    assert!(nested_spawn_completed, "the worker journal must record the successful nested spawn");
-    assert!(grandchild_completed, "the grandchild journal must record terminal completion");
+    assert!(
+        nested_spawn_completed,
+        "the worker journal must record the successful nested spawn"
+    );
+    assert!(
+        grandchild_completed,
+        "the grandchild journal must record terminal completion"
+    );
     assert!(grandchild_output.contains("headless-flow-grandchild-result"));
     assert_eq!(
         model

@@ -337,11 +337,10 @@ async fn invoke_driver_tool_with_request(
         .as_ref()
         .map(|context| context.workspace_dir.as_path())
         .unwrap_or_else(|| std::path::Path::new(""));
-    let owner = parent.data.subagent_owner_scope(
-        owner_workspace,
-        &parent_session,
-        thread_id.as_deref(),
-    );
+    let owner =
+        parent
+            .data
+            .subagent_owner_scope(owner_workspace, &parent_session, thread_id.as_deref());
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
     let mut dispatcher = dispatcher
         .with_job_registry(jobs)

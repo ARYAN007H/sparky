@@ -562,9 +562,9 @@ async fn run_typed_mode(
         .map(|&i| parent.all_tool_specs[i].as_ref().clone())
         .collect();
     let nested_spawn_tool = if nested_spawn_allowed("spawn_subagent") {
-        Some(crate::agent::orchestration::tools::SpawnSubagentTool::scoped(
-            nested_spawn_ids.clone(),
-        ))
+        Some(
+            crate::agent::orchestration::tools::SpawnSubagentTool::scoped(nested_spawn_ids.clone()),
+        )
     } else {
         None
     };
