@@ -84,7 +84,6 @@ async fn registered_dispatch_preserves_headless_marker_when_binding_scoped_core(
         .await
     })
     .await
-    .expect("dispatch task succeeds")
     .expect("probe is registered")
     .expect("probe handler succeeds");
 
