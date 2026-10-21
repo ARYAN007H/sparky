@@ -190,7 +190,7 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
 // Polyfill PointerEvent for @testing-library/user-event's pointer sequences
 // against Radix triggers. jsdom 28 still ships no PointerEvent constructor, so
 // user-event falls back to MouseEvent and Radix's pointer handlers never fire.
-if (typeof globalThis.PointerEvent === 'undefined') {
+if (typeof globalThis.PointerEvent === 'undefined' && typeof MouseEvent !== 'undefined') {
   globalThis.PointerEvent = class PointerEvent extends MouseEvent {
     readonly pointerId: number;
     readonly pointerType: string;
