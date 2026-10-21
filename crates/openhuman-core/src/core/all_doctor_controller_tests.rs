@@ -14,7 +14,7 @@ fn raw_doctor_platform_registry_matches_its_independent_contract() {
         registry(),
         internal_registry(),
         &contract,
-        &crate::platform::doctor::doctor_parameter_contracts(),
+        &crate::doctor::doctor_parameter_contracts(),
     )
     .expect("raw Doctor entries retain their ordered wire contracts");
     let entries: Vec<_> = registry()
@@ -22,8 +22,32 @@ fn raw_doctor_platform_registry_matches_its_independent_contract() {
         .filter(|row| row.controller.schema.namespace == "doctor")
         .collect();
     let use_cache = TypeSchema::Option(Box::new(TypeSchema::Bool));
+    let report_inputs = [
+        (
+            "tier",
+            TypeSchema::Option(Box::new(TypeSchema::Enum {
+                variants: vec!["static", "connect", "live"],
+            })),
+            false,
+        ),
+        (
+            "only",
+            TypeSchema::Option(Box::new(TypeSchema::Array(Box::new(TypeSchema::String)))),
+            false,
+        ),
+        (
+            "skip",
+            TypeSchema::Option(Box::new(TypeSchema::Array(Box::new(TypeSchema::String)))),
+            false,
+        ),
+        (
+            "profile",
+            TypeSchema::Option(Box::new(TypeSchema::String)),
+            false,
+        ),
+    ];
     assert_eq!(
-        crate::core::all::verify_wire_fields(&entries[0].controller.schema.inputs, &[]),
+        crate::core::all::verify_wire_fields(&entries[0].controller.schema.inputs, &report_inputs,),
         Ok(())
     );
     assert_eq!(
@@ -67,7 +91,7 @@ fn raw_doctor_decoders_ignore_unknown_fields_and_keep_boolean_types_strict() {
             ("use_cache".into(), json!("not a boolean")),
             ("nested_extra".into(), json!({"ignored":[1, false]})),
         ]))
-        .expect("doctor.report ignores the entire parameter map");
+        .expect("doctor.report ignores unknown fields and parses declared fields");
 
     let models = entries
         .iter()
