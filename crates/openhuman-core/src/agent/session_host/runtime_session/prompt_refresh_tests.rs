@@ -491,3 +491,51 @@ async fn a_prompt_that_fails_to_render_keeps_the_recorded_one() {
         .expect("a resumed turn does not fail on its prompt");
     assert_eq!(prepared.prefix, None);
 }
+
+#[tokio::test]
+async fn a_catalogue_change_under_a_kept_prompt_carries_no_note() {
+    // The prompt is kept (the integrations it renders are not read yet), but
+    // a permanent tool was added since the thread was recorded: the catalogue
+    // is refreshed on the recorded prompt. The prompt itself was not
+    // replaced, so the turn says nothing about it.
+    let root = tempfile::tempdir().expect("tempdir");
+    let prelude = composed_prelude(root.path(), SystemPromptBuilder::verbatim("current".into()));
+    {
+        let mut surface = prelude
+            .tool_surface
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let spec = tinytools::ToolSpec {
+            name: "A_TOOL".into(),
+            description: "d".into(),
+            parameters: serde_json::json!({"type": "object"}),
+        };
+        surface.visible_tool_specs = Arc::new(vec![Arc::new(spec)]);
+        surface.permanent_tool_names = ["A_TOOL".to_string()].into();
+    }
+    let recorded = PrefixSnapshot::new(vec![Message::system("recorded")]);
+    let history = [Message::system("recorded"), Message::user("hi")];
+    let sink = snapshot(3);
+    let mut request = request();
+    let prepared = prelude
+        .prepare_turn(false, &resumed(&recorded, &history), &sink, &mut request)
+        .await
+        .expect("prepared turn");
+    let prefix = prepared
+        .prefix
+        .as_ref()
+        .expect("the refreshed catalogue is offered");
+    assert_eq!(
+        prefix.messages()[0].text(),
+        "recorded",
+        "the prompt is kept"
+    );
+    let catalogue = prefix.messages().last().expect("a catalogue").text();
+    assert!(catalogue.contains("A_TOOL"));
+    assert_eq!(sink.lock().unwrap().request_base_len, 4);
+    assert_eq!(
+        request.input.text(),
+        "hi",
+        "a catalogue change alone is not a replaced prompt"
+    );
+}

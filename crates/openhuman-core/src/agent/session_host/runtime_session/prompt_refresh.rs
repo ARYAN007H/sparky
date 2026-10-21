@@ -18,7 +18,8 @@
 //! with a one-time note saying so (`PROMPT_UPDATE_NOTE`). The conversation
 //! before it was written under the old prompt, and a model keeps to what it
 //! already said there (that something is "coming soon", say) over
-//! instructions that changed since.
+//! instructions that changed since. Only a prompt rendered on that turn
+//! counts: the catalogue changing under a prompt the turn kept says nothing.
 
 use std::sync::PoisonError;
 
@@ -54,10 +55,15 @@ impl OpenHumanTurnPrelude {
             .prepare(new_session)
             .await
             .map_err(|error| RuntimeError::Driver(error.to_string()))?;
-        let refresh_prompt = view.resumed && self.refreshes_prompt_on_resume();
-        if refresh_prompt {
+        // Whether this turn rendered the current prompt. Only then can a
+        // changed prefix mean the prompt was replaced: the permanent-tool
+        // catalogue below also changes the prefix of a prompt that was kept.
+        let rendered = if view.resumed && self.refreshes_prompt_on_resume() {
             preparation.prefix = self.current_prompt_prefix(view).await;
-        }
+            preparation.prefix.is_some()
+        } else {
+            false
+        };
         self.refresh_permanent_prefix(&mut preparation, view.prefix);
         if let Some(prefix) = preparation.prefix.as_ref() {
             // The runtime sends `prefix` in place of the recorded one, so the
@@ -68,7 +74,7 @@ impl OpenHumanTurnPrelude {
                 .saturating_sub(view.prefix.messages().len())
                 + prefix.messages().len();
         }
-        if refresh_prompt {
+        if rendered {
             let changed = preparation
                 .prefix
                 .as_ref()
