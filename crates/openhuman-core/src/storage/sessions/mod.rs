@@ -186,7 +186,7 @@ pub fn workspace_transcripts(
     agent_id: &str,
     workspace_dir: &std::path::Path,
 ) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
-    super::workspace::provider_for_workspace(workspace_dir)
+    workspace::provider_for_workspace(workspace_dir)
         .for_agent(agent_id)
         .transcripts
 }
