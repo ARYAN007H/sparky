@@ -876,6 +876,10 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
     let voice_log = std::fs::read_to_string(logs.join("voice.log"))
         .expect("read captured core log after voice delivery");
     assert!(
+        voice_log.contains("[voice message]"),
+        "captured core log should retain the content-free voice preview"
+    );
+    assert!(
         !voice_log.contains("the dictated voice request"),
         "voice transcripts must not be written to the core log"
     );
