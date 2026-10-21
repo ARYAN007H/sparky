@@ -61,13 +61,33 @@ pub(crate) async fn import_legacy<F, Fut>(
     adopt: F,
 ) -> Result<Outcome>
 where
-    F: FnOnce(SavingsAggregate) -> Fut,
-    Fut: Future<Output = Result<bool>>,
+    F: FnOnce(SavingsAggregate) -> Fut + Send + 'static,
+    Fut: Future<Output = Result<bool>> + Send + 'static,
 {
-    let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
+    if std::fs::symlink_metadata(file).is_err() {
+        return Ok(Outcome::NoSource);
+    }
+    let marker = support::marker_id("savings", file);
+    let file = file.to_owned();
+    let ctx_for_read = ctx.clone();
+    let result = support::with_module_claim(
+        ctx,
+        MODULE_ID,
+        MARKER_KIND,
+        &marker,
+        move |scoped| {
+            crate::storage::block_on_anyhow(async move {
+                import_into(&ctx_for_read, &scoped, &file, adopt).await
+            })
+        },
+    )?;
+    let Some(result) = result else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(&scoped, file, adopt).await
+    Ok(match result {
+        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
+        support::ClaimedImport::Imported(outcome) => outcome,
+    })
 }
 
 async fn import_into<F, Fut>(scoped: &Storage, file: &Path, adopt: F) -> Result<Outcome>
@@ -75,10 +95,6 @@ where
     F: FnOnce(SavingsAggregate) -> Fut,
     Fut: Future<Output = Result<bool>>,
 {
-    let marker = support::marker_id("savings", file);
-    if support::already_imported(scoped, MARKER_KIND, &marker).await? {
-        return Ok(Outcome::AlreadyDone);
-    }
     if std::fs::symlink_metadata(file).is_err() {
         return Ok(Outcome::NoSource);
     }
@@ -102,7 +118,6 @@ where
             false
         }
     };
-    support::mark_imported(scoped, MARKER_KIND, &marker).await?;
     log::debug!("{LOG_PREFIX} adopted={adopted}");
     Ok(Outcome::Imported { adopted })
 }
