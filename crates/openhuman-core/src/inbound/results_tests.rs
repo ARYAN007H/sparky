@@ -110,6 +110,25 @@ fn results_list_oldest_first_by_source_status_and_time_without_the_acked() {
     assert!(wire.get("message").is_none() && wire.get("acked").is_none());
     assert_eq!(wire["status"], "running");
     assert_eq!(wire["event_ids"], serde_json::json!(["e1", "e2"]));
+    assert_eq!(wire["blocked"], serde_json::json!([]));
+}
+
+#[test]
+fn blocked_events_are_kept_with_the_result() {
+    let results = results();
+    let blocked = vec![BlockedEvent {
+        event_id: "e2".into(),
+        reason: "blocked: instruction_override".into(),
+    }];
+    results
+        .start(&running("t1", "x:mentions", 1).with_blocked(blocked.clone()))
+        .unwrap();
+    let listed = results.list(&ResultQuery::default()).unwrap();
+    assert_eq!(listed[0].blocked, blocked);
+    assert_eq!(
+        serde_json::to_value(&listed[0]).unwrap()["blocked"],
+        serde_json::json!([{ "event_id": "e2", "reason": "blocked: instruction_override" }])
+    );
 }
 
 #[test]
