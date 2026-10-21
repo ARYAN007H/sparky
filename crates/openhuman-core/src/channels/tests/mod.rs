@@ -14,6 +14,8 @@
 //! * `identity.rs` — `build_system_prompt` inlining workspace identity
 //!   markdown into the Project Context section.
 //! * `prompt.rs` — system-prompt section assembly and bootstrap truncation.
+//! * `host_pipeline.rs` — thread/reaction routing through the host send path
+//!   and thread-scoped conversation histories across Discord channels.
 //! * `runtime_dispatch.rs` — the dispatch loop through
 //!   `runtime::test_support::run_dispatch_harness`: inbound-envelope
 //!   publication, parallel processing, typing-task cancellation, the
