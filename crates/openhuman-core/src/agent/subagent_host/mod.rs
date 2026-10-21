@@ -36,6 +36,7 @@
 //! | `ops/`            | typed/fork mode and TinyAgents graph route                 |
 //! | `tool_prep.rs`    | Tool filtering + prompt loading + prompt protocol block     |
 
+mod fork_context;
 mod autonomous;
 mod lifecycle;
 mod ops;
@@ -56,6 +57,7 @@ mod persisted_compat_tests;
 
 // Public API — the entry point and the shapes it returns.
 pub use autonomous::{definition_iter_cap, subagent_iter_cap_with_autonomous_lift};
+pub use fork_context::{AgentContextPreparedSource, ParentExecutionContext};
 pub(crate) use lifecycle::checkpoint_resume;
 pub(crate) use lifecycle::detached_subagent_parent;
 pub(crate) use lifecycle::load_subagent_checkpoint;
