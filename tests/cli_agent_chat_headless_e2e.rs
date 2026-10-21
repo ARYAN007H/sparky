@@ -278,10 +278,17 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
         &origin,
         &success_logs,
     );
+    let probes = primary_llm_probes(&origin);
     assert!(
         success,
-        "one-shot CLI failed; logs: {}\nstdout: {stdout}\nstderr: {stderr}",
+        "one-shot CLI failed; logs: {}\nprobes: {probes:#?}\nstdout: {stdout}\nstderr: {stderr}",
         logs.display()
+    );
+    assert!(
+        probes
+            .iter()
+            .any(|(probe, streaming)| probe.contains(CHILD_PROMPT) && *streaming),
+        "no actual streaming primary LLM request carried the child prompt: {probes:#?}"
     );
     let response: Value = serde_json::from_str(stdout.trim())
         .unwrap_or_else(|error| panic!("CLI stdout is not JSON ({error}): {stdout}"));
@@ -301,14 +308,6 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
     // llmThreads key for this run. Prove the child request from primary LLM
     // request history and the child's unique response from CLI output. Only
     // the child rule emits CHILD_RESULT; root completion emits ROOT_RESULT.
-    let probes = primary_llm_probes(&origin);
-    assert!(
-        probes
-            .iter()
-            .any(|(probe, streaming)| probe.contains(CHILD_PROMPT) && *streaming),
-        "no actual streaming primary LLM request carried the child prompt: {probes:#?}"
-    );
-
     // Repeat with a separate profile and a child model error. A failed
     // descendant must make the one-shot CLI fail instead of returning the
     // scripted successful root response.
