@@ -15,6 +15,7 @@ pub(super) const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 const NATIVE_STAGED_ACTIVE: u8 = 0;
 const NATIVE_STAGED_COMMITTED: u8 = 1;
 const NATIVE_STAGED_DISCARDED: u8 = 2;
+const NATIVE_STAGED_CLEANING: u8 = 3;
 
 /// Owns staged refs from one native request until the durable transcript claim
 /// succeeds or every queued request clone is dropped.
@@ -25,7 +26,7 @@ struct NativeStagedLeaseState {
     dispatch: crate::core::runtime::DispatchCtx,
     thread_id: String,
     config: crate::config::Config,
-    parts: Vec<ContentPart>,
+    parts: std::sync::Mutex<Vec<ContentPart>>,
     state: AtomicU8,
 }
 
@@ -40,9 +41,18 @@ impl NativeStagedLease {
             dispatch,
             thread_id,
             config,
-            parts,
+            parts: std::sync::Mutex::new(parts),
             state: AtomicU8::new(NATIVE_STAGED_ACTIVE),
         }))
+    }
+
+    pub(crate) fn track(&self, part: ContentPart) -> Result<(), String> {
+        let mut parts = self.0.parts.lock().unwrap_or_else(|error| error.into_inner());
+        if self.0.state.load(Ordering::Acquire) != NATIVE_STAGED_ACTIVE {
+            return Err("native attachment lease is no longer active".into());
+        }
+        parts.push(part);
+        Ok(())
     }
 
     pub(crate) fn mark_committed(&self) {
@@ -60,7 +70,7 @@ impl NativeStagedLease {
             .state
             .compare_exchange(
                 NATIVE_STAGED_ACTIVE,
-                NATIVE_STAGED_DISCARDED,
+                NATIVE_STAGED_CLEANING,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             )
@@ -68,13 +78,41 @@ impl NativeStagedLease {
         {
             return Ok(());
         }
+        let mut attempt = NativeStagedCleanupAttempt {
+            state: self.0.clone(),
+            completed: false,
+        };
+        let parts = self.0.parts.lock().unwrap_or_else(|error| error.into_inner()).clone();
         discard_native_channel_parts(
             &self.0.dispatch,
             &self.0.thread_id,
             &self.0.config,
-            &self.0.parts,
+            &parts,
         )
-        .await
+        .await?;
+        self.0
+            .state
+            .store(NATIVE_STAGED_DISCARDED, Ordering::Release);
+        attempt.completed = true;
+        Ok(())
+    }
+}
+
+struct NativeStagedCleanupAttempt {
+    state: std::sync::Arc<NativeStagedLeaseState>,
+    completed: bool,
+}
+
+impl Drop for NativeStagedCleanupAttempt {
+    fn drop(&mut self) {
+        if !self.completed {
+            let _ = self.state.state.compare_exchange(
+                NATIVE_STAGED_CLEANING,
+                NATIVE_STAGED_ACTIVE,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+        }
     }
 }
 
@@ -95,7 +133,11 @@ impl Drop for NativeStagedLeaseState {
         let dispatch = self.dispatch.clone();
         let thread_id = self.thread_id.clone();
         let config = self.config.clone();
-        let parts = self.parts.clone();
+        let parts = self
+            .parts
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
         dispatch.clone().spawn(async move {
             if discard_native_channel_parts(&dispatch, &thread_id, &config, &parts)
                 .await
@@ -115,6 +157,7 @@ pub(crate) async fn stage_native_channel_part(
     name: &str,
     mime: &str,
     bytes: &[u8],
+    lease: &NativeStagedLease,
 ) -> Result<ContentPart, String> {
     if thread_id.trim().is_empty() || bytes.is_empty() {
         return Err("native attachment scope and bytes must be non-empty".into());
@@ -174,11 +217,17 @@ pub(crate) async fn stage_native_channel_part(
         Ok(part)
     }
     .await;
-    if result.is_err() {
-        let path = staged_config.action_dir.join(file_path);
-        let _ = tokio::fs::remove_file(path).await;
+    match result {
+        Ok(part) => {
+            lease.track(part.clone())?;
+            Ok(part)
+        }
+        Err(error) => {
+            let path = staged_config.action_dir.join(file_path);
+            let _ = tokio::fs::remove_file(path).await;
+            Err(error)
+        }
     }
-    result
 }
 
 pub(crate) async fn commit_native_channel_parts(
