@@ -49,9 +49,8 @@ impl WatcherStateStore {
     }
 
     fn from_backend(backend: Arc<dyn StorageBackend>) -> Result<Self> {
-        let scope = Scope::new("local/vault-watcher").context("build watcher scope")?;
         let storage = backend
-            .for_scope(&scope)
+            .for_scope(&Scope::local())
             .map_err(anyhow::Error::from)
             .context("open watcher scope")?;
         Ok(Self {
