@@ -107,7 +107,7 @@ impl DocumentLeases {
 
     /// Records that the document store this was built over is bound to
     /// `scope`, so storage fences can name the lease record
-    /// ([`LeaseStore::driver_fence`]).
+    /// ([`LeaseStore::write_condition`]).
     #[must_use]
     pub fn in_scope(mut self, scope: Scope) -> Self {
         self.scope = Some(scope);
@@ -398,7 +398,7 @@ impl LeaseStore for DocumentLeases {
         Ok(self.read(key).await?.map(|record| record_of(record.doc)))
     }
 
-    fn driver_fence(&self, key: &str, node: &str, epoch: u64) -> Option<WriteCondition> {
+    fn write_condition(&self, key: &str, node: &str, epoch: u64) -> Option<WriteCondition> {
         let scope = self.scope.clone()?;
         let id = Key::of([LEASE_OWNER, key]).ok()?;
         WriteCondition::new(
