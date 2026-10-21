@@ -388,10 +388,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::security::encryption::all_encryption_controller_entries(),
     );
     // Keyring consent — user approval before local secret storage fallback
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Security,
-        crate::security::keyring_consent::all_keyring_consent_registered_controllers(),
+        crate::security::keyring_consent::all_keyring_consent_controller_entries(),
     );
     // Security policy metadata
     push(

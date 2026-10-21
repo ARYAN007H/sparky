@@ -1,38 +1,6 @@
 use super::*;
 use serde_json::{json, Map};
 
-fn keyring_consent_fixture_contracts() -> Vec<ControllerParamContract> {
-    vec![
-        ControllerParamContract {
-            method: "keyring_consent.status",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-        ControllerParamContract {
-            method: "keyring_consent.decide",
-            required: &["mode"],
-            optional: &[],
-            examples: [
-                "local_encrypted",
-                "declined",
-                "",
-                "unknown",
-                " local_encrypted ",
-            ]
-            .into_iter()
-            .map(|mode| json!({ "mode": mode }))
-            .collect(),
-        },
-        ControllerParamContract {
-            method: "keyring_consent.retry_probe",
-            required: &[],
-            optional: &[],
-            examples: vec![json!({})],
-        },
-    ]
-}
-
 fn keyring_consent_entries() -> Vec<ControllerEntry> {
     registry()
         .iter()
@@ -59,7 +27,7 @@ fn raw_keyring_consent_registry_matches_its_independent_contract() {
         registry(),
         internal_registry(),
         &contract,
-        &keyring_consent_fixture_contracts(),
+        &crate::security::keyring_consent::keyring_consent_parameter_contracts(),
     )
     .expect("raw Keyring Consent entries retain their ordered wire contracts");
 }
@@ -111,7 +79,7 @@ fn raw_keyring_consent_decoders_pin_their_safe_wire_boundary() {
         decide.decode_params(Map::new()).unwrap_err(),
         "missing required param 'mode'"
     );
-    for value in [json!(null), json!(false), json!(7), json!([]), json!({})] {
+    for value in [json!(null), json!(false), json!(0.5), json!([]), json!({})] {
         assert_eq!(
             decide
                 .decode_params(Map::from_iter([("mode".into(), value)]))
@@ -119,6 +87,32 @@ fn raw_keyring_consent_decoders_pin_their_safe_wire_boundary() {
             "missing required param 'mode'"
         );
     }
+}
+
+#[test]
+fn raw_keyring_consent_decide_rejects_before_persistence() {
+    let decide = keyring_consent_entries()
+        .into_iter()
+        .find(|entry| entry.schema.function == "decide")
+        .expect("raw decide entry");
+    let missing =
+        futures::executor::block_on(decide.invoke(DispatchCtx::unbound(), Map::new())).unwrap_err();
+    assert_eq!(missing, "missing required param 'mode'");
+    let wrong_type = futures::executor::block_on(decide.invoke(
+        DispatchCtx::unbound(),
+        Map::from_iter([("mode".into(), json!(false))]),
+    ))
+    .unwrap_err();
+    assert_eq!(wrong_type, "missing required param 'mode'");
+    let unknown = futures::executor::block_on(decide.invoke(
+        DispatchCtx::unbound(),
+        Map::from_iter([("mode".into(), json!("unknown"))]),
+    ))
+    .unwrap_err();
+    assert_eq!(
+        unknown,
+        "invalid mode 'unknown': expected 'local_encrypted' or 'declined'"
+    );
 }
 
 #[test]
