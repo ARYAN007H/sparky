@@ -427,20 +427,32 @@ impl OpenHumanSessionHost {
                             .take_turn_inputs();
                         let origin = options.run_context.data.origin.clone();
                         let (enriched, memory_turn) = futures::join!(
-                            prelude.enrich_request(
-                                &original_user_message,
-                                &turn,
-                                &mut options.run_context.data,
-                            ),
+                            async {
+                                let value = prelude
+                                    .enrich_request(
+                                        &original_user_message,
+                                        &turn,
+                                        &mut options.run_context.data,
+                                    )
+                                    .await;
+                                concurrent_turn_diagnostic(9);
+                                value
+                            },
                             // Boxed: the hook's future (config load, engine
                             // calls) would otherwise be inlined into this
                             // already-large hook future.
-                            Box::pin(prelude.memory_pre_turn(
-                                view.history,
-                                view.committed_turns,
-                                view.history.last().filter(|last| **last == request.input),
-                                origin,
-                            )),
+                            Box::pin(async {
+                                let value = prelude
+                                    .memory_pre_turn(
+                                        view.history,
+                                        view.committed_turns,
+                                        view.history.last().filter(|last| **last == request.input),
+                                        origin,
+                                    )
+                                    .await;
+                                concurrent_turn_diagnostic(10);
+                                value
+                            }),
                         );
                         concurrent_turn_diagnostic(6);
                         options.run_context.data.memory_turn = memory_turn;
