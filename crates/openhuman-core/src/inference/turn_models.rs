@@ -126,7 +126,7 @@ fn build_turn_models_crate(
         thread_id,
     };
     let opts = tinyagents_harness::host::BuildOpts {
-        native_tools,
+        native_tools: true,
         temperature: Some(temperature),
         egress_tag: None,
     };

@@ -195,16 +195,7 @@ impl OpenHumanModelFactory<'_> {
                 resolved_model,
                 request.route.as_deref().unwrap_or(role),
             );
-            return Ok((
-                with_request_defaults(
-                    model,
-                    ModelRequestDefaults {
-                        model: (!route.model.is_empty()).then(|| route.model.clone()),
-                        temperature: request.opts.temperature,
-                    },
-                ),
-                route,
-            ));
+            return Ok((model, route));
         }
 
         let (model, route_provider, resolved_model) =
@@ -357,14 +348,7 @@ fn with_request_defaults(
     model: Arc<dyn ChatModel<()>>,
     defaults: ModelRequestDefaults,
 ) -> Arc<dyn ChatModel<()>> {
-    match model.profile().cloned() {
-        Some(profile) => {
-            Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(defaults))
-        }
-        None => {
-            Arc::new(ProfileOverrideModel::new_preserving_profile(model).with_defaults(defaults))
-        }
-    }
+    Arc::new(ProfileOverrideModel::new_preserving_profile(model).with_defaults(defaults))
 }
 
 /// Build an `Arc<dyn ChatModel>` for the given workload role, under `ctx`.
