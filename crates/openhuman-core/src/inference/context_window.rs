@@ -12,6 +12,7 @@ use tinyinference_llm::model::context_window::{
     ContextWindowResolver, ContextWindowRouteInput, ManagedDefaultWindow, ResolvedWindow,
 };
 use tinyinference_llm::model::discover::model_limits_cache;
+use tinyinference_llm::model::discover::DiscoveryRequest;
 #[cfg(test)]
 use tinyinference_llm::model::discover::{ModelLimitsCache, ModelListingFetcher};
 use tinyinference_local::profile::LocalProviderKind;
@@ -176,14 +177,9 @@ fn route_input(
         tinyinference_local::profile::context_window_with_local_fallback(model, None, Some(kind))
     });
     route.discovery = match local_kind {
-        None => match extensions {
-            Some(extensions) => crate::inference::provider::factory::model_limits_request_for(
-                role, provider, model, config, extensions,
-            ),
-            None => crate::inference::provider::factory::model_limits_request(
-                role, provider, model, config,
-            ),
-        },
+        None => Some(extensions).and_then(|extensions| {
+            model_limits_request_for(role, provider, model, config, extensions)
+        }),
         Some(LocalProviderKind::Ollama) => None,
         Some(_) => None,
     };
@@ -193,6 +189,98 @@ fn route_input(
         ));
     }
     route
+}
+
+/// Resolve the host's selected discovery endpoint and credentials, then ask
+/// TinyInference's provider registry to construct its native listing request.
+/// The host supplies only policy it owns: managed catalog selection, stored
+/// cloud credentials, and hosted-auth routing.
+pub(crate) fn model_limits_request(
+    role: &str,
+    provider: &str,
+    model: &str,
+    config: &Config,
+) -> Option<DiscoveryRequest> {
+    let extensions = crate::core::runtime::CoreContext::current_extensions();
+    model_limits_request_for(role, provider, model, config, extensions.as_ref())
+}
+
+pub(crate) fn model_limits_request_for(
+    role: &str,
+    provider: &str,
+    model: &str,
+    config: &Config,
+    extensions: Option<&crate::core::slots::Extensions>,
+) -> Option<DiscoveryRequest> {
+    use crate::config::schema::cloud_providers::AuthStyle;
+    use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
+    use tinyinference_providers::route::{ProviderRoute, RouteKind};
+
+    let provider = provider.trim();
+    let route = ProviderRoute::parse(provider);
+    if provider.is_empty()
+        || provider == "cloud"
+        || provider == crate::inference::provider::factory::PROVIDER_OPENHUMAN
+        || route
+            .as_ref()
+            .is_some_and(|route| matches!(route.kind(), RouteKind::Managed))
+    {
+        let model = route
+            .as_ref()
+            .map(|route| route.model.as_str())
+            .filter(|model| !model.is_empty())
+            .unwrap_or(model);
+        return crate::inference::registry::catalog_for(
+            extensions,
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        )
+        .and_then(|entry| entry.limits)
+        .and_then(|limits| limits(model, config));
+    }
+
+    let route = route?;
+    let RouteKind::Cloud { slug } = route.kind() else {
+        return None;
+    };
+    let entry = config.cloud_providers.iter().find(|entry| entry.slug == slug)?;
+    if crate::config::schema::cloud_providers::is_hosted_auth_style_for(extensions, entry.auth_style)
+    {
+        let model = if route.model.trim().is_empty() {
+            model
+        } else {
+            route.model.trim()
+        };
+        return crate::inference::registry::catalog_for(
+            extensions,
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        )
+        .and_then(|entry| entry.limits)
+        .and_then(|limits| limits(model, config));
+    }
+    let resolution = crate::inference::provider::factory::resolve_cloud_slug_for(
+        role,
+        &slug,
+        &route.model,
+        config,
+        extensions,
+    )
+    .ok()?;
+    if resolution.codex.using_oauth || resolution.entry.auth_style == AuthStyle::OpenhumanJwt {
+        return None;
+    }
+    let spec = crate::inference::provider::factory::cloud_provider_spec(
+        resolution.entry,
+        &resolution.effective_model,
+    );
+    let options = ProviderBuildOptions {
+        auth_style: Some(resolution.entry.auth_style.into()),
+        codex: Some(&resolution.codex),
+        ..ProviderBuildOptions::default()
+    };
+    ProviderRegistry::new(crate::inference::provider::factory::CloudCredentialResolver(
+        &resolution.key,
+    ))
+    .discovery_request(&spec, &options)
 }
 
 /// Static hints owned outside TinyInference's generic model catalog.
