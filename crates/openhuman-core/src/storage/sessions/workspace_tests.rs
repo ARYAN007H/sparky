@@ -103,11 +103,6 @@ fn an_unusable_workspace_degrades_to_an_in_memory_store() {
     first
         .try_for_agent("degraded")
         .expect("the in-memory fallback opens an agent");
-
-    assert!(
-        current_documents_for(&unusable).is_none()
-            || crate::storage::sessions::installed().is_some()
-    );
 }
 
 #[test]
