@@ -48,6 +48,10 @@ pub(crate) async fn process_channel_runtime_message(
         legacy_history,
         progressive_target,
     } = runtime_msg;
+    let typed_envelope_input = message.channel.is_empty()
+        && inbound_envelope
+            .as_ref()
+            .is_some_and(super::native_media::requires_typed_preparation);
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
         None => {
@@ -69,7 +73,11 @@ pub(crate) async fn process_channel_runtime_message(
                 &crate::channels::context::module_client(&ctx).await,
                 channel_inbound_preparation_request(
                     source,
-                    tinychannels_bus::module_inbound::ChannelInboundPreparationMode::LegacyText,
+                    if typed_envelope_input {
+                        tinychannels_bus::module_inbound::ChannelInboundPreparationMode::Typed
+                    } else {
+                        tinychannels_bus::module_inbound::ChannelInboundPreparationMode::LegacyText
+                    },
                 ),
             )
             .await
@@ -87,6 +95,19 @@ pub(crate) async fn process_channel_runtime_message(
     let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
+    let native_message_input = if typed_envelope_input {
+        match super::native_media::resolve_typed_message(&ctx, &envelope, &prepared.thread_id)
+            .await
+        {
+            Ok(input) => input,
+            Err(error) => {
+                tracing::warn!("[dispatch] typed native media was rejected: {error}");
+                return;
+            }
+        }
+    } else {
+        None
+    };
     let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
         channel: envelope.channel.clone(),
         conversation: envelope.conversation.clone(),
@@ -416,6 +437,7 @@ pub(crate) async fn process_channel_runtime_message(
                 session_key.clone(),
                 request_id,
                 enriched_message.clone(),
+                native_message_input,
                 trusted,
             )
             .await
