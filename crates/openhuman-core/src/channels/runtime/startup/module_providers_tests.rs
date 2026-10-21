@@ -729,17 +729,20 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         "media:tenant7/thread42/voice1"
     );
     assert_eq!(
-        image_gateway_wire["structured"]["channel_ref"]["account_id"],
+        image_gateway_wire["structured"]["channel_ref"]["accountId"],
         "trusted-account-7"
     );
     assert_eq!(
-        image_gateway_wire["structured"]["conversation_ref"]["thread_id"],
+        image_gateway_wire["structured"]["conversation_ref"]["threadId"],
         "topic-3"
     );
     assert_eq!(
         gateway_terminals
             .iter()
-            .filter(|event| event.full_response().is_some_and(|text| text == "Generated image"))
+            .filter(|event| {
+                serde_json::to_value(event)
+                    .is_ok_and(|wire| wire["full_response"] == "Generated image")
+            })
             .count(),
         1,
         "image delivery has one provider terminal"
@@ -747,7 +750,10 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
     assert_eq!(
         gateway_terminals
             .iter()
-            .filter(|event| event.full_response().is_some_and(|text| text.is_empty()))
+            .filter(|event| {
+                serde_json::to_value(event)
+                    .is_ok_and(|wire| wire.to_string().contains("media:tenant7/thread42/voice1"))
+            })
             .count(),
         1,
         "voice delivery has one provider terminal"
@@ -755,7 +761,10 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
     assert_eq!(
         gateway_terminals
             .iter()
-            .filter(|event| event.full_response().is_some_and(|text| text == "Final hosted reply"))
+            .filter(|event| {
+                serde_json::to_value(event)
+                    .is_ok_and(|wire| wire["full_response"] == "Final hosted reply")
+            })
             .count(),
         1,
         "final text has one provider terminal"
