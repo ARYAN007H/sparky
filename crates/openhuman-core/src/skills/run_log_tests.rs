@@ -100,6 +100,7 @@ async fn host_written_log_parses_like_legacy_layout() {
     let runs = scan_runs(tmp.path(), Some("triage-inbox"), 10);
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].run_id, "run-abcdef123456");
+    assert_eq!(find_run_log_path(tmp.path(), "run-abcdef123456"), Some(path.clone()));
     assert_eq!(runs[0].status, "DONE");
     assert_eq!(runs[0].duration_ms, Some(42));
     assert_eq!(

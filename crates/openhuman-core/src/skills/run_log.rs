@@ -98,7 +98,7 @@ pub fn find_run_log_path(workspace: &Path, run_id: &str) -> Option<PathBuf> {
     scan_runs(workspace, None, usize::MAX)
         .into_iter()
         .find(|run| run.run_id == run_id)
-        .map(|run| PathBuf::from(run.stream_id))
+        .map(|run| PathBuf::from(run.log_path))
 }
 
 /// Read the full terminal outcome for a persisted run stream.
@@ -165,7 +165,7 @@ pub fn read_run_log_slice(
     offset: u64,
     max_bytes: usize,
 ) -> io::Result<RunLogSlice> {
-    let id = stream_id(path).map_err(io_error)?;
+    let id = stream_id(path).map_err(io_error)?.to_owned();
     let store = run_log_store(workspace).map_err(io_error)?;
     crate::storage::block_on(async move {
         store
