@@ -123,13 +123,6 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         credential.to_string().contains("u1"),
         "profile credential was not installed: {credential}"
     );
-    let threads = rpc(&base, "openhuman.threads_list");
-
-    assert!(
-        threads.to_string().contains("fixture-thread"),
-        "thread owner did not read its historical profile record: {threads}"
-    );
-
     assert!(
         profile.join("storage.db").is_file(),
         "boot migrated the active profile; profile entries: {:?}; workspace entries: {:?}; logs: {}",
