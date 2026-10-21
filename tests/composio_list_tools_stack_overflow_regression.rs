@@ -420,9 +420,13 @@ async fn drive_subagent() {
     // The parent is an explicit value on the run options, not ambient state.
     let mut options = SubagentRunOptions::default();
     options.run_context.parent = Some(parent);
-    let parent = options.run_context.clone().into_tinyagents(
-        tinyagents_harness::context::RunConfig::new("composio-stack-regression-subagent"),
-    );
+    let parent =
+        options
+            .run_context
+            .clone()
+            .into_tinyagents(tinyagents_harness::context::RunConfig::new(
+                "composio-stack-regression-subagent",
+            ));
     let _ = OpenHumanSubagentHost::new(def, options)
         .run(&parent, "list available gmail actions".into())
         .await;
@@ -436,8 +440,10 @@ async fn drive_subagent() {
         2,
         "the model must continue after the tool result"
     );
-    assert!(tool_output
-        .lock()
-        .as_deref()
-        .is_some_and(|output| output.contains("composio is disabled")));
+    assert!(
+        tool_output
+            .lock()
+            .as_deref()
+            .is_some_and(|output| output.contains("composio is disabled"))
+    );
 }

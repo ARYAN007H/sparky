@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::subagent_host::{spawn_async_via_driver_tool_with_jobs, SubagentRunStatus};
+use crate::agent::subagent_host::{SubagentRunStatus, spawn_async_via_driver_tool_with_jobs};
 
 #[tokio::test]
 async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {

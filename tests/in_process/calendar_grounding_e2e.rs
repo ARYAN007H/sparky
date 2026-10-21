@@ -215,9 +215,13 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
     // The parent is an explicit value on the run options, not ambient state.
     let mut options = openhuman_core::agent::subagent_host::SubagentRunOptions::default();
     options.run_context.parent = Some(parent);
-    let parent = options.run_context.clone().into_tinyagents(
-        tinyagents_harness::context::RunConfig::new("calendar-grounding-subagent-test"),
-    );
+    let parent =
+        options
+            .run_context
+            .clone()
+            .into_tinyagents(tinyagents_harness::context::RunConfig::new(
+                "calendar-grounding-subagent-test",
+            ));
     let _ = openhuman_core::agent::subagent_host::OpenHumanSubagentHost::new(def, options)
         .run(&parent, "list my calendar events for today".into())
         .await;
