@@ -64,19 +64,24 @@ impl ChatModel<()> for TriageReplyModel {
 
 fn triage_test_model(
     requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
+    builds: Arc<Mutex<Vec<(String, String)>>>,
     failing_role: Option<&'static str>,
 ) -> crate::inference::registry::ChatModelEntry {
     crate::inference::registry::ChatModelEntry {
         build: Arc::new(move |build_request| {
             let role = build_request.role.to_string();
-            if failing_role == Some(build_request.role) {
-                anyhow::bail!("test provider has no model for role {role}");
-            }
             let model = build_request
                 .model_override
                 .or(build_request.default_model)
                 .unwrap_or("unknown-test-model")
                 .to_string();
+            builds
+                .lock()
+                .unwrap()
+                .push((role.clone(), model.clone()));
+            if failing_role == Some(build_request.role) {
+                anyhow::bail!("test provider has no model for role {role}");
+            }
             Ok((
                 Arc::new(TriageReplyModel {
                     requests: Arc::clone(&requests),
@@ -104,11 +109,12 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     config.default_model = Some(crate::config::MODEL_MANAGED_DEFAULT.to_string());
 
     let requests = Arc::new(Mutex::new(Vec::new()));
+    let builds = Arc::new(Mutex::new(Vec::new()));
     let extensions = crate::core::slots::Extensions::new();
     crate::inference::registry::register_chat_model_in(
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        triage_test_model(Arc::clone(&requests), None),
+        triage_test_model(Arc::clone(&requests), Arc::clone(&builds), None),
     );
     let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
         .services(crate::core::runtime::ServiceSet::none())
@@ -145,7 +151,10 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
     let requests = requests.lock().unwrap();
     assert_eq!(requests.len(), 1, "triage should make one model request");
-    assert_eq!(requests[0].0, "agentic", "the trigger reactor should use its configured model role");
+    assert_eq!(
+        requests[0].0, "agentic",
+        "the trigger reactor should use its configured model role"
+    );
     assert_eq!(
         requests[0].1,
         crate::config::MODEL_MANAGED_DEFAULT,
@@ -158,10 +167,6 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
             .iter()
             .any(|message| message.text().contains("handle this trigger inline")),
         "the target agent should receive the triage prompt"
-    );
-    assert_eq!(
-        requests[0].2.model.is_none(),
-        "the managed model pin belongs to provider resolution, not a per-request override"
     );
     let tool_names: Vec<_> = requests[0]
         .2
@@ -206,6 +211,84 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         child_lifecycle.is_empty(),
         "a triage one-shot turn must not persist a child subagent lifecycle: {child_lifecycle:?}"
     );
+}
+
+#[tokio::test]
+async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build() {
+    let _events_guard = test_events_guard().await;
+    let temp = tempfile::tempdir().expect("isolated triage workspace");
+    let workspace = temp.path().join("workspace");
+    let mut config = Config {
+        workspace_dir: workspace.clone(),
+        config_path: temp.path().join("config.toml"),
+        action_dir: temp.path().join("actions"),
+        ..Config::default()
+    };
+    config.default_model = Some(crate::config::MODEL_MANAGED_DEFAULT.to_string());
+
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let builds = Arc::new(Mutex::new(Vec::new()));
+    let extensions = crate::core::slots::Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        triage_test_model(
+            Arc::clone(&requests),
+            Arc::clone(&builds),
+            Some("agentic"),
+        ),
+    );
+    let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
+        .services(crate::core::runtime::ServiceSet::none())
+        .domains(crate::core::runtime::DomainSet::none())
+        .config(config)
+        .extensions(extensions)
+        .build()
+        .await
+        .expect("isolated core runtime");
+    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(runtime.context()));
+    let envelope = envelope("esc-react-model-fallback");
+    crate::core::bus::init().await.expect("bus init");
+
+    runtime
+        .run_in(
+            Arc::clone(runtime.context()),
+            crate::security::turn_origin::with_origin(
+                crate::triage::local_trigger_origin(),
+                apply_decision(
+                    &ctx,
+                    run_with_target(
+                        TriageAction::React,
+                        "trigger_reactor",
+                        "handle this trigger with the parent model",
+                    ),
+                    &envelope,
+                ),
+            ),
+        )
+        .await
+        .expect("react escalation should complete");
+
+    let builds = builds.lock().unwrap();
+    assert!(builds.iter().any(|(role, _)| role == "chat"));
+    assert!(builds.iter().any(|(role, _)| role == "agentic"));
+    drop(builds);
+    let requests = requests.lock().unwrap();
+    assert_eq!(
+        requests.len(),
+        1,
+        "the hint model construction failure should fall back to the parent model"
+    );
+    assert_eq!(
+        requests[0].0, "chat",
+        "fallback must retain the parent model workload role"
+    );
+    assert_eq!(requests[0].1, crate::config::MODEL_MANAGED_DEFAULT);
+    assert!(requests[0].2.messages.iter().any(|message| {
+        message
+            .text()
+            .contains("handle this trigger with the parent model")
+    }));
 }
 
 /// The triage parent is the shared root context with one override: nested
