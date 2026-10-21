@@ -62,6 +62,36 @@ fn v2_scopes_are_left_alone() {
     }
 }
 
+#[test]
+#[cfg(feature = "legacy-import")]
+fn legacy_approval_rows_are_upgraded_before_copy_to_the_profile_store() {
+    let (records, specs) = upgrade_legacy_scope_document(crate::storage::import::Record {
+        collection: "approvals".into(),
+        id: "fixture-approval".into(),
+        doc: json!({
+            "tool_name": "shell",
+            "action_summary": "Fixture approval",
+            "args_redacted": "{}",
+            "session_id": "fixture-session",
+            "created_at": "2025-02-03T04:05:06Z",
+            "expires_at": "2099-01-01T00:00:00Z",
+            "pending": true
+        }),
+        created_ms: Some(1_738_548_306_000),
+        schema: Some(1),
+        expires_ms: None,
+        updated_ms: None,
+    })
+    .unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].collection, "approvals.requests");
+    assert_eq!(records[0].id, "fixture-approval");
+    assert_eq!(records[0].doc["created_ms"], 1_738_548_306_000_i64);
+    assert_eq!(records[0].doc["deadline_ms"], 4_070_908_800_000_i64);
+    assert_eq!(records[0].doc["pending"], true);
+    assert!(specs.iter().any(|spec| spec.name == "approvals.requests"));
+}
+
 #[tokio::test]
 #[cfg(feature = "legacy-import")]
 async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
