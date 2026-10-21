@@ -22,11 +22,22 @@ use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
 
+fn channel_inbound_preparation_request(
+    source: tinychannels_bus::module_inbound::ChannelInboundSource,
+) -> tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+    tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+        source,
+        namespace: "main".into(),
+        session_policy: Default::default(),
+        preparation_mode: Default::default(),
+    }
+}
+
 pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
     runtime_msg: RuntimeChannelMessage,
 ) {
-    use tinychannels_bus::module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest};
+    use tinychannels_bus::module_inbound::ChannelInboundSource;
     let RuntimeChannelMessage {
         message,
         inbound_envelope,
@@ -55,12 +66,7 @@ pub(crate) async fn process_channel_runtime_message(
             };
             match crate::modules::channel_controller::prepare_inbound(
                 &crate::channels::context::module_client(&ctx).await,
-                PrepareChannelInboundRequest {
-                    source,
-                    namespace: "main".into(),
-                    session_policy: Default::default(),
-                    preparation_mode: Default::default(),
-                },
+                channel_inbound_preparation_request(source),
             )
             .await
             {
@@ -619,3 +625,7 @@ pub(crate) async fn process_channel_runtime_message(
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 }
+
+#[cfg(test)]
+#[path = "turn_tests.rs"]
+mod tests;
