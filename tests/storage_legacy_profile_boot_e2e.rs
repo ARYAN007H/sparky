@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use serde_json::{Value, json};
 use openhuman_core::storage::DocumentStoreExt as _;
+use serde_json::{Value, json};
 use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;
 
@@ -181,7 +181,12 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     .unwrap();
     let local_scope = openhuman_core::storage::Scope::local();
     let local_storage = inspect_backend.for_scope(&local_scope).unwrap();
-    for collection in ["approvals", "approvals.requests", "flows_definitions", "flows.definitions"] {
+    for collection in [
+        "approvals",
+        "approvals.requests",
+        "flows_definitions",
+        "flows.definitions",
+    ] {
         let rows = openhuman_core::storage::block_on(async {
             local_storage
                 .documents()
