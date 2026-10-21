@@ -5,6 +5,7 @@
 
 use super::*;
 use tinyinference_llm::model::discover::DiscoveryRequest;
+use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
 
 /// The discovery request for `provider` (a role's resolved provider string)
 /// serving `model`, or `None` when the route has no listing to ask:
@@ -79,21 +80,28 @@ pub(crate) fn model_limits_request_for(
         log::debug!("[model_limits] codex oauth routing has no window listing slug={slug}");
         return None;
     }
-    let auth_style = super::cloud_spec::registry_auth_style(resolution.entry.auth_style)?;
-    let (extra_headers, temperature_unsupported) = (Vec::new(), Vec::new());
-    super::cloud_spec::cloud_discovery_request(&super::cloud_spec::CloudBuild {
-        spec: super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model),
-        auth_style,
-        key: resolution.key.as_str(),
-        temperature_override: None,
-        temperature_unsupported_models: &temperature_unsupported,
-        native_tool_calling: true,
-        extra_headers: &extra_headers,
-        extra_query_params: &[],
-        user_agent: None,
+    if resolution.entry.auth_style == AuthStyle::OpenhumanJwt {
+        return None;
+    }
+    let spec =
+        super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model);
+    let options = ProviderBuildOptions {
+        auth_style: Some(resolution.entry.auth_style.into()),
         codex: Some(&resolution.codex),
-        http: None,
-    })
+        ..ProviderBuildOptions::default()
+    };
+    match ProviderRegistry::new(super::cloud_spec::CloudCredentialResolver(&resolution.key))
+        .discovery_request(&spec, &options)
+    {
+        Ok(request) => request,
+        Err(error) => {
+            log::debug!(
+                "[model_limits] registry discovery unavailable slug={}: {error}",
+                spec.provider
+            );
+            None
+        }
+    }
 }
 
 /// The managed backend's catalogue listing request, from the registered

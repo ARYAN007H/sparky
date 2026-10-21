@@ -87,9 +87,9 @@ publishes `DomainEvent::SessionExpired` locally when that check fails. Its typed
 failure callback publishes the same event for managed endpoint authentication failures, using the
 owner's explicit provenance rather than inferring ownership from the provider label.
 
-[`provider/openai_codex.rs`](./provider/openai_codex.rs) is related but is not a model. When ChatGPT/Codex OAuth tokens exist
-for the `openai` slug, `resolve_openai_codex_routing` re-targets that slug at the Codex backend
-with the account and originator headers. The OAuth flow itself (start, complete, import from the
+When ChatGPT/Codex OAuth tokens exist for the `openai` slug, the host selects the OAuth
+credential and TinyInference's `resolve_codex_routing` supplies the Codex backend route. OpenHuman
+adds the account and originator headers. The OAuth flow itself (start, complete, import from the
 Codex CLI, status, disconnect) and its token store live in [`security/credentials/openai_oauth/`](../security/credentials/openai_oauth/);
 this domain only exposes the RPC wrappers in [`ops.rs`](./ops.rs).
 
@@ -202,7 +202,6 @@ picks the provider the same way a provider string does.
 | `provider/` | Model construction and provider policy. See [`provider/README.md`](provider/README.md). |
 | `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
 | `provider_model.rs`, `registry.rs` | Provider-neutral model hooks and caller adapters; hosted aliases, model defaults, pricing, and request metadata are registered by `openhuman-tinyhumans`. |
-| `provider/openai_codex.rs` | Codex routing metadata for the `openai` slug when Codex OAuth is connected. |
 | `registry.rs` | Registered provider ownership metadata; provider-neutral retry classification is supplied by TinyInference. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |
 | [`provider/`](./provider/) | [`http_error.rs`](./provider/http_error.rs) (host reporter over `tinyinference_llm::failure::http`, `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `factory/` (chat-model construction and cloud provider resolution). |

@@ -1,4 +1,6 @@
 use super::*;
+use tinyinference_llm::providers::openai::codex::OpenAiCodexRouting;
+use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
 
 fn entry(slug: &str, endpoint: &str, auth_style: AuthStyle) -> CloudProviderCreds {
     CloudProviderCreds {
@@ -11,20 +13,18 @@ fn entry(slug: &str, endpoint: &str, auth_style: AuthStyle) -> CloudProviderCred
     }
 }
 
-fn build<'a>(entry: &CloudProviderCreds, model: &str, key: &'a str) -> CloudBuild<'a> {
-    CloudBuild {
-        spec: cloud_provider_spec(entry, model),
-        auth_style: registry_auth_style(entry.auth_style).expect("not managed"),
-        key,
-        temperature_override: None,
-        temperature_unsupported_models: &[],
-        native_tool_calling: true,
-        extra_headers: &[],
-        extra_query_params: &[],
-        user_agent: None,
-        codex: None,
-        http: None,
-    }
+fn build(entry: &CloudProviderCreds, model: &str, key: &str) {
+    let spec = cloud_provider_spec(entry, model);
+    ProviderRegistry::new(CloudCredentialResolver(key))
+        .build_with(
+            &spec,
+            ProviderBuildOptions {
+                auth_style: Some(entry.auth_style.into()),
+                native_tool_calling: Some(true),
+                ..ProviderBuildOptions::default()
+            },
+        )
+        .unwrap_or_else(|error| panic!("{} failed to build: {error}", entry.slug));
 }
 
 #[test]
@@ -50,9 +50,12 @@ fn spec_keeps_the_slug_as_provider_name_and_picks_the_kind_from_auth() {
 }
 
 #[test]
-fn managed_jwt_style_never_maps_onto_the_registry() {
-    assert!(registry_auth_style(AuthStyle::OpenhumanJwt).is_none());
-    assert!(registry_auth_style(AuthStyle::Bearer).is_some());
+fn auth_style_conversion_maps_managed_jwt_to_the_registry_neutral_style() {
+    let _: tinyinference_llm::providers::openai::AuthStyle = AuthStyle::Bearer.into();
+    assert_eq!(
+        tinyinference_llm::providers::openai::AuthStyle::from(AuthStyle::OpenhumanJwt),
+        tinyinference_llm::providers::openai::AuthStyle::None
+    );
 }
 
 #[test]
@@ -62,8 +65,7 @@ fn registry_builds_a_model_for_every_unmanaged_builtin_preset() {
             continue;
         }
         let creds = entry(preset.slug, preset.endpoint, preset.auth_style);
-        build_cloud_model(build(&creds, "some-model", "sk-test"))
-            .unwrap_or_else(|error| panic!("{} failed to build: {error}", preset.slug));
+        build(&creds, "some-model", "sk-test");
     }
 }
 
@@ -74,8 +76,17 @@ fn discovery_request_carries_bearer_auth_and_pins_openrouter_sorting() {
         "https://openrouter.ai/api/v1",
         AuthStyle::Bearer,
     );
-    let request =
-        cloud_discovery_request(&build(&creds, "m", "sk-or")).expect("openrouter has a listing");
+    let spec = cloud_provider_spec(&creds, "m");
+    let request = ProviderRegistry::new(CloudCredentialResolver("sk-or"))
+        .discovery_request(
+            &spec,
+            &ProviderBuildOptions {
+                auth_style: Some(AuthStyle::Bearer.into()),
+                ..ProviderBuildOptions::default()
+            },
+        )
+        .unwrap()
+        .expect("openrouter has a listing");
     assert_eq!(request.endpoint, "https://openrouter.ai/api/v1");
     assert!(request
         .headers
@@ -90,7 +101,17 @@ fn discovery_request_uses_x_api_key_for_anthropic() {
         "https://api.anthropic.com/v1",
         AuthStyle::Anthropic,
     );
-    let request = cloud_discovery_request(&build(&claude, "claude", "sk-ant")).expect("listing");
+    let spec = cloud_provider_spec(&claude, "claude");
+    let request = ProviderRegistry::new(CloudCredentialResolver("sk-ant"))
+        .discovery_request(
+            &spec,
+            &ProviderBuildOptions {
+                auth_style: Some(AuthStyle::Anthropic.into()),
+                ..ProviderBuildOptions::default()
+            },
+        )
+        .unwrap()
+        .expect("listing");
     assert!(request.headers.iter().any(|(name, _)| name == "x-api-key"));
 }
 
@@ -103,12 +124,20 @@ fn discovery_request_builds_codex_oauth_listing_request() {
         account_id: Some("account-123".to_string()),
     };
     let query = [("client_version".to_string(), "0.130.0".to_string())];
-    let mut with_oauth = build(&openai, "gpt", "tok");
-    with_oauth.codex = Some(&oauth);
-    with_oauth.extra_query_params = &query;
-    with_oauth.user_agent = Some("codex_cli_rs/0.0.0 (OpenHuman 0.64.18)");
-
-    let request = cloud_discovery_request(&with_oauth).expect("Codex OAuth has a listing");
+    let spec = cloud_provider_spec(&openai, "gpt");
+    let request = ProviderRegistry::new(CloudCredentialResolver("tok"))
+        .discovery_request(
+            &spec,
+            &ProviderBuildOptions {
+                auth_style: Some(AuthStyle::Bearer.into()),
+                extra_query_params: &query,
+                user_agent: Some("codex_cli_rs/0.0.0 (OpenHuman 0.64.18)"),
+                codex: Some(&oauth),
+                ..ProviderBuildOptions::default()
+            },
+        )
+        .unwrap()
+        .expect("Codex OAuth has a listing");
     assert_eq!(request.endpoint, "https://chatgpt.com/backend-api/codex");
     assert_eq!(
         request.effective_listing_url(),

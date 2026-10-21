@@ -9,6 +9,9 @@ use crate::inference::provider::factory::access_gates::verify_backend_session_ac
 use crate::inference::provider::factory::access_gates::verify_session_active;
 use crate::inference::provider::fallback_diagnostics;
 use tinyinference_llm::providers::anthropic::endpoint_is_anthropic_messages;
+use tinyinference_llm::providers::registry::{
+    resolve_slug_model, ProviderBuildOptions, ProviderRegistry,
+};
 
 /// Look up a `cloud_providers` entry by slug and build the provider.
 /// The shared resolution for a `<slug>:<model>` cloud provider — the cloud
@@ -47,79 +50,71 @@ pub(super) fn resolve_cloud_slug_for<'a>(
         )
     })?;
 
-    // Resolve effective model: use provided model if non-empty, else fall back
-    // to the entry's legacy default_model (if any), else empty → error.
-    let mut effective_model = if model.trim().is_empty() {
-        entry.default_model.clone().unwrap_or_default()
-    } else {
-        model.to_string()
-    };
-
-    // Guard: if effective_model is still empty after fallback, bail with an
-    // actionable error. Sending an empty model string to providers like
-    // nvidia-nim causes a 400 "model field is required" — a confusing error
-    // that obscures the real cause (missing model in the provider string or
-    // unset default_model on the config entry).
-    // See https://github.com/tinyhumansai/openhuman/issues/2784.
-    //
-    // OpenhumanJwt entries are exempt: they always delegate to
-    // make_openhuman_backend which derives the model from config.default_model,
-    // ignoring whatever effective_model we computed here.
     let hosted = crate::config::schema::cloud_providers::is_hosted_auth_style_for(
         extensions,
         entry.auth_style,
     );
-    if !hosted && effective_model.trim().is_empty() {
-        log::warn!(
-            "[providers][chat-factory] role={} slug={} resolved to empty model — \
-             provider string must include a model id (e.g. '{}:<model-id>') or \
-             set default_model on the cloud_providers entry",
-            role,
-            slug,
-            slug,
-        );
-        anyhow::bail!(
-            "[chat-factory] no model configured: role '{}' resolved to an empty model id for slug '{}'. \
-             Include a model in the provider string (e.g. '{slug}:<model-id>') or \
-             set default_model on the cloud_providers entry for slug '{slug}'.",
-            role,
-            slug,
-        );
-    }
-
-    if !hosted
-        && crate::inference::provider_model::is_abstract_model_for(
-            extensions,
-            PROVIDER_OPENHUMAN,
-            &effective_model,
-        )
-    {
-        if let Some(default_model) = entry.default_model.as_deref().map(str::trim).filter(|m| {
-            !m.is_empty()
-                && !crate::inference::provider_model::is_abstract_model_for(
-                    extensions,
-                    PROVIDER_OPENHUMAN,
-                    m,
-                )
-        }) {
-            log::info!(
-                "[providers][chat-factory] role={} slug={} remapping abstract model {} -> {}",
-                role,
-                slug,
-                effective_model,
-                default_model
-            );
-            effective_model = default_model.to_string();
+    // Hosted routes derive their model from the managed provider and retain the
+    // old permissive behavior. BYOK model fallback and hint classification are
+    // shared with the provider owner.
+    let effective_model = if hosted {
+        if model.trim().is_empty() {
+            entry.default_model.clone().unwrap_or_default()
         } else {
-            anyhow::bail!(
-                "[chat-factory] model '{}' is an abstract tier for role '{}', \
-                 but cloud provider slug '{}' has no concrete default_model configured. \
-                 Set cloud_providers[].default_model to a provider-native model id (e.g. deepseek-v4-pro).",
-                effective_model,
-                role,
-                slug
-            );
+            model.to_string()
         }
+    } else {
+        match resolve_slug_model(model, entry.default_model.as_deref(), |candidate| {
+            crate::inference::provider_model::is_abstract_model_for(
+                extensions,
+                PROVIDER_OPENHUMAN,
+                candidate,
+            )
+        }) {
+            Ok(model) => model,
+            Err(tinyinference_llm::providers::registry::SlugModelError::MissingModel) => {
+                log::warn!(
+                    "[providers][chat-factory] role={} slug={} resolved to empty model — \
+                     provider string must include a model id (e.g. '{}:<model-id>') or \
+                     set default_model on the cloud_providers entry",
+                    role,
+                    slug,
+                    slug,
+                );
+                anyhow::bail!(
+                    "[chat-factory] no model configured: role '{}' resolved to an empty model id for slug '{}'. \
+                     Include a model in the provider string (e.g. '{slug}:<model-id>') or \
+                     set default_model on the cloud_providers entry for slug '{slug}'.",
+                    role,
+                    slug,
+                );
+            }
+            Err(tinyinference_llm::providers::registry::SlugModelError::NoConcreteDefault) => {
+                let requested_model = if model.trim().is_empty() {
+                    entry.default_model.as_deref().unwrap_or_default()
+                } else {
+                    model
+                };
+                anyhow::bail!(
+                    "[chat-factory] model '{}' is an abstract tier for role '{}', \
+                     but cloud provider slug '{}' has no concrete default_model configured. \
+                     Set cloud_providers[].default_model to a provider-native model id (e.g. deepseek-v4-pro).",
+                    requested_model,
+                    role,
+                    slug
+                );
+            }
+        }
+    };
+
+    if !hosted && effective_model != model && !model.trim().is_empty() {
+        log::info!(
+            "[providers][chat-factory] role={} slug={} remapping abstract model {} -> {}",
+            role,
+            slug,
+            model,
+            effective_model
+        );
     }
 
     log::info!(
@@ -127,7 +122,7 @@ pub(super) fn resolve_cloud_slug_for<'a>(
         role,
         slug,
         effective_model,
-        redact_endpoint(&entry.endpoint)
+        redact_endpoint_origin(&entry.endpoint)
     );
 
     // #5146 §2.1: a raw "failed to read API key for slug 'anthropic'" is
@@ -186,7 +181,7 @@ pub(super) fn resolve_cloud_slug_for<'a>(
         anyhow::bail!("{}", missing_credentials());
     }
     let bearer_is_oauth = slug == "openai" && openai_bearer_is_oauth(config);
-    let codex = resolve_openai_codex_routing(config, slug, &entry.endpoint, &key, bearer_is_oauth)
+    let codex = resolve_codex_routing(config, slug, &entry.endpoint, &key, bearer_is_oauth)
         .map_err(anyhow::Error::msg)?;
 
     Ok(CloudSlugResolution {
@@ -435,38 +430,48 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools_for
         crate::security::egress::EgressDescriptor::inference(&slug, &effective_model, true),
     );
 
-    let http = match config
+    let ca_bundle = config
         .cloud_provider_ca_certs
         .get(&slug)
         .filter(|pem| !pem.is_empty())
-    {
-        Some(pem) => {
-            let label = if anthropic_native {
-                "provider.anthropic"
-            } else {
-                "provider.compatible"
-            };
-            match crate::util::tls::client_with_ca_bundle(pem, label) {
-                Ok(http) => Some(http),
-                Err(error) => return Some(Err(anyhow::anyhow!(error))),
-            }
-        }
-        None => None,
+        .map(String::as_str);
+    let service_key = if anthropic_native {
+        "provider.anthropic"
+    } else {
+        "provider.compatible"
     };
-    let auth_style = cloud_spec::registry_auth_style(entry.auth_style)
-        .expect("managed JWT entries returned above");
-    let chat = cloud_spec::build_cloud_model(cloud_spec::CloudBuild {
-        spec: cloud_spec::cloud_provider_spec(entry, &effective_model),
-        auth_style,
-        key: key.as_str(),
-        temperature_override,
-        temperature_unsupported_models: config.temperature_unsupported_models.as_slice(),
-        native_tool_calling,
-        extra_headers: extra_headers.as_slice(),
-        extra_query_params: extra_query_params.as_slice(),
-        user_agent: user_agent.as_deref(),
-        codex: codex_route,
-        http,
+    let http_builder = ca_bundle.map(|_| {
+        std::sync::Arc::new(move || {
+            crate::config::apply_runtime_proxy_to_builder(
+                crate::util::tls::tls_client_builder(),
+                service_key,
+            )
+        }) as tinyinference_llm::providers::registry::ProviderHttpClientBuilder<'_>
     });
+    let spec = cloud_spec::cloud_provider_spec(entry, &effective_model);
+    log::debug!(
+        "[providers][cloud-spec] build slug={} kind={} auth={:?}",
+        spec.provider,
+        spec.kind.as_str(),
+        entry.auth_style
+    );
+    let chat = ProviderRegistry::new(cloud_spec::CloudCredentialResolver(&key))
+        .build_with(
+            &spec,
+            ProviderBuildOptions {
+                auth_style: Some(entry.auth_style.into()),
+                temperature_override,
+                temperature_unsupported_models: config.temperature_unsupported_models.as_slice(),
+                native_tool_calling: Some(native_tool_calling),
+                extra_headers: extra_headers.as_slice(),
+                extra_query_params: extra_query_params.as_slice(),
+                user_agent: user_agent.as_deref(),
+                codex: codex_route,
+                http_builder,
+                ca_bundle,
+                ..ProviderBuildOptions::default()
+            },
+        )
+        .map_err(|error| anyhow::anyhow!("[chat-factory] {error}"));
     Some(chat.map(|chat| (chat, effective_model)))
 }

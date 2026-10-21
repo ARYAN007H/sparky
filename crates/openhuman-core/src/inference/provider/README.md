@@ -39,7 +39,7 @@ previously `providers/` (pre-consolidation single-crate layout); see
 | Managed OpenHuman backend | registered chat model (`openhuman-tinyhumans`, `src/inference/`) | `openhuman` / `cloud` (session JWT + billing metadata) |
 | OpenAI-compatible (BYOK cloud slugs, local runtimes) | `tinyinference_llm::providers::openai` | `<slug>:<model>`, `ollama:<model>`, `lmstudio:<model>`, `mlx:<model>`, `omlx:<model>`, `local-openai:<model>` |
 | Anthropic Messages API (prompt caching) | `tinyinference_llm::providers::anthropic` | `<slug>:<model>` whose endpoint is the first-party Messages API and native tool calling is on |
-| Codex OAuth / Responses API | [`openai_codex.rs`](./openai_codex.rs) host OAuth selection plus `tinyinference_llm::providers::openai::codex` metadata | the `openai` cloud slug once Codex OAuth tokens exist |
+| Codex OAuth / Responses API | Host OAuth selection plus `tinyinference_llm::providers::openai::codex` routing metadata | the `openai` cloud slug once Codex OAuth tokens exist |
 | Claude Agent SDK subprocess | `tinyagents_harness::providers::claude_agent_sdk` | `claude_agent_sdk` / `claude_agent_sdk:<model>` |
 | Claude Code CLI subprocess | `tinyagents_harness::providers::claude_code` (see the [Claude Code provider guide](../../../../../docs/gitbooks/en/developing/providers/claude-code.md)) | `claude-code:<model>` |
 

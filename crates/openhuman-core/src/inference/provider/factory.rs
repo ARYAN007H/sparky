@@ -30,8 +30,10 @@ pub use chat_model::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
 };
-pub(crate) use credentials::openai_bearer_is_oauth;
-pub use credentials::{auth_key_for_slug, lookup_key_for_slug, redact_endpoint};
+pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
+pub(crate) use credentials::{
+    openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
+};
 pub(crate) use discovery::{model_limits_request, model_limits_request_for};
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use managed_backend::make_openhuman_backend_model;
@@ -91,7 +93,6 @@ mod factory_tests;
 
 use crate::config::schema::cloud_providers::AuthStyle;
 use crate::config::Config;
-use crate::inference::provider::openai_codex::resolve_openai_codex_routing;
 use crate::security::credentials::AuthService;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
@@ -101,7 +102,6 @@ use tinyinference_llm::providers::openai::codex::{
     openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
     OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
 };
-use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
 
 /// Sentinel meaning "use the OpenHuman backend session JWT".
 pub const PROVIDER_OPENHUMAN: &str = "openhuman";

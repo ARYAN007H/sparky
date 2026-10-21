@@ -103,6 +103,64 @@ async fn forwards_schema_max_tokens_and_provider_options() {
 }
 
 #[tokio::test]
+async fn preserves_configured_endpoint_path_on_the_wire() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/private-path-segment/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(completion_body("ok", "stop")))
+        .mount(&server)
+        .await;
+    let endpoint = CompletionEndpoint {
+        base_url: format!("{}/private-path-segment/v1", server.uri()),
+        api_key: "sk-test".to_string(),
+        headers: Vec::new(),
+    };
+    let request = ModelRequest::new(vec![Message::user("hi")]).with_model("m".to_string());
+
+    complete_once(&endpoint, request, None).await.unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].url.path(),
+        "/private-path-segment/v1/chat/completions"
+    );
+}
+
+#[test]
+fn completion_endpoint_debug_redacts_path_url_credentials_and_header_values() {
+    let endpoint = CompletionEndpoint {
+        base_url: "https://user:password@provider.example/private-path-token/v1?api_key=query-token#fragment-token"
+            .to_string(),
+        api_key: "bearer-token".to_string(),
+        headers: vec![("X-Api-Key".to_string(), "header-token".to_string())],
+    };
+
+    let debug = format!("{endpoint:?}");
+
+    assert!(debug.contains("https://provider.example"), "{debug}");
+    for secret in [
+        "user",
+        "password",
+        "private-path-token",
+        "query-token",
+        "fragment-token",
+        "bearer-token",
+        "header-token",
+    ] {
+        assert!(!debug.contains(secret), "leaked {secret} in {debug}");
+    }
+    let invalid = CompletionEndpoint {
+        base_url: "not a URL with private-token".to_string(),
+        api_key: "k".to_string(),
+        headers: Vec::new(),
+    };
+    let debug = format!("{invalid:?}");
+    assert!(debug.contains("<endpoint>"), "{debug}");
+    assert!(!debug.contains("private-token"), "{debug}");
+}
+
+#[tokio::test]
 async fn surfaces_length_finish_reason() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
