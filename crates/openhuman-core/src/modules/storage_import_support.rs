@@ -52,10 +52,26 @@ fn capture_module_storage(
         .ok_or_else(|| anyhow!("profile import has no active profile host"))?;
     let id = crate::profiles::ProfileId::parse(&profile_id)
         .map_err(|error| anyhow!("invalid caller profile id: {error}"))?;
+    Ok(Some(capture_profile_module_storage(
+        &host,
+        &id,
+        &profile_id,
+        &caller_context,
+        scope,
+    )?))
+}
+
+fn capture_profile_module_storage(
+    host: &crate::profiles::ProfileHost,
+    id: &crate::profiles::ProfileId,
+    profile_id: &str,
+    caller_context: &Arc<crate::core::runtime::CoreContext>,
+    scope: crate::storage::Scope,
+) -> Result<CapturedModuleStorage> {
     let profile = host
-        .get(&id)
+        .get(id)
         .ok_or_else(|| anyhow!("caller profile is no longer open"))?;
-    require_profile_context(profile.context(), &caller_context, &profile_id)?;
+    require_profile_context(profile.context(), caller_context, profile_id)?;
     let backend = host
         .storage_backend_for(&profile)
         .map_err(|error| {
@@ -65,11 +81,11 @@ fn capture_module_storage(
             )
         })?
         .ok_or_else(|| anyhow!("profile storage is unavailable for this import"))?;
-    Ok(Some(CapturedModuleStorage {
+    Ok(CapturedModuleStorage {
         backend,
         scope,
         _profile: Some(profile),
-    }))
+    })
 }
 
 /// Rejects work from an old context after a profile has been reopened under a
