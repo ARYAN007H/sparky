@@ -215,8 +215,8 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
                 Err(CronError::NotFound(_))
             ));
 
-            drop(agent);
             runtime.remove_agent("teeny").await.unwrap();
+            drop(agent);
             drop(runtime);
         })
         .await

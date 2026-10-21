@@ -181,8 +181,8 @@ fn host_only_advertises_exactly_the_host_tools_under_a_bare_prompt() {
             advertised.sort();
             assert_eq!(advertised, vec!["find_documents", "read_file"]);
             assert_eq!(system_text(&requests[0]), BARE_PROMPT);
-            drop(agent);
             runtime.remove_agent("analyst").await.unwrap();
+            drop(agent);
         })
         .await
         .expect("test task");
@@ -250,8 +250,8 @@ fn host_only_refuses_builtin_tools_the_model_names() {
             assert!(results.contains("read_file-host-result"), "{results}");
             assert!(results.contains("unknown tool `shell`"), "{results}");
             assert!(results.contains("unknown tool `write_file`"), "{results}");
-            drop(agent);
             runtime.remove_agent("refuser").await.unwrap();
+            drop(agent);
         })
         .await
         .expect("test task");
@@ -290,8 +290,8 @@ fn host_only_forces_read_only_access_and_sandbox() {
             );
             assert!(agent.access().turn_origin().is_none());
             assert!(agent.config().autonomy.trusted_roots.is_empty());
-            drop(agent);
             runtime.remove_agent("readonly").await.unwrap();
+            drop(agent);
         })
         .await
         .expect("test task");
