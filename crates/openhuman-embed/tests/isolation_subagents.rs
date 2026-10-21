@@ -47,8 +47,13 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
             // ── A declares a helper; B does not ──
             let a_provider = scripted_provider(
                 vec![tool_call_completion(
-                    "delegate_a_helper",
-                    &serde_json::json!({ "prompt": "summarise the plan" }).to_string(),
+                    "spawn_subagent",
+                    &serde_json::json!({
+                        "agent_id": "a_helper",
+                        "prompt": "summarise the plan",
+                        "task_key": "a-helper-summary"
+                    })
+                    .to_string(),
                 )],
                 "a-done",
             )
@@ -90,9 +95,15 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
             assert!(
                 tool_names(&a_requests[0])
                     .iter()
-                    .any(|t| t == "delegate_a_helper"),
+                    .any(|t| t == "spawn_subagent"),
                 "a is offered its own helper: {:?}",
                 tool_names(&a_requests[0])
+            );
+            assert!(
+                !tool_names(&a_requests[0])
+                    .iter()
+                    .any(|tool| tool == "delegate_a_helper"),
+                "a uses the shared spawn tool instead of a generated delegate alias"
             );
             assert!(
                 a_requests
