@@ -4,7 +4,7 @@
 #![cfg(feature = "storage-sqlite")]
 
 use super::*;
-use crate::storage::fence::{FenceError, LeaseFence, ScopeMatch};
+use crate::storage::fence::{fence_error, FenceError, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore};
 use serde_json::json;
 use std::sync::{
@@ -13,7 +13,7 @@ use std::sync::{
 };
 use std::time::Duration;
 use tinystoragedrivers_api::StorageBackend as _;
-use tinystoragedrivers_types::{NewMessage, Precondition, QueueSpec, Scope};
+use tinystoragedrivers_types::{CollectionSpec, NewMessage, Precondition, QueueSpec, Scope};
 
 const TTL: Duration = Duration::from_secs(30);
 const MARGIN_MS: u64 = 5_000;
