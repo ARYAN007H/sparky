@@ -87,7 +87,8 @@ impl InboundSourceConfig {
 ///
 /// A name outside `^[a-z0-9_-]+:[a-z0-9_.*-]+$`, or under a reserved prefix.
 pub fn check_source_name(name: &str) -> Result<(), String> {
-    let kind_char = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '-');
+    let kind_char =
+        |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '-');
     let well_formed = name.split_once(':').is_some_and(|(kind, rest)| {
         !kind.is_empty()
             && !rest.is_empty()
@@ -126,13 +127,15 @@ impl InboundConfig {
     /// The configured sources that can run, by name; an unusable one is
     /// logged and left out.
     pub fn usable_sources(&self) -> impl Iterator<Item = (&str, &InboundSourceConfig)> {
-        self.sources.keys().filter_map(|name| match self.source(name) {
-            Ok(source) => Some((name.as_str(), source)),
-            Err(error) => {
-                tracing::warn!(error = %error, "[inbound] unusable source left out");
-                None
-            }
-        })
+        self.sources
+            .keys()
+            .filter_map(|name| match self.source(name) {
+                Ok(source) => Some((name.as_str(), source)),
+                Err(error) => {
+                    tracing::warn!(error = %error, "[inbound] unusable source left out");
+                    None
+                }
+            })
     }
 
     /// Whether `source` is a usable external source, run on a pinned agent.

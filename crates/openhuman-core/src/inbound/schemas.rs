@@ -111,9 +111,17 @@ pub fn schemas(function: &str) -> ControllerSchema {
                           debounced per key into batches, each run as one turn of the \
                           source's pinned agent. A redelivered `event_id` answers `duplicate`.",
             inputs: vec![
-                string_input("source", "A configured source name, e.g. `x:mentions`.", true),
+                string_input(
+                    "source",
+                    "A configured source name, e.g. `x:mentions`.",
+                    true,
+                ),
                 string_input("key", "What the source's events are batched by.", true),
-                string_input("event_id", "The source's own id; a redelivery is a duplicate.", true),
+                string_input(
+                    "event_id",
+                    "The source's own id; a redelivery is a duplicate.",
+                    true,
+                ),
                 string_input("text", "The event's text.", true),
                 FieldSchema {
                     name: "payload",
@@ -121,7 +129,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     comment: "The source's payload, handed to the agent as is.",
                     required: false,
                 },
-                u64_input("received_at_ms", "When the source received it (default now)."),
+                u64_input(
+                    "received_at_ms",
+                    "When the source received it (default now).",
+                ),
             ],
             outputs: vec![json_output(
                 "result",
@@ -135,7 +146,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
             inputs: vec![
                 string_input("source", "Only this source's results.", false),
                 u64_input("since_ms", "Only results started at or after this time."),
-                u64_input("limit", "Maximum number of results (default 50, at most 500)."),
+                u64_input(
+                    "limit",
+                    "Maximum number of results (default 50, at most 500).",
+                ),
                 string_input("status", "`running`, `completed` or `failed`.", false),
             ],
             outputs: vec![json_output(

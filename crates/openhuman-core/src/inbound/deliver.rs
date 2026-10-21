@@ -283,7 +283,10 @@ impl Deliverer {
 
     /// The pinned source every event of `turn` comes from, with its
     /// configuration, when there is one.
-    async fn pinned_source(&self, events: &[InboundEvent]) -> Option<(String, InboundSourceConfig)> {
+    async fn pinned_source(
+        &self,
+        events: &[InboundEvent],
+    ) -> Option<(String, InboundSourceConfig)> {
         let first = events.first()?;
         if !events.iter().all(|event| event.source == first.source) {
             return None;
@@ -366,7 +369,11 @@ impl Deliverer {
         request: ClassifySalienceRequest,
     ) -> Result<ClassifySalienceResponse, String> {
         let event = request.event;
-        if self.pinned_source(std::slice::from_ref(&event)).await.is_some() {
+        if self
+            .pinned_source(std::slice::from_ref(&event))
+            .await
+            .is_some()
+        {
             // A pinned source's events always reach its agent: no triage.
             return Ok(ClassifySalienceResponse::new(SalienceClass::Actionable));
         }

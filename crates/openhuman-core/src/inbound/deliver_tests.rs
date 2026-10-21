@@ -379,7 +379,11 @@ async fn a_pinned_source_runs_its_agent_without_triage_and_keeps_the_text() {
     let agent = ScriptedAgent::new([Reply::Text("draft")]);
     let results = memory_results();
     let response = pinned_deliverer(&triage, &agent, &results)
-        .deliver(turn(vec![mention("t1"), mention("t2")], Lane::Interactive, 1))
+        .deliver(turn(
+            vec![mention("t1"), mention("t2")],
+            Lane::Interactive,
+            1,
+        ))
         .await;
     assert_eq!(response.status, DeliverStatus::Accepted);
     assert_eq!(triage.runs(), 0, "a pinned source was triaged");

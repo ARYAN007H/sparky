@@ -224,10 +224,10 @@ impl Pinned {
             return Delivered::Running;
         };
         let items: Vec<ExternalItem> = turn.events.iter().filter_map(external_of).collect();
-        let key = turn
-            .events
-            .first()
-            .map_or_else(|| turn.conversation_key.clone(), |e| e.conversation_key.clone());
+        let key = turn.events.first().map_or_else(
+            || turn.conversation_key.clone(),
+            |e| e.conversation_key.clone(),
+        );
         let event_ids = items.iter().map(|item| item.id.clone()).collect();
         let message = render_prompt(name, &key, source, &items);
         let fresh = Stored::running(

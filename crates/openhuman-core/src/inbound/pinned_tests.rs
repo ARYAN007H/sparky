@@ -38,7 +38,12 @@ fn a_configured_prompt_takes_the_batch_in_place_of_its_placeholder() {
         prompt: Some("Draft replies.\n{{events}}\nBe brief.".to_owned()),
         ..InboundSourceConfig::default()
     };
-    let prompt = render_prompt("x:mentions", "mentions", &source, &[item("1", "a"), item("2", "b")]);
+    let prompt = render_prompt(
+        "x:mentions",
+        "mentions",
+        &source,
+        &[item("1", "a"), item("2", "b")],
+    );
     assert!(prompt.starts_with("Draft replies.\n[{"), "{prompt}");
     assert!(prompt.ends_with("}]\nBe brief."), "{prompt}");
     assert!(!prompt.contains("{{events}}"));

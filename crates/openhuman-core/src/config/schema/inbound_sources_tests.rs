@@ -54,7 +54,15 @@ fn source_names_are_checked() {
         assert!(check_source_name(good).is_ok(), "{good}");
     }
     for bad in [
-        "", "mentions", "X:mentions", "x:", ":m", "x:m:n", "x y:m", "x:m/n", "x:é",
+        "",
+        "mentions",
+        "X:mentions",
+        "x:",
+        ":m",
+        "x:m:n",
+        "x y:m",
+        "x:m/n",
+        "x:é",
     ] {
         assert!(check_source_name(bad).is_err(), "{bad}");
     }

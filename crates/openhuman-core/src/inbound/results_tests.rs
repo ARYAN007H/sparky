@@ -31,15 +31,24 @@ fn a_started_turn_is_running_until_it_finishes() {
     assert_eq!(results.running().unwrap().len(), 1);
     assert_eq!(results.get("t1").unwrap().unwrap().message, "the message");
 
-    let done = results.finish("t1", Ok("draft".into()), 20).unwrap().unwrap();
+    let done = results
+        .finish("t1", Ok("draft".into()), 20)
+        .unwrap()
+        .unwrap();
     assert_eq!(done.result.status, ResultStatus::Completed);
     assert_eq!(done.result.text.as_deref(), Some("draft"));
     assert_eq!(done.result.completed_ms, Some(20));
     assert!(results.running().unwrap().is_empty());
-    assert!(results.finish("nope", Ok(String::new()), 1).unwrap().is_none());
+    assert!(results
+        .finish("nope", Ok(String::new()), 1)
+        .unwrap()
+        .is_none());
 
     results.start(&running("t2", "x:mentions", 11)).unwrap();
-    let failed = results.finish("t2", Err("boom".into()), 30).unwrap().unwrap();
+    let failed = results
+        .finish("t2", Err("boom".into()), 30)
+        .unwrap()
+        .unwrap();
     assert_eq!(failed.result.status, ResultStatus::Failed);
     assert_eq!(failed.result.error.as_deref(), Some("boom"));
     assert_eq!(failed.result.text, None);
@@ -110,7 +119,13 @@ fn results_past_their_source_ttl_are_pruned() {
     results.start(&running("new", "x:mentions", 9_000)).unwrap();
     results.start(&running("dm", "x:dms", 1_000)).unwrap();
     let pruned = results
-        .prune(10_000, |source| if source == "x:mentions" { 5_000 } else { 50_000 })
+        .prune(10_000, |source| {
+            if source == "x:mentions" {
+                5_000
+            } else {
+                50_000
+            }
+        })
         .unwrap();
     assert_eq!(pruned, 1);
     assert!(results.get("old").unwrap().is_none());

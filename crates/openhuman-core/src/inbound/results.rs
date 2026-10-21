@@ -189,7 +189,11 @@ impl Results {
     ///
     /// The storage backend or scope cannot be opened.
     pub fn open(config: &Config) -> anyhow::Result<Self> {
-        Ok(Self(Repo::current_for(&config.workspace_dir, DOMAIN, specs)?))
+        Ok(Self(Repo::current_for(
+            &config.workspace_dir,
+            DOMAIN,
+            specs,
+        )?))
     }
 
     #[cfg(test)]

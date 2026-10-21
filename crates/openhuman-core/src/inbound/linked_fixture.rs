@@ -313,7 +313,11 @@ impl Rig {
     /// Attach the module with `inbound`'s sources in its pipeline, and serve
     /// the host with `pinned` running them.
     pub(crate) async fn pinned(inbound: InboundConfig, pinned: Pinned) -> Self {
-        Self::build(ScriptedTriage::new(Vec::<Step>::new()), Some((inbound, pinned))).await
+        Self::build(
+            ScriptedTriage::new(Vec::<Step>::new()),
+            Some((inbound, pinned)),
+        )
+        .await
     }
 
     async fn build(triage: Arc<ScriptedTriage>, pinned: Option<(InboundConfig, Pinned)>) -> Self {

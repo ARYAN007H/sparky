@@ -109,7 +109,11 @@ impl EventHandler<DomainEvent> for Completed {
     }
 }
 
-async fn until_results(config: &crate::config::Config, results: &Results, n: usize) -> Vec<crate::inbound::results::InboundResult> {
+async fn until_results(
+    config: &crate::config::Config,
+    results: &Results,
+    n: usize,
+) -> Vec<crate::inbound::results::InboundResult> {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
     loop {
         let listed = super::results(
@@ -140,10 +144,16 @@ async fn an_offer_names_an_unconfigured_or_unusable_source() {
     assert!(refused.contains("not configured"), "{refused}");
     let mut params = mention("1");
     params.source = "composio:gmail".into();
-    assert!(offer(&config, &client, params).await.unwrap_err().contains("reserved"));
+    assert!(offer(&config, &client, params)
+        .await
+        .unwrap_err()
+        .contains("reserved"));
     let mut params = mention("1");
     params.event_id = " ".into();
-    assert!(offer(&config, &client, params).await.unwrap_err().contains("event_id"));
+    assert!(offer(&config, &client, params)
+        .await
+        .unwrap_err()
+        .contains("event_id"));
     let mut off = config.clone();
     off.components.eventqueues = false;
     assert!(offer(&off, &client, mention("1"))
@@ -255,10 +265,20 @@ fn results_are_limited_and_pruned_past_their_ttl() {
             .unwrap();
     }
     let params: ResultsParams = serde_json::from_value(json!({ "limit": 1 })).unwrap();
-    let listed = super::results(&config, &results, params).unwrap().value.results;
+    let listed = super::results(&config, &results, params)
+        .unwrap()
+        .value
+        .results;
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].turn_id, "t1");
     assert!(results.get("old").unwrap().is_none(), "not pruned");
     let capped: ResultsParams = serde_json::from_value(json!({ "limit": 100_000 })).unwrap();
-    assert_eq!(super::results(&config, &results, capped).unwrap().value.results.len(), 2);
+    assert_eq!(
+        super::results(&config, &results, capped)
+            .unwrap()
+            .value
+            .results
+            .len(),
+        2
+    );
 }

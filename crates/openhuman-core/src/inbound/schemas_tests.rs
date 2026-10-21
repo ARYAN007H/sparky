@@ -32,7 +32,10 @@ async fn malformed_params_are_refused_before_the_module_is_reached() {
 
 #[test]
 fn the_external_source_functions_have_schemas() {
-    let names: Vec<&str> = all_controller_schemas().iter().map(|s| s.function).collect();
+    let names: Vec<&str> = all_controller_schemas()
+        .iter()
+        .map(|s| s.function)
+        .collect();
     for name in ["offer", "results", "result_ack"] {
         assert!(names.contains(&name), "{name}");
     }
