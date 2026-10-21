@@ -126,13 +126,16 @@ impl ChatModel<()> for CronChildModel {
             let call = self
                 .child_calls
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if let Some(started) = self.child_started.lock().unwrap().take() {
+                let _ = started.send(());
+            }
             if self.child_attempts_dangerous_tool {
                 if call > 0 {
                     self.child_dangerous_tool_denied.store(
                         request.messages.iter().any(|message| {
-                            message.text().contains(
-                                "Scheduled agent turns may use read-only tools only",
-                            )
+                            message
+                                .text()
+                                .contains("Scheduled agent turns may use read-only tools only")
                         }),
                         std::sync::atomic::Ordering::SeqCst,
                     );
@@ -332,7 +335,8 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     );
     assert_eq!(
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        1
+        2,
+        "the child receives the denied tool result and then completes"
     );
     assert!(
         model
@@ -394,6 +398,9 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
             .load(std::sync::atomic::Ordering::SeqCst),
         "the real child model request exposed the declared destructive tool"
     );
+    assert!(model
+        .child_dangerous_tool_denied
+        .load(std::sync::atomic::Ordering::SeqCst));
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         &config.workspace_dir,
         &format!("cron:{}", job.id),
@@ -407,12 +414,20 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
     assert_eq!(jobs.len(), 1, "one native child belongs to this Cron job");
     assert_eq!(
         jobs[0].status,
-        tinyagents_orchestration::subagent::SubAgentJobStatus::Failed,
-        "Cron admits only the orchestration control call, not child actions"
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Completed,
+        "the child may recover after the denied action and report the denial"
     );
     assert!(jobs[0]
-        .error
+        .output
         .as_deref()
         .unwrap_or_default()
-        .contains("Scheduled agent turns may use read-only tools only"));
+        .contains("headless-cron-child-returned-after-policy-denial"));
+    let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].status, "ok");
+    assert!(runs[0]
+        .output
+        .as_deref()
+        .unwrap_or_default()
+        .contains("headless-cron-child-returned-after-policy-denial"));
 }
