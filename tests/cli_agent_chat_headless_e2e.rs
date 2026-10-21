@@ -146,6 +146,7 @@ fn configure(home: &Path, workspace: &Path, backend: &str) {
 }
 
 fn run_cli(
+    method: &str,
     home: &Path,
     workspace: &Path,
     action_dir: &Path,
@@ -162,7 +163,7 @@ fn run_cli(
             .args([
                 "call",
                 "--method",
-                "openhuman.inference_agent_chat",
+                method,
                 "--params",
             ])
             .arg(params.to_string())
@@ -271,8 +272,17 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
 
     let success_logs = logs.join("success");
     std::fs::create_dir_all(&success_logs).expect("create success logs");
-    let (success, stdout, stderr) =
-        run_cli(home.path(), &workspace, &action_dir, &origin, &success_logs);
+    // Exercise the supported legacy method too: dispatch resolves it to the
+    // canonical agent-chat method, so it must receive the same headless root
+    // authorization.
+    let (success, stdout, stderr) = run_cli(
+        "openhuman.local_ai_agent_chat",
+        home.path(),
+        &workspace,
+        &action_dir,
+        &origin,
+        &success_logs,
+    );
     assert!(
         success,
         "one-shot CLI failed; logs: {}\nstdout: {stdout}\nstderr: {stderr}",
@@ -346,6 +356,7 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
     let failure_logs = logs.join("failure");
     std::fs::create_dir_all(&failure_logs).expect("create failure logs");
     let (failed, failed_stdout, failed_stderr) = run_cli(
+        "openhuman.inference_agent_chat",
         failed_home.path(),
         &failed_workspace,
         &failed_action_dir,
