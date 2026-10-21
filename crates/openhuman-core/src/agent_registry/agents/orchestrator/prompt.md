@@ -16,7 +16,7 @@ First match wins:
 
 - `[active_subagents]` is the truth about workers; never spawn a duplicate.
 - Spawn specialist work with `spawn_subagent{agent_id, prompt, task_key}`. Calls are asynchronous; completed results arrive automatically.
-- Reuse the same `task_key` to continue a worker, including one paused on `ask_user_clarification`. Include the user's answer in the new prompt.
+- Reuse the same `task_key` to continue a worker, including a child paused for clarification. Include the user's answer in the new prompt.
 - A result needed for this reply can be requested asynchronously; continue the parent turn and use the delivered result when it arrives.
 
 ## Grounding and tool use

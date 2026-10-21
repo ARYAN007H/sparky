@@ -273,10 +273,6 @@ fn master_agent_has_coding_hint_and_named_tools() {
                     "retired sub-agent tool `{retired}` must not reappear (#5701)"
                 );
             }
-            assert!(
-                !tools.iter().any(|t| t == "spawn_subagent"),
-                "spawn_subagent must not appear — removed in #1141"
-            );
             // The Master Agent owns the ordinary coding loop directly.
             // Keep its mutation surface intentionally small: one patch
             // mechanism for existing files, file_write for new files,

@@ -89,7 +89,7 @@ fn render_installed_skills_empty_is_omitted() {
 fn prompt_documents_the_single_always_async_spawn_contract() {
     assert!(ARCHETYPE.contains("Calls are asynchronous; completed results arrive automatically."));
     assert!(ARCHETYPE.contains("Reuse the same `task_key` to continue a worker"));
-    assert!(ARCHETYPE.contains("including one paused on `ask_user_clarification`"));
+    assert!(ARCHETYPE.contains("including one paused for clarification"));
     for retired in [
         "blocking: true",
         "continue_subagent",
