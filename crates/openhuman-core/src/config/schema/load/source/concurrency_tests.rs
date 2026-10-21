@@ -512,7 +512,7 @@ async fn config_snapshot_is_bound_to_its_backend_instance() {
     let storage_b = memory_backend();
     let config_a = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage_a, "tenant-same-anchor"),
+            scoped(storage_a.as_ref(), "tenant-same-anchor"),
             Scope::new("tenant-same-anchor").unwrap(),
             keys(14),
         );
@@ -523,7 +523,7 @@ async fn config_snapshot_is_bound_to_its_backend_instance() {
     };
     let (config_b, version_b) = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage_b, "tenant-same-anchor"),
+            scoped(storage_b.as_ref(), "tenant-same-anchor"),
             Scope::new("tenant-same-anchor").unwrap(),
             keys(14),
         );
@@ -567,7 +567,7 @@ async fn config_snapshot_is_bound_to_its_backend_instance() {
 
     let error = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage_b, "tenant-same-anchor"),
+            scoped(storage_b.as_ref(), "tenant-same-anchor"),
             Scope::new("tenant-same-anchor").unwrap(),
             keys(14),
         );
