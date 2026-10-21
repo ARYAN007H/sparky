@@ -1,10 +1,10 @@
 use super::*;
+use tinyagents_harness::HarnessStatusStore;
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
 use tinyagents_harness::observability::replay::read_run_events_page;
 use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
-use tinyagents_harness::HarnessStatusStore;
 use tinystoragedrivers_testkit::memory_backend as test_memory_backend;
 
 fn backend() -> Arc<dyn StorageBackend> {
@@ -151,12 +151,14 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
     .unwrap();
     assert_eq!(late.deleted, 1);
     let storage = backend.for_scope(&Scope::local()).unwrap();
-    assert!(storage
-        .streams()
-        .info(&format!("{JOURNAL_STREAM}/run.old"))
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        storage
+            .streams()
+            .info(&format!("{JOURNAL_STREAM}/run.old"))
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]
