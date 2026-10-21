@@ -120,6 +120,10 @@ async fn disconnect(config: &Config, server_id: &str) {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn two_servers_same_tool_name_no_collision() {
     let (_workspace, config) = fresh_workspace_config();
     let servers = Map::from_iter([
@@ -181,6 +185,10 @@ async fn two_servers_same_tool_name_no_collision() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn tool_calls_route_to_the_correct_server() {
     let (_workspace, config) = fresh_workspace_config();
     let servers = Map::from_iter([
@@ -204,6 +212,10 @@ async fn tool_calls_route_to_the_correct_server() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn failed_connect_does_not_block_healthy_peer() {
     let (_workspace, config) = fresh_workspace_config();
     let servers = Map::from_iter([
@@ -255,4 +267,53 @@ async fn failed_connect_does_not_block_healthy_peer() {
         "isolation-check"
     );
     disconnect(&config, good).await;
+}
+
+#[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
+async fn disabled_server_contributes_no_tools_to_agent_surface() {
+    let (_workspace, config) = fresh_workspace_config();
+    let servers = Map::from_iter([
+        ("@disabled-test/live".to_owned(), stub_server(false)),
+        ("@disabled-test/quiet".to_owned(), stub_server(false)),
+    ]);
+    let installed = install_servers(&config, servers).await;
+    let live = &installed["@disabled-test/live"];
+    let quiet = &installed["@disabled-test/quiet"];
+    connect(&config, live).await.expect("live server connects");
+
+    assert!(
+        openhuman_core::mcp::registry::ops::mcp_clients_connect(&config, quiet.to_owned())
+            .await
+            .is_err(),
+        "an explicitly disabled server must refuse connection"
+    );
+    let statuses = openhuman_core::mcp::registry::ops::mcp_clients_status(&config)
+        .await
+        .expect("read server status");
+    let status_for = |id: &str| {
+        statuses.value["servers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|status| status["server_id"] == id)
+            .expect("server remains visible in status")
+    };
+    assert_eq!(status_for(live)["status"], "connected");
+    assert_eq!(status_for(quiet)["status"], "disabled");
+
+    let all_tools =
+        openhuman_core::mcp::registry::connections::all_connected_tools_for_config(&config).await;
+    assert!(all_tools
+        .iter()
+        .any(|(id, _, tool)| id == live && tool.name == "echo"));
+    assert!(all_tools.iter().all(|(id, _, _)| id != quiet));
+    assert_eq!(
+        call_echo(&config, live, "live-while-quiet").await,
+        "live-while-quiet"
+    );
+    disconnect(&config, live).await;
 }

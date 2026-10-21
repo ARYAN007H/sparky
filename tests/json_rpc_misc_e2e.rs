@@ -91,7 +91,7 @@ async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
         Some(1),
         "{one}"
     );
-    assert!(!sites.join("shop.test.json").exists());
+    assert!(sites.join("shop.test.json").exists());
     assert!(sites.join("books.test.json").exists());
 
     let blank = post_json_rpc(
@@ -117,7 +117,21 @@ async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
         Some(1),
         "{every}"
     );
-    assert!(!sites.join("books.test.json").exists());
+    assert!(sites.join("books.test.json").exists());
+
+    let none_left = post_json_rpc(
+        &rpc_base,
+        41_255,
+        "openhuman.modules_browser_forget_sites",
+        json!({}),
+    )
+    .await;
+    let none_left = peel_logs_envelope(assert_no_jsonrpc_error(&none_left, "forget again"));
+    assert_eq!(
+        none_left.get("forgotten").and_then(Value::as_u64),
+        Some(0),
+        "nothing may remain after forgetting every site: {none_left}"
+    );
 
     rpc_join.abort();
 }

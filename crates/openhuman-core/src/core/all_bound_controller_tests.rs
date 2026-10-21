@@ -17,6 +17,11 @@ fn staged_bound_methods() -> Vec<&'static str> {
     methods.extend(["doctor.report", "doctor.models"]);
     methods.extend(["encrypt.secret", "decrypt.secret"]);
     methods.extend([
+        "keyring_consent.status",
+        "keyring_consent.decide",
+        "keyring_consent.retry_probe",
+    ]);
+    methods.extend([
         "approval.list_pending",
         "approval.list_recent_decisions",
         "approval.decide",
@@ -706,3 +711,6 @@ mod registry_test_support;
 
 #[path = "all_bound_registry_contract_tests.rs"]
 mod registry_contract_tests;
+
+#[path = "all_keyring_consent_controller_tests.rs"]
+mod keyring_consent_controller_tests;

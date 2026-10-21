@@ -5,11 +5,10 @@
 
 use std::process::Command;
 
-#[macro_use]
-#[path = "support/storage_drivers.rs"]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::UrlCase;
+use storage_case::UrlCase;
 
 fn core(workspace: &std::path::Path, url: Option<&str>, args: &[&str]) -> std::process::Output {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_openhuman-core"));
@@ -68,8 +67,11 @@ fn one_shot(url: &str, args: &[&str]) -> (std::process::Output, tempfile::TempDi
     (output, workspace)
 }
 
-/// SQLite is asked to persist a job written by one process for another.
-fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
+/// Write a job in one process, list in another: the backend is what carries
+/// it from the first to the second.
+#[test]
+fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
+    let case = UrlCase::open();
     let args = [
         "cron",
         "add",
@@ -85,7 +87,7 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
     assert!(
         added.status.success(),
         "cron add against {}: {stderr}",
-        case.driver.name()
+        case.url
     );
 
     // A different workspace: only the backend can hold the job.
@@ -113,17 +115,4 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
         !String::from_utf8_lossy(&classic.stdout).contains("storage-probe"),
         "the job lives in the backend, not in files"
     );
-}
-
-#[cfg(feature = "storage-sqlite")]
-mod sqlite {
-    use super::*;
-
-    #[test]
-    fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
-        storage_drivers::run_url(
-            storage_drivers::Driver::Sqlite,
-            super::a_second_process_reads_what_a_one_shot_wrote_to_the_backend,
-        );
-    }
 }

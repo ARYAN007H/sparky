@@ -126,6 +126,8 @@ impl Drop for RuntimeProxyRestore {
     }
 }
 
+// The allowlist store lives in `channels::host`, which the gates-off build omits.
+#[cfg(feature = "channels")]
 #[tokio::test]
 async fn channel_allowlist_store_loads_a_versioned_document_before_saving() {
     let tmp = tempfile::tempdir().unwrap();
