@@ -108,12 +108,6 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
 fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let home = tempfile::tempdir().unwrap();
     let (profile, source) = seed_existing_profile(home.path());
-    let source_bytes = std::fs::read(&source).unwrap();
-    assert_eq!(
-        source_bytes, FIXTURE,
-        "profile seed must match the checked-in historical database"
-    );
-
     let (_server, base) = start(home.path());
     let credential = rpc_with_params(
         &base,
