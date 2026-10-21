@@ -11,7 +11,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tinystoragedrivers::{
     CollectionSpec, ErrorKind, ExpectedDocument, Filter, Precondition, ReadCheck, Storage,
-    StorageError, Versioned, WriteCondition, WriteOp,
+    StorageBackend, StorageError, Versioned, WriteCondition, WriteOp,
 };
 use tinystoragedrivers_api::DocumentStore;
 
@@ -54,6 +54,52 @@ pub fn step_id(kind: &str, id: &str) -> String {
 
 /// The owner name used by module importers.
 pub const HOST_OWNER: &str = "host";
+
+/// Returns a backend whose scope handles carry `condition` on every write.
+/// Calling `for_scope_conditioned` on the wrapped backend composes the
+/// condition with any profile-level condition before opening the target.
+pub(crate) fn backend_with_condition(
+    backend: std::sync::Arc<dyn StorageBackend>,
+    condition: WriteCondition,
+) -> std::sync::Arc<dyn StorageBackend> {
+    std::sync::Arc::new(ClaimBoundBackend { backend, condition })
+}
+
+struct ClaimBoundBackend {
+    backend: std::sync::Arc<dyn StorageBackend>,
+    condition: WriteCondition,
+}
+
+impl std::fmt::Debug for ClaimBoundBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClaimBoundBackend")
+            .field("backend", &self.backend)
+            .finish_non_exhaustive()
+    }
+}
+
+impl StorageBackend for ClaimBoundBackend {
+    fn capabilities(&self) -> tinystoragedrivers::Capabilities {
+        self.backend.capabilities()
+    }
+
+    fn for_scope(&self, scope: &crate::storage::Scope) -> Result<Storage, StorageError> {
+        self.backend.for_scope_conditioned(scope, &self.condition)
+    }
+
+    fn for_scope_conditioned(
+        &self,
+        scope: &crate::storage::Scope,
+        condition: &WriteCondition,
+    ) -> Result<Storage, StorageError> {
+        let condition = self
+            .condition
+            .clone()
+            .and(condition.clone())
+            .map_err(|error| StorageError::invalid_input(error.to_string()))?;
+        self.backend.for_scope_conditioned(scope, &condition)
+    }
+}
 
 fn record_key(owner: &str, step: &str, kind: &str) -> String {
     // Hex encoding keeps this key injective even when either source component
