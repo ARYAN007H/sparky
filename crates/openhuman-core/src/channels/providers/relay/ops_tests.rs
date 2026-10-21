@@ -171,9 +171,10 @@ impl ResolverInstallGuard {
 
 impl Drop for ResolverInstallGuard {
     fn drop(&mut self) {
-        host_agents::clear_if(&self.installed);
-        if let Some(previous) = self.previous.take() {
-            host_agents::install(previous);
+        if host_agents::clear_if(&self.installed) {
+            if let Some(previous) = self.previous.take() {
+                host_agents::install(previous);
+            }
         }
     }
 }
@@ -346,27 +347,30 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         .filter(|request| request.url.path().ends_with("/chat/completions"))
         .map(|request| serde_json::from_slice(&request.body).unwrap())
         .collect();
-    assert!(chats.len() >= 4, "{chats:#?}");
     assert_eq!(
         chats.len(),
         4,
         "one tool call and one answer per turn: {chats:#?}"
     );
     let second_messages = chats[2]["messages"].as_array().expect("messages array");
-    let second_content: Vec<&str> = second_messages
+    let second_content: Vec<(&str, &str)> = second_messages
         .iter()
-        .filter_map(|message| message["content"].as_str())
+        .filter_map(|message| Some((message["role"].as_str()?, message["content"].as_str()?)))
         .collect();
     assert!(
         second_content
             .iter()
-            .any(|text| text.contains("first question"))
+            .any(|(role, text)| *role == "user" && text.contains("first question"))
     );
-    assert!(second_content.contains(&"answer 1"));
     assert!(
         second_content
             .iter()
-            .any(|text| text.contains("second question"))
+            .any(|(role, text)| *role == "assistant" && *text == "answer 1")
+    );
+    assert!(
+        second_content
+            .iter()
+            .any(|(role, text)| *role == "user" && text.contains("second question"))
     );
 
     let thread = params("m1", "x").thread_id();
