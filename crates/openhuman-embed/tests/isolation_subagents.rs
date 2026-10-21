@@ -111,6 +111,19 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
                 })
                 .expect("canonical spawn tool schema");
             assert_eq!(
+                a_body["tools"]
+                    .as_array()
+                    .expect("provider request tools")
+                    .iter()
+                    .filter(|tool| {
+                        tool.pointer("/function/name").and_then(|v| v.as_str())
+                            == Some("spawn_subagent")
+                    })
+                    .count(),
+                1,
+                "A receives one canonical spawn tool"
+            );
+            assert_eq!(
                 spawn_spec.pointer("/function/parameters/properties/agent_id/enum"),
                 Some(&serde_json::json!(["a_helper"])),
                 "A's spawn schema lists only its declared helper"
@@ -206,6 +219,7 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .agent(
                     AgentSpec::new("host-only-lead")
                         .provider(route(&host_only_provider, "host-only-model"))
+                        .bare_prompt("You are a host-managed agent.")
                         .definition(AgentDefinitionSpec::new().tools(ToolScopeSpec::HostOnly))
                         .subagents([(
                             "host_helper",
@@ -228,6 +242,12 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .iter()
                 .all(|request| !String::from_utf8_lossy(&request.body)
                     .contains("HOST-ONLY-HELPER-MARK")));
+            let host_tool_results = host_requests
+                .iter()
+                .map(common::tool_results)
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert_refused_without_async_reference(&host_tool_results);
 
             let denied_provider = scripted_provider(
                 vec![
@@ -252,7 +272,7 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                         .definition(
                             AgentDefinitionSpec::new()
                                 .tools(ToolScopeSpec::Named(Vec::new()))
-                                .disallow_tools(["spawn_subagent"]),
+                                .disallow_tools(["spawn_*"]),
                         )
                         .subagents([(
                             "denied_helper",
@@ -275,6 +295,12 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .iter()
                 .all(|request| !String::from_utf8_lossy(&request.body)
                     .contains("DISALLOWED-HELPER-MARK")));
+            let denied_tool_results = denied_requests
+                .iter()
+                .map(common::tool_results)
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert_refused_without_async_reference(&denied_tool_results);
 
             assert_eq!(
                 chat_requests(&runtime_provider).await.len(),
@@ -285,4 +311,20 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
         .await
         .expect("test task");
     });
+}
+
+fn assert_refused_without_async_reference(result: &str) {
+    let lowercase = result.to_ascii_lowercase();
+    assert!(
+        lowercase.contains("not available")
+            || lowercase.contains("not allowed")
+            || lowercase.contains("not in the current session"),
+        "the attempted spawn must return an explicit refusal: {result}"
+    );
+    for reference_field in ["task_id", "subagent_session_id", "status"] {
+        assert!(
+            !result.contains(reference_field),
+            "a refused spawn must not return an asynchronous task reference: {result}"
+        );
+    }
 }

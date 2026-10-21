@@ -320,9 +320,11 @@ impl AgentSpec {
     /// Sub-agents only this agent can ask to work, each under its own id.
     ///
     /// They become workers in this agent's own catalogue and are reachable
-    /// through the asynchronous `spawn_subagent` tool's `agent_id` selection.
-    /// Other agents on the runtime never see them. Ids follow the agent-id
-    /// rules and must not name a built-in definition.
+    /// through the asynchronous `spawn_subagent` tool's `agent_id` selection
+    /// when its scope permits that tool. HostOnly scopes exclude it, and an
+    /// explicit `disallow_tools` rule can still deny it. Other agents on the
+    /// runtime never see these workers. Ids follow the agent-id rules and must
+    /// not name a built-in definition.
     pub fn subagents<I, S>(mut self, subagents: I) -> Self
     where
         I: IntoIterator<Item = (S, AgentDefinitionSpec)>,
