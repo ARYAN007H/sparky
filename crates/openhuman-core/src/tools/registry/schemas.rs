@@ -74,7 +74,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 name: "tool_id",
                 ty: TypeSchema::String,
                 comment: "Stable registry id, for example `memory.recall` or `tools.web_search`.",
-                required: false,
+                required: true,
             }],
             outputs: vec![FieldSchema {
                 name: "tool",
