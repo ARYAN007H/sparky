@@ -30,15 +30,18 @@ async fn production_harness_ceiling_is_open_and_reusable() {
 }
 
 #[tokio::test]
-async fn headless_flow_agent_includes_its_spawned_child_result() {
+async fn headless_flow_agent_includes_nested_grandchild_result() {
     use async_trait::async_trait;
     use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 
     const CHILD_PROMPT: &str = "headless-flow-child-result-marker";
+    const GRANDCHILD_PROMPT: &str = "headless-flow-grandchild-result-marker";
 
     struct FlowChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize,
         child_calls: std::sync::atomic::AtomicUsize,
+        grandchild_calls: std::sync::atomic::AtomicUsize,
+        nested_spawn_calls: std::sync::atomic::AtomicUsize,
         accepted_followups: std::sync::atomic::AtomicUsize,
         child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
         child_release: tokio::sync::Notify,
@@ -64,15 +67,44 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
             if request
                 .messages
                 .iter()
+                .any(|message| message.text().contains(GRANDCHILD_PROMPT))
+            {
+                self.grandchild_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                return Ok(ModelResponse::assistant("headless-flow-grandchild-result"));
+            }
+            if request
+                .messages
+                .iter()
                 .any(|message| message.text().contains(CHILD_PROMPT))
             {
-                self.child_calls
+                let call = self
+                    .child_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if call > 0 {
+                    return Ok(ModelResponse::assistant(
+                        "headless-flow-worker-result-with-grandchild",
+                    ));
+                }
                 if let Some(started) = self.child_started.lock().unwrap().take() {
                     let _ = started.send(());
                 }
-                self.child_release.notified().await;
-                return Ok(ModelResponse::assistant("headless-flow-child-result"));
+                self.nested_spawn_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let mut response = ModelResponse::assistant("");
+                response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                    "headless-flow-grandchild-spawn",
+                    "spawn_subagent",
+                    serde_json::json!({
+                        "agent_id": "task_manager_agent",
+                        "prompt": GRANDCHILD_PROMPT,
+                        "task_key": "headless-flow-grandchild-task",
+                        "context": "headless flow grandchild regression",
+                        "model": "test-model"
+                    }),
+                )];
+                response.finish_reason = Some("tool_calls".into());
+                return Ok(response);
             }
 
             if request.messages.iter().any(|message| {
@@ -95,11 +127,12 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
                 ));
             }
             let mut response = ModelResponse::assistant("");
+            self.child_release.notified().await;
             response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
                 "headless-flow-spawn",
                 "spawn_subagent",
                 serde_json::json!({
-                    "agent_id": "task_manager_agent",
+                    "agent_id": "flow_worker",
                     "prompt": CHILD_PROMPT,
                     "task_key": "headless-flow-child-task",
                     "context": "headless flow regression",
@@ -115,6 +148,8 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     let model = std::sync::Arc::new(FlowChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
+        grandchild_calls: std::sync::atomic::AtomicUsize::new(0),
+        nested_spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
@@ -129,8 +164,27 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     config.default_model = Some("test-model".into());
     config.chat_provider = Some("omlx:test-model".into());
 
+    let builtin_definitions =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    let mut orchestrator = builtin_definitions
+        .get("orchestrator")
+        .expect("orchestrator definition")
+        .clone();
+    orchestrator.subagents = vec![tinyagents_definition::SubagentEntry::AgentId(
+        "flow_worker".to_string(),
+    )];
+    let mut worker = builtin_definitions
+        .get("task_manager_agent")
+        .expect("worker definition")
+        .clone();
+    worker.id = "flow_worker".to_string();
+    worker.agent_tier = tinyagents_definition::AgentTier::Reasoning;
+    worker.extra_tools.push("spawn_subagent".to_string());
+    worker.subagents = vec![tinyagents_definition::SubagentEntry::AgentId(
+        "task_manager_agent".to_string(),
+    )];
     let definitions = std::sync::Arc::new(
-        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(),
+        builtin_definitions.with_definitions([orchestrator, worker]),
     );
     let core = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
@@ -192,8 +246,18 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     );
     assert_eq!(
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "the worker must run, spawn its grandchild, and complete through the real dispatch"
+    );
+    assert_eq!(
+        model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
         1,
-        "the detached child must run through the real model dispatch"
+        "the worker must issue a real nested spawn"
+    );
+    assert_eq!(
+        model.grandchild_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the grandchild must run through the real model dispatch"
     );
     assert_eq!(
         model
@@ -208,8 +272,8 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     );
 
     assert!(
-        output.to_string().contains("headless-flow-child-result"),
-        "the headless flow result must include its spawned child output: {output}"
+        output.to_string().contains("headless-flow-grandchild-result"),
+        "the headless flow result must include its grandchild output: {output}"
     );
 }
 
