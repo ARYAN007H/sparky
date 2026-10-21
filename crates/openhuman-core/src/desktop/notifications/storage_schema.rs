@@ -15,10 +15,10 @@
 
 use anyhow::Result;
 use serde_json::Value;
-use tinystoragedrivers::{CollectionSpec, IndexSpec, Key};
+use tinystoragedrivers::{CollectionSpec, IndexSpec};
 
 use crate::storage::schema_support::{
-    key_of, map_legacy_collection, time_ms, Body, LegacySourceRecord as SourceRecord,
+    key_of, key_of_parts, map_legacy_collection, time_ms, Body, LegacySourceRecord as SourceRecord,
     LegacyTargetRecord as TargetRecord,
 };
 
@@ -84,10 +84,8 @@ pub(super) fn legacy_collections() -> Vec<CollectionSpec> {
 /// Never in practice: a two-part key is valid.
 pub(super) fn core_id(workspace: &str, event_id: &str) -> String {
     #[allow(clippy::expect_used)]
-    Key::of([workspace, event_id])
+    key_of_parts([workspace, event_id])
         .expect("a two-part key is valid")
-        .as_str()
-        .to_owned()
 }
 
 fn integration_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
