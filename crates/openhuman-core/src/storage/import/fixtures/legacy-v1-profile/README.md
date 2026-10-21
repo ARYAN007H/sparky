@@ -24,8 +24,10 @@ owner models and writer transformations from `2d3e22636e^`:
   The approvals and threads owners migrate those into their current
   collections and ids before their public APIs read them.
 - The thread owner also has a committed thread and message in the historical
-  SQLite database. The desktop owner APIs must read the thread, message, and
-  migrated transcript key after boot.
+  SQLite database. The generator's typed rows mirror TinyAgents' committed
+  `ThreadDto` and `MessageDto` storage bodies at submodule commit
+  `bed24d72c923f6daefc780e7fdbf2b2892a5b334`. The desktop owner APIs must
+  read the thread, message, and migrated transcript key after boot.
 - The TinyFlows catalog fixture uses its historical `flows_definitions`
   collection with `graph_json` and RFC3339 timestamps. The catalog's schema
   migration converts it, and the public `flows_list` operation must return it.
