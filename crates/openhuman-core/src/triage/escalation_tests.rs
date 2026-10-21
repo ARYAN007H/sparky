@@ -167,18 +167,11 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     )));
 
     let child_lifecycle = runtime
-        .run_in(
-            Arc::clone(runtime.context()),
-            async {
-                crate::storage::state_kv::StateKv::open(
-                    &workspace,
-                    "subagents",
-                    "lifecycle-neutral",
-                )
+        .run_in(Arc::clone(runtime.context()), async {
+            crate::storage::state_kv::StateKv::open(&workspace, "subagents", "lifecycle-neutral")
                 .expect("open scoped neutral subagent lifecycle records")
                 .list::<serde_json::Value>("record/")
-            },
-        )
+        })
         .await
         .expect("read scoped neutral subagent lifecycle records");
     assert!(
