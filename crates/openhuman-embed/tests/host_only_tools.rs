@@ -165,7 +165,7 @@ fn host_only_advertises_exactly_the_host_tools_under_a_bare_prompt() {
                 .build()
                 .await
                 .unwrap_or_else(|error| {
-                    eprintln!("host-only refusal runtime build failed: {error:?}");
+                    eprintln!("host-only advertise runtime build failed: {error:?}");
                     panic!("runtime");
                 });
             let calls = Arc::new(AtomicUsize::new(0));
@@ -181,6 +181,8 @@ fn host_only_advertises_exactly_the_host_tools_under_a_bare_prompt() {
             advertised.sort();
             assert_eq!(advertised, vec!["find_documents", "read_file"]);
             assert_eq!(system_text(&requests[0]), BARE_PROMPT);
+            drop(agent);
+            runtime.remove_agent("analyst").await.unwrap();
         })
         .await
         .expect("test task");
@@ -217,7 +219,7 @@ fn host_only_refuses_builtin_tools_the_model_names() {
                 .build()
                 .await
                 .unwrap_or_else(|error| {
-                    eprintln!("host-only readonly runtime build failed: {error:?}");
+                    eprintln!("host-only refusal runtime build failed: {error:?}");
                     panic!("runtime");
                 });
             let calls = Arc::new(AtomicUsize::new(0));
@@ -271,7 +273,10 @@ fn host_only_forces_read_only_access_and_sandbox() {
                 .backend_url(backend.uri())
                 .build()
                 .await
-                .expect("runtime");
+                .unwrap_or_else(|error| {
+                    eprintln!("host-only readonly runtime build failed: {error:?}");
+                    panic!("runtime");
+                });
             let agent = runtime
                 .agent(host_only_spec(
                     "readonly",
