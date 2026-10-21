@@ -1,19 +1,19 @@
 use super::*;
 use crate::agent::tinyagents::thread_reasoning::{
-    apply_requested_effort, parse_reasoning_effort, set_thread_effort, thread_effort,
+    apply_requested_effort, set_thread_effort, thread_effort, turn_reasoning, turn_reasoning_for,
 };
 
 #[test]
 fn parses_wire_tokens_and_aliases() {
-    assert_eq!(parse_reasoning_effort("high"), Some(ReasoningEffort::High));
-    assert_eq!(parse_reasoning_effort(" Low "), Some(ReasoningEffort::Low));
-    assert_eq!(parse_reasoning_effort("off"), Some(ReasoningEffort::None));
-    assert_eq!(parse_reasoning_effort("max"), Some(ReasoningEffort::XHigh));
+    assert_eq!(ReasoningEffort::parse("high"), Some(ReasoningEffort::High));
+    assert_eq!(ReasoningEffort::parse(" Low "), Some(ReasoningEffort::Low));
+    assert_eq!(ReasoningEffort::parse("off"), Some(ReasoningEffort::None));
+    assert_eq!(ReasoningEffort::parse("max"), Some(ReasoningEffort::XHigh));
     assert_eq!(
-        parse_reasoning_effort("xhigh"),
+        ReasoningEffort::parse("xhigh"),
         Some(ReasoningEffort::XHigh)
     );
-    assert_eq!(parse_reasoning_effort("turbo"), None);
+    assert_eq!(ReasoningEffort::parse("turbo"), None);
 }
 
 #[test]

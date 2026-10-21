@@ -48,7 +48,9 @@ pub(crate) fn turn_reasoning(
     thread_id: Option<&str>,
     config: Option<&crate::config::Config>,
 ) -> Option<ReasoningConfig> {
-    if let Some(effort) = thread_id.and_then(|thread_id| store(dispatch).get(&ThreadId::new(thread_id))) {
+    if let Some(effort) =
+        thread_id.and_then(|thread_id| store(dispatch).get(&ThreadId::new(thread_id)))
+    {
         return Some(ReasoningConfig::effort(effort));
     }
     config.and_then(crate::inference::reasoning::reasoning_for_config)
@@ -66,10 +68,7 @@ pub(crate) fn turn_reasoning_for(
 
     let dispatch = ctx.dispatch_ctx();
     let reasoning = if let Some(thread_id) = ctx.thread_id.as_deref() {
-        store(&dispatch).reasoning_for_turn(
-            Some(&ThreadId::new(thread_id)),
-            max_output_tokens,
-        )
+        store(&dispatch).reasoning_for_turn(Some(&ThreadId::new(thread_id)), max_output_tokens)
     } else {
         None
     }
@@ -110,4 +109,3 @@ pub(crate) fn set_thread_effort(
         }
     }
 }
-

@@ -205,7 +205,7 @@ async fn drive_turn(
         deterministic_cacheable,
         is_local,
         run_context.tool_dialect,
-        crate::inference::reasoning::turn_reasoning_for(
+        crate::agent::tinyagents::thread_reasoning::turn_reasoning_for(
             &run_context,
             hosted_root.as_ref().map(|(base, _)| base.config.as_ref()),
             max_output_tokens,
