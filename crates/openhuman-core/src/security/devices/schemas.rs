@@ -39,6 +39,11 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
     ]
 }
 
+#[cfg(test)]
+pub(crate) fn devices_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::parameter_contracts()
+}
+
 // ---------------------------------------------------------------------------
 // Schema definitions
 // ---------------------------------------------------------------------------
@@ -152,14 +157,15 @@ pub fn schemas(function: &str) -> ControllerSchema {
 fn handle_create_pairing(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
-        let label = read_optional_string(&params, "label")?;
+        let label = parse_create_pairing(params)?;
         to_json(crate::security::devices::rpc::devices_create_pairing(&ctx, &config, label).await?)
     })
 }
 
-fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
+        parse_list(params)?;
         to_json(crate::security::devices::rpc::devices_list(&config).await?)
     })
 }
@@ -167,9 +173,21 @@ fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFutur
 fn handle_revoke(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
-        let channel_id = read_required::<String>(&params, "channel_id")?;
+        let channel_id = parse_revoke(params)?;
         to_json(crate::security::devices::rpc::devices_revoke(&config, channel_id).await?)
     })
+}
+
+fn parse_create_pairing(params: Map<String, Value>) -> Result<Option<String>, String> {
+    read_optional_string(&params, "label")
+}
+
+fn parse_list(_params: Map<String, Value>) -> Result<(), String> {
+    Ok(())
+}
+
+fn parse_revoke(params: Map<String, Value>) -> Result<String, String> {
+    read_required::<String>(&params, "channel_id")
 }
 
 // ---------------------------------------------------------------------------
