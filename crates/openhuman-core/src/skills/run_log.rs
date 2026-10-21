@@ -20,6 +20,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio_util::sync::CancellationToken;
 
 use crate::progress::AgentProgress;
+use crate::storage::StorageError;
 
 pub use tinyskills::run_log::{detect_repeated_line, RunLogSlice, RunOutcome, ScannedRun};
 use tinyskills::run_log::{parse_runs, parse_terminal_outcome, short, slice, truncate};
@@ -29,8 +30,9 @@ type RunLogStore = tinyskills_drivers::StreamRunLogStore;
 fn run_log_store(workspace: &Path) -> anyhow::Result<RunLogStore> {
     let opened = crate::storage::local::open("skills::run_log", workspace)?;
     let storage = opened.scoped()?;
+    let prepared = storage.clone();
     crate::storage::block_on(async move {
-        crate::storage::boot::prepare_scope(&storage).await?;
+        crate::storage::boot::prepare_scope(&prepared).await?;
         Ok(())
     })?;
     Ok(RunLogStore::new(Arc::clone(storage.streams())))
@@ -50,12 +52,19 @@ fn io_error(error: impl std::fmt::Display) -> io::Error {
     io::Error::other(error.to_string())
 }
 
-fn read_full(store: &RunLogStore, id: &str) -> Result<String, tinyskills_drivers::RunLogStoreError> {
+fn read_full(store: &RunLogStore, id: &str) -> Result<String, io::Error> {
     let mut text = String::new();
     let mut offset = 0;
     loop {
-        let page = crate::storage::block_on(store.read_slice(id, offset, 64 * 1024))
-            .map_err(|error| tinyskills_drivers::RunLogStoreError::Storage(error.into()))?;
+        let store = store.clone();
+        let id = id.to_owned();
+        let page = crate::storage::block_on(async move {
+            store
+                .read_slice(&id, offset, 64 * 1024)
+                .await
+                .map_err(|error| StorageError::backend(error.to_string()))
+        })
+        .map_err(io_error)?;
         offset = page.offset;
         text.push_str(&page.content);
         if page.eof || page.bytes_read == 0 {
@@ -79,10 +88,9 @@ pub fn find_run_log_path(workspace: &Path, run_id: &str) -> Option<PathBuf> {
 }
 
 /// Read the full terminal outcome for a persisted run stream.
-pub fn read_terminal_outcome(path: &Path) -> Option<RunOutcome> {
+pub fn read_terminal_outcome(workspace: &Path, path: &Path) -> Option<RunOutcome> {
     let id = stream_id(path).ok()?;
-    let workspace = crate::config::Config::load_or_init_sync().ok()?.workspace_dir;
-    let store = run_log_store(&workspace).ok()?;
+    let store = run_log_store(workspace).ok()?;
     let text = read_full(&store, id).ok()?;
     parse_terminal_outcome(&text)
 }
@@ -96,30 +104,51 @@ pub fn scan_runs(workspace: &Path, workflow_id: Option<&str>, limit: usize) -> V
             return Vec::new();
         }
     };
-    let entries = match crate::storage::block_on(async move { store.scan(None, usize::MAX).await }) {
-        Ok(runs) => runs
-            .into_iter()
-            .filter_map(|run| {
-                let text = read_full(&store, &run.stream_id).ok()?;
-                Some((run.stream_id, text))
-            })
-            .collect::<Vec<_>>(),
+    let runs = match crate::storage::block_on(async move {
+        store
+            .scan(None, usize::MAX)
+            .await
+            .map_err(|error| StorageError::backend(error.to_string()))
+    }) {
+        Ok(runs) => runs,
         Err(error) => {
             log::warn!("[skills::run_log] could not scan run logs: {error}");
             return Vec::new();
         }
     };
+    let store = match run_log_store(workspace) {
+        Ok(store) => store,
+        Err(error) => {
+            log::warn!("[skills::run_log] could not reopen run-log storage: {error:#}");
+            return Vec::new();
+        }
+    };
+    let entries = runs
+        .into_iter()
+        .filter_map(|run| {
+            let text = read_full(&store, &run.stream_id).ok()?;
+            Some((run.stream_id, text))
+        })
+        .collect::<Vec<_>>();
     parse_runs(entries, workflow_id, limit)
 }
 
 /// Read a byte-offset slice from a persisted run stream.
-pub fn read_run_log_slice(path: &Path, offset: u64, max_bytes: usize) -> io::Result<RunLogSlice> {
+pub fn read_run_log_slice(
+    workspace: &Path,
+    path: &Path,
+    offset: u64,
+    max_bytes: usize,
+) -> io::Result<RunLogSlice> {
     let id = stream_id(path).map_err(io_error)?;
-    let workspace = crate::config::Config::load_or_init_sync()
-        .map_err(io_error)?
-        .workspace_dir;
-    let store = run_log_store(&workspace).map_err(io_error)?;
-    crate::storage::block_on(store.read_slice(id, offset, max_bytes)).map_err(io_error)
+    let store = run_log_store(workspace).map_err(io_error)?;
+    crate::storage::block_on(async move {
+        store
+            .read_slice(id, offset, max_bytes)
+            .await
+            .map_err(|error| StorageError::backend(error.to_string()))
+    })
+    .map_err(io_error)
 }
 
 /// Registry of in-flight workflow runs → their cancellation token. A run
@@ -177,11 +206,18 @@ pub fn cancel_run(run_id: &str) -> bool {
 /// `<runs_dir>/<skill>_<UTC ts>_<short run id>.log`, stamped with the host clock.
 pub fn run_log_path(workspace: &Path, workflow_id: &str, run_id: &str) -> PathBuf {
     let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-    tinyskills::run_log::run_log_path(workspace, workflow_id, run_id, &ts)
+    let _ = workspace;
+    PathBuf::from(format!(
+        "skills.runs.{}.{}.{}",
+        tinyskills::run_log::sanitize(workflow_id),
+        tinyskills::run_log::sanitize(&ts),
+        tinyskills::run_log::sanitize(run_id)
+    ))
 }
 
 /// Write the run header, stamped with the host clock.
 pub async fn write_header(
+    workspace: &Path,
     path: &Path,
     workflow_id: &str,
     run_id: &str,
@@ -189,18 +225,43 @@ pub async fn write_header(
     task_prompt: &str,
 ) -> std::io::Result<()> {
     let started = chrono::Utc::now().to_rfc3339();
-    tinyskills::run_log::write_header(path, workflow_id, run_id, &started, inputs, task_prompt)
+    let id = stream_id(path).map_err(io_error)?;
+    let timestamp = id
+        .strip_prefix("skills.runs.")
+        .and_then(|tail| tail.split('.').nth(1))
+        .ok_or_else(|| io_error("invalid run-log stream id"))?;
+    let store = run_log_store(workspace).map_err(io_error)?;
+    let created = crate::storage::block_on(async move {
+        store
+            .start(workflow_id, run_id, timestamp, &started, inputs, task_prompt)
+            .await
+            .map_err(|error| StorageError::backend(error.to_string()))
+    })
+    .map_err(io_error)?;
+    if created != id {
+        return Err(io_error("run-log stream id did not match the requested id"));
+    }
+    Ok(())
 }
 
 /// Write the final footer, stamped with the host clock.
 pub async fn write_footer(
+    workspace: &Path,
     path: &Path,
     status: &str,
     elapsed_ms: u64,
     output: &str,
 ) -> std::io::Result<()> {
     let finished = chrono::Utc::now().to_rfc3339();
-    tinyskills::run_log::write_footer(path, status, elapsed_ms, &finished, output)
+    let id = stream_id(path).map_err(io_error)?.to_owned();
+    let store = run_log_store(workspace).map_err(io_error)?;
+    crate::storage::block_on(async move {
+        store
+            .finish(&id, status, elapsed_ms, &finished, output)
+            .await
+            .map_err(|error| StorageError::backend(error.to_string()))
+    })
+    .map_err(io_error)
 }
 
 /// One log line for a step, or `None` for events too noisy to log per-event
@@ -301,12 +362,29 @@ pub fn format_event(ev: &AgentProgress) -> Option<String> {
 /// so, so the caller can write a `STOPPED` footer instead of `DONE`.
 pub async fn drain_to_log(
     mut rx: Receiver<AgentProgress>,
+    workspace: PathBuf,
     path: PathBuf,
 ) -> Option<tinyagents_harness::turn_stop::TurnStop> {
+    let store = match run_log_store(&workspace) {
+        Ok(store) => store,
+        Err(error) => {
+            log::warn!("[skills::run_log] could not open run-log storage: {error:#}");
+            return None;
+        }
+    };
+    let id = match stream_id(&path) {
+        Ok(id) => id.to_owned(),
+        Err(error) => {
+            log::warn!("[skills::run_log] invalid run-log stream: {error:#}");
+            return None;
+        }
+    };
     let mut stop = None;
     while let Some(ev) = rx.recv().await {
         if let Some(line) = format_event(&ev) {
-            let _ = tinyskills::run_log::append_line(&path, &line);
+            if let Err(error) = store.append_line(&id, &line).await {
+                log::warn!("[skills::run_log] append failed: {error}");
+            }
         }
         if let AgentProgress::TurnCompleted { stop: Some(s), .. } = &ev {
             stop = Some(s.clone());
