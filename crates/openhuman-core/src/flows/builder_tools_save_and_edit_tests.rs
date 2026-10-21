@@ -392,6 +392,9 @@ async fn save_workflow_accepts_correctly_schemad_graph() {
         .await
         .unwrap();
 
+    if result.is_error {
+        eprintln!("save_workflow rejected the fixture graph: {}", result.output());
+    }
     assert!(!result.is_error, "{}", result.output());
     let parsed: Value = serde_json::from_str(&result.output()).unwrap();
     assert_eq!(parsed["type"], "workflow_saved");
