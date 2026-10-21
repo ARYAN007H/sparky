@@ -107,7 +107,12 @@ async fn host_dispatch_preserves_thread_reply_and_reaction_targets() {
         ..Default::default()
     })
     .await;
-    assert_eq!(reaction.sends.len(), 1, "one reaction is sent");
+    assert_eq!(
+        reaction.sends.len(),
+        1,
+        "one reaction is sent: {:#?}",
+        reaction.sends
+    );
     assert_eq!(reaction.sends[0].content, "[REACTION:👍]");
     assert_eq!(reaction.sends[0].thread_ts.as_deref(), Some("message-42"));
     assert_eq!(reaction.model_calls.len(), 1);
@@ -234,12 +239,20 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
     {
         let calls = model_state.calls.lock().unwrap();
         assert_eq!(calls.len(), 2);
-        assert!(calls[0]
-            .iter()
-            .any(|(_, text)| text == "first thread message"));
-        assert!(calls[1]
-            .iter()
-            .any(|(_, text)| text == "second thread message"));
+        assert!(
+            calls[0]
+                .iter()
+                .any(|(_, text)| text == "first thread message"),
+            "first model call was: {:#?}",
+            calls[0]
+        );
+        assert!(
+            calls[1]
+                .iter()
+                .any(|(_, text)| text == "second thread message"),
+            "second model call was: {:#?}",
+            calls[1]
+        );
         assert!(!calls[1]
             .iter()
             .any(|(_, text)| text == "first thread message"));
