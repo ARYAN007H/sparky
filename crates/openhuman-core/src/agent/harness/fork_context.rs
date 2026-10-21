@@ -5,9 +5,9 @@
 //! A [`ParentExecutionContext`] travels explicitly: the parent
 //! [`crate::agent::OpenHumanSessionHost`] attaches it to its turn's
 //! [`OpenHumanRunContext`](crate::agent::tinyagents::host::OpenHumanRunContext)
-//! (`parent`), tools read it from there, and triage escalation builds its root parent with
-//! [`crate::triage::parent_context::build_root_parent`] and pass it
-//! to the spawns they make. There is no ambient copy.
+//! (`parent`), tools read it from there, and triage escalation uses
+//! [`crate::triage::parent_context::build_root_parent`] before passing the result
+//! to its spawns. There is no ambient copy.
 //!
 //! Stashed in `Arc`s so cloning into a child costs a refcount bump
 //! rather than a full copy.

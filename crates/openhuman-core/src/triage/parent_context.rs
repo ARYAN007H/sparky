@@ -33,8 +33,8 @@ pub(crate) async fn build_root_parent(
 ) -> Result<ParentExecutionContext> {
     // Sub-agent spawns resolve their definition through the global
     // agent-definition registry, so it MUST be initialised before any spawn.
-    // The full runtime boot (`bootstrap_core_runtime`) does this, but these
-    // Triage can also be reached from contexts that only built the HTTP router
+    // The full runtime boot (`bootstrap_core_runtime`) does this, but triage can
+    // also be reached from contexts that only built the HTTP router
     // (e.g. the JSON-RPC e2e harness) — so init defensively here. `OnceLock`
     // makes this idempotent: a no-op when the registry is already loaded.
     if crate::agent_registry::host_definition::AgentDefinitionRegistry::global().is_none() {
