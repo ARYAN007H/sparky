@@ -1,14 +1,107 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use openhuman::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
-use openhuman::platform::cost::types::{CostRecord, CostSource, TokenUsage, UsageScope};
-use openhuman::profiles::{ProfileId, types::ProfileMeta};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageConfig, WriteOptions};
 
 const PROFILE_ID: &str = "u1";
 const CREATED_AT_MS: i64 = 1_738_548_306_000;
+
+// These wire types are copied from the historical owner models at
+// OpenHuman 2d3e22636e^ (paths listed in the fixture README). Keeping this
+// generator standalone avoids linking the current host or its patched module
+// graph into a historical TSD v1 writer. The fixture test decodes the output
+// with today's owner models after the owner's schema step runs.
+#[derive(Serialize)]
+struct LegacyCostRecord {
+    id: String,
+    usage: LegacyTokenUsage,
+    session_id: String,
+}
+
+#[derive(Serialize)]
+struct LegacyTokenUsage {
+    model: String,
+    input_tokens: u64,
+    output_tokens: u64,
+    total_tokens: u64,
+    cached_input_tokens: u64,
+    cache_creation_tokens: u64,
+    reasoning_tokens: u64,
+    cost_usd: f64,
+    cost_source: LegacyCostSource,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    run_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    root_run_id: Option<String>,
+    #[serde(skip_serializing_if = "LegacyUsageScope::is_empty")]
+    scope: LegacyUsageScope,
+    timestamp: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum LegacyCostSource {
+    Estimated,
+    ProviderCharged,
+    Unknown,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct LegacyUsageScope {}
+
+impl LegacyUsageScope {
+    fn is_empty(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Serialize)]
+struct LegacyArtifactMeta {
+    id: String,
+    kind: LegacyArtifactKind,
+    title: String,
+    path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_root: Option<String>,
+    size_bytes: u64,
+    status: LegacyArtifactStatus,
+    created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thread_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+enum LegacyArtifactKind {
+    Presentation,
+    Document,
+    Image,
+    Video,
+    Other,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+enum LegacyArtifactStatus {
+    Pending,
+    Ready,
+    Failed,
+}
+
+#[derive(Serialize)]
+struct LegacyProfileMeta {
+    profile_id: String,
+    created_at: u64,
+    layout_version: u32,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,10 +124,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let profile_scope = backend.for_scope(&Scope::new("profile:u1")?)?;
     let docs = profile_scope.documents();
 
-    let cost = CostRecord {
+    let cost = LegacyCostRecord {
         id: "cost-0001".into(),
         session_id: "session-fixture".into(),
-        usage: TokenUsage {
+        usage: LegacyTokenUsage {
             model: "fixture-model".into(),
             input_tokens: 12,
             output_tokens: 3,
@@ -43,10 +136,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             cache_creation_tokens: 0,
             reasoning_tokens: 0,
             cost_usd: 0.000_015,
-            cost_source: CostSource::Estimated,
+            cost_source: LegacyCostSource::Estimated,
             run_id: None,
             root_run_id: None,
-            scope: UsageScope::default(),
+            scope: LegacyUsageScope::default(),
             timestamp: DateTime::parse_from_rfc3339("2025-02-03T04:05:06.789+02:00")?
                 .with_timezone(&Utc),
         },
@@ -55,15 +148,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     cost_body["ts_ms"] = 1_738_548_306_789_i64.into();
     put(docs, "cost_records", "cost-0001", cost_body).await?;
 
-    let artifact = ArtifactMeta {
+    let artifact = LegacyArtifactMeta {
         id: "artifact-1".into(),
-        kind: ArtifactKind::Document,
+        kind: LegacyArtifactKind::Document,
         title: "Fixture plan".into(),
         path: "artifact-1/plan.md".into(),
         file: None,
         file_root: None,
         size_bytes: 4,
-        status: ArtifactStatus::Ready,
+        status: LegacyArtifactStatus::Ready,
         created_at: DateTime::parse_from_rfc3339("2025-02-03T04:05:06Z")?.with_timezone(&Utc),
         error: None,
         thread_id: Some("thread-1".into()),
@@ -90,8 +183,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     let cluster = backend.for_scope(&Scope::new("cluster")?)?;
-    let profile = ProfileMeta {
-        profile_id: ProfileId::parse(PROFILE_ID)?,
+    let profile = LegacyProfileMeta {
+        profile_id: PROFILE_ID.into(),
         created_at: u64::try_from(CREATED_AT_MS / 1000)?,
         layout_version: 1,
     };
