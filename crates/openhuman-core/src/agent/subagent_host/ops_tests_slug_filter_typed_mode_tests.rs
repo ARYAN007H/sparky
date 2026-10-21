@@ -259,7 +259,7 @@ async fn capped_no_progress_subagent_returns_incomplete_status() {
     //
     // The legacy repeat-identical-call circuit-breaker `Halted` distinction
     // folded into this cap handling during the tinyagents migration (#4249) —
-    // see `run_subagent`'s status mapping. With `max_iterations = 2` the two
+    // see the host status mapping. With `max_iterations = 2` the two
     // scripted tool calls exhaust the budget; the checkpoint summary call then
     // draws the deterministic "reached my tool-call limit" digest.
     let provider = ScriptedProvider::new(vec![

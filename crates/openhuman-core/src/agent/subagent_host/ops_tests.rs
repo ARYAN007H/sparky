@@ -308,7 +308,7 @@ fn make_parent(
 }
 
 // ── Runtime spawn-hierarchy (tier) gate (issue #4098) ───────────────────────
-// `tier_gate_decision` is the pure decision the runtime gate in `run_subagent`
+// `tier_gate_decision` is the pure decision the runtime gate in child execution
 // applies to each delegation hop. Tested directly so the deny/allow/skip
 // table is covered without standing up a global registry or a live spawn.
 

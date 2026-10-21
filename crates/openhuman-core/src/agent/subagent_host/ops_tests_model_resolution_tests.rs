@@ -1,7 +1,4 @@
 use super::*;
-use crate::agent::subagent_host::{
-    SubagentRunStatus, run_subagent_via_driver_tool, spawn_async_via_driver_tool_with_jobs,
-};
 use tinyagents_harness::context::{RunDepth, current_run_depth, with_run_depth};
 
 struct BlockingSubagentCloseTool {
@@ -618,7 +615,7 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
                 with_parent(parent, SubagentRunOptions::default()),
             )
             .await
-            .map_err(|e| anyhow::anyhow!("nested run_subagent failed: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("nested child execution failed: {e}"))?;
             Ok(ToolResult::success(outcome.output))
         }
     }
@@ -667,7 +664,7 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
     });
 
     let outcome = outcome.expect(
-        "nested run_subagent must complete on a 1 MiB worker stack — \
+        "nested child execution must complete on a 1 MiB worker stack — \
          a stack overflow here means the recursion boundary in \
          `run_typed_mode` regressed (see the `Box::pin` callsites around \
          `run_typed_mode` and the child's tinyagents drive future).",

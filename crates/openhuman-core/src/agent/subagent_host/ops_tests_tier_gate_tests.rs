@@ -92,7 +92,7 @@ fn tier_gate_allows_upward_reasoning_to_chat() {
 //
 // These exercise the gate at its real call site rather than only the policy it
 // consults. The lever is that no `ParentExecutionContext` is installed here, so
-// an ungated `run_subagent` returns `NoParentContext`: each refusal below is
+// an ungated child execution returns `NoParentContext`: each refusal below is
 // therefore evidence the gate ran *and* that it ran before anything was spent,
 // and removing the gate turns every one of them into `NoParentContext`.
 // ---------------------------------------------------------------------------
