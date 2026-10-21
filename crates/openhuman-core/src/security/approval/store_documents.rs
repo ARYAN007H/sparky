@@ -31,9 +31,10 @@ use serde_json::{json, Value};
 use crate::config::Config;
 use crate::storage::documents::compare_and_swap;
 use crate::storage::local;
+use crate::storage::schema_support::fresh_key;
 use crate::storage::{block_on, DocumentStore, DocumentStoreExt, Storage, StorageError};
 use tinystoragedrivers::{
-    CollectionSpec, ErrorKind, Filter, Key, Precondition, Query, Sort, Versioned,
+    CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned,
 };
 
 #[cfg(feature = "legacy-import")]
@@ -242,7 +243,7 @@ impl Docs {
             "decided_ms": now,
             "decision": decision.as_str(),
         });
-        let id = Key::ulid().as_str().to_owned();
+        let id = fresh_key();
         self.run(|docs| async move {
             docs.put(APPROVALS, &id, doc, Precondition::Absent)
                 .await
