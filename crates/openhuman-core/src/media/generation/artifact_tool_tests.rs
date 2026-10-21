@@ -289,7 +289,7 @@ async fn removes_partial_destination_when_blob_read_fails() {
     let dest = root.path().join("partial.png");
     std::fs::write(&dest, b"reserved placeholder").unwrap();
 
-    let reader: tinyagents_storage_kit::blob::BlobReader = Box::pin(futures_util::stream::iter([
+    let mut reader: tinyagents_storage_kit::blob::BlobReader = Box::pin(futures_util::stream::iter([
         Ok(bytes::Bytes::from_static(b"partial media")),
         Err(tinystoragedrivers_types::StorageError::backend(
             "reader failed",

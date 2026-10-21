@@ -362,7 +362,12 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     );
 
     let registry = ProfileRegistry::cluster(backend.as_ref()).unwrap();
-    let profile = storage::block_on(registry.get(&ProfileId::parse("u1").unwrap()))
+    let profile = storage::block_on_anyhow(async {
+        registry
+            .get(&ProfileId::parse("u1").unwrap())
+            .await
+            .map_err(anyhow::Error::msg)
+    })
         .unwrap()
         .unwrap();
     assert_eq!(profile.profile_id.as_str(), "u1");

@@ -311,7 +311,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
         .unwrap();
     assert_eq!(
         outcome.outcome.as_ref().unwrap(),
-        crate::storage::import::Outcome::AlreadyDone
+        &crate::storage::import::Outcome::AlreadyDone
     );
     let after_storage = destination.clone();
     let after = storage::block_on(async move {
@@ -343,7 +343,7 @@ fn boot_import_reports_no_source_for_a_workspace_without_legacy_storage() {
         .expect("scope migration is in the boot importer pipeline");
     assert_eq!(
         report.outcome.as_ref().unwrap(),
-        crate::storage::import::Outcome::NoSource
+        &crate::storage::import::Outcome::NoSource
     );
 }
 

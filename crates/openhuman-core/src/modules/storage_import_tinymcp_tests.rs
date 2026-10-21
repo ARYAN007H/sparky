@@ -1,4 +1,5 @@
 use super::*;
+use crate::storage::lease::LeaseStore as _;
 use crate::storage::{Scope, Storage};
 use std::sync::Arc;
 use tinystoragedrivers::StorageBackend;

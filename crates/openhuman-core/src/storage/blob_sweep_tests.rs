@@ -43,7 +43,7 @@ async fn wait_until_expired(backend: &Arc<dyn StorageBackend>, scope: &Scope, ke
 #[tokio::test]
 async fn sweep_scope_reclaims_only_lapsed_blobs_of_that_scope() {
     let backend = backend_with_clock();
-    let local = Scope::local();
+    let local = Scope::new("local").unwrap();
     let other = crate::storage::scope_for_agent("blob-sweep-other").to_storage_scope();
     put_expiring(&backend, &local, "short", 10).await;
     put_expiring(&backend, &local, "long", 10_000).await;
@@ -64,8 +64,8 @@ async fn sweep_scope_reclaims_only_lapsed_blobs_of_that_scope() {
 #[tokio::test]
 async fn sweep_all_visits_the_local_scope() {
     let backend = backend_with_clock();
-    put_expiring(&backend, &Scope::local(), "gone", 10).await;
-    wait_until_expired(&backend, &Scope::local(), "gone").await;
+    put_expiring(&backend, &Scope::new("local").unwrap(), "gone", 10).await;
+    wait_until_expired(&backend, &Scope::new("local").unwrap(), "gone").await;
     assert_eq!(sweep_all(Arc::clone(&backend)).await, 1);
     assert_eq!(sweep_all(backend).await, 0);
 }
@@ -85,7 +85,7 @@ async fn spawned_sweeper_waits_for_its_first_delay_then_keeps_ticking() {
 #[tokio::test]
 async fn sweeping_through_the_fenced_backend_reaches_the_driver() {
     let inner = backend_with_clock();
-    let scope = Scope::local();
+    let scope = Scope::new("local").unwrap();
     put_expiring(&inner, &scope, "gone", 10).await;
     wait_until_expired(&inner, &scope, "gone").await;
     let fenced: Arc<dyn StorageBackend> =
@@ -226,7 +226,7 @@ impl StorageBackend for HungSweep {
 async fn a_hung_scope_sweep_times_out_and_counts_as_zero() {
     let inner = backend_with_clock();
     let hung = HungSweep(inner);
-    let removed = sweep_scope_within(&hung, &Scope::local(), Duration::from_secs(30)).await;
+    let removed = sweep_scope_within(&hung, &Scope::new("local").unwrap(), Duration::from_secs(30)).await;
     assert_eq!(removed, 0);
 }
 
@@ -327,7 +327,7 @@ async fn orphan_sweep_pages_and_preserves_referenced_blobs() {
     use tinystoragedrivers_testkit::memory_storage;
     use tinystoragedrivers_types::Scope;
 
-    let storage = memory_storage(&Scope::local());
+    let storage = memory_storage(&Scope::new("local").unwrap());
     let blobs = storage.blobs();
     for index in 0..=MAX_BLOB_LIST_PAGE_ITEMS {
         blobs
@@ -355,7 +355,7 @@ async fn orphan_sweep_checks_references_only_for_eligible_blobs() {
     use tinystoragedrivers_testkit::memory_storage;
     use tinystoragedrivers_types::Scope;
 
-    let storage = memory_storage(&Scope::local());
+    let storage = memory_storage(&Scope::new("local").unwrap());
     let blobs = storage.blobs();
     blobs.put("cleanup/a", vec![1], None).await.unwrap();
     blobs.put("cleanup/b", vec![2], None).await.unwrap();
@@ -380,7 +380,7 @@ async fn orphan_sweep_stops_on_reference_error_after_preserving_prior_progress()
     use tinystoragedrivers_testkit::memory_storage;
     use tinystoragedrivers_types::Scope;
 
-    let storage = memory_storage(&Scope::local());
+    let storage = memory_storage(&Scope::new("local").unwrap());
     let blobs = storage.blobs();
     for key in ["cleanup/a", "cleanup/b", "cleanup/c"] {
         blobs.put(key, vec![1], None).await.unwrap();
@@ -409,7 +409,7 @@ async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
     use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 
-    let storage = memory_storage(&Scope::local());
+    let storage = memory_storage(&Scope::new("local").unwrap());
     let blobs = Arc::clone(storage.blobs());
     blobs.put("cleanup/a", vec![1], None).await.unwrap();
     let faults = FaultPlan::new();
@@ -431,7 +431,7 @@ async fn orphan_sweep_stops_on_delete_error_after_preserving_prior_progress() {
     use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 
-    let storage = memory_storage(&Scope::local());
+    let storage = memory_storage(&Scope::new("local").unwrap());
     let blobs = Arc::clone(storage.blobs());
     for key in ["cleanup/a", "cleanup/b", "cleanup/c"] {
         blobs.put(key, vec![1], None).await.unwrap();
