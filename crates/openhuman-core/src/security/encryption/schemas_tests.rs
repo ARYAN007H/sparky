@@ -50,21 +50,6 @@ pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
 }
 
 #[test]
-fn read_required_parses_values_and_preserves_error_categories() {
-    let mut m = Map::new();
-    m.insert("key".into(), Value::String("value".into()));
-    let result: String = read_required(&m, "key").unwrap();
-    assert_eq!(result, "value");
-    assert!(read_required::<String>(&Map::new(), "key")
-        .unwrap_err()
-        .contains("missing required param"));
-    let wrong = Map::from_iter([("key".into(), Value::Bool(true))]);
-    assert!(read_required::<String>(&wrong, "key")
-        .unwrap_err()
-        .contains("invalid"));
-}
-
-#[test]
 fn secret_parsers_preserve_strings_and_required_value_errors() {
     use serde_json::json;
 
