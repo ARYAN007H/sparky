@@ -437,13 +437,13 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
         &repo,
         import_state::HOST_OWNER,
         "legacy-module-import",
-        |condition| {
+        move |condition| {
             let claim_backend =
                 backend_with_condition(Arc::clone(&captured.backend), condition.clone());
             let stale_storage = claim_backend
                 .for_scope(&scope)
                 .map_err(anyhow::Error::from)?;
-            crate::storage::block_on_anyhow(async {
+            crate::storage::block_on_anyhow(async move {
                 stale_storage
                     .documents()
                     .ensure_collection(&CollectionSpec::new(SERVERS))
