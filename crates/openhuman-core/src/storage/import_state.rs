@@ -90,12 +90,20 @@ struct Claim {
 
 fn decode<T: for<'de> Deserialize<'de>>(
     row: Versioned<serde_json::Value>,
+    expected_type: &str,
     expected_owner: &str,
     expected_step: &str,
 ) -> Result<T, StorageError> {
+    let record_type = row
+        .doc
+        .get("record_type")
+        .and_then(serde_json::Value::as_str);
     let owner = row.doc.get("owner").and_then(serde_json::Value::as_str);
     let step = row.doc.get("step").and_then(serde_json::Value::as_str);
-    if owner != Some(expected_owner) || step != Some(expected_step) {
+    if record_type != Some(expected_type)
+        || owner != Some(expected_owner)
+        || step != Some(expected_step)
+    {
         return Err(StorageError::serialization(
             "import state key does not match its owner and step",
         ));
@@ -111,7 +119,7 @@ pub async fn done(scoped: &Storage, owner: &str, step: &str) -> Result<bool, Sto
     let Some(row) = scoped.get(COLLECTION, &id).await? else {
         return Ok(false);
     };
-    let _: Completion = decode(row, owner, step)?;
+    let _: Completion = decode(row, "completion", owner, step)?;
     Ok(true)
 }
 
@@ -137,7 +145,7 @@ async fn mark_done_at(
     .map_err(|error| StorageError::serialization(error.to_string()))?;
     for _ in 0..CAS_RETRIES {
         if let Some(current) = scoped.get(COLLECTION, &id).await? {
-            let _: Completion = decode(current, owner, step)?;
+            let _: Completion = decode(current, "completion", owner, step)?;
             return Ok(());
         }
         match scoped
@@ -262,7 +270,7 @@ fn acquire(
             let current = docs.get(COLLECTION, &id).await?;
             let (expected, precondition, epoch) = match current {
                 Some(row) => {
-                    let claim: Claim = decode(row.clone(), &owner_owned, &step_owned)?;
+                    let claim: Claim = decode(row.clone(), "claim", &owner_owned, &step_owned)?;
                     if claim.holder.is_some() && claim.valid_until_ms > now_ms {
                         return Ok(None);
                     }
@@ -352,7 +360,7 @@ fn renew(repo: &Repo, token: &ClaimToken, now_ms: i64) -> Result<bool> {
         let Some(row) = docs.get(COLLECTION, &id).await? else {
             return Ok(false);
         };
-        let mut claim: Claim = decode(row.clone(), &token.owner, &token.step)?;
+        let mut claim: Claim = decode(row.clone(), "claim", &token.owner, &token.step)?;
         if claim.holder.as_deref() != Some(&token.holder)
             || claim.epoch != token.epoch
             || claim.valid_until_ms <= now_ms
@@ -390,7 +398,7 @@ fn release(repo: &Repo, token: &ClaimToken) -> Result<()> {
         let Some(row) = docs.get(COLLECTION, &id).await? else {
             return Ok(());
         };
-        let mut claim: Claim = decode(row.clone(), &token.owner, &token.step)?;
+        let mut claim: Claim = decode(row.clone(), "claim", &token.owner, &token.step)?;
         if claim.holder.as_deref() != Some(&token.holder) || claim.epoch != token.epoch {
             return Ok(());
         }

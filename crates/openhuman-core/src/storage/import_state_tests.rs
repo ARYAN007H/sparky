@@ -15,6 +15,15 @@ fn repo() -> Repo {
     Repo::on(&backend, &Scope::local(), "claim-test", spec).unwrap()
 }
 
+#[test]
+fn state_keys_keep_owner_and_step_boundaries_unambiguous() {
+    assert_ne!(
+        record_key("a/b", "c", "done"),
+        record_key("a", "b/c", "done")
+    );
+    assert_eq!(collection_specs()[0].name, "storage.import_state");
+}
+
 fn load_claim(repo: &Repo, owner: &str, step: &str) -> Option<Claim> {
     let scoped = repo.scoped().clone();
     let (owner, step) = (owner.to_owned(), step.to_owned());
@@ -22,7 +31,7 @@ fn load_claim(repo: &Repo, owner: &str, step: &str) -> Option<Claim> {
         ensure(&scoped).await?;
         let id = record_key(&owner, &step, "claim");
         match docs.get(COLLECTION, &id).await? {
-            Some(row) => decode(row, &owner, &step).map(Some),
+            Some(row) => decode(row, "claim", &owner, &step).map(Some),
             None => Ok(None),
         }
     })
