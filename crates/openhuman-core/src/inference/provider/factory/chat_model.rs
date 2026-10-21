@@ -526,6 +526,13 @@ pub(super) fn create_chat_model_from_string_with_model_id_inner(
     provider: &str,
     config: &Config,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
+    let resolved_provider;
+    let provider = if provider.trim().is_empty() || provider.trim() == "cloud" {
+        resolved_provider = resolve_primary_cloud_provider_string(config);
+        resolved_provider.as_str()
+    } else {
+        provider
+    };
     build_one_shot(&DispatchCtx::ambient(), role, Some(provider), config)
 }
 
