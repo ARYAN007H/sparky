@@ -360,7 +360,12 @@ async fn read_scoped_media(
             },),
         )
         .await
-        .map_err(|_| "native media could not be resolved in this turn".to_owned())?;
+        .map_err(|_| {
+            log_rejection(
+                "module_read_begin",
+                "native media could not be resolved in this turn".to_owned(),
+            )
+        })?;
     let mut lease = MediaReadLease::new(client.clone(), dispatch.clone(), begin.handle.clone());
     if begin.byte_count == 0
         || begin.byte_count > max_bytes
@@ -375,13 +380,19 @@ async fn read_scoped_media(
             .size_bytes
             .is_some_and(|size| size != begin.byte_count as u64)
     {
-        return Err("native media read metadata does not match its scoped reference".into());
+        return Err(log_rejection(
+            "module_read_metadata",
+            "native media read metadata does not match its scoped reference".into(),
+        ));
     }
     let expected_chunks = begin
         .byte_count
         .div_ceil(tinychannels_bus::module_media::MEDIA_READ_CHUNK_BYTES);
     if begin.chunk_count as usize != expected_chunks {
-        return Err("native media read chunk count is invalid".into());
+        return Err(log_rejection(
+            "module_read_chunk_count",
+            "native media read chunk count is invalid".into(),
+        ));
     }
     let mut bytes = Vec::with_capacity(begin.byte_count);
     for sequence in 0..begin.chunk_count {
@@ -395,23 +406,41 @@ async fn read_scoped_media(
                 },),
             )
             .await
-            .map_err(|_| "native media read was interrupted".to_owned())?;
+            .map_err(|_| {
+                log_rejection(
+                    "module_read_chunk",
+                    "native media read was interrupted".to_owned(),
+                )
+            })?;
         let expected_done = sequence + 1 == begin.chunk_count;
         if chunk.sequence != sequence || chunk.done != expected_done {
-            return Err("native media read returned an invalid chunk sequence".into());
+            return Err(log_rejection(
+                "module_read_sequence",
+                "native media read returned an invalid chunk sequence".into(),
+            ));
         }
         if chunk.bytes.len() > tinychannels_bus::module_media::MEDIA_READ_CHUNK_BYTES {
-            return Err("native media read returned an oversized chunk".into());
+            return Err(log_rejection(
+                "module_read_chunk_size",
+                "native media read returned an oversized chunk".into(),
+            ));
         }
         if bytes.len().saturating_add(chunk.bytes.len()) > begin.byte_count
             || bytes.len().saturating_add(chunk.bytes.len()) > max_bytes
         {
-            return Err("native media bytes exceed their declared limit".into());
+            return Err(log_rejection(
+                "module_read_total_size",
+                "native media bytes exceed their declared limit".into(),
+            ));
         }
         bytes.extend(chunk.bytes);
     }
-    validate_actual_media_size(bytes.len(), begin.byte_count, max_bytes)?;
-    lease.abort().await?;
+    validate_actual_media_size(bytes.len(), begin.byte_count, max_bytes)
+        .map_err(|error| log_rejection("module_read_final_size", error))?;
+    lease
+        .abort()
+        .await
+        .map_err(|error| log_rejection("module_read_abort", error))?;
     Ok(bytes)
 }
 
