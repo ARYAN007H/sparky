@@ -17,15 +17,7 @@ use tinysearch_bus::Role;
 /// Whether a tool name belongs to a spawn/delegation surface that hosted
 /// profiles must keep outside their tool capabilities.
 pub(crate) fn is_profile_spawn_tool(name: &str) -> bool {
-    crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool(name)
-        || crate::agent_registry::host_definition::AgentDefinitionRegistry::current().is_some_and(
-            |registry| {
-                registry
-                    .list()
-                    .iter()
-                    .any(|definition| definition.delegate_name.as_deref() == Some(name))
-            },
-        )
+    crate::agent::tinyagents::turn_policy::is_subagent_spawn_tool(name)
 }
 /// Search capability vocabulary for operator presentation settings.
 pub use tinysearch_bus::Role as SearchRole;

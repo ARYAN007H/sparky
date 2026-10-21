@@ -107,26 +107,6 @@ fn every_packed_tool_name_resolves_to_a_registered_tool() {
     );
     let registered: std::collections::HashSet<&str> = tools.iter().map(|t| t.name()).collect();
 
-    // Delegation tools are synthesised per-session from each agent's
-    // `delegate_name`, not built by `all_tools`, so they are legitimately
-    // absent here. `owners` holds agent ids (`crypto_agent`); the names that
-    // appear in `tools` are delegate names (`do_crypto`), so resolve them from
-    // the agent registry rather than from `owners`.
-    //
-    // `.expect`, not `.unwrap_or_default()`: an empty delegate set would make
-    // EVERY pack delegate (`do_crypto`, `build_workflow`, `run_skill`, …) report
-    // as missing, so a registry that failed to load would surface as a list of
-    // phantom names — the exact failure this test exists to report, raised for
-    // the wrong reason. `load_builtins` documents that built-in TOML is baked
-    // into the binary and must always parse, so an `Err` here is a broken
-    // invariant worth failing loudly on rather than absorbing.
-    let delegates: std::collections::HashSet<String> =
-        crate::agent_registry::agents::load_builtins()
-            .expect("built-in agent registry must load; without it every pack delegate would be reported as a phantom name")
-            .into_iter()
-            .filter_map(|d| d.delegate_name)
-            .collect();
-
     // `PACKS` is unconditional, but most packs' tools are behind Cargo features
     // that are NOT in `default` — `flows`, `mcp`, `skills`, `web3`, `documents`,
     // `voice`. Under a partial feature set "missing" means "compiled out", not
@@ -166,7 +146,7 @@ fn every_packed_tool_name_resolves_to_a_registered_tool() {
             continue;
         }
         for name in pack.tools {
-            if registered.contains(name) || delegates.contains(*name) {
+            if registered.contains(name) {
                 continue;
             }
             missing.push(format!("{}::{}", pack.id, name));
@@ -174,8 +154,7 @@ fn every_packed_tool_name_resolves_to_a_registered_tool() {
     }
     assert!(
         missing.is_empty(),
-        "every tool named in a pack must resolve to a registered tool (or be a \
-         delegate name); these do not: {missing:?}"
+        "every tool named in a pack must resolve to a registered tool; these do not: {missing:?}"
     );
 }
 
@@ -409,7 +388,7 @@ fn all_tools_default_registry_contains_expected_baseline_surface() {
         "apply_patch",
         "csv_export",
         "spawn_subagent",
-        "spawn_async_subagent",
+        "spawn_subagent",
         "ask_user_clarification",
         "read_workspace_state",
         "todo",

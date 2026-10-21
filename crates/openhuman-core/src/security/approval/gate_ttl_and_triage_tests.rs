@@ -54,7 +54,7 @@ async fn pending_for_thread_tracks_request_under_chat_context_and_clears() {
 }
 
 /// Regression for #5499: an async-delegated sub-agent carries the `WebChat`
-/// origin across the `tokio::spawn` boundary (`spawn_async_subagent` calls
+/// origin across the `tokio::spawn` boundary (`spawn_subagent` calls
 /// `turn_origin::propagate`) but NOT the chat approval context.
 /// Before the origin-routing fallback the gate parked with `thread_id:
 /// None`, the web-channel surface dropped the `ApprovalRequested` event

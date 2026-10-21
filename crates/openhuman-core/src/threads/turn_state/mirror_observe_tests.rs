@@ -626,7 +626,7 @@ fn thinking_timing_wire_shape_is_camel_case_and_backward_compatible() {
 #[test]
 fn subagent_spawned_derives_source_tool_name_from_the_parent_row() {
     // Only `spawn_subagent` ever hardcoded a "spawn_subagent" source. Every
-    // other delegation path (`spawn_async_subagent`,
+    // other delegation path (`spawn_subagent`,
     // a synthesized `delegate_researcher`, …) must show its own real tool
     // name, derived from the parent call's row by `parent_call_id` — never
     // the historical hardcoded default.

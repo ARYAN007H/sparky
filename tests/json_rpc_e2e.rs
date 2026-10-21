@@ -3863,7 +3863,7 @@ async fn json_rpc_run_ledger_lifecycle() {
             worker_thread_id: Some("worker-1".to_string()),
             checkpoint_path: Some("/tmp/sub-run-1.json".to_string()),
             checkpoint: Some(json!({
-                "resumeTool": "continue_subagent",
+                "resumeTool": "spawn_subagent",
                 "taskId": "sub-run-1"
             })),
             summary: Some("Which repo should I inspect?".to_string()),

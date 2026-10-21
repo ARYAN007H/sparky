@@ -35,39 +35,10 @@ pub(crate) fn subagent_prompt_protocol(
 /// delegates. Nested spawns would create a recursion tree the harness
 /// is not designed to budget, cost, or observe.
 ///
-/// Matches TinyAgents' spawn-tool list and the host's
-/// `continue_subagent` tools, and every synthesised per-archetype `delegate_*` tool
-///   ([`crate::tools::orchestrator_tools::collect_orchestrator_tools`]
-///   emits tools for each configured delegation target).
-///
-/// The shared static names stay aligned with TinyAgents; registry lookup is
-/// needed only for host-defined, unprefixed `delegate_name` overrides.
+/// Matches TinyAgents' shared spawn-tool list and OpenHuman's single spawn
+/// tool. Specialist allowlist entries are arguments to that tool, not aliases.
 pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
-    if crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool(name) {
-        return true;
-    }
-    let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
-    is_registered_delegate_alias(name, registry.as_deref())
-}
-
-fn is_registered_delegate_alias(
-    name: &str,
-    registry: Option<&crate::agent_registry::host_definition::AgentDefinitionRegistry>,
-) -> bool {
-    // Synthesised delegation tools are named by the target agent's
-    // `delegate_name` override, which mostly does NOT carry the `delegate_`
-    // prefix (`manage_tasks`, `create_image`, `setup_skills`,
-    // `build_workflow`, …). The prefix check above misses every one of them,
-    // which let wildcard-scoped children inherit the orchestrator's spawn
-    // surface. Resolve the override names via the registry so the strip
-    // stays in lockstep with `collect_orchestrator_tools`'s naming.
-    if let Some(registry) = registry {
-        return registry
-            .list()
-            .iter()
-            .any(|def| def.delegate_name.as_deref() == Some(name));
-    }
-    false
+    crate::agent::tinyagents::turn_policy::is_subagent_spawn_tool(name)
 }
 
 /// Returns indices into `parent_tools` for the tools the sub-agent may

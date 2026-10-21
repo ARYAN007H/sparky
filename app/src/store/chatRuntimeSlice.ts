@@ -108,8 +108,8 @@ export interface SubagentActivity {
    * Identity (`<request_id>:<seq>`) of the `subagent_spawned` event that last
    * started or resumed this delegation.
    *
-   * `continue_subagent` announces a resume by republishing `subagent_spawned`
-   * for the same task/agent, so "an existing row got spawned again" is the
+   * Resuming a paused task republishes `subagent_spawned` for the same
+   * task/agent, so "an existing row got spawned again" is the
    * only resume signal the frontend gets — and a Socket.IO redelivery of the
    * ORIGINAL spawn is indistinguishable from it by shape alone. Comparing
    * identities separates them: a redelivery repeats the pair the core stamped
@@ -1392,7 +1392,7 @@ export function toolTimelineFromPersisted(
  * intact preserves the truthful "was waiting for the user" history — and the
  * pulse is already stopped by the row-level `cancelled` above.
  *
- * A detached sub-agent (`spawn_async_subagent`, `mode === 'async'`) is the
+ * A detached sub-agent (`spawn_subagent`, `mode === 'async'`) is the
  * exception, and the parent's snapshot is never allowed to settle it. It is a
  * fire-and-forget task that deliberately outlives the turn that spawned it, so
  * the parent's lifecycle says nothing about whether the child is alive — and
@@ -1975,9 +1975,8 @@ const chatRuntimeSlice = createSlice({
       // event-seen map, so guard here.
       const existing = entries.find(e => e.id === rowId);
       if (existing) {
-        // ...with one exception. `continue_subagent` republishes
-        // `subagent_spawned` for the SAME task/agent when it resumes a paused
-        // child (continue_subagent.rs:330), and that is the only signal the
+        // ...with one exception. Resuming a paused task republishes
+        // `subagent_spawned` for the SAME task/agent, and that is the only signal the
         // frontend gets that the pause is over. Swallowing it left the row
         // stuck on `awaiting_user` for the rest of the run: the card kept
         // asking a question the user had already answered.
@@ -2005,6 +2004,9 @@ const chatRuntimeSlice = createSlice({
             existing.subagent.status = 'running';
             existing.subagent.awaitingQuestion = undefined;
             existing.subagent.spawnEventId = spawnEventId;
+            // Reattach the resumed task card to the newest parent call so the
+            // completed spawn from its earlier turn does not claim this work.
+            if (parentCallId) existing.subagent.parentCallId = parentCallId;
           }
         }
         return;
@@ -2137,16 +2139,8 @@ const chatRuntimeSlice = createSlice({
         output?: string;
       }>
     ) => {
-      const {
-        threadId,
-        rowId,
-        taskId,
-        success,
-        iterations,
-        elapsedMs,
-        outputChars,
-        output,
-      } = action.payload;
+      const { threadId, rowId, taskId, success, iterations, elapsedMs, outputChars, output } =
+        action.payload;
       // Settle a still-in-flight row: `running`, or `awaiting_user` (a subagent
       // paused for input that then completes must not stay stuck at
       // awaiting_user). Already-terminal rows are left as-is.
@@ -2158,10 +2152,10 @@ const chatRuntimeSlice = createSlice({
       // running, and a background delivery (a `chat_done` with no
       // `inference_start`) then froze it as its own trail: a card that spun
       // forever under the reply announcing the child's result. Both ids are
-      // turn-independent, so a run resumed by `continue_subagent` (same task
-      // id) also settles the earlier turn's card for it. That is how a paused
+      // turn-independent, so a run resumed with the same task id also settles
+      // the earlier turn's card for it. That is how a paused
       // `awaiting_user` card clears: the resumed run's completion carries the
-      // new `continue_subagent` call as its parent, never the original spawn.
+      // newest `spawn_subagent` call as its parent, never the original spawn.
       // Restored past-turn timelines too, like `subagentCancelResolved`: they
       // hold persisted (core-id) rows the process-source panel shows.
       const coreRowId = taskId !== undefined ? `subagent:${taskId}` : undefined;

@@ -105,7 +105,7 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
             )
             .expect("detached child context")
             .with_cancellation(cancellation);
-        crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
+        crate::agent::orchestration::tools::SpawnSubagentTool::new()
             .execute_with_live_parent_context(args, None, live.data.child(), detached)
             .await
             .expect("spawn tool executes")
@@ -333,7 +333,7 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
         .expect("detached child context")
         .with_cancellation(detached_data.cancellation.clone());
 
-    let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
+    let result = crate::agent::orchestration::tools::SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
@@ -469,7 +469,7 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
         )
         .expect("detached child context")
         .with_cancellation(detached_data.cancellation.clone());
-    let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
+    let result = crate::agent::orchestration::tools::SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
@@ -577,7 +577,7 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
         .expect("the already-detached invocation is allowed")
         .with_cancellation(detached_data.cancellation.clone());
 
-    let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
+    let result = crate::agent::orchestration::tools::SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",

@@ -1,9 +1,6 @@
 //! Registration of agent dialogue and delegation tools.
 
-use super::orchestration::tools::{
-    CloseSubagentTool, ContinueSubagentTool, ListSubagentsTool, SpawnAsyncSubagentTool,
-    SpawnSubagentTool, SteerSubagentTool, WaitSubagentTool,
-};
+use super::orchestration::tools::SpawnSubagentTool;
 use super::tools::{PlanExitTool, TodoTool};
 use crate::config::Config;
 #[cfg(feature = "skills")]
@@ -23,10 +20,8 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         // returns a single text result. See
         // `agent::subagent_host` for the dispatch path.
         Box::new(SpawnSubagentTool::new()),
-        Box::new(SpawnAsyncSubagentTool::new()),
-        // Interactive clarification early-exit. Sub-agents pause on this tool
-        // (checkpoint → `AwaitingUser`, see `subagent_host`) and
-        // the orchestrator resumes them via `continue_subagent` (#4291).
+        // Interactive clarification early-exit. A paused child is resumed by
+        // spawning again with the same task_key.
         // Several agent scopes (orchestrator, crypto, markets, scheduler,
         // desktop control) name it, so it must exist in the base
         // registry or none of them can actually ask the user anything.
@@ -35,13 +30,6 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         // tree) rooted at the agent action dir. Named by the orchestrator and
         // planner scopes.
         Box::new(WorkspaceStateTool::new(action_dir.to_path_buf())),
-        // Steer/list/close reusable async sub-agents and collect results by
-        // durable `subagent_session_id` (preferred) or transient `task_id`.
-        Box::new(ListSubagentsTool::new()),
-        Box::new(SteerSubagentTool::new()),
-        Box::new(WaitSubagentTool::new()),
-        Box::new(CloseSubagentTool::new()),
-        Box::new(ContinueSubagentTool::new()),
         // The session todo list is scoped to the conversation thread.
         // `plan_exit` hands a completed plan-mode pass to the build-mode pass.
         Box::new(TodoTool::new(root_config.workspace_dir.clone())),

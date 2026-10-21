@@ -31,12 +31,9 @@ omit_identity = false
 omit_memory_context = false
 omit_safety_preamble = true
 
-# Delegation surface. The `collect_orchestrator_tools` helper reads this
-# at agent-build time and synthesises one `delegate_*` tool per named
-# specialist. The tool name and target `when_to_use` description are both
-# preserved in the model-facing routing surface. Archetype routes that are
-# withheld by a tool pack are described in the orchestrator prompt's live
-# specialist roster, using the registry's current `when_to_use` text.
+# Specialist routing surface. This allowlist constrains the `agent_id` enum
+# for the single `spawn_subagent` tool. Every named specialist is reached by
+# that tool; no per-specialist dispatch aliases are generated.
 #
 # `{ skills = "*" }` contributes deferred Composio actions, discovered through
 # `tool_search` and called directly; it does not spawn a sub-agent.
@@ -84,12 +81,12 @@ allowlist = [
     # a dedicated multimodal model (`MODEL_MEDIA_UNDERSTANDING`), so it can
     # actually see the image.
     "vision_agent",
-    # Image-generation specialist. Synthesised into a `delegate_create_image`
-    # tool. Route make/generate/edit an image requests here — it owns prompt
+    # Image-generation specialist. Route make/generate/edit an image requests
+    # here — it owns prompt
     # craft, model selection, and saving the result to the workspace.
     "image_agent",
-    # Video-generation specialist. Synthesised into a `delegate_create_video`
-    # tool. Route make/generate a video or animate this image requests here —
+    # Video-generation specialist. Route make/generate a video or animate this
+    # image requests here —
     # generation is async (minutes) and the agent blocks until the clip is saved.
     "video_agent",
     # Deck specialist. Owns presentation grounding, citations, image
@@ -99,20 +96,15 @@ allowlist = [
     # skills from community registries (OpenHuman, HermesHub, ClawHub).
     # Running an installed skill is the orchestrator's own `run_workflow`.
     "skill_setup",
-    # Workflow-authoring specialist (Phase 5a). Synthesised into a
-    # `build_workflow` tool at agent-build time. Route any "set up a workflow
+    # Workflow-authoring specialist. Route any "set up a workflow
     # that…", "automate…", "when X happens do Y", or "build/edit an automation
     # or flow" request here — it grounds nodes in real tool slugs + connections,
     # can sandbox dry-run a draft, and returns a workflow PROPOSAL for the user
     # to review and save. It never creates/enables/runs a real flow itself.
-    # Delegations run ASYNC by default: `build_workflow` returns an
-    # [async_subagent_ref] immediately and the proposal arrives as a follow-up
-    # turn; iterate on it via continue_subagent with the subagent_session_id
-    # from that ref / the [active_subagents] roster — never re-delegate the
-    # same build from scratch.
+    # Calls run asynchronously. Reuse the same task_key to continue this
+    # proposal or answer a clarification without creating another child.
     "workflow_builder",
-    # Workflow-discovery specialist (the "Flow Scout"). Synthesised into a
-    # `discover_workflows` tool at agent-build time. Route "what workflows
+    # Workflow-discovery specialist (the "Flow Scout"). Route "what workflows
     # should I set up?", "suggest some automations", or "discover flows for me"
     # here — it reads the user's memory/threads/connections/flows read-only and
     # records concrete, buildable suggestions for the Flows page. It never
@@ -122,7 +114,7 @@ allowlist = [
     # NOTE: `summarizer` is not listed. It is runtime-only: the oversized
     # tool-result hook resolves it from the registry
     # (`context.summarizer_payload_threshold_tokens`, default 4000), and it
-    # never gets a delegate tool.
+    # is only reached by runtime summarization and is not model-callable.
     { skills = "*" },
 ]
 
@@ -160,14 +152,14 @@ named = [
     # strips this name from the allowlist and keeps the deferred set beside it
     # (`agent/session_host/builder/builder_build.rs`).
     "tool_search",
-    # The orchestrator runs installed skills itself; installation stays on the
-    # `setup_skills` hand-off.
+    # The orchestrator runs installed skills itself; installation is routed to
+    # `skill_setup` through `spawn_subagent`.
     "run_workflow",
     # `ask_user_clarification` is deliberately absent. On the chat surface it
     # is a no-op with a schema cost: it ends the turn with the question as the
     # reply, which is exactly what asking in prose does. It stays on the
     # sub-agent belts, where a headless child has no other way to pause into
-    # `awaiting_user` for `continue_subagent`.
+    # `awaiting_user`; the parent resumes it with spawn_subagent and task_key.
 # Direct coding surface. The Master Agent owns the normal inspect → edit →
 # verify loop in the action sandbox. `apply_patch` is the one edit mechanism
 # for existing files, `file_write` creates new files, and `shell` runs builds
@@ -218,36 +210,9 @@ named = [
     "storage_download_file",
     "storage_list_files",
     "storage_get_link",
-    # Sub-agent surface, deliberately three tools (#5701). A sub-agent is
-    # always async: `spawn_async_subagent` returns a task id immediately and
-    # the runner delivers the result back on an idle system turn via
-    # `orchestration::background_delivery`. Nothing has to block for it, so
-    # the collection surface that used to sit here — `wait`, `wait_loop`,
-    # `wait_subagent` — bought nothing but tokens and an invitation to stall
-    # the turn. Multiple async sub-agent requests can also be sent in parallel:
-    # already several workers in flight, so a dedicated fan-out tool was a
-    # second way to say the same thing. `steer_subagent` and `close_subagent`
-    # were fleet-management affordances for a fleet the model no longer
-    # enumerates; a worker that needs different instructions is cheaper to
-    # respawn, and idle sessions are reaped against the registry cap anyway.
-    "spawn_async_subagent",
-    # Fleet awareness. Re-enumerates the workers this parent has in flight
-    # (running / awaiting_user / completed-uncollected / failed) plus reusable
-    # durable sessions — the recovery move when the `[async_subagent_ref]`
-    # blocks have scrolled out of context and the model would otherwise lose
-    # track of, or needlessly re-spawn, a worker. Reads the same live
-    # `running_subagents` registry the ambient `[active_subagents]` turn block
-    # is built from.
-    "list_subagents",
-    # Resume a sub-agent that paused on `ask_user_clarification` (#4291). When
-    # a delegated sub-agent (e.g. task_manager_agent via `manage_tasks`)
-    # asks the user a question, the runner checkpoints it and the orchestrator
-    # gets a `[SUBAGENT_AWAITING_USER]` envelope with the task_id/agent_id. The
-    # orchestrator MUST resume that exact checkpoint with the user's answer via
-    # this tool — without it, the only continuation is to re-delegate a fresh,
-    # stateless sub-agent that asks again, looping forever. Both the async
-    # spawn and the synchronous delegate paths instruct the model to call it.
-    "continue_subagent",
+    # Sub-agent work always uses the asynchronous spawn surface. Select the
+    # specialist with agent_id and reuse task_key to continue an existing task.
+    "spawn_subagent",
     "composio_list_connections",
     # "What can I connect?" — the backend allowlist as
     # `{toolkits, catalog:[{slug, name, description, categories}]}`. Distinct
@@ -332,6 +297,6 @@ named = [
     # NOTE: `generate_presentation` is intentionally NOT listed here — deck
     # generation policy (grounding, citations, image verification) belongs to
     # `presentation_agent`, which the orchestrator reaches via
-    # `delegate_make_presentation`. Listing it directly is asserted against in
+    # `spawn_subagent(agent_id = "presentation_agent")`. Listing it directly is asserted against in
     # tests/in_process/orchestrator_presentation_wiring.rs.
 ]

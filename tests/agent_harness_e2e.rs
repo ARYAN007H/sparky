@@ -17,6 +17,8 @@ mod env_guard;
 mod linked_modules;
 #[path = "support/scripted_stack.rs"]
 mod scripted_stack;
+#[path = "support/tinyhumans_boot.rs"]
+mod tinyhumans_boot;
 use env_guard::EnvVarGuard;
 use scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
@@ -598,14 +600,19 @@ async fn wait_for_event(
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         match tokio::time::timeout(remaining, rx.recv()).await {
             Ok(Some(v)) => {
-                seen.push(
-                    v.get("event")
-                        .and_then(Value::as_str)
-                        .unwrap_or("<no event>")
-                        .to_string(),
-                );
-                if v.get("event").and_then(Value::as_str) == Some(event_name) {
+                let received = v.get("event").and_then(Value::as_str);
+                seen.push(received.unwrap_or("<no event>").to_string());
+                if received == Some(event_name) {
                     return v;
+                }
+                if received == Some("chat_error") {
+                    let error_type = v.get("error_type").and_then(Value::as_str);
+                    let error_source = v.get("error_source").and_then(Value::as_str);
+                    let message = v.get("message").and_then(Value::as_str);
+                    let captured_requests = with_captured(|captured| captured.len());
+                    panic!(
+                        "received chat_error while waiting for {event_name}: error_type={error_type:?}, error_source={error_source:?}, message={message:?}, captured requests={captured_requests}"
+                    );
                 }
             }
             Ok(None) => {
@@ -695,10 +702,14 @@ async fn boot_stack() -> Stack {
 const SUPERVISED_AUTONOMY_CONFIG: &str = "[autonomy]\nenabled = true\nlevel = \"supervised\"\n";
 
 async fn boot_stack_with_config(extra_config: &str) -> Stack {
+    // This in-process host needs the same TinyHumans backend transport that
+    // the CLI binary receives during normal startup.
+    tinyhumans_boot::boot();
+
     // Ensure the global AgentDefinitionRegistry is populated with built-in
     // archetypes (orchestrator, vision_agent, task_manager_agent, etc.) before
-    // the RPC stack starts. Without this the session builder cannot synthesise
-    // delegation tools and every `analyze_image`/`spawn_subagent` call becomes
+    // the RPC stack starts. Without this the session builder cannot build
+    // spawn_subagent's agent_id schema and every call becomes
     // "Unknown tool: …", making delegation tests vacuous.
     init_agent_def_registry();
 
@@ -974,22 +985,15 @@ async fn multi_turn_state_persistence_inner() {
 
 // ─── Task 3: Subagent delegation happy path ───────────────────────────────────
 //
-// Tool surface (crates/openhuman-core/src/tools/orchestrator_tools.rs,
-//   crates/openhuman-core/src/agent_registry/agents/vision_agent/agent.toml):
-//   - vision_agent has `delegate_name = "analyze_image"`, so the
-//     orchestrator LLM sees a tool named "analyze_image" synthesised by collect_orchestrator_tools.
-//   - The tool takes { "prompt": string, ... } per ArchetypeDelegationTool schema.
-//   - The orchestrator TOML lists "vision_agent" in its subagents.allowlist.
-//   - AgentDefinitionRegistry must be initialised (done in boot_stack) for the
-//     delegation tool to be synthesised; without it the call becomes "Unknown tool: analyze_image".
+// Tool surface: the orchestrator selects vision_agent through
+// spawn_subagent({ agent_id, prompt, image_paths }).
 //
 // Actual LLM request ordering (with registry init):
-//   request[0] = orchestrator → model returns { tool_calls: [analyze_image(...)] }
+//   request[0] = orchestrator → model returns { tool_calls: [spawn_subagent(...)] }
 //   request[1] = vision_agent subagent inner loop → model returns canary text
 //   request[2] = orchestrator synthesis → model returns final text with canary
 
-/// Orchestrator delegates to vision_agent via the `analyze_image`
-/// tool (delegate_name on the vision_agent definition); the subagent runs
+/// Orchestrator selects vision_agent through `spawn_subagent`; the subagent runs
 /// its own inner LLM call; the final orchestrator synthesis reply contains the
 /// subagent canary. Three upstream requests prove the full delegation path ran.
 #[test]
@@ -1017,14 +1021,13 @@ async fn subagent_delegation_happy_path_inner() {
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
-        // request[0]: Orchestrator calls the `analyze_image` tool
-        // (vision_agent's delegate_name).
+        // request[0]: Orchestrator selects the vision specialist.
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "Find the marker phrase",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
         // request[1]: vision_agent subagent inner LLM call returns its canary.
@@ -1063,7 +1066,7 @@ async fn subagent_delegation_happy_path_inner() {
     );
 
     // Delegation evidenced by ≥3 captured upstream requests:
-    //   request[0] = orchestrator turn: analyze_image tool call returned
+    //   request[0] = orchestrator turn: spawn_subagent tool call returned
     //   request[1] = vision_agent subagent inner LLM call: canary text returned
     //   request[2] = orchestrator synthesis: canary forwarded in final reply
     //
@@ -1115,17 +1118,16 @@ async fn subagent_delegation_happy_path_inner() {
 
 // ─── Task 4: Delegated clarification flow ─────────────────────────────────────
 //
-// `manage_tasks` is task_manager_agent's synthesised delegate (its `agent.toml`
-// `delegate_name`), and `ask_user_clarification` IS in that agent's named tools.
-// So a blocking delegation that needs a detail pauses the *child*, and
-// `dispatch_subagent` hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
-// the `manage_tasks` tool result (#4291). That envelope is an ordinary tool
-// result to the orchestrator — `manage_tasks` is not in its `early_exit_tools`
+// The orchestrator selects task_manager_agent through spawn_subagent, and
+// ask_user_clarification is in that agent's named tools. A child that needs a
+// detail pauses and hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
+// the spawn_subagent result (#4291). That envelope is an ordinary tool result
+// to the orchestrator — spawn_subagent is not in its `early_exit_tools`
 // — so the orchestrator relays the question in its OWN next reply, and turn 1
 // ends on that text.
 //
 // Actual LLM request ordering (4 upstream calls total):
-//   request[0] = orchestrator turn 1 → manage_tasks (blocking) tool call
+//   request[0] = orchestrator turn 1 → spawn_subagent tool call
 //   request[1] = task_manager_agent → ask_user_clarification pauses the child
 //   request[2] = orchestrator, with the awaiting-user envelope in context →
 //                relays the question as text; turn 1 ends (chat_done)
@@ -1146,14 +1148,17 @@ async fn delegated_clarification_flow_inner() {
     let _lock = env_lock();
     reset_script(vec![
         // ── turn 1 ──
-        // request[0]: Orchestrator delegates to task_manager_agent via manage_tasks.
+        // request[0]: Orchestrator selects the task manager.
         tool_call_completion(
-            "manage_tasks",
-            json!({ "prompt": "Add my GitHub issues as a task source", "blocking": true }),
+            "spawn_subagent",
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "Add my GitHub issues as a task source"
+            }),
         ),
         // request[1]: task_manager_agent asks for the missing detail. This pauses
         //   the child; the question comes back to the orchestrator inside the
-        //   `[SUBAGENT_AWAITING_USER]` envelope as the manage_tasks result.
+        //   `[SUBAGENT_AWAITING_USER]` envelope as the spawn_subagent result.
         tool_call_completion(
             "ask_user_clarification",
             json!({ "question": "WHICH_VERSION_CANARY?" }),
@@ -1227,11 +1232,8 @@ async fn delegated_clarification_flow_inner() {
     let requests = with_captured(|c| c.clone());
 
     // ── No unknown-tool result in any captured request ──
-    // Proves manage_tasks was recognised by the orchestrator. This is the guard
-    // that let the 3-completion version of this test pass vacuously: with the
-    // delegate unresolved, the engine's lowercase "unknown tool `manage_tasks`"
-    // result never matched the old `"Unknown tool:"` literal, and the
-    // orchestrator consumed the child's clarification completion itself.
+    // The shared spawn tool is registered, and the task-manager child is
+    // reached without an unknown-tool result.
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
         "found an unknown-tool result in captured requests — delegation was broken; \
@@ -1240,7 +1242,7 @@ async fn delegated_clarification_flow_inner() {
     );
 
     // ── Both turns traversed the expected four upstream requests ──
-    // request[0] = orchestrator (manage_tasks call),
+    // request[0] = orchestrator (spawn_subagent call),
     // request[1] = task_manager_agent (ask_user_clarification pause),
     // request[2] = orchestrator (relays the question; turn-1 end),
     // request[3] = orchestrator turn-2 synthesis (turn-2 end).
@@ -1253,20 +1255,20 @@ async fn delegated_clarification_flow_inner() {
     );
 
     // ── request[1] went to task_manager_agent, not the orchestrator ──
-    // Proves the blocking delegate really ran (the child's system prompt is
+    // Proves the async spawn really ran (the child's system prompt is
     // task-manager-specific; both agents share the project-context prefix, so
     // message 0 alone cannot tell them apart). Without this the flow degrades
     // to "orchestrator asks the user itself", which never exercises the pause.
     let child_request = requests.get(1).map(Value::to_string).unwrap_or_default();
     assert!(
         child_request.contains("You own the user's task-source feeds and artifacts"),
-        "request[1] did not carry the task_manager_agent prompt — manage_tasks did not \
+        "request[1] did not carry the task_manager_agent prompt — spawn_subagent did not \
          delegate; request: {child_request}"
     );
 
     // ── request[2] saw the child's pause as a `[SUBAGENT_AWAITING_USER]` envelope ──
     // Proves `dispatch_subagent` surfaced the pause the #4291 way (structured
-    // envelope carrying the question, as the manage_tasks tool result) rather
+    // envelope carrying the question, as the spawn_subagent result) rather
     // than as a plain success the model could read as "answered".
     let relay_request = requests.get(2).map(Value::to_string).unwrap_or_default();
     assert!(
@@ -2027,29 +2029,29 @@ async fn provider_error_retry_inner() {
 //   with the current built-in agent graph; the cap is a safety net for
 //   runtime-registered agents.
 //
-//   Fallback (plan Task 9, step 9.2 fallback): orchestrator → vision_agent
-//   (via `analyze_image`) → vision_agent scripted to call file_write (not in
+//   Fallback: orchestrator → vision_agent via spawn_subagent → vision_agent
+//   scripted to call file_write (not in
 //   vision_agent's read-only named tools → SubagentToolSource::execute returns
 //   a blocked response, tool loop continues) → vision_agent second LLM call
-//   returns DEPTH2_CANARY text → dispatch_subagent forwards as `analyze_image`
+//   returns DEPTH2_CANARY text → spawn_subagent forwards it
 //   tool result → orchestrator synthesis. The three-level synthesis path (user
 //   turn → vision_agent subagent → tool-loop continuation → orchestrator
 //   synthesis) is the deepest path reachable with built-in agents without src/
 //   changes.
 //   LLM request ordering (4 upstream calls):
-//     request[0] = orchestrator → `analyze_image` delegation
+//     request[0] = orchestrator → `spawn_subagent` delegation
 //     request[1] = vision_agent (inner loop) → file_write (blocked)
 //     request[2] = vision_agent (inner loop continuation) → DEPTH2_CANARY text
 //     request[3] = orchestrator synthesis
 
-/// Two `spawn_async_subagent` calls issued together really do put two workers
+/// Two `spawn_subagent` calls issued together really do put two workers
 /// in flight: both are dispatched and both run, concurrently.
 ///
 /// Concurrent async delegation calls keep independent workers in flight at
 /// the same time.
 ///
 /// The *other* half — both results reaching the user — is deliberately not
-/// asserted here, and not because it stopped mattering. `spawn_async_subagent`
+/// asserted here, and not because it stopped mattering. `spawn_subagent`
 /// returns a task id immediately and results come back through
 /// `orchestration::background_delivery`, which is documented "idle-gated —
 /// never mid-turn" and debounced, i.e. on a LATER system turn. That subsystem
@@ -2085,14 +2087,16 @@ async fn concurrent_async_subagents_overlap_inner() {
     // the orchestrator's reply for the queue, which is why nothing below keys
     // on a script index.
     reset_script(vec![
+        // These text-only canary tasks use flow_discovery; vision_agent
+        // requires an image attachment.
         tool_calls_completion(&[
             (
-                "spawn_async_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
+                "spawn_subagent",
+                json!({ "agent_id": "flow_discovery", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
             ),
             (
-                "spawn_async_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
+                "spawn_subagent",
+                json!({ "agent_id": "flow_discovery", "prompt": "Find PARALLEL_BETA_CANARY" }),
             ),
         ]),
         text_completion("Spawned two workers; results will arrive as they land."),
@@ -2184,7 +2188,7 @@ async fn concurrent_async_subagents_overlap_inner() {
     );
 }
 
-/// Orchestrator delegates to vision_agent via `analyze_image`; it calls
+/// Orchestrator selects vision_agent through `spawn_subagent`; it calls
 /// file_write (not in its read-only named tools, so SubagentToolSource
 /// returns error); vision_agent loops and returns DEPTH2_CANARY;
 /// dispatch_subagent forwards the result; orchestrator synthesizes.
@@ -2223,14 +2227,13 @@ async fn multi_hop_delegation_chain_inner() {
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
-        // request[0]: Orchestrator delegates to vision_agent via
-        // `analyze_image` (its delegate_name, agent_registry/agents/vision_agent/agent.toml:3).
+        // request[0]: Orchestrator selects the vision specialist.
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "deep question",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
         // request[1]: vision_agent first inner LLM call → scripts file_write.
@@ -2243,9 +2246,9 @@ async fn multi_hop_delegation_chain_inner() {
             json!({ "path": "depth-2.txt", "content": "depth-2 write?" }),
         ),
         // request[2]: vision_agent second inner LLM call → text result.
-        // This becomes the `analyze_image` tool result forwarded by dispatch_subagent.
+        // This becomes the spawn_subagent result.
         text_completion("DEPTH2_CANARY"),
-        // request[3]: Orchestrator receives the analyze_image result and synthesizes.
+        // request[3]: Orchestrator receives the subagent result and synthesizes.
         text_completion("Final answer: DEPTH2_CANARY"),
     ]);
     let mut events = spawn_sse_collector(format!(
@@ -2279,7 +2282,7 @@ async fn multi_hop_delegation_chain_inner() {
 
     // ≥4 upstream requests prove the full delegation path ran (≥3 would
     // false-pass if the subagent inner loop early-exited):
-    //   request[0] = orchestrator (analyze_image call),
+    //   request[0] = orchestrator (spawn_subagent call),
     //   request[1] = vision_agent first iter (file_write → blocked),
     //   request[2] = vision_agent second iter (DEPTH2_CANARY text),
     //   request[3] = orchestrator synthesis.
@@ -2292,13 +2295,13 @@ async fn multi_hop_delegation_chain_inner() {
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
-    // No unknown-tool result for `analyze_image` — delegation was synthesised correctly.
-    // Scoped to `analyze_image`: the subagent's `file_write` call IS
+    // No unknown-tool result for spawn_subagent — specialist selection succeeded.
+    // Scoped to spawn_subagent: the subagent's `file_write` call IS
     // rejected as unknown by design (see the ordering note above), so a blanket
     // check would fail on the very mechanic this test exercises.
     assert!(
-        !captured_requests_reject_tool_as_unknown(&requests, "analyze_image"),
-        "found an unknown-tool result — `analyze_image` delegation was not synthesised; requests: {}",
+        !captured_requests_reject_tool_as_unknown(&requests, "spawn_subagent"),
+        "found an unknown-tool result — spawn_subagent was not available; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
@@ -3379,8 +3382,11 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     reset_script(vec![
         // Orchestrator hands the install to `skill_setup` (a direct hand-off, #6302).
         tool_call_completion(
-            "setup_skills",
-            json!({ "prompt": "Install the harness registry skill", "blocking": true }),
+            "spawn_subagent",
+            json!({
+                "agent_id": "skill_setup",
+                "prompt": "Install the harness registry skill"
+            }),
         ),
         // skill_setup finds the entry, then installs it (the gate parks here).
         tool_call_completion(
@@ -3603,35 +3609,25 @@ fn use_skill_offers_pack(request: &Value, pack: &str) -> bool {
         .any(|tool| tool.to_string().contains(&quoted))
 }
 
-/// One scripted turn in which the orchestrator hands a request to a specialist
-/// by calling `hand_off` through the `use_skill` tool pack `pack`.
-///
-/// `setup_skills` is a member of the `skills` pack (#6787: it cost ~270 tokens
-/// on every orchestrator request for a family used a few times a week), so the
-/// orchestrator reaches it as `use_skill { skill: "skills", tool: "setup_skills" }`.
-///
-/// Three things must hold, all read from the captured model requests:
-/// * the orchestrator's own request offers the pack and does not advertise
-///   `hand_off` or any raw `skill_registry_*` tool on the wire;
-/// * the hand-off call returned a result (`tool_result_text` panics on
-///   `unknown tool`);
-/// * a later request came from the specialist, recognised by a tool only its
-///   belt carries.
+/// One scripted turn in which the orchestrator starts a specialist through
+/// the shared `spawn_subagent` tool.
 #[cfg(feature = "skills")]
-async fn assert_packed_hand_off_reaches_specialist(
+async fn assert_spawn_reaches_specialist(
     stack: &Stack,
     events: &mut tokio::sync::mpsc::UnboundedReceiver<Value>,
     rpc_id: i64,
     client_id: &str,
-    pack: &str,
-    hand_off: &str,
+    specialist: &str,
     specialist_only_tools: &[&str],
 ) {
     reset_script(vec![
-        packed_tool_call_completion(
-            pack,
-            hand_off,
-            json!({ "prompt": format!("Handle this through {hand_off}"), "blocking": true }),
+        tool_call_completion(
+            "spawn_subagent",
+            json!({
+                "agent_id": specialist,
+                "prompt": format!("Handle this through {specialist}"),
+                "task_key": format!("route-{specialist}")
+            }),
         ),
         text_completion("The specialist finished the task."),
         text_completion("The specialist handled it."),
@@ -3640,8 +3636,8 @@ async fn assert_packed_hand_off_reaches_specialist(
         &stack.rpc_base,
         rpc_id,
         client_id,
-        &format!("thread-{hand_off}"),
-        &format!("Please hand this to {hand_off}"),
+        &format!("thread-{specialist}"),
+        &format!("Please hand this to {specialist}"),
     )
     .await;
     let done = wait_for_terminal(events, Duration::from_secs(120)).await;
@@ -3650,22 +3646,21 @@ async fn assert_packed_hand_off_reaches_specialist(
     assert_eq!(
         done.get("event").and_then(Value::as_str),
         Some("chat_done"),
-        "the `{hand_off}` turn must finish: {done}\nrequests: {}",
+        "the `{specialist}` turn must finish: {done}\nrequests: {}",
         dump()
     );
 
     let orchestrator = requests
         .first()
-        .unwrap_or_else(|| panic!("no model request for the `{hand_off}` turn"));
+        .unwrap_or_else(|| panic!("no model request for the `{specialist}` turn"));
     let belt = advertised_tool_names(orchestrator);
     assert!(
-        belt.iter().any(|name| name == "use_skill") && use_skill_offers_pack(orchestrator, pack),
-        "the orchestrator must offer the `{pack}` pack through use_skill so it can reach \
-         `{hand_off}`; it advertised {belt:?}"
+        belt.iter().any(|name| name == "spawn_subagent"),
+        "the orchestrator must offer spawn_subagent to reach `{specialist}`; it advertised {belt:?}"
     );
     assert!(
-        !belt.iter().any(|name| name == hand_off),
-        "`{hand_off}` is packed (#6787), not a direct tool on the orchestrator's wire: {belt:?}"
+        !belt.iter().any(|name| name == specialist),
+        "`{specialist}` is an agent id, not a model-facing tool name: {belt:?}"
     );
     let raw: Vec<&String> = belt
         .iter()
@@ -3676,8 +3671,8 @@ async fn assert_packed_hand_off_reaches_specialist(
         "the orchestrator must not advertise raw registry tools: {raw:?}"
     );
 
-    tool_result_text(&requests, hand_off)
-        .unwrap_or_else(|| panic!("no tool result for `{hand_off}`; requests: {}", dump()));
+    tool_result_text(&requests, "spawn_subagent")
+        .unwrap_or_else(|| panic!("no spawn_subagent result; requests: {}", dump()));
     assert!(
         requests
             .iter()
@@ -3685,27 +3680,25 @@ async fn assert_packed_hand_off_reaches_specialist(
             .any(|request| advertised_tool_names(request)
                 .iter()
                 .any(|name| specialist_only_tools.contains(&name.as_str()))),
-        "no model request came from the specialist behind `{hand_off}` (a belt with any of \
+        "no model request came from the specialist behind `{specialist}` (a belt with any of \
          {specialist_only_tools:?}); requests: {}",
         dump()
     );
 }
 
-/// Skill installs reach `skill_setup` through its `setup_skills` hand-off,
-/// which is a member of the `skills` tool pack (#6787) and so is called through
-/// `use_skill`; running an installed skill is the orchestrator's own
-/// `run_workflow`, not a hand-off to a retired `skill_executor` (`run_skill`).
+/// Skill installs reach `skill_setup` through the shared spawn tool; running an
+/// installed skill remains the orchestrator's own `run_workflow`.
 #[cfg(feature = "skills")]
 #[test]
-fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack() {
+fn orchestrator_spawns_skill_setup_with_agent_id() {
     run_on_agent_stack(
-        "orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack",
-        orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack_inner,
+        "orchestrator_spawns_skill_setup_with_agent_id",
+        orchestrator_spawns_skill_setup_with_agent_id_inner,
     );
 }
 
 #[cfg(feature = "skills")]
-async fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pack_inner() {
+async fn orchestrator_spawns_skill_setup_with_agent_id_inner() {
     let _lock = env_lock();
     reset_script(Vec::new());
     let stack = boot_stack().await;
@@ -3714,13 +3707,12 @@ async fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pac
         stack.rpc_base
     ))
     .await;
-    assert_packed_hand_off_reaches_specialist(
+    assert_spawn_reaches_specialist(
         &stack,
         &mut events,
         910,
         "harness-skill-handoff",
-        "skills",
-        "setup_skills",
+        "skill_setup",
         &[
             "skill_registry_install",
             "skill_registry_uninstall",
@@ -4925,7 +4917,7 @@ async fn thread_goal_is_set_read_back_and_completed_across_turns_inner() {
 /// Cancel aborts the detached task, and an aborted future never reaches its own
 /// `Cancelled` branch — so before `AbortReport` the client got no terminal event
 /// and the delegation card spun forever. This drives the production path: a
-/// real `spawn_async_subagent` child held mid-model-call by the canary barrier,
+/// real `spawn_subagent` child held mid-model-call by the canary barrier,
 /// cancelled over the `openhuman.subagent_cancel` JSON-RPC, and observed on the
 /// same SSE stream the app renders from (`subagent_failed` is what settles the
 /// card's row). A second cancel then gets the RPC's "nothing running" answer
@@ -4946,8 +4938,8 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     arm_canary_barrier(&["CANCEL_E2E_CANARY", "CANCEL_E2E_NEVER"]);
     reset_script(vec![
         tool_calls_completion(&[(
-            "spawn_async_subagent",
-            json!({ "agent_id": "vision_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
+            "spawn_subagent",
+            json!({ "agent_id": "flow_discovery", "prompt": "Find CANCEL_E2E_CANARY" }),
         )]),
         text_completion("Spawned a worker; its result will arrive later."),
         text_completion("worker would have finished here"),

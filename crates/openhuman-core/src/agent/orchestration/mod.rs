@@ -18,7 +18,6 @@ pub(crate) mod completion_notice;
 pub(crate) mod completion_owners;
 pub(crate) mod completion_target;
 pub(crate) mod delivery_drain;
-pub(crate) mod fleet_tools;
 #[path = "parent_context/builder.rs"]
 pub(crate) mod parent_context;
 pub(crate) mod running_subagents;

@@ -1,55 +1,33 @@
 //! Dynamic orchestrator tool generation.
 //!
-//! The orchestrator agent is direct-first and only delegates specialised
-//! work. Rather than exposing a single generic
-//! `spawn_subagent(agent_id, prompt)` mega-tool, we synthesise one named
-//! tool per [`SubagentEntry::AgentId`] in the orchestrator's
-//! `[subagents] allowlist = [...]` TOML section, so the LLM's function-calling schema
-//! contains discoverable, well-named tools like `manage_tasks`,
-//! `create_image`, `build_workflow`, etc.
+//! The orchestrator delegates specialist work through the single
+//! `spawn_subagent(agent_id, prompt)` tool. `AgentId` entries in its
+//! `[subagents]` allowlist constrain that tool; they do not create additional
+//! model-facing tools.
 //!
-//! For [`SubagentEntry::Skills`] wildcard expansions we synthesise one
+//! For [`SubagentEntry::Skills`] wildcard expansions we synthesize one
 //! `ToolExposure::Deferred` [`ComposioActionTool`] per action of every
 //! connected Composio toolkit. Those never reach the wire: a belt that opted
 //! into discovery (`tool_search` in its `[tools] named`) finds them through
-//! the harness's `tool_search` bridge and calls them directly, so "send this
-//! email" is one search and one call. There is no `delegate_to_integrations_
-//! agent` any more — routing a single action through a sub-agent spawn cost a
-//! blocking agentic round-trip and a second prompt for work the parent could
-//! do in one call.
-//!
-//! Each synthesised delegation tool's description is pulled live from the
-//! target agent's [`AgentDefinition::when_to_use`] — so descriptions
-//! automatically stay in sync with the definitions and never drift from a
-//! hardcoded table.
+//! the harness's `tool_search` bridge and calls them directly.
 //!
 //! Called from [`crate::agent::session_host::builder`] at
-//! agent-build time, with the orchestrator's own definition, the global
-//! registry (for delegation target lookups), and the current list of
-//! connected Composio integrations.
-//!
-//! [`AgentDefinition::when_to_use`]: crate::agent_registry::host_definition::AgentDefinition::when_to_use
+//! agent-build time, with the orchestrator's own definition and the current
+//! list of connected Composio integrations.
 //! [`SubagentEntry::AgentId`]: tinyagents_definition::SubagentEntry::AgentId
 //! [`SubagentEntry::Skills`]: tinyagents_definition::SubagentEntry::Skills
 
-use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::integrations::composio::ComposioActionTool;
 use crate::integrations::ConnectedIntegration;
 use tinyagents_definition::SubagentEntry;
 
-use crate::agent::orchestration::tools::ArchetypeDelegationTool;
-use crate::agent::orchestration::tools::DelegationTarget;
 use tinytools::Tool;
 
-/// Synthesise the delegation tool list for an agent based on its
-/// declarative `subagents` field.
+/// Return deferred integration actions for the agent's skills wildcard.
 ///
-/// Each [`SubagentEntry::AgentId`] is resolved against `registry` and
-/// rendered as an [`ArchetypeDelegationTool`] whose `name()` defaults to
-/// `delegate_{target.id}` (overridable via the target agent's
-/// `delegate_name` field) and whose `description()` is the target's
-/// `when_to_use` — so editing an agent's TOML description immediately
-/// updates the tool schema the orchestrator LLM sees, with zero drift.
+/// `AgentId` entries only configure the `spawn_subagent` allowlist; they do
+/// not create additional model-facing tools.
 ///
 /// Each [`SubagentEntry::Skills`] wildcard expands to the connected
 /// integrations' actions as `Deferred` tools
@@ -63,13 +41,9 @@ use tinytools::Tool;
 /// `connected_integrations` slice produces zero tools, which is the correct
 /// behaviour when the user has not yet connected any integrations.
 ///
-/// Returns an empty Vec when `definition.subagents` is empty — callers
-/// (notably the builder) handle this by not extending the visible-tool
-/// set, so non-delegating agents behave identically to how they did
-/// before this module existed.
+/// Returns an empty Vec when there are no connected integration actions.
 pub fn collect_orchestrator_tools(
     definition: &AgentDefinition,
-    registry: &AgentDefinitionRegistry,
     connected_integrations: &[ConnectedIntegration],
 ) -> Vec<Box<dyn Tool>> {
     let mut tools: Vec<Box<dyn Tool>> = Vec::new();
@@ -77,51 +51,10 @@ pub fn collect_orchestrator_tools(
     for entry in &definition.subagents {
         match entry {
             SubagentEntry::AgentId(agent_id) => {
-                // Runtime-only sub-agents — the LLM must never see a
-                // `delegate_*` tool for these because they're dispatched
-                // directly by the runtime, not by an explicit LLM tool
-                // call. Issue #574 introduced `summarizer` as the first
-                // such sub-agent; future runtime-only agents should
-                // join this filter.
-                if agent_id == "summarizer" {
-                    log::debug!(
-                        "[orchestrator_tools] skipping runtime-only sub-agent '{}' \
-                         (no delegation tool synthesised)",
-                        agent_id
-                    );
-                    continue;
-                }
-                let Some(target) = registry.get(agent_id) else {
-                    log::warn!(
-                        "[orchestrator_tools] subagent '{}' referenced by '{}' is not in the registry — skipping",
-                        agent_id,
-                        definition.id
-                    );
-                    continue;
-                };
-                let tool_name = target
-                    .delegate_name
-                    .clone()
-                    .unwrap_or_else(|| format!("delegate_{}", target.id));
                 log::debug!(
-                    "[orchestrator_tools] registering archetype delegation tool: {} -> {}",
-                    tool_name,
-                    target.id
+                    "[orchestrator_tools] agent '{}' is allowed through spawn_subagent(agent_id)",
+                    agent_id
                 );
-                // The description is the target's `when_to_use` verbatim.
-                //
-                // It used to be prefixed with "Use only when direct
-                // response/direct tools are insufficient. " — 13 tokens
-                // repeated once per delegate tool, ~250 per turn on the Master
-                // Agent, restating a rule its prompt already carries as
-                // "**Direct-first always**". A parent whose prompt does not
-                // state that rule should gain it there, once, rather than
-                // paying for it on every delegate schema on every turn.
-                tools.push(Box::new(ArchetypeDelegationTool {
-                    tool_name,
-                    agent_id: DelegationTarget(target.id.clone()),
-                    tool_description: target.when_to_use.clone(),
-                }));
             }
             SubagentEntry::Skills(wildcard) => {
                 if !wildcard.matches_all() {
@@ -139,10 +72,8 @@ pub fn collect_orchestrator_tools(
                 // never sees them — the session builder leaves them
                 // prompt-hidden, which the direct-call gate refuses. Approval
                 // and channel permission apply per call. This used to sit
-                // beside a collapsed `delegate_to_integrations_agent` tool
-                // that spawned `integrations_agent` per toolkit; with the
-                // actions searchable that spawn only added a blocking
-                // sub-agent round-trip, so the delegation tool is gone.
+                // beside a per-toolkit sub-agent route; searchable actions
+                // are directly callable through the harness.
                 let actions = collect_deferred_integration_actions(connected_integrations);
                 if !actions.is_empty() {
                     log::debug!(
@@ -156,7 +87,7 @@ pub fn collect_orchestrator_tools(
     }
 
     log::info!(
-        "[orchestrator_tools] assembled {} delegation tool(s) for agent '{}' ({} integrations connected)",
+        "[orchestrator_tools] assembled {} deferred integration tool(s) for agent '{}' ({} integrations connected)",
         tools.len(),
         definition.id,
         connected_integrations.len()

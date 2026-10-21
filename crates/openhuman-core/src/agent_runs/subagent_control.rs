@@ -1,5 +1,5 @@
 //! Controller schema + JSON-RPC dispatcher for user-driven control of detached
-//! background sub-agents (`spawn_async_subagent`).
+//! background sub-agents (`spawn_subagent`).
 //!
 //! Exposes `openhuman.subagent_cancel`: the frontend "Cancel" affordance in the
 //! background-tasks drawer calls this to abort a still-running detached
@@ -16,32 +16,24 @@
 
 use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
-use tinyagents_orchestration::steering::SteerError;
 
 use crate::agent::orchestration::running_subagents::CancelledSubagent;
 use crate::agent::orchestration::{background_completions, running_subagents, subagent_sessions};
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use tinyagents_harness::run_queue::QueueLane;
 
 /// Controller schemas exposed for detached sub-agent control.
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
-    vec![schema_for("subagent_cancel"), schema_for("subagent_steer")]
+    vec![schema_for("subagent_cancel")]
 }
 
 /// Registered controllers (schema + handler) for detached sub-agent control.
 pub fn all_registered_controllers() -> Vec<RegisteredController> {
-    vec![
-        RegisteredController {
-            schema: schema_for("subagent_cancel"),
-            handler: handle_subagent_cancel,
-        },
-        RegisteredController {
-            schema: schema_for("subagent_steer"),
-            handler: handle_subagent_steer,
-        },
-    ]
+    vec![RegisteredController {
+        schema: schema_for("subagent_cancel"),
+        handler: handle_subagent_cancel,
+    }]
 }
 
 fn schema_for(function: &str) -> ControllerSchema {
@@ -68,28 +60,6 @@ fn schema_for(function: &str) -> ControllerSchema {
                 "{ cancelled: bool, taskId: string, outcome?: \"completed\" | \"failed\" | \"unknown\" } \
                  — cancelled=false if nothing was running; outcome then says how the run had \
                  ended, or \"unknown\" if the core no longer knows the task.",
-            )],
-        },
-        "subagent_steer" => ControllerSchema {
-            namespace: "subagent",
-            function: "steer",
-            description: "Inject a message into a still-running detached background sub-agent by \
-                          spawn task id. This trusted RPC control mirrors the steer_subagent agent \
-                          tool and returns immediately after the message is queued.",
-            inputs: vec![
-                required_str(
-                    "taskId",
-                    "Spawn task id (`sub-…`) of the running background sub-agent.",
-                ),
-                required_str(
-                    "message",
-                    "Instruction or context to queue for the running sub-agent.",
-                ),
-                optional_str("mode", "Optional queue mode: steer (default) or collect."),
-            ],
-            outputs: vec![json_output(
-                "result",
-                "{ steered: bool, taskId: string, mode: string }.",
             )],
         },
         _ => ControllerSchema {
@@ -259,53 +229,6 @@ async fn settle_paused_driver_cancel(
         .await;
     }
     Ok(transitioned)
-}
-
-fn handle_subagent_steer(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let cid = new_correlation_id();
-        let task_id = require_str(&params, "taskId")?;
-        let message = require_str(&params, "message")?;
-        let (lane, mode) = match opt_str(&params, "mode").as_deref() {
-            Some("collect") => (QueueLane::Collect, "collect"),
-            _ => (QueueLane::Steer, "steer"),
-        };
-        log::debug!(
-            target: "subagent_control_rpc",
-            "[subagent_control_rpc][{cid}] steer.entry task_id={task_id} mode={mode} chars={}",
-            message.chars().count()
-        );
-
-        match running_subagents::steer_control(&ctx, &task_id, message, lane).await {
-            Ok(()) => {
-                log::debug!(
-                    target: "subagent_control_rpc",
-                    "[subagent_control_rpc][{cid}] steer.done task_id={task_id} mode={mode} steered=true"
-                );
-                to_json(json!({ "steered": true, "taskId": task_id, "mode": mode }))
-            }
-            Err(err) => {
-                let reason = match err {
-                    SteerError::Unknown => "unknown",
-                    // SaaS user controls check the captured worker profile,
-                    // independently of the caller-supplied task ID.
-                    SteerError::NotOwned => "not_owned",
-                    SteerError::UnsupportedLane => "unsupported_lane",
-                    _ => "steer_failed",
-                };
-                log::debug!(
-                    target: "subagent_control_rpc",
-                    "[subagent_control_rpc][{cid}] steer.done task_id={task_id} mode={mode} steered=false reason={reason}"
-                );
-                to_json(json!({
-                    "steered": false,
-                    "taskId": task_id,
-                    "mode": mode,
-                    "reason": reason,
-                }))
-            }
-        }
-    })
 }
 
 fn to_json<T: serde::Serialize>(value: T) -> Result<Value, String> {

@@ -18,44 +18,31 @@ use tinytools_agent::dialect::ToolCallFormat;
 ///
 /// Each render gets its own workspace: building a prompt seeds identity files
 /// into it, and the tests here render in parallel.
-fn visible_tool_names(def: &AgentDefinition, definitions: &[AgentDefinition]) -> HashSet<String> {
+fn visible_tool_names(def: &AgentDefinition) -> HashSet<String> {
     let mut visible = match &def.tools {
         ToolScope::Wildcard => HashSet::new(),
         ToolScope::Named(names) => names.iter().cloned().collect(),
     };
     visible.extend(def.extra_tools.iter().cloned());
 
-    for subagent in &def.subagents {
-        let SubagentEntry::AgentId(agent_id) = subagent else {
-            continue;
-        };
-        if agent_id == "summarizer" {
-            continue;
-        }
-        let Some(target) = definitions
-            .iter()
-            .find(|candidate| candidate.id == *agent_id)
-        else {
-            continue;
-        };
-        visible.insert(
-            target
-                .delegate_name
-                .clone()
-                .unwrap_or_else(|| format!("delegate_{}", target.id)),
-        );
+    if def
+        .subagents
+        .iter()
+        .any(|entry| matches!(entry, SubagentEntry::AgentId(_)))
+    {
+        visible.insert("spawn_subagent".to_string());
     }
     visible
 }
 
-fn render(def: &AgentDefinition, definitions: &[AgentDefinition]) -> String {
+fn render(def: &AgentDefinition, _definitions: &[AgentDefinition]) -> String {
     let (PromptSource::Dynamic(()), Some(build)) =
         (&def.system_prompt, def.extensions.prompt_builder)
     else {
         panic!("built-in `{}` must carry a dynamic prompt", def.id);
     };
     let workspace = tempfile::TempDir::new().expect("temp workspace");
-    let visible = visible_tool_names(def, definitions);
+    let visible = visible_tool_names(def);
     let ctx = PromptContext {
         workspace_dir: workspace.path(),
         model_name: "test",
@@ -186,19 +173,6 @@ pub(super) fn names_presented_as_callable<'a>(
             prose = prose.replace(&format!("skill `{}`, tool `{name}`", pack.id), "");
         }
     }
-    // The workflow pack is feature-gated, but its route syntax is still
-    // intentional prose when that pack is unavailable in this build.
-    for route in [
-        "skill `workflows`, tool `build_workflow`",
-        "skill `workflows`, tool `discover_workflows`",
-    ] {
-        prose = prose.replace(route, "");
-    }
-    // The generated workflow guide can also mention the routed tool on its
-    // own after the pack-specific text has been elided.
-    prose = prose
-        .replace("`build_workflow`", "")
-        .replace("`discover_workflows`", "");
     not_callable
         .into_iter()
         .filter(|name| prose.contains(&format!("`{name}`")))

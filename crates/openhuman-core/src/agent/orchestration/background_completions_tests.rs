@@ -220,59 +220,6 @@ fn recovery_is_claimed_once_per_workspace() {
 }
 
 #[test]
-fn mark_collected_sweeps_the_queued_entry() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    record(w, "sess-mc", "mc-sub-1", "collected", Some("thread-mc"));
-    record(w, "sess-mc", "mc-sub-2", "keep", Some("thread-mc"));
-
-    // The parent collected sub-1 inline, so it must not be delivered again;
-    // sub-2 (never waited on) survives for normal idle delivery.
-    assert!(mark_collected(w, "mc-sub-1"), "swept the queued entry");
-    assert_eq!(pending_ids(w, "thread-mc"), ["mc-sub-2"]);
-}
-
-#[test]
-fn record_after_mark_collected_is_dropped() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    assert!(
-        !mark_collected(w, "mc-late"),
-        "nothing queued yet, nothing swept"
-    );
-    // A completion that records *after* (the wait-before-record order) is
-    // dropped rather than queued for a duplicate delivery turn.
-    record(
-        w,
-        "sess-mc-race",
-        "mc-late",
-        "stale",
-        Some("thread-mc-race"),
-    );
-    assert!(pending_ids(w, "thread-mc-race").is_empty());
-}
-
-#[test]
-fn mark_collected_is_task_scoped() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    // Only the collected task is suppressed; an un-waited sibling still
-    // surfaces (the genuinely-later fire-and-forget feature is preserved).
-    mark_collected(w, "mc-scope-1");
-    record(
-        w,
-        "sess-mc-scope",
-        "mc-scope-2",
-        "later",
-        Some("thread-mc-scope"),
-    );
-    assert_eq!(pending_ids(w, "thread-mc-scope"), ["mc-scope-2"]);
-}
-
-#[test]
 fn record_failure_queues_a_framed_failure_for_delivery() {
     let _guard = test_guard();
     let ws = workspace();

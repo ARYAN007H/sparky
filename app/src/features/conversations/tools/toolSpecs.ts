@@ -63,7 +63,6 @@ import {
   MailXIcon,
   MapPinIcon,
   MessageCircleQuestionIcon,
-  MessageSquareReplyIcon,
   MousePointerClickIcon,
   NetworkIcon,
   NewspaperIcon,
@@ -298,19 +297,8 @@ export const EXACT_TOOL_SPECS: Record<string, ToolSpec> = {
 
   // ── Agents and delegation ──────────────────────────────────────────────
   spawn_subagent: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
+  // Kept for recorded transcripts from before the single-spawn contract.
   spawn_async_subagent: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent_id') }),
-  delegate_to: spec('delegateTask', BotIcon, 'agent', { chip: chip.text('agent', 'agent_id') }),
-  continue_subagent: spec('messageAgent', MessageSquareReplyIcon, 'agent', {
-    chip: chip.text('agent_id'),
-  }),
-  steer_subagent: spec('messageAgent', MessageSquareReplyIcon, 'agent', {
-    chip: chip.text('agent_id'),
-  }),
-  wait_subagent: spec('waitForAgent', HourglassIcon, 'agent'),
-  close_subagent: spec('closeAgent', BotIcon, 'agent'),
-  list_subagents: spec('checkAgents', BotIcon, 'agent'),
-  wait: spec('wait', HourglassIcon, 'agent'),
-  wait_loop: spec('wait', HourglassIcon, 'agent'),
   ask_user_clarification: spec('askQuestion', MessageCircleQuestionIcon, 'agent', {
     chip: chip.text('question'),
   }),

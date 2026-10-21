@@ -943,8 +943,8 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
           // Event-seen guard, matching `onToolCall`/`onToolResult`. This socket
           // reconnects and redelivers freely (13+ times in one measured
           // session), and a replayed `subagent_spawned` that lands AFTER
-          // `subagent_awaiting_user` looks exactly like `continue_subagent`
-          // resuming the child — the reducer would clear the pause and the
+          // `subagent_awaiting_user` looks exactly like a same-task resume —
+          // the reducer would clear the pause and the
           // question would vanish while the child was still blocked. `seq` is
           // the core's own answer to this: `(request_id, seq)` is stamped per
           // emission (`publish_seq_stamped`), so a redelivery repeats the pair

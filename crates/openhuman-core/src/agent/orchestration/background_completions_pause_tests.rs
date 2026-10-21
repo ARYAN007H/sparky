@@ -202,9 +202,8 @@ fn repeated_pauses_are_distinct_and_inline_collection_sweeps_them() {
         .collect();
     assert_eq!(pause_ids.len(), 2, "each pause gets a unique router key");
 
-    assert!(mark_collected(w, "sub-repeat-pause"));
     assert!(
-        pending_for(w, "thread-repeat-pause").is_empty(),
-        "collecting the final result also withdraws its queued pause notices"
+        pending_for(w, "thread-repeat-pause").len() == 3,
+        "pause notices and the final result remain available for automatic delivery"
     );
 }

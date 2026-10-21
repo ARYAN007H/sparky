@@ -103,7 +103,7 @@ impl OpenHumanTurnPrelude {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut collected = definition
             .as_ref()
-            .map(|definition| collect_orchestrator_tools(definition, &registry, &integrations))
+            .map(|definition| collect_orchestrator_tools(definition, &integrations))
             .unwrap_or_default();
         #[cfg(feature = "mcp")]
         collected.extend(mcp_tools);

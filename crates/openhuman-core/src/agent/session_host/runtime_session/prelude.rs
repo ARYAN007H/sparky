@@ -246,33 +246,11 @@ impl OpenHumanTurnPrelude {
                 run_context.stop_hooks.push(Arc::new(hook));
             }
         }
-        // Build the roster from this turn's *effective* visible tool set
-        // (snapshotted under the tool-surface lock, then released), not the
-        // definition's static scope: a hide or named restriction can narrow what
-        // this turn can call, and the roster must not advertise a control it cannot invoke.
-        let turn_fleet = {
-            let visible = self
-                .tool_surface
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .visible_tool_names
-                .clone();
-            if visible.is_empty() {
-                crate::agent::orchestration::fleet_tools::FleetToolSet::for_parent(
-                    &self.agent_definition_id,
-                )
-            } else {
-                crate::agent::orchestration::fleet_tools::FleetToolSet::from_visible_tool_names(
-                    &visible,
-                )
-            }
-        };
         if let Some(block) =
             crate::agent::orchestration::running_subagents::active_subagents_context_block(
                 &self.dispatch_ctx(),
                 &self.event_session_id,
                 &self.workspace_dir,
-                &turn_fleet,
             )
         {
             context.push_str(&block);

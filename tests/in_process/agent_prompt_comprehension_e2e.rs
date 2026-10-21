@@ -16,8 +16,8 @@
 //! `env_lock()` across `.await` on purpose, as there.
 #![allow(clippy::await_holding_lock)]
 
-use crate::env_guard::env_lock_async;
 use crate::env_guard::EnvVarGuard;
+use crate::env_guard::env_lock_async;
 use crate::rpc_auth::{ensure_rpc_auth, rpc_token};
 use crate::scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
@@ -31,7 +31,7 @@ use axum::http::header::AUTHORIZATION;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tempfile::tempdir;
 
 use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
@@ -452,6 +452,7 @@ impl Drop for Stack {
 }
 
 async fn boot_stack(extra_config: &str) -> Stack {
+    crate::tinyhumans_boot::boot();
     AGENT_DEF_REGISTRY_INIT.get_or_init(|| {
         AgentDefinitionRegistry::init_global_builtins()
             .expect("AgentDefinitionRegistry::init_global_builtins must not fail");
@@ -639,7 +640,7 @@ async fn run_case_inner(case: Case) {
 
     match case.entry {
         Entry::Summarizer => {
-            use openhuman_core::inference::host_runtime::ops::{agent_chat_for, AgentChatTarget};
+            use openhuman_core::inference::host_runtime::ops::{AgentChatTarget, agent_chat_for};
             let mut config = openhuman_core::config::Config::load_or_init()
                 .await
                 .unwrap();
@@ -797,10 +798,9 @@ async fn run_case_inner(case: Case) {
             requests.len() >= 2,
             "the tool result must reach a subsequent model request"
         );
-        assert!(requests
-            .iter()
-            .all(|request| !system_text(request)
-                .contains("You compress a single oversized tool result")));
+        assert!(requests.iter().all(|request| {
+            !system_text(request).contains("You compress a single oversized tool result")
+        }));
     }
 }
 
@@ -1031,38 +1031,26 @@ fn orchestrator_prompt_names_only_discoverable_delegates() {
         )
         .await;
         assert_no_jsonrpc_error(&resp, "channel_web_chat");
-        wait_for_terminal(&mut events).await;
-
+        let terminal = wait_for_terminal(&mut events).await;
         let requests = captured().clone();
+        assert_eq!(
+            terminal.get("event").and_then(Value::as_str),
+            Some("chat_done"),
+            "prompt-discovery turn ended with event={:?}, error_type={:?}, message={:?}; captured requests={}",
+            terminal.get("event").and_then(Value::as_str),
+            terminal.get("error_type").and_then(Value::as_str),
+            terminal.get("message").and_then(Value::as_str),
+            requests.len(),
+        );
         let orchestrator = requests
             .iter()
             .find(|r| system_text(r).contains("## Routing\n\nFirst match wins:"))
             .expect("no orchestrator request captured");
         let prompt = system_text(orchestrator);
         let belt = advertised_tool_names(orchestrator);
-        let request_text = orchestrator.to_string();
-        // Validate the built-in contract independently of the process-global
-        // registry, which other integration tests may initialise first.
-        let registry = AgentDefinitionRegistry::builtins_only();
-
-        let undiscoverable: Vec<String> = registry
-            .list()
-            .into_iter()
-            .filter_map(|def| def.delegate_name.clone())
-            .filter(|name| prompt.contains(&format!("`{name}`")))
-            .filter(|name| {
-                let advertised = belt.iter().any(|b| b == name);
-                let packed =
-                    openhuman_core::tools::toolpacks::pack_for_tool(name).is_some_and(|pack| {
-                        belt.iter().any(|b| b == "use_skill") && request_text.contains(pack.id)
-                    });
-                !advertised && !packed
-            })
-            .collect();
         assert!(
-            undiscoverable.is_empty(),
-            "the orchestrator prompt names delegates the model cannot find: {undiscoverable:?}; \
-             advertised {belt:?}"
+            belt.iter().any(|name| name == "spawn_subagent"),
+            "specialist routing requires the shared spawn tool; advertised {belt:?}; prompt: {prompt}"
         );
     });
 }

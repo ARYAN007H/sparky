@@ -203,8 +203,40 @@ pub(crate) async fn spawn_async_via_driver_tool(
         + Sync
         + 'static,
 ) -> Result<String, SubagentRunError> {
-    spawn_async_via_driver_tool_using_jobs(parent, definition, input, options, None, completion)
-        .await
+    spawn_async_via_driver_tool_using_jobs(
+        parent, definition, input, options, None, None, completion,
+    )
+    .await
+}
+
+/// Resumes a host-authorized clarification checkpoint through the same
+/// detached Jobs path as a new spawn, retaining its lifecycle key and task id.
+pub(crate) async fn resume_async_via_driver_tool(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    original_key: SubagentTaskKey,
+    resume: SubagentResume,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
+    input: String,
+    options: SubagentRunOptions,
+    completion: impl Fn(
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
+) -> Result<String, SubagentRunError> {
+    spawn_async_via_driver_tool_using_jobs(
+        parent,
+        definition,
+        input,
+        options,
+        None,
+        Some((original_key, resume)),
+        completion,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -229,6 +261,7 @@ pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
         input,
         options,
         Some(jobs),
+        None,
         completion,
     )
     .await
@@ -240,6 +273,7 @@ async fn spawn_async_via_driver_tool_using_jobs(
     input: String,
     options: SubagentRunOptions,
     jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
+    continuation: Option<(SubagentTaskKey, SubagentResume)>,
     completion: impl Fn(
             String,
             Result<SubagentRunOutcome, String>,
@@ -249,13 +283,17 @@ async fn spawn_async_via_driver_tool_using_jobs(
         + Sync
         + 'static,
 ) -> Result<String, SubagentRunError> {
-    let task_id = options
-        .task_id
-        .clone()
+    let task_id = continuation
+        .as_ref()
+        .map(|(key, _)| key.task_id.clone())
+        .or_else(|| options.task_id.clone())
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
     let mut options = options;
     options.task_id = Some(task_id.clone());
-    let task_key = SubagentTaskKey::from_context(parent, task_id, None);
+    let task_key = continuation
+        .as_ref()
+        .map(|(key, _)| key.clone())
+        .unwrap_or_else(|| SubagentTaskKey::from_context(parent, task_id.clone(), None));
     let (tool_result, bundle) = invoke_async_spawn_driver_tool(
         parent,
         definition,
@@ -264,7 +302,7 @@ async fn spawn_async_via_driver_tool_using_jobs(
         "background",
         Some(Arc::new(completion)),
         jobs,
-        None,
+        continuation,
     )
     .await?;
     decode_driver_job_result(tool_result, &bundle, &task_key)
@@ -348,9 +386,13 @@ async fn invoke_driver_tool_with_request(
     )?;
     let request_host = host_request.clone();
     let request_task_id = task_id.clone();
+    let callback_lifecycle_key = continuation
+        .as_ref()
+        .map(|(key, _)| key.clone())
+        .unwrap_or_else(|| SubagentTaskKey::from_context(parent, task_id.clone(), None));
     let request_continuation = continuation;
     let dispatcher = DriverSubAgentTool::new(
-        "spawn_async_subagent",
+        "spawn_subagent",
         "Host-prepared asynchronous subagent invocation.",
         bundle.driver.clone(),
         move |_state: &(), parent, args, _call_id| {
@@ -421,7 +463,7 @@ async fn invoke_driver_tool_with_request(
             ToolTimeout::Unbounded,
         );
     if let Some(completion) = completion {
-        let callback_task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
+        let callback_task_key = callback_lifecycle_key;
         let host_outcome = Arc::clone(&bundle.host_outcome);
         let failures = Arc::clone(&bundle.failures);
         let persistence = Arc::clone(&bundle.persistence);

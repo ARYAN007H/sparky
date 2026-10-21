@@ -122,7 +122,7 @@ pub(crate) async fn bootstrap_core_runtime(
     }
 
     // --- Run-ledger recovery -------------------------------------------
-    // Detached sub-agent runs (`spawn_async_subagent`) from a previous process
+    // Detached sub-agent runs (`spawn_subagent`) from a previous process
     // are gone with that process. Any `agent_runs` row still marked `running`
     // at boot is orphaned — its driver died without firing a terminal event, so
     // the finalizer never settled it. Stamp such rows `interrupted` so they stop

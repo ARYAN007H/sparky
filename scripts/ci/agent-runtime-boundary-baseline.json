@@ -15,7 +15,7 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/orchestration/tools/spawn_async_subagent_execute.rs",
+    "path": "crates/openhuman-core/src/agent/orchestration/tools/spawn_subagent_execute.rs",
     "line": 396,
     "text": "let join = dispatch.spawn(crate::agent::turn_origin::propagate(",
     "occurrence": 1

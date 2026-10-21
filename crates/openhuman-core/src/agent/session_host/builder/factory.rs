@@ -389,18 +389,17 @@ impl OpenHumanSessionHost {
             crate::integrations::composio::cached_active_integrations(config);
         let prewarmed_integrations_slice = prewarmed_integrations.as_deref().unwrap_or(&[]);
 
-        // Resolve the per-agent delegation tool set and visible-tool
-        // whitelist from the target definition (when we have one) or
-        // fall back to the orchestrator's synthesis path.
+        // Resolve the per-agent deferred integration actions and visible-tool
+        // whitelist from the target definition (when we have one) or fall
+        // back to the orchestrator's action-expansion path.
         //
         // For an agent with `[subagents] allowlist = [...]` in its TOML (today:
-        // orchestrator), `collect_orchestrator_tools` synthesises one
-        // `ArchetypeDelegationTool` per named sub-agent plus, for the
-        // `{ skills = "*" }` wildcard, one `Deferred` action tool per
-        // connected Composio action (reached through `tool_search`).
+        // orchestrator), `collect_orchestrator_tools` returns only `Deferred`
+        // connected Composio actions from the skills wildcard. Named
+        // specialists are routed through the durable `spawn_subagent` tool.
         //
         // For an agent without `subagents` (today: welcome, critic,
-        // summarizer, etc.), no delegation tools are synthesised — the
+        // summarizer, etc.), no deferred integration actions are synthesized — the
         // LLM only sees the agent's own `ToolScope::Named` entries
         // from the global registry, narrowed by the visible-tool
         // filter.
@@ -421,11 +420,10 @@ impl OpenHumanSessionHost {
         ) {
             // Host-only: no delegation; the host's names join an empty belt.
             _ if host_only => (Vec::new(), Some(super::host_only::empty_belt())),
-            (Some(def), Some(reg)) => {
+            (Some(def), Some(_reg)) => {
                 let synthed = if should_synthesize_delegation_tools(def) {
                     tools::orchestrator_tools::collect_orchestrator_tools(
                         def,
-                        &reg,
                         prewarmed_integrations_slice,
                     )
                 } else {
@@ -485,7 +483,6 @@ impl OpenHumanSessionHost {
                 let synthed = match reg.get("orchestrator") {
                     Some(orch_def) => tools::orchestrator_tools::collect_orchestrator_tools(
                         orch_def,
-                        &reg,
                         prewarmed_integrations_slice,
                     ),
                     None => {
@@ -505,9 +502,8 @@ impl OpenHumanSessionHost {
                 // definition `resolve_target_definition` synthesizes
                 // straight from `config.agent_registry.entries` without
                 // ever consulting `AgentDefinitionRegistry::current()`, see
-                // `agent_registry::find_custom_in_config`). Delegation-tool
-                // synthesis needs the registry (to resolve named
-                // subagents), so it's skipped here, but `def.tools` is a
+                // `agent_registry::find_custom_in_config`). Integration
+                // expansion is skipped here, but `def.tools` is a
                 // real scope the caller authored and MUST still gate
                 // visibility — silently dropping it into the `(_, None)`
                 // "no registry, no filter" catch-all would leave a custom
@@ -517,7 +513,7 @@ impl OpenHumanSessionHost {
                 // synthesis path exists to provide.
                 log::debug!(
                     "[agent::builder] AgentDefinitionRegistry not initialised — skipping \
-                     delegation tool synthesis, but still applying target definition's own \
+                     integration action expansion, but still applying target definition's own \
                      tool scope"
                 );
                 let filter: Option<std::collections::HashSet<String>> = match &def.tools {

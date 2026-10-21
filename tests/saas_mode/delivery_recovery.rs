@@ -5,7 +5,7 @@
 //! sub-agent finishing and its result being delivered: a pending record in
 //! the profile's completion queue (the `orchestration_completions` documents
 //! of its scope in `<workspace>/storage`), addressed by thread id. The SaaS user
-//! surface does not offer `spawn_async_subagent` (the `agent` domain is off
+//! surface does not offer `spawn_subagent` (the `agent` domain is off
 //! for profiles), so the record is written here, through the harness's own
 //! store, while the core is down, exactly as `record_completion` would have
 //! written it.

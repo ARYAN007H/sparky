@@ -17,7 +17,7 @@ impl SessionHostBuilder {
             .tools
             .ok_or_else(|| anyhow::anyhow!("tools are required"))?;
         // Advertise only the spawnable ids on the wire: see
-        // `SpawnAsyncSubagentTool::scoped` for why the spec-view narrowing
+        // `SpawnSubagentTool::scoped` for why the spec-view narrowing
         // alone did not reach a native-tool-calling provider.
         let spawn_scope_id = self
             .session_definition
@@ -29,15 +29,15 @@ impl SessionHostBuilder {
             if !allowed.is_empty() {
                 if let Some(slot) = tools
                     .iter_mut()
-                    .find(|tool| tool.name() == "spawn_async_subagent")
+                    .find(|tool| tool.name() == "spawn_subagent")
                 {
                     tracing::debug!(
                         agent = %agent_id,
                         ids = allowed.len(),
-                        "[tools] scoping spawn_async_subagent schema to the subagent allowlist"
+                        "[tools] scoping spawn_subagent schema to the subagent allowlist"
                     );
                     *slot = Box::new(
-                        crate::agent::orchestration::tools::SpawnAsyncSubagentTool::scoped(allowed),
+                        crate::agent::orchestration::tools::SpawnSubagentTool::scoped(allowed),
                     );
                 }
             }

@@ -1,5 +1,4 @@
-//! JSON-RPC E2E coverage for detached sub-agent control
-//! (`subagent_cancel` / `subagent_steer`).
+//! JSON-RPC E2E coverage for detached sub-agent cancellation and retired steering.
 //!
 //! Every case boots the real Axum JSON-RPC router over HTTP against an
 //! isolated `HOME` and asserts on the **content** of the response. Nothing
@@ -222,47 +221,24 @@ fn str_at<'a>(value: &'a Value, pointer: &str) -> &'a str {
         .unwrap_or_else(|| panic!("expected a string at {pointer} in {value}"))
 }
 
-// ── subagent: cancel / steer ────────────────────────────────────────────────
+// ── subagent: cancel / retired steer ───────────────────────────────────────
 
-/// The background-tasks drawer's Cancel and steer controls. Both answer
-/// **structurally** for a task that is not running rather than erroring — the
-/// drawer's row may be stale, and a stale row must not raise. `steer` goes
-/// further and says *why* it did nothing.
+/// The background-tasks drawer's Cancel control remains available; the old
+/// steer RPC is no longer part of the surface.
 #[tokio::test]
-async fn subagent_steer_honours_and_defaults_the_queue_mode() {
+async fn subagent_steer_is_method_not_found_and_cancel_remains_available() {
     let _lock = env_lock_async().await;
     let h = setup().await;
 
-    let collect = h
-        .ok(
-            3504,
-            "openhuman.subagent_steer",
-            json!({
-                "taskId": "sub-not-running",
-                "message": "note this for later",
-                "mode": "collect",
-            }),
-        )
+    let unknown = h
+        .err(3504, "openhuman.subagent_steer", json!({ "taskId": "sub-not-running", "message": "hi" }))
         .await;
-    assert_eq!(
-        collect.get("mode").and_then(Value::as_str),
-        Some("collect"),
-        "an explicit queue mode is honoured and echoed: {collect}"
-    );
+    assert_eq!(unknown, "unknown method: openhuman.subagent_steer");
 
-    // An unrecognised mode falls back to steer rather than erroring.
-    let bogus_mode = h
-        .ok(
-            3505,
-            "openhuman.subagent_steer",
-            json!({ "taskId": "sub-not-running", "message": "hi", "mode": "teleport" }),
-        )
+    let cancel = h
+        .ok(3505, "openhuman.subagent_cancel", json!({ "taskId": "sub-not-running" }))
         .await;
-    assert_eq!(
-        bogus_mode.get("mode").and_then(Value::as_str),
-        Some("steer"),
-        "an unknown mode degrades to the default: {bogus_mode}"
-    );
+    assert_eq!(cancel.get("cancelled").and_then(Value::as_bool), Some(false));
 
     h.join.abort();
 }

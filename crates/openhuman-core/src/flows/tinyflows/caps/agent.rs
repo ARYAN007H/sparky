@@ -322,9 +322,9 @@ impl OpenHumanAgentRunner {
     /// **Synchronous only (B40 / Gap 4).** A flow `agent` node runs here with
     /// no explicit chat thread on its run context. If the
     /// agent it runs is a delegating agent (e.g. the orchestrator) and
-    /// calls `spawn_async_subagent` directly, the tool now refuses (see the
+    /// calls `spawn_subagent` directly, the tool now refuses (see the
     /// `parent_thread_id.is_none()` guard in
-    /// `agent_orchestration::tools::spawn_async_subagent`) rather than
+    /// `agent_orchestration::tools::spawn_subagent`) rather than
     /// silently discarding the background result once it finishes —
     /// `background_delivery` has nowhere to deliver it without a thread id.
     /// This module does not bridge async subagent delivery into flow runs.

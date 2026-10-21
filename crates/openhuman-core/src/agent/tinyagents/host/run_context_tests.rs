@@ -277,7 +277,7 @@ fn stale_parent_snapshot() -> ParentExecutionContext {
 /// `on_progress.is_some()` proves *presence*, not *identity*: a bind that
 /// installed some other, freshly created channel satisfies it just as happily,
 /// and that is the miswiring that actually ships. Production reads this exact
-/// field one clone away — `spawn_async_subagent_execute.rs` opens with
+/// field one clone away — `spawn_subagent_execute.rs` opens with
 /// `let progress_sink = parent.on_progress.clone();` — so delivery onto this
 /// receiver is what "the panel will see the spawn" reduces to.
 fn assert_bound_sink_is_this_runs_channel(
