@@ -7,11 +7,12 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use tinystoragedrivers_types::QueueSpec;
 
-/// An opaque, validated version-1 queue manifest supplied by the host.
+/// A version-1 queue manifest supplied by the host.
 ///
 /// This type is public because it appears in the public `StorageGrant` and
-/// inbound settings contracts. Its contents remain host-managed; construct it
-/// through [`QueueManifest::from_json`] so validation cannot be bypassed.
+/// inbound settings contracts. [`QueueManifest::from_json`] parses and
+/// validates it; values deserialized through Serde directly should be checked
+/// with [`QueueManifest::validate`] before use.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct QueueManifest {
@@ -24,18 +25,18 @@ pub struct QueueManifest {
 /// Host policy for one queue.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct QueueDeclaration {
-    pub name: String,
+pub(crate) struct QueueDeclaration {
+    pub(crate) name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub description: String,
+    pub(crate) description: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub owner: Option<String>,
+    pub(crate) owner: Option<String>,
     #[serde(default = "default_max_attempts")]
-    pub max_attempts: u32,
+    pub(crate) max_attempts: u32,
     #[serde(default)]
-    pub dedupe_window_ms: u64,
+    pub(crate) dedupe_window_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub visibility_ms: Option<u64>,
+    pub(crate) visibility_ms: Option<u64>,
 }
 
 fn default_max_attempts() -> u32 {
@@ -44,7 +45,7 @@ fn default_max_attempts() -> u32 {
 
 impl QueueDeclaration {
     /// The storage-port queue behavior declared by this host policy.
-    pub fn spec(&self) -> QueueSpec {
+    pub(crate) fn spec(&self) -> QueueSpec {
         QueueSpec {
             max_attempts: self.max_attempts,
             dedupe_window_ms: self.dedupe_window_ms,
@@ -104,12 +105,12 @@ impl QueueManifest {
     }
 
     /// Look up a declaration by exact queue name.
-    pub fn get(&self, name: &str) -> Option<&QueueDeclaration> {
+    pub(crate) fn get(&self, name: &str) -> Option<&QueueDeclaration> {
         self.queues.iter().find(|queue| queue.name == name)
     }
 
     /// Declarations for one-time host setup.
-    pub fn queues(&self) -> &[QueueDeclaration] {
+    pub(crate) fn queues(&self) -> &[QueueDeclaration] {
         &self.queues
     }
 }
