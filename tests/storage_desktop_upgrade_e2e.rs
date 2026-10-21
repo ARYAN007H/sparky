@@ -558,7 +558,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
         assert!(
             juice
                 .blobs()
-                .get(&format!("juice/ccr/{token}"))
+                .get(&format!("tinyjuice_ccr/{token}"))
                 .await
                 .unwrap()
                 .is_some(),
