@@ -64,7 +64,7 @@ pub(crate) fn build_chat_model(
         .filter(|model| !model.is_empty())
         .map(str::to_string)
         .unwrap_or_else(|| pinned.clone());
-    let options = managed_options(request.context.config);
+    let options = managed_options(&request.context.config);
     log::debug!(
         "[tinyhumans][inference] building managed chat model role={} model={} native_tools={} threaded={}",
         request.role,

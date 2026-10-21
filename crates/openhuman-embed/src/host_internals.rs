@@ -379,7 +379,7 @@ pub mod inference_registry {
         BackendErrorClassification, BackendErrorClassifier, BackendErrorKind, BoxFuture,
         CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest, ChatModelEntry,
         ChatModelFactory, ChatModelRequest, ConfigNormalizer, EmbeddingFactory, EmbeddingRequest,
-        ProviderModelHooks, ReadinessProbe,
+        ProviderContext, ProviderModelHooks, ReadinessProbe,
     };
 }
 

@@ -274,7 +274,7 @@ impl PointedInference {
                 .to_string();
             // Like the hosted provider: the acting profile's own credential
             // rides as the bearer.
-            let token = openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(request.config)
+            let token = openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(&request.context.config)
                 .map(|credential| credential.secret().to_string())
                 .map_err(anyhow::Error::msg)?;
             let wire =
