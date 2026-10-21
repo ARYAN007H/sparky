@@ -293,6 +293,9 @@ pub struct OpenHumanSessionHost {
     /// Per-turn host environment (budget, cancellation, deadline, hooks, ...)
     /// handed in by the entry point; copied onto every turn's run context.
     pub(super) host_env: crate::agent::turn_env::HostTurnEnv,
+    /// Whether this specific single-shot host turn should settle all native
+    /// driver descendants before returning its result. Normal chat stays async.
+    pub(super) settle_headless_descendants: bool,
     /// Backend/session thread explicitly owned by this agent run. It is kept
     /// separate from event identity: CLI and worker event sessions are not
     /// necessarily user conversation threads.

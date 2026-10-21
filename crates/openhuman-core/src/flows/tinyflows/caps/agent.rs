@@ -319,18 +319,11 @@ impl OpenHumanAgentRunner {
     /// a custom flow agent's model pin (e.g. `hint:reasoning`) silently
     /// dropped to the default chat model once routed through the harness.
     ///
-    /// **Synchronous only (B40 / Gap 4).** A flow `agent` node runs here with
-    /// no explicit chat thread on its run context. If the
-    /// agent it runs is a delegating agent (e.g. the orchestrator) and
-    /// calls `spawn_subagent` directly, the tool now refuses (see the
-    /// `parent_thread_id.is_none()` guard in
-    /// `agent_orchestration::tools::spawn_subagent`) rather than
-    /// silently discarding the background result once it finishes —
-    /// `background_delivery` has nowhere to deliver it without a thread id.
-    /// This module does not bridge async subagent delivery into flow runs.
-    /// For work that needs to happen in parallel, model it as parallel flow
-    /// nodes (the tinyflows engine already fans those out) instead of
-    /// reaching for a background sub-agent from inside a single node.
+    /// **Headless settlement.** A flow `agent` node has no chat thread, so it
+    /// opts its fresh session into bounded descendant settlement: the native
+    /// `spawn_subagent` call remains asynchronous, then this runner waits for
+    /// the root-owned descendant tree and folds completed child output into
+    /// the node result before returning.
     async fn run_via_harness(
         &self,
         dispatch: &crate::core::runtime::DispatchCtx,
@@ -397,6 +390,7 @@ impl OpenHumanAgentRunner {
             ))
         })?;
         agent.set_agent_definition_name(agent_ref.to_string());
+        agent.enable_headless_descendant_settlement();
 
         let prompt = build_harness_run_prompt(&request);
 
@@ -418,6 +412,13 @@ impl OpenHumanAgentRunner {
         let effective_iteration_cap = agent.agent_config().max_tool_iterations;
         let timeout_secs =
             resolve_run_timeout_secs(requested_timeout_secs, effective_iteration_cap);
+        let deadline = tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
+            std::time::Duration::from_secs(timeout_secs),
+        );
+        let absolute_deadline = tokio::time::Instant::from_std(deadline.started() + deadline.backstop());
+        let mut host_env = agent.host_env().clone();
+        host_env.turn_deadline = Some(deadline);
+        agent.set_host_env(host_env);
 
         tracing::debug!(
             target: "flows",
@@ -483,7 +484,7 @@ impl OpenHumanAgentRunner {
             None => run,
         };
         let final_text =
-            match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), run).await {
+            match tokio::time::timeout_at(absolute_deadline, run).await {
                 Ok(Ok(text)) => text,
                 Ok(Err(e)) => {
                     tracing::warn!(
