@@ -19,26 +19,27 @@
 //! fields (`created_ms`, `ingested_ms`) carry the ordering. Removing a source
 //! removes its ledger entries, which the SQL schema did with a cascade.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use tinystoragedrivers::{CollectionSpec, Filter, Precondition, Query, Sort, Versioned};
 
-use super::store::{apply_patch, content_hash, IngestedTaskRef};
+use super::store::{IngestedTaskRef, apply_patch, content_hash};
 use super::types::{
     FetchReason, FilterSpec, ProviderSlug, SourceTarget, TaskSource, TaskSourcePatch,
 };
 use crate::config::Config;
 use crate::integrations::composio::contract::NormalizedTask;
-use crate::storage::documents::{compare_and_swap, text, Repo};
+use crate::storage::documents::{Repo, compare_and_swap, text};
 use crate::storage::{DocumentStoreExt, StorageError};
 
-pub(super) use super::storage_schema::{ingested_id, INGESTED, SOURCES};
+pub(super) use super::storage_schema::{INGESTED, SOURCES, ingested_id};
 use super::storage_schema::{legacy_collections, specs};
 use crate::storage::schema_support::key_of;
 const DOMAIN: &str = "task_sources::store";
 
 /// The legacy `sources.db`, as the storage importer reads it.
+#[cfg(feature = "legacy-import")]
 pub(crate) fn import_source() -> crate::storage::import::Source {
     crate::storage::import::Source {
         domain: "task_sources",
@@ -226,11 +227,7 @@ impl Docs {
                 .await?;
             docs.delete(SOURCES, &key, Precondition::None).await
         })?;
-        if removed {
-            Ok(())
-        } else {
-            Err(not_found(id))
-        }
+        if removed { Ok(()) } else { Err(not_found(id)) }
     }
 
     pub(super) fn record_fetch(

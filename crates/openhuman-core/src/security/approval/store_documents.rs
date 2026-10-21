@@ -24,20 +24,20 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::Config;
 use crate::storage::documents::compare_and_swap;
 use crate::storage::local;
-use crate::storage::{block_on, DocumentStore, DocumentStoreExt, Storage, StorageError};
+use crate::storage::{DocumentStore, DocumentStoreExt, Storage, StorageError, block_on};
 use tinystoragedrivers::{
     CollectionSpec, ErrorKind, Filter, Key, Precondition, Query, Sort, Versioned,
 };
 
+pub(super) use super::storage_schema::{APPROVALS, FLOW_TRUST, trust_id};
 use super::storage_schema::{legacy_collections, specs};
-pub(super) use super::storage_schema::{trust_id, APPROVALS, FLOW_TRUST};
 
 use super::types::{
     ApprovalAuditEntry, ApprovalDecision, ApprovalSourceContext, ExecutionOutcome, PendingApproval,
@@ -74,6 +74,7 @@ pub(super) fn for_agent(config: &Config, agent: &str) -> Result<Docs> {
 }
 
 /// The legacy `approval.db`, as the storage importer reads it.
+#[cfg(feature = "legacy-import")]
 pub(crate) fn import_source() -> crate::storage::import::Source {
     crate::storage::import::Source {
         domain: "approval",

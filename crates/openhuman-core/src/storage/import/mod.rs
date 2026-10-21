@@ -67,20 +67,20 @@ use std::sync::Arc;
 
 use anyhow::Result;
 #[cfg(feature = "legacy-import")]
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 #[cfg(feature = "legacy-import")]
 use sha2::Digest;
 use tinystoragedrivers::CollectionSpec;
 #[cfg(feature = "legacy-import")]
 use tinystoragedrivers::{ErrorKind, Precondition};
 
+use super::StorageBackend;
+#[cfg(feature = "legacy-import")]
+use super::block_on;
 #[cfg(feature = "legacy-import")]
 use super::documents::Repo;
 #[cfg(feature = "legacy-import")]
 use super::rusqlite;
-#[cfg(feature = "legacy-import")]
-use super::block_on;
-use super::StorageBackend;
 use crate::config::Config;
 #[cfg(feature = "legacy-import")]
 use rusqlite::Connection;
@@ -352,8 +352,8 @@ pub fn run_with(
 /// declare. A record in a collection no step reads passes through unchanged.
 #[cfg(feature = "legacy-import")]
 fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<CollectionSpec>)> {
-    use tinystoragedrivers::schema::{Item, SourceRecord, StepBody};
     use tinystoragedrivers::Meta;
+    use tinystoragedrivers::schema::{Item, SourceRecord, StepBody};
     let schema = super::schema::owner_schemas()
         .into_iter()
         .find(|schema| schema.owner.as_str() == owner)

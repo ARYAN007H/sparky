@@ -31,7 +31,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned};
 
@@ -40,10 +40,10 @@ use super::types::{
     NotificationStatus,
 };
 use crate::config::Config;
-use crate::storage::documents::{compare_and_swap, text, update_or_insert, Repo};
+use crate::storage::documents::{Repo, compare_and_swap, text, update_or_insert};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
-pub(super) use super::storage_schema::{core_id, CORE, DEDUP, NOTIFICATIONS, SETTINGS};
+pub(super) use super::storage_schema::{CORE, DEDUP, NOTIFICATIONS, SETTINGS, core_id};
 use super::storage_schema::{legacy_collections, specs};
 use crate::storage::schema_support::key_of;
 
@@ -62,6 +62,7 @@ const DEDUP_WINDOW_SECS: i64 = 60;
 /// that may serve several workspaces gets them re-filed under the real
 /// workspace's key, exactly as [`current`] does for new records
 /// ([`workspace_key_for`]).
+#[cfg(feature = "legacy-import")]
 pub(crate) fn import_source() -> crate::storage::import::Source {
     crate::storage::import::Source {
         domain: "notifications",

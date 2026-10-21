@@ -13,20 +13,21 @@
 
 use anyhow::Result;
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinystoragedrivers::{CollectionSpec, Filter, Precondition, Query, Sort, Versioned};
 
 use crate::config::Config;
 use crate::security::devices::types::PairedDevice;
-use crate::storage::documents::{compare_and_swap, text, Repo};
 use crate::storage::DocumentStoreExt;
+use crate::storage::documents::{Repo, compare_and_swap, text};
 
-use super::storage_schema::{legacy_collections, spec, DEVICES};
+use super::storage_schema::{DEVICES, legacy_collections, spec};
 use crate::storage::schema_support::{key_of, ms_rfc3339};
 
 const DOMAIN: &str = "devices::store";
 
 /// The legacy `devices.db`, as the storage importer reads it.
+#[cfg(feature = "legacy-import")]
 pub(crate) fn import_source() -> crate::storage::import::Source {
     crate::storage::import::Source {
         domain: "devices",

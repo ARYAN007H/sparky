@@ -1,4 +1,5 @@
 use super::*;
+#[cfg(feature = "legacy-import")]
 use crate::storage::import::Outcome;
 use crate::storage::{CollectionSpec, Precondition, Scope};
 use std::sync::Mutex;
@@ -98,6 +99,7 @@ fn the_new_workspace_is_a_different_database() {
 }
 
 #[test]
+#[cfg(feature = "legacy-import")]
 fn the_legacy_files_of_the_new_workspace_are_imported() {
     let first = TempDir::new().unwrap();
     let second = TempDir::new().unwrap();

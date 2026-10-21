@@ -28,14 +28,16 @@ pub mod schemas;
 mod storage_schema;
 pub mod store;
 mod store_documents;
+#[cfg(feature = "legacy-import")]
 mod store_import;
 pub(crate) use storage_schema::{collection_specs, upgrade_records};
+#[cfg(feature = "legacy-import")]
 pub(crate) use store_documents::import_source;
 pub mod types;
 
 pub use bus::{
-    publish_core_notification, register_notification_bridge_subscriber,
-    subscribe_core_notifications, NotificationBridgeSubscriber,
+    NotificationBridgeSubscriber, publish_core_notification,
+    register_notification_bridge_subscriber, subscribe_core_notifications,
 };
 pub use schemas::{
     all_controller_schemas as all_notifications_controller_schemas,

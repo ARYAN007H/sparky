@@ -44,18 +44,19 @@ pub mod rebind;
 pub mod schema;
 pub mod schema_support;
 pub mod scope;
+#[cfg(feature = "legacy-import")]
 pub mod scope_move;
 pub mod secrets;
 pub mod sessions;
 pub mod state_kv;
 
 pub use scope::{
-    scope_for_agent, scope_for_module, scope_for_profile, tenant_scope, ParsedScope, Principal,
-    Scope, Tenant,
+    ParsedScope, Principal, Scope, Tenant, scope_for_agent, scope_for_module, scope_for_profile,
+    tenant_scope,
 };
 
 use std::future::Future;
-use std::sync::{mpsc, Arc, LazyLock, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock, mpsc};
 
 /// SQLite bindings re-exported by the storage driver crate, for the two
 /// consumers that open a SQLite file that is not a storage backend: the
@@ -180,8 +181,8 @@ impl Blocking {
     }
 }
 
-use crate::config::schema::storage::redact_url;
 use crate::config::Config;
+use crate::config::schema::storage::redact_url;
 
 /// The environment variable that overrides `[storage] url`.
 pub const STORAGE_URL_VAR: &str = "OPENHUMAN_STORAGE_URL";
