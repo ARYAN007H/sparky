@@ -409,9 +409,30 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     );
     assert_eq!(messages[1].content, "answer 1");
 
-    let outbound: Vec<_> = observed_events
+    let scoped_events: Vec<_> = observed_events
         .into_iter()
         .filter(|event| event.context().client_id == "gw-ops-test")
+        .collect();
+    let projected_terminals: Vec<_> = scoped_events
+        .iter()
+        .filter(|event| event.event_name() == "chat_done")
+        .collect();
+    assert_eq!(
+        projected_terminals.len(),
+        2,
+        "each relayed turn should publish one shared projected terminal"
+    );
+    assert_eq!(
+        projected_terminals
+            .iter()
+            .map(|event| event.context().request_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["req-m1", "req-m2"]
+    );
+
+    let outbound: Vec<_> = scoped_events
+        .into_iter()
+        .filter(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT)
         .collect();
     assert_eq!(outbound.len(), 2, "one channel_outbound per reply");
     assert!(outbound
