@@ -86,7 +86,10 @@ fn shared() -> SqliteBackend {
 #[tokio::test]
 async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
     let backend = shared();
-    let (a, b) = (Node::new("node-a", &backend), Node::new("node-b", &backend));
+    let (a, b) = (
+        Node::new("node-a", &backend.backend),
+        Node::new("node-b", &backend.backend),
+    );
 
     a.take("alice").await;
     a.put("profile:alice", "n1").await.unwrap();
@@ -129,7 +132,7 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
 
     // The new holder writes, and its write is the one that stands.
     b.put("profile:alice", "n2").await.unwrap();
-    let stored = backend
+    let stored = backend.backend
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap()
         .documents()
@@ -143,7 +146,7 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
 #[tokio::test]
 async fn a_paused_node_refuses_its_own_writes_once_its_grant_runs_out() {
     let backend = shared();
-    let a = Node::new("node-a", &backend);
+    let a = Node::new("node-a", &backend.backend);
     a.take("alice").await;
 
     // Nobody took over yet, but node A's renewals stopped landing: inside
@@ -159,7 +162,7 @@ async fn a_paused_node_refuses_its_own_writes_once_its_grant_runs_out() {
 #[tokio::test]
 async fn a_renewed_grant_keeps_admitting_writes() {
     let backend = shared();
-    let a = Node::new("node-a", &backend);
+    let a = Node::new("node-a", &backend.backend);
     let grant = a.take("alice").await;
     a.set_clock(20_000);
     let renewed = a.leases.renew(&grant, 20_000).await.unwrap();
@@ -256,9 +259,6 @@ impl LeaseStore for PausedAfterCheck {
         self.inner.holder_readonly(key).await
     }
 
-    fn driver_fence(&self, key: &str, node: &str, epoch: u64) -> Option<tinystoragedrivers::Fence> {
-        self.inner.driver_fence(key, node, epoch)
-    }
 }
 
 /// Node A holds `alice` on `shared`; returns A's fenced view, its fence,
@@ -295,7 +295,7 @@ async fn paused_holder(
 /// the write's own atomic step and refuses it.
 async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn StorageBackend>) {
     assert!(shared.capabilities().contains(Capability::Fencing));
-    let (a, fence, leases) = paused_holder(&shared).await;
+    let (a, fence, leases) = paused_holder(shared).await;
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     scoped
         .documents()
@@ -335,14 +335,15 @@ async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn Storag
 
 #[tokio::test]
 async fn memory_driver_refuses_a_write_after_a_takeover_the_check_missed() {
-    driver_refuses_the_write_the_host_check_admitted(shared()).await;
+    let backend = shared();
+    driver_refuses_the_write_the_host_check_admitted(Arc::clone(&backend.backend)).await;
 }
 
 /// Streams and blobs go through the driver fence too.
 #[tokio::test]
 async fn stream_and_blob_writes_are_driver_fenced() {
     let backend = shared();
-    let (a, _fence, leases) = paused_holder(&backend).await;
+    let (a, _fence, leases) = paused_holder(&backend.backend).await;
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     leases.armed.store(true, Ordering::SeqCst);
     assert!(scoped.streams().append("log", json!(1)).await.is_err());
@@ -351,7 +352,8 @@ async fn stream_and_blob_writes_are_driver_fenced() {
         .unwrap();
     assert_eq!(raw.streams().len("log").await.unwrap(), 0);
 
-    let (b, _fence, leases) = paused_holder(&shared()).await;
+    let backend = shared();
+    let (b, _fence, leases) = paused_holder(&backend.backend).await;
     let scoped = b.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     leases.armed.store(true, Ordering::SeqCst);
     assert!(scoped.blobs().put("k", b"x".to_vec(), None).await.is_err());
@@ -450,7 +452,7 @@ async fn a_checked_batch_reaches_the_driver_through_the_fenced_view() {
 #[tokio::test]
 async fn fenced_blobs_forward_expiry_and_capabilities() {
     let backend = shared();
-    let node = Node::new("node-a", &backend);
+    let node = Node::new("node-a", &backend.backend);
     node.take("alice").await;
     let scoped = node.scoped("profile:alice");
 
@@ -459,7 +461,7 @@ async fn fenced_blobs_forward_expiry_and_capabilities() {
     assert!(!blobs.capabilities().contains(Capability::PresignedUrls));
     assert_eq!(
         blobs.max_key_len(),
-        backend
+        backend.backend
             .for_scope(&Scope::new("profile:alice").unwrap())
             .unwrap()
             .blobs()
@@ -486,7 +488,10 @@ async fn fenced_blobs_forward_expiry_and_capabilities() {
 #[tokio::test]
 async fn expiring_blob_writes_are_fenced() {
     let backend = shared();
-    let (a, b) = (Node::new("node-a", &backend), Node::new("node-b", &backend));
+    let (a, b) = (
+        Node::new("node-a", &backend.backend),
+        Node::new("node-b", &backend.backend),
+    );
     a.take("alice").await;
     b.set_clock(TTL.as_millis() as u64 + 1);
     b.take("alice").await;
@@ -498,7 +503,7 @@ async fn expiring_blob_writes_are_fenced() {
         .put_expiring("k", b"x".to_vec(), None, Duration::from_secs(60))
         .await
         .is_err());
-    assert!(backend
+    assert!(backend.backend
         .for_scope(&Scope::new("alice~default").unwrap())
         .unwrap()
         .blobs()
@@ -532,5 +537,6 @@ async fn conditional_append_passes_through(inner: Arc<dyn StorageBackend>) {
 
 #[tokio::test]
 async fn fenced_memory_backend_passes_conditional_appends_through() {
-    conditional_append_passes_through(shared()).await;
+    let backend = shared();
+    conditional_append_passes_through(Arc::clone(&backend.backend)).await;
 }
