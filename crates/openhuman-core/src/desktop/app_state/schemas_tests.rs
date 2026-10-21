@@ -1,5 +1,62 @@
 use super::*;
-use crate::core::all::{assert_schema_controller_parity, expect_schema_identity};
+use crate::core::all::{
+    assert_schema_controller_parity, expect_schema_identity, ControllerHandler,
+    ControllerParamContract,
+};
+
+#[test]
+fn legacy_handlers_keep_their_identity_and_order() {
+    let expected: [(&str, ControllerHandler); 2] = [
+        ("snapshot", handle_snapshot),
+        ("update_local_state", handle_update_local_state),
+    ];
+    let controllers = all_app_state_registered_controllers();
+    assert_eq!(controllers.len(), expected.len());
+    for ((function, handler), controller) in expected.iter().zip(&controllers) {
+        assert_eq!(controller.schema.namespace, "app_state");
+        assert_eq!(controller.schema.function, *function);
+        assert!(std::ptr::fn_addr_eq(controller.handler, *handler));
+    }
+}
+
+pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
+    use serde_json::json;
+
+    vec![
+        ControllerParamContract {
+            method: "app_state.snapshot",
+            required: &[],
+            optional: &[],
+            examples: vec![json!({})],
+        },
+        ControllerParamContract {
+            method: "app_state.update_local_state",
+            required: &[],
+            optional: &["encryptionKey", "onboardingTasks", "keyringConsent"],
+            examples: vec![
+                json!({}),
+                json!({
+                    "encryptionKey": null,
+                    "onboardingTasks": null,
+                    "keyringConsent": null
+                }),
+                json!({
+                    "encryptionKey": "  keep whitespace  ",
+                    "onboardingTasks": {
+                        "accessibilityPermissionGranted": false,
+                        "enabledTools": [],
+                        "connectedSources": [],
+                        "updatedAtMs": null
+                    },
+                    "keyringConsent": {
+                        "storageMode": "",
+                        "consentedAtMs": null
+                    }
+                }),
+            ],
+        },
+    ]
+}
 
 #[test]
 fn app_state_schema_contracts_and_registration_are_preserved() {

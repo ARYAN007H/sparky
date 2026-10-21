@@ -39,6 +39,11 @@ pub fn all_app_state_registered_controllers() -> Vec<RegisteredController> {
     ]
 }
 
+#[cfg(test)]
+pub(crate) fn app_state_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::parameter_contracts()
+}
+
 pub fn app_state_schemas(function: &str) -> ControllerSchema {
     match function {
         "snapshot" => ControllerSchema {
