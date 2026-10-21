@@ -216,6 +216,8 @@ pub(crate) async fn run_subagent_direct_with_native_context(
                 attempted_depth: parent_depth.saturating_add(1),
                 max_depth,
             })?;
+        let nested_spawn_depth_available =
+            RunConfig::checked_child_depth(attempted_depth, max_depth).is_ok();
         options.run_context.spawn_depth = attempted_depth;
         // Acts on memory as a child of its parent: same team, own definition.
         let acting = options.run_context.memory_identity.take().unwrap_or_default();
@@ -476,13 +478,26 @@ async fn run_typed_mode(
             .or(definition.skill_filter.as_deref()),
     );
 
-    // Sub-agents must never spawn their own sub-agents. Strip `spawn_subagent`
-    // and every synthesised `delegate_*` tool regardless of the archetype's
-    // declared scope.
+    // Sub-agents are leaves unless their own definition explicitly declares a
+    // spawn tool, and the host's checked depth budget admits another child.
+    // Keep the normal definition scope, denylist, and inherited ceiling as
+    // independent constraints on that opt-in.
+    let explicitly_declares_nested_spawn = |name: &str| {
+        is_subagent_spawn_tool(name)
+            && (definition.extra_tools.iter().any(|tool| tool == name)
+                || matches!(
+                    &definition.tools,
+                    tinyagents_definition::ToolScope::Named(names)
+                        if names.iter().any(|tool| tool == name)
+                ))
+    };
+    let nested_spawn_allowed = |name: &str| {
+        nested_spawn_depth_available && explicitly_declares_nested_spawn(name)
+    };
     let before = allowed_indices.len();
     allowed_indices.retain(|&i| {
         let name = parent.all_tools[i].name();
-        !is_subagent_spawn_tool(name)
+        !is_subagent_spawn_tool(name) || nested_spawn_allowed(name)
     });
     let stripped = before - allowed_indices.len();
     if stripped > 0 {
@@ -500,7 +515,7 @@ async fn run_typed_mode(
             if definition.extra_tools.iter().any(|n| n == name)
                 && !allowed_indices.contains(&i)
                 && !crate::tools::rules::glob_list_matches(&definition.disallowed_tools, name)
-                && !is_subagent_spawn_tool(name)
+                && (!is_subagent_spawn_tool(name) || nested_spawn_allowed(name))
             {
                 allowed_indices.push(i);
             }
