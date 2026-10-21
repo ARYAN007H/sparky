@@ -90,11 +90,16 @@ pub(super) fn resolve_cloud_slug_for<'a>(
                 );
             }
             Err(tinyinference_llm::providers::registry::SlugModelError::NoConcreteDefault) => {
+                let requested_model = if model.trim().is_empty() {
+                    entry.default_model.as_deref().unwrap_or_default()
+                } else {
+                    model
+                };
                 anyhow::bail!(
                     "[chat-factory] model '{}' is an abstract tier for role '{}', \
                      but cloud provider slug '{}' has no concrete default_model configured. \
-                     Set cloud_providers[].default_model to a provider-native model id.",
-                    model,
+                     Set cloud_providers[].default_model to a provider-native model id (e.g. deepseek-v4-pro).",
+                    requested_model,
                     role,
                     slug
                 );
