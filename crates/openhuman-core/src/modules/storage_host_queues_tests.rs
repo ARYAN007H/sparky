@@ -7,7 +7,8 @@ use super::*;
 use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 use tinybus::Connection;
-use tinystoragedrivers::queue::{NewMessage, QueueManifest, QueueSpec};
+use crate::modules::storage_queue_manifest::QueueManifest;
+use tinystoragedrivers_types::{NewMessage, QueueSpec};
 use tinystoragedrivers::ErrorKind;
 
 fn manifest() -> Arc<QueueManifest> {
