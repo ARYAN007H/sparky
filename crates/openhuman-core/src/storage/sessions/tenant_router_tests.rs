@@ -64,6 +64,11 @@ async fn the_same_agent_key_is_isolated_between_operator_and_profile_scopes() {
         agent: Some("asha".into()),
     });
     let profile = router.for_agent(&profile_key);
+    let escaped_key = crate::core::runtime::session_key(&crate::core::runtime::Tenant {
+        profile: Some("a~b%c".into()),
+        agent: Some("asha".into()),
+    });
+    let escaped_profile = router.for_agent(&escaped_key);
 
     operator
         .kv
@@ -75,6 +80,11 @@ async fn the_same_agent_key_is_isolated_between_operator_and_profile_scopes() {
         .put("scope-test", "owner", serde_json::json!("alice"))
         .await
         .unwrap();
+    escaped_profile
+        .kv
+        .put("scope-test", "owner", serde_json::json!("escaped"))
+        .await
+        .unwrap();
 
     assert_eq!(
         operator.kv.get("scope-test", "owner").await.unwrap(),
@@ -83,5 +93,13 @@ async fn the_same_agent_key_is_isolated_between_operator_and_profile_scopes() {
     assert_eq!(
         profile.kv.get("scope-test", "owner").await.unwrap(),
         Some(serde_json::json!("alice"))
+    );
+    assert_eq!(
+        escaped_profile
+            .kv
+            .get("scope-test", "owner")
+            .await
+            .unwrap(),
+        Some(serde_json::json!("escaped"))
     );
 }

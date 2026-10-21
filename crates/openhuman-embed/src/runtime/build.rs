@@ -159,6 +159,11 @@ impl RuntimeBuilder {
         // build cannot undo (the stored API key, the host memory engine), so
         // a refused controller extension leaves neither behind. Restorable
         // seams are undone by this guard if the boot below fails.
+        let mut storage_info = super::StorageInfo::describe(
+            self.seams.storage.as_ref(),
+            config.as_ref().unwrap_or(&Config::default()),
+            self.seams.storage_driver.as_deref(),
+        );
         let mut host_seams = std::mem::take(&mut self.seams);
         if host_seams.storage.is_none() {
             if let Some(config) = &config {
@@ -174,12 +179,8 @@ impl RuntimeBuilder {
         // storage seam, and removed with the runtime.
         if host_seams.storage.is_none() && matches!(self.workspace, Workspace::Stateless) {
             host_seams.storage = Some(super::StorageSource::Url("memory".into()));
+            storage_info = super::StorageInfo::url("backend", "memory");
         }
-        let mut storage_info = super::StorageInfo::describe(
-            host_seams.storage.as_ref(),
-            config.as_ref().unwrap_or(&Config::default()),
-            host_seams.storage_driver.as_deref(),
-        );
         validate_storage_feature(host_seams.storage.as_ref())?;
         host_seams
             .open_storage()

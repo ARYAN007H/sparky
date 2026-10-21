@@ -107,7 +107,7 @@ impl StorageInfo {
             },
         }
     }
-    fn url(source: &str, url: &str) -> Self {
+    pub(super) fn url(source: &str, url: &str) -> Self {
         let driver = openhuman_core::storage::StorageUrl::parse(url)
             .ok()
             .map(|u| u.driver().to_string());
