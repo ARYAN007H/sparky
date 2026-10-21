@@ -1,9 +1,7 @@
 use super::*;
 use std::{ops::Range, sync::Arc, time::Duration};
 use tinystoragedrivers_api::{BlobStore, Storage, StorageBackend};
-use tinystoragedrivers_types::{
-    Blob, BlobMeta, Capabilities, Result, Scope,
-};
+use tinystoragedrivers_types::{Blob, BlobMeta, Capabilities, Result, Scope};
 
 /// The TSD testkit memory engine uses its real clock; tests wait on the
 /// backend's observable expiry instead of mutating a process-global clock.
@@ -114,12 +112,10 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
 #[cfg(not(feature = "modules"))]
 #[test]
 fn no_module_blob_scopes_without_the_modules_feature() {
-    assert!(
-        crate::modules::expiring_blob_module_scopes(
-            &crate::core::runtime::DispatchCtx::host_default()
-        )
-        .is_empty()
-    );
+    assert!(crate::modules::expiring_blob_module_scopes(
+        &crate::core::runtime::DispatchCtx::host_default()
+    )
+    .is_empty());
 }
 
 #[tokio::test]
@@ -410,7 +406,7 @@ async fn orphan_sweep_stops_on_reference_error_after_preserving_prior_progress()
 async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
     use std::sync::Arc;
     use tinystoragedrivers_api::BlobStore;
-    use tinystoragedrivers_testkit::{Failing, FaultPlan, memory_storage};
+    use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 
     let storage = memory_storage(&Scope::local());
@@ -432,7 +428,7 @@ async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
 async fn orphan_sweep_stops_on_delete_error_after_preserving_prior_progress() {
     use std::sync::Arc;
     use tinystoragedrivers_api::BlobStore;
-    use tinystoragedrivers_testkit::{Failing, FaultPlan, memory_storage};
+    use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 
     let storage = memory_storage(&Scope::local());

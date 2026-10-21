@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 use std::path::Path;
 use std::sync::Arc;
 use tinyagents_harness::media::MediaOutput;
-use tinystoragedrivers::BlobStore;
+use tinystoragedrivers_api::BlobStore;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
 use super::{MediaArtifactTool, copy_blob_to_file, has_reusable_files_reference};
