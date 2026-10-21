@@ -1,10 +1,10 @@
 use super::*;
-use crate::storage::{MemoryStorage, Scope, StorageBackend};
+use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
 use chrono::{Duration, Utc};
 
 use super::super::types::TokenUsage;
 
-fn docs_in(storage: &MemoryStorage, scope: &str) -> CostDocs {
+fn docs_in(storage: &dyn StorageBackend, scope: &str) -> CostDocs {
     CostDocs::over(&storage.for_scope(&Scope::new(scope).unwrap()).unwrap())
 }
 
@@ -17,7 +17,8 @@ fn record(model: &str, cost: f64, secs_ago: i64) -> CostRecord {
 
 #[test]
 fn records_round_trip_oldest_first() {
-    let docs = docs_in(&MemoryStorage::new(), "local");
+    let storage = memory_backend();
+    let docs = docs_in(storage.as_ref(), "local");
     let newer = record("b/model", 0.5, 1);
     let older = record("a/model", 0.25, 60);
     docs.add(&newer).unwrap();
@@ -32,7 +33,8 @@ fn records_round_trip_oldest_first() {
 
 #[test]
 fn a_record_is_written_once() {
-    let docs = docs_in(&MemoryStorage::new(), "local");
+    let storage = memory_backend();
+    let docs = docs_in(storage.as_ref(), "local");
     let rec = record("a/model", 0.1, 0);
     docs.add(&rec).unwrap();
     assert!(docs.add(&rec).is_err());
