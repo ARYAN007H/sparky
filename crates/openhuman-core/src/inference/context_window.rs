@@ -123,7 +123,7 @@ fn route_input(
         tinyinference_local::profile::context_window_with_local_fallback(model, None, Some(kind))
     });
     route.discovery = match local_kind {
-        None => Some(match extensions {
+        None => match extensions {
             Some(extensions) => {
                 crate::inference::provider::factory::model_limits_request_for(
                     role, provider, model, config, extensions,
@@ -132,8 +132,7 @@ fn route_input(
             None => crate::inference::provider::factory::model_limits_request(
                 role, provider, model, config,
             ),
-        })
-        .flatten(),
+        },
         Some(LocalProviderKind::Ollama) => None,
         Some(_) => None,
     };

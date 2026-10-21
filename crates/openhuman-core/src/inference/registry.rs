@@ -229,6 +229,16 @@ pub fn provider_default_model(provider_id: &str) -> Option<String> {
     (hooks.default_model)()
 }
 
+/// The registered provider's default model selected by an explicit context,
+/// falling back to process registration when that context has no entry.
+pub(crate) fn provider_default_model_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+) -> Option<String> {
+    let hooks = chat_model_for(extensions, provider_id)?.models?;
+    (hooks.default_model)()
+}
+
 /// Default pricing supplied by the registered provider, if any.
 pub fn provider_default_pricing(provider_id: &str) -> Option<(String, f64, f64)> {
     let hooks = provider_model_hooks(provider_id)?;

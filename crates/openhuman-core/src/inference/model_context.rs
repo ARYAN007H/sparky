@@ -1,21 +1,12 @@
-//! Known model context-window sizes for pre-inference budgeting.
-//!
-//! Provider `/models` responses may include `context_length` / `context_window`,
-//! but the agent harness must enforce limits **before** the first dispatch —
-//! otherwise long histories produce upstream `400 Bad Request` errors when usage
-//! metadata is not yet available.
+//! Context-window projections and user-configured model capabilities.
 
-/// Resolve the context window (in tokens) for a model id or registered provider alias.
+/// Resolves a model-only context window using owner-provided static hints.
 ///
-/// Returns the static model estimate. Call [`context_window_for_route`] when
-/// the provider route is known; provider-discovered values are stored per
-/// route and model. Thread usage prefers its persisted per-turn value before
-/// consulting either lookup.
-///
-/// Returns `None` when the model is unknown — callers should skip pre-dispatch
-/// trimming rather than guess.
+/// This projection uses an empty route identity so it cannot borrow provider
+/// discovery from an unrelated endpoint. Returns `None` when no owner or
+/// managed-provider hint is available.
 pub fn context_window_for_model(model: &str) -> Option<u64> {
-    static_context_window_for_model(model)
+    crate::inference::context_window::project_context_window_for_model(model, None).window
 }
 
 /// Resolve the synchronous window for a model on a specific provider route.
@@ -24,79 +15,20 @@ pub(crate) fn context_window_for_route(
     model: &str,
     config: &crate::config::Config,
 ) -> Option<u64> {
-    crate::inference::context_window::config_override(model, config)
-        .or_else(|| crate::inference::context_window::remembered_window(provider, model))
-        .or_else(|| static_context_window_for_model(model))
+    crate::inference::context_window::project_context_window("chat", provider, model, config).window
 }
 
-/// The static guess for a model's window: provider metadata, then the cost catalog,
-/// then the generic id-pattern hints. These never override a provider-reported
-/// window; [`crate::inference::context_window`] consults them last.
+/// Projects static owner hints for a model without a provider route.
 pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
-    static_context_window_for_model_with_provider_window(
-        model,
-        crate::inference::registry::provider_model_context_window(
-            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-            model.trim(),
-        ),
-    )
+    crate::inference::context_window::project_context_window_for_model(model, None).window
 }
 
-/// Context-aware counterpart used when a dispatch carries its own provider
-/// registry. An empty context does not borrow model metadata from ambient work.
+/// Context-aware counterpart for a dispatch with its own provider registry.
 pub(crate) fn static_context_window_for_model_in(
     extensions: Option<&crate::core::slots::Extensions>,
     model: &str,
 ) -> Option<u64> {
-    static_context_window_for_model_with_provider_window(
-        model,
-        crate::inference::registry::provider_model_context_window_for(
-            extensions,
-            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-            model.trim(),
-        ),
-    )
-}
-
-fn static_context_window_for_model_with_provider_window(
-    model: &str,
-    provider_window: Option<u64>,
-) -> Option<u64> {
-    let normalized = model.trim();
-    if normalized.is_empty() {
-        return None;
-    }
-
-    if let Some(window) = provider_window {
-        return Some(window);
-    }
-
-    // Keep conservative estimates for generic small-model ids.
-    if normalized.starts_with("gemma") || normalized.contains(":1b") || normalized.contains("270m")
-    {
-        return Some(8_192);
-    }
-
-    if let Some(price) = tinyagents_registry::pricing::lookup(normalized) {
-        tracing::debug!(
-            model = normalized,
-            catalog_model = price.model_id,
-            context_window = price.context_window,
-            "[model_context] matched cost catalog row"
-        );
-        return Some(u64::from(price.context_window));
-    }
-
-    if let Some(window) = tinyinference_llm::model::context_window_for_model_id(normalized) {
-        tracing::debug!(
-            model = normalized,
-            context_window = window,
-            "[model_context] matched tinyagents model context hint"
-        );
-        return Some(window);
-    }
-
-    None
+    crate::inference::context_window::project_context_window_for_model(model, extensions).window
 }
 
 /// Whether the model resolved for a chat hint/agent/profile accepts image input

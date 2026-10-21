@@ -58,6 +58,14 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
             }),
         },
     );
+    assert_eq!(
+        crate::inference::registry::provider_default_model_for(
+            Some(&extensions),
+            "scoped-provider"
+        )
+        .as_deref(),
+        Some("scoped/model")
+    );
     let context = crate::core::runtime::CoreContext::for_test_with_extensions(
         crate::core::runtime::DomainSet::full(),
         None,
