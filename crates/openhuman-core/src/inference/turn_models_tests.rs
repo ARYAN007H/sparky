@@ -215,7 +215,7 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
                     model
                         .filter(|model| !model.starts_with("hint:"))
                         .map(str::to_string)
-                        .or_else(|| config.default_model.clone())
+                        .or_else(|| config.config.default_model.clone())
                         .or_else(|| Some("fixture/managed-default".into()))
                 }),
                 context_window: Arc::new(|_| None),

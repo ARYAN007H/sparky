@@ -505,10 +505,9 @@ pub async fn probe_inference_readiness(
         log::debug!("[flows][inference-probe] role={role} managed provider registered no probe");
         return Ok(());
     };
-    let provider_context = crate::inference::registry::ProviderContext {
-        config: config.clone(),
-        egress: crate::security::egress::EgressLedger::none(),
-    };
+    let provider_context = crate::inference::registry::ProviderContext::new(
+        config, &crate::security::egress::EgressLedger::none(),
+    );
     let model_id = entry
         .models
         .as_ref()

@@ -110,7 +110,7 @@ fn install_suggestions_model_fixture() {
                 resolve_model: Arc::new(|_, config, model| {
                     model
                         .map(str::to_string)
-                        .or_else(|| config.default_model.clone())
+                        .or_else(|| config.config.default_model.clone())
                         .or_else(|| Some("fixture/suggestions".to_string()))
                 }),
                 context_window: Arc::new(|_| None),

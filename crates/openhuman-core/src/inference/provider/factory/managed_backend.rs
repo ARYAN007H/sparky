@@ -67,7 +67,7 @@ pub(super) fn managed_chat_model_for(
         return Err(managed_unavailable_error());
     };
     let model = match entry.models.as_ref() {
-        Some(models) => (models.resolve_model)(role, &crate::inference::registry::ProviderContext { config: config.clone(), egress: egress.clone() }, model_override),
+        Some(models) => (models.resolve_model)(role, &crate::inference::registry::ProviderContext::new(config, egress), model_override),
         None => model_override
             .or(config.default_model.as_deref())
             .map(str::trim)
@@ -82,10 +82,7 @@ pub(super) fn managed_chat_model_for(
         egress,
         crate::security::egress::EgressDescriptor::inference("openhuman", &model, true),
     );
-    let context = crate::inference::registry::ProviderContext {
-        config: config.clone(),
-        egress: egress.clone(),
-    };
+    let context = crate::inference::registry::ProviderContext::new(config, egress);
     let request = crate::inference::registry::ChatModelRequest {
         role,
         model_override: Some(&model),
@@ -186,10 +183,7 @@ pub(crate) fn make_openhuman_backend_model_for_options(
     }
     config.secrets.encrypt = options.secrets_encrypt;
     let egress = EgressLedger::none();
-    let context = crate::inference::registry::ProviderContext {
-        config: config.clone(),
-        egress,
-    };
+    let context = crate::inference::registry::ProviderContext::new(&config, &egress);
     let request = crate::inference::registry::ChatModelRequest {
         role: "delegate",
         model_override: Some(model),

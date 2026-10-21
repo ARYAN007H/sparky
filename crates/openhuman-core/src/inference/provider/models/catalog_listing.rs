@@ -158,7 +158,7 @@ pub async fn list_configured_models_from_config(
         ) {
             Some(catalog) => {
                 let request = catalog_request(config, Some(&entry))?;
-                run_registered_catalog(PROVIDER_OPENHUMAN, config, request, catalog).await
+                run_registered_catalog(crate::inference::provider::factory::PROVIDER_OPENHUMAN, config, request, catalog).await
             }
             None => Ok(no_managed_catalog()),
         };

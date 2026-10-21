@@ -41,7 +41,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ChatModelEntry {
-            build: Arc::new(|_| Err(anyhow::anyhow!("test factory"))),
+            build: Arc::new(|_| panic!("metadata-only provider entry")),
             probe: None,
             models: Some(ProviderModelMetadata {
                 default_model: Arc::new(|| Some("scoped/model".to_string())),

@@ -55,7 +55,7 @@ async fn managed_construction_ledger_collapses_repeat_disclosures() {
                         .map(str::trim)
                         .filter(|model| !model.is_empty() && !model.starts_with("hint:"))
                         .map(str::to_string)
-                        .or_else(|| config.default_model.clone())
+                        .or_else(|| config.config.default_model.clone())
                 }),
                 context_window: Arc::new(|_| None),
                 default_pricing: Arc::new(|| None),

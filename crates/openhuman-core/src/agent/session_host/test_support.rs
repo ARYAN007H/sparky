@@ -31,7 +31,7 @@ fn model_fixture_entry() -> ChatModelEntry<ProviderContext> {
             let model = request
                 .model_override
                 .or(request.default_model)
-                .or(request.context.config.default_model.as_deref())
+                .or(request.context.config.config.default_model.as_deref())
                 .unwrap_or("test/session-fixture");
             Ok((Arc::new(SessionFixtureModel), model.to_string()))
         }),
@@ -67,7 +67,7 @@ fn model_fixture_entry() -> ChatModelEntry<ProviderContext> {
                     .map(|hint_role| {
                         if hint_role == "chat" {
                             config
-                                .default_model
+                                .config.default_model
                                 .as_deref()
                                 .filter(|configured| !configured.starts_with("hint:"))
                                 .map(str::to_string)
@@ -77,7 +77,7 @@ fn model_fixture_entry() -> ChatModelEntry<ProviderContext> {
                         }
                     }),
                 None if role == "agentic" => Some("test/session-fixture".into()),
-                None => match config.default_model.as_deref() {
+                None => match config.config.default_model.as_deref() {
                     Some("fixture-reasoning") => Some("test/selected-reasoning".into()),
                     Some(model) => Some(model.to_string()),
                     None => Some("test/session-fixture".into()),

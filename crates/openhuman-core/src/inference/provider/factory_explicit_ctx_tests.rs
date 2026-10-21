@@ -20,10 +20,10 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
                     name.to_string(),
                 ))
             }),
-            probe: Some(Arc::new(move |_, model, _| {
+            probe: Some(Arc::new(move |request| {
                 let actual = probed.clone();
                 Box::pin(async move {
-                    assert_eq!(model, name);
+                    assert_eq!(request.model, name);
                     actual.store(true, Ordering::SeqCst);
                     Ok(())
                 })

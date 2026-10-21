@@ -1,5 +1,6 @@
 use super::*;
 use tinyinference_llm::model::ChatModel;
+use tinyinference_llm::model::discover::DiscoveryRequest;
 use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
     create_chat_model_from_string, make_openhuman_backend_model_for_thread, PROVIDER_OPENHUMAN,
@@ -51,7 +52,7 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry<ProviderContext> {
                 Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
                 Some(_) => None,
                 None => config
-                    .default_model
+                    .config.default_model
                     .clone()
                     .or_else(|| Some("host/fake-default".to_string())),
             }),

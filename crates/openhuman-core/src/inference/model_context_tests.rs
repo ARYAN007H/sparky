@@ -109,7 +109,7 @@ fn model_supports_vision_uses_the_scoped_provider_capability_hook() {
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ChatModelEntry {
-            build: Arc::new(|_| Err(anyhow::anyhow!("test factory"))),
+            build: Arc::new(|_| panic!("metadata-only provider entry")),
             probe: None,
             models: Some(ProviderModelMetadata {
                 default_model: Arc::new(|| None),
