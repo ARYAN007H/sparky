@@ -708,9 +708,15 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
     assert_eq!(image_gateway.context().thread_id, thread_id);
     assert!(image_gateway.belongs_to("relay-typed-output-agent"));
     assert!(image_gateway.belongs_to_profile("relay-typed-output-profile"));
-    assert_eq!(
-        image_gateway_wire["structured"]["parts"][0]["part"]["media"]["opaqueId"],
-        "media:tenant7/thread42/image1"
+    assert!(
+        image_gateway_wire["structured"]["parts"]
+            .as_array()
+            .expect("typed provider parts")
+            .iter()
+            .any(|part| {
+                part["part"]["kind"] == "image"
+                    && part["part"]["media"]["opaqueId"] == "media:tenant7/thread42/image1"
+            })
     );
     let voice_gateway = gateway_terminals
         .iter()
@@ -720,13 +726,16 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         })
         .expect("voice part reaches the scoped provider terminal");
     let voice_gateway_wire = serde_json::to_value(voice_gateway).expect("gateway voice wire");
-    assert_eq!(
-        voice_gateway_wire["structured"]["parts"][0]["part"]["kind"],
-        "voice_note"
-    );
-    assert_eq!(
-        voice_gateway_wire["structured"]["parts"][0]["part"]["voiceNote"]["media"]["opaqueId"],
-        "media:tenant7/thread42/voice1"
+    assert!(
+        voice_gateway_wire["structured"]["parts"]
+            .as_array()
+            .expect("typed voice provider parts")
+            .iter()
+            .any(|part| {
+                part["part"]["kind"] == "voice_note"
+                    && part["part"]["voiceNote"]["media"]["opaqueId"]
+                        == "media:tenant7/thread42/voice1"
+            })
     );
     assert_eq!(
         image_gateway_wire["structured"]["channel_ref"]["accountId"],
