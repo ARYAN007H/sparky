@@ -487,7 +487,10 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         origins: Arc::new(Mutex::new(Vec::new())),
     });
     let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
-    let mut ctx = context(Arc::clone(&channel), config(&tmp, Some("teeny-chat")));
+    let mut channel_config = config(&tmp, Some("teeny-chat"));
+    channel_config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    channel_config.modules.allow_download = false;
+    let mut ctx = context(Arc::clone(&channel), channel_config);
     Arc::get_mut(&mut ctx)
         .expect("the test owns the runtime context")
         .message_timeout_secs = timeout;
