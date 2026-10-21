@@ -177,6 +177,22 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         async move { openhuman_core::storage::open(&archive_url).await },
     )
     .expect("archived historical database must remain readable");
+    let target_url = format!("sqlite:{}", profile.join("storage.db").display());
+    let target_backend = openhuman_core::storage::block_on(async move {
+        openhuman_core::storage::open(&target_url).await
+    })
+    .unwrap();
+    for name in ["local", "profile:u1"] {
+        let scope = openhuman_core::storage::Scope::new(name).unwrap();
+        let scoped = target_backend.for_scope(&scope).unwrap();
+        let rows = openhuman_core::storage::block_on(async move {
+            scoped
+                .documents()
+                .query_all("conversations.threads", &tinystoragedrivers::Query::all())
+                .await
+        });
+        eprintln!("target thread rows in {name}: {rows:?}");
+    }
 
     // The profile's V2 workspace resolves its default backend to the exact
     // storage.db that desktop boot just opened.
