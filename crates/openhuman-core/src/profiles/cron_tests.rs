@@ -86,7 +86,7 @@ async fn hosted_memory_cron_sweep_child() {
     let registry = crate::storage::fence::registry();
     let backend: Arc<dyn crate::storage::StorageBackend> =
         Arc::new(crate::storage::fenced_backend::FencedBackend::new(
-            Arc::new(crate::storage::MemoryStorage::new()),
+            crate::storage::test_support::memory_backend(),
             Arc::clone(&registry),
         ));
     let _storage = RestoreInstalledStorage(crate::storage::install(backend));

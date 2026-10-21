@@ -545,7 +545,7 @@ async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
     let registry = crate::storage::fence::registry();
     let backend: Arc<dyn crate::storage::StorageBackend> =
         Arc::new(crate::storage::fenced_backend::FencedBackend::new(
-            Arc::new(crate::storage::MemoryStorage::new()),
+            crate::storage::test_support::memory_backend(),
             Arc::clone(&registry),
         ));
     let _storage = RestoreInstalledStorage(crate::storage::install(backend));
@@ -613,7 +613,7 @@ async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
     let registry = crate::storage::fence::registry();
     let backend: Arc<dyn crate::storage::StorageBackend> =
         Arc::new(crate::storage::fenced_backend::FencedBackend::new(
-            Arc::new(crate::storage::MemoryStorage::new()),
+            crate::storage::test_support::memory_backend(),
             Arc::clone(&registry),
         ));
     let _storage = RestoreInstalledStorage(crate::storage::install(backend));
