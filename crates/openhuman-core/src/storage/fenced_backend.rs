@@ -60,7 +60,10 @@ impl FencedBackend {
         }
     }
 
-    fn condition_for(&self, scope: &Scope) -> Result<Option<WriteCondition>, StorageError> {
+    fn condition_for(
+        &self,
+        scope: &Scope,
+    ) -> Result<Option<(Arc<LeaseFence>, WriteCondition)>, StorageError> {
         let fence = if let Some(captured) = &self.captured {
             if !captured.covers(scope.as_str()) {
                 return Err(StorageError::backend(
@@ -84,11 +87,12 @@ impl FencedBackend {
                     .map_or_else(super::fence::system_now_ms, |registry| registry.now_ms()),
             )
             .map_err(|error| error.into_storage())?;
-        fence.write_condition().map(Some).ok_or_else(|| {
+        let condition = fence.write_condition().ok_or_else(|| {
             StorageError::backend(
                 "profile lease has no atomic storage condition; refusing unguarded handles",
             )
-        })
+        })?;
+        Ok(Some((fence, condition)))
     }
 }
 
@@ -104,7 +108,14 @@ impl StorageBackend for FencedBackend {
 
     fn for_scope(&self, scope: &Scope) -> Result<Storage, StorageError> {
         match self.condition_for(scope)? {
-            Some(condition) => self.inner.for_scope_conditioned(scope, &condition),
+            Some((fence, condition)) => {
+                let storage = self.inner.for_scope_conditioned(scope, &condition)?;
+                Ok(super::fenced_ports::wrap(
+                    storage,
+                    fence,
+                    Arc::clone(self.registry.as_ref().expect("fenced backend has a clock")),
+                ))
+            }
             None => self.inner.for_scope(scope),
         }
     }
@@ -115,9 +126,16 @@ impl StorageBackend for FencedBackend {
         condition: &WriteCondition,
     ) -> Result<Storage, StorageError> {
         match self.condition_for(scope)? {
-            Some(fence) => self
-                .inner
-                .for_scope_conditioned(scope, &fence.and(condition.clone())?),
+            Some((fence, profile_condition)) => {
+                let storage = self
+                    .inner
+                    .for_scope_conditioned(scope, &profile_condition.and(condition.clone())?)?;
+                Ok(super::fenced_ports::wrap(
+                    storage,
+                    fence,
+                    Arc::clone(self.registry.as_ref().expect("fenced backend has a clock")),
+                ))
+            }
             None => self.inner.for_scope_conditioned(scope, condition),
         }
     }
