@@ -23,8 +23,12 @@ fn envelope_carries_resume_handles_and_question() {
         "envelope: {env}"
     );
     assert!(
-        env.to_lowercase().contains("do not re-spawn"),
-        "envelope must forbid re-spawn: {env}"
+        env.contains("This resumes the existing child"),
+        "envelope must resume the existing child: {env}"
+    );
+    assert!(
+        env.contains("do not choose a new task_key"),
+        "envelope must keep the original task key: {env}"
     );
     // Delimited so the orchestrator can parse the handles out.
     assert!(env.contains("[SUBAGENT_AWAITING_USER]"), "envelope: {env}");
@@ -155,8 +159,8 @@ fn a_repaused_subagent_gets_the_same_injection_safe_envelope() {
         // carries the #4291 anti-respawn instruction on every pause, first or
         // nth, persisted or not.
         assert!(
-            env.to_lowercase().contains("do not re-spawn"),
-            "every pause envelope must forbid re-spawn (checkpointed={checkpointed}): {env}"
+            env.contains("This resumes the existing child"),
+            "every pause envelope must resume the existing child (checkpointed={checkpointed}): {env}"
         );
     }
 }
