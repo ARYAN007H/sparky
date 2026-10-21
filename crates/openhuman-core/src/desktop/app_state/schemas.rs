@@ -116,11 +116,7 @@ fn handle_update_local_state(ctx: DispatchCtx, params: Map<String, Value>) -> Co
 }
 
 fn snapshot_controller() -> BoundRegisteredController {
-    BoundRegisteredController::typed(
-        app_state_schemas("snapshot"),
-        parse_snapshot,
-        run_snapshot,
-    )
+    BoundRegisteredController::typed(app_state_schemas("snapshot"), parse_snapshot, run_snapshot)
 }
 
 fn update_local_state_controller() -> BoundRegisteredController {

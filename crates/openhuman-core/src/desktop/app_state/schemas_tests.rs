@@ -3,6 +3,7 @@ use crate::core::all::{
     assert_schema_controller_parity, expect_schema_identity, ControllerHandler,
     ControllerParamContract,
 };
+use serde_json::json;
 
 #[test]
 fn legacy_handlers_keep_their_identity_and_order() {
@@ -201,6 +202,49 @@ fn update_local_state_patch_preserves_array_to_struct_defaults() {
     let consent = patch.keyring_consent.as_ref().unwrap().as_ref().unwrap();
     assert_eq!(consent.storage_mode, "");
     assert_eq!(consent.consented_at_ms, None);
+}
+
+async fn runtime_app_state_entries() -> Vec<crate::core::all::ControllerEntry> {
+    use crate::core::runtime::{CoreContext, DomainSet};
+
+    CoreContext::scope(CoreContext::for_test(DomainSet::full(), None), async {
+        crate::core::all::all_registered_controllers()
+            .into_iter()
+            .filter(|entry| entry.schema.namespace == "app_state")
+            .collect()
+    })
+    .await
+}
+
+#[tokio::test]
+async fn update_local_state_rejects_malformed_params_before_loading_config() {
+    use crate::config::test_env::EnvVarGuard;
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir(tmp.path().join("config.toml")).unwrap();
+    let _env = EnvVarGuard::workspace_async(tmp.path()).await;
+    let entries = runtime_app_state_entries().await;
+    let update = entries
+        .iter()
+        .find(|entry| entry.schema.method_name() == "app_state.update_local_state")
+        .expect("runtime app_state.update_local_state entry");
+
+    let error = update
+        .invoke(
+            DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None)),
+            Map::from_iter([("encryptionKey".into(), json!(false))]),
+        )
+        .await
+        .expect_err("malformed parameters stop before app-state persistence loads config");
+    assert!(
+        error.starts_with("invalid params:"),
+        "update parser error takes precedence over config loading: {error}"
+    );
+    assert!(
+        !error.contains("config.toml"),
+        "the operation config loader was not reached: {error}"
+    );
 }
 
 fn parse_update(value: serde_json::Value) -> Result<StoredAppStatePatch, String> {
