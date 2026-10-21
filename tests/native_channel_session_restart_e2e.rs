@@ -677,7 +677,54 @@ async fn wait_for_completion(state: &MockState, count: usize) {
 fn assert_model_received_typed_image(request: &Value) {
     use base64::Engine as _;
     let content = last_user_content(request).expect("image user content is present");
-    let image = find_block_type(content, "image_url").expect("image is a typed image block");
+    let image = find_block_type(content, "image_url").unwrap_or_else(|| {
+        fn collect_shape(value: &Value, types: &mut Vec<String>, fields: &mut Vec<String>) {
+            match value {
+                Value::Array(items) => {
+                    for item in items {
+                        collect_shape(item, types, fields);
+                    }
+                }
+                Value::Object(fields) => {
+                    if let Some(kind) = fields.get("type").and_then(Value::as_str) {
+                        types.push(kind.to_owned());
+                    }
+                    for (name, item) in fields {
+                        fields.push(name.clone());
+                        collect_shape(item, types, fields);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let messages = request["messages"].as_array().expect("request messages");
+        let shapes = messages
+            .iter()
+            .enumerate()
+            .map(|(index, message)| {
+                let content = &message["content"];
+                let mut types = Vec::new();
+                let mut fields = Vec::new();
+                collect_shape(content, &mut types, &mut fields);
+                fields.sort();
+                fields.dedup();
+                let serialized = serde_json::to_string(content).unwrap_or_default();
+                format!(
+                    "message={index} role={} content_kind={} block_types={types:?} fields={fields:?} staged_ref={} image_data_url={}",
+                    message["role"].as_str().unwrap_or("unknown"),
+                    match content {
+                        Value::Array(_) => "array",
+                        Value::Object(_) => "object",
+                        Value::String(_) => "string",
+                        _ => "other",
+                    },
+                    serialized.contains("openhuman-staged://"),
+                    serialized.contains("data:image/")
+                )
+            })
+            .collect::<Vec<_>>();
+        panic!("image is missing from typed model content; safe request shape: {shapes:?}");
+    });
     let url = image["image_url"]["url"]
         .as_str()
         .expect("typed image carries a data URL");
