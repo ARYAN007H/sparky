@@ -303,6 +303,44 @@ async fn native_attachment_refs_are_bound_to_profile_agent_account_and_turn() {
 }
 
 #[tokio::test]
+async fn native_staged_file_reader_enforces_limit_and_rejects_symlinks() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("workspace");
+    let outside = temp.path().join("outside");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("small.txt"), b"small").unwrap();
+    std::fs::write(root.join("large.txt"), b"larger than bound").unwrap();
+
+    assert_eq!(
+        super::staged::read_staged_file_bounded(&root.join("small.txt"), &root, 16)
+            .await
+            .unwrap(),
+        b"small"
+    );
+    assert!(
+        super::staged::read_staged_file_bounded(&root.join("large.txt"), &root, 4)
+            .await
+            .unwrap_err()
+            .contains("configured byte limit")
+    );
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+
+        std::fs::write(&outside, b"outside workspace").unwrap();
+        symlink(&outside, root.join("swapped.txt")).unwrap();
+        assert!(super::staged::read_staged_file_bounded(
+            &root.join("swapped.txt"),
+            &root,
+            128,
+        )
+        .await
+        .is_err());
+    }
+}
+
+#[tokio::test]
 async fn multipart_claim_failure_keeps_prior_claim_owned_by_retry() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();

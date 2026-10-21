@@ -472,15 +472,58 @@ pub(crate) async fn read_authorized_native_attachment(
         .content_type
         .clone()
         .ok_or_else(|| "native attachment MIME is unavailable".to_owned())?;
-    let bytes = tokio::fs::read(path)
+    let root = tokio::fs::canonicalize(&workspace)
         .await
-        .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
+        .map_err(|_| "native attachment workspace is unavailable".to_owned())?;
+    let limit = native_attachment_byte_limit(&record.attachment.part, config)?;
+    let bytes = read_staged_file_bounded(&path, &root, limit).await?;
     validate_native_attachment_size(&record.attachment.part, bytes.len(), config)?;
     Ok(ResolvedNativeAttachment {
         path: entry.path.clone(),
         mime,
         bytes,
     })
+}
+
+fn native_attachment_byte_limit(
+    part: &ContentPart,
+    config: &crate::config::Config,
+) -> Result<usize, String> {
+    let is_image = matches!(part, ContentPart::Image { .. });
+    let mb = if is_image {
+        config.multimodal.effective_limits().1
+    } else {
+        config.multimodal_files.effective_limits().1
+    };
+    Ok(mb
+        .saturating_mul(1024 * 1024)
+        .min(tinychannels_bus::module_media::MEDIA_UPLOAD_MAX_BYTES))
+}
+
+async fn read_staged_file_bounded(
+    path: &std::path::Path,
+    root: &std::path::Path,
+    limit: usize,
+) -> Result<Vec<u8>, String> {
+    let file = crate::agent::attachments::secure_open(path, root)
+        .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
+    let metadata = file
+        .metadata()
+        .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
+    if !metadata.is_file() || metadata.len() > limit as u64 {
+        return Err("native attachment exceeds its configured byte limit".into());
+    }
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::from_std(file);
+    let mut bytes = Vec::new();
+    file.take(limit.saturating_add(1) as u64)
+        .read_to_end(&mut bytes)
+        .await
+        .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
+    if bytes.len() > limit {
+        return Err("native attachment exceeds its configured byte limit".into());
+    }
+    Ok(bytes)
 }
 
 fn validate_native_attachment_policy(

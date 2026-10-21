@@ -57,7 +57,11 @@ pub(crate) async fn configured_agent(
     );
     config.default_model = Some(route.model.clone());
     config.default_temperature = ctx.temperature;
-    config.multimodal_files = crate::config::MultimodalFileConfig::for_untrusted_channel_input();
+    // Keep the operator's actual count, MIME, and byte limits for the
+    // host-issued opaque media grants. External marker/path resolution remains
+    // disabled by the ExternalChannel attachment scope, and remote fetch stays
+    // off; the zero sentinel here would also reject these exact trusted refs.
+    config.multimodal_files.allow_remote_fetch = false;
     HostAgent::from_config(&dispatch, config, &agent_id).map_err(|error| error.to_string())
 }
 
