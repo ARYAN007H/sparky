@@ -109,12 +109,32 @@ async fn host_dispatch_preserves_thread_reply_and_reaction_targets() {
     .await;
     assert_eq!(
         reaction.sends.len(),
-        1,
-        "one reaction is sent: {:#?}",
-        reaction.sends
+        2,
+        "the acknowledgment and model reaction are both sent"
     );
-    assert_eq!(reaction.sends[0].content, "[REACTION:👍]");
-    assert_eq!(reaction.sends[0].thread_ts.as_deref(), Some("message-42"));
+    assert_eq!(
+        reaction
+            .sends
+            .iter()
+            .filter(|send| send.content == "[REACTION:👍]")
+            .count(),
+        1,
+        "the model reaction is sent once"
+    );
+    assert_eq!(
+        reaction
+            .sends
+            .iter()
+            .filter(|send| send.content.starts_with("[REACTION:") && send.content != "[REACTION:👍]")
+            .count(),
+        1,
+        "the acknowledgment is a distinct reaction"
+    );
+    assert!(reaction.sends.iter().all(|send| {
+        send.content.starts_with("[REACTION:")
+            && send.recipient == "reply"
+            && send.thread_ts.as_deref() == Some("message-42")
+    }));
     assert_eq!(reaction.model_calls.len(), 1);
     assert!(reaction.model_calls[0].text.contains("hello"));
 }
@@ -242,20 +262,28 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
         assert!(
             calls[0]
                 .iter()
-                .any(|(_, text)| text == "first thread message"),
+                .any(|(role, text)| {
+                    role == "user"
+                        && text.contains("You are responding via the \"discord\" channel")
+                        && text.ends_with("first thread message")
+                }),
             "first model call was: {:#?}",
             calls[0]
         );
         assert!(
             calls[1]
                 .iter()
-                .any(|(_, text)| text == "second thread message"),
+                .any(|(role, text)| {
+                    role == "user"
+                        && text.contains("You are responding via the \"discord\" channel")
+                        && text.ends_with("second thread message")
+                }),
             "second model call was: {:#?}",
             calls[1]
         );
         assert!(!calls[1]
             .iter()
-            .any(|(_, text)| text == "first thread message"));
+            .any(|(role, text)| role == "user" && text.contains("first thread message")));
     }
     assert_eq!(channel_state.sent_messages.lock().await.len(), 2);
 }
