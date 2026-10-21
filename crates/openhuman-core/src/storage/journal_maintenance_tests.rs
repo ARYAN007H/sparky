@@ -304,7 +304,7 @@ async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_wri
     let work = captured_profile_work(
         &host,
         vec![Arc::clone(&profile)],
-        super::fence::system_now_ms(),
+        crate::storage::fence::system_now_ms(),
     )
     .unwrap()
     .into_iter()
