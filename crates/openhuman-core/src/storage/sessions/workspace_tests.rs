@@ -88,6 +88,7 @@ fn the_ledger_serves_reads_from_async_and_sync_callers() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn an_unusable_workspace_degrades_to_an_in_memory_store() {
     // A path under a regular file cannot hold a storage directory, so the
     // default backend cannot open and the provider degrades rather than fails.

@@ -84,8 +84,13 @@ async fn opens_memory_and_refuses_garbage() {
     block_on(async move {
         docs.ensure_collection(&CollectionSpec::new("probe"))
             .await?;
-        docs.put("probe", "opened", serde_json::json!({"ok": true}), Precondition::Absent)
-            .await?;
+        docs.put(
+            "probe",
+            "opened",
+            serde_json::json!({"ok": true}),
+            Precondition::Absent,
+        )
+        .await?;
         assert_eq!(docs.get("probe", "opened").await?.unwrap().doc["ok"], true);
         Ok(())
     })
@@ -101,14 +106,10 @@ fn install_installed_and_clear() {
     assert!(slot.installed().is_none());
     let backend = test_support::memory_backend();
     assert!(slot.install(Arc::clone(&backend)).is_none());
-    assert!(
-        slot.installed()
-            .is_some_and(|got| Arc::ptr_eq(&got, &backend))
-    );
-    assert!(
-        slot.install(test_support::memory_backend())
-            .is_some()
-    );
+    assert!(slot
+        .installed()
+        .is_some_and(|got| Arc::ptr_eq(&got, &backend)));
+    assert!(slot.install(test_support::memory_backend()).is_some());
     assert!(slot.clear());
     assert!(!slot.clear());
 }
@@ -116,11 +117,9 @@ fn install_installed_and_clear() {
 #[test]
 fn agent_scopes_sit_under_the_local_tenant() {
     assert_eq!(scope_for_agent("agent-7").as_str(), "local/agent:agent-7");
-    assert!(
-        scope_for_agent("has a space")
-            .as_str()
-            .starts_with("local/agent:~")
-    );
+    assert!(scope_for_agent("has a space")
+        .as_str()
+        .starts_with("local/agent:~"));
 }
 
 #[test]
@@ -158,11 +157,9 @@ fn a_profile_scopes_storage_over_its_agents() {
     let odd = scope_for_profile("has a space");
     assert!(odd.as_str().starts_with("u:~"), "{odd}");
     assert_ne!(odd, scope_for_profile("has  a space"));
-    assert!(
-        scope_for_profile(&"x".repeat(400))
-            .as_str()
-            .starts_with("u:~")
-    );
+    assert!(scope_for_profile(&"x".repeat(400))
+        .as_str()
+        .starts_with("u:~"));
 }
 
 #[test]
@@ -236,12 +233,19 @@ fn only_mongodb_and_sqlite_have_cross_process_cas() {
 }
 
 #[tokio::test]
+#[cfg(all(feature = "storage-sqlite", feature = "storage-file"))]
 async fn local_drivers_do_not_claim_cross_process_cas() {
     let dir = tempfile::tempdir().unwrap();
     for (url, expected) in [
         ("memory".to_string(), false),
-        (format!("sqlite:{}", dir.path().join("cas.db").display()), true),
-        (format!("file:{}", dir.path().join("files").display()), false),
+        (
+            format!("sqlite:{}", dir.path().join("cas.db").display()),
+            true,
+        ),
+        (
+            format!("file:{}", dir.path().join("files").display()),
+            false,
+        ),
     ] {
         let backend = open(&url).await.unwrap();
         assert!(

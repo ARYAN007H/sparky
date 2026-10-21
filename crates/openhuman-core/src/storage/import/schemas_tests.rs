@@ -88,6 +88,7 @@ async fn run_import(workspace: Option<&std::path::Path>) -> Value {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn a_real_run_on_an_empty_configured_workspace_reports_each_domain() {
     let result = run_import(None).await;
     assert_eq!(result["dry_run"], Value::Bool(false), "{result:#}");
@@ -96,6 +97,7 @@ async fn a_real_run_on_an_empty_configured_workspace_reports_each_domain() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn a_real_run_on_an_overridden_workspace_opens_that_workspaces_backend() {
     let other = tempfile::TempDir::new().unwrap();
     let result = run_import(Some(other.path())).await;

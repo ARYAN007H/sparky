@@ -1,7 +1,7 @@
 use super::*;
 use crate::storage::{Scope, StorageBackend};
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::Arc;
 use tinystoragedrivers::CollectionSpec;
 use tinystoragedrivers_testkit::MemoryBackend;
 
@@ -199,11 +199,10 @@ fn a_legacy_marker_row_is_honoured_and_removed() {
             .await?
         );
         assert!(!done(&owned, "storage", &step_id("storage_import", "other@x")).await?);
-        assert!(
-            docs.query_all("storage_import", &tinystoragedrivers::Query::all())
-                .await?
-                .is_empty()
-        );
+        assert!(docs
+            .query_all("storage_import", &tinystoragedrivers::Query::all())
+            .await?
+            .is_empty());
         assert_eq!(migrate_legacy_markers(&owned).await?, 0);
         assert!(
             done(
@@ -240,8 +239,9 @@ fn a_waiting_process_runs_once_the_holder_releases() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn a_long_import_keeps_its_claim_alive() {
-    let repo = repo();
+    let (_dir, _backend, repo) = sqlite_repo();
     let now = chrono::Utc::now().timestamp_millis();
     let rival_repo = repo.clone();
     let rival_ran = with_claim_at(&repo, OWNER, "m", now, 90, |_| {

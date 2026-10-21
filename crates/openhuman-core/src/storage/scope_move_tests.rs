@@ -130,7 +130,8 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
 #[tokio::test]
 #[cfg(feature = "legacy-import")]
 async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
+    let fixture = crate::storage::test_support::sqlite_backend().unwrap();
+    let backend = Arc::clone(&fixture.backend);
     let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
         scopes: vec!["cluster".into()],
         documents: vec![

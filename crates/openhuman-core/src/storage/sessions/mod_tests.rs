@@ -247,9 +247,12 @@ fn the_per_workspace_store_recovers_nothing_at_install_time() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn each_workspace_keeps_its_sessions_in_its_own_database() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
+    crate::storage::local::use_persistent_default_for_test(first.path());
+    crate::storage::local::use_persistent_default_for_test(second.path());
     let in_first = provider_for_workspace(first.path()).for_agent("agent");
     let in_second = provider_for_workspace(second.path()).for_agent("agent");
 
@@ -276,8 +279,10 @@ fn started(thread: &str, request: &str) -> tinyagents_session::turn_state::TurnS
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn a_threads_turn_state_survives_a_restart_of_the_workspace_store() {
     let dir = tempfile::tempdir().unwrap();
+    crate::storage::local::use_persistent_default_for_test(dir.path());
     turn_states_for(dir.path())
         .put(&started("thread-1", "req-1"))
         .unwrap();
@@ -306,8 +311,10 @@ async fn a_threads_turn_state_survives_a_restart_of_the_workspace_store() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn a_stashed_attachment_survives_a_restart_of_the_workspace_store() {
     let dir = tempfile::tempdir().unwrap();
+    crate::storage::local::use_persistent_default_for_test(dir.path());
     let data_uri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     let stash = attachment_stash_for(dir.path()).expect("a stash for the default tenant");
     stash.write("att-1", data_uri).await.unwrap();
