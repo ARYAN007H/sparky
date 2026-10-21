@@ -58,9 +58,9 @@ jobs:
           test "$(git rev-parse HEAD^{tree})" = 2a1b033abc182301dd087448db8822812462fb4b
           test "$(git rev-parse HEAD:crates/openhuman-core/src/security/encryption/schemas.rs)" = 125bde450150e9da007e2093ec21cc7578c396dd
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
-          git submodule status --recursive > /tmp/encryption-proof-submodules-before.txt
-          if grep -Eq '^[+-U]' /tmp/encryption-proof-submodules-before.txt; then
-            cat /tmp/encryption-proof-submodules-before.txt
+          submodules="$(git submodule status --recursive)"
+          if grep -Eq '^[+-U]' <<< "$submodules"; then
+            printf '%s\n' "$submodules"
             echo "recursive submodules are not at their recorded pins"
             exit 1
           fi
@@ -94,6 +94,7 @@ jobs:
             printf 'build_filesystem=%s\n' "$(df -Pk . | tail -n 1)"
             printf 'build_command=TMPDIR=%s CARGO_BUILD_JOBS=1 RUST_MIN_STACK=33554432 bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json\n' "$TMPDIR"
           } > "$evidence/receipt.txt"
+          git submodule status --recursive > "$evidence/submodules-before-build.txt"
 
           build_json="$evidence/build.jsonl"
           build_stderr="$evidence/build.stderr"
@@ -115,7 +116,7 @@ jobs:
           test -z "$(git status --porcelain=v1 --untracked-files=all --ignore-submodules=none)"
           git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
           git submodule status --recursive > "$evidence/submodules-after-build.txt"
-          cmp /tmp/encryption-proof-submodules-before.txt "$evidence/submodules-after-build.txt"
+          cmp "$evidence/submodules-before-build.txt" "$evidence/submodules-after-build.txt"
 
           python3 - "$build_json" "$evidence/test-binary-path" "$evidence/compiler-fresh.txt" <<'PY'
           import json
