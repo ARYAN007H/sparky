@@ -173,16 +173,18 @@ pub use types::{LoadPolicy, ModuleRecord, ModuleSource, ModuleState, ModuleStatu
 pub async fn import_legacy_mcp(
     ctx: &crate::core::runtime::DispatchCtx,
     data_dir: &std::path::Path,
-) -> Result<String, String> {
+) -> Result<(), String> {
     #[cfg(all(feature = "modules", feature = "legacy-import"))]
     {
         match storage_import_tinymcp::import_legacy(ctx, data_dir).await {
             Ok(outcome) => {
-                let summary = format!("{outcome:?}");
-            log::debug!("[mcp] legacy storage import: {outcome:?}");
-            storage_grant_schemas::migrate_imported(ctx, storage_grant_schemas::tinymcp::MODULE_ID)
+                log::debug!("[mcp] legacy storage import: {outcome:?}");
+                storage_grant_schemas::migrate_imported(
+                    ctx,
+                    storage_grant_schemas::tinymcp::MODULE_ID,
+                )
                 .await;
-                Ok(summary)
+                Ok(())
             }
             Err(error) => {
                 log::warn!("[mcp] legacy storage import failed, will retry: {error:#}");
@@ -200,7 +202,7 @@ pub async fn import_legacy_mcp(
     #[cfg(not(feature = "modules"))]
     {
         let _ = (ctx, data_dir);
-        Ok("Unavailable".to_owned())
+        Ok(())
     }
 }
 
