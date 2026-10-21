@@ -291,11 +291,22 @@ pub async fn compare_and_swap(
     id: &str,
     change: impl Fn(&Value) -> Option<Value> + Send + Sync,
 ) -> Result<Option<Versioned<Value>>, StorageError> {
+    update_document(docs, collection, id, |current| Ok(change(current))).await
+}
+
+/// Applies a fallible transformation to an existing document under
+/// compare-and-swap. Returning `Ok(None)` declines the write.
+pub async fn update_document(
+    docs: &Arc<dyn DocumentStore>,
+    collection: &str,
+    id: &str,
+    mut change: impl FnMut(&Value) -> Result<Option<Value>, StorageError> + Send,
+) -> Result<Option<Versioned<Value>>, StorageError> {
     for _ in 0..32 {
         let Some(current) = docs.get(collection, id).await? else {
             return Ok(None);
         };
-        let Some(next) = change(&current.doc) else {
+        let Some(next) = change(&current.doc)? else {
             return Ok(None);
         };
         match docs

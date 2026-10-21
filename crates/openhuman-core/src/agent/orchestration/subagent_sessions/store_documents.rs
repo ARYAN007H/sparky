@@ -232,14 +232,16 @@ impl Docs {
     {
         let id = key_of(subagent_session_id)?;
         let updated = self.0.run(|docs| async move {
-            crate::storage::documents::compare_and_swap(&docs, SESSIONS, &id, move |current| {
+            crate::storage::documents::update_document(&docs, SESSIONS, &id, move |current| {
                 let stored: StoredSession = serde_json::from_value(current)
                     .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
                 let mut session = DurableSubagentSession::from(stored);
                 if !update(&mut session, chrono::Utc::now().to_rfc3339()) {
-                    return None;
+                    return Ok(None);
                 }
-                serde_json::to_value(StoredSession::from(&session)).ok()
+                let next = serde_json::to_value(StoredSession::from(&session))
+                    .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+                Ok(Some(next))
             })
             .await
             .map(|updated| updated.map(|record| record.doc))
