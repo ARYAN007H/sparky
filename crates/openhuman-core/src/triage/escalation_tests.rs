@@ -33,11 +33,10 @@ impl ChatModel<()> for TriageReplyModel {
         _state: &(),
         request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
-        self.requests.lock().unwrap().push((
-            self.role.clone(),
-            self.model.clone(),
-            request,
-        ));
+        self.requests
+            .lock()
+            .unwrap()
+            .push((self.role.clone(), self.model.clone(), request));
         Ok(ModelResponse::assistant("handled inline"))
     }
 
@@ -46,11 +45,10 @@ impl ChatModel<()> for TriageReplyModel {
         _state: &(),
         request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelStream> {
-        self.requests.lock().unwrap().push((
-            self.role.clone(),
-            self.model.clone(),
-            request,
-        ));
+        self.requests
+            .lock()
+            .unwrap()
+            .push((self.role.clone(), self.model.clone(), request));
         let response = ModelResponse::assistant("handled inline");
         Ok(ModelStream::new(Box::pin(futures::stream::iter([
             ModelStreamItem::Started,
@@ -75,10 +73,7 @@ fn triage_test_model(
                 .or(build_request.default_model)
                 .unwrap_or("unknown-test-model")
                 .to_string();
-            builds
-                .lock()
-                .unwrap()
-                .push((role.clone(), model.clone()));
+            builds.lock().unwrap().push((role.clone(), model.clone()));
             if failing_role == Some(build_request.role) {
                 anyhow::bail!("test provider has no model for role {role}");
             }
@@ -232,11 +227,7 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
     crate::inference::registry::register_chat_model_in(
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        triage_test_model(
-            Arc::clone(&requests),
-            Arc::clone(&builds),
-            Some("agentic"),
-        ),
+        triage_test_model(Arc::clone(&requests), Arc::clone(&builds), Some("agentic")),
     );
     let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
         .services(crate::core::runtime::ServiceSet::none())
@@ -288,6 +279,76 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
         message
             .text()
             .contains("handle this trigger with the parent model")
+    }));
+}
+
+#[tokio::test]
+async fn react_dispatch_inherits_the_parent_model_role_for_inherit_targets() {
+    let _events_guard = test_events_guard().await;
+    let temp = tempfile::tempdir().expect("isolated triage workspace");
+    let workspace = temp.path().join("workspace");
+    let mut config = Config {
+        workspace_dir: workspace.clone(),
+        config_path: temp.path().join("config.toml"),
+        action_dir: temp.path().join("actions"),
+        ..Config::default()
+    };
+    config.default_model = Some("hint:coding".to_string());
+
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let builds = Arc::new(Mutex::new(Vec::new()));
+    let extensions = crate::core::slots::Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        triage_test_model(Arc::clone(&requests), Arc::clone(&builds), None),
+    );
+    let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
+        .services(crate::core::runtime::ServiceSet::none())
+        .domains(crate::core::runtime::DomainSet::none())
+        .config(config)
+        .extensions(extensions)
+        .build()
+        .await
+        .expect("isolated core runtime");
+    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(runtime.context()));
+    let envelope = envelope("esc-inherit-model-role");
+    crate::core::bus::init().await.expect("bus init");
+
+    runtime
+        .run_in(
+            Arc::clone(runtime.context()),
+            crate::security::turn_origin::with_origin(
+                crate::triage::local_trigger_origin(),
+                apply_decision(
+                    &ctx,
+                    run_with_target(
+                        TriageAction::Escalate,
+                        "orchestrator",
+                        "route this task with the parent workload",
+                    ),
+                    &envelope,
+                ),
+            ),
+        )
+        .await
+        .expect("escalation should complete");
+
+    let requests = requests.lock().unwrap();
+    assert_eq!(
+        requests.len(),
+        1,
+        "the routed target should reach the model"
+    );
+    assert_eq!(
+        requests[0].0, "coding",
+        "an inherited target must keep its parent's workload role"
+    );
+    assert_eq!(requests[0].1, crate::config::MODEL_MANAGED_DEFAULT);
+    assert!(requests[0].2.messages.iter().any(|message| {
+        message
+            .text()
+            .contains("route this task with the parent workload")
     }));
 }
 
