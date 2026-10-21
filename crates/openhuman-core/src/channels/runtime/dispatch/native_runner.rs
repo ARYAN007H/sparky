@@ -577,6 +577,7 @@ pub(crate) async fn run(
     runtime.shared.begin_delivery_wait(&request_id);
     let cleanup_staged_parts = staged_parts.clone();
     let cleanup_config = trusted.host_agent.config.clone();
+    let cleanup_thread_id = thread_id.clone();
     let request = TurnRequest {
         scope: ScopeKey {
             agent_id: trusted.host_agent.definition.id.clone(),
@@ -608,7 +609,7 @@ pub(crate) async fn run(
     if !queued && result.is_err() && !cleanup_staged_parts.is_empty() {
         if let Err(error) = crate::threads::attachments::discard_native_channel_parts(
             dispatch,
-            &thread_id,
+            &cleanup_thread_id,
             &cleanup_config,
             &cleanup_staged_parts,
         )
