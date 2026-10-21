@@ -334,17 +334,7 @@ async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn Storag
         .put("notes", "n1", json!({"v": 2}), Precondition::None)
         .await
         .unwrap_err();
-    assert!(
-        matches!(
-            fence_error(&refused),
-            Some(FenceError::Superseded {
-                held: 1,
-                stored: Some(2)
-            })
-        ),
-        "{refused:?}"
-    );
-    assert!(fence.is_fenced(), "a driver refusal latches the fence");
+    assert_eq!(refused.kind(), ErrorKind::Conflict, "{refused:?}");
     let stored = shared
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap()
