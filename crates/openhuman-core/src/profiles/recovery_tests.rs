@@ -3,7 +3,7 @@ use crate::core::runtime::{ContextOverlay, DomainSet};
 use std::sync::Arc;
 use tinyagents_session::port::SessionStoreProvider;
 use tinyagents_session::turn_state::{TurnLifecycle, TurnState};
-use tinystoragedrivers::{MemoryStorage, StorageBackend};
+use crate::storage::test_support::memory_backend;
 
 fn profile() -> ProfileId {
     ProfileId::for_user("recovering", crate::profiles::ProfileIdMode::Raw).unwrap()
@@ -12,7 +12,7 @@ fn profile() -> ProfileId {
 /// A context for the profile whose host overrides carry a storage-backed
 /// session store (no workspace files), as a SaaS host installs.
 fn context_with_store() -> (Arc<CoreContext>, Arc<dyn SessionStoreProvider>) {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend = memory_backend();
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(
         tinyagents_session::DriverSessionStores::new(backend, crate::storage::Scope::local())
             .unwrap()
