@@ -37,7 +37,7 @@ use tinyagents_runtime::{
 };
 use tinyinference_llm::message::Message;
 
-fn concurrent_turn_diagnostic(stage: usize) {
+pub(super) fn concurrent_turn_diagnostic(stage: usize) {
     if std::env::var_os("OH_DIAG_CONCURRENT").is_none() {
         return;
     }
