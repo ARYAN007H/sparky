@@ -304,7 +304,9 @@ pub fn status_store_for(
         };
         Some(Arc::clone(scoped.documents()))
     })?;
-    Some(tinyagents_harness::observability::DriverStatusStore::new(docs))
+    Some(tinyagents_harness::observability::DriverStatusStore::new(
+        docs,
+    ))
 }
 
 /// The calling tenant's run ledger for `workspace_dir` ([`ledger_for`]), or an
