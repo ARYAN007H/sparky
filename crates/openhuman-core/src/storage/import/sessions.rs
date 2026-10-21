@@ -195,6 +195,9 @@ fn import_turn_states(dir: &Path, destination: &dyn TurnStates) -> Result<TurnSt
 }
 
 fn turn_state_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    if std::fs::symlink_metadata(dir)?.file_type().is_symlink() {
+        anyhow::bail!("turn-state root {} is a symbolic link", dir.display());
+    }
     let mut files = Vec::new();
     let mut entries = std::fs::read_dir(dir)
         .with_context(|| format!("list turn-state directory {}", dir.display()))?
@@ -675,6 +678,9 @@ fn agent_of(stem: &str, known: &HashMap<String, String>) -> Option<String> {
 /// Every `*.jsonl` under `raw` (flat and date-grouped), flat winning a
 /// duplicate stem, as `(stem, path)`.
 fn transcript_files(raw: &Path) -> Result<Vec<(String, PathBuf)>> {
+    if std::fs::symlink_metadata(raw)?.file_type().is_symlink() {
+        anyhow::bail!("transcript root {} is a symbolic link", raw.display());
+    }
     let mut flat = Vec::new();
     let mut dated = Vec::new();
     let mut entries: Vec<_> = std::fs::read_dir(raw)
