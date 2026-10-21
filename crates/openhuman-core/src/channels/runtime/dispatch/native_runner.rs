@@ -184,6 +184,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
                 message: request.text.clone(),
                 message_input: request.payload.native_message_input.clone(),
                 staged_parts: request.payload.native_staged_parts.clone(),
+                staged_message_id: request.payload.native_message_id.clone(),
                 origin: trusted.origin.clone(),
                 progress: Some(agent_progress),
                 run_queue: Some(queue),
@@ -558,6 +559,7 @@ pub(crate) async fn run(
     text: String,
     message_input: Option<tinyinference_llm::message::Message>,
     staged_parts: Vec<tinychannels_bus::ContentPart>,
+    staged_message_id: Option<String>,
     preparation_error: Option<String>,
     trusted: Arc<crate::agent::turn_host::TrustedAgentTurn>,
 ) -> NativeTurnExecution {
@@ -586,6 +588,7 @@ pub(crate) async fn run(
             trusted_turn: Some(trusted),
             native_message_input: message_input,
             native_staged_parts: staged_parts,
+            native_message_id: staged_message_id,
             native_preparation_error: preparation_error,
             ..Default::default()
         },

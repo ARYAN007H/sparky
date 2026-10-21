@@ -321,6 +321,10 @@ pub struct OpenHumanRunContext {
     pub(crate) tool_result_artifact_index: Option<Arc<ToolResultArtifactIndexStore>>,
     /// Current-turn attachment placeholders forwarded to vision delegates.
     pub attachment_placeholders: Arc<Vec<String>>,
+    /// Opaque native media refs issued for this exact root channel turn.
+    pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    /// Provider message identity for durable post-commit claims.
+    pub(crate) native_message_id: Option<String>,
     /// Dispatch guard shared by synchronous delegates in this run.
     pub dispatch: Option<Arc<TurnDispatchState>>,
     /// Optional task recency restriction for integration tools.
@@ -457,6 +461,8 @@ impl OpenHumanRunContext {
             file_state_agent_id: None,
             tool_result_artifact_index: None,
             attachment_placeholders: Arc::new(Vec::new()),
+            native_staged_parts: Vec::new(),
+            native_message_id: None,
             dispatch: None,
             task_recency_window: None,
             command_environment: None,
@@ -596,6 +602,8 @@ impl OpenHumanRunContext {
         self.command_environment = env.command_environment.clone().or(self.command_environment);
         self.memory_identity = env.memory_identity.clone().or(self.memory_identity);
         self.core = env.core.clone().or(self.core);
+        self.native_staged_parts = env.native_staged_parts.clone();
+        self.native_message_id = env.native_message_id.clone();
         self.stop_hooks
             .extend(env.hooks.stop_hooks().iter().cloned());
         self.tool_hooks
@@ -622,6 +630,8 @@ impl OpenHumanRunContext {
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.resolved_route = Arc::new(Mutex::new(None));
         child.memory_turn = None;
+        child.native_staged_parts.clear();
+        child.native_message_id = None;
         child.response_shape = None;
         child
     }

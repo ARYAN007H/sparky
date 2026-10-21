@@ -374,27 +374,33 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None => None,
     };
-    let native_message_input = if typed_envelope_input {
-        let Some(host) = selected_host.as_ref() else {
-            tracing::warn!("[dispatch] typed native media has no selected host agent");
-            return;
-        };
+    let native_preparation = if typed_envelope_input {
+        if let Some(host) = selected_host.as_ref() {
         match super::native_media::resolve_typed_message(
             &ctx,
             &host.config,
             &envelope,
             &prepared_thread_id,
+            &enriched_message,
         )
         .await
         {
             Ok(input) => input,
             Err(error) => {
-                tracing::warn!("[dispatch] typed native media was rejected: {error}");
-                return;
+                tracing::warn!("[dispatch] typed native media was rejected safely");
+                Some(Err(error))
             }
+        }
+        } else {
+            Some(Err("native media has no selected host agent".to_owned()))
         }
     } else {
         None
+    };
+    let (native_message_input, native_staged_parts, native_preparation_error) = match native_preparation {
+        Some(Ok(Some(prepared))) => (Some(prepared.message), prepared.staged_parts, None),
+        Some(Ok(None)) | None => (None, Vec::new(), None),
+        Some(Err(error)) => (None, Vec::new(), Some(error)),
     };
     let channel_session = selected_host.as_ref().and_then(|host| {
         let account_id = envelope
@@ -448,6 +454,9 @@ pub(crate) async fn process_channel_runtime_message(
                 request_id,
                 enriched_message.clone(),
                 native_message_input,
+                native_staged_parts,
+                Some(envelope.message_id.clone()),
+                native_preparation_error,
                 trusted,
             )
             .await

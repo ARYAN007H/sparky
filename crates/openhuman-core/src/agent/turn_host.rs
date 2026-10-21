@@ -63,6 +63,7 @@ pub(crate) struct AgentTurnRequest {
     /// owning persistence boundary. `None` retains the normal text conversion.
     pub(crate) message_input: Option<tinyinference_llm::message::Message>,
     pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    pub(crate) native_message_id: Option<String>,
     pub(crate) thread_id: Option<String>,
     pub(crate) origin: AgentTurnOrigin,
     pub(crate) approval: ApprovalTurnContext,
@@ -116,6 +117,8 @@ impl AgentTurnHost {
         session.set_run_queue(request.run_queue);
         session.set_thread_id(request.thread_id);
         let mut host_env = request.host_env;
+        host_env.native_staged_parts = request.native_staged_parts;
+        host_env.native_message_id = request.native_message_id;
         host_env.approval = request.approval.clone();
         host_env.cancellation = Some(request.cancellation);
         host_env.turn_deadline = request
@@ -130,12 +133,10 @@ impl AgentTurnHost {
         let scoped_origin = origin.clone();
         let message = request.message;
         let input = request.message_input;
-        let native_staged_parts = request.native_staged_parts;
         let approval = request.approval;
         let turn = async move {
             match input {
                 Some(input) => {
-                    session.set_native_staged_parts(native_staged_parts);
                     session
                         .run_single_with_approval_and_message(
                             &message,

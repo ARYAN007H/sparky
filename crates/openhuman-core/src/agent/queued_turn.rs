@@ -59,6 +59,7 @@ pub struct QueuedPayload {
     /// Host-created staged refs authorized for this exact external turn.
     /// Requeued synthetic placeholders never inherit this grant.
     pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    pub(crate) native_message_id: Option<String>,
     /// A preparation failure is sent through the shared runner's terminal
     /// path without invoking the model.
     pub(crate) native_preparation_error: Option<String>,

@@ -104,6 +104,8 @@ impl HostAgent {
         turn_deadline: Option<std::time::Duration>,
         imported_history: &[tinyagents_session::transcript::TranscriptMessage],
         legacy_history: Option<crate::channels::providers::relay::LegacyHistoryImport>,
+        staged_parts: Vec<tinychannels_bus::ContentPart>,
+        staged_message_id: Option<String>,
     ) -> anyhow::Result<String> {
         let config = self.config.clone();
         let agent_id = self.definition.id.clone();
@@ -127,6 +129,8 @@ impl HostAgent {
             crate::agent::turn_host::AgentTurnRequest {
                 message: message.to_owned(),
                 message_input,
+                native_staged_parts: staged_parts,
+                native_message_id: staged_message_id,
                 thread_id: Some(session_key.to_owned()),
                 origin,
                 approval: approval.clone(),
