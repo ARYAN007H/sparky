@@ -65,8 +65,10 @@ fn owner_conversion_preserves_driver_times_and_absolute_expiry() {
         Ok(rows
             .into_iter()
             .map(|row| {
-                Ok(LegacyTargetRecord::new("current", row.id, json!({"current":true}))
-                    .source_metadata(row.meta))
+                Ok(
+                    LegacyTargetRecord::new("current", row.id, json!({"current":true}))
+                        .source_metadata(row.meta),
+                )
             })
             .collect::<anyhow::Result<Vec<_>>>()?)
     })
