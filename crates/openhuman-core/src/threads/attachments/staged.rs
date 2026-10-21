@@ -334,8 +334,9 @@ pub(crate) async fn stage_native_channel_part(
     let mut part = input.clone();
     let media = opaque_media_mut(&mut part)
         .ok_or_else(|| "native attachment kind cannot be staged".to_owned())?;
-    media.opaque_id = Some(uuid::Uuid::new_v4().simple().to_string());
-    media.path = None;
+    let opaque_id = uuid::Uuid::new_v4().simple().to_string();
+    media.opaque_id = Some(opaque_id.clone());
+    media.path = Some(format!("openhuman-staged://{opaque_id}"));
     media.url = None;
     media.local_cache_path = None;
     media.content_type = Some(file.mime.clone());
@@ -343,10 +344,7 @@ pub(crate) async fn stage_native_channel_part(
 
     let tenant = tenant_for(ctx)?;
     let repo = staged_repo(ctx, &config.workspace_dir)?;
-    let opaque_id = opaque_media(&part)
-        .and_then(|media| media.opaque_id.as_deref())
-        .ok_or_else(|| "native attachment has no opaque reference".to_owned())?;
-    let id = staged_doc_id(opaque_id)?;
+    let id = staged_doc_id(&opaque_id)?;
     let manifest = StagedAttachment {
         tenant,
         thread_id: thread_id.to_owned(),

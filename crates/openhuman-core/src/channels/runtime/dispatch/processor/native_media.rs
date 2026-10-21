@@ -34,13 +34,14 @@ pub(super) async fn resolve_typed_message(
     config: &crate::config::Config,
     envelope: &ChannelInboundEnvelope,
     thread_id: &str,
-) -> Result<Option<Message>, String> {
+) -> Result<Option<ResolvedNativeMessage>, String> {
     if !requires_typed_preparation(envelope) {
         return Ok(None);
     }
     validate_native_parts(&envelope.parts)?;
     let scope = media_scope(envelope)?;
     let mut parts = envelope.parts.clone();
+    let mut staged_parts = Vec::new();
     let mut image_count = 0usize;
     let mut file_count = 0usize;
     let (max_images, image_mb) = config.multimodal.effective_limits();
@@ -132,20 +133,30 @@ pub(super) async fn resolve_typed_message(
             .content_type
             .as_deref()
             .ok_or_else(|| "native media has no content type".to_owned())?;
-        let staged = crate::agent::attachments::store_scoped_channel_media(
-            config, thread_id, &name, mime, &bytes,
+        let staged = crate::threads::attachments::stage_native_channel_part(
+            &dispatch,
+            thread_id,
+            config,
+            part,
+            &name,
+            mime,
+            &bytes,
         )
-        .await
-        .map_err(|_| "native media could not be staged safely".to_owned())?;
-        media.path = Some(staged.path);
-        media.url = None;
-        media.local_cache_path = None;
-        media.opaque_id = None;
-        media.content_type = Some(staged.mime);
-        media.size_bytes = Some(staged.size_bytes as u64);
+        .await?;
+        *part = staged.clone();
+        staged_parts.push(staged);
     }
 
-    crate::agent::message_convert::user_message_from_parts("", &parts).map(Some)
+    let message = crate::agent::message_convert::user_message_from_parts("", &parts)?;
+    Ok(Some(ResolvedNativeMessage {
+        message,
+        staged_parts,
+    }))
+}
+
+pub(super) struct ResolvedNativeMessage {
+    pub(super) message: Message,
+    pub(super) staged_parts: Vec<ContentPart>,
 }
 
 fn media_scope(envelope: &ChannelInboundEnvelope) -> Result<HostVoiceScope, String> {
