@@ -38,10 +38,9 @@ pub(super) fn marker_id(prefix: &str, source: &Path) -> String {
 }
 
 /// Whether the importer `kind` already finished for marker `id`, recorded in
-/// `tsd.migrations` of the module's scope. `kind` is the old marker
-/// collection name (`tinybox_host_import`), so a marker row an older build
-/// wrote ([`crate::storage::import_state::migrate_legacy_markers`]) answers
-/// the same question.
+/// the host-owned import-state collection of the module's scope. `kind` is a
+/// stable marker family name (`tinybox_host_import`), outside the module's
+/// granted collections.
 pub(super) async fn already_imported(scoped: &Storage, kind: &str, id: &str) -> Result<bool> {
     crate::storage::import_state::host_import_done(scoped, kind, id)
         .await

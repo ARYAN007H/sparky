@@ -2,7 +2,7 @@ use super::*;
 #[cfg(feature = "legacy-import")]
 use serde_json::json;
 #[cfg(feature = "legacy-import")]
-use crate::storage::{Precondition, Scope};
+use crate::storage::Precondition;
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::Meta;
 

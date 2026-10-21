@@ -12,7 +12,8 @@
 //! * **The path is fixed.** It is `state/tokenjuice_savings.json` under the
 //!   workspace, read without following a symlink and capped in size; nothing
 //!   in the file can name another path.
-//! * **Runs once per file.** A marker in `tsd.migrations` records it. A
+//! * **Runs once per file.** A host-owned marker in the module scope records
+//!   it. A
 //!   snapshot that does not parse is marked too (the old ledger ignored it as
 //!   well), so a corrupt file is not retried forever. A failed hand-over writes
 //!   no marker and is retried at the next install.

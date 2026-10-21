@@ -23,9 +23,6 @@ use tinystoragedrivers_types::{CollectionSpec, ErrorKind, WriteOptions};
 use crate::storage::{DocumentStore, DocumentStoreExt, Precondition, Scope, StorageBackend};
 use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
 
-/// The `tsd.migrations` owner the move records under.
-pub const MIGRATION_OWNER: &str = "host";
-
 /// The ids a hashed v1 scope can be matched against.
 #[derive(Debug, Default, Clone)]
 pub struct Known {
