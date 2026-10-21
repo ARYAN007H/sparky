@@ -1,10 +1,20 @@
 use super::*;
-use crate::core::all::ControllerParamContract;
+use crate::core::all::{assert_schema_controller_parity, ControllerParamContract};
 
 #[test]
 fn legacy_registered_handlers_keep_their_function_identity() {
     let controllers = all_registered_controllers();
+    let schemas = all_controller_schemas();
     assert_eq!(controllers.len(), 2);
+    assert_eq!(schemas.len(), 2);
+    assert_eq!(
+        schemas
+            .iter()
+            .map(|schema| schema.method_name())
+            .collect::<Vec<_>>(),
+        ["encrypt.secret", "decrypt.secret"]
+    );
+    assert_schema_controller_parity(&schemas, &controllers, "secret");
     assert!(std::ptr::fn_addr_eq(
         controllers[0].handler,
         handle_encrypt_secret
