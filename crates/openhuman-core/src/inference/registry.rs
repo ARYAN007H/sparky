@@ -50,13 +50,13 @@ impl ProviderContext {
 }
 
 /// Native TinyInference chat registration types used by the host.
-pub use tinyinference_llm::providers::overrides::{
-    ChatModelEntry, ChatModelFactory, ChatModelRequest, ReadinessProbe,
-};
+pub type ChatModelEntry = tinyinference_llm::providers::overrides::ChatModelEntry<ProviderContext>;
+pub type ChatModelFactory = tinyinference_llm::providers::overrides::ChatModelFactory<ProviderContext>;
+pub type ChatModelRequest<'a> = tinyinference_llm::providers::overrides::ChatModelRequest<'a, ProviderContext>;
+pub type ReadinessProbe = tinyinference_llm::providers::overrides::ReadinessProbe<ProviderContext>;
 
 /// Native provider metadata specialized to OpenHuman's host context.
-pub type ProviderModelHooks =
-    tinyinference_llm::providers::overrides::ProviderModelMetadata<ProviderContext>;
+pub type ProviderModelHooks = tinyinference_llm::providers::overrides::ProviderModelMetadata<ProviderContext>;
 
 /// A provider-neutral semantic category for a backend error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -249,7 +249,7 @@ pub fn resolve_provider_model(
     model_override: Option<&str>,
 ) -> Option<String> {
     let hooks = provider_model_hooks(provider_id)?;
-    (hooks.resolve_model)(role, config, model_override)
+    (hooks.resolve_model)(role, &ProviderContext::new(config, &EgressLedger::none()), model_override)
 }
 
 pub(crate) fn resolve_provider_model_for(
@@ -260,7 +260,7 @@ pub(crate) fn resolve_provider_model_for(
     model_override: Option<&str>,
 ) -> Option<String> {
     let hooks = chat_model_for(extensions, provider_id)?.models?;
-    (hooks.resolve_model)(role, config, model_override)
+    (hooks.resolve_model)(role, &ProviderContext::new(config, &EgressLedger::none()), model_override)
 }
 
 /// The provider's model-specific context window, if known.
