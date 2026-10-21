@@ -1,11 +1,15 @@
 use super::*;
-use crate::core::all::{assert_schema_controller_parity, ControllerParamContract};
+use crate::core::all::{
+    assert_schema_controller_parity, ControllerHandler, ControllerParamContract,
+};
 
 #[test]
 fn legacy_registered_handlers_keep_their_function_identity() {
     let controllers = all_registered_controllers();
     let schemas = all_controller_schemas();
+    let expected_handlers: [ControllerHandler; 2] = [handle_encrypt_secret, handle_decrypt_secret];
     assert_eq!(controllers.len(), 2);
+    assert_eq!(controllers.len(), expected_handlers.len());
     assert_eq!(schemas.len(), 2);
     assert_eq!(
         schemas
@@ -15,14 +19,9 @@ fn legacy_registered_handlers_keep_their_function_identity() {
         ["encrypt.secret", "decrypt.secret"]
     );
     assert_schema_controller_parity(&schemas, &controllers, "secret");
-    assert!(std::ptr::fn_addr_eq(
-        controllers[0].handler,
-        handle_encrypt_secret
-    ));
-    assert!(std::ptr::fn_addr_eq(
-        controllers[1].handler,
-        handle_decrypt_secret
-    ));
+    for (controller, expected) in controllers.iter().zip(expected_handlers) {
+        assert!(std::ptr::fn_addr_eq(controller.handler, expected));
+    }
 }
 
 pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
