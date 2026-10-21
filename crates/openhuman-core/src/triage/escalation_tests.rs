@@ -168,6 +168,13 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
             ..
         } if external_id == "esc-react-inline" && target_agent == "trigger_reactor"
     )));
+    assert!(!captured.iter().any(|event| matches!(
+        event,
+        DomainEvent::TriggerEscalationFailed {
+            external_id,
+            ..
+        } if external_id == "esc-react-inline"
+    )));
 
     let child_lifecycle = runtime
         .run_in(Arc::clone(runtime.context()), async {
