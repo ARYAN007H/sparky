@@ -20,7 +20,6 @@ use std::sync::Arc;
 
 use tinyinference_embeddings::EmbeddingModel;
 use tinyinference_llm::model::discover::DiscoveryRequest;
-use tinyinference_llm::model::ChatModel;
 
 use crate::config::Config;
 use crate::core::slots::{Extensions, HookSlot};
@@ -35,85 +34,29 @@ pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 // Chat models
 // ---------------------------------------------------------------------------
 
-/// What a registered chat-model factory is asked to build.
-pub struct ChatModelRequest<'a> {
-    /// The workload role the route was resolved for (`chat`, `reasoning`, ...).
-    pub role: &'a str,
-    /// The configuration in force.
-    pub config: &'a Config,
-    /// The concrete model id the core resolved for this construction (a role
-    /// alias such as `hint:coding` has already been translated to the
-    /// configured default).
-    pub model_override: Option<&'a str>,
-    /// The model the turn runs on when the request itself names none.
-    pub default_model: Option<&'a str>,
-    /// Whether the model should use native tool calling.
-    pub native_tool_calling: bool,
-    /// The conversation thread this model serves, when it is a turn model.
-    pub thread_id: Option<&'a str>,
-    /// Where the construction discloses its external transfer.
-    pub egress: &'a EgressLedger,
-}
-
-/// Builds a chat model and reports the model id it resolved to.
-pub type ChatModelFactory = Arc<
-    dyn for<'a> Fn(&ChatModelRequest<'a>) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)>
-        + Send
-        + Sync,
->;
-
-/// Asks a provider whether it can serve `role` right now: `(role, model,
-/// config)`, where `model` is the concrete model id the core resolved.
-pub type ReadinessProbe =
-    Arc<dyn Fn(String, String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
-
-/// Resolves a provider-owned model id to its workload role.
-pub type ModelRoleResolver = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
-
-/// Resolves a workload role and optional model pin to a concrete model id.
-pub type ModelResolver = Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>;
-
-/// Looks up a provider-owned static context window for a model id.
-pub type ModelContextWindow = Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>;
-
-/// A registered chat-model provider.
+/// Host state supplied to a native TinyInference provider callback.
 #[derive(Clone)]
-pub struct ChatModelEntry {
-    /// Builds the model.
-    pub build: ChatModelFactory,
-    /// Optional readiness probe (the flows inference probe).
-    pub probe: Option<ReadinessProbe>,
-    /// Optional model vocabulary and defaults owned by this provider. The
-    /// core calls these hooks without interpreting provider-specific ids.
-    pub models: Option<ProviderModelHooks>,
+pub struct ProviderContext {
+    /// Configuration selected by the host for this call.
+    pub config: Config,
+    /// Egress ledger selected by the host for this call.
+    pub egress: EgressLedger,
 }
 
-/// Provider-owned model behavior consulted by generic inference callers.
-#[derive(Clone)]
-pub struct ProviderModelHooks {
-    /// The provider's default model, absent when it has no default.
-    pub default_model: Arc<dyn Fn() -> Option<String> + Send + Sync>,
-    /// Resolves a role alias or legacy model id to its workload role.
-    pub role_for_model: ModelRoleResolver,
-    /// Whether a model is a provider-specific alias rather than a concrete id.
-    pub is_alias: Arc<dyn Fn(&str) -> bool + Send + Sync>,
-    /// Whether a model is a concrete id suitable for pass-through.
-    pub is_raw_model: Arc<dyn Fn(&str) -> bool + Send + Sync>,
-    /// Whether a model accepts image input according to provider metadata.
-    pub supports_vision: Arc<dyn Fn(&str) -> bool + Send + Sync>,
-    /// Resolves the provider's default/alias policy for a managed construction.
-    pub resolve_model: ModelResolver,
-    /// The default model's static context window, if the provider knows it.
-    pub context_window: ModelContextWindow,
-    /// Provider default pricing as (model id, input USD/1M, output USD/1M).
-    pub default_pricing: Arc<dyn Fn() -> Option<(String, f64, f64)> + Send + Sync>,
-    /// Applies a provider-specific request hint without exposing its wire key.
-    pub without_reasoning: Arc<
-        dyn Fn(tinyinference_llm::model::ModelRequest) -> tinyinference_llm::model::ModelRequest
-            + Send
-            + Sync,
-    >,
+impl ProviderContext {
+    fn new(config: &Config, egress: &EgressLedger) -> Self {
+        Self { config: config.clone(), egress: egress.clone() }
+    }
 }
+
+/// Native TinyInference chat registration types used by the host.
+pub use tinyinference_llm::providers::overrides::{
+    ChatModelEntry, ChatModelFactory, ChatModelRequest, ReadinessProbe,
+};
+
+/// Native provider metadata specialized to OpenHuman's host context.
+pub type ProviderModelHooks =
+    tinyinference_llm::providers::overrides::ProviderModelMetadata<ProviderContext>;
 
 /// A provider-neutral semantic category for a backend error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
