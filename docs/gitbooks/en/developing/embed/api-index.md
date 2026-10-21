@@ -254,7 +254,7 @@ The compiled capability report describes this build:
       "top_p": null,
       "max_iterations": 200
     },
-    "provider_model": "openrouter/deepseek/deepseek-v4-flash",
+    "provider_model": null,
     "routed_provider": false,
     "sandbox": "None",
     "approval_gate": true,

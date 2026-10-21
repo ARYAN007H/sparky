@@ -35,6 +35,13 @@ use serde::{Deserialize, Serialize};
 
 use super::cloud_providers::{AuthStyle, CloudProviderCreds};
 
+/// Select only the URL origin for route diagnostics, then use TinyInference's
+/// canonical sanitizer for credentials and malformed URL handling.
+fn redacted_endpoint_origin_for_log(endpoint: &str) -> String {
+    let origin = url::Url::parse(endpoint.trim()).map(|url| url.origin().ascii_serialization());
+    tinyinference_core::sanitize::redact_url(origin.as_deref().unwrap_or(endpoint))
+}
+
 /// The `cloud_providers` slug [`apply`] registers the route under.
 ///
 /// Hyphenated and prefixed so it cannot collide with a provider slug a user
@@ -70,7 +77,7 @@ impl std::fmt::Debug for EphemeralRoute {
         f.debug_struct("EphemeralRoute")
             .field(
                 "endpoint",
-                &crate::inference::provider::factory::redact_endpoint(&self.endpoint),
+                &redacted_endpoint_origin_for_log(&self.endpoint),
             )
             .field("api_key", &"[redacted]")
             .field("header_count", &self.headers.len())
@@ -124,7 +131,7 @@ pub fn apply(config: &mut crate::config::Config, route: EphemeralRoute) {
     let Some(model) = model else {
         log::warn!(
             "[config][ephemeral-route] ignoring route to {} — no model resolved for this call",
-            crate::inference::provider::factory::redact_endpoint(&route.endpoint)
+            redacted_endpoint_origin_for_log(&route.endpoint)
         );
         return;
     };
@@ -155,7 +162,7 @@ pub fn apply(config: &mut crate::config::Config, route: EphemeralRoute) {
 
     log::info!(
         "[config][ephemeral-route] this call routed to {} model={}",
-        crate::inference::provider::factory::redact_endpoint(&route.endpoint),
+        redacted_endpoint_origin_for_log(&route.endpoint),
         model
     );
 

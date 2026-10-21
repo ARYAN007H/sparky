@@ -111,7 +111,12 @@ pub(super) fn create_turn_chat_model_with_native_tools_and_route_inner(
     };
     if !test_override_active {
         if resolves_to_managed_backend(role, config) {
-            let (chat, _resolved_model) = managed_chat_model(
+            let resolved_context = ctx.resolved();
+            let extensions = resolved_context
+                .as_deref()
+                .map(crate::core::runtime::CoreContext::extensions);
+            let (chat, _resolved_model) = super::managed_backend::managed_chat_model_for(
+                extensions,
                 role,
                 config,
                 None,
@@ -156,21 +161,31 @@ pub(super) fn create_turn_chat_model_with_native_tools_and_route_inner(
             return result
                 .map(|(chat, resolved_model)| (chat, provider_name.clone(), resolved_model));
         }
-        if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools(
+        let resolved_context = ctx.resolved();
+        let extensions = resolved_context
+            .as_deref()
+            .map(crate::core::runtime::CoreContext::extensions);
+        if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools_for(
             role,
             config,
             native_tool_calling,
             egress,
+            extensions,
         ) {
             return result
                 .map(|(chat, resolved_model)| (chat, provider_name.clone(), resolved_model));
         }
     }
-    Err(unresolved_chat_model_error(
+    let resolved_context = ctx.resolved();
+    let extensions = resolved_context
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
+    Err(unresolved_chat_model_error_for(
         role,
         &provider_for_role(role, config),
         config,
         egress,
+        extensions,
     ))
 }
 
@@ -269,7 +284,12 @@ pub(crate) fn create_turn_chat_model_from_string_with_native_tools_and_route(
     let p = provider_string.trim();
     let is_managed = p.is_empty() || p == "cloud" || p == PROVIDER_OPENHUMAN;
     if is_managed && !test_override_active {
-        let (chat, _resolved_model) = managed_chat_model(
+        let resolved_context = ctx.resolved();
+        let extensions = resolved_context
+            .as_deref()
+            .map(crate::core::runtime::CoreContext::extensions);
+        let (chat, _resolved_model) = super::managed_backend::managed_chat_model_for(
+            extensions,
             role,
             config,
             None,

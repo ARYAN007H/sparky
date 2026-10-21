@@ -19,7 +19,7 @@ use tinyagents_harness::summarization::{
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::memory_summarizer::MemoryRecallSummarizer;
-use crate::inference::provider::model::TurnChatModel;
+use crate::inference::turn_models::TurnChatModel;
 use tinyagents_harness::turn_outcome::ToolOutcomeSink;
 
 /// Fractions of a capped turn's model-call budget at which the model is told

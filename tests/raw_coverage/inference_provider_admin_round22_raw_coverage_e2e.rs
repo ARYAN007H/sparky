@@ -27,7 +27,7 @@ use tinyinference_local::service::LocalAiService;
 use openhuman_core::inference::provider::factory::{
     auth_key_for_slug, create_chat_model_from_string_with_model_id,
 };
-use openhuman_core::inference::provider::list_configured_models;
+use openhuman_core::inference::provider::models::catalog_listing::list_configured_models;
 use openhuman_core::security::credentials::{
     AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
 };
@@ -153,6 +153,7 @@ async fn provider_admin_model_listing_covers_openrouter_validation_and_local_syn
 
 #[tokio::test]
 async fn factory_covers_legacy_api_key_scoping_and_abstract_model_errors() {
+    crate::tinyhumans_boot::boot();
     let _env = env_lock_async().await;
     let (base, state) = serve_mock().await;
     let tmp = tempdir().expect("tempdir");

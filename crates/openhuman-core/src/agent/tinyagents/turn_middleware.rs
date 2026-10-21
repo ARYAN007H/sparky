@@ -37,7 +37,7 @@ use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{ProviderUsageCarry, SubagentScope, ToolFailureMap};
 use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::verify_before_finish;
-use crate::inference::provider::model::TurnChatModel;
+use crate::inference::turn_models::TurnChatModel;
 
 use super::ToolPolicyEnforcement;
 
@@ -180,9 +180,7 @@ pub(super) fn install_turn_middleware(
     let usage_carry = provider_usage_carry.clone();
     harness.push_model_middleware(Arc::new(
         tinyagents_harness::middleware::library::UsageCarryMiddleware::new(move |response| {
-            if let Some(usage) =
-                crate::inference::provider::model::usage_info_from_response(response)
-            {
+            if let Some(usage) = tinyinference_llm::usage::usage_info_from_response(response) {
                 usage_carry
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())

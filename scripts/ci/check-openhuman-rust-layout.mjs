@@ -25,6 +25,8 @@ const LEGACY_LIMIT_ENTRIES = [
   // `spawn_subagent_tool_impl.rs` had its entry DELETED, not lowered: the
   // parameter schema moved to `spawn_subagent_parameters.rs` and the file is
   // under the general 750 limit, so it needs no exception at all.
+  // The session-todo integration added transcript metadata construction to
+  // this already-exempt composition seam. Keep its allowance exact.
   // Session-host factory still assembles the product's deliberately coupled
   // provider, security, memory, tool and prompt policy.  Generic session
   // state moved to tinyagents-runtime; this remaining composition is split in
@@ -41,7 +43,7 @@ const LEGACY_LIMIT_ENTRIES = [
   ["crates/openhuman-core/src/core/all_tests.rs", 1465],
   ["crates/openhuman-core/src/core/events.rs", 1697],
   ["crates/openhuman-core/src/core/events_tests.rs", 988],
-  ["crates/openhuman-core/src/core/observability.rs", 3429],
+  ["crates/openhuman-core/src/core/observability.rs", 3425],
 ];
 const LEGACY_LIMITS = new Map(LEGACY_LIMIT_ENTRIES);
 
