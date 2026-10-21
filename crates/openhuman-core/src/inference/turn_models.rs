@@ -12,12 +12,9 @@ use tinyinference_llm::model::ProfileOverrideModel;
 use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 
 /// The per-turn crate [`ChatModel`](tinyinference_llm::model::ChatModel) set,
-/// built once from an openhuman [`Provider`] by [`build_turn_models`] — the
-/// single place a turn's `native model adapters are constructed (issue #4249, Phase 5).
+/// assembled by TinyAgents' `TurnModelSet` for one turn.
 ///
-/// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) takes this bundle instead of the raw provider, so
-/// the harness assembly is expressed purely in crate model types; the
-/// `Provider` → `ChatModel` adaptation is confined to `build_turn_models`.
+/// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) resolves calls through its native resolver.
 pub(crate) struct TurnModels {
     /// The turn's effective/primary model (registry default + dispatch target).
     pub(crate) primary: TurnChatModel,
@@ -95,14 +92,9 @@ impl TurnModels {
     }
 }
 
-/// Build the per-turn [`TurnModels`] **crate-natively** from `(role, config)` —
-/// the Phase 3 P3-B cutover of [`build_turn_models`]: instead of wrapping one host
-/// `Provider` per tier in a [`native model adapter`], each tier is built as a crate-native
-/// [`ChatModel`] via [`factory::create_turn_chat_model`] (managed →
-/// `TinyHumansModel`, local/cloud → crate `OpenAiModel`).
+/// Build one per-turn set through TinyAgents' model-factory contract.
 ///
-/// The `TurnModels` shape is identical to [`build_turn_models`] so
-/// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) is unchanged. The provider metadata
+/// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) receives the native route resolver. Provider metadata
 /// (`provider_id` / `native_tools` / `supports_vision`) is derived by the caller
 /// ([`TurnModelSource::build`]) from the resolved provider string and config.
 /// `error_slot` is a fresh
@@ -138,10 +130,39 @@ fn build_turn_models_crate(
         temperature: Some(temperature),
         egress_tag: None,
     };
+    let resolved = ctx.resolved();
+    let extensions = resolved
+        .as_deref()
+        .map(crate::core::runtime::CoreContext::extensions);
+    let configured_provider = primary_override
+        .map(str::to_owned)
+        .unwrap_or_else(|| crate::inference::provider::provider_for_role(role, config));
+    let provider_route = tinyinference_providers::route::ProviderRoute::parse(&configured_provider)
+        .map(|route| route.provider)
+        .unwrap_or_else(|| configured_provider.clone());
+    let workload_requests = tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS
+        .iter()
+        .map(|route| {
+            let role = crate::inference::provider_model::role_for_provider_model_for(
+                extensions,
+                &provider_route,
+                route,
+            );
+            tinyagents_harness::host::ModelBuildRequest {
+                role: role.to_owned(),
+                route: Some((*route).to_owned()),
+                purpose: tinyagents_harness::host::ModelPurpose::WorkloadTier(
+                    (*route).to_owned(),
+                ),
+                model_pin: Some((*route).to_owned()),
+                opts: opts.clone(),
+            }
+        })
+        .collect();
     let built = tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, role)
         .primary_model_pin(model)
         .primary_opts(opts.clone())
-        .workload_opts(opts.clone())
+        .workload_requests(workload_requests)
         .summarization(role, Some(model.to_owned()))
         .summarization_opts(opts)
         .build()?
@@ -163,6 +184,8 @@ fn build_turn_models_crate(
                     })
                     .cloned(),
             });
+            #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+            let injected = injected.or_else(crate::inference::provider::factory::test_provider_override::current);
             let profile = model.profile().cloned().unwrap_or_default();
             let selected_model = profile.model.as_deref().filter(|value| !value.is_empty()).unwrap_or("unknown");
             let provider = profile.provider.as_deref().unwrap_or("unknown");
@@ -375,49 +398,6 @@ impl TurnModelSource {
         context_window: Option<u64>,
         thread_id: Option<&str>,
     ) -> anyhow::Result<TurnModels> {
-        if let Some(source) = &self.crate_native {
-            let source_ctx = source.ctx();
-            if let Some(local) = source_ctx.host_overrides() {
-                if let Some(custom) = local.model_for(&source.role) {
-                    let mut models = Self::from_model(custom)
-                        .with_attachment_config(source.config.clone())
-                        .build(model, temperature, context_window, thread_id)?;
-                    for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
-                        let resolved_context = source_ctx.resolved();
-                        let extensions = resolved_context
-                            .as_deref()
-                            .map(crate::core::runtime::CoreContext::extensions);
-                        let role = crate::inference::provider_model::role_for_provider_model_for(
-                            extensions,
-                            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-                            tier,
-                        );
-                        if let Some(custom) = local
-                            .role_models
-                            .get(tier)
-                            .or_else(|| local.role_models.get(role))
-                        {
-                            models.routes.push((
-                                tier.to_owned(),
-                                crate::attachments::provider::wrap_injected(
-                                    &source_ctx,
-                                    custom.clone(),
-                                    source.config.clone(),
-                                ),
-                            ));
-                        }
-                    }
-                    if let Some(custom) = local.role_models.get("summarization") {
-                        models.summarizer = crate::attachments::provider::wrap_injected(
-                            &source_ctx,
-                            custom.clone(),
-                            source.config.clone(),
-                        );
-                    }
-                    return Ok(models);
-                }
-            }
-        }
         if let Some(direct) = &self.direct_model {
             let mut profile = direct.profile().cloned().unwrap_or_default();
             if let Some(window) = context_window.filter(|window| *window > 0) {
