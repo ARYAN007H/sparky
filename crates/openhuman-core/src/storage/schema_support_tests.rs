@@ -47,3 +47,35 @@ fn keys_convert_at_every_depth_and_back() {
     );
     assert_eq!(camel_keys(&snake, &renames), camel);
 }
+
+#[test]
+fn owner_conversion_preserves_driver_times_and_absolute_expiry() {
+    use crate::storage::import::Record;
+
+    let source = Record {
+        collection: "legacy".into(),
+        id: "source-id".into(),
+        doc: json!({"legacy":true}),
+        created_ms: Some(100),
+        schema: Some(7),
+        expires_ms: Some(900),
+        updated_ms: Some(200),
+    };
+    let converted = map_legacy_collection(vec![source], "legacy", |rows| {
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                Ok(LegacyTargetRecord::new("current", row.id, json!({"current":true}))
+                    .source_metadata(row.meta))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?)
+    })
+    .unwrap();
+
+    assert_eq!(converted.len(), 1);
+    assert_eq!(converted[0].collection, "current");
+    assert_eq!(converted[0].schema, Some(7));
+    assert_eq!(converted[0].created_ms, Some(100));
+    assert_eq!(converted[0].updated_ms, Some(200));
+    assert_eq!(converted[0].expires_ms, Some(900));
+}
