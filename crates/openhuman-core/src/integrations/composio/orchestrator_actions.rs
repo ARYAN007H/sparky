@@ -154,5 +154,5 @@ pub(crate) fn sanitise_slug(raw: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "orchestrator_tools_tests.rs"]
+#[path = "orchestrator_actions_tests.rs"]
 mod tests;

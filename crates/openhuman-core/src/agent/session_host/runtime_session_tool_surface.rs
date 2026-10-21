@@ -52,7 +52,7 @@ impl OpenHumanTurnPrelude {
     /// this request is prepared.
     pub(super) fn refresh_delegation_tool_surface(&self) -> anyhow::Result<()> {
         use crate::agent_registry::host_definition::AgentDefinitionRegistry;
-        use crate::tools::orchestrator_tools::collect_orchestrator_tools;
+        use crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools;
         use tinytools::ToolPolicyEngine;
 
         let Some(registry) = AgentDefinitionRegistry::current() else {

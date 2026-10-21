@@ -13,7 +13,7 @@ use crate::integrations::composio::{
     FetchConnectedIntegrationsStatus,
 };
 use crate::integrations::ConnectedIntegration;
-use crate::tools::orchestrator_tools;
+use crate::integrations::composio::orchestrator_actions;
 use std::collections::HashSet;
 use std::time::Duration;
 use tinyagents_definition::ToolScope;
@@ -152,7 +152,7 @@ pub(super) async fn resolve_target_agent(channel: &str) -> AgentScoping {
             connected_integration_count = connected.len(),
             "[dispatch::routing] fetched connected integrations for delegation expansion"
         );
-        orchestrator_tools::collect_orchestrator_tools(definition, &connected)
+        orchestrator_actions::collect_orchestrator_tools(definition, &connected)
     } else {
         Vec::new()
     };

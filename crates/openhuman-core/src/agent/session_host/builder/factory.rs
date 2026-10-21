@@ -374,7 +374,7 @@ impl OpenHumanSessionHost {
             _ if host_only => (Vec::new(), Some(super::host_only::empty_belt())),
             (Some(def), Some(_reg)) => {
                 let synthed = if should_synthesize_delegation_tools(def) {
-                    tools::orchestrator_tools::collect_orchestrator_tools(
+                    crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools(
                         def,
                         prewarmed_integrations_slice,
                     )
@@ -433,7 +433,7 @@ impl OpenHumanSessionHost {
                 // callers that invoke the old `from_config` on a
                 // pre-startup or test registry state.
                 let synthed = match reg.get("orchestrator") {
-                    Some(orch_def) => tools::orchestrator_tools::collect_orchestrator_tools(
+                    Some(orch_def) => crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools(
                         orch_def,
                         prewarmed_integrations_slice,
                     ),
