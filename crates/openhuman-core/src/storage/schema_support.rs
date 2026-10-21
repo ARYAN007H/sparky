@@ -5,19 +5,78 @@
 //! these read a clock or the environment.
 
 use serde_json::{Map, Value};
-use tinystoragedrivers::schema::Owner;
 use tinystoragedrivers::{Key, StorageError};
 
-/// The owner named `name`.
-///
-/// # Panics
-///
-/// When `name` is not a valid owner. Every caller passes a constant that
-/// `storage_schema_tests` composes into the registry.
-#[must_use]
-pub fn owner(name: &str) -> Owner {
-    #[allow(clippy::expect_used)]
-    Owner::new(name).expect("a constant owner name satisfies the grammar")
+use crate::storage::import::Record;
+
+/// Source row passed through a typed owner import conversion.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LegacySourceRecord {
+    pub id: String,
+    pub body: Value,
+    pub meta: LegacySourceMeta,
+}
+
+/// Metadata carried into an owner conversion from the source reader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct LegacySourceMeta {
+    pub created_ms: i64,
+}
+
+/// Target row emitted by a typed owner import conversion.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LegacyTargetRecord {
+    pub collection: String,
+    pub id: String,
+    pub body: Value,
+    pub created_ms: Option<i64>,
+}
+
+impl LegacyTargetRecord {
+    pub fn new(collection: impl Into<String>, id: impl Into<String>, body: Value) -> Self {
+        Self {
+            collection: collection.into(),
+            id: id.into(),
+            body,
+            created_ms: None,
+        }
+    }
+
+    pub fn created_ms(mut self, created_ms: i64) -> Self {
+        self.created_ms = Some(created_ms);
+        self
+    }
+}
+
+/// Converts one legacy collection using an owner-specific pure transform.
+/// Records from other collections pass through unchanged.
+pub(crate) fn map_legacy_collection(
+    records: Vec<Record>,
+    source_collection: &str,
+    convert: fn(Vec<LegacySourceRecord>) -> anyhow::Result<Vec<LegacyTargetRecord>>,
+) -> anyhow::Result<Vec<Record>> {
+    let mut source = Vec::new();
+    let mut output = Vec::new();
+    for record in records {
+        if record.collection == source_collection {
+            source.push(LegacySourceRecord {
+                id: record.id,
+                body: record.doc,
+                meta: LegacySourceMeta {
+                    created_ms: record.created_ms.unwrap_or_default(),
+                },
+            });
+        } else {
+            output.push(record);
+        }
+    }
+    output.extend(convert(source)?.into_iter().map(|record| Record {
+        collection: record.collection,
+        id: record.id,
+        doc: record.body,
+        created_ms: record.created_ms,
+    }));
+    Ok(output)
 }
 
 /// Unix epoch milliseconds of an RFC 3339 timestamp, `None` when it does not
