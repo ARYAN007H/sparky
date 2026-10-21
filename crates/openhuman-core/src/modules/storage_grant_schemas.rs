@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use super::storage_grants::StorageGrant;
 use super::storage_queue_manifest::QueueManifest;
-use crate::storage::schema::module_items;
+use crate::storage::schema::module_collections;
 
 /// One module's row: its registry id, the schema owner that declares its
 /// storage, secret prefixes the schema cannot name, and the queue manifest the
@@ -130,7 +130,7 @@ pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, mo
 pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     let row = ROWS.iter().find(|row| row.module == module_id)?;
     let queues = row.queues.and_then(|source| source());
-    let items = module_items(row.owner);
+    let items = module_collections(row.owner);
     let mut secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
     secret_prefixes.extend(items.secrets);
     Some(StorageGrant {
