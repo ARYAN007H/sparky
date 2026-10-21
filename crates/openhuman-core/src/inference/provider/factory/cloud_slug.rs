@@ -9,7 +9,9 @@ use crate::inference::provider::factory::access_gates::verify_backend_session_ac
 use crate::inference::provider::factory::access_gates::verify_session_active;
 use crate::inference::provider::fallback_diagnostics;
 use tinyinference_llm::providers::anthropic::endpoint_is_anthropic_messages;
-use tinyinference_llm::providers::registry::resolve_slug_model;
+use tinyinference_llm::providers::registry::{
+    resolve_slug_model, ProviderBuildOptions, ProviderRegistry,
+};
 
 /// Look up a `cloud_providers` entry by slug and build the provider.
 /// The shared resolution for a `<slug>:<model>` cloud provider — the cloud
@@ -442,20 +444,29 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools_for
         }) as tinyinference_llm::providers::registry::ProviderHttpClientBuilder<'_>
     });
     let spec = cloud_spec::cloud_provider_spec(entry, &effective_model);
-    let chat = cloud_spec::build_cloud_model(
-        &spec,
-        &key,
-        entry.auth_style,
-        temperature_override,
-        config.temperature_unsupported_models.as_slice(),
-        native_tool_calling,
-        extra_headers.as_slice(),
-        extra_query_params.as_slice(),
-        user_agent.as_deref(),
-        codex_route,
-        None,
-        http_builder,
-        ca_bundle,
+    log::debug!(
+        "[providers][cloud-spec] build slug={} kind={} auth={:?}",
+        spec.provider,
+        spec.kind.as_str(),
+        entry.auth_style
     );
+    let chat = ProviderRegistry::new(cloud_spec::CloudCredentialResolver(&key))
+        .build_with(
+            &spec,
+            ProviderBuildOptions {
+                auth_style: Some(entry.auth_style.into()),
+                temperature_override,
+                temperature_unsupported_models: config.temperature_unsupported_models.as_slice(),
+                native_tool_calling: Some(native_tool_calling),
+                extra_headers: extra_headers.as_slice(),
+                extra_query_params: extra_query_params.as_slice(),
+                user_agent: user_agent.as_deref(),
+                codex: codex_route,
+                http_builder,
+                ca_bundle,
+                ..ProviderBuildOptions::default()
+            },
+        )
+        .map_err(|error| anyhow::anyhow!("[chat-factory] {error}"));
     Some(chat.map(|chat| (chat, effective_model)))
 }
