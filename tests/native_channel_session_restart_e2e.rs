@@ -685,11 +685,11 @@ fn assert_model_received_typed_image(request: &Value) {
                         collect_shape(item, types, fields);
                     }
                 }
-                Value::Object(fields) => {
-                    if let Some(kind) = fields.get("type").and_then(Value::as_str) {
+                Value::Object(object) => {
+                    if let Some(kind) = object.get("type").and_then(Value::as_str) {
                         types.push(kind.to_owned());
                     }
-                    for (name, item) in fields {
+                    for (name, item) in object {
                         fields.push(name.clone());
                         collect_shape(item, types, fields);
                     }
