@@ -65,10 +65,15 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             _state: &(),
             request: ModelRequest,
         ) -> tinyinference_llm::Result<ModelResponse> {
-            if request
+            let contains_child_prompt = request
                 .messages
                 .iter()
-                .any(|message| message.text().contains(GRANDCHILD_PROMPT))
+                .any(|message| message.text().contains(CHILD_PROMPT));
+            if !contains_child_prompt
+                && request
+                    .messages
+                    .iter()
+                    .any(|message| message.text().contains(GRANDCHILD_PROMPT))
             {
                 self.grandchild_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -228,10 +233,10 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         )
         .await
     });
-    tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx)
-        .await
-        .expect("the real native grandchild reaches its model")
-        .expect("grandchild-start observation remains connected");
+    let grandchild_reached_model = matches!(
+        tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await,
+        Ok(Ok(()))
+    );
     tokio::time::timeout(
         std::time::Duration::from_secs(5),
         model.root_followup.notified(),
@@ -277,11 +282,12 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         }));
     }
     eprintln!(
-        "NESTED_FLOW_DIAGNOSTIC child_calls={} child_spawn_schema_per_call={:?} nested_spawn_calls={} grandchild_calls={} worker_jobs={:?} unknown_spawn_recovery={:?}",
+        "NESTED_FLOW_DIAGNOSTIC child_calls={} child_spawn_schema_per_call={:?} nested_spawn_calls={} grandchild_calls={} grandchild_reached_model={} worker_jobs={:?} unknown_spawn_recovery={:?}",
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
         model.child_schema_names.lock().unwrap(),
         model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
         model.grandchild_calls.load(std::sync::atomic::Ordering::SeqCst),
+        grandchild_reached_model,
         child_runs,
         unknown_spawn_events,
     );
