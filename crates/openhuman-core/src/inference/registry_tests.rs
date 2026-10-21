@@ -148,12 +148,9 @@ async fn a_registered_catalog_answers_the_model_listing_for_its_provider() {
     register_catalog(
         "fake-catalog",
         CatalogEntry {
-            list: Arc::new(|_, _| {
+            list: Arc::new(|_| {
                 Box::pin(async {
-                    Ok(Outcome::new(
-                        serde_json::json!({ "models": [{ "id": "registered" }] }),
-                        vec![],
-                    ))
+                    Ok(serde_json::json!({ "models": [{ "id": "registered" }] }))
                 })
             }),
             limits: None,
@@ -186,7 +183,7 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
     register_catalog(
         PROVIDER_OPENHUMAN,
         CatalogEntry {
-            list: Arc::new(|_, _| Box::pin(async { Err("unused".to_string()) })),
+            list: Arc::new(|_| Box::pin(async { Err("unused".to_string()) })),
             limits: Some(Arc::new(|model, _| {
                 Some(DiscoveryRequest::new("https://catalog.example/v1", model))
             })),
@@ -241,9 +238,9 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
     register_catalog(
         PROVIDER_OPENHUMAN,
         CatalogEntry {
-            list: Arc::new(move |_, request| {
-                *sink.lock().unwrap() = request.provider_key.clone();
-                Box::pin(async { Ok(Outcome::new(serde_json::json!({ "models": [] }), vec![])) })
+            list: Arc::new(move |request: CatalogRequest<ProviderContext>| {
+                *sink.lock().unwrap() = request.context.catalog.as_ref().unwrap().request.provider_key.clone();
+                Box::pin(async { Ok(serde_json::json!({ "models": [] })) })
             }),
             limits: None,
         },

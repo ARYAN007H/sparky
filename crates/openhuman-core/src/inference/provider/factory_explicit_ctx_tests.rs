@@ -4,7 +4,7 @@ use super::*;
 async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{ChatModelEntry, ProviderModelMetadata};
+    use crate::inference::registry::{ChatModelEntry, ProviderContext, ProviderModelMetadata};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
@@ -134,7 +134,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        register_catalog_in, CatalogEntry, ChatModelEntry, ProviderModelMetadata,
+        register_catalog_in, CatalogEntry, CatalogRequest, ChatModelEntry, ProviderContext, ProviderModelMetadata,
     };
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
@@ -165,9 +165,9 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
         }
     }
 
-    fn catalog(name: &'static str) -> CatalogEntry {
+    fn catalog(name: &'static str) -> CatalogEntry<ProviderContext> {
         CatalogEntry {
-            list: Arc::new(|_, _| {
+            list: Arc::new(|_| {
                 Box::pin(async { Err("model listing is not used by this test".to_string()) })
             }),
             limits: Some(Arc::new(move |model, _| {
