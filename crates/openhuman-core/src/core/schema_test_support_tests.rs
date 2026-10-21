@@ -227,3 +227,76 @@ fn real_owner_namespaces_reject_each_controller_namespace_typo() {
         }
     }
 }
+
+#[test]
+fn wire_field_contract_pins_count_order_type_and_requiredness() {
+    let field = crate::core::FieldSchema {
+        name: "items",
+        ty: crate::core::TypeSchema::Option(Box::new(crate::core::TypeSchema::Array(Box::new(
+            crate::core::TypeSchema::Ref("WireItem"),
+        )))),
+        comment: "Items in wire order.",
+        required: false,
+    };
+    let expected = [(
+        "items",
+        crate::core::TypeSchema::Option(Box::new(crate::core::TypeSchema::Array(Box::new(
+            crate::core::TypeSchema::Ref("WireItem"),
+        )))),
+        false,
+    )];
+    assert_eq!(
+        verify_wire_fields(std::slice::from_ref(&field), &expected),
+        Ok(())
+    );
+
+    let wrong_name = [("renamed", expected[0].1.clone(), false)];
+    assert!(
+        verify_wire_fields(std::slice::from_ref(&field), &wrong_name)
+            .unwrap_err()
+            .contains("name mismatch")
+    );
+    assert!(verify_wire_fields(std::slice::from_ref(&field), &[])
+        .unwrap_err()
+        .contains("count mismatch"));
+    let wrong_required = [("items", expected[0].1.clone(), true)];
+    assert!(
+        verify_wire_fields(std::slice::from_ref(&field), &wrong_required)
+            .unwrap_err()
+            .contains("requiredness mismatch")
+    );
+    let wrong_nested_type = [(
+        "items",
+        crate::core::TypeSchema::Option(Box::new(crate::core::TypeSchema::Array(Box::new(
+            crate::core::TypeSchema::Ref("OtherWireItem"),
+        )))),
+        false,
+    )];
+    assert!(
+        verify_wire_fields(std::slice::from_ref(&field), &wrong_nested_type)
+            .unwrap_err()
+            .contains("type mismatch")
+    );
+
+    let reversed = [
+        crate::core::FieldSchema {
+            name: "second",
+            ty: crate::core::TypeSchema::Bool,
+            comment: "Second.",
+            required: true,
+        },
+        crate::core::FieldSchema {
+            name: "first",
+            ty: crate::core::TypeSchema::String,
+            comment: "First.",
+            required: true,
+        },
+    ];
+    let ordered = [
+        ("first", crate::core::TypeSchema::String, true),
+        ("second", crate::core::TypeSchema::Bool, true),
+    ];
+    assert!(verify_wire_fields(&reversed, &ordered)
+        .unwrap_err()
+        .contains("name mismatch"));
+}

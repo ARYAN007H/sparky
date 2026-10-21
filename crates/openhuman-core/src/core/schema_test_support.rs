@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::{FieldSchema, TypeSchema};
 
 /// Independently authored wire fixtures checked against an actual bound
 /// registry entry. The runner validates examples with the production schema
@@ -90,6 +91,40 @@ pub(crate) fn verify_parameter_schema(
                 contract.method
             )
         })?;
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_wire_fields(
+    actual: &[FieldSchema],
+    expected: &[(&'static str, TypeSchema, bool)],
+) -> Result<(), String> {
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "wire field count mismatch: expected {}, got {}",
+            expected.len(),
+            actual.len()
+        ));
+    }
+    for (index, (field, (name, ty, required))) in actual.iter().zip(expected).enumerate() {
+        if field.name != *name {
+            return Err(format!(
+                "wire field {index} name mismatch: expected `{name}`, got `{}`",
+                field.name
+            ));
+        }
+        if field.ty != *ty {
+            return Err(format!(
+                "wire field `{name}` type mismatch: expected {ty:?}, got {:?}",
+                field.ty
+            ));
+        }
+        if field.required != *required {
+            return Err(format!(
+                "wire field `{name}` requiredness mismatch: expected {required}, got {}",
+                field.required
+            ));
+        }
     }
     Ok(())
 }

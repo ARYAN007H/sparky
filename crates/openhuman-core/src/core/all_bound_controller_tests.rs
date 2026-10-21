@@ -700,3 +700,9 @@ mod devices_controller_tests;
 
 #[path = "all_approval_controller_tests.rs"]
 mod approval_controller_tests;
+
+#[path = "all_bound_registry_test_support.rs"]
+mod registry_test_support;
+
+#[path = "all_bound_registry_contract_tests.rs"]
+mod registry_contract_tests;
