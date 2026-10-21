@@ -226,20 +226,58 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             provider_server.hold_until(CONCURRENT_TURNS);
             let started = std::time::Instant::now();
             let mut turns = tokio::task::JoinSet::new();
+            let completed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
             for index in 0..CONCURRENT_TURNS {
                 let harness = std::sync::Arc::clone(&harness);
+                let completed = std::sync::Arc::clone(&completed);
                 turns.spawn(async move {
-                    harness
+                    let result = harness
                         .turn(format!("Concurrent agent {index}"))
                         .session(format!("concurrent-agent-{index}"))
                         .send()
-                        .await
+                        .await;
+                    completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    (index, result)
                 });
             }
             let outcomes = tokio::time::timeout(CONCURRENT_HANG_GUARD, async {
                 let mut outcomes = Vec::with_capacity(CONCURRENT_TURNS);
-                while let Some(outcome) = turns.join_next().await {
-                    outcomes.push(outcome.expect("concurrent turn task did not panic"));
+                let mut report = tokio::time::interval(std::time::Duration::from_secs(10));
+                report.tick().await;
+                loop {
+                    tokio::select! {
+                        joined = turns.join_next() => match joined {
+                            Some(Ok((index, Ok(outcome)))) => outcomes.push((index, outcome)),
+                            Some(Ok((index, Err(error)))) => fail(format!(
+                                "concurrent turn {index} failed after {:?}: {error:?}; \
+                                 completed={}, provider requests={}, in_flight={}, peak={}",
+                                started.elapsed(),
+                                completed.load(std::sync::atomic::Ordering::Relaxed),
+                                provider_server.chat_requests(),
+                                provider_server.in_flight(),
+                                provider_server.peak_in_flight(),
+                            )),
+                            Some(Err(error)) => fail(format!(
+                                "concurrent turn task failed after {:?}: {error}; \
+                                 completed={}, provider requests={}, in_flight={}, peak={}",
+                                started.elapsed(),
+                                completed.load(std::sync::atomic::Ordering::Relaxed),
+                                provider_server.chat_requests(),
+                                provider_server.in_flight(),
+                                provider_server.peak_in_flight(),
+                            )),
+                            None => break,
+                        },
+                        _ = report.tick() => eprintln!(
+                            "harness_embed concurrent progress: elapsed={:?}, completed={}, \
+                             provider requests={}, in_flight={}, peak={}",
+                            started.elapsed(),
+                            completed.load(std::sync::atomic::Ordering::Relaxed),
+                            provider_server.chat_requests(),
+                            provider_server.in_flight(),
+                            provider_server.peak_in_flight(),
+                        ),
+                    }
                 }
                 outcomes
             })
@@ -268,8 +306,8 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                 provider_server.peak_in_flight()
             );
             let mut session_ids = std::collections::HashSet::new();
-            for outcome in outcomes {
-                let outcome = outcome.expect("concurrent turn runs");
+            for (index, outcome) in outcomes {
+                assert_eq!(outcome.session_id, format!("concurrent-agent-{index}"));
                 assert!(outcome.reply.contains(REPLY));
                 assert!(session_ids.insert(outcome.session_id));
             }
