@@ -35,6 +35,27 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
 }
 
 #[test]
+fn explicitly_scoped_nested_spawn_is_retained_only_with_host_grant() {
+    let tools: Vec<Box<dyn Tool>> = vec![Box::new(NamedTool("spawn_subagent"))];
+    let scope = ToolScope::Named(vec!["spawn_subagent".to_owned()]);
+
+    assert!(filter_tool_indices_with_nested_spawn(&tools, &scope, &[], None, false).is_empty());
+    assert_eq!(
+        filter_tool_indices_with_nested_spawn(&tools, &scope, &[], None, true),
+        vec![0],
+        "an explicit host grant should preserve the definition's named spawn tool"
+    );
+    assert!(filter_tool_indices_with_nested_spawn(
+        &tools,
+        &scope,
+        &["spawn_subagent".to_owned()],
+        None,
+        true,
+    )
+    .is_empty(), "the definition denylist must still win over the grant");
+}
+
+#[test]
 fn child_keeps_the_parents_protocol() {
     use tinytools_agent::dialect::ToolCallFormat;
 
