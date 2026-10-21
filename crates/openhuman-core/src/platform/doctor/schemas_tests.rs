@@ -5,10 +5,8 @@ use crate::core::all::assert_schema_controller_parity;
 fn legacy_handlers_keep_their_identity_and_order() {
     use crate::core::all::ControllerHandler;
 
-    let handlers: [(&str, ControllerHandler); 2] = [
-        ("report", handle_report),
-        ("models", handle_models),
-    ];
+    let handlers: [(&str, ControllerHandler); 2] =
+        [("report", handle_report), ("models", handle_models)];
     let controllers = all_registered_controllers();
     assert_eq!(controllers.len(), handlers.len());
     assert_eq!(all_controller_schemas().len(), handlers.len());

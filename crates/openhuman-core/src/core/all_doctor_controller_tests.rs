@@ -10,7 +10,11 @@ fn raw_doctor_platform_registry_matches_its_independent_contract() {
     let contracts = crate::platform::doctor::doctor_parameter_contracts();
     let methods = ["doctor.report", "doctor.models"];
 
-    assert_eq!(entries.len(), methods.len(), "complete raw Doctor inventory");
+    assert_eq!(
+        entries.len(),
+        methods.len(),
+        "complete raw Doctor inventory"
+    );
     assert_eq!(
         entries
             .iter()
@@ -19,9 +23,7 @@ fn raw_doctor_platform_registry_matches_its_independent_contract() {
         methods,
         "Doctor registration order is a wire contract"
     );
-    assert!(entries
-        .iter()
-        .all(|row| row.group == DomainGroup::Platform));
+    assert!(entries.iter().all(|row| row.group == DomainGroup::Platform));
     assert!(internal_registry()
         .iter()
         .all(|row| row.controller.schema.namespace != "doctor"));
@@ -33,10 +35,7 @@ fn raw_doctor_platform_registry_matches_its_independent_contract() {
         ["openhuman.doctor_report", "openhuman.doctor_models"]
     );
 
-    for (entry, output_type) in entries
-        .iter()
-        .zip(["DoctorReport", "ModelProbeReport"])
-    {
+    for (entry, output_type) in entries.iter().zip(["DoctorReport", "ModelProbeReport"]) {
         let outputs = &entry.controller.schema.outputs;
         assert_eq!(outputs.len(), 1);
         assert_eq!(outputs[0].name, "report");
