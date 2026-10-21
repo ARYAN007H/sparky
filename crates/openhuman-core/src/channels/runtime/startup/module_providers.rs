@@ -16,6 +16,7 @@ use tinychannels_bus::module_runtime::{
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
 use tinychannels_bus::{ChannelMessage, SendMessage};
+#[cfg(test)]
 use tinychannels_runtime::Channel;
 use tokio::sync::mpsc;
 
@@ -27,7 +28,10 @@ pub(super) struct ModuleChannelRuntime {
     proxy: tinychannels_bus::HttpProxyPolicy,
     infos: Vec<ConfiguredChannelInfo>,
     relay: Option<tinychannels_bus::module_relay::RelayReservation>,
+    #[cfg(test)]
     channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+    #[cfg(not(test))]
+    channels: Arc<HashMap<String, Arc<super::ChannelHandle>>>,
     closed: bool,
 }
 
@@ -35,7 +39,7 @@ pub(super) struct ModuleChannelRuntime {
 pub(super) struct ModuleChannel {
     pub(super) name: String,
     pub(super) object: ModuleObjectClient,
-    interaction: tinychannels_bus::ChannelInteractionInfo,
+    pub(super) interaction: tinychannels_bus::ChannelInteractionInfo,
     relay: Option<tinychannels_bus::module_relay::RelayReservation>,
     relay_fronted: bool,
 }
@@ -137,7 +141,10 @@ impl ModuleChannelRuntime {
                         .any(|identity| identity.platform == channel)
             })
         };
-        let mut channels = HashMap::new();
+        #[cfg(test)]
+        let mut channels: HashMap<String, Arc<dyn Channel>> = HashMap::new();
+        #[cfg(not(test))]
+        let mut channels: HashMap<String, Arc<super::ChannelHandle>> = HashMap::new();
         let mut progressive = HashMap::new();
         for info in &infos {
             let channel = ModuleChannel {
@@ -148,7 +155,13 @@ impl ModuleChannelRuntime {
                 relay_fronted: relay_fronts(&info.name),
             };
             let channel = Arc::new(channel);
+            #[cfg(test)]
             channels.insert(info.name.clone(), channel.clone() as Arc<dyn Channel>);
+            #[cfg(not(test))]
+            channels.insert(
+                info.name.clone(),
+                Arc::new(super::ChannelHandle::Module((*channel).clone())),
+            );
             let progressive_channel: Arc<dyn ProgressiveChannelTransport> = channel.clone();
             progressive.insert(info.name.clone(), Arc::downgrade(&progressive_channel));
         }
@@ -169,7 +182,13 @@ impl ModuleChannelRuntime {
         })
     }
 
+    #[cfg(test)]
     pub(super) fn channels(&self) -> Arc<HashMap<String, Arc<dyn Channel>>> {
+        Arc::clone(&self.channels)
+    }
+
+    #[cfg(not(test))]
+    pub(super) fn channels(&self) -> Arc<HashMap<String, Arc<super::ChannelHandle>>> {
         Arc::clone(&self.channels)
     }
 
@@ -333,8 +352,7 @@ fn channel_proxy(config: &Config) -> tinychannels_bus::HttpProxyPolicy {
     }
 }
 
-#[async_trait]
-impl Channel for ModuleChannel {
+impl ModuleChannel {
     fn name(&self) -> &str {
         &self.name
     }
@@ -343,7 +361,7 @@ impl Channel for ModuleChannel {
         self.interaction.proactive_target.clone()
     }
 
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+    pub(super) async fn send_prepared(&self, message: &SendMessage) -> anyhow::Result<()> {
         self.send_prepared(message).await
     }
 

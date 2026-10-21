@@ -15,6 +15,103 @@ mod turn_parts;
 use anyhow::Result;
 use tinybus::module::{ModuleCallError, ModuleClient};
 
+#[cfg(test)]
+pub(crate) type ChannelHandle = dyn tinychannels_runtime::Channel;
+
+/// Host-owned handle to a configured channel instance. Production operations
+/// are dispatched through the loaded TinyChannels module's bus object.
+#[cfg(not(test))]
+#[derive(Clone)]
+pub(crate) enum ChannelHandle {
+    Module(module_providers::ModuleChannel),
+    Relay(std::sync::Arc<crate::channels::providers::relay::RelayChannel>),
+}
+
+#[cfg(not(test))]
+impl ChannelHandle {
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Self::Module(channel) => &channel.name,
+            Self::Relay(channel) => channel.name(),
+        }
+    }
+
+    pub(crate) fn proactive_target(&self) -> Option<String> {
+        match self {
+            Self::Module(channel) => channel.proactive_target(),
+            Self::Relay(_) => None,
+        }
+    }
+
+    pub(crate) fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
+        match self {
+            Self::Module(channel) => channel.capabilities(),
+            Self::Relay(_) => tinychannels_bus::ChannelCapabilities::unknown(),
+        }
+    }
+
+    pub(crate) fn supports_reactions(&self) -> bool {
+        matches!(self, Self::Module(channel) if channel.interaction.supports_reactions)
+    }
+
+    pub(crate) async fn send(
+        &self,
+        message: &tinychannels_bus::SendMessage,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::Module(channel) => channel.send_prepared(message).await,
+            Self::Relay(channel) => channel.send(message).await,
+        }
+    }
+
+    pub(crate) async fn send_with_outbound_intent(
+        &self,
+        message: &tinychannels_bus::SendMessage,
+    ) -> anyhow::Result<()> {
+        self.send(message).await
+    }
+
+    pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
+        match self {
+            Self::Module(channel) => channel
+                .interact(tinychannels_bus::ChannelInteraction::StartTyping {
+                    recipient: recipient.to_owned(),
+                })
+                .await,
+            Self::Relay(_) => Ok(()),
+        }
+    }
+
+    pub(crate) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
+        match self {
+            Self::Module(channel) => channel
+                .interact(tinychannels_bus::ChannelInteraction::StopTyping {
+                    recipient: recipient.to_owned(),
+                })
+                .await,
+            Self::Relay(_) => Ok(()),
+        }
+    }
+
+    pub(crate) async fn begin_typing_refresh(
+        &self,
+        recipient: &str,
+        interval_secs: u64,
+    ) -> anyhow::Result<Option<String>> {
+        match self {
+            Self::Module(channel) => channel.begin_typing_refresh(recipient, interval_secs).await,
+            Self::Relay(_) => Ok(None),
+        }
+    }
+
+    pub(crate) async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
+        match self {
+            Self::Module(channel) => channel.end_typing_refresh(handle).await,
+            Self::Relay(_) => Ok(()),
+        }
+    }
+}
+
 /// Ask the owning module to prepare effective execution limits for this host
 /// runtime. A malformed response fails closed and reports only the module ID.
 pub(crate) async fn prepare_runtime_limits(
