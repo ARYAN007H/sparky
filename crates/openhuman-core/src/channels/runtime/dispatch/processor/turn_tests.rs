@@ -80,7 +80,7 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
 async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
     use tinychannels_bus::{
         channel::{
-            ChannelRef, ContentPart, ConversationKind, ConversationRef, FileReference, MediaKind,
+            ChannelRef, ContentPart, ConversationKind, ConversationRef, MediaKind,
             MediaReference, SenderRef, VoiceNote, VoiceTranscript, VoiceTranscriptSource,
             VoiceTranscriptState,
         },
@@ -154,7 +154,7 @@ async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
     .expect("typed preparation retains the full provider envelope");
 
     assert_eq!(prepared.envelope, envelope);
-    assert_eq!(prepared.message.content, "before\\nspoken words\\nafter");
+    assert_eq!(prepared.message.content, "before\nspoken words\nafter");
     assert_eq!(prepared.envelope.channel.account_id.as_deref(), Some("work"));
     assert_eq!(prepared.envelope.conversation.thread_id.as_deref(), Some("thread-3"));
     assert_eq!(prepared.envelope.conversation.topic_id.as_deref(), Some("topic-4"));
@@ -162,6 +162,4 @@ async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
         prepared.envelope.parts.get(2),
         Some(ContentPart::File { media, .. }) if media.opaque_id.as_deref() == Some("scoped-file-ref")
     ));
-
-    let _ = FileReference::default();
 }
