@@ -90,12 +90,11 @@ pub async fn test_connection(
         "{LOG_PREFIX} test_connection starting"
     );
 
+    let custom_provider = custom_endpoint
+        .as_deref()
+        .map(|endpoint| format!("custom:{endpoint}"));
     let selected = settings(
-        if custom_endpoint.is_some() {
-            &format!("custom:{}", custom_endpoint.as_deref().unwrap_or_default())
-        } else {
-            provider_tag
-        },
+        custom_provider.as_deref().unwrap_or(provider_tag),
         model,
         dims,
         tinyinference_local::ollama::ollama_base_url_from_override(
