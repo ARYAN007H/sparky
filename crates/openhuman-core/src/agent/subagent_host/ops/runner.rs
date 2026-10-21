@@ -15,7 +15,7 @@ use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
 use crate::agent::session_host::dedup_visible_tool_specs;
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
-    filter_tool_indices_with_nested_spawn, is_subagent_spawn_tool, subagent_prompt_protocol,
+    filter_definition_tool_indices, is_subagent_spawn_tool, subagent_prompt_protocol,
 };
 use crate::agent::subagent_host::types::{
     SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
@@ -476,67 +476,15 @@ async fn run_typed_mode(
     };
 
     // ── Filter tools per definition + per-spawn override ───────────────
-    let nested_spawn_ids = definition.allowed_subagent_ids();
-    let explicitly_declares_nested_spawn = |name: &str| {
-        is_subagent_spawn_tool(name)
-            && (definition.extra_tools.iter().any(|tool| tool == name)
-                || matches!(
-                    &definition.tools,
-                    tinyagents_definition::ToolScope::Named(names)
-                        if names.iter().any(|tool| tool == name)
-                ))
-    };
-    let nested_spawn_allowed = |name: &str| {
-        nested_spawn_depth_available
-            && !nested_spawn_ids.is_empty()
-            && explicitly_declares_nested_spawn(name)
-    };
-    let nested_spawn_granted = parent
-        .all_tools
-        .iter()
-        .any(|tool| nested_spawn_allowed(tool.name()));
-    let mut allowed_indices = filter_tool_indices_with_nested_spawn(
+    let (mut allowed_indices, nested_spawn_granted) = filter_definition_tool_indices(
         &parent.all_tools,
-        &definition.tools,
-        &definition.disallowed_tools,
+        definition,
         options
             .skill_filter_override
             .as_deref()
             .or(definition.skill_filter.as_deref()),
-        nested_spawn_granted,
+        nested_spawn_depth_available,
     );
-
-    // Sub-agents are leaves unless their own definition explicitly declares a
-    // spawn tool, and the host's checked depth budget admits another child.
-    // Keep the normal definition scope, denylist, and inherited ceiling as
-    // independent constraints on that opt-in.
-    let before = allowed_indices.len();
-    allowed_indices.retain(|&i| {
-        let name = parent.all_tools[i].name();
-        !is_subagent_spawn_tool(name) || nested_spawn_allowed(name)
-    });
-    let stripped = before - allowed_indices.len();
-    if stripped > 0 {
-        tracing::debug!(
-            agent_id = %definition.id,
-            stripped,
-            "[subagent_host] removed sub-agent spawn tools from sub-agent's tool surface"
-        );
-    }
-
-    // ── Force-include extra_tools ──────────────────────────────────────
-    if !definition.extra_tools.is_empty() {
-        for (i, tool) in parent.all_tools.iter().enumerate() {
-            let name = tool.name();
-            if definition.extra_tools.iter().any(|n| n == name)
-                && !allowed_indices.contains(&i)
-                && !crate::tools::rules::glob_list_matches(&definition.disallowed_tools, name)
-                && (!is_subagent_spawn_tool(name) || nested_spawn_allowed(name))
-            {
-                allowed_indices.push(i);
-            }
-        }
-    }
 
     // A child may only narrow an explicit profile/channel ceiling, never widen
     // it back to `all_tools`. The parent's own role-specific prompt surface is
