@@ -166,7 +166,7 @@ impl FailurePolicy for HaltCopy {
             count,
             failure_text,
         )
-            .summary
+        .summary
     }
 
     fn no_progress_halt_summary(&self, consecutive: u32, tool: &str, failure_text: &str) -> String {
@@ -325,13 +325,11 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         if result.is_error && !is_command_exit_report(&failure_text) {
             if let Some(kind) = stop::terminal_inference_failure_kind(heuristic) {
                 let halt = match kind {
-                    TerminalInferenceFailureKind::BudgetExhausted => {
-                        stop::halt_summary::budget(
-                            &crate::agent::tinyagents::host::OpenHumanCopyProvider,
-                            &call.name,
-                            &failure_text,
-                        )
-                    }
+                    TerminalInferenceFailureKind::BudgetExhausted => stop::halt_summary::budget(
+                        &crate::agent::tinyagents::host::OpenHumanCopyProvider,
+                        &call.name,
+                        &failure_text,
+                    ),
                     TerminalInferenceFailureKind::ProviderConfig => {
                         stop::halt_summary::provider_config(
                             &crate::agent::tinyagents::host::OpenHumanCopyProvider,

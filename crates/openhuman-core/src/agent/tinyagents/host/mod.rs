@@ -42,8 +42,8 @@ pub use bundle::{
     OpenHumanHostBase, OpenHumanHostBundle, OpenHumanHostBundleFactory, OpenHumanHostBundleInputs,
     OpenHumanHostInvocationInputs,
 };
-pub use definition_registry::OpenHumanDefinitionRegistry;
 pub(crate) use copy::OpenHumanCopyProvider;
+pub use definition_registry::OpenHumanDefinitionRegistry;
 pub use run_context::{
     decide_dispatch, DispatchDecision, DispatchInputs, LastTurnUsage, OpenHumanRunContext,
     OpenHumanRunExt, SubagentUsageEntry, TurnDispatchState,
