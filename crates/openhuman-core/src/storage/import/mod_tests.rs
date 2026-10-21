@@ -384,6 +384,34 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     assert_eq!(profile.created_at, 1_738_548_306);
     assert_eq!(profile.layout_version, 1);
 
+    // These owner records predate the per-domain file importers. They lived
+    // in the profile's TSD database and must still be readable after the
+    // profile's real layout migration, including the owner-specific schema
+    // conversion performed during boot.
+    let owner_docs = Arc::clone(
+        backend
+            .for_scope(&scope_for_profile("u1"))
+            .unwrap()
+            .documents(),
+    );
+    let (approvals, thread_keys, secrets, flows) = storage::block_on(async move {
+        Ok::<_, crate::storage::StorageError>((
+            owner_docs.query_all("approvals.requests", &Query::all()).await?,
+            owner_docs
+                .query_all("threads.transcript_keys", &Query::all())
+                .await?,
+            owner_docs.query_all("secrets", &Query::all()).await?,
+            owner_docs
+                .query_all("flows.definitions", &Query::all())
+                .await?,
+        ))
+    })
+    .unwrap();
+    assert_eq!(approvals.len(), 1, "historical approval remains readable");
+    assert_eq!(thread_keys.len(), 1, "historical thread key remains readable");
+    assert_eq!(secrets.len(), 1, "historical secret remains readable");
+    assert_eq!(flows.len(), 1, "historical flow remains readable");
+
     assert_eq!(
         sha2::Sha256::digest(std::fs::read(&source_db).unwrap()),
         source_hash,
