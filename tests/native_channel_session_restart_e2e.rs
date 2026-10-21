@@ -813,18 +813,22 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
     wait_healthy(&core_rpc, &mut core, &logs.join("typed-media.log")).await;
 
     push_media_update(&mocks.state, media_update(200, 20, true, false, None));
+    wait_for_media_fetch(&mocks.state, 200, "typed-image-file", "photos/native.png").await;
     wait_for_completion(&mocks.state, 1).await;
     push_media_update(&mocks.state, media_update(201, 21, false, true, None));
+    wait_for_media_fetch(&mocks.state, 201, "typed-document-file", "documents/native.txt").await;
     wait_for_completion(&mocks.state, 2).await;
     push_media_update(
         &mocks.state,
         media_update(202, 22, true, false, Some("image caption before media")),
     );
+    wait_for_media_fetch(&mocks.state, 202, "typed-image-file", "photos/native.png").await;
     wait_for_completion(&mocks.state, 3).await;
     push_media_update(
         &mocks.state,
         media_update(203, 23, false, true, Some("file caption before media")),
     );
+    wait_for_media_fetch(&mocks.state, 203, "typed-document-file", "documents/native.txt").await;
     wait_for_completion(&mocks.state, 4).await;
 
     let requests = mocks
@@ -879,4 +883,35 @@ fn push_media_update(state: &MockState, update: Value) {
         .lock()
         .expect("Telegram updates")
         .push_back(update);
+}
+
+async fn wait_for_media_fetch(state: &MockState, update_id: i64, file_id: &str, file_path: &str) {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        let served = state
+            .served_update_ids
+            .lock()
+            .expect("served Telegram updates")
+            .contains(&update_id);
+        let metadata = state
+            .file_requests
+            .lock()
+            .expect("Telegram getFile requests")
+            .iter()
+            .any(|request| request == file_id);
+        let downloaded = state
+            .file_downloads
+            .lock()
+            .expect("Telegram file downloads")
+            .iter()
+            .any(|download| download == file_path);
+        assert!(
+            Instant::now() < deadline,
+            "media update {update_id} did not reach file fetch: served={served}, getFile={metadata}, downloaded={downloaded}"
+        );
+        if served && metadata && downloaded {
+            return;
+        }
+        sleep(Duration::from_millis(25)).await;
+    }
 }
