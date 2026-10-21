@@ -233,6 +233,7 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
         .unwrap()
         .sealed_ms
         .unwrap();
+    let raw = backend.for_scope(&profile_scope).unwrap();
     let expired_at = sealed_at + DAY_MS as i64 + 1;
 
     // Provisioned in the registry, but never opened here: it may be leased by
@@ -256,14 +257,7 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
         .await
         .unwrap();
     assert_eq!(expired.deleted, 0);
-    assert!(backend
-        .for_scope(&profile_scope)
-        .unwrap()
-        .streams()
-        .info(&stream)
-        .await
-        .unwrap()
-        .is_some());
+    assert!(raw.streams().info(&stream).await.unwrap().is_some());
 }
 
 #[tokio::test]
@@ -300,6 +294,7 @@ async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_wri
         .unwrap()
         .sealed_ms
         .unwrap();
+    let raw = backend.for_scope(&scope).unwrap();
 
     // Capture the exact admitted fence and scope list first. Expiration after
     // that point must still prevent both conditional stream deletion and the
@@ -321,7 +316,6 @@ async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_wri
     assert_eq!(summary.deleted, 0);
     assert_eq!(summary.scopes, 0);
 
-    let raw = backend.for_scope(&scope).unwrap();
     assert!(raw.streams().info(&stream).await.unwrap().is_some());
     assert!(raw
         .documents()
