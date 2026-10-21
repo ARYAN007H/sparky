@@ -51,6 +51,8 @@
 pub mod live;
 mod schemas;
 #[cfg(feature = "legacy-import")]
+pub(crate) mod layout_status;
+#[cfg(feature = "legacy-import")]
 pub mod sessions;
 #[cfg(feature = "legacy-import")]
 mod snapshot;
