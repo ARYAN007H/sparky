@@ -33,6 +33,12 @@ test('collection names must be <owner>.<entity> in snake_case', () => {
   assert.equal(problems.length, 3, problems.join('\n'));
 });
 
+test('known legacy migration collections remain inventoried', () => {
+  assert.deepEqual(lint({
+    collections: [collection('remix_markers'), collection('tinymemes_documents')],
+  }), []);
+});
+
 test('duplicate collection and index names are refused', () => {
   const problems = lint({
     collections: [
@@ -70,6 +76,7 @@ test('the rendering is stable and inventories CollectionSpecs by owner namespace
       }),
       collection('b.x'),
       collection('a.z', { ttl_field: 'expires_ms' }),
+      collection('remix_markers'),
     ],
   };
   const text = render(dump);
@@ -77,6 +84,7 @@ test('the rendering is stable and inventories CollectionSpecs by owner namespace
   assert.ok(text.indexOf('`a.y`') < text.indexOf('`a.z`'));
   assert.match(text, /## a\n/);
   assert.match(text, /## b\n/);
+  assert.match(text, /## legacy \(unqualified names\)\n/);
   assert.doesNotMatch(text, /composed registry/i);
   assert.match(text, /by_created/);
   assert.match(text, /`expires_ms`/);
