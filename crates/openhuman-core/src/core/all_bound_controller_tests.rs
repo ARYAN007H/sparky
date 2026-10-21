@@ -42,6 +42,7 @@ fn staged_bound_methods() -> Vec<&'static str> {
         "voice.live_test_provider",
     ]);
     methods.push("threads.upsert");
+    methods.extend(["devices.create_pairing", "devices.list", "devices.revoke"]);
     methods.extend([
         "profiles.provision",
         "profiles.deprovision",
@@ -686,3 +687,6 @@ mod doctor_controller_tests;
 
 #[path = "all_app_state_controller_tests.rs"]
 mod app_state_controller_tests;
+
+#[path = "all_devices_controller_tests.rs"]
+mod devices_controller_tests;
