@@ -6,9 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tinyagents_storage_kit::Key;
 use tinystoragedrivers::secrets::{DerivedKeys, DocumentSecrets, SecretStore};
-use tinystoragedrivers::{
-    CollectionSpec, Precondition, Scope, StorageConfig, StreamStore, WriteOptions,
-};
+use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageConfig, WriteOptions};
 use zeroize::Zeroizing;
 
 const PROFILE_ID: &str = "u1";

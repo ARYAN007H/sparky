@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use openhuman_core::storage::DocumentStoreExt as _;
 use serde_json::{Value, json};
 use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;
@@ -70,10 +69,6 @@ fn start(home: &Path) -> (Server, String) {
         );
         std::thread::sleep(Duration::from_millis(250));
     }
-}
-
-fn rpc(base: &str, method: &str) -> Value {
-    rpc_with_params(base, method, json!({}))
 }
 
 fn rpc_with_params(base: &str, method: &str, params: Value) -> Value {
@@ -178,23 +173,6 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         async move { openhuman_core::storage::open(&archive_url).await },
     )
     .expect("archived historical database must remain readable");
-    let target_url = format!("sqlite:{}", profile.join("storage.db").display());
-    let target_backend = openhuman_core::storage::block_on(async move {
-        openhuman_core::storage::open(&target_url).await
-    })
-    .unwrap();
-    for name in ["local", "profile:u1"] {
-        let scope = openhuman_core::storage::Scope::new(name).unwrap();
-        let scoped = target_backend.for_scope(&scope).unwrap();
-        let rows = openhuman_core::storage::block_on(async move {
-            scoped
-                .documents()
-                .query_all("conversations.threads", &tinystoragedrivers::Query::all())
-                .await
-        });
-        eprintln!("target thread rows in {name}: {rows:?}");
-    }
-
     // The profile's V2 workspace resolves its default backend to the exact
     // storage.db that desktop boot just opened.
     let workspace = profile.join("files");
@@ -204,11 +182,17 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     config.storage.url = Some(format!("sqlite:{}", profile.join("storage.db").display()));
     let owner_workspace = workspace.clone();
     std::thread::spawn(move || {
+        let storage_url = config.storage.url.as_deref().unwrap().to_owned();
         let owner_runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
         owner_runtime.block_on(async move {
+            let owner_backend = openhuman_core::storage::block_on(async {
+                openhuman_core::storage::open(&storage_url).await
+            })
+            .unwrap();
+            openhuman_core::storage::install_for_url(&storage_url, owner_backend);
             let runtime = openhuman_core::core::runtime::CoreBuilder::new(
                 openhuman_core::core::types::HostKind::TauriShell,
             )
