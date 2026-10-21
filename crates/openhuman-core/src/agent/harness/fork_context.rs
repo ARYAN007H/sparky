@@ -5,8 +5,7 @@
 //! A [`ParentExecutionContext`] travels explicitly: the parent
 //! [`crate::agent::OpenHumanSessionHost`] attaches it to its turn's
 //! [`OpenHumanRunContext`](crate::agent::tinyagents::host::OpenHumanRunContext)
-//! (`parent`), tools read it from there, and controller-spawned background
-//! surfaces (such as the workflow engine) build a root one with
+//! (`parent`), tools read it from there, and triage escalation builds its root parent with
 //! [`crate::triage::parent_context::build_root_parent`] and pass it
 //! to the spawns they make. There is no ambient copy.
 //!
