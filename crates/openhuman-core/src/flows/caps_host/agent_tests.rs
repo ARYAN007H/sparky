@@ -257,39 +257,53 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         .filter(|job| job.agent == "flow_worker")
         .map(|job| (job.status.clone(), job.subagent_run_id.clone()))
         .collect::<Vec<_>>();
+    let grandchild_jobs = snapshots
+        .iter()
+        .filter(|job| job.agent == "task_manager_agent")
+        .collect::<Vec<_>>();
     let diagnostic_dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(
         &core_for_journal,
     ));
-    let mut unknown_spawn_events = Vec::new();
-    for run_id in child_runs.iter().filter_map(|(_, run_id)| run_id.as_deref()) {
-        let events = crate::agent::tinyagents::journal::read_run_events(
-            &diagnostic_dispatch,
-            run_id,
-            0,
+    let worker_run_id = child_runs
+        .first()
+        .and_then(|(_, run_id)| run_id.as_deref())
+        .expect("the worker job records its own run id");
+    let worker_events = crate::agent::tinyagents::journal::read_run_events(
+        &diagnostic_dispatch,
+        worker_run_id,
+        0,
+    )
+    .await
+    .expect("read the worker journal for the nested-spawn evidence");
+    let nested_spawn_completed = worker_events.iter().any(|observation| {
+        matches!(
+            &observation.event,
+            tinyagents_harness::events::AgentEvent::ToolCompleted {
+                tool_name,
+                error: None,
+                ..
+            } if tool_name == "spawn_subagent"
         )
-        .await
-        .expect("read worker journal for the nested-spawn diagnostic");
-        unknown_spawn_events.extend(events.iter().filter_map(|observation| {
-            match &observation.event {
-                tinyagents_harness::events::AgentEvent::UnknownToolCall {
-                    requested_name,
-                    recovery,
-                    ..
-                } if requested_name == "spawn_subagent" => Some(recovery.clone()),
-                _ => None,
-            }
-        }));
-    }
-    eprintln!(
-        "NESTED_FLOW_DIAGNOSTIC child_calls={} child_spawn_schema_per_call={:?} nested_spawn_calls={} grandchild_calls={} grandchild_reached_model={} worker_jobs={:?} unknown_spawn_recovery={:?}",
-        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        model.child_schema_names.lock().unwrap(),
-        model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
-        model.grandchild_calls.load(std::sync::atomic::Ordering::SeqCst),
-        grandchild_reached_model,
-        child_runs,
-        unknown_spawn_events,
-    );
+    });
+    let grandchild_run_id = grandchild_jobs
+        .first()
+        .and_then(|job| job.subagent_run_id.as_deref())
+        .expect("the grandchild job records its own run id");
+    let grandchild_events = crate::agent::tinyagents::journal::read_run_events(
+        &diagnostic_dispatch,
+        grandchild_run_id,
+        0,
+    )
+    .await
+    .expect("read the grandchild's durable run events");
+    let grandchild_completed = grandchild_events.iter().any(|observation| {
+        matches!(
+            &observation.event,
+            tinyagents_harness::events::AgentEvent::RunCompleted { run_id, .. }
+                if run_id.as_str() == grandchild_run_id
+        )
+    });
+    let grandchild_output = grandchild_jobs[0].output.as_deref().unwrap_or_default();
 
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
@@ -315,6 +329,20 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         1,
         "the grandchild must run through the real model dispatch"
     );
+    assert!(grandchild_reached_model, "the grandchild must reach its model callback");
+    assert_eq!(grandchild_jobs.len(), 1, "one grandchild job must be admitted");
+    assert_eq!(
+        grandchild_jobs[0].status,
+        tinyagents_harness_tools::subagents::SubAgentJobStatus::Completed,
+        "the grandchild must reach a terminal successful state"
+    );
+    assert_ne!(
+        worker_run_id, grandchild_run_id,
+        "worker and grandchild must have distinct native run identities"
+    );
+    assert!(nested_spawn_completed, "the worker journal must record the successful nested spawn");
+    assert!(grandchild_completed, "the grandchild journal must record terminal completion");
+    assert!(grandchild_output.contains("headless-flow-grandchild-result"));
     assert_eq!(
         model
             .accepted_followups
