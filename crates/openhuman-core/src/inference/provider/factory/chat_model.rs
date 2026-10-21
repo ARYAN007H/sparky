@@ -35,13 +35,9 @@ impl OpenHumanModelFactory<'_> {
     }
 
     fn injected(&self, request: &ModelBuildRequest) -> Option<Arc<dyn ChatModel<()>>> {
-        #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-        if let Some(model) = test_provider_override::current() {
-            return Some(model);
-        }
         let local = self.ctx.host_overrides()?;
         let route = request.route.as_deref();
-        match &request.purpose {
+        let host_model = match &request.purpose {
             ModelPurpose::Primary => local.model_for(&request.role),
             ModelPurpose::Summarization => local
                 .role_models
@@ -52,7 +48,15 @@ impl OpenHumanModelFactory<'_> {
                 .and_then(|route| local.role_models.get(route))
                 .or_else(|| local.role_models.get(&request.role))
                 .cloned(),
+        };
+        if host_model.is_some() {
+            return host_model;
         }
+        #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+        if let Some(model) = test_provider_override::current() {
+            return Some(model);
+        }
+        None
     }
 
     fn build_request(

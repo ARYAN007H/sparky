@@ -499,7 +499,7 @@ impl TurnModelSource {
                 .or_else(crate::inference::provider::factory::test_provider_override::current);
             #[cfg(not(any(test, feature = "e2e-test-support", feature = "rss-bench")))]
             let injected = host_injected;
-            let injected_profile = injected.as_ref().and_then(|model| model.profile());
+            let injected_profile = host_injected.as_ref().and_then(|model| model.profile());
             let provider_string = cn.primary_override.clone().unwrap_or_else(|| {
                 crate::inference::provider::provider_for_role(&cn.role, &cn.config)
             });
@@ -526,6 +526,11 @@ impl TurnModelSource {
                         ),
                         context_window.or(profile.max_input_tokens),
                     )
+                } else if host_injected.is_some() {
+                    // A host-injected model owns the provider choice even when
+                    // it does not publish a profile. Keep capability claims
+                    // conservative and retain only the caller's window.
+                    ("injected".to_string(), false, false, false, false, context_window)
                 } else {
                     let is_local =
                         tinyinference_local::profile::is_local_provider_string(&provider_string);
