@@ -165,11 +165,12 @@ fn direct_key_path(provider: &str) -> String {
 /// token.
 fn managed_credential_available(config: &Config) -> bool {
     use crate::security::credentials::{
-        APP_SESSION_PROVIDER, AuthService, api_key,
+        api_key,
         session_support::{
-            SessionTokenCheck, check_session_backend, classify_session_token,
-            is_local_session_token,
+            check_session_backend, classify_session_token, is_local_session_token,
+            SessionTokenCheck,
         },
+        AuthService, APP_SESSION_PROVIDER,
     };
 
     if api_key::get_api_key_read_only(config)

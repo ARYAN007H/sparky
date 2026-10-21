@@ -1,8 +1,8 @@
 use super::*;
 use crate::doctor::contract::{DoctorCtx, FindingSeverity};
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 struct ExistingList {

@@ -60,23 +60,19 @@ async fn former_runtime_settings_findings_keep_their_paths_without_exposing_valu
             "missing {path} finding: {findings:#?}"
         );
     }
-    assert!(
-        findings
-            .iter()
-            .filter(|finding| finding.check_id == ID)
-            .all(|finding| finding.severity == FindingSeverity::Warn
-                && !finding.fix_hint.trim().is_empty())
-    );
+    assert!(findings
+        .iter()
+        .filter(|finding| finding.check_id == ID)
+        .all(|finding| finding.severity == FindingSeverity::Warn
+            && !finding.fix_hint.trim().is_empty()));
     assert!(findings.iter().all(|finding| {
         !finding.message.contains("private-model-name")
             && !finding.message.contains("private-route-name")
             && !finding.message.contains("private-agent-name")
     }));
-    assert!(
-        !findings
-            .iter()
-            .any(|finding| finding.check_id == "doctor/selection")
-    );
+    assert!(!findings
+        .iter()
+        .any(|finding| finding.check_id == "doctor/selection"));
 }
 
 #[tokio::test]

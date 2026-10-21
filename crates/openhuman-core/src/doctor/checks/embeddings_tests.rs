@@ -1,4 +1,4 @@
-use super::{ConfiguredModelCheck, model_matches};
+use super::{model_matches, ConfiguredModelCheck};
 use crate::config::Config;
 use crate::doctor::runner;
 use crate::doctor::{DoctorCheck, DoctorCtx, DoctorOptions, DoctorTier, Finding, FindingSeverity};
@@ -63,12 +63,10 @@ async fn missing_embedding_model_and_dimensions_are_reported() {
         paths.contains(&"memory.embedding_dimensions"),
         "missing dimensions path in findings: {findings:#?}"
     );
-    assert!(
-        findings
-            .iter()
-            .filter(|result| result.check_id == EMBEDDINGS_CONFIG)
-            .all(|result| result.severity == FindingSeverity::Error)
-    );
+    assert!(findings
+        .iter()
+        .filter(|result| result.check_id == EMBEDDINGS_CONFIG)
+        .all(|result| result.severity == FindingSeverity::Error));
 }
 
 #[tokio::test]
@@ -159,18 +157,14 @@ async fn configured_ollama_model_uses_each_selected_config_base_url() {
         finding.check_id == "embeddings/configured-model"
             && finding.severity == FindingSeverity::Error
     }));
-    assert!(
-        request_a
-            .await
-            .expect("fake Ollama A request")
-            .starts_with("GET /api/tags ")
-    );
-    assert!(
-        request_b
-            .await
-            .expect("fake Ollama B request")
-            .starts_with("GET /api/tags ")
-    );
+    assert!(request_a
+        .await
+        .expect("fake Ollama A request")
+        .starts_with("GET /api/tags "));
+    assert!(request_b
+        .await
+        .expect("fake Ollama B request")
+        .starts_with("GET /api/tags "));
 }
 
 #[tokio::test]
@@ -187,11 +181,9 @@ async fn non_ollama_embedding_provider_is_skipped_instead_of_reported_healthy() 
         finding.check_id == "embeddings/configured-model"
             && finding.severity == FindingSeverity::Skipped
     }));
-    assert!(
-        findings
-            .iter()
-            .all(|finding| finding.severity != FindingSeverity::Pass)
-    );
+    assert!(findings
+        .iter()
+        .all(|finding| finding.severity != FindingSeverity::Pass));
 }
 
 #[tokio::test]
