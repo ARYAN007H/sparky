@@ -122,7 +122,14 @@ test("bumpVersion and parseArgs", () => {
   assert.equal(bumpVersion("0.2.9", "minor"), "0.3.0");
   assert.equal(bumpVersion("0.2.9", "major"), "1.0.0");
   assert.throws(() => bumpVersion("0.2.9", "huge"), /--bump/);
-  assert.deepEqual(parseArgs(["tinyx", "--bump", "minor", "--yes"]), { bump: "minor", yes: true, dryRun: false, id: "tinyx" });
+  assert.deepEqual(parseArgs(["tinyx", "--bump", "minor", "--yes"]), {
+    bump: "minor",
+    yes: true,
+    dryRun: false,
+    owner: "tinyhumansai",
+    workflowInput: "bump",
+    id: "tinyx",
+  });
   assert.throws(() => parseArgs([]), /usage/);
   assert.throws(() => parseArgs(["x", "--bump", "no"]), /--bump/);
 });

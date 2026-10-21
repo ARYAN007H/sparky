@@ -136,6 +136,11 @@ async function defaultConfirm(question) {
  * injectable so tests never touch GitHub or git.
  */
 export async function repin(opts, deps = {}) {
+  opts = {
+    ...opts,
+    owner: opts.owner ?? ORG,
+    workflowInput: opts.workflowInput ?? "bump",
+  };
   const root = resolve(opts.root ?? DEFAULT_ROOT);
   const run = deps.run ?? defaultRun;
   const confirm = deps.confirm ?? defaultConfirm;
