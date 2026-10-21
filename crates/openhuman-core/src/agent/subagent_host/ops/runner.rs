@@ -303,8 +303,6 @@ pub(crate) async fn run_subagent_direct_with_native_context(
                     &loaded_config,
                     native,
                     nested_spawn_depth_available,
-                    attempted_depth,
-                    max_depth,
                 ))
                 .await
             })
@@ -406,8 +404,6 @@ async fn run_typed_mode(
     config: &LoadedConfig,
     native: crate::agent::tinyagents::NativeSubagentRunContext,
     nested_spawn_depth_available: bool,
-    active_child_depth: usize,
-    max_depth: usize,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     let started = Instant::now();
 
