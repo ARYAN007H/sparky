@@ -654,7 +654,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     assert!(sent[1].content.contains("Thread: `Telegram"));
     assert!(sent[1].content.contains("Provider: `anthropic`"));
     assert!(sent[1].content.contains("Model: `claude-3`"));
-    assert!(sent[1].content.contains("In-memory turns: 1"));
+    assert!(sent[1].content.contains("Session turns: 0"));
     assert!(sent[1].content.contains("Turn: in progress"));
 
     assert!(sent[2].content.contains("**Recent sessions**"));

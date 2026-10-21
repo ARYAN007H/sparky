@@ -3,6 +3,7 @@ use super::super::context::{
     CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
+use super::super::runtime::test_support::linked_telegram_runtime;
 use super::common::{
     IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel, ToolCallingModel,
 };
