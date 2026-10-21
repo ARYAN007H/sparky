@@ -280,7 +280,7 @@ fn registration_preserves_a_live_or_unanchored_higher_epoch_fence() {
 
 #[tokio::test]
 async fn the_guard_passes_unfenced_scopes_and_refuses_with_a_typed_error() {
-    let backend = MemoryStorage::new();
+    let backend = crate::storage::test_support::sqlite_backend().unwrap();
     let store = leases(&backend, "a");
     let grant = store.acquire("alice", 0).await.unwrap();
     let registry = FenceRegistry::new(|| 40_000);
