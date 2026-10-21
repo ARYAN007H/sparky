@@ -103,7 +103,7 @@ async fn callback_documents_route_uses_the_captured_storage() {
         Some(&peer),
         Object::Documents,
         "Get",
-        json!({"collection": "juice.savings", "document_id": "current"}),
+        json!({"collection": "juice.savings", "id": "current"}),
     )
     .await;
 
@@ -125,7 +125,7 @@ async fn callback_documents_route_keeps_the_module_collection_grant() {
             Some(&peer),
             Object::Documents,
             "Get",
-            json!({"collection": "another.module.collection", "document_id": "x"}),
+            json!({"collection": "another.module.collection", "id": "x"}),
         )
         .await,
         Err(HostFailure::Denied("target-not-granted"))
