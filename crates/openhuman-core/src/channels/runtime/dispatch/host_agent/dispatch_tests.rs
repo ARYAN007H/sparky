@@ -465,6 +465,22 @@ fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
 }
 
 async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner() {
+    let env_lock = crate::config::test_env::EnvVarGuard::locked_async().await;
+    let provider_server = MockServer::start().await;
+    let _provider_base = env_lock.with("OPENHUMAN_TELEGRAM_BOT_API_BASE", provider_server.uri());
+    Mock::given(method("POST"))
+        .and(path("/bottoken/sendMessage"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": {
+                "message_id": 991,
+                "date": 1,
+                "chat": { "id": 42, "type": "private" },
+                "text": "reply"
+            }
+        })))
+        .mount(&provider_server)
+        .await;
     let _bus = crate::agent::bus::use_real_agent_handler().await;
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
@@ -498,6 +514,15 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     let mut channel_config = config(&tmp, Some("teeny-chat"));
     channel_config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
     channel_config.modules.allow_download = false;
+    channel_config.channels_config.telegram = Some(tinychannels_bus::config::TelegramConfig {
+        bot_token: "token".into(),
+        chat_id: None,
+        allowed_users: vec!["42".into()],
+        stream_mode: Default::default(),
+        draft_update_interval_ms: 1,
+        silent_streaming: true,
+        mention_only: false,
+    });
     let mut ctx = context(Arc::clone(&channel), channel_config);
     Arc::get_mut(&mut ctx)
         .expect("the test owns the runtime context")
@@ -600,17 +625,37 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         tokio::time::advance(std::time::Duration::from_secs(2)).await;
         turn.await.expect("native channel turn task completes");
     }
-    let sent = channel.sent.lock().unwrap().clone();
-    assert_eq!(sent.len(), 1, "the timed-out turn emits one terminal reply");
+    let terminal_sends = provider_server
+        .received_requests()
+        .await
+        .expect("mock Telegram requests")
+        .into_iter()
+        .filter(|request| request.url.path() == "/bottoken/sendMessage")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        terminal_sends.len(),
+        1,
+        "the timed-out turn emits exactly one terminal provider send"
+    );
+    let terminal_body: serde_json::Value =
+        serde_json::from_slice(&terminal_sends[0].body).expect("Telegram send JSON");
     assert!(
-        sent[0].content.contains("past its time budget"),
-        "the response is the classified timeout notice: {sent:#?}"
+        terminal_body["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("past its time budget")),
+        "the actual module provider receives the classified timeout notice: {terminal_body:#}"
     );
 
     tokio::time::advance(std::time::Duration::from_secs(2)).await;
     tokio::task::yield_now().await;
     assert_eq!(
-        channel.sent.lock().unwrap().len(),
+        provider_server
+            .received_requests()
+            .await
+            .expect("mock Telegram requests")
+            .iter()
+            .filter(|request| request.url.path() == "/bottoken/sendMessage")
+            .count(),
         1,
         "the delayed model response cannot deliver after timeout cleanup"
     );
