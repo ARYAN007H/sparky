@@ -397,17 +397,18 @@ async fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap(
     );
 
     CoreContext::scope(context, async {
+        let agent_ref = "task_manager_agent";
         let def = definitions
-        .get("planner")
-        .expect("planner definition registered")
-        .clone();
+            .get(agent_ref)
+            .expect("task manager definition registered")
+            .clone();
         let expected = def.effective_max_iterations();
         assert_eq!(expected, 50);
 
         let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
             &crate::core::runtime::DispatchCtx::unbound(),
             &config,
-            "planner",
+            agent_ref,
         )
         .expect("build planner agent");
         assert_eq!(agent.agent_config().max_tool_iterations, expected);
