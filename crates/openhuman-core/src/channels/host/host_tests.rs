@@ -1,4 +1,4 @@
-//! Unit tests for the OpenHuman ChannelHost capability adapters.
+//! Unit tests for host-owned channel event projection.
 
 use super::*;
 #[test]

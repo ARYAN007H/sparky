@@ -9,7 +9,7 @@ use std::sync::Arc;
 const LOG_PREFIX: &str = "[channels_host]";
 
 // ---------------------------------------------------------------------------
-// AllowlistStore → config.toml channel allowlist
+// Host allowlist persistence → config.toml channel allowlist
 // ---------------------------------------------------------------------------
 
 /// Persists newly-authorized identities into the on-disk channel allowlist,
@@ -63,7 +63,7 @@ impl ConfigAllowlistStore {
 }
 
 // ---------------------------------------------------------------------------
-// EventSink → routes provider events to the right OpenHuman bus
+// Host callback → routes provider events to the right OpenHuman bus
 // ---------------------------------------------------------------------------
 
 /// Routes provider events by `domain`:
@@ -73,7 +73,7 @@ impl ConfigAllowlistStore {
 ///   Typed `channel_event` payloads use `publish_host_in` so trusted scope can
 ///   resolve and persist their exact OpenHuman message target first.
 ///
-/// One capability, two backends — providers don't know which bus they hit.
+/// One host callback, two backends — the module does not know which bus it hits.
 pub struct OpenHumanEventSink;
 
 impl OpenHumanEventSink {
