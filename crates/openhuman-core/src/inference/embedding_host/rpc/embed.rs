@@ -7,7 +7,9 @@ use super::{resolve_api_key, LOG_PREFIX};
 use crate::inference::embedding_host::factory::{
     create_embedding_provider_with_config, credential_resolver, managed_factory, settings,
 };
-use tinyinference_embeddings::verify::test_embedding_connection;
+use tinyinference_embeddings::verify::{
+    ConnectionTestError, test_embedding_connection_detailed,
+};
 use tinyinference_providers::route::split_custom_provider;
 
 /// Generates embeddings for the given input texts using the currently
@@ -103,15 +105,18 @@ pub async fn test_connection(
     );
     let credentials = credential_resolver(config);
     let managed = managed_factory(Some(config.clone()), None);
-    let result = test_embedding_connection(
+    let result = test_embedding_connection_detailed(
         &selected,
         &credentials,
         &managed,
         custom_endpoint.as_deref(),
     )
-    .await
-    .map(|result| result.actual_dims)
-    .map_err(|error| error.to_string());
+    .await;
+    let result = match result {
+        Ok(result) => Ok(result.actual_dims),
+        Err(ConnectionTestError::Build(error)) => return Err(error.to_string()),
+        Err(ConnectionTestError::Embed(error)) => Err(error.to_string()),
+    };
 
     match result {
         Ok(actual_dims) => {
