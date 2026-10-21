@@ -1,5 +1,4 @@
 use super::*;
-use crate::storage::Scope;
 use std::{ops::Range, sync::Arc, time::Duration};
 use tinystoragedrivers_api::{BlobStore, Storage, StorageBackend};
 use tinystoragedrivers_types::{Blob, BlobMeta, Capabilities, Result};
@@ -45,7 +44,7 @@ async fn wait_until_expired(backend: &Arc<dyn StorageBackend>, scope: &Scope, ke
 async fn sweep_scope_reclaims_only_lapsed_blobs_of_that_scope() {
     let backend = backend_with_clock();
     let local = Scope::local();
-    let other = crate::storage::scope_for_agent("blob-sweep-other");
+    let other = crate::storage::scope_for_agent("blob-sweep-other").to_storage_scope();
     put_expiring(&backend, &local, "short", 10).await;
     put_expiring(&backend, &local, "long", 10_000).await;
     put_expiring(&backend, &other, "short", 10).await;
@@ -122,8 +121,8 @@ fn no_module_blob_scopes_without_the_modules_feature() {
 #[tokio::test]
 async fn sweep_profiles_reclaims_each_profiles_own_scope() {
     let backend = backend_with_clock();
-    let acme = crate::storage::scope_for_profile("acme");
-    let globex = crate::storage::scope_for_profile("globex");
+    let acme = crate::storage::scope_for_profile("acme").to_storage_scope();
+    let globex = crate::storage::scope_for_profile("globex").to_storage_scope();
     put_expiring(&backend, &acme, "gone", 10).await;
     put_expiring(&backend, &acme, "kept", 10_000).await;
     put_expiring(&backend, &globex, "gone", 10).await;
@@ -144,7 +143,7 @@ async fn sweep_profiles_reclaims_each_profiles_own_scope() {
 #[tokio::test]
 async fn sweep_profiles_skips_profiles_not_listed() {
     let backend = backend_with_clock();
-    let other = crate::storage::scope_for_profile("not-listed");
+    let other = crate::storage::scope_for_profile("not-listed").to_storage_scope();
     put_expiring(&backend, &other, "gone", 10).await;
     wait_until_expired(&backend, &other, "gone").await;
     assert_eq!(sweep_profiles(backend.as_ref(), &[]).await, 0);
