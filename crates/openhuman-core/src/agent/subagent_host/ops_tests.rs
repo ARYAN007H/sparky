@@ -245,10 +245,7 @@ fn tool_response(name: &str, args: &str) -> ModelResponse {
     }
 }
 
-/// Build a minimal `ParentExecutionContext` suitable for runner tests.
-/// Uses a no-op memory backend so we don't have to spin up a real one.
-/// `options` with `parent` bound as the run's explicit parent execution
-/// context, the way a spawning tool or orchestration surface supplies it.
+/// Run the direct host adapter against an explicit root context in unit tests.
 async fn run_host_from_test_options(
     definition: &AgentDefinition,
     input: &str,
@@ -262,6 +259,10 @@ async fn run_host_from_test_options(
         .await
 }
 
+/// Build a minimal `ParentExecutionContext` suitable for runner tests.
+/// Uses a no-op memory backend so we don't have to spin up a real one.
+/// `options` with `parent` bound as the run's explicit parent execution
+/// context, the way a spawning tool or orchestration surface supplies it.
 fn with_parent(
     parent: ParentExecutionContext,
     mut options: SubagentRunOptions,
