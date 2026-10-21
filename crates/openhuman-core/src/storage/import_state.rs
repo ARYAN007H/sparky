@@ -248,18 +248,28 @@ pub fn with_claim<T>(
     step: &str,
     body: impl FnOnce(&WriteCondition) -> Result<T>,
 ) -> Result<Option<T>> {
+    with_claim_ttl(repo, owner, step, CLAIM_TTL_MS, body)
+}
+
+fn with_claim_ttl<T>(
+    repo: &Repo,
+    owner: &str,
+    step: &str,
+    ttl_ms: i64,
+    body: impl FnOnce(&WriteCondition) -> Result<T>,
+) -> Result<Option<T>> {
     let started = Instant::now();
     let mut body = Some(body);
     loop {
         let now = chrono::Utc::now().timestamp_millis();
-        if let Some(token) = acquire(repo, owner, step, now, CLAIM_TTL_MS)? {
+        if let Some(token) = acquire(repo, owner, step, now, ttl_ms)? {
             let condition = token.write_condition()?;
             let (stop_tx, stop_rx) = std::sync::mpsc::channel();
             let healthy = std::sync::Arc::new(AtomicBool::new(true));
             let heartbeat = start_heartbeat(
                 repo.clone(),
                 token.clone(),
-                CLAIM_TTL_MS,
+                ttl_ms,
                 stop_rx,
                 std::sync::Arc::clone(&healthy),
             );

@@ -16,6 +16,16 @@ fn repo() -> Repo {
     Repo::on(&backend, &Scope::local(), "claim-test", spec).unwrap()
 }
 
+#[cfg(feature = "storage-sqlite")]
+fn sqlite_repo() -> (tempfile::TempDir, Arc<dyn StorageBackend>, Repo) {
+    let dir = tempfile::tempdir().unwrap();
+    let database = dir.path().join("claims.sqlite");
+    let url = format!("sqlite:{}", database.display());
+    let backend = crate::storage::block_on(crate::storage::open(&url)).unwrap();
+    let repo = Repo::on(&backend, &Scope::local(), "claim-test", spec).unwrap();
+    (dir, backend, repo)
+}
+
 #[test]
 fn state_keys_keep_owner_and_step_boundaries_unambiguous() {
     assert_ne!(
@@ -245,4 +255,49 @@ fn a_long_import_keeps_its_claim_alive() {
     })
     .unwrap();
     assert_eq!(rival_ran, Some(false));
+}
+
+#[cfg(feature = "storage-sqlite")]
+#[test]
+fn takeover_and_lost_heartbeat_refuse_the_stale_payload_write() {
+    let (_dir, _backend, repo) = sqlite_repo();
+    let (condition_tx, condition_rx) = mpsc::channel();
+    let (takeover_tx, takeover_rx) = mpsc::channel();
+    let worker_repo = repo.clone();
+    let worker = std::thread::spawn(move || {
+        with_claim_ttl(&worker_repo, OWNER, "payload", 120, |condition| {
+            condition_tx.send(condition.clone()).unwrap();
+            takeover_rx.recv().unwrap();
+            std::thread::sleep(Duration::from_millis(150));
+            let stale_repo = worker_repo.conditioned(condition)?;
+            let attempted = stale_repo.run(|docs| async move {
+                docs.ensure_collection(&CollectionSpec::new("claim_payload"))
+                    .await?;
+                docs.put(
+                    "claim_payload",
+                    "stale",
+                    serde_json::json!({ "value": 1 }),
+                    Precondition::Absent,
+                )
+                .await
+                .map(|_| ())
+            });
+            assert!(attempted.is_err(), "the expired claim cannot write its payload");
+            Ok(())
+        })
+    });
+
+    let _old_condition = condition_rx.recv().unwrap();
+    let now = chrono::Utc::now().timestamp_millis();
+    let replacement = acquire(&repo, OWNER, "payload", now.saturating_add(10_000), 5_000)
+        .unwrap()
+        .expect("takeover replaces the old claim");
+    takeover_tx.send(()).unwrap();
+    assert!(worker.join().unwrap().is_err(), "lost heartbeat fails the import");
+    release(&repo, &replacement).unwrap();
+
+    let payload = repo
+        .run(|docs| async move { docs.get("claim_payload", "stale").await })
+        .unwrap();
+    assert!(payload.is_none(), "the stale payload was never published");
 }
