@@ -1,4 +1,4 @@
-//! Network tools: GitBooks docs lookup, Gmail unsubscribe, and (under the
+//! Network tools: GitBooks docs lookup and (under the
 //! `mcp` feature) the MCP client/setup tools, plus the host adapter for the
 //! tools that live in `tinytools_std::network` (`http_request`, `web_fetch`,
 //! `curl`, `pushover`). [`gate`] implements `NetGate` for `SecurityPolicy` and
