@@ -21,7 +21,8 @@ async fn native_turn_factory_applies_default_temperature_and_preserves_explicit_
     let _override = crate::inference::provider::factory::test_provider_override::install_model(
         Arc::new(TemperatureProbe(Arc::clone(&seen))),
     );
-    let config = Arc::new(crate::config::Config::default());
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Arc::new(managed_fixture_config(&tmp));
     let ctx = crate::core::runtime::DispatchCtx::unbound();
     let models = TurnModelSource::new_crate_native(&ctx, "chat", config)
         .build("hint:chat", 0.3, None, None)
@@ -155,7 +156,8 @@ async fn explicit_provider_string_turn_source_uses_scoped_managed_model() {
     let ambient_context =
         CoreContext::for_test_with_host_kind(HostKind::Library, DomainSet::full(), None);
     let dispatch = DispatchCtx::new(explicit_context);
-    let mut config = crate::config::Config::default();
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let mut config = managed_fixture_config(&tmp);
     config.chat_provider = Some("unconfigured:must-not-win".into());
 
     CoreContext::scope(ambient_context, async {
