@@ -29,6 +29,7 @@ impl ProfileHost {
         };
         Ok(Some(Arc::new(FencedBackend::for_fence(
             Arc::clone(backend),
+            Arc::clone(&self.fences),
             Arc::clone(profile.lease_fence()),
         ))))
     }

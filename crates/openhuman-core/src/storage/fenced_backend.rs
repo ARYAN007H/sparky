@@ -46,10 +46,16 @@ impl FencedBackend {
     /// admitted when a particular profile was captured. It fails closed for
     /// scopes outside the captured fence, and does not consult or follow a
     /// replacement fence in the registry.
-    pub fn for_fence(inner: Arc<dyn StorageBackend>, fence: Arc<LeaseFence>) -> Self {
+    pub fn for_fence(
+        inner: Arc<dyn StorageBackend>,
+        clock: Arc<FenceRegistry>,
+        fence: Arc<LeaseFence>,
+    ) -> Self {
         Self {
             inner,
-            registry: None,
+            // The registry supplies this host's clock only. Captured backends
+            // never look up a replacement fence in it.
+            registry: Some(clock),
             captured: Some(fence),
         }
     }
