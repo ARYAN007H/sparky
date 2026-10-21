@@ -58,6 +58,6 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
         Err(error) => error,
         Ok(_) => panic!("explicit CLI dispatch must require a session despite ambient Library"),
     };
-    assert!(session_error.to_string().contains("session"));
+    assert!(session_error.to_string().contains("SESSION_EXPIRED"));
     assert!(builds.lock().expect("build counter").is_empty());
 }
