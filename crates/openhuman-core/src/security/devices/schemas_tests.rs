@@ -101,6 +101,16 @@ fn create_pairing_parser_preserves_optional_labels_and_strict_type_errors() {
     ] {
         assert_eq!(parse_create_pairing(params).unwrap(), expected);
     }
+    assert_eq!(
+        parse_create_pairing(Map::from_iter([
+            ("label".into(), json!("  parser label  ")),
+            ("unknown_scalar".into(), json!(true)),
+            ("unknown_nested".into(), json!({"ignored": [1, null]})),
+        ]))
+        .unwrap(),
+        Some("  parser label  ".to_owned()),
+        "the actual parser keeps its value while ignoring unknown fields"
+    );
 
     for (value, kind) in [
         (json!(true), "bool"),
@@ -151,6 +161,16 @@ fn revoke_parser_requires_and_preserves_a_string_channel_id() {
             value
         );
     }
+    assert_eq!(
+        parse_revoke(Map::from_iter([
+            ("channel_id".into(), json!("  parser channel id  ")),
+            ("extra_scalar".into(), json!(true)),
+            ("extra_nested".into(), json!({"ignored": [false, null]})),
+        ]))
+        .unwrap(),
+        "  parser channel id  ",
+        "the actual parser preserves the channel id while ignoring extras"
+    );
 }
 
 async fn runtime_device_entries() -> Vec<crate::core::all::ControllerEntry> {

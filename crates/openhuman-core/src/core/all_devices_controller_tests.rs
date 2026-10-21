@@ -61,10 +61,28 @@ fn raw_devices_security_registry_matches_its_independent_contract() {
             "expires_at"
         ]
     );
-    assert_eq!(
-        create.outputs.iter().filter(|field| field.required).count(),
-        4
-    );
+    for name in ["channel_id", "pairing_token", "core_pubkey", "expires_at"] {
+        let field = create
+            .outputs
+            .iter()
+            .find(|field| field.name == name)
+            .expect("required pairing output is declared");
+        assert!(field.required, "{name} remains required");
+        assert!(
+            matches!(&field.ty, TypeSchema::String),
+            "{name} remains a string"
+        );
+    }
+    let rpc_url = create
+        .outputs
+        .iter()
+        .find(|field| field.name == "rpc_url")
+        .expect("optional RPC URL output is declared");
+    assert!(!rpc_url.required);
+    assert!(matches!(
+        &rpc_url.ty,
+        TypeSchema::Option(inner) if matches!(inner.as_ref(), TypeSchema::String)
+    ));
 
     let list = &entries[1].controller.schema;
     assert!(list.inputs.is_empty());
