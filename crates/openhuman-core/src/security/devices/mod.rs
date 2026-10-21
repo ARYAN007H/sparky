@@ -21,6 +21,8 @@ pub use schemas::{
     all_controller_schemas as all_devices_controller_schemas,
     all_registered_controllers as all_devices_registered_controllers,
 };
+#[cfg(test)]
+pub(crate) use schemas::devices_parameter_contracts;
 pub use types::{
     CreatePairingResponse, ListDevicesResponse, PairedDevice, PairingSession, RevokeDeviceResponse,
 };
