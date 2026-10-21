@@ -169,7 +169,7 @@ pub fn read_run_log_slice(
     let store = run_log_store(workspace).map_err(io_error)?;
     crate::storage::block_on(async move {
         store
-            .read_slice(id, offset, max_bytes)
+            .read_slice(&id, offset, max_bytes)
             .await
             .map_err(|error| StorageError::backend(error.to_string()))
     })

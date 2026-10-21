@@ -167,7 +167,7 @@ pub fn module_config(config: &Config) -> Value {
         }
     };
     tracing::debug!(
-        queues = resolved.manifest.queues.len(),
+        queues = resolved.manifest.queues().len(),
         backend = %resolved.backend,
         "[inbound] configuring the tinyeventqueues module"
     );

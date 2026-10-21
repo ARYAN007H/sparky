@@ -233,7 +233,7 @@ impl Docs {
         let id = key_of(subagent_session_id)?;
         let updated = self.0.run(|docs| async move {
             crate::storage::documents::update_document(&docs, SESSIONS, &id, move |current| {
-                let stored: StoredSession = serde_json::from_value(current)
+                let stored: StoredSession = serde_json::from_value(current.clone())
                     .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
                 let mut session = DurableSubagentSession::from(stored);
                 if !update(&mut session, chrono::Utc::now().to_rfc3339()) {

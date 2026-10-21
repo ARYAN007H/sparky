@@ -235,10 +235,10 @@ async fn claim_content(
             .and_then(Value::as_i64);
         if skip_recent && last.is_some_and(|last| last >= window_start) {
             previous = None;
-            return Ok(None);
+            return None;
         }
         previous = Some(last);
-        Ok(Some(json!({ "last_ms": now_ms })))
+        Some(json!({ "last_ms": now_ms }))
     })
     .await?;
     Ok(previous)
