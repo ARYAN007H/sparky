@@ -99,6 +99,30 @@ fn native_audio_video_and_incomplete_voice_are_rejected_before_media_reads() {
         },
     };
     assert!(validate_native_parts(&[pending_voice]).is_err());
+
+    for transcript in [
+        None,
+        Some(tinychannels_bus::VoiceTranscript {
+            text: "failed transcript".into(),
+            language: None,
+            state: tinychannels_bus::VoiceTranscriptState::Failed,
+            source: tinychannels_bus::VoiceTranscriptSource::HostStt,
+        }),
+        Some(tinychannels_bus::VoiceTranscript {
+            text: " \n ".into(),
+            language: None,
+            state: tinychannels_bus::VoiceTranscriptState::Complete,
+            source: tinychannels_bus::VoiceTranscriptSource::HostStt,
+        }),
+    ] {
+        let unavailable = ContentPart::VoiceNote {
+            voice_note: tinychannels_bus::VoiceNote {
+                transcript,
+                ..Default::default()
+            },
+        };
+        assert!(validate_native_parts(&[unavailable]).is_err());
+    }
 }
 
 #[test]
