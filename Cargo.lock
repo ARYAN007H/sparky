@@ -9125,7 +9125,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.28"
+version = "0.8.29"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
