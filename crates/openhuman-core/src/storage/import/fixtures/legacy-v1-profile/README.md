@@ -48,5 +48,5 @@ cargo run --locked --manifest-path crates/openhuman-core/src/storage/import/fixt
 ```
 
 The checked-in database SHA-256 is
-`1eef4893bc406f7bcc500c4c42fecc6a87a2e03bc496767b846deec93705fa81`.
+`62842b07c111e6c9ba056d83e4e3e67ab394e07b3ea70c5d3d8ec69fff4e991e`.
 Regenerate and verify it with `sha256sum` when updating the fixture.
