@@ -165,6 +165,53 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
 }
 
 #[tokio::test]
+async fn explicit_provider_string_turn_source_uses_scoped_managed_model() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use crate::core::slots::Extensions;
+    use crate::core::types::HostKind;
+
+    let provider = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
+    let explicit_extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &explicit_extensions,
+        provider,
+        scoped_model_entry("explicit-provider-model", false),
+    );
+    let explicit_context = CoreContext::for_test_with_host_kind(
+        HostKind::Library,
+        DomainSet::full(),
+        None,
+    );
+    let explicit_context = {
+        let mut context = Arc::try_unwrap(explicit_context).ok().unwrap();
+        context.extensions = explicit_extensions;
+        Arc::new(context)
+    };
+    let ambient_context = CoreContext::for_test_with_host_kind(
+        HostKind::Library,
+        DomainSet::full(),
+        None,
+    );
+    let dispatch = DispatchCtx::new(explicit_context);
+    let mut config = crate::config::Config::default();
+    config.chat_provider = Some("unconfigured:must-not-win".into());
+
+    CoreContext::scope(ambient_context, async {
+        let source = TurnModelSource::new_crate_native_from_string(
+            &dispatch,
+            "chat",
+            "openhuman",
+            Arc::new(config),
+        );
+        let models = source
+            .build("explicit-turn-model", 0.0, None, None)
+            .expect("explicit provider string should construct through the scoped model");
+        assert_eq!(name_of(&models.primary).await, "explicit-provider-model");
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn explicit_turn_context_without_provider_does_not_borrow_ambient_provider() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
