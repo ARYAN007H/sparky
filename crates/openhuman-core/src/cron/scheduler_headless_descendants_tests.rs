@@ -293,6 +293,14 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("scheduled child exited before its model blocked: {error}"),
         Err(_) => {
+            eprintln!(
+                "CRON_TIMEOUT_SETUP_DIAGNOSTIC spawn_calls={} accepted_followups={} child_calls={} invocation_dropped={} run_finished={}",
+                model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+                model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
+                model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+                model.child_invocation_dropped.load(std::sync::atomic::Ordering::SeqCst),
+                run.is_finished(),
+            );
             model.child_release.notify_one();
             let _ = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
             panic!(
