@@ -137,6 +137,7 @@ pub(crate) struct LinkedTelegramRuntime {
     _storage: crate::channels::module_fixture::MemoryStorageGuard,
     _workspace: tempfile::TempDir,
     server: MockServer,
+    config: crate::config::Config,
     runtime: crate::channels::runtime::ModuleRuntimeTestGuard,
 }
 
@@ -145,6 +146,10 @@ impl LinkedTelegramRuntime {
         &self,
     ) -> Arc<HashMap<String, Arc<crate::channels::runtime::ChannelHandle>>> {
         self.runtime.channels()
+    }
+
+    pub(crate) fn config(&self) -> &crate::config::Config {
+        &self.config
     }
 
     pub(crate) async fn provider_request_paths(&self) -> Vec<String> {
@@ -179,6 +184,14 @@ pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
         .await;
     Mock::given(method("POST"))
         .and(path("/bottoken/sendChatAction"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": true
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/bottoken/setMessageReaction"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "ok": true,
             "result": true
@@ -236,6 +249,7 @@ pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
         _storage: storage,
         _workspace: workspace,
         server,
+        config,
         runtime,
     }
 }
@@ -244,14 +258,24 @@ pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
 /// clear durable channel history exercise the host reset path.
 pub(crate) fn bind_test_core_context(
     context: &mut crate::channels::context::ChannelRuntimeContext,
+    base_config: &crate::config::Config,
 ) -> Arc<crate::core::runtime::CoreContext> {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 
     let workspace = context.workspace_dir.as_ref().clone();
-    let mut config = crate::config::Config::default();
+    let mut config = base_config.clone();
     config.workspace_dir = workspace.clone();
     config.action_dir = workspace.clone();
     config.config_path = workspace.join("config.toml");
+    config.cloud_providers = vec![crate::config::schema::CloudProviderCreds {
+        id: "p_openai_channel_test".into(),
+        slug: "openai".into(),
+        label: "Channel test provider".into(),
+        endpoint: "http://127.0.0.1:9/v1".into(),
+        default_model: Some("channel-test-model".into()),
+        ..Default::default()
+    }];
+    context.config = Some(Arc::new(config.clone()));
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace)).derive_with(
         ContextOverlay::new(config, DomainSet::full(), Default::default())
             .profile("channel-handle-test"),

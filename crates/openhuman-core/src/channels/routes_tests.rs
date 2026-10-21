@@ -78,7 +78,8 @@ async fn handle_linked_runtime_command(
     use tinychannels_bus::module_remote::RemoteSessionScope;
 
     ctx.channels_by_name = linked.channels();
-    let _core = crate::channels::runtime::test_support::bind_test_core_context(ctx);
+    let _core =
+        crate::channels::runtime::test_support::bind_test_core_context(ctx, linked.config());
     let prepared = crate::modules::channel_controller::prepare_inbound(
         &crate::channels::context::module_client(ctx).await,
         PrepareChannelInboundRequest {
@@ -101,7 +102,7 @@ async fn handle_linked_runtime_command(
     };
     handle_runtime_command_with_reset(
         ctx,
-        msg,
+        &prepared.message,
         target_channel,
         &prepared.history_key,
         Some(scope),

@@ -130,7 +130,10 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         config: None,
         core: None,
     };
-    let _core = crate::channels::runtime::test_support::bind_test_core_context(&mut runtime_ctx);
+    let _core = crate::channels::runtime::test_support::bind_test_core_context(
+        &mut runtime_ctx,
+        _linked.config(),
+    );
     let runtime_ctx = Arc::new(runtime_ctx);
 
     let cmd_msg = traits::ChannelMessage {
