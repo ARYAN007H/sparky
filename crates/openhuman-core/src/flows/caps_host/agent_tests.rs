@@ -285,6 +285,31 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             } if tool_name == "spawn_subagent"
         )
     });
+    let nested_spawn_outcomes = worker_events
+        .iter()
+        .filter_map(|observation| match &observation.event {
+            tinyagents_harness::events::AgentEvent::ToolCompleted {
+                tool_name,
+                error,
+                ..
+            } if tool_name == "spawn_subagent" => Some(error.clone()),
+            tinyagents_harness::events::AgentEvent::UnknownToolCall {
+                requested_name,
+                recovery,
+                ..
+            } if requested_name == "spawn_subagent" => Some(Some(recovery.clone())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    eprintln!(
+        "NESTED_FLOW_POLICY_DIAGNOSTIC worker_calls={} schema={:?} nested_spawn_calls={} worker_jobs={:?} grandchild_jobs={} spawn_events={:?}",
+        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model.child_schema_names.lock().unwrap(),
+        model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        child_runs,
+        grandchild_jobs.len(),
+        nested_spawn_outcomes,
+    );
     let grandchild_run_id = grandchild_jobs
         .first()
         .and_then(|job| job.subagent_run_id.as_deref())
