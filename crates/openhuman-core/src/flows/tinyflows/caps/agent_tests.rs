@@ -183,9 +183,8 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     worker.subagents = vec![tinyagents_definition::SubagentEntry::AgentId(
         "task_manager_agent".to_string(),
     )];
-    let definitions = std::sync::Arc::new(
-        builtin_definitions.with_definitions([orchestrator, worker]),
-    );
+    let definitions =
+        std::sync::Arc::new(builtin_definitions.with_definitions([orchestrator, worker]));
     let core = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
         config.clone(),
@@ -250,12 +249,16 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         "the worker must run, spawn its grandchild, and complete through the real dispatch"
     );
     assert_eq!(
-        model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model
+            .nested_spawn_calls
+            .load(std::sync::atomic::Ordering::SeqCst),
         1,
         "the worker must issue a real nested spawn"
     );
     assert_eq!(
-        model.grandchild_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model
+            .grandchild_calls
+            .load(std::sync::atomic::Ordering::SeqCst),
         1,
         "the grandchild must run through the real model dispatch"
     );
@@ -272,7 +275,9 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     );
 
     assert!(
-        output.to_string().contains("headless-flow-grandchild-result"),
+        output
+            .to_string()
+            .contains("headless-flow-grandchild-result"),
         "the headless flow result must include its grandchild output: {output}"
     );
 }
