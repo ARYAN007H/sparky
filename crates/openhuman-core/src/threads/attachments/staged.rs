@@ -419,6 +419,7 @@ pub(crate) async fn read_authorized_native_attachment(
     thread_id: &str,
     opaque_id: &str,
     current_parts: &[ContentPart],
+    allow_committed_history: bool,
 ) -> Result<ResolvedNativeAttachment, String> {
     let id = staged_doc_id(opaque_id)?;
     let tenant = tenant_for(ctx)?;
@@ -442,7 +443,7 @@ pub(crate) async fn read_authorized_native_attachment(
             && claim.thread_id == thread_id
             && claim.part == record.attachment.part
     });
-    if !current_authority && !committed_authority {
+    if !current_authority && !(allow_committed_history && committed_authority) {
         return Err("native attachment lacks a current or committed host grant".into());
     }
     let entries = vec![record.attachment.clone()];

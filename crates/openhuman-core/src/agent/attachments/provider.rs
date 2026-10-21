@@ -266,7 +266,10 @@ impl AttachmentModel {
                     )));
                     continue;
                 }
-                let resolved = match self.resolve_block(&block, &scope).await {
+                let resolved = match self
+                    .resolve_block(&block, &scope, Some(message_index) != latest_user_message)
+                    .await
+                {
                     Ok(resolved) => resolved,
                     Err(error)
                         if Some(message_index) != latest_user_message

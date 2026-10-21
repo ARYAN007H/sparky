@@ -12,6 +12,7 @@ impl AttachmentModel {
         &self,
         block: &ContentBlock,
         scope: &AttachmentAccessScope,
+        allow_committed_history: bool,
     ) -> tinyinference_llm::Result<Option<(InputModality, String, String, Vec<u8>, bool)>> {
         let (modality, source, mime, is_local) = match block {
             ContentBlock::Image(image) => (
@@ -37,6 +38,7 @@ impl AttachmentModel {
                 thread_id,
                 opaque_id,
                 &scope.native_staged_parts,
+                allow_committed_history,
             )
             .await
             .map_err(tinyinference_llm::Error::Model)?;
