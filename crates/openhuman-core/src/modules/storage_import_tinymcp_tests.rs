@@ -106,7 +106,8 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     // Env values only ever land in the secret, never in a document.
     assert!(!body.to_string().contains("sk-secret"));
     let stored = rig
-        .secrets
+        .scoped
+        .secrets()
         .get("mcp_client_env/srv-1")
         .await
         .unwrap()
@@ -115,7 +116,8 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     assert_eq!(env["API_KEY"], "sk-secret");
     assert_eq!(env["REGION"], "eu");
     assert!(rig
-        .secrets
+        .scoped
+        .secrets()
         .get("mcp_client_env/srv-2")
         .await
         .unwrap()
@@ -178,7 +180,7 @@ async fn the_legacy_files_are_left_untouched() {
     import_into(
         &DispatchCtx::host_default(),
         &rig.scoped,
-        &rig.secrets,
+        rig.scoped.secrets().as_ref(),
         legacy.path(),
     )
     .await
