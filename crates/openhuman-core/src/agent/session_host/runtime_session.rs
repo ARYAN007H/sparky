@@ -37,16 +37,6 @@ use tinyagents_runtime::{
 };
 use tinyinference_llm::message::Message;
 
-pub(super) fn concurrent_turn_diagnostic(stage: usize) {
-    if std::env::var_os("OH_DIAG_CONCURRENT").is_none() {
-        return;
-    }
-    static COUNTS: [std::sync::atomic::AtomicUsize; 14] =
-        [const { std::sync::atomic::AtomicUsize::new(0) }; 14];
-    let count = COUNTS[stage].fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-    eprintln!("OpenHuman concurrent diagnostic stage={stage} count={count}");
-}
-
 use super::types::OpenHumanSessionHost;
 use crate::agent::{
     message_convert::{user_message_from_text, user_text_with_markers},
@@ -352,7 +342,6 @@ impl OpenHumanSessionHost {
                 let resume_target = resume_target.clone();
                 let state = self.runtime_state.clone();
                 move |_, options, _| {
-                    concurrent_turn_diagnostic(0);
                     let resume_target = resume_target.clone();
                     begin_turn_resume(
                         &mut state
@@ -370,7 +359,6 @@ impl OpenHumanSessionHost {
             {
                 let state = self.runtime_state.clone();
                 move |request, options, view| {
-                    concurrent_turn_diagnostic(1);
                     let state = state.clone();
                     let request_base_len = view.history.len()
                         + usize::from(view.history.last() != Some(&request.input));
@@ -398,20 +386,17 @@ impl OpenHumanSessionHost {
                         // its completion; settle it before this turn reads the goal.
                         post_commit::await_pending(pending_post_commit).await;
                         let new_session = !view.resumed && view.history.is_empty();
-                        concurrent_turn_diagnostic(2);
                         prelude
                             .refresh_turn_boundary(new_session)
                             .await
                             .map_err(|error| {
                                 tinyagents_runtime::RuntimeError::Driver(error.to_string())
                             })?;
-                        concurrent_turn_diagnostic(3);
                         let context_window = prelude
                             .turn_model_source
                             .effective_context_window(&prelude.model_name)
                             .await
                             .unwrap_or_default();
-                        concurrent_turn_diagnostic(5);
                         options
                             .run_context
                             .data
@@ -427,41 +412,27 @@ impl OpenHumanSessionHost {
                             .take_turn_inputs();
                         let origin = options.run_context.data.origin.clone();
                         let (enriched, memory_turn) = futures::join!(
-                            async {
-                                let value = prelude
-                                    .enrich_request(
-                                        &original_user_message,
-                                        &turn,
-                                        &mut options.run_context.data,
-                                    )
-                                    .await;
-                                concurrent_turn_diagnostic(9);
-                                value
-                            },
+                            prelude.enrich_request(
+                                &original_user_message,
+                                &turn,
+                                &mut options.run_context.data,
+                            ),
                             // Boxed: the hook's future (config load, engine
                             // calls) would otherwise be inlined into this
                             // already-large hook future.
-                            Box::pin(async {
-                                let value = prelude
-                                    .memory_pre_turn(
-                                        view.history,
-                                        view.committed_turns,
-                                        view.history.last().filter(|last| **last == request.input),
-                                        origin,
-                                    )
-                                    .await;
-                                concurrent_turn_diagnostic(10);
-                                value
-                            }),
+                            Box::pin(prelude.memory_pre_turn(
+                                view.history,
+                                view.committed_turns,
+                                view.history.last().filter(|last| **last == request.input),
+                                origin,
+                            )),
                         );
-                        concurrent_turn_diagnostic(6);
                         options.run_context.data.memory_turn = memory_turn;
                         request.input = user_message_from_text(&enriched);
                         let mut preparation =
                             prelude.prepare(new_session).await.map_err(|error| {
                                 tinyagents_runtime::RuntimeError::Driver(error.to_string())
                             })?;
-                        concurrent_turn_diagnostic(7);
                         prelude.refresh_permanent_prefix(&mut preparation, view.prefix);
                         if turn.overrides.suppress_tools {
                             // One-off tool-less turn: must not become the
@@ -511,7 +482,6 @@ impl OpenHumanSessionHost {
                             .unwrap_or_else(|poisoned| poisoned.into_inner())
                             .required_output
                             .clone();
-                        concurrent_turn_diagnostic(8);
                         Ok(preparation)
                     })
                 }

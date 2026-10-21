@@ -84,7 +84,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         &self,
         mut request: DriverRequest<OpenHumanRunContext>,
     ) -> Result<DriverOutcome, DriverFailure> {
-        super::runtime_session::concurrent_turn_diagnostic(4);
         // Heal an orphaned tool head before reading history.
         repair_orphaned_tool_head(&mut request.history);
         // Use the policy and context prepared for this exact request.

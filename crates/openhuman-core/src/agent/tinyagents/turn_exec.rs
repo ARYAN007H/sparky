@@ -10,16 +10,6 @@
 use std::collections::{BTreeSet, HashSet};
 use std::sync::Arc;
 
-fn concurrent_turn_diagnostic(stage: usize) {
-    if std::env::var_os("OH_DIAG_CONCURRENT").is_none() {
-        return;
-    }
-    static COUNTS: [std::sync::atomic::AtomicUsize; 4] =
-        [const { std::sync::atomic::AtomicUsize::new(0) }; 4];
-    let count = COUNTS[stage].fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-    eprintln!("turn_exec concurrent diagnostic stage={stage} count={count}");
-}
-
 use anyhow::Result;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
@@ -149,7 +139,6 @@ async fn drive_turn(
     )>,
     native_subagent: Option<NativeSubagentRunContext>,
 ) -> Result<TinyagentsTurnOutcome> {
-    concurrent_turn_diagnostic(0);
     let TurnSpec {
         mut run_context,
         turn_models,
@@ -536,7 +525,6 @@ async fn drive_turn(
         stream: streaming,
         controls,
     };
-    concurrent_turn_diagnostic(1);
     let mut prepared = driver.prepare(request).await.map_err(|failure| {
         tracing::error!(error = %failure.error, "[tinyagents] turn driver could not prepare the turn");
         anyhow::anyhow!("{}", failure.error)
@@ -636,7 +624,6 @@ async fn drive_turn(
         tools = tool_count,
         "[tinyagents] turn harness assembled"
     );
-    concurrent_turn_diagnostic(2);
 
     // Heap-allocate the harness drive future. It is large (it owns the whole run
     // context, middleware stack, and loop state), and a sub-agent turn runs
@@ -645,7 +632,6 @@ async fn drive_turn(
     // pointer on the stack at each level.
     let resolved_route_slot = run_context.resolved_route.clone();
     let (run_result, early_exit) = if let Some((base, agent_id)) = hosted_root {
-        concurrent_turn_diagnostic(3);
         let tool_sets = hosted_tool_sets.expect("hosted root retained its tool sets");
         let mut host_bundle =
             crate::agent::tinyagents::host::OpenHumanHostBundleFactory::build_for_invocation(

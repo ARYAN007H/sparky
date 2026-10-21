@@ -232,10 +232,7 @@ impl OpenHumanTurnPrelude {
             None
         } else if let Some(thread_id) = self.thread_id.as_deref() {
             let store = crate::agent::goals::goal_store(&self.workspace_dir, &self.dispatch_ctx());
-            super::concurrent_turn_diagnostic(11);
-            let result = store.prepare_turn(thread_id).await;
-            super::concurrent_turn_diagnostic(12);
-            match result {
+            match store.prepare_turn(thread_id).await {
                 Ok(preparation) => {
                     if let Some(block) = preparation.context_block {
                         context.push_str(&block);
