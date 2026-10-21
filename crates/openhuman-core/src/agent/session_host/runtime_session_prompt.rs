@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 impl super::OpenHumanTurnPrelude {
     pub(super) fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {
         use crate::agent::prompts::{PromptContext, PromptTool};

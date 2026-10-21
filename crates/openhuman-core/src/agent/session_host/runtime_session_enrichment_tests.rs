@@ -1,4 +1,4 @@
-use super::enrichment::enriched_typed_user_input;
+use super::*;
 
 #[test]
 fn host_enrichment_preserves_ordered_typed_media_once() {
@@ -22,9 +22,10 @@ fn host_enrichment_preserves_ordered_typed_media_once() {
     });
     let original_text = crate::agent::message_convert::user_text_with_markers(&original);
     let enriched = format!("turn preamble\n\nhost channel context\n{original_text}");
-    let Message::User(actual) = enriched_typed_user_input(&original, &original_text, &enriched)
-        .expect("prefix is constructed before original text")
-        .expect("typed media is retained")
+    let Message::User(actual) =
+        enrichment::enriched_typed_user_input(&original, &original_text, &enriched)
+            .expect("prefix is constructed before original text")
+            .expect("typed media is retained")
     else {
         panic!("enriched input remains a user message");
     };
@@ -55,7 +56,7 @@ fn host_enrichment_fails_closed_if_typed_input_suffix_changes() {
             mime_type: Some("image/png".into()),
         })],
     });
-    assert!(enriched_typed_user_input(&original, "original", "changed input").is_err());
+    assert!(enrichment::enriched_typed_user_input(&original, "original", "changed input").is_err());
 }
 
 #[test]
@@ -66,7 +67,7 @@ fn host_enrichment_keeps_text_only_path_unchanged() {
         content: vec![ContentBlock::Text("hello".into())],
     });
     assert!(
-        enriched_typed_user_input(&original, "hello", "prefix\n\nhello")
+        enrichment::enriched_typed_user_input(&original, "hello", "prefix\n\nhello")
             .expect("text-only input has no typed-media transformation")
             .is_none()
     );
