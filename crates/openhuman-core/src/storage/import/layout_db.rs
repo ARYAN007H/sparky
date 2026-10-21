@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use super::state::LayoutError;
+use crate::storage::layout::LayoutError;
 use crate::storage::rusqlite::{self, Connection, OpenFlags};
 
 /// Row counts per table.
@@ -71,7 +71,7 @@ fn tmp_path(dest: &Path) -> PathBuf {
     dest.with_file_name(name)
 }
 
-fn mismatch(source: &Counts, copy: &Counts) -> Option<String> {
+pub(crate) fn mismatch(source: &Counts, copy: &Counts) -> Option<String> {
     if source == copy {
         return None;
     }
