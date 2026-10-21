@@ -73,6 +73,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
 }
 
 async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {
+    let marker = support::marker_id("tinybox", base);
+    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
+        return Ok(Outcome::AlreadyDone);
+    }
     let docs = scoped.documents();
     let index = base.join(INDEX_FILE);
     if !index.is_file() {
@@ -108,6 +112,7 @@ async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {
         _ => tracing::warn!("{LOG_PREFIX} skipped an index file that is not a JSON object"),
     }
 
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported written={written}");
     Ok(Outcome::Imported { written })
 }
