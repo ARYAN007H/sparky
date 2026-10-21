@@ -26,8 +26,9 @@ previously `providers/` (pre-consolidation single-crate layout); see
   (`inference::registry`); TinyHumans supplies its hosted model vocabulary and request policy.
   OpenAI-compatible and Anthropic builders live
   in `tinyinference_llm::providers` and are called directly.
-- **DTOs** ([`types.rs`](./types.rs)): `ChatResponse`, `ProviderDelta`,
-  `ToolCall`, `UsageInfo`, `AGENT_TURN_MAX_OUTPUT_TOKENS`.
+- **Provider response and usage types**: `ChatResponse`, `ProviderDelta`, and
+  `BilledUsage` come from `tinyinference_llm`; the hosted turn output cap lives
+  with the OpenHuman turn policy.
 - **Error classifiers**: reusable classifiers live in
   `tinyinference_llm::classification`; this directory retains OpenHuman managed-backend and telemetry policy.
 

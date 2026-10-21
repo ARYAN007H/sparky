@@ -8,13 +8,8 @@
 pub mod factory;
 pub(crate) mod fallback_diagnostics;
 pub mod http_error;
-pub(crate) mod model;
 pub mod models;
 pub(crate) mod openai_codex;
-pub mod types;
-
-#[allow(unused_imports)]
-pub use types::{BilledUsage, ChatResponse, ProviderDelta, AGENT_TURN_MAX_OUTPUT_TOKENS};
 
 pub use factory::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,

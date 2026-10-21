@@ -513,7 +513,7 @@ pub async fn apply_runtime_settings(
         let parsed = if effort.is_empty() {
             None
         } else {
-            let parsed = crate::agent::tinyagents::parse_reasoning_effort(effort)
+            let parsed = tinyinference_llm::model::ReasoningEffort::parse(effort)
                 .ok_or_else(|| format!("unknown reasoning_effort '{effort}'"))?;
             Some(parsed.as_str().to_string())
         };

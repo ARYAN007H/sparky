@@ -3,9 +3,12 @@
 
 use std::sync::Arc;
 
+pub(crate) type TurnChatModel = Arc<dyn tinyinference_llm::model::ChatModel<()>>;
+pub(crate) type TierRoutes = Vec<(String, TurnChatModel)>;
+pub(crate) type BuiltTurnModels = (TurnChatModel, TierRoutes, TurnChatModel);
+
 use crate::core::runtime::DispatchCtx;
 
-use crate::inference::provider::model::{BuiltTurnModels, TierRoutes, TurnChatModel};
 use tinyinference_llm::model::ProfileOverrideModel;
 use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 

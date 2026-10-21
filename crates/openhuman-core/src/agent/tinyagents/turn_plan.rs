@@ -23,7 +23,7 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::tool_registration::host_tool_set_builder_for_turn;
 use crate::agent::tinyagents::turn_policy::run_policy_for_provider;
-use crate::inference::provider::model::TurnChatModel;
+use crate::inference::turn_models::TurnChatModel;
 
 /// The run policy for one turn, and whether it carries a cross-route fallback.
 ///

@@ -23,7 +23,8 @@ use crate::agent::{
     },
     tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
-use crate::inference::provider::{BilledUsage, AGENT_TURN_MAX_OUTPUT_TOKENS};
+use tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS;
+use tinyinference_llm::usage::BilledUsage;
 
 /// Accounting from model calls performed after the harness loop has ended.
 #[derive(Default)]
@@ -85,7 +86,7 @@ impl RepairUsage {
         trace: Option<&SupplementalTrace>,
     ) {
         self.record(
-            response.and_then(crate::inference::provider::model::usage_info_from_response),
+            response.and_then(tinyinference_llm::usage::usage_info_from_response),
             kind != tinyagents_harness::close::CloseRequestKind::Verification,
             trace,
         );
