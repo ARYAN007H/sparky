@@ -218,3 +218,84 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
         None
     );
 }
+
+#[test]
+fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{
+        register_chat_model, register_chat_model_in, unregister_chat_model, ChatModelEntry,
+        ProviderContext, ProviderModelHooks,
+    };
+    use serde_json::json;
+    use std::sync::Arc;
+
+    fn entry(label: &'static str, window: u64) -> ChatModelEntry {
+        ChatModelEntry {
+            build: Arc::new(|_| panic!("metadata lookup must not build a model")),
+            probe: None,
+            models: Some(ProviderModelHooks {
+                default_model: Arc::new(move || Some(format!("{label}/default"))),
+                role_for_model: Arc::new(move |model| {
+                    (model == format!("{label}/alias")).then(|| format!("{label}/role"))
+                }),
+                is_alias: Arc::new(move |model| model == format!("{label}/alias")),
+                is_raw_model: Arc::new(move |model| model == format!("{label}/raw")),
+                supports_vision: Arc::new(move |model| model == format!("{label}/vision")),
+                resolve_model: Arc::new(move |role, context: &ProviderContext, pin| {
+                    Some(format!("{label}:{}:{}", context.config.default_model.as_deref().unwrap_or("unset"), pin.unwrap_or(role)))
+                }),
+                context_window: Arc::new(move |model| (model == format!("{label}/raw")).then_some(window)),
+                default_pricing: Arc::new(move || Some((format!("{label}/priced"), 1.25, 2.5))),
+                without_reasoning: Arc::new(move |mut request| {
+                    request.metadata["reasoning_removed_by"] = json!(label);
+                    request
+                }),
+            }),
+        }
+    }
+
+    let _guard = crate::inference::inference_test_guard();
+    let provider = "provider-metadata-scope-regression";
+    let process = entry("process", 101);
+    register_chat_model(provider, process);
+    let a_extensions = Extensions::new();
+    register_chat_model_in(&a_extensions, provider, entry("context-a", 202));
+    let b_extensions = Extensions::new();
+    register_chat_model_in(&b_extensions, provider, entry("context-b", 303));
+
+    let verify = |extensions: Option<&Extensions>, label: &str, window: u64| {
+        assert_eq!(crate::inference::registry::provider_default_model_for(extensions, provider).as_deref(), Some(format!("{label}/default").as_str()));
+        assert_eq!(crate::inference::registry::provider_model_role_for(extensions, provider, &format!("{label}/alias")).as_deref(), Some(format!("{label}/role").as_str()));
+        assert!(crate::inference::registry::provider_model_is_alias_for(extensions, provider, &format!("{label}/alias")));
+        assert!(crate::inference::registry::provider_model_is_raw(provider, &format!("{label}/raw")) || extensions.is_some());
+        assert!(crate::inference::registry::provider_model_supports_vision_for(extensions, provider, &format!("{label}/vision")));
+        let config = Config { default_model: Some(format!("{label}/config")), ..Config::default() };
+        assert_eq!(crate::inference::registry::resolve_provider_model_for(extensions, provider, "chat", &config, Some("pin")), Some(format!("{label}:{label}/config:pin")));
+        assert_eq!(crate::inference::registry::provider_model_context_window_for(extensions, provider, &format!("{label}/raw")), Some(window));
+        assert_eq!(crate::inference::registry::provider_default_pricing_for(extensions, provider), Some((format!("{label}/priced"), 1.25, 2.5)));
+        let mut request = tinyinference_llm::model::ModelRequest::new(vec![]);
+        request.model = Some(format!("{label}/raw"));
+        request.max_tokens = Some(37);
+        request.metadata = json!({"caller": "kept"});
+        let request = crate::inference::registry::provider_request_without_reasoning_for(extensions, provider, request);
+        assert_eq!(request.model.as_deref(), Some(format!("{label}/raw").as_str()));
+        assert_eq!(request.max_tokens, Some(37));
+        assert_eq!(request.metadata, json!({"caller": "kept", "reasoning_removed_by": label}));
+    };
+
+    verify(None, "process", 101);
+    verify(Some(&a_extensions), "context-a", 202);
+    verify(Some(&b_extensions), "context-b", 303);
+
+    let ambient_a = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(), None, a_extensions.clone(),
+    );
+    crate::core::runtime::CoreContext::sync_scope(ambient_a, || {
+        assert_eq!(crate::inference::registry::provider_default_model(provider).as_deref(), Some("context-a/default"));
+        assert_eq!(crate::inference::registry::provider_default_pricing(provider).as_ref().map(|price| price.0.as_str()), Some("context-a/priced"));
+        let request = crate::inference::registry::provider_request_without_reasoning(provider, tinyinference_llm::model::ModelRequest::new(vec![]));
+        assert_eq!(request.metadata["reasoning_removed_by"], "context-a");
+        assert_eq!(crate::inference::registry::provider_model_context_window_for(None, provider, "process/raw"), Some(101), "explicit process-only lookup must ignore ambient registration");
+    });
+    unregister_chat_model(provider);
+}
