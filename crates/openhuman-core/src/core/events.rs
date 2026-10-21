@@ -998,6 +998,30 @@ pub enum DomainEvent {
         /// Already scrubbed; safe to log.
         detail: String,
     },
+    /// A pinned source's batch ran on its agent and the agent's final text is
+    /// stored. Carries no text: a subscriber is woken by this and reads the
+    /// result over `inbound.results` (keyed by `turn_id`).
+    InboundTurnCompleted {
+        /// The configured source (`x:mentions`).
+        source: String,
+        /// The key the batch was debounced by.
+        key: String,
+        /// The queues' turn id, the result's key.
+        turn_id: String,
+        /// The source's ids of the events the batch carried.
+        event_ids: Vec<String>,
+        /// The pinned agent that ran.
+        agent_id: String,
+    },
+    /// A pinned source's batch failed for good (its last attempt failed, or
+    /// it failed after its delivery was acknowledged); stored as `failed`.
+    InboundTurnFailed {
+        source: String,
+        key: String,
+        turn_id: String,
+        /// Already scrubbed; safe to log.
+        detail: String,
+    },
 
     // ── Device pairing ──────────────────────────────────────────────────
     /// A mobile device completed the X25519 handshake and is now paired.
@@ -1435,7 +1459,9 @@ impl DomainEvent {
 
             Self::InboundEventDropped { .. }
             | Self::InboundDeferred { .. }
-            | Self::InboundDeadLettered { .. } => "inbound",
+            | Self::InboundDeadLettered { .. }
+            | Self::InboundTurnCompleted { .. }
+            | Self::InboundTurnFailed { .. } => "inbound",
 
             Self::DevicePaired { .. }
             | Self::DeviceRevoked { .. }
@@ -1612,6 +1638,22 @@ impl DomainEvent {
             Self::McpServerParked { error, .. } => {
                 Some(format!("parked, not retrying — {}", clip(error)))
             }
+            Self::InboundTurnCompleted {
+                source,
+                key,
+                turn_id,
+                event_ids,
+                ..
+            } => Some(format!(
+                "{source}/{key} turn {turn_id}: {} event(s)",
+                event_ids.len()
+            )),
+            Self::InboundTurnFailed {
+                source,
+                key,
+                turn_id,
+                detail,
+            } => Some(format!("{source}/{key} turn {turn_id}: {}", clip(detail))),
             _ => None,
         }
     }
