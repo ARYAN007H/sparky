@@ -363,7 +363,6 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
 }
 
 #[test]
-#[test]
 fn explicit_cloud_provider_string_routes_to_crate_native_model() {
     let _guard = crate::inference::inference_test_guard();
     let mut config = Config::default();
