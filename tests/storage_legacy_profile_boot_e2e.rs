@@ -188,12 +188,6 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .build()
             .unwrap();
         owner_runtime.block_on(async move {
-            let open_url = storage_url.clone();
-            let owner_backend = openhuman_core::storage::block_on(async move {
-                openhuman_core::storage::open(&open_url).await
-            })
-            .unwrap();
-            openhuman_core::storage::install_for_url(&storage_url, owner_backend);
             let runtime = openhuman_core::core::runtime::CoreBuilder::new(
                 openhuman_core::core::types::HostKind::TauriShell,
             )
@@ -206,6 +200,12 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .build()
             .await
             .unwrap();
+            let open_url = storage_url.clone();
+            let owner_backend = openhuman_core::storage::block_on(async move {
+                openhuman_core::storage::open(&open_url).await
+            })
+            .unwrap();
+            openhuman_core::storage::install_for_url(&storage_url, owner_backend);
             openhuman_core::core::runtime::CoreContext::scope(
                 std::sync::Arc::clone(runtime.context()),
                 async {
