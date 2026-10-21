@@ -72,7 +72,9 @@ async fn drain_to_log_returns_the_turns_stop() {
     );
     let log = read_run_log_slice(dir.path(), &path, 0, 4096).unwrap();
     assert!(log.content.contains("stopped: iteration_cap"), "{log:?}");
-    write_footer(dir.path(), &path, "STOPPED", 1, "stopped").await.unwrap();
+    write_footer(dir.path(), &path, "STOPPED", 1, "stopped")
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -92,13 +94,18 @@ async fn host_written_log_parses_like_legacy_layout() {
     )
     .await
     .unwrap();
-    write_footer(tmp.path(), &path, "DONE", 42, "ok").await.unwrap();
+    write_footer(tmp.path(), &path, "DONE", 42, "ok")
+        .await
+        .unwrap();
     let runs = scan_runs(tmp.path(), Some("triage-inbox"), 10);
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].run_id, "run-abcdef123456");
     assert_eq!(runs[0].status, "DONE");
     assert_eq!(runs[0].duration_ms, Some(42));
-    assert_eq!(read_terminal_outcome(tmp.path(), &path).unwrap().status, "DONE");
+    assert_eq!(
+        read_terminal_outcome(tmp.path(), &path).unwrap().status,
+        "DONE"
+    );
 
     // The stream retains the same parsed run metadata as the old log format.
 }

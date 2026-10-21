@@ -164,16 +164,15 @@ pub async fn spawn_workflow_run_background(
         let inherited_origin = inherited_origin.clone();
         let ctx = ctx.clone();
         tokio::spawn(async move {
-            if let Err(e) =
-                run_log::write_header(
-                    &workspace,
-                    &log_path,
-                    &workflow_id,
-                    &run_id,
-                    &inputs,
-                    &task_prompt,
-                )
-                .await
+            if let Err(e) = run_log::write_header(
+                &workspace,
+                &log_path,
+                &workflow_id,
+                &run_id,
+                &inputs,
+                &task_prompt,
+            )
+            .await
             {
                 tracing::warn!(run_id = %run_id, error = %e, "[skills] workflow_run: header write failed");
             }
@@ -270,15 +269,14 @@ pub async fn spawn_workflow_run_background(
             run_log::unregister_run_cancel(&run_id);
             match result {
                 None => {
-                    let _ =
-                        run_log::write_footer(
-                            &workspace,
-                            &log_path,
-                            "CANCELLED",
-                            ms,
-                            "Run stopped by user.",
-                        )
-                        .await;
+                    let _ = run_log::write_footer(
+                        &workspace,
+                        &log_path,
+                        "CANCELLED",
+                        ms,
+                        "Run stopped by user.",
+                    )
+                    .await;
                     tracing::info!(run_id = %run_id, "[workflows] workflow_run: cancelled");
                 }
                 Some(Ok(out)) if stop.is_some() => {
@@ -305,19 +303,29 @@ pub async fn spawn_workflow_run_background(
                              repeated line (truncated to 160 chars):\n  {preview}\n\n\
                              full final output follows below for forensic review:\n\n{out}",
                         );
-                        let _ = run_log::write_footer(&workspace, &log_path, "DEGENERATE", ms, &body).await;
+                        let _ =
+                            run_log::write_footer(&workspace, &log_path, "DEGENERATE", ms, &body)
+                                .await;
                         tracing::warn!(
                             run_id = %run_id,
                             repeats = count,
                             "[skills] workflow_run: degenerate final response rejected"
                         );
                     } else {
-                        let _ = run_log::write_footer(&workspace, &log_path, "DONE", ms, &out).await;
+                        let _ =
+                            run_log::write_footer(&workspace, &log_path, "DONE", ms, &out).await;
                         tracing::info!(run_id = %run_id, "[skills] workflow_run: completed");
                     }
                 }
                 Some(Err(e)) => {
-                    let _ = run_log::write_footer(&workspace, &log_path, "FAILED", ms, &format!("{e:#}")).await;
+                    let _ = run_log::write_footer(
+                        &workspace,
+                        &log_path,
+                        "FAILED",
+                        ms,
+                        &format!("{e:#}"),
+                    )
+                    .await;
                     tracing::warn!(run_id = %run_id, error = ?e, "[skills] workflow_run: failed");
                 }
             }
