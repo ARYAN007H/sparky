@@ -510,36 +510,7 @@ impl OpenHumanSubagentHost {
                     })
                     .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
             }));
-        Box::pin(self.run_leader(parent, task_key, child, input, false, checkpoint_dir)).await
-    }
-
-    async fn continue_with_key(
-        self,
-        parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        task_key: SubagentTaskKey,
-        input: String,
-    ) -> Result<SubagentRunOutcome, SubagentRunError> {
-        let child_config = RunConfig::new(format!("subagent-{}", uuid::Uuid::new_v4()));
-        let (_, child) = crate::agent::tinyagents::host::direct_subagent_child(
-            parent,
-            task_key.task_id.clone(),
-            child_config,
-        )
-        .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-        let checkpoint_dir =
-            absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
-                parent
-                    .data
-                    .parent
-                    .as_ref()
-                    .map(|context| {
-                        context
-                            .workspace_dir
-                            .join(".openhuman/subagent_checkpoints")
-                    })
-                    .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
-            }));
-        Box::pin(self.run_leader(parent, task_key, child, input, true, checkpoint_dir)).await
+        Box::pin(self.run_leader(parent, task_key, child, input, checkpoint_dir)).await
     }
 
     async fn run_leader(
@@ -548,7 +519,6 @@ impl OpenHumanSubagentHost {
         task_key: SubagentTaskKey,
         child: RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
         input: String,
-        continuation: bool,
         checkpoint_dir: PathBuf,
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
         let fallback_agent_id = self.definition.id.clone();
@@ -561,22 +531,17 @@ impl OpenHumanSubagentHost {
             shared_subagent_flight(&parent.data.dispatch_ctx(), &checkpoint_dir),
             parent.data.dispatch_ctx(),
         )?;
-        let request = if continuation {
-            SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None, None)
-                .await
-        } else {
-            // `direct_subagent_child` derives the same key for the host's
-            // durable lookup; this constructor independently proves that the
-            // execution context is the supplied parent's direct child.
-            SubagentRequest::fresh_from_parent(
-                parent,
-                child,
-                task_key.task_id.clone(),
-                request,
-                input,
-                None,
-            )
-        }
+        // `direct_subagent_child` derives the same key for the host's durable
+        // lookup; this constructor independently proves that the execution
+        // context is the supplied parent's direct child.
+        let request = SubagentRequest::fresh_from_parent(
+            parent,
+            child,
+            task_key.task_id.clone(),
+            request,
+            input,
+            None,
+        )
         .map_err(map_lifecycle_error)?;
         let cancellation = parent.cancellation.clone();
         match Box::pin(driver.driver.run(request, cancellation)).await {

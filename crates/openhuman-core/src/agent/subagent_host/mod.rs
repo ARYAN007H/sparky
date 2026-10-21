@@ -33,7 +33,7 @@
 //! | File              | Contents                                                    |
 //! | ----------------- | ----------------------------------------------------------- |
 //! | `types.rs`        | `SubagentRun{Options,Outcome,Error}`, `SubagentMode`        |
-//! | `ops/`            | `run_subagent`, typed/fork mode, TinyAgents graph route     |
+//! | `ops/`            | typed/fork mode and TinyAgents graph route                 |
 //! | `tool_prep.rs`    | Tool filtering + prompt loading + prompt protocol block     |
 
 mod autonomous;
@@ -61,15 +61,10 @@ pub(crate) use lifecycle::detached_subagent_parent;
 pub(crate) use lifecycle::load_subagent_checkpoint;
 pub(crate) use lifecycle::load_terminal_outcome;
 pub(crate) use lifecycle::resume_async_via_driver_tool;
-#[cfg(test)]
-pub(crate) use lifecycle::run_subagent_via_driver_tool;
 pub(crate) use lifecycle::spawn_async_via_driver_tool;
 #[cfg(test)]
 pub(crate) use lifecycle::spawn_async_via_driver_tool_with_jobs;
-pub use lifecycle::{
-    continue_subagent, continue_subagent_with_parent, run_subagent, run_subagent_with_parent,
-    OpenHumanSubagentHost,
-};
+pub use lifecycle::OpenHumanSubagentHost;
 pub use types::{
     SubagentCheckpointData, SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
     SubagentRunStatus, SubagentUsage,
