@@ -6,6 +6,7 @@
 //! Invalid or oversized identity segments use the same stable SHA-256/base32
 //! representation as the previous scope implementation.
 
+use std::fmt;
 use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,12 @@ impl Scope {
     /// grammar. This is used while reading legacy scopes before migration.
     pub fn new(value: impl AsRef<str>) -> Result<Self, StorageError> {
         tinystoragedrivers::Scope::new(value).map(Self)
+    }
+
+    /// Parses an opaque stored scope without interpreting its host grammar.
+    /// Use [`Scope::parsed`] when a caller needs OpenHuman tenant semantics.
+    pub fn parse(value: impl AsRef<str>) -> Result<Self, StorageError> {
+        Self::new(value)
     }
 
     /// The host's single-operator tenant scope.
@@ -136,6 +143,12 @@ impl Deref for Scope {
 impl AsRef<str> for Scope {
     fn as_ref(&self) -> &str {
         self.as_str()
+    }
+}
+
+impl fmt::Display for Scope {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
@@ -286,7 +299,7 @@ fn valid_segment(segment: &str) -> bool {
         hashed.len() == MAX_HASH_SEGMENT_LEN
             && hashed
                 .bytes()
-                .all(|byte| byte.is_ascii_lowercase() && byte.is_ascii_alphabetic() || (b'2'..=b'7').contains(&byte))
+                .all(|byte| byte.is_ascii_lowercase() || (b'2'..=b'7').contains(&byte))
     }) {
         return true;
     }
