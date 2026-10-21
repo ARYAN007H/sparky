@@ -272,7 +272,7 @@ required-features = ["voice", "http-server"]
 # installs a storage backend into the process-wide slot.
 name = "storage_desktop_upgrade_e2e"
 path = "../../tests/storage_desktop_upgrade_e2e.rs"
-required-features = ["storage-sqlite", "modules"]
+required-features = ["storage-sqlite", "modules", "flows", "linked-modules"]
 
 [[test]]
 # The released TinyMCP cdylib under the real host: add a server, restart the
