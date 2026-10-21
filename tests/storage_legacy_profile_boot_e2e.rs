@@ -155,7 +155,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         !source.exists(),
         "migration should archive the old workspace storage path"
     );
-    let archive_dir = profile.join("backups");
+    let archive_dir = home.path().join(".openhuman/backups");
     let archive = std::fs::read_dir(&archive_dir)
         .unwrap_or_else(|error| {
             panic!(
