@@ -224,6 +224,24 @@ async fn test_connection_managed_without_provider_reports_backend_unavailable() 
     );
 }
 
+#[tokio::test]
+async fn test_connection_returns_model_construction_failures_as_rpc_errors() {
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let tmp = TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.config_path = tmp.path().join("config.toml");
+
+    let error = test_connection(
+        &config,
+        Some("not-a-provider"),
+        Some("model"),
+        Some(4),
+    )
+    .await
+    .expect_err("invalid provider construction must remain an RPC error");
+    assert!(error.contains("unknown embedding provider"), "{error}");
+}
+
 /// Live `embed` (RPC) for managed also routes through the config-aware
 /// factory; with no session it surfaces the same backend-session error.
 #[tokio::test]
