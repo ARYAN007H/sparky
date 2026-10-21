@@ -152,7 +152,7 @@ pub fn all_tools_with_runtime(
             action_dir.to_path_buf(),
         )),
     ]);
-    tools.push(Box::new(GmailUnsubscribeTool));
+    tools.push(Box::new(crate::integrations::gmail::GmailUnsubscribeTool));
     #[cfg(feature = "skills")]
     tools.extend(crate::skills::registration::tools(config.clone()));
     tools.append(&mut vec![

@@ -8,7 +8,6 @@
 
 mod gate;
 mod gitbooks;
-mod gmail_unsubscribe;
 mod host;
 // Leaf-gated: the only consumers of these two are the `#[cfg(feature = "mcp")]`
 // blocks in `tools/ops.rs`, so no stub is needed — nothing names them when the
@@ -20,7 +19,6 @@ mod mcp;
 mod mcp_server_tools;
 
 pub use gitbooks::{GitbooksGetPageTool, GitbooksSearchTool};
-pub use gmail_unsubscribe::GmailUnsubscribeTool;
 #[cfg(feature = "web3")]
 pub(crate) use host::x402_request_tool;
 pub use host::{

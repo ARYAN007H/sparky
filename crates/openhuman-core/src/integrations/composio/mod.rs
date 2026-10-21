@@ -58,6 +58,7 @@ pub mod googlecalendar_args;
 pub mod identity;
 pub mod identity_store;
 pub mod module_client;
+pub mod orchestrator_actions;
 pub mod ops;
 pub(crate) mod processing;
 pub mod schemas;
