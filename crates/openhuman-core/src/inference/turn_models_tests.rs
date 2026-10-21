@@ -116,7 +116,11 @@ async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_su
                 )]),
             )
             .await;
-        assert!(result.is_err(), "zero token budget rejects each route");
+        let error = result.expect_err("zero token budget rejects each route");
+        assert!(
+            error.to_string().contains("budget exceeded"),
+            "route must fail at its owner budget wrapper: {error}"
+        );
         assert!(expected_slot.lock().unwrap().is_some());
     }
 
@@ -129,7 +133,11 @@ async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_su
             )]),
         )
         .await;
-    assert!(result.is_err(), "zero token budget rejects summary");
+    let error = result.expect_err("zero token budget rejects summary");
+    assert!(
+        error.to_string().contains("budget exceeded"),
+        "summary must fail at its owner budget wrapper: {error}"
+    );
     assert!(summary_slot.lock().unwrap().is_some());
 }
 

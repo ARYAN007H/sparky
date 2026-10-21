@@ -214,9 +214,10 @@ async fn one_shot_cloud_sentinel_resolves_the_configured_byok_provider() {
     let _guard = crate::inference::inference_test_guard_async().await;
     let _env = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = tempfile::tempdir().expect("isolated workspace");
-    let mut config =
-        config_with_providers_in_tempdir(&tmp, vec![openai_entry("p_openai", "openai")]);
-    config.chat_provider = Some("openai:gpt-4o-mini".into());
+    let mut provider = openai_entry("p_openai", "openai");
+    provider.default_model = Some("gpt-4o-mini".into());
+    let mut config = config_with_providers_in_tempdir(&tmp, vec![provider]);
+    config.primary_cloud = Some("p_openai".into());
     store_byo_key(&config, "openai", "sk-fixture");
     let library = crate::core::runtime::CoreContext::for_test_with_host_kind(
         crate::core::types::HostKind::Library,
