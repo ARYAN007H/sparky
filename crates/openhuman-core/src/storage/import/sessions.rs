@@ -35,8 +35,9 @@ use anyhow::{Context, Result};
 use tinyagents_session::DriverSessionStores;
 use tinyagents_session::port::TurnStates;
 use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
+use tinyagents_session::run_ledger::RunLedgerStore;
 use tinyagents_session::transcript::{
-    DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory, TranscriptLocator,
+    DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory,
     TranscriptMessage, TranscriptMeta, TranscriptPartial, TranscriptTurn, decode_transcript_jsonl,
     session_stem,
 };
@@ -75,7 +76,15 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             Arc::clone(backend),
             condition.clone(),
         );
-        let provider = DriverSessionStores::new(claimed_backend, Scope::local())
+        let factory: tinyagents_session::port::AgentStorageFactory = Arc::new(move |agent_id| {
+            let scope = crate::storage::scope_for_agent(agent_id);
+            let storage = claimed_backend.for_scope(&scope)?;
+            Ok(tinyagents_storage_kit::ScopedStorage::new(
+                storage,
+                (**scope).clone(),
+            ))
+        });
+        let provider = DriverSessionStores::new(factory)
             .map_err(|error| anyhow::anyhow!("start the session store bridge: {error}"))?
             .recover_on_open(false);
         let mut found = 0usize;
