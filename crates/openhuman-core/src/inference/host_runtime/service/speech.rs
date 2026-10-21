@@ -83,6 +83,9 @@ pub async fn transcribe_bytes(
     })
 }
 
+type ConfiguredProviderFactory<'a> =
+    dyn Fn(&Config) -> Result<Box<dyn SttProvider>, String> + Send + Sync + 'a;
+
 fn selected_stt_provider<'a>(
     config: &'a Config,
     provider_name: &str,
@@ -98,8 +101,7 @@ fn selected_stt_provider<'a>(
 
 struct ConfiguredSttProvider<'a> {
     config: &'a Config,
-    provider_factory:
-        Box<dyn Fn(&Config) -> Result<Box<dyn SttProvider>, String> + Send + Sync + 'a>,
+    provider_factory: Box<ConfiguredProviderFactory<'a>>,
 }
 
 #[async_trait::async_trait]
