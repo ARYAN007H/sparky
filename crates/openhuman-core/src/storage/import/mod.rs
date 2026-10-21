@@ -52,10 +52,12 @@
 pub(crate) mod layout_db;
 #[cfg(feature = "legacy-import")]
 pub(crate) mod layout_status;
-#[cfg(feature = "legacy-import")]
-pub mod scope_move;
 pub mod live;
 mod schemas;
+#[cfg(feature = "legacy-import")]
+pub mod scope_move;
+#[cfg(feature = "legacy-import")]
+pub(crate) mod session_db;
 #[cfg(feature = "legacy-import")]
 pub mod sessions;
 #[cfg(feature = "legacy-import")]
@@ -75,20 +77,20 @@ use std::sync::Arc;
 
 use anyhow::Result;
 #[cfg(feature = "legacy-import")]
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 #[cfg(feature = "legacy-import")]
 use sha2::Digest;
 use tinystoragedrivers::CollectionSpec;
 #[cfg(feature = "legacy-import")]
 use tinystoragedrivers::{ErrorKind, Precondition, WriteOptions};
 
+use super::StorageBackend;
 #[cfg(feature = "legacy-import")]
 use super::block_on;
 #[cfg(feature = "legacy-import")]
 use super::documents::Repo;
 #[cfg(feature = "legacy-import")]
 use super::rusqlite;
-use super::StorageBackend;
 use crate::config::Config;
 #[cfg(feature = "legacy-import")]
 use rusqlite::Connection;
