@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::inference::host_runtime as local_runtime;
-use tinyinference_llm::sentiment::{parse_sentiment_response, SentimentResult};
+use tinyinference_llm::sentiment::{parse_sentiment_response, sentiment_prompt, SentimentResult};
 use tracing::{debug, warn};
 
 const LOG_PREFIX: &str = "[inference::ops]";
@@ -29,15 +29,7 @@ pub async fn inference_analyze_sentiment(
         ));
     }
 
-    let prompt = format!(
-        "Classify the emotion and sentiment of this user message.\n\
-         Reply with EXACTLY three words separated by spaces:\n\
-         EMOTION VALENCE CONFIDENCE\n\
-         Where EMOTION is one of: joy, sadness, anger, surprise, fear, disgust, neutral\n\
-         VALENCE is one of: positive, negative, neutral\n\
-         CONFIDENCE is a number from 0.0 to 1.0\n\n\
-         User message: {message}"
-    );
+    let prompt = sentiment_prompt(message);
     let runtime = crate::inference::local_runtime_config(config);
     let Some(_permit) = crate::platform::llm_gate::wait_for_capacity().await else {
         return Ok(Outcome::single_log(
