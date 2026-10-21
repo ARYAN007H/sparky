@@ -61,8 +61,8 @@ pub(super) fn managed_chat_model_for(
     egress: &EgressLedger,
 ) -> anyhow::Result<ManagedChatModel> {
     enforce_local_only_inference(role, PROVIDER_OPENHUMAN)?;
-    let Some(entry) = crate::inference::registry::chat_model_for(extensions, PROVIDER_OPENHUMAN)
-    else {
+    let overrides = crate::inference::registry::provider_overrides(extensions.cloned());
+    let Some(entry) = overrides.chat_entry(PROVIDER_OPENHUMAN) else {
         log::debug!("[providers][chat-factory] role={role} managed provider is not registered");
         return Err(managed_unavailable_error());
     };
@@ -86,15 +86,15 @@ pub(super) fn managed_chat_model_for(
         config: config.clone(),
         egress: egress.clone(),
     };
-    let built = (entry.build)(&crate::inference::registry::ChatModelRequest {
+    let request = crate::inference::registry::ChatModelRequest {
         role,
         model_override: Some(&model),
         default_model,
         native_tool_calling,
         thread_id,
         context: &context,
-    })?;
-    Ok(built)
+    };
+    Ok(overrides.build_chat(PROVIDER_OPENHUMAN, &request, |_| unreachable!("provider override was selected"))?)
 }
 
 /// Construct a managed turn model with the explicit OpenHuman thread attached.
@@ -176,7 +176,8 @@ pub(crate) fn make_openhuman_backend_model_for_options(
     model: &str,
     thread_id: Option<&str>,
 ) -> anyhow::Result<ManagedChatModel> {
-    let Some(entry) = crate::inference::registry::chat_model(PROVIDER_OPENHUMAN) else {
+    let overrides = crate::inference::registry::provider_overrides(None);
+    let Some(entry) = overrides.chat_entry(PROVIDER_OPENHUMAN) else {
         return Err(managed_unavailable_error());
     };
     let mut config = Config::default();
@@ -189,13 +190,13 @@ pub(crate) fn make_openhuman_backend_model_for_options(
         config: config.clone(),
         egress,
     };
-    let built = (entry.build)(&crate::inference::registry::ChatModelRequest {
+    let request = crate::inference::registry::ChatModelRequest {
         role: "delegate",
         model_override: Some(model),
         default_model: Some(model),
         native_tool_calling: true,
         thread_id,
         context: &context,
-    })?;
-    Ok(built)
+    };
+    Ok(overrides.build_chat(PROVIDER_OPENHUMAN, &request, |_| unreachable!("provider override was selected"))?)
 }
