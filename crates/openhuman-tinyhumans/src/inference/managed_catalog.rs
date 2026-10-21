@@ -10,7 +10,7 @@
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::Outcome;
 use openhuman_embed::__host::inference_registry::{
-    BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest,
+    BoxFuture, CatalogEntry, CatalogHostRequest, CatalogLimits, CatalogRequest, ProviderContext,
 };
 use openhuman_embed::__host::security::credentials::session_support::{
     classify_session_token, load_app_session_profile, publish_local_session_expiry,
@@ -30,20 +30,25 @@ use crate::client::endpoint::{
 const MODELS_PATH: &str = "/openai/v1/models";
 
 /// The registry entry for the managed catalog.
-pub(super) fn entry() -> CatalogEntry {
-    let list: CatalogListing = Arc::new(
-        |config: Config,
-         request: CatalogRequest|
-         -> BoxFuture<Result<Outcome<serde_json::Value>, String>> {
-            Box::pin(async move { list_models(&config, request).await })
-        },
-    );
-    let limits: CatalogLimits =
-        Arc::new(|model: &str, config: &Config| limits_request(model, config));
-    CatalogEntry {
-        list,
-        limits: Some(limits),
-    }
+pub(super) fn entry() -> CatalogEntry<ProviderContext> {
+    let list = Arc::new(|request: CatalogRequest<ProviderContext>| -> BoxFuture<Result<serde_json::Value, String>> {
+        Box::pin(async move {
+            let context = request.context;
+            let host = context.catalog.as_ref().expect("catalog host context");
+            let outcome = list_models(
+                &context.config,
+                CatalogHostRequest {
+                    provider_key: host.request.provider_key.clone(),
+                    client: host.request.client.clone(),
+                },
+            ).await?;
+            host.logs.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(outcome.logs);
+            Ok(outcome.value)
+        })
+    });
+    let limits: CatalogLimits<ProviderContext> =
+        Arc::new(|model: &str, context: &ProviderContext| limits_request(model, &context.config));
+    CatalogEntry { list, limits: Some(limits) }
 }
 
 fn empty_catalog(reason: &str) -> Result<Outcome<serde_json::Value>, String> {
@@ -105,7 +110,7 @@ pub(super) fn listing_auth(check: SessionTokenCheck, provider_key: &str) -> List
 /// The `list_configured_models` listing for the managed provider.
 pub(super) async fn list_models(
     config: &Config,
-    request: CatalogRequest,
+    request: CatalogHostRequest,
 ) -> Result<Outcome<serde_json::Value>, String> {
     // Classify the session directly: a store error propagates (a recoverable
     // fault the picker should surface), only an absent or expired session

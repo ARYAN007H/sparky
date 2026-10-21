@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use openhuman_embed::__host::egress::{emit_external_transfer, enforce_egress, EgressDescriptor};
-use openhuman_embed::__host::inference_registry::EmbeddingRequest;
+use openhuman_embed::__host::inference_registry::{EmbeddingRequest, ProviderContext};
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
 use tinyinference_embeddings::{BearerResolver, CloudEmbeddingModel, EmbeddingEgressGuard};
 
@@ -18,7 +18,7 @@ use crate::client::endpoint::is_managed_endpoint_for_api_key;
 /// Builds the owning cloud embedding implementation with the credential scope
 /// and turn context supplied by the inference registry.
 pub(super) fn from_request(
-    request: &EmbeddingRequest<'_, openhuman_embed::__host::inference_registry::ProviderContext>,
+    request: &EmbeddingRequest<'_, ProviderContext>,
 ) -> CloudEmbeddingModel {
     let context = request.context.embedding.as_ref().expect("embedding host context");
     build_cloud_model(

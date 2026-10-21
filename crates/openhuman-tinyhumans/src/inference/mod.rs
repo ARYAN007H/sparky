@@ -27,8 +27,9 @@ use std::sync::Arc;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::inference_registry::{
     register_backend_error_classifier, register_catalog, register_chat_model,
-    register_config_normalizer, register_embedding, BoxFuture, ChatModelEntry, ChatModelFactory,
-    ChatModelRequest, ProviderContext, ProviderModelMetadata, ReadinessProbe, PROVIDER_OPENHUMAN,
+    register_config_normalizer, register_embedding, ChatModelEntry, ChatModelFactory,
+    ChatModelRequest, EmbeddingRequest, ProviderContext, ProviderModelMetadata, ReadinessProbe,
+    PROVIDER_OPENHUMAN,
 };
 use tinyinference_llm::model::ChatModel;
 
@@ -135,9 +136,12 @@ pub(crate) fn register(_options: &InstallOptions) {
             }),
         },
     );
-    register_embedding(PROVIDER_OPENHUMAN, |request| {
-        Ok(Box::new(managed_embedding::from_request(request)))
-    });
+    register_embedding(
+        PROVIDER_OPENHUMAN,
+        Arc::new(|request: &EmbeddingRequest<'_, ProviderContext>| {
+            Ok(Box::new(managed_embedding::from_request(request)))
+        }),
+    );
     register_catalog(PROVIDER_OPENHUMAN, managed_catalog::entry());
     register_config_normalizer(PROVIDER_OPENHUMAN, Arc::new(tiers::normalize_config));
     register_backend_error_classifier(Arc::new(backend_error_code::classify));
