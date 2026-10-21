@@ -6,8 +6,9 @@ use crate::storage::Scope;
 use serde_json::json;
 #[cfg(feature = "storage-sqlite")]
 use std::sync::Arc;
+use tinystoragedrivers::Meta;
 #[cfg(feature = "storage-sqlite")]
-use tinystoragedrivers::{Meta, Precondition};
+use tinystoragedrivers::Precondition;
 
 #[test]
 fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {
