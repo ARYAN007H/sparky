@@ -1,13 +1,24 @@
 use super::*;
+#[cfg(feature = "storage-sqlite")]
+use crate::storage::test_support::sqlite_backend;
+#[cfg(feature = "storage-sqlite")]
+use std::sync::Arc;
 
+#[cfg(feature = "storage-sqlite")]
 #[tokio::test]
 async fn the_operators_cron_limits_bind_every_profile_whatever_its_config_says() {
     let tmp = tempfile::tempdir().unwrap();
+    let fixture = sqlite_backend().unwrap();
     let mut saas = SaasConfig::new(tmp.path());
     saas.cron.agent_jobs_only = true;
     saas.cron.min_interval_secs = 900;
     saas.cron.max_active_jobs = 3;
-    let host = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
+    let host = ProfileHost::with_backend(
+        saas,
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(Arc::clone(&fixture.backend)),
+    )
+    .unwrap();
     let id = profile("alice");
     host.provision(&id).await.unwrap();
     // The user's own file tries to switch the mode off.
