@@ -288,6 +288,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
     let (_temp, config, core, dispatch, job) = scheduled_agent_fixture(2);
+    let inspect_dispatch = dispatch.clone();
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
     let scheduler_config = config.clone();
@@ -317,6 +318,16 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
     assert_eq!(runs.len(), 1, "scheduler persisted one completed attempt");
     assert_ne!(runs[0].status, "ok", "the configured deadline expired");
+    assert!(
+        runs[0]
+            .output
+            .as_deref()
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .contains("timed out"),
+        "persisted Cron output identifies the timeout: {:?}",
+        runs[0].output
+    );
     assert!(!runs[0]
         .output
         .as_deref()
@@ -342,6 +353,30 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
             .child_invocation_dropped
             .load(std::sync::atomic::Ordering::SeqCst),
         "the root deadline dropped the child model future"
+    );
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &config.workspace_dir,
+        &format!("cron:{}", job.id),
+        None,
+    );
+    let registry = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(&inspect_dispatch);
+    let jobs = registry
+        .try_list_owned(owner.as_str())
+        .expect("inspect this Cron run's native descendants");
+    assert_eq!(jobs.len(), 1, "one native child belongs to this Cron job");
+    let child = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        registry.wait_owned(jobs[0].id.as_str(), owner),
+    )
+    .await
+    .expect("root timeout cancellation reaches its child")
+    .expect("the child remains available until its terminal state");
+    assert_eq!(
+        child.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled,
+        "the root deadline cancels the blocked native child"
     );
 }
 
