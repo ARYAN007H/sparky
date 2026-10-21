@@ -1,8 +1,6 @@
 use super::*;
 use crate::agent::subagent_host::types::SubagentCheckpointData;
 
-#[path = "legacy_terminal.rs"]
-pub(super) mod legacy_terminal;
 
 pub(in crate::agent::subagent_host) struct OpenHumanPersistence {
     checkpoint_dir: std::path::PathBuf,
