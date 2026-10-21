@@ -100,6 +100,45 @@ fn profile_phase_out_rewrites_imported_bytes_without_mutating_legacy_source() {
     assert_eq!(std::fs::read(&path).unwrap(), source_before);
 }
 
+#[test]
+fn profile_phase_out_sanitizes_imported_sqlite_system_rows_only() {
+    let timestamp = chrono::DateTime::from_timestamp_millis(1_700_000_000_000).unwrap();
+    let mut messages = vec![
+        tinyagents_session::types::SessionMessage {
+            id: 7,
+            session_id: "session".into(),
+            role: "system".into(),
+            content: "## Identity\n\n### PROFILE.md\n\nprivate\n\n### Tools\n\nshell".into(),
+            reasoning_content: None,
+            model: None,
+            input_tokens: None,
+            output_tokens: None,
+            cost_usd: None,
+            created_at: timestamp,
+        },
+        tinyagents_session::types::SessionMessage {
+            id: 8,
+            session_id: "session".into(),
+            role: "user".into(),
+            content: "please keep this PROFILE.md mention".into(),
+            reasoning_content: None,
+            model: None,
+            input_tokens: None,
+            output_tokens: None,
+            cost_usd: None,
+            created_at: timestamp,
+        },
+    ];
+
+    sanitize_legacy_system_messages(&mut messages);
+
+    assert_eq!(messages[0].id, 7);
+    assert!(!messages[0].content.contains("PROFILE.md"));
+    assert!(messages[0].content.contains("### Tools"));
+    assert_eq!(messages[1].id, 8);
+    assert!(messages[1].content.contains("PROFILE.md"));
+}
+
 #[cfg(unix)]
 #[test]
 fn session_file_discovery_never_follows_symlinks_outside_legacy_roots() {

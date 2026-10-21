@@ -265,17 +265,17 @@ fn decode_transcript(
 )> {
     let bytes =
         std::fs::read(path).with_context(|| format!("read transcript {}", path.display()))?;
-    let (import_bytes, _) = tinyagents_session::transcript::rewrite_first_system_message_jsonl(
-        &bytes,
-        |content| {
-            let Some(cleaned) = crate::config::migrations::phase_out_profile_md::strip_profile_md_block(content) else {
+    let (import_bytes, _) =
+        tinyagents_session::transcript::rewrite_first_system_message_jsonl(&bytes, |content| {
+            let Some(cleaned) =
+                crate::config::migrations::phase_out_profile_md::strip_profile_md_block(content)
+            else {
                 return false;
             };
             *content = cleaned;
             true
-        },
-    )
-    .with_context(|| format!("sanitize imported transcript {}", path.display()))?;
+        })
+        .with_context(|| format!("sanitize imported transcript {}", path.display()))?;
     let decoded = decode_transcript_jsonl(&import_bytes)
         .with_context(|| format!("decode transcript {}", path.display()))?;
     Ok((
