@@ -117,7 +117,7 @@ alignGlobalEventWithDom();
 
 // Polyfill window.matchMedia — used by Rive (@rive-app/react-webgl2) and
 // some media-query hooks; not implemented in jsdom.
-if (typeof window.matchMedia === 'undefined') {
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'undefined') {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn((query: string) => ({
@@ -410,7 +410,7 @@ afterEach(async () => {
   // Fake-timer suites own their clock. Awaiting a synthetic timer there would
   // wait until Vitest's per-test timeout, rather than draining anything.
   if (!vi.isFakeTimers()) {
-    await new Promise<void>(resolve => window.setTimeout(resolve, 0));
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
   alignGlobalEventWithDom();
   // Re-seed the IPC handle after any test that may have deleted it
