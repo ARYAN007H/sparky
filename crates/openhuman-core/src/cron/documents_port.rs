@@ -87,7 +87,10 @@ impl DocScope {
         Ok(Self {
             workspace_dir: config.workspace_dir.clone(),
             scope: opened.scope,
-            backend: None,
+            // The schedule call crosses the synchronous storage bridge before
+            // TinyFlows calls this host document port. Keep the backend we
+            // already opened so the callback does not re-enter that bridge.
+            backend: Some(opened.backend),
         })
     }
 
