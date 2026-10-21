@@ -21,8 +21,7 @@ fn leaves_legacy_transcript_and_markdown_source_bytes_unchanged() {
     fs::create_dir_all(&companion_dir).unwrap();
     let transcript = transcript_dir.join("old.jsonl");
     let companion = companion_dir.join("old.md");
-    let transcript_bytes = br##"{"role":"system","content":"### PROFILE.md\n\nold profile\n\n### Tools\n\nshell"}
-"##;
+    let transcript_bytes = b"{\"role\":\"system\",\"content\":\"### PROFILE.md\\n\\nold profile\\n\\n### Tools\\n\\nshell\"}\n";
     let companion_bytes = b"## [system]\n\n### PROFILE.md\n\nold profile\n";
     fs::write(&transcript, transcript_bytes).unwrap();
     fs::write(&companion, companion_bytes).unwrap();
