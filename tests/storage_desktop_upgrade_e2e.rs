@@ -399,12 +399,16 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
     let docs = backend.for_scope(&Scope::local()).unwrap();
     let mut total = 0;
     // The importers write the v2 collections of the owners behind each source.
-    for spec in openhuman_core::storage::schema::owner_collections().unwrap() {
-        if spec.name == "tsd.migrations" {
-            continue;
+    let collections = openhuman_core::storage::schema::owner_collections().unwrap();
+    for source in import::sources() {
+        let prefix = format!("{}.", source.owner);
+        for spec in collections
+            .iter()
+            .filter(|spec| spec.name.starts_with(&prefix))
+        {
+            docs.documents().ensure_collection(spec).await.unwrap();
+            total += count(&docs, &spec.name).await;
         }
-        docs.documents().ensure_collection(&spec).await.unwrap();
-        total += count(&docs, &spec.name).await;
     }
     total
 }
