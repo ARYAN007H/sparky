@@ -7,8 +7,8 @@ use super::*;
 use crate::config::Config;
 use crate::memory::lifecycle::jobs::BACKGROUND_JOB;
 use crate::security::SecurityPolicy;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tempfile::TempDir;
 
 fn config(tmp: &TempDir) -> Config {

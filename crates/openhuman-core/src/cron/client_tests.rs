@@ -31,17 +31,13 @@ async fn schedules_are_validated_and_the_agent_floor_applies() {
     validate_schedule(&config, &every_minute, at(8), false)
         .await
         .unwrap();
-    assert!(
-        validate_schedule(&config, &every_minute, at(8), true)
-            .await
-            .is_err()
-    );
+    assert!(validate_schedule(&config, &every_minute, at(8), true)
+        .await
+        .is_err());
     let past = Schedule::At { at: at(1) };
-    assert!(
-        validate_schedule(&config, &past, at(8), false)
-            .await
-            .is_err()
-    );
+    assert!(validate_schedule(&config, &past, at(8), false)
+        .await
+        .is_err());
 }
 
 #[tokio::test]
@@ -51,12 +47,10 @@ async fn expressions_normalise_and_report_their_cron_form() {
         normalize_expression(&config, "0 9 * * 1-5").await.unwrap(),
         "0 0 9 * * 2-6"
     );
-    assert!(
-        schedule_cron_expression(&config, &cron("0 9 * * *"))
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(schedule_cron_expression(&config, &cron("0 9 * * *"))
+        .await
+        .unwrap()
+        .is_some());
     assert!(
         schedule_cron_expression(&config, &Schedule::Every { every_ms: 1000 })
             .await

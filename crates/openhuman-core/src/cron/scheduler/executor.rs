@@ -16,12 +16,12 @@ use super::failure_classification::{
 };
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::cron::bus_host::{Binding, kind_refusal};
-use crate::cron::handlers::{JobRunContext, kind_handler};
+use crate::cron::bus_host::{kind_refusal, Binding};
+use crate::cron::handlers::{kind_handler, JobRunContext};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tinyflows_bus::schedule::Attempt;
 use tinyflows_bus::schedule::types::{CronJob, JobType, SessionTarget};
+use tinyflows_bus::schedule::Attempt;
 
 /// Run states kept before the map is cleared outright (a run whose task was
 /// aborted never reaches `failed`).

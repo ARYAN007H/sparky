@@ -296,9 +296,8 @@ impl ModuleRuntimeTestGuard {
 
     pub(crate) fn module_objects(
         &self,
-    ) -> std::sync::Arc<
-        std::collections::HashMap<String, tinybus::module::ModuleObjectClient>,
-    > {
+    ) -> std::sync::Arc<std::collections::HashMap<String, tinybus::module::ModuleObjectClient>>
+    {
         self.0.module_objects()
     }
 

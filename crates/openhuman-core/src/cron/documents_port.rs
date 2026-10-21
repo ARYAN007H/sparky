@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 
 use anyhow::{Context, Result};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinybus::Result as BusResult;
 use tinyflows_bus::schedule::CallbackAddress;
 use tinystoragedrivers::{

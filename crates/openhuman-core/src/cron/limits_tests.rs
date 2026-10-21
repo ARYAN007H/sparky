@@ -1,9 +1,9 @@
 //! The agent-only limits: what is refused at add, update and run.
 
 use super::*;
-use crate::cron::job_builder::{AgentJobInput, create_agent_job};
+use crate::cron::job_builder::{create_agent_job, AgentJobInput};
 use crate::cron::limits;
-use crate::cron::{JobOrigin, add_job, add_shell_job, get_job, update_job};
+use crate::cron::{add_job, add_shell_job, get_job, update_job, JobOrigin};
 use tempfile::TempDir;
 
 fn limited(tmp: &TempDir) -> Config {
@@ -54,16 +54,14 @@ fn shell_and_flow_jobs_are_refused() {
     assert!(add_shell_job(&config, None, every.clone(), "echo hi").is_err());
     assert!(add_job(&config, "*/10 * * * *", "echo hi").is_err());
     assert!(crate::cron::add_flow_schedule_job(&config, "flow", every).is_err());
-    assert!(
-        limits::check_patch(
-            &config,
-            &CronJobPatch {
-                command: Some("echo hi".into()),
-                ..CronJobPatch::default()
-            }
-        )
-        .is_err()
-    );
+    assert!(limits::check_patch(
+        &config,
+        &CronJobPatch {
+            command: Some("echo hi".into()),
+            ..CronJobPatch::default()
+        }
+    )
+    .is_err());
 }
 
 #[test]
@@ -85,28 +83,24 @@ fn jobs_need_a_conversation_and_may_not_pick_a_destination() {
     }
     let job = create_agent_job(&config, input(600_000, None), origin()).unwrap();
     assert_eq!(job.delivery.mode, "origin");
-    assert!(
-        update_job(
-            &config,
-            &job.id,
-            CronJobPatch {
-                delivery: Some(delivery("announce")),
-                ..CronJobPatch::default()
-            }
-        )
-        .is_err()
-    );
-    assert!(
-        update_job(
-            &config,
-            &job.id,
-            CronJobPatch {
-                origin: Some(None),
-                ..CronJobPatch::default()
-            }
-        )
-        .is_err()
-    );
+    assert!(update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            delivery: Some(delivery("announce")),
+            ..CronJobPatch::default()
+        }
+    )
+    .is_err());
+    assert!(update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            origin: Some(None),
+            ..CronJobPatch::default()
+        }
+    )
+    .is_err());
 }
 
 #[test]
@@ -169,27 +163,21 @@ async fn run_now_refuses_a_stored_job_that_breaks_the_limits() {
     let shell =
         add_shell_job(&config, None, Schedule::Every { every_ms: 600_000 }, "echo").unwrap();
     config.cron.agent_jobs_only = true;
-    assert!(
-        crate::cron::ops::run_job_now(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            &config,
-            &shell.id
-        )
-        .await
-        .is_err()
-    );
-    assert!(
-        crate::cron::ops::cron_run(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            &config,
-            &shell.id
-        )
-        .await
-        .is_err()
-    );
-    assert!(
-        crate::cron::list_runs(&config, &shell.id, 10)
-            .unwrap()
-            .is_empty()
-    );
+    assert!(crate::cron::ops::run_job_now(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &shell.id
+    )
+    .await
+    .is_err());
+    assert!(crate::cron::ops::cron_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &shell.id
+    )
+    .await
+    .is_err());
+    assert!(crate::cron::list_runs(&config, &shell.id, 10)
+        .unwrap()
+        .is_empty());
 }

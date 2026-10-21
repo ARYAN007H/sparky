@@ -3,13 +3,13 @@
 
 use super::*;
 use crate::cron::handlers::{
-    JobKindHandler, JobOutcome, JobRunContext, kind_handler, register_kind,
+    kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext,
 };
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
 use tinyflows_bus::schedule::types::Schedule;
-use tinyflows_bus::schedule::{CALLBACK_INTERFACE, callbacks};
+use tinyflows_bus::schedule::{callbacks, CALLBACK_INTERFACE};
 
 fn config(tmp: &TempDir) -> Config {
     let config = Config {

@@ -5,6 +5,8 @@ pub(crate) mod session;
 mod startup;
 
 pub(crate) use startup::hydrate_channel_credentials;
+#[cfg(test)]
+pub(crate) use startup::prepare_module_runtime_for_test_in_context;
 pub(crate) use startup::prepare_runtime_limits;
 pub use startup::start_channels;
 pub(crate) use startup::start_channels_with_session;
@@ -13,8 +15,6 @@ pub(crate) use startup::ChannelHandle;
 pub(crate) use startup::TestChannel;
 #[cfg(test)]
 pub(crate) use startup::{prepare_module_runtime_for_test, ModuleRuntimeTestGuard};
-#[cfg(test)]
-pub(crate) use startup::prepare_module_runtime_for_test_in_context;
 // The hosted-channel relay (`channels::providers::relay`) runs one message
 // through the same pipeline, with a context built from the caller's config.
 #[cfg(test)]

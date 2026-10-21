@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::turn_origin::{TrustedAutomationSource, with_origin};
+use crate::agent::turn_origin::{with_origin, TrustedAutomationSource};
 use serde_json::json;
 use tinyflows_bus::schedule::types::{
     ChannelConversationIdentity, ChannelSessionIdentity, Schedule,

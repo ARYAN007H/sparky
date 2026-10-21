@@ -9,12 +9,12 @@
 //! changed ([`super::store`]) and again where it runs, so a row written before
 //! the mode was switched on is refused too.
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use chrono::{Duration, Utc};
 
 use crate::config::Config;
 use crate::cron::{
-    CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule, delivery_mode, list_jobs,
+    delivery_mode, list_jobs, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule,
 };
 
 /// Whether `config` restricts cron to agent jobs.
