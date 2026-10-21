@@ -1,8 +1,10 @@
 //! Test-only storage backends backed by the real TSD testkit and drivers.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::storage::{block_on_anyhow, StorageBackend};
+use crate::storage::StorageBackend;
+#[cfg(feature = "storage-sqlite")]
+use crate::storage::block_on_anyhow;
 
 /// A real TSD in-memory backend for tests that do not require conditional
 /// writes or persistence across backend instances.
@@ -10,9 +12,20 @@ pub fn memory_backend() -> Arc<dyn StorageBackend> {
     Arc::new(tinystoragedrivers_testkit::MemoryBackend::new())
 }
 
+static STORAGE_SLOT_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+/// Serializes a test that reads or mutates the process-wide installed storage
+/// slot. Hold this guard for the full test lifetime, including cleanup.
+pub fn lock_storage_slot() -> MutexGuard<'static, ()> {
+    STORAGE_SLOT_TEST_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// A temporary installation in the process storage slot, restored on drop.
 /// Use only in tests that exercise boot/import paths reading `installed_url`.
 pub struct InstalledBackendGuard {
+    _slot_lock: MutexGuard<'static, ()>,
     previous_backend: Option<Arc<dyn StorageBackend>>,
     previous_url: Option<String>,
 }
@@ -20,9 +33,11 @@ pub struct InstalledBackendGuard {
 /// Installs `backend` with its URL for a test that exercises the production
 /// boot path, restoring the previous process slot when the guard is dropped.
 pub fn install_for_test(url: &str, backend: Arc<dyn StorageBackend>) -> InstalledBackendGuard {
+    let slot_lock = lock_storage_slot();
     let previous_url = crate::storage::installed_url();
     let previous_backend = crate::storage::install_for_url(url, backend);
     InstalledBackendGuard {
+        _slot_lock: slot_lock,
         previous_backend,
         previous_url,
     }
