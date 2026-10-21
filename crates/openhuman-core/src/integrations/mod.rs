@@ -10,6 +10,7 @@
 
 pub(crate) mod announcement_notes;
 pub mod composio;
+pub mod gmail;
 mod connected_identities;
 pub(crate) mod recorded_tools;
 pub mod task_sources;
