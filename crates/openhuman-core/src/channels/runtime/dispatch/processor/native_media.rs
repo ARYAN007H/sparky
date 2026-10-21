@@ -1,16 +1,13 @@
 //! Resolve typed native-channel media through TinyChannels' scoped media port.
 
-use tinybus::module::{ModuleCallError, ModuleClient};
+use tinybus::module::{ModuleCallError, ModuleObjectClient};
 use tinychannels_bus::{
     module_media::{MediaReadBegin, MediaReadChunk, MediaReadFinish},
     ChannelInboundEnvelope, ContentPart, HostVoiceScope, MediaKind, MediaReference,
 };
 use tinyinference_llm::message::Message;
 
-use crate::{
-    channels::context::{module_client, ChannelRuntimeContext},
-    core::runtime::DispatchCtx,
-};
+use crate::{channels::context::ChannelRuntimeContext, core::runtime::DispatchCtx};
 
 const MAX_MEDIA_BYTES: usize = tinychannels_bus::module_media::MEDIA_UPLOAD_MAX_BYTES;
 
@@ -119,7 +116,19 @@ pub(super) async fn resolve_typed_message(
             "native file attachments are disabled or exceed their count limit".into(),
         ));
     }
-    let client = module_client(ctx).await;
+    // Media reads must reach the same configured module object that owns the
+    // provider activation and its opaque media store. A process-wide client
+    // creates a callback-only runtime with no running provider state.
+    let client = ctx
+        .module_objects
+        .get(&scope.configured_instance)
+        .cloned()
+        .ok_or_else(|| {
+            log_rejection(
+                "module_instance",
+                "configured native media module is unavailable".into(),
+            )
+        })?;
     let module_dispatch = ctx.dispatch_ctx();
     let mut media_payloads = Vec::new();
     for (index, part) in parts.iter_mut().enumerate() {
@@ -166,7 +175,7 @@ pub(super) async fn resolve_typed_message(
         let bytes = read_scoped_media(
             &client,
             &module_dispatch,
-            envelope.channel.id.as_str(),
+            &scope.configured_instance,
             &scope,
             &media,
             byte_limit,
@@ -360,7 +369,7 @@ fn validate_actual_media_size(
 }
 
 async fn read_scoped_media(
-    client: &ModuleClient,
+    client: &ModuleObjectClient,
     dispatch: &DispatchCtx,
     instance: &str,
     scope: &HostVoiceScope,
@@ -369,7 +378,6 @@ async fn read_scoped_media(
 ) -> Result<Vec<u8>, String> {
     let begin = client
         .call_confidential::<tinychannels_bus::MediaReadInfo>(
-            "tinychannels",
             tinychannels_bus::methods::BEGIN_MEDIA_READ,
             (MediaReadBegin {
                 instance: instance.to_owned(),
@@ -431,7 +439,6 @@ async fn read_scoped_media(
     for sequence in 0..begin.chunk_count {
         let chunk = client
             .call_confidential::<tinychannels_bus::MediaReadChunkResult>(
-                "tinychannels",
                 tinychannels_bus::methods::READ_MEDIA_CHUNK,
                 (MediaReadChunk {
                     handle: begin.handle.clone(),
@@ -482,14 +489,14 @@ async fn read_scoped_media(
 }
 
 struct MediaReadLease {
-    client: ModuleClient,
+    client: ModuleObjectClient,
     dispatch: DispatchCtx,
     handle: Option<tinychannels_bus::MediaReadHandle>,
 }
 
 impl MediaReadLease {
     fn new(
-        client: ModuleClient,
+        client: ModuleObjectClient,
         dispatch: DispatchCtx,
         handle: tinychannels_bus::MediaReadHandle,
     ) -> Self {
@@ -506,7 +513,6 @@ impl MediaReadLease {
         };
         self.client
             .call_confidential::<()>(
-                "tinychannels",
                 tinychannels_bus::methods::ABORT_MEDIA_READ,
                 (MediaReadFinish(handle),),
             )
@@ -536,7 +542,7 @@ impl Drop for MediaReadLease {
 
 #[cfg(test)]
 pub(crate) fn drop_media_read_lease_for_test(
-    client: ModuleClient,
+    client: ModuleObjectClient,
     dispatch: DispatchCtx,
     handle: tinychannels_bus::MediaReadHandle,
 ) {
