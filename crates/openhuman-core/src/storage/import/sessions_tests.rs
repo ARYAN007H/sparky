@@ -1,9 +1,12 @@
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
-use crate::storage::MemoryStorage;
+use crate::storage::test_support::{SqliteBackend, sqlite_backend};
 use crate::storage::rusqlite;
 use crate::util::classic_transcript_fixture::write_classic;
 use sha2::Digest as _;
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use tempfile::TempDir;
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptMeta};
 use tinyagents_session::turn_state::TurnState;
@@ -17,8 +20,18 @@ fn workspace() -> (TempDir, Config) {
     (dir, config)
 }
 
-fn backend() -> Arc<dyn StorageBackend> {
-    Arc::new(MemoryStorage::new())
+struct TestBackend(SqliteBackend);
+
+impl Deref for TestBackend {
+    type Target = Arc<dyn StorageBackend>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.backend
+    }
+}
+
+fn backend() -> TestBackend {
+    TestBackend(sqlite_backend().unwrap())
 }
 
 #[test]
