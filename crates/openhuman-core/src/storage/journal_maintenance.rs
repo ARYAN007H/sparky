@@ -55,11 +55,110 @@ pub async fn maintain_once(
     now_ms: i64,
 ) -> Result<MaintenanceSummary, crate::storage::StorageError> {
     let retention_ms = u64::from(retention_days).saturating_mul(DAY_MS);
-    // Keep these handles alive for the entire pass. An open profile handle
-    // keeps its host slot in use, which prevents its lease fence from being
-    // retired while this pass writes to that profile's scope.
-    let (_hosted_profiles, scopes) = known_scopes()?;
-    maintain_scopes(backend, scopes, retention_ms, now_ms).await
+    let work = known_scope_work(backend)?;
+    maintain_work_items(work, retention_ms, now_ms).await
+}
+
+struct ScopeWorkItem {
+    backend: Arc<dyn StorageBackend>,
+    scope: Scope,
+    // Retains the open host slot. The captured backend separately pins the
+    // exact lease epoch and carries its condition on every mutation.
+    _profile: Option<Arc<crate::profiles::Profile>>,
+}
+
+fn known_scope_work(
+    backend: &Arc<dyn StorageBackend>,
+) -> Result<Vec<ScopeWorkItem>, crate::storage::StorageError> {
+    let mut base_scopes = BTreeSet::new();
+    if !crate::core::runtime::mode::is_saas() {
+        base_scopes.insert(Scope::local());
+    }
+
+    for (agent, context) in crate::storage::agents::contexts() {
+        let dispatch = crate::core::runtime::DispatchCtx::new(context);
+        if let Ok(tenant) = dispatch.tenant() {
+            if tenant.profile.is_none() {
+                if let Some(agent) = tenant.agent.or(Some(agent)) {
+                    base_scopes.insert(crate::storage::scope_for_agent(&agent));
+                }
+            }
+        }
+    }
+
+    if !crate::core::runtime::mode::is_saas() {
+        for module in crate::modules::registry::ALL {
+            if let Ok(scope) = Scope::local().module(module.id) {
+                base_scopes.insert(scope);
+            }
+        }
+    }
+
+    let mut work = base_scopes
+        .into_iter()
+        .map(|scope| ScopeWorkItem {
+            backend: Arc::clone(backend),
+            scope,
+            _profile: None,
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(host) = crate::profiles::host::host() {
+        let now = super::fence::system_now_ms();
+        for profile in host.hosted_profiles() {
+            if profile.lease_fence().check_local(now).is_err() {
+                continue;
+            }
+            let Some(profile_backend) = host.storage_backend_for(&profile)? else {
+                // File leases have no shared storage backend to maintain.
+                continue;
+            };
+            let base = crate::storage::scope_for_profile(profile.id.as_str());
+            let mut profile_scopes = BTreeSet::from([base.clone()]);
+            for module in crate::modules::registry::ALL {
+                if let Ok(scope) = base.module(module.id) {
+                    profile_scopes.insert(scope);
+                }
+            }
+            work.extend(profile_scopes.into_iter().map(|scope| ScopeWorkItem {
+                backend: Arc::clone(&profile_backend),
+                scope,
+                _profile: Some(Arc::clone(&profile)),
+            }));
+        }
+    }
+    Ok(work)
+}
+
+async fn maintain_work_items(
+    work: Vec<ScopeWorkItem>,
+    retention_ms: u64,
+    now_ms: i64,
+) -> Result<MaintenanceSummary, crate::storage::StorageError> {
+    let mut summary = MaintenanceSummary::default();
+    for item in work {
+        match maintain_scope(&item.backend, &item.scope, retention_ms, now_ms).await {
+            Ok(report) => {
+                summary.scopes += 1;
+                summary.backfilled += report.backfilled as u64;
+                summary.deleted += report.deleted as u64;
+                summary.conflicts += report.conflicts as u64;
+            }
+            Err(error) => tracing::warn!(
+                scope = item.scope.as_str(),
+                %error,
+                "{LOG} owner journal maintenance failed; retrying on the next sweep"
+            ),
+        }
+    }
+    tracing::debug!(
+        scopes = summary.scopes,
+        backfilled = summary.backfilled,
+        deleted = summary.deleted,
+        conflicts = summary.conflicts,
+        "{LOG} pass complete"
+    );
+    Ok(summary)
 }
 
 async fn maintain_scopes(
