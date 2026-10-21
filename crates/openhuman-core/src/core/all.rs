@@ -556,10 +556,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::tools::all_tools_registered_controllers(),
     );
     // Unified read-only registry across MCP stdio tools and controller-backed tools
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Platform,
-        crate::tools::registry::all_tool_registry_registered_controllers(),
+        crate::tools::registry::all_tool_registry_bound_controller_entries(),
     );
     // Memory v2 (`docs/specs/memory-v2.md`): engines, recall/fetch/learn/
     // forget, conversations, document sources, context.md and v1 import.

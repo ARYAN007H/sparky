@@ -44,7 +44,7 @@ fn required_tool_id_trims_padded_ids_before_lookup() {
     let mut params = Map::new();
     params.insert("tool_id".to_string(), json!(" tools.web_search "));
 
-    assert_eq!(required_tool_id(&params).unwrap(), "tools.web_search");
+    assert_eq!(parse_get(params).unwrap(), "tools.web_search");
 }
 
 #[test]

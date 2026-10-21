@@ -15,6 +15,7 @@ pub use schemas::{
     all_controller_schemas as all_tool_registry_controller_schemas,
     all_registered_controllers as all_tool_registry_registered_controllers,
 };
+pub(crate) use schemas::all_bound_controller_entries as all_tool_registry_bound_controller_entries;
 pub use tinytools::{
     CapabilityProviderDiagnostics, McpAllowlistDiagnostics, McpServerAllowlistSummary,
     McpWriteAuditHealth, RecentPolicyDenial, ToolPolicyDiagnostics, ToolPolicyPosture,
