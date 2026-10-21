@@ -104,10 +104,7 @@ describe('SubagentTaskCard', () => {
         toolCallId="sub-1"
         args={{} as never}
         argsText="{}"
-        result={{
-          status: 'complete',
-          activity: legacyActivity,
-        } as never}
+        result={{ status: 'complete', activity: legacyActivity } as never}
         status={{ type: 'complete' }}
         addResult={() => {}}
         resume={() => {}}
@@ -115,7 +112,10 @@ describe('SubagentTaskCard', () => {
       />
     );
 
-    expect(screen.getByTestId('assistant-ui-subagent-call')).toHaveAttribute('data-status', 'success');
+    expect(screen.getByTestId('assistant-ui-subagent-call')).toHaveAttribute(
+      'data-status',
+      'success'
+    );
     expect(screen.getByText('Research is complete.')).toBeInTheDocument();
     expect(screen.queryByTestId('worktree-actions')).toBeNull();
     expect(screen.queryByText(/worker/)).toBeNull();

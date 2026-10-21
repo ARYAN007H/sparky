@@ -109,9 +109,7 @@ describe('SubagentActivityCard', () => {
       changedFiles: ['notes.md'],
       isDirty: true,
     };
-    render(
-      <SubagentActivityCard activity={legacyActivity} />
-    );
+    render(<SubagentActivityCard activity={legacyActivity} />);
 
     expect(screen.getByText('Research is complete.')).toBeInTheDocument();
     expect(screen.queryByTestId('worktree-actions')).toBeNull();
