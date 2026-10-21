@@ -8,6 +8,7 @@ use crate::modules::channel_runtime::ChannelRuntimeLease;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
+use tokio::sync::mpsc;
 use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
 use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,

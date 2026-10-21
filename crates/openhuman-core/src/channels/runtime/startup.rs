@@ -326,7 +326,7 @@ use chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
 #[cfg(any(test, debug_assertions))]
 use credentials::resolve_yuanbao_app_secret;
 #[cfg(test)]
-use relay::RelayInboundMessageHandler;
+use crate::channels::providers::relay::RelayInboundMessageHandler;
 
 #[cfg(any(test, debug_assertions))]
 #[path = "startup_test_support_tests.rs"]

@@ -4,8 +4,8 @@ pub use super::dispatch::test_support::build_channel_context_block_for_test;
 use super::dispatch::{
     process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
 };
-pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
-use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use crate::channels::context::ChannelRuntimeContext;
+use tinychannels_bus::CHANNEL_MESSAGE_TIMEOUT_SECS;
 use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::events::DomainEvent;
