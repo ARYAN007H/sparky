@@ -24,19 +24,26 @@ use super::CoreContext;
 #[derive(Clone, Default)]
 pub struct DispatchCtx {
     core: Option<Arc<CoreContext>>,
+    headless_agent_chat: bool,
 }
 
 impl DispatchCtx {
     /// Dispatch under `core`: the tenant's context for a SaaS request, an
     /// agent's derived context for an embedded call, the host's own otherwise.
     pub fn new(core: Arc<CoreContext>) -> Self {
-        Self { core: Some(core) }
+        Self {
+            core: Some(core),
+            headless_agent_chat: false,
+        }
     }
 
     /// Dispatch with no context. Only for tests and pre-boot callers; every
     /// reader of the context treats this as "nothing configured here".
     pub fn unbound() -> Self {
-        Self { core: None }
+        Self {
+            core: None,
+            headless_agent_chat: false,
+        }
     }
 
     /// Dispatch under the process default context (the first one built), or
@@ -45,6 +52,7 @@ impl DispatchCtx {
     pub fn process_default() -> Self {
         Self {
             core: CoreContext::default_context(),
+            headless_agent_chat: false,
         }
     }
 
@@ -62,7 +70,10 @@ impl DispatchCtx {
         } else {
             CoreContext::current()
         };
-        Self { core }
+        Self {
+            core,
+            headless_agent_chat: false,
+        }
     }
 
     /// The context for work that arrives with none of its own and no tenant on
