@@ -14,6 +14,31 @@ pub(crate) fn store(ctx: &DispatchCtx) -> Arc<ThreadReasoningStore> {
     crate::core::runtime::slot_for::<ThreadReasoningStore>(ctx)
 }
 
+pub(crate) fn thread_effort(ctx: &DispatchCtx, thread_id: &str) -> Option<ReasoningEffort> {
+    store(ctx).get(&ThreadId::new(thread_id))
+}
+
+pub(crate) fn set_thread_effort(
+    ctx: &DispatchCtx,
+    thread_id: &str,
+    effort: Option<ReasoningEffort>,
+) {
+    let thread_id = ThreadId::new(thread_id);
+    let store = store(ctx);
+    let previous = match effort {
+        Some(effort) => store.set_effort(&thread_id, effort),
+        None => store.clear(&thread_id),
+    };
+    if previous != effort {
+        log::info!(
+            "[agent][reasoning] thread reasoning effort changed thread_id={} {:?} -> {:?}",
+            thread_id.as_str(),
+            previous.map(ReasoningEffort::as_str),
+            effort.map(ReasoningEffort::as_str)
+        );
+    }
+}
+
 /// Applies a chat request's optional reasoning choice, preserving the wire
 /// error text used by existing clients for an unrecognized effort.
 pub(crate) fn apply_requested_effort(
@@ -35,21 +60,12 @@ pub(crate) fn apply_requested_effort(
             .ok_or_else(|| format!("unknown reasoning_effort '{trimmed}'"))?)
     };
 
-    let thread_id = ThreadId::new(thread_id);
-    let store = store(ctx);
-    let previous = match requested {
-        Some(effort) => store.set_effort(&thread_id, effort),
-        None => store.clear(&thread_id),
-    };
-    if previous != requested {
-        log::info!(
-            "[agent][reasoning] thread reasoning effort changed thread_id={} {:?} -> {:?}",
-            thread_id.as_str(),
-            previous.map(ReasoningEffort::as_str),
-            requested.map(ReasoningEffort::as_str)
-        );
-    }
+    set_thread_effort(ctx, thread_id, requested);
     Ok(())
+}
+
+pub(crate) fn parse_reasoning_effort(raw: &str) -> Option<ReasoningEffort> {
+    ReasoningEffort::parse(raw)
 }
 
 #[cfg(test)]
