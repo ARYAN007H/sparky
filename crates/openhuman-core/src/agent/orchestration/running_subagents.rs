@@ -12,6 +12,7 @@ pub(crate) use cancel::{
     cancel_for_thread, stop_for_thread, CancelledSubagent,
 };
 pub(crate) use registry::admit_spawn;
+#[cfg(test)]
 pub(crate) use registry::RegistrationError;
 pub(crate) use roster::active_subagents_context_block;
 pub(crate) use task_ledger::reconcile_orphaned_tasks_on_boot;
