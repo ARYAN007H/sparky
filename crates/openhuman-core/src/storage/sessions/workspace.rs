@@ -39,7 +39,6 @@ pub fn release_workspace_defaults() {
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clear();
-    super::release_workspace_stores();
     crate::storage::local::release_all();
 }
 
@@ -53,7 +52,6 @@ pub fn release_workspace(workspace_dir: &Path) {
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .remove(workspace_dir);
-    super::release_workspace_stores_for(workspace_dir);
     crate::storage::local::forget(workspace_dir);
 }
 
