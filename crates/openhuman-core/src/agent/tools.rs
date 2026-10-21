@@ -28,6 +28,6 @@ mod todo;
 
 pub use plan_exit::PlanExitTool;
 pub const PLAN_EXIT_MARKER: &str = tinyagents_harness_tools::PLAN_EXIT_MARKER;
+pub use tinyagents_harness_tools::{WaitLoopTool, WaitTool};
 pub use todo::TodoTool;
 pub(crate) use todo::TodoToolDispatch;
-pub use tinyagents_harness_tools::{WaitLoopTool, WaitTool};

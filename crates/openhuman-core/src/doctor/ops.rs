@@ -9,8 +9,8 @@ use super::contract::DoctorProfileStatus;
 use super::profile::DesktopProfileSelection;
 use crate::config::Config;
 use crate::core::{
-    runtime::{ComponentSet, CoreContext, DispatchCtx},
     Outcome,
+    runtime::{ComponentSet, CoreContext, DispatchCtx},
 };
 use crate::doctor::{
     DoctorConfigSource, DoctorCtx, DoctorOptions, DoctorReport, DoctorSummary, DoctorTier, Finding,
@@ -252,8 +252,8 @@ fn unusable_default_config_outcome(
         .collect::<HashSet<_>>();
     let only = options.only.iter().cloned().collect::<HashSet<_>>();
     let skip = options.skip.iter().cloned().collect::<HashSet<_>>();
-    let parse_selected = (only.is_empty() || only.contains("config/parse"))
-        && !skip.contains("config/parse");
+    let parse_selected =
+        (only.is_empty() || only.contains("config/parse")) && !skip.contains("config/parse");
     let mut findings = if parse_selected {
         config_parse_finding(config).into_iter().collect::<Vec<_>>()
     } else {
@@ -291,7 +291,10 @@ fn unusable_default_config_outcome(
         findings,
         ok: false,
     };
-    Ok(Some(Outcome::single_log(report, "doctor config parse failed")))
+    Ok(Some(Outcome::single_log(
+        report,
+        "doctor config parse failed",
+    )))
 }
 
 async fn report_with_context(

@@ -1,14 +1,14 @@
 use super::*;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::core::runtime::{CoreContext, DomainSet};
 use crate::core::slots::Extensions;
 use crate::memory::engine::{Binding, EngineHealth};
 use crate::memory::engine_registry::{
-    register_memory_engine_in, register_memory_health_probe_in, EngineEntry, EngineFuture,
-    ReadOnlyHealthProbe,
+    EngineEntry, EngineFuture, ReadOnlyHealthProbe, register_memory_engine_in,
+    register_memory_health_probe_in,
 };
 
 #[tokio::test]
@@ -17,8 +17,7 @@ async fn malformed_config_fallback_honors_exact_doctor_selectors() {
     let config_path = directory.path().join("config.toml");
     let workspace = directory.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create workspace");
-    std::fs::write(&config_path, "[broken\n")
-        .expect("write malformed config");
+    std::fs::write(&config_path, "[broken\n").expect("write malformed config");
     let config = Config::load_from_config_path(&config_path, &workspace)
         .await
         .expect("load default fallback");
