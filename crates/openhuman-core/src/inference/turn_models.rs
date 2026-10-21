@@ -301,9 +301,8 @@ impl TurnModelSource {
         Self::from_model(Arc::new(ProfileOverrideModel::new(model, profile)))
     }
 
-    /// Build a crate-native source: [`build`](Self::build) constructs the tiered
-    /// [`TurnModels`] from `(role, config)` via [`build_turn_models_crate`] rather
-    /// than wrapping a provider in `native model adapters. Used by the session-builder producer
+    /// Build a crate-native source: [`build`](Self::build) uses TinyAgents' `TurnModelSet`
+    /// to construct the turn's native models under the host policy adapter. Used by the session-builder producer
     /// (`crate_native_provider`); the triage path uses
     /// [`new_crate_native_from_string`](Self::new_crate_native_from_string).
     pub(crate) fn new_crate_native(
@@ -323,8 +322,8 @@ impl TurnModelSource {
         }
     }
 
-    /// Build a crate-native source whose **primary** model is built from an explicit
-    /// `provider_string` (via [`factory::create_turn_chat_model_from_string`]) rather
+    /// Build a crate-native source whose **primary** model uses an explicit
+    /// `provider_string` rather
     /// than the role's default resolution — the triage path's #1257 force-managed
     /// override (`build_remote_provider` picks the effective string). Routes still
     /// use the standard workload tiers.

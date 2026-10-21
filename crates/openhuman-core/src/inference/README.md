@@ -72,10 +72,9 @@ in `registry.rs`. The generic `provider_model.rs` adapter maps workload-role hin
 concrete ids without carrying a hosted catalog. The TinyAgents workload router that consumes this
 for agent turns is in [`agent/tinyagents/routes.rs`](../agent/tinyagents/routes.rs).
 
-There are two families of entry points. `create_chat_model*` in `factory/chat_model.rs` is for
-one-shot callers (summaries, sentiment, prompts). `create_turn_chat_model*` in
-`factory/turn_model.rs` is for agent turns and carries native-tool and route options. Both go
-through the same gates and constructors.
+One-shot callers use `create_chat_model*` in `factory/chat_model.rs`. Agent turns use the
+TinyAgents `TurnModelSet` through `TurnModelSource`, which builds the primary, workload routes,
+and summarizer under the same host gates.
 
 ### The managed backend model
 
@@ -216,8 +215,8 @@ picks the provider the same way a provider string does.
 - `create_chat_model`, `create_chat_model_with_model_id`, `create_chat_model_from_string` (in
   [`provider/factory/chat_model.rs`](./provider/factory/chat_model.rs)) build a model for one-shot work from a role or an explicit
   provider string.
-- `create_turn_chat_model*` ([`provider/factory/turn_model.rs`](./provider/factory/turn_model.rs), crate-private) build the model for
-  an agent turn.
+- `TurnModelSource` ([`turn_models.rs`](./turn_models.rs)) uses TinyAgents' `TurnModelSet` to
+  build models for an agent turn.
 - `provider_for_role` ([`provider/factory/routing.rs`](./provider/factory/routing.rs)) returns the configured provider string for a
   role. `provider_model.rs` handles generic `hint:*` workload markers and consults provider hooks for provider-owned aliases.
 - `probe_inference_readiness` (`provider/factory/chat_model.rs`) checks that a role can actually
