@@ -326,7 +326,9 @@ Migration steps:
 
 | Kind | Name | Version | Scope | Indexed fields |
 | --- | --- | --- | --- | --- |
+| collection | `skills.bundles` | 1 | tenant |  |
 | collection | `skills.catalogs` | 2 | tenant |  |
+| blobs | `skills/bundle-generations` |  | tenant |  |
 | blobs | `skills/bundles` |  | tenant |  |
 
 Migration steps:

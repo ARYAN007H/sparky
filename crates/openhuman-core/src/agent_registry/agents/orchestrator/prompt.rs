@@ -39,7 +39,7 @@ pub fn build(ctx: &PromptContext<'_>) -> Result<String> {
     // A packed install route is already named under "Capabilities not in your
     // tool list"; the skills section names it only when it is on the belt.
     let skill_install = hand_off_route(ctx, "skill_setup")
-        .filter(|route| !route.contains(tinyagents_harness::tool::packs::USE_SKILL));
+        .filter(|route| !route.contains(tinyagents_harness_tools::skills::USE_SKILL));
     // An empty visibility set is the builder's unfiltered sentinel. Preserve
     // the MCP route for those sessions while suppressing it in gated-off builds.
     // Registered is enough: the orchestrator defers the registry tools
@@ -258,7 +258,7 @@ fn hand_off_route(ctx: &PromptContext<'_>, specialist: &str) -> Option<String> {
     // tool you do not have" failure this whole block exists to end (#6302).
     if !ctx
         .visible_tool_names
-        .contains(tinyagents_harness::tool::packs::USE_SKILL)
+        .contains(tinyagents_harness_tools::skills::USE_SKILL)
     {
         return None;
     }
@@ -281,7 +281,7 @@ fn run_workflow_route(ctx: &PromptContext<'_>) -> Option<String> {
     // which case the policy gate would refuse the call this names.
     if !ctx
         .visible_tool_names
-        .contains(tinyagents_harness::tool::packs::USE_SKILL)
+        .contains(tinyagents_harness_tools::skills::USE_SKILL)
         || !belt_lists(ctx, RUN_WORKFLOW)
     {
         return None;
@@ -418,7 +418,7 @@ fn render_installed_skills(
             // chars / instruction fences) and cap so a single installed
             // skill can't bloat the prompt or smuggle routing instructions;
             // full details stay one `describe_workflow` call away.
-            tinytools_std::sanitize::sanitize_for_llm(&skill.description, SKILL_DESCRIPTION_CHARS)
+            tinytools::sanitize::sanitize_for_llm(&skill.description, SKILL_DESCRIPTION_CHARS)
                 .replace(['\n', '\t'], " ")
                 .trim()
                 .to_string()
@@ -505,7 +505,7 @@ fn format_connected_mcp_block(
         let capability = if capability_raw.is_empty() {
             String::new()
         } else {
-            tinytools_std::sanitize::sanitize_for_llm(capability_raw, 120)
+            tinytools::sanitize::sanitize_for_llm(capability_raw, 120)
                 .replace(['\n', '\t'], " ")
                 .trim()
                 .to_string()
