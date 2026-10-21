@@ -173,11 +173,45 @@ async fn the_v2_default_opens_one_storage_db_file_beside_config_toml() {
     let backend = crate::storage::open(&default_url(&layout.workspace_dir))
         .await
         .unwrap();
-    assert_eq!(backend.driver(), "sqlite");
+    let scoped = backend.for_scope(&crate::storage::Scope::local()).unwrap();
+    let documents = scoped.documents();
+    documents
+        .ensure_collection(&crate::storage::CollectionSpec::new(
+            "storage.default_probe",
+        ))
+        .await
+        .unwrap();
+    documents
+        .put(
+            "storage.default_probe",
+            "persisted",
+            serde_json::json!({"opened": true}),
+            crate::storage::Precondition::Absent,
+        )
+        .await
+        .unwrap();
+    drop(documents);
+    drop(scoped);
+    drop(backend);
     assert!(
         layout.storage_db.is_file(),
         "{} should be a database file",
         layout.storage_db.display()
     );
     assert!(!layout.workspace_dir.join(DEFAULT_DIR).exists());
+
+    let reopened = crate::storage::open(&default_url(&layout.workspace_dir))
+        .await
+        .unwrap();
+    let scoped = reopened.for_scope(&crate::storage::Scope::local()).unwrap();
+    assert_eq!(
+        scoped
+            .documents()
+            .get("storage.default_probe", "persisted")
+            .await
+            .unwrap()
+            .unwrap()
+            .doc["opened"],
+        true
+    );
 }
