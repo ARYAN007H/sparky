@@ -312,7 +312,9 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
         .expect("boot importer includes legacy scope movement");
     assert_eq!(moved.outcome.as_ref().unwrap(), &Outcome::AlreadyDone);
 
-    let profile_scope = backend.for_scope(&scope_for_profile("u1")).unwrap();
+    let profile_scope = backend
+        .for_scope(&crate::storage::scope_for_profile("u1"))
+        .unwrap();
     let profile_docs = Arc::clone(profile_scope.documents());
     let (cost, artifact, args) = storage::block_on(async move {
         let cost = profile_docs
