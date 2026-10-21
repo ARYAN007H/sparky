@@ -351,7 +351,7 @@ fn read_records<T: DeserializeOwned>(
         let mut object = Map::new();
         for (index, field) in fields.iter().enumerate() {
             let value = sql_value(row.get_ref(index)?)?;
-            object.insert(field.output.to_owned(), decode_value(value, field.decode));
+            object.insert(field.output.to_owned(), decode_value(value, field.decode)?);
         }
         normalize_legacy_status(table, &mut object)?;
         let record: T = serde_json::from_value(Value::Object(object))
@@ -406,23 +406,28 @@ fn read_tool_effects(connection: &rusqlite::Connection) -> Result<Vec<ToolEffect
     .collect()
 }
 
-fn decode_value(value: Value, decode: Decode) -> Value {
-    match decode {
+fn decode_value(value: Value, decode: Decode) -> Result<Value> {
+    Ok(match decode {
         Decode::Plain => value,
-        Decode::JsonOrEmpty => value
-            .as_str()
-            .and_then(|raw| serde_json::from_str(raw).ok())
-            .unwrap_or_else(|| json!({})),
+        Decode::JsonOrEmpty => {
+            let raw = value
+                .as_str()
+                .context("legacy JSON column is not text")?;
+            serde_json::from_str(raw).unwrap_or_else(|_| json!({}))
+        }
         Decode::OptionalJson => value
             .as_str()
             .and_then(|raw| serde_json::from_str(raw).ok())
             .unwrap_or(Value::Null),
-        Decode::JsonArray => value
-            .as_str()
-            .and_then(|raw| serde_json::from_str(raw).ok())
-            .filter(Value::is_array)
-            .unwrap_or_else(|| json!([])),
-    }
+        Decode::JsonArray => {
+            let raw = value
+                .as_str()
+                .context("legacy JSON array column is not text")?;
+            serde_json::from_str::<Vec<String>>(raw)
+                .map(|values| json!(values))
+                .unwrap_or_else(|_| json!([]))
+        }
+    })
 }
 
 fn normalize_legacy_status(table: &str, row: &mut Map<String, Value>) -> Result<()> {
