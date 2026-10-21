@@ -212,6 +212,64 @@ test("dispatching a release asks first and a refusal dispatches nothing", async 
   }
 });
 
+test("fork release dispatch targets the selected owner and ref", async () => {
+  const root = tree();
+  const calls = [];
+  const ref = "epic/8131-storage-primitives";
+  try {
+    const res = await repin(
+      {
+        id: "tinyx",
+        owner: "senamakel",
+        ref,
+        workflowInput: "tag",
+        version: "0.3.0",
+        root,
+      },
+      { run: fakeRun(calls), confirm: async () => true, log: () => {} },
+    );
+    assert.equal(res.version, "0.3.0");
+    assert.deepEqual(res.failed, []);
+    assert.ok(
+      calls.some((call) =>
+        JSON.stringify(call) ===
+        JSON.stringify([
+          "gh",
+          "workflow",
+          "run",
+          "release.yml",
+          "-R",
+          "senamakel/tinyx",
+          "--ref",
+          ref,
+          "-f",
+          "tag=v0.3.0",
+        ]),
+      ),
+    );
+    assert.ok(
+      calls.some((call) =>
+        call[0] === "gh" &&
+        call[1] === "run" &&
+        call.includes("--branch") &&
+        call.includes(ref),
+      ),
+      "the helper watches the dispatched fork branch rather than the fork default branch",
+    );
+    assert.ok(
+      calls.some((call) =>
+        call[0] === "gh" &&
+        call[1] === "release" &&
+        call[2] === "download" &&
+        call.includes("senamakel/tinyx"),
+      ),
+      "checksums come from the selected fork repository",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("--dry-run changes and dispatches nothing", async () => {
   const root = tree();
   const calls = [];
