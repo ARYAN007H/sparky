@@ -78,7 +78,7 @@ use anyhow::{anyhow, Context};
 use sha2::Digest;
 use tinystoragedrivers::CollectionSpec;
 #[cfg(feature = "legacy-import")]
-use tinystoragedrivers::{ErrorKind, Precondition};
+use tinystoragedrivers::{ErrorKind, Precondition, WriteOptions};
 
 #[cfg(feature = "legacy-import")]
 use super::block_on;
@@ -481,12 +481,23 @@ fn import_one(
             }
             let mut written = 0usize;
             for record in found {
+                let mut options = WriteOptions::new();
+                if let Some(schema) = record.schema {
+                    options = options.schema(schema);
+                }
+                if let Some(created_ms) = record.created_ms {
+                    options = options.created_ms(created_ms);
+                }
+                if let Some(expires_ms) = record.expires_ms {
+                    options = options.expires_ms(expires_ms);
+                }
                 match docs
-                    .put(
+                    .put_with(
                         &record.collection,
                         &record.id,
                         record.doc,
                         Precondition::Absent,
+                        options,
                     )
                     .await
                 {
