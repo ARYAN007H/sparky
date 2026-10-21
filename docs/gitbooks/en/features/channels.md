@@ -13,6 +13,10 @@ Channel providers normalize platform messages into typed envelopes and send
 typed replies through the configured provider. OpenHuman keeps account policy,
 authorization, agent execution, and durable conversation sessions in the host;
 provider transport runs in the TinyChannels module behind its bus contract.
+The host communicates with the module through typed TinyBus requests and
+callbacks: it does not link provider implementations. The module prepares
+provider identity and ordered message parts; OpenHuman checks access, selects
+the agent, and binds the message to its durable session before running a turn.
 
 ## What a channel does
 
@@ -33,7 +37,11 @@ incoming message, when a [trigger](integrations/triggers.md) or cron job fires.
 A channel receives proactive messages only if it has a default delivery
 target. Channels without one are skipped.
 
-Where the platform allows it, channels can show a typing indicator, stream draft updates, post threaded replies and add emoji reactions. Each channel declares what it supports.
+Where the platform allows it, channels can show a typing indicator, stream
+draft updates, post threaded replies, send supported media or voice notes, and
+add emoji reactions. These are provider-specific capabilities: the module
+reports what each configured provider supports, and OpenHuman does not emulate
+an unsupported operation.
 
 ## Supported channels
 
