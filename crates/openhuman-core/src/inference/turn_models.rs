@@ -525,7 +525,14 @@ impl TurnModelSource {
                     // A host-injected model owns the provider choice even when
                     // it does not publish a profile. Keep capability claims
                     // conservative and retain only the caller's window.
-                    ("injected".to_string(), false, false, false, false, context_window)
+                    (
+                        "injected".to_string(),
+                        false,
+                        false,
+                        false,
+                        false,
+                        context_window,
+                    )
                 } else {
                     let is_local =
                         tinyinference_local::profile::is_local_provider_string(&provider_string);

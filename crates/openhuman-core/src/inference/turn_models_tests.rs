@@ -389,11 +389,7 @@ async fn injected_turn_without_profile_keeps_conservative_capabilities() {
         }
     }
 
-    let root = CoreContext::for_test_with_host_kind(
-        HostKind::Library,
-        DomainSet::full(),
-        None,
-    );
+    let root = CoreContext::for_test_with_host_kind(HostKind::Library, DomainSet::full(), None);
     let mut overrides = HostOverrides::default();
     overrides.model = Some(Arc::new(ProfilelessModel));
     let context = root.derive_with(
