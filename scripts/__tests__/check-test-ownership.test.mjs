@@ -47,6 +47,42 @@ test('rejects TinyChannels provider imports with whitespace around path separato
   ]);
 });
 
+test('rejects direct calls into TinyChannels provider internals', () => {
+  const source = `
+    tinychannels::providers::email_channel::parse("message");
+  `;
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
+test('expands nested grouped imports of TinyChannels provider internals', () => {
+  const source = `
+    use tinychannels::{providers::{email_channel::parse}};
+  `;
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
+test('allowlisted imports do not permit direct calls into implementation internals', () => {
+  const source = 'tinymemory_tools::lifecycle::window::Window::default();';
+  assert.equal(
+    findOwnershipViolations(source, 'crates/openhuman-core/src/memory/lifecycle/adapter_tests.rs').length,
+    1,
+  );
+});
+
 test('allows public facades and bus contracts', () => {
   const source = `
     use tinychannels::ChannelInboundEnvelope;
