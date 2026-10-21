@@ -29,7 +29,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::storage::{CollectionSpec, DocumentStore, Precondition, Storage, StorageBackend};
+use crate::storage::{CollectionSpec, DocumentStore, Precondition, Storage};
+#[cfg(test)]
+use crate::storage::StorageBackend;
 use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
 use sha2::Digest;
@@ -135,6 +137,7 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
     Ok(imported.unwrap_or(Outcome::InProgress))
 }
 
+#[cfg(test)]
 async fn import_into(
     backend: &Arc<dyn StorageBackend>,
     scope: &crate::storage::Scope,
