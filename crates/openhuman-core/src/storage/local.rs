@@ -1,13 +1,14 @@
 //! The workspace default for code that runs with no backend installed.
 //!
 //! Hosts install a backend at startup ([`super::install_for_url`]) and every
-//! store reaches it through [`super::installed`]. A unit test, or an embedder
-//! that never ran the host boot, installs none; rather than keep a second,
-//! file-shaped implementation of each store for them, such a call opens **the
-//! same default a host would**: `sqlite:<workspace>/storage` (v1) or `sqlite:<user dir>/storage.db` (v2)
-//! ([`super::config::default_url`]), once per workspace for the life of the
-//! process. A different workspace is a different database, which is also what
-//! isolates tests that use a temp directory each.
+//! store reaches it through [`super::installed`]. An embedder that never ran
+//! the host boot installs none; such a call opens **the same default a host
+//! would**: `sqlite:<workspace>/storage` (v1) or
+//! `sqlite:<user dir>/storage.db` (v2) ([`super::config::default_url`]), once
+//! per workspace for the life of the process. A different workspace is a
+//! different database. Under `cfg(test)`, ordinary unit tests use the TSD
+//! `MemoryBackend` testkit instead; tests of durable reopen behavior explicitly
+//! opt into the SQLite default.
 //!
 //! A SaaS core with no storage URL lands here too: each profile's workspace is
 //! its own database, so nothing is shared between tenants.

@@ -355,7 +355,7 @@ storage itself.
 ## Schema, scopes and boot
 
 - `scope.rs`: the one scope grammar (`tenant_scope`, `scope_for_profile`, `scope_for_agent`, `scope_for_module`), built on tsd's `Scope::tenant/local/agent/module`.
-- `schema.rs`: `owner_schemas()` and the composed `registry()`; `module_items(owner)` feeds the generated module grants.
-- `boot.rs`: `prepare_and_migrate`, called by `open`: prepare, scope move, then per scope the importers and `Registry::migrate`.
+- `schema.rs`: `owner_collections()` composes and validates the linked owners' `CollectionSpec` declarations; `module_collections(owner)` feeds module grants.
+- `boot.rs`: `prepare_and_migrate`, called by `open`, ensures the composed collections in the host's local and cluster scopes. Tenant, agent and module scopes are prepared by their owners when opened.
 - `scope_move.rs`: the resumable copy of v1 scopes (`profile:`, `<profile>~<agent>`, raw agent ids, `module:<id>@<base>`, the `*-sha256:` fallbacks) into the v2 scopes.
-- The generated reference is `docs/storage-schema.md`; `node scripts/ci/check-storage-schema.mjs` lints it.
+- The generated reference is `docs/storage-schema.md`; `node scripts/ci/check-storage-schema.mjs` lints the current collection names, indexes, expiry fields and search fields.

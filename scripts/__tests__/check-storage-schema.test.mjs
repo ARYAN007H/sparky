@@ -3,73 +3,78 @@ import test from 'node:test';
 
 import { lint, render } from '../ci/check-storage-schema.mjs';
 
-const owner = (name, items, steps = []) => ({ owner: name, items, steps });
 const collection = (name, extra = {}) => ({
-  kind: 'collection',
   name,
-  version: 2,
-  scope: 'tenant',
-  index_fields: [],
+  indexes: [],
   ...extra,
 });
 
 test('a well-formed schema is clean', () => {
   const dump = {
-    owners: [
-      owner('cron', [collection('cron.jobs', { index_fields: ['next_run_ms'] })], [
-        { id: 'jobs_v2', item: 'cron.jobs', from: 1, to: 2, source: 'cron_jobs' },
-      ]),
-      owner('juice', [{ kind: 'blobs', name: 'juice/ccr/', scope: 'module' }]),
+    collections: [
+      collection('cron.jobs', {
+        indexes: [{ name: 'by_time', fields: ['next_run_ms'], unique: false }],
+        ttl_field: 'expires_ms',
+        search: { fields: ['name', 'description'] },
+      }),
     ],
   };
   assert.deepEqual(lint(dump), []);
 });
 
-test('names must be <owner>.<entity> in snake_case without a version suffix', () => {
+test('collection names must be <owner>.<entity> in snake_case', () => {
   const problems = lint({
-    owners: [
-      owner('cron', [
-        collection('jobs'),
-        collection('cron.Jobs'),
-        collection('flows.runs'),
-        collection('cron.jobs_v2'),
-      ]),
+    collections: [
+      collection('jobs'),
+      collection('Cron.Jobs'),
+      collection('flows.runs-v2'),
     ],
   });
-  assert.equal(problems.length, 4, problems.join('\n'));
+  assert.equal(problems.length, 3, problems.join('\n'));
 });
 
-test('a name claimed by two owners is refused', () => {
+test('duplicate collection and index names are refused', () => {
   const problems = lint({
-    owners: [owner('a', [{ kind: 'blobs', name: 'a/x/', scope: 'module' }]), owner('a', [])],
+    collections: [
+      collection('cron.jobs', {
+        indexes: [
+          { name: 'by_time', fields: ['created_ms'] },
+          { name: 'by_time', fields: ['updated_ms'] },
+        ],
+      }),
+      collection('cron.jobs'),
+    ],
   });
-  assert.ok(problems.some(p => p.includes('declared twice')));
+  assert.ok(problems.some(p => p.includes('collection "cron.jobs" is declared more than once')));
+  assert.ok(problems.some(p => p.includes('index name "by_time" is empty or duplicated')));
 });
 
 test('indexed time fields must be epoch milliseconds', () => {
   const problems = lint({
-    owners: [owner('cron', [collection('cron.jobs', { index_fields: ['created_at', 'next_run_ms'] })])],
-  });
-  assert.equal(problems.length, 1);
-  assert.match(problems[0], /created_at/);
-});
-
-test('a step for an undeclared item or one that does not go up is refused', () => {
-  const problems = lint({
-    owners: [
-      owner('cron', [collection('cron.jobs')], [
-        { id: 'a', item: 'cron.nope', from: 1, to: 2 },
-        { id: 'b', item: 'cron.jobs', from: 2, to: 2 },
-      ]),
-    ],
+    collections: [collection('cron.jobs', {
+      indexes: [{ name: 'by_time', fields: ['created_at', 'next_run_ms'] }],
+      ttl_field: 'expires_at',
+    })],
   });
   assert.equal(problems.length, 2);
+  assert.match(problems[0], /created_at/);
+  assert.match(problems[1], /expires_at/);
 });
 
-test('the rendering is stable and lists every owner', () => {
-  const dump = { owners: [owner('b', [collection('b.x')]), owner('a', [collection('a.y')])] };
+test('the rendering is stable and lists the composed collection declarations', () => {
+  const dump = {
+    collections: [
+      collection('b.x'),
+      collection('a.y', {
+        indexes: [{ name: 'by_created', fields: ['created_ms'], unique: true }],
+        search: { fields: ['title'] },
+      }),
+    ],
+  };
   const text = render(dump);
-  assert.ok(text.indexOf('## a') < text.indexOf('## b'));
+  assert.ok(text.indexOf('`a.y`') < text.indexOf('`b.x`'));
+  assert.match(text, /by_created/);
+  assert.match(text, /Search fields/);
   assert.equal(render(dump), text);
 });
 
@@ -85,9 +90,9 @@ test('the dump example builds with web3 by default and with an override that kee
     env: { STORAGE_SCHEMA_FEATURES: 'core-product' },
     run: (_cmd, argv) => {
       args = argv;
-      return { status: 0, stdout: '{"owners":[]}', stderr: '' };
+      return { status: 0, stdout: '{"collections":[]}', stderr: '' };
     },
   });
-  assert.deepEqual(dump, { owners: [] });
+  assert.deepEqual(dump, { collections: [] });
   assert.equal(args[args.indexOf('--features') + 1], product);
 });
