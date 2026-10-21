@@ -36,7 +36,10 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
 
     const CHILD_PROMPT: &str = "headless-flow-child-result-marker";
 
-    struct FlowChildModel;
+    struct FlowChildModel {
+        spawn_calls: std::sync::atomic::AtomicUsize,
+        child_calls: std::sync::atomic::AtomicUsize,
+    }
 
     #[async_trait]
     impl ChatModel<()> for FlowChildModel {
@@ -59,9 +62,20 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
                 .iter()
                 .any(|message| message.text().contains(CHILD_PROMPT))
             {
+                self.child_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 return Ok(ModelResponse::assistant("headless-flow-child-result"));
             }
 
+            if request.messages.iter().any(|message| {
+                message
+                    .text()
+                    .contains("Accepted async sub-agent `task_manager_agent`")
+            }) {
+                return Ok(ModelResponse::assistant("headless-flow-root-result"));
+            }
+            self.spawn_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let mut response = ModelResponse::assistant("");
             response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
                 "headless-flow-spawn",
@@ -79,28 +93,63 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     }
 
     let _inference = crate::inference::inference_test_guard_async().await;
+    let model = std::sync::Arc::new(FlowChildModel {
+        spawn_calls: std::sync::atomic::AtomicUsize::new(0),
+        child_calls: std::sync::atomic::AtomicUsize::new(0),
+    });
     let _model = crate::inference::provider::factory::test_provider_override::install_model(
-        std::sync::Arc::new(FlowChildModel),
+        model.clone(),
     );
     let workspace = tempfile::tempdir().expect("flow workspace");
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
     config.action_dir = workspace.path().to_path_buf();
     config.default_model = Some("test-model".into());
+    config.chat_provider = Some("omlx:test-model".into());
+
+    let definitions = std::sync::Arc::new(
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(),
+    );
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    )
+    .derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config.clone(),
+            crate::core::runtime::DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
+    );
 
     let runner = super::OpenHumanAgentRunner {
         config: std::sync::Arc::new(config),
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core)),
         approval: Default::default(),
     };
-    let output = tinyflows::caps::AgentRunner::run_agent(
-        &runner,
-        "orchestrator",
-        serde_json::json!({"prompt": "Delegate the headless-flow-child-result-marker task."}),
-        None,
+    let output = crate::core::runtime::CoreContext::scope(
+        core,
+        Box::pin(tinyflows::caps::AgentRunner::run_agent(
+            &runner,
+            "orchestrator",
+            serde_json::json!({"prompt": "Delegate this task to the child."}),
+            None,
+        )),
     )
     .await
     .expect("headless flow agent should settle its child");
+
+    assert_eq!(
+        model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the parent model must issue the real spawn_subagent call"
+    );
+    assert_eq!(
+        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the detached child must run through the real model dispatch"
+    );
 
     assert!(
         output.to_string().contains("headless-flow-child-result"),
