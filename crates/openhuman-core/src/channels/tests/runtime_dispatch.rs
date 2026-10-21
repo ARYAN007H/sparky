@@ -1,12 +1,12 @@
-use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use super::super::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
 use super::super::runtime::test_support::{
-    linked_telegram_runtime, run_dispatch_harness, DispatchHarnessOptions,
+    DispatchHarnessOptions, linked_telegram_runtime, run_dispatch_harness,
 };
 use super::super::runtime::{
-    process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
+    RuntimeChannelMessage, process_channel_message, run_message_dispatch_loop,
 };
-use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
+use super::common::{RecordingChannel, SlowModel, use_real_agent_handler};
+use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
 use crate::channels::runtime::ChannelHandle;
 use crate::core::events::DomainEvent;
 use crate::inference::provider;
@@ -362,7 +362,9 @@ fn unrelated_processed_event(n: usize) -> DomainEvent {
     }
 }
 
-async fn resolved_route_ctx(send_error: Option<&str>) -> (Arc<ChannelRuntimeContext>, Arc<RecordingChannel>) {
+async fn resolved_route_ctx(
+    send_error: Option<&str>,
+) -> (Arc<ChannelRuntimeContext>, Arc<RecordingChannel>) {
     let mut channel_state = RecordingChannel::default();
     channel_state.send_error = send_error.map(str::to_owned);
     let channel_impl = Arc::new(channel_state);
@@ -370,32 +372,35 @@ async fn resolved_route_ctx(send_error: Option<&str>) -> (Arc<ChannelRuntimeCont
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
 
-    (Arc::new(ChannelRuntimeContext {
-        relay_thread: None,
-        channels_by_name: Arc::new(channels_by_name),
-        module_objects: Arc::new(HashMap::new()),
-        turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
-            Arc::new(super::common::DummyModel),
-        )),
-        default_provider: Arc::new("requested-provider".to_string()),
-        tools_registry: Arc::new(vec![]),
-        system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
-        model: Arc::new("requested-model".to_string()),
-        temperature: 0.0,
-        max_tool_iterations: 10,
-        turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
-        route_overrides: Arc::new(Mutex::new(HashMap::new())),
-        api_url: None,
-        inference_url: None,
-        reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
-        workspace_dir: Arc::new(std::env::temp_dir()),
-        message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
-        multimodal: crate::config::MultimodalConfig::default(),
-        multimodal_files: crate::config::MultimodalFileConfig::default(),
-        config: None,
-        core: None,
-    }), channel_impl)
+    (
+        Arc::new(ChannelRuntimeContext {
+            relay_thread: None,
+            channels_by_name: Arc::new(channels_by_name),
+            module_objects: Arc::new(HashMap::new()),
+            turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
+                Arc::new(super::common::DummyModel),
+            )),
+            default_provider: Arc::new("requested-provider".to_string()),
+            tools_registry: Arc::new(vec![]),
+            system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
+            model: Arc::new("requested-model".to_string()),
+            temperature: 0.0,
+            max_tool_iterations: 10,
+            turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
+            route_overrides: Arc::new(Mutex::new(HashMap::new())),
+            api_url: None,
+            inference_url: None,
+            reliability: Arc::new(crate::config::ReliabilityConfig::default()),
+            provider_runtime_options: provider::ProviderRuntimeOptions::default(),
+            workspace_dir: Arc::new(std::env::temp_dir()),
+            message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
+            multimodal: crate::config::MultimodalConfig::default(),
+            multimodal_files: crate::config::MultimodalFileConfig::default(),
+            config: None,
+            core: None,
+        }),
+        channel_impl,
+    )
 }
 
 async fn run_resolved_route_message(
@@ -462,7 +467,10 @@ async fn run_resolved_route_message(
     assert_eq!(model, "actual-model");
     let sends = channel.sent.lock().expect("test sends lock");
     if send_error.is_some() {
-        assert!(sends.is_empty(), "a failed send must not be recorded as delivered");
+        assert!(
+            sends.is_empty(),
+            "a failed send must not be recorded as delivered"
+        );
     } else {
         assert_eq!(sends.len(), 1, "successful reply delivery must be recorded");
     }
@@ -672,8 +680,10 @@ async fn dispatch_replies_with_timeout_notice_when_handler_exceeds_deadline() {
         ..Default::default()
     })
     .await;
-    assert!(timed_out
-        .sends
-        .iter()
-        .any(|send| send.content.contains("Request timed out")));
+    assert!(
+        timed_out
+            .sends
+            .iter()
+            .any(|send| send.content.contains("Request timed out"))
+    );
 }
