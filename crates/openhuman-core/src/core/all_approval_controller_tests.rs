@@ -24,7 +24,11 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
     ];
     let contracts = crate::security::approval::approval_parameter_contracts();
 
-    assert_eq!(grouped.len(), methods.len(), "complete raw approval inventory");
+    assert_eq!(
+        grouped.len(),
+        methods.len(),
+        "complete raw approval inventory"
+    );
     assert_eq!(
         grouped
             .iter()
@@ -45,10 +49,7 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         rpc_methods
     );
 
-    let entries: Vec<_> = grouped
-        .iter()
-        .map(|row| row.controller.clone())
-        .collect();
+    let entries: Vec<_> = grouped.iter().map(|row| row.controller.clone()).collect();
     assert_eq!(
         contracts.iter().map(|row| row.method).collect::<Vec<_>>(),
         methods,
@@ -66,7 +67,11 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         ["flow_id", "tool_names"].as_slice(),
     ]) {
         assert_eq!(
-            schema.inputs.iter().map(|field| field.name).collect::<Vec<_>>(),
+            schema
+                .inputs
+                .iter()
+                .map(|field| field.name)
+                .collect::<Vec<_>>(),
             expected,
             "{}.{} input order",
             schema.namespace,
@@ -80,21 +85,36 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         |ty| matches!(ty, TypeSchema::Option(inner) if matches!(inner.as_ref(), TypeSchema::String)),
     );
     assert_eq!(schemas[1].inputs.len(), 1);
-    assert_input(schemas[1], "limit", false, |ty| {
-        matches!(ty, TypeSchema::Option(inner) if matches!(inner.as_ref(), TypeSchema::U64))
-    });
+    assert_input(
+        schemas[1],
+        "limit",
+        false,
+        |ty| matches!(ty, TypeSchema::Option(inner) if matches!(inner.as_ref(), TypeSchema::U64)),
+    );
     assert_eq!(schemas[2].inputs.len(), 3);
-    assert_input(schemas[2], "request_id", true, |ty| matches!(ty, TypeSchema::String));
-    assert_input(schemas[2], "decision", true, |ty| matches!(ty, TypeSchema::String));
-    assert_input(schemas[2], "agent_id", false, |ty| {
-        matches!(ty, TypeSchema::Option(inner) if matches!(inner.as_ref(), TypeSchema::String))
+    assert_input(schemas[2], "request_id", true, |ty| {
+        matches!(ty, TypeSchema::String)
     });
+    assert_input(schemas[2], "decision", true, |ty| {
+        matches!(ty, TypeSchema::String)
+    });
+    assert_input(
+        schemas[2],
+        "agent_id",
+        false,
+        |ty| matches!(ty, TypeSchema::Option(inner) if matches!(inner.as_ref(), TypeSchema::String)),
+    );
     assert!(schemas[3].inputs.is_empty());
     assert_eq!(schemas[4].inputs.len(), 2);
-    assert_input(schemas[4], "flow_id", true, |ty| matches!(ty, TypeSchema::String));
-    assert_input(schemas[4], "tool_names", true, |ty| {
-        matches!(ty, TypeSchema::Array(inner) if matches!(inner.as_ref(), TypeSchema::String))
+    assert_input(schemas[4], "flow_id", true, |ty| {
+        matches!(ty, TypeSchema::String)
     });
+    assert_input(
+        schemas[4],
+        "tool_names",
+        true,
+        |ty| matches!(ty, TypeSchema::Array(inner) if matches!(inner.as_ref(), TypeSchema::String)),
+    );
 
     let outputs = [
         ("pending", "PendingApproval", true),
@@ -104,7 +124,13 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         ("result", "FlowPreauthorizationResult", true),
     ];
     for (schema, (name, reference, required)) in schemas.iter().zip(outputs) {
-        assert_eq!(schema.outputs.len(), 1, "{}.{} output count", schema.namespace, schema.function);
+        assert_eq!(
+            schema.outputs.len(),
+            1,
+            "{}.{} output count",
+            schema.namespace,
+            schema.function
+        );
         let output = &schema.outputs[0];
         assert_eq!(output.name, name);
         assert_eq!(output.required, required);
@@ -152,8 +178,17 @@ fn assert_input(
         .inputs
         .iter()
         .find(|field| field.name == name)
-        .unwrap_or_else(|| panic!("{}.{} missing input {name}", schema.namespace, schema.function));
-    assert_eq!(field.required, required, "{}.{} {name}", schema.namespace, schema.function);
+        .unwrap_or_else(|| {
+            panic!(
+                "{}.{} missing input {name}",
+                schema.namespace, schema.function
+            )
+        });
+    assert_eq!(
+        field.required, required,
+        "{}.{} {name}",
+        schema.namespace, schema.function
+    );
     assert!(
         type_matches(&field.ty),
         "{}.{} input {name} has wrong type",

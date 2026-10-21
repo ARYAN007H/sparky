@@ -261,24 +261,24 @@ fn parse_decide(
 fn parse_preauthorize_flow(params: Map<String, Value>) -> Result<(String, Vec<String>), String> {
     let flow_id = read_required_string(&params, "flow_id")?;
     let tool_names = match params.get("tool_names") {
-            Some(Value::Array(items)) => items
-                .iter()
-                .map(|v| match v {
-                    Value::String(s) => Ok(s.clone()),
-                    other => Err(format!(
-                        "invalid 'tool_names' entry: expected string, got {}",
-                        type_name(other)
-                    )),
-                })
-                .collect::<Result<Vec<String>, String>>()?,
-            Some(other) => {
-                return Err(format!(
-                    "invalid 'tool_names': expected array of strings, got {}",
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|v| match v {
+                Value::String(s) => Ok(s.clone()),
+                other => Err(format!(
+                    "invalid 'tool_names' entry: expected string, got {}",
                     type_name(other)
-                ))
-            }
-            None => return Err("missing required param 'tool_names'".to_string()),
-        };
+                )),
+            })
+            .collect::<Result<Vec<String>, String>>()?,
+        Some(other) => {
+            return Err(format!(
+                "invalid 'tool_names': expected array of strings, got {}",
+                type_name(other)
+            ))
+        }
+        None => return Err("missing required param 'tool_names'".to_string()),
+    };
     Ok((flow_id, tool_names))
 }
 

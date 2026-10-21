@@ -1,5 +1,7 @@
 use super::*;
-use crate::core::all::{assert_schema_controller_parity, ControllerHandler, ControllerParamContract};
+use crate::core::all::{
+    assert_schema_controller_parity, ControllerHandler, ControllerParamContract,
+};
 use serde_json::json;
 
 #[test]
@@ -37,7 +39,12 @@ pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
             method: "approval.list_recent_decisions",
             required: &[],
             optional: &["limit"],
-            examples: vec![json!({}), json!({"limit": null}), json!({"limit": 0}), json!({"limit": 500})],
+            examples: vec![
+                json!({}),
+                json!({"limit": null}),
+                json!({"limit": 0}),
+                json!({"limit": 500}),
+            ],
         },
         ControllerParamContract {
             method: "approval.decide",
@@ -93,9 +100,11 @@ fn list_pending_parser_trims_optional_agent_and_ignores_extras() {
     }
     for value in [json!(false), json!(0), json!([]), json!({})] {
         assert_eq!(
-            parse_list_pending(Map::from_iter([("agent_id".into(), value.clone())]))
-                .unwrap_err(),
-            format!("invalid 'agent_id': expected string, got {}", value_kind(&value))
+            parse_list_pending(Map::from_iter([("agent_id".into(), value.clone())])).unwrap_err(),
+            format!(
+                "invalid 'agent_id': expected string, got {}",
+                value_kind(&value)
+            )
         );
     }
 }
@@ -109,15 +118,13 @@ fn recent_decisions_parser_keeps_optional_unsigned_limit_semantics() {
     );
     for limit in [0, 1, u64::MAX] {
         assert_eq!(
-            parse_list_recent_decisions(Map::from_iter([("limit".into(), json!(limit))]))
-                .unwrap(),
+            parse_list_recent_decisions(Map::from_iter([("limit".into(), json!(limit))])).unwrap(),
             Some(limit)
         );
     }
     for value in [json!(-1), json!(1.5)] {
         assert_eq!(
-            parse_list_recent_decisions(Map::from_iter([("limit".into(), value)]))
-                .unwrap_err(),
+            parse_list_recent_decisions(Map::from_iter([("limit".into(), value)])).unwrap_err(),
             "invalid 'limit': expected unsigned integer"
         );
     }
@@ -128,8 +135,7 @@ fn recent_decisions_parser_keeps_optional_unsigned_limit_semantics() {
         (json!({}), "object"),
     ] {
         assert_eq!(
-            parse_list_recent_decisions(Map::from_iter([("limit".into(), value)]))
-                .unwrap_err(),
+            parse_list_recent_decisions(Map::from_iter([("limit".into(), value)])).unwrap_err(),
             format!("invalid 'limit': expected unsigned integer, got {kind}")
         );
     }
@@ -220,23 +226,21 @@ fn preauthorize_parser_preserves_flow_and_tool_strings_without_normalizing() {
     ]))
     .unwrap();
     assert_eq!(flow, " flow raw ");
-        assert_eq!(
-            tools,
-            vec![
-                String::new(),
-                " tool ".to_owned(),
-                "tool".to_owned(),
-                "tool".to_owned()
-            ]
-        );
     assert_eq!(
-        parse_preauthorize_flow(Map::from_iter([("flow_id".into(), json!("flow"))]))
-            .unwrap_err(),
+        tools,
+        vec![
+            String::new(),
+            " tool ".to_owned(),
+            "tool".to_owned(),
+            "tool".to_owned()
+        ]
+    );
+    assert_eq!(
+        parse_preauthorize_flow(Map::from_iter([("flow_id".into(), json!("flow"))])).unwrap_err(),
         "missing required param 'tool_names'"
     );
     assert_eq!(
-        parse_preauthorize_flow(Map::from_iter([("tool_names".into(), json!([]))]))
-            .unwrap_err(),
+        parse_preauthorize_flow(Map::from_iter([("tool_names".into(), json!([]))])).unwrap_err(),
         "missing required param 'flow_id'"
     );
     for value in [json!(null), json!(true), json!("tools"), json!({})] {
