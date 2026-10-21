@@ -62,14 +62,6 @@ impl ConfigAllowlistStore {
     }
 }
 
-#[cfg(test)]
-#[async_trait]
-impl AllowlistStore for ConfigAllowlistStore {
-    async fn persist_allowed_identity(&self, channel: &str, identity: &str) -> anyhow::Result<()> {
-        ConfigAllowlistStore::persist_allowed_identity(self, channel, identity).await
-    }
-}
-
 // ---------------------------------------------------------------------------
 // EventSink → routes provider events to the right OpenHuman bus
 // ---------------------------------------------------------------------------
@@ -214,15 +206,3 @@ async fn publish_event(domain: &str, kind: &str, payload: serde_json::Value) -> 
     Ok(())
 }
 
-#[cfg(test)]
-#[async_trait]
-impl EventSink for OpenHumanEventSink {
-    async fn publish(
-        &self,
-        domain: &str,
-        kind: &str,
-        payload: serde_json::Value,
-    ) -> anyhow::Result<()> {
-        self.publish_host(domain, kind, payload).await
-    }
-}
