@@ -135,12 +135,7 @@ test("every allowlisted path carries a reason and known rules", () => {
     }
   }
   const state = `${SRC}/config/workspace/state.rs`;
-  const [site] = scan(state, "let conn = Connection::open(db_path)?;");
-  assert.ok(allowed(state, site));
-  assert.ok(!allowed(state, { ...site, rule: "json-write" }));
-  assert.ok(
-    !allowed(state, { ...site, text: "let c = Connection::open(other)?;" }),
-  );
+  assert.equal(ALLOW.has(state), false, "the TSD facade removed the old SQLite opener");
 });
 
 test("a new database open fails the check", () => {
