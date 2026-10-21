@@ -42,6 +42,26 @@ fn reads_completed_versions_from_a_read_only_database_snapshot() {
             )
             .unwrap();
     }
+    let compressed = serde_json::json!({
+        "owner": "compressed",
+        "step": "large-step",
+        "from": 0,
+        "to": 4,
+        "cursor": null,
+        "written": 1,
+        "done": true,
+        "padding": "x".repeat(6000),
+    })
+    .to_string();
+    let mut blob = vec![1];
+    blob.extend(zstd::encode_all(compressed.as_bytes(), 3).unwrap());
+    connection
+        .execute(
+            "INSERT INTO docs (scope, coll, id, updated_ms, body) \
+             VALUES ('local', 'tsd.migrations', 'compressed', 400, ?1)",
+            [rusqlite::types::Value::Blob(blob)],
+        )
+        .unwrap();
     connection
         .execute(
             "INSERT INTO docs (scope, coll, id, updated_ms, body) \
@@ -56,8 +76,12 @@ fn reads_completed_versions_from_a_read_only_database_snapshot() {
 
     assert_eq!(
         versions,
-        vec![("profiles".into(), 2), ("threads".into(), 3)]
+        vec![
+            ("compressed".into(), 4),
+            ("profiles".into(), 2),
+            ("threads".into(), 3)
+        ]
     );
-    assert_eq!(last, Some(300));
+    assert_eq!(last, Some(400));
     assert_eq!(std::fs::read(&db).unwrap(), original);
 }

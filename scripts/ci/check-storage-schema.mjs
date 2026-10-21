@@ -30,8 +30,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(HERE, '..', '..');
 export const DOC_PATH = resolve(REPO_ROOT, 'docs', 'storage-schema.md');
 
-const COLLECTION = /^[a-z][a-z0-9_]{1,23}\.[a-z][a-z0-9_]*$/;
-const ENTITY = /^[a-z][a-z0-9_]*$/;
+const COLLECTION = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 const TIME_SUFFIX = /(_at|_ns|_us|_secs|_ts|_time)$/;
 
 /** Features the dump is built with: the contributor set plus the wallet owner. */
