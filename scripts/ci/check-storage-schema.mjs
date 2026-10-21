@@ -32,6 +32,7 @@ export const REPO_ROOT = resolve(HERE, '..', '..');
 export const DOC_PATH = resolve(REPO_ROOT, 'docs', 'storage-schema.md');
 
 const COLLECTION = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
+const LEGACY_COLLECTIONS = new Set(['remix_markers', 'tinymemes_documents']);
 const TIME_SUFFIX = /(_at|_ns|_us|_secs|_ts|_time)$/;
 
 /** Features the dump is built with: the contributor set plus the wallet owner. */
@@ -90,7 +91,7 @@ export function lint(dump) {
   const names = new Set();
   for (const collection of dump.collections ?? []) {
     const { name, indexes = [], ttl_field: ttlField, search } = collection;
-    if (!COLLECTION.test(name)) {
+    if (!COLLECTION.test(name) && !LEGACY_COLLECTIONS.has(name)) {
       problems.push(`collection "${name}" must be <owner>.<entity> with a snake_case entity`);
     }
     if (names.has(name)) problems.push(`collection "${name}" is declared more than once`);
@@ -123,7 +124,9 @@ const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 export function render(dump) {
   const owners = new Map();
   for (const collection of dump.collections ?? []) {
-    const owner = collection.name.split('.', 1)[0];
+    const owner = collection.name.includes('.')
+      ? collection.name.split('.', 1)[0]
+      : 'legacy (unqualified names)';
     if (!owners.has(owner)) owners.set(owner, []);
     owners.get(owner).push(collection);
   }
