@@ -339,3 +339,151 @@ async fn a_configured_deliverer_reads_the_triage_timeout_on_first_use() {
     assert_eq!(response.status, DeliverStatus::Accepted);
     assert!(deliverer.timeout().await <= Duration::from_secs(25));
 }
+
+// ── Pinned sources ─────────────────────────────────────────────────────────
+
+use crate::inbound::fixture::{
+    memory_results, mentions_inbound, until_finished, Reply, ScriptedAgent,
+};
+use crate::inbound::pinned::{Pinned, PinnedAgent};
+use crate::inbound::results::{ResultStatus, Results};
+
+fn mention(id: &str) -> InboundEvent {
+    events::external(
+        "x:mentions",
+        "mentions",
+        id,
+        &format!("hello {id}"),
+        json!({ "author": "@a" }),
+        5,
+    )
+    .unwrap()
+}
+
+fn pinned_deliverer(
+    triage: &Arc<ScriptedTriage>,
+    agent: &Arc<ScriptedAgent>,
+    results: &Results,
+) -> Deliverer {
+    deliverer(triage)
+        .with_inbound(mentions_inbound(10, 25))
+        .with_pinned(Pinned::new(
+            agent.clone() as Arc<dyn PinnedAgent>,
+            results.clone(),
+        ))
+}
+
+#[tokio::test]
+async fn a_pinned_source_runs_its_agent_without_triage_and_keeps_the_text() {
+    let triage = ScriptedTriage::new(Vec::<Step>::new());
+    let agent = ScriptedAgent::new([Reply::Text("draft")]);
+    let results = memory_results();
+    let response = pinned_deliverer(&triage, &agent, &results)
+        .deliver(turn(vec![mention("t1"), mention("t2")], Lane::Interactive, 1))
+        .await;
+    assert_eq!(response.status, DeliverStatus::Accepted);
+    assert_eq!(triage.runs(), 0, "a pinned source was triaged");
+    let runs = agent.runs();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].agent_id, "teeny-mentions");
+    assert_eq!(runs[0].source, "x:mentions");
+    assert_eq!(runs[0].key, "mentions");
+    assert!(runs[0].message.contains("hello t1") && runs[0].message.contains("hello t2"));
+    let stored = results.get("turn-1").unwrap().unwrap();
+    assert_eq!(stored.result.status, ResultStatus::Completed);
+    assert_eq!(stored.result.text.as_deref(), Some("draft"));
+    assert_eq!(stored.result.event_ids, ["t1", "t2"]);
+}
+
+#[tokio::test]
+async fn a_slow_pinned_run_is_acknowledged_at_the_budget_and_stored_when_it_ends() {
+    let triage = ScriptedTriage::new(Vec::<Step>::new());
+    let agent = ScriptedAgent::new([Reply::Slow(Duration::from_millis(300), "late")]);
+    let results = memory_results();
+    let deliverer =
+        pinned_deliverer(&triage, &agent, &results).with_budget(Duration::from_millis(50));
+    let started = std::time::Instant::now();
+    let response = deliverer
+        .deliver(turn(vec![mention("t1")], Lane::Interactive, 1))
+        .await;
+    assert_eq!(response.status, DeliverStatus::Accepted);
+    assert!(started.elapsed() < Duration::from_millis(300));
+    assert_eq!(
+        results.get("turn-1").unwrap().unwrap().result.status,
+        ResultStatus::Running
+    );
+    let done = until_finished(&results, "turn-1", Duration::from_secs(5))
+        .await
+        .unwrap();
+    assert_eq!(done.result.text.as_deref(), Some("late"));
+}
+
+#[tokio::test]
+async fn a_slow_pinned_run_that_fails_after_the_budget_is_stored_as_failed() {
+    let triage = ScriptedTriage::new(Vec::<Step>::new());
+    let agent = ScriptedAgent::new([Reply::SlowFail(Duration::from_millis(200), "late boom")]);
+    let results = memory_results();
+    let response = pinned_deliverer(&triage, &agent, &results)
+        .with_budget(Duration::from_millis(30))
+        .deliver(turn(vec![mention("t1")], Lane::Interactive, 1))
+        .await;
+    assert_eq!(response.status, DeliverStatus::Accepted);
+    let done = until_finished(&results, "turn-1", Duration::from_secs(5))
+        .await
+        .unwrap();
+    assert_eq!(done.result.status, ResultStatus::Failed);
+    assert_eq!(done.result.error.as_deref(), Some("late boom"));
+}
+
+#[tokio::test]
+async fn a_failed_pinned_run_is_retried_and_stored_as_failed_on_its_last_attempt() {
+    let triage = ScriptedTriage::new(Vec::<Step>::new());
+    let agent = ScriptedAgent::new([Reply::Fail("down"), Reply::Fail("still down")]);
+    let results = memory_results();
+    let deliverer = pinned_deliverer(&triage, &agent, &results);
+    let first = deliverer
+        .deliver(turn(vec![mention("t1")], Lane::Interactive, 1))
+        .await;
+    assert_eq!(first.status, DeliverStatus::Retry { after_ms: None });
+    assert_eq!(
+        results.get("turn-1").unwrap().unwrap().result.status,
+        ResultStatus::Running
+    );
+    let last = deliverer
+        .deliver(turn(vec![mention("t1")], Lane::Interactive, 3))
+        .await;
+    assert_eq!(last.status, DeliverStatus::Retry { after_ms: None });
+    let stored = results.get("turn-1").unwrap().unwrap();
+    assert_eq!(stored.result.status, ResultStatus::Failed);
+    assert_eq!(stored.result.error.as_deref(), Some("still down"));
+    assert_eq!(agent.runs().len(), 2);
+}
+
+#[tokio::test]
+async fn a_finished_pinned_turn_is_not_run_again() {
+    let triage = ScriptedTriage::new(Vec::<Step>::new());
+    let agent = ScriptedAgent::new([Reply::Text("once")]);
+    let results = memory_results();
+    let first = pinned_deliverer(&triage, &agent, &results)
+        .deliver(turn(vec![mention("t1")], Lane::Interactive, 1))
+        .await;
+    assert_eq!(first.status, DeliverStatus::Accepted);
+    // A new process (nothing remembered) is handed the same turn again.
+    let again = pinned_deliverer(&triage, &agent, &results)
+        .deliver(turn(vec![mention("t1")], Lane::Interactive, 2))
+        .await;
+    assert_eq!(again.status, DeliverStatus::Accepted);
+    assert_eq!(agent.runs().len(), 1, "a finished turn ran again");
+}
+
+#[tokio::test]
+async fn a_pinned_event_is_classified_actionable_without_triage() {
+    let triage = ScriptedTriage::new(Vec::<Step>::new());
+    let agent = ScriptedAgent::new([]);
+    let classified = pinned_deliverer(&triage, &agent, &memory_results())
+        .classify(ClassifySalienceRequest::new(mention("t1"), 35))
+        .await
+        .unwrap();
+    assert_eq!(classified.class, SalienceClass::Actionable);
+    assert_eq!(triage.runs(), 0);
+}
