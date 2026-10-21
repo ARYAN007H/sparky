@@ -108,6 +108,11 @@ pub struct Record {
     pub id: String,
     /// The document body.
     pub doc: serde_json::Value,
+    /// Creation time metadata requested by a legacy conversion, if known.
+    ///
+    /// The import writer uses this as document metadata; owner converters keep
+    /// semantic event times in the body when the old format did so.
+    pub created_ms: Option<i64>,
 }
 
 impl From<ImportDoc> for Record {
@@ -116,6 +121,7 @@ impl From<ImportDoc> for Record {
             collection: doc.collection.to_string(),
             id: doc.id,
             doc: doc.doc,
+            created_ms: None,
         }
     }
 }
@@ -345,6 +351,7 @@ fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<Collec
                 collection: collection.clone(),
                 id: r.id,
                 doc: r.body,
+                created_ms: None,
             }));
             continue;
         };
@@ -353,6 +360,7 @@ fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<Collec
                 collection: target.collection,
                 id: target.id,
                 doc: target.body,
+                created_ms: target.created_ms,
             });
         }
     }
