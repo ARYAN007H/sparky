@@ -440,10 +440,8 @@ async fn drive_subagent() {
         2,
         "the model must continue after the tool result"
     );
-    assert!(
-        tool_output
-            .lock()
-            .as_deref()
-            .is_some_and(|output| output.contains("composio is disabled"))
-    );
+    assert!(tool_output
+        .lock()
+        .as_deref()
+        .is_some_and(|output| output.contains("composio is disabled")));
 }

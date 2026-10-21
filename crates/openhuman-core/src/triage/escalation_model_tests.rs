@@ -171,11 +171,9 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         .map(|tool| tool.name.as_str())
         .collect();
     assert!(tool_names.contains(&"read_workspace_state"));
-    assert!(
-        !tool_names
-            .iter()
-            .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") })
-    );
+    assert!(!tool_names
+        .iter()
+        .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
     assert!(!tool_names.contains(&"shell"));
     assert!(!tool_names.contains(&"file_write"));
     drop(requests);
@@ -295,13 +293,11 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
         requests[0].1, model_marker,
         "the expected model served the turn"
     );
-    assert!(
-        requests[0]
-            .2
-            .messages
-            .iter()
-            .any(|message| { message.text().contains("send this trigger reply") })
-    );
+    assert!(requests[0]
+        .2
+        .messages
+        .iter()
+        .any(|message| { message.text().contains("send this trigger reply") }));
     drop(requests);
     let sentinel = "triage-direct-source-egress-sentinel";
     BUS.publish(crate::core::events::DomainEvent::ExternalTransferPending {
@@ -497,12 +493,13 @@ async fn escalate_dispatch_preserves_orchestrator_tools_without_child_delegation
         .iter()
         .map(|tool| tool.name.as_str())
         .collect();
-    assert!(tool_names.contains(&"grep"), "the orchestrator keeps its advertised coding tool");
     assert!(
-        !tool_names
-            .iter()
-            .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") })
+        tool_names.contains(&"grep"),
+        "the orchestrator keeps its advertised coding tool"
     );
+    assert!(!tool_names
+        .iter()
+        .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
 }
 
 #[tokio::test]
