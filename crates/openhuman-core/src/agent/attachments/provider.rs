@@ -250,15 +250,6 @@ impl AttachmentModel {
                 }
             }
         }
-        if scope.external_channel
-            && request.messages.iter().any(|message| {
-                matches!(message, Message::User(user) if user.content.iter().any(is_media_block))
-            })
-        {
-            return Err(tinyinference_llm::Error::Model(
-                "attachment resolution is disabled for external channel input".into(),
-            ));
-        }
         for (message_index, message) in request.messages.iter_mut().enumerate() {
             let Message::User(user) = message else {
                 continue;

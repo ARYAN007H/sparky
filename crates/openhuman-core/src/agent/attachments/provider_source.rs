@@ -32,7 +32,7 @@ impl AttachmentModel {
                 tinyinference_llm::Error::Model("native attachment session is unavailable".into())
             })?;
             let resolved = crate::threads::attachments::read_authorized_native_attachment(
-                &crate::core::runtime::DispatchCtx::ambient(),
+                &self.dispatch_ctx(),
                 &self.config,
                 thread_id,
                 opaque_id,
