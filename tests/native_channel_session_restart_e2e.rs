@@ -760,10 +760,23 @@ fn assert_model_received_file_content(request: &Value) {
             "typed document carries the downloaded file bytes: {encoded}"
         );
     } else {
-        assert!(
-            content_has_text_block(content, std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
-            "unsupported Document input must reach the model as extracted literal text"
-        );
+        if !content_has_text_block(content, std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()) {
+            let serialized = serde_json::to_string(content).unwrap_or_default();
+            panic!(
+                "unsupported Document input must reach the model as extracted literal text; safe content shape: kind={} block_types={:?} staged_ref={} file_bytes_text={} file_bytes_base64={} caption={}",
+                match content {
+                    Value::Array(_) => "array",
+                    Value::Object(_) => "object",
+                    Value::String(_) => "string",
+                    _ => "other",
+                },
+                content_block_types(content),
+                serialized.contains("openhuman-staged://"),
+                serialized.contains(std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+                serialized.contains(&base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES)),
+                serialized.contains("file caption before media")
+            );
+        }
     }
     let text_blocks = collect_text_blocks(content);
     let encoded = base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES);
@@ -806,6 +819,22 @@ fn find_block_type<'a>(value: &'a Value, expected: &str) -> Option<&'a Value> {
                 .find_map(|item| find_block_type(item, expected))
         }
         _ => None,
+    }
+}
+
+fn content_block_types(value: &Value) -> Vec<String> {
+    match value {
+        Value::Array(items) => items.iter().flat_map(content_block_types).collect(),
+        Value::Object(fields) => {
+            let mut kinds = fields
+                .get("type")
+                .and_then(Value::as_str)
+                .map(|kind| vec![kind.to_owned()])
+                .unwrap_or_default();
+            kinds.extend(fields.values().flat_map(content_block_types));
+            kinds
+        }
+        _ => Vec::new(),
     }
 }
 
