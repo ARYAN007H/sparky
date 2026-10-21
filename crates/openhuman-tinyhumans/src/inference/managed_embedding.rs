@@ -17,14 +17,17 @@ use crate::client::endpoint::is_managed_endpoint_for_api_key;
 
 /// Builds the owning cloud embedding implementation with the credential scope
 /// and turn context supplied by the inference registry.
-pub(super) fn from_request(request: &EmbeddingRequest<'_>) -> CloudEmbeddingModel {
+pub(super) fn from_request(
+    request: &EmbeddingRequest<'_, openhuman_embed::__host::inference_registry::ProviderContext>,
+) -> CloudEmbeddingModel {
+    let context = request.context.embedding.as_ref().expect("embedding host context");
     build_cloud_model(
-        request.config.and_then(|config| config.api_url.clone()),
-        request.state_dir.clone(),
-        request.secrets_encrypt,
+        context.config.as_ref().and_then(|config| config.api_url.clone()),
+        context.state_dir.clone(),
+        context.secrets_encrypt,
         request.model,
         request.dimensions,
-        request.chat.clone(),
+        context.chat.clone(),
     )
 }
 

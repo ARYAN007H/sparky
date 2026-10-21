@@ -11,7 +11,8 @@ use tinyinference_embeddings::{EmbeddingModel, UnavailableEmbeddingModel};
 use tinyinference_providers::route::custom_provider_string;
 
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::EmbeddingRequest;
+use tinyinference_llm::providers::overrides::EmbeddingRequest;
+use crate::inference::registry::ProviderContext;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::credentials::embedding_scope::credential_scope;
 
@@ -34,17 +35,15 @@ pub(super) fn managed_factory(
     chat: Option<ApprovalChatContext>,
 ) -> ManagedModelFactory {
     Arc::new(move |model, dimensions| {
-        if let Some(registered) = crate::inference::registry::embedding(PROVIDER_OPENHUMAN) {
+        if let Some(registered) = crate::inference::registry::ambient_provider_overrides()
+            .embedding_factory(PROVIDER_OPENHUMAN)
+        {
             log::debug!("[embeddings::factory] managed model served by a registered factory");
             let (state_dir, secrets_encrypt) = credential_scope(config.as_ref());
-            return registered(&EmbeddingRequest {
-                config: config.as_ref(),
-                model,
-                dimensions,
-                chat: chat.clone(),
-                state_dir,
-                secrets_encrypt,
-            });
+            let context = ProviderContext::for_embedding(
+                config.as_ref(), chat.clone(), state_dir, secrets_encrypt,
+            );
+            return registered(&EmbeddingRequest { model, dimensions, context: &context });
         }
         log::debug!("[embeddings::factory] no managed embedding provider registered");
         let message = format!(
