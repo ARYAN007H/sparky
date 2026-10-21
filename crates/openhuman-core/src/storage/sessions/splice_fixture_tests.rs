@@ -8,7 +8,7 @@ use tinyagents_session::transcript::{TranscriptLocator, TranscriptMessage, Trans
 /// A fresh transcript store over the driver ports on memory (the production
 /// store, minus the disk), shared by cloning the `Arc`.
 pub(crate) fn memory_locator() -> Arc<dyn TranscriptLocator> {
-    tinyagents_session::testkit::in_memory_transcript()
+    memory_session_provider().for_agent("fixture").transcripts
 }
 
 /// A real driver-backed session provider over the TSD memory testkit. All

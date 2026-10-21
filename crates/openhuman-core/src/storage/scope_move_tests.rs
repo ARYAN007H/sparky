@@ -1,11 +1,11 @@
 use super::*;
-use std::path::Path;
 #[cfg(feature = "legacy-import")]
 use crate::storage::Precondition;
 #[cfg(feature = "legacy-import")]
 use serde_json::json;
 #[cfg(feature = "legacy-import")]
 use std::io::Read;
+use std::path::Path;
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::Meta;
 
@@ -209,18 +209,20 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
     assert_eq!(lease.meta.expires_ms, Some(10_000));
 
     let operator = backend.for_scope(&crate::storage::Scope::local()).unwrap();
-    assert!(operator
-        .documents()
-        .get("profiles.registry", "alice")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        operator
+            .documents()
+            .get("profiles.registry", "alice")
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[cfg(feature = "legacy-import")]
 #[test]
 fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
-    use crate::storage::layout::{legacy, Target};
+    use crate::storage::layout::{Target, legacy};
     use crate::storage::{self, CollectionSpec, DocumentStoreExt, Precondition, Query, Scope};
 
     let dir = tempfile::tempdir().unwrap();
