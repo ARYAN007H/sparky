@@ -16,6 +16,22 @@ pub const MASTER_KEY_ENV: &str = "OPENHUMAN_KEYRING_MASTER_KEY";
 pub const MASTER_KEY_FILE_ENV: &str = "OPENHUMAN_KEYRING_MASTER_KEY_FILE";
 const KEY_LEN: usize = 32;
 
+/// Decode the same operator-supplied master-key form as the enabled backend.
+fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
+    let expected = 2 * KEY_LEN;
+    let got = hex.chars().count();
+    if got != expected {
+        return Err(format!("expected {expected} hex characters, got {got}"));
+    }
+    if !hex.is_ascii() {
+        return Err("value is not valid hex".to_string());
+    }
+    let bytes = crypto::hex_decode(hex).map_err(|_| "value is not valid hex".to_string())?;
+    let mut key = [0u8; KEY_LEN];
+    key.copy_from_slice(&bytes);
+    Ok(key)
+}
+
 #[path = "encrypted_file_backend/key_source.rs"]
 pub mod key_source;
 pub use key_source::{

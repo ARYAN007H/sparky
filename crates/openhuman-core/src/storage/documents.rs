@@ -14,7 +14,7 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, Weak};
 
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Versioned};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Versioned};
 
 use super::{
     block_on, current_scope, installed, DocumentStore, Scope, Storage, StorageBackend, StorageError,
