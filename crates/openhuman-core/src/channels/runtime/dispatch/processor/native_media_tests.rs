@@ -153,7 +153,7 @@ fn module_media_scope_preserves_account_full_conversation_and_provider_turn() {
             id: "telegram".into(),
             account_id: None,
         },
-        ..envelope
+        ..envelope.clone()
     };
     assert!(media_scope(&missing_account).is_err());
 
