@@ -332,6 +332,12 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         )
     });
     let grandchild_output = grandchild_jobs[0].output.as_deref().unwrap_or_default();
+    eprintln!(
+        "NESTED_FLOW_TERMINAL_DIAGNOSTIC returned_before_child={returned_before_child} status={:?} error={:?} events={:?}",
+        grandchild_jobs[0].status,
+        grandchild_jobs[0].error,
+        grandchild_events.iter().map(|o| &o.event).collect::<Vec<_>>(),
+    );
 
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
