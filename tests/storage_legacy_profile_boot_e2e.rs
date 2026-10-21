@@ -48,7 +48,7 @@ fn start(home: &Path) -> (Server, String) {
         .env_remove("OPENHUMAN_STORAGE_URL")
         .env_remove("OPENHUMAN_MODE")
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(std::fs::File::create(home.join("core.stderr.log")).unwrap())
         .spawn()
         .expect("spawn the desktop core host");
     let mut server = Server(server);
@@ -137,7 +137,19 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         "flow owner did not read its historical profile record: {flows}"
     );
 
-    assert!(profile.join("storage.db").is_file(), "boot migrated the active profile");
+    assert!(
+        profile.join("storage.db").is_file(),
+        "boot migrated the active profile; profile entries: {:?}; workspace entries: {:?}; logs: {}",
+        std::fs::read_dir(&profile)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>(),
+        std::fs::read_dir(profile.join("workspace"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>(),
+        std::fs::read_to_string(home.path().join("core.stderr.log")).unwrap_or_default()
+    );
     assert_eq!(
         std::fs::read(&source).unwrap(),
         source_bytes,
