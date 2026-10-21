@@ -1,6 +1,6 @@
 //! Resolve typed native-channel media through TinyChannels' scoped media port.
 
-use tinybus::module::ModuleClient;
+use tinybus::module::{ModuleCallError, ModuleClient};
 use tinychannels_bus::{
     module_media::{MediaReadBegin, MediaReadChunk, MediaReadFinish},
     ChannelInboundEnvelope, ContentPart, HostVoiceScope, MediaKind, MediaReference,
@@ -32,6 +32,25 @@ fn log_rejection(stage: &'static str, error: String) -> String {
     // Keep diagnostics useful without putting those values into channel logs.
     tracing::warn!(stage, "[dispatch] typed native media preparation rejected");
     error
+}
+
+fn log_module_call_rejection(
+    method: &'static str,
+    error: ModuleCallError,
+    fallback: &'static str,
+) -> String {
+    let class = match error {
+        ModuleCallError::Unavailable => "unavailable",
+        ModuleCallError::IncompatibleContract => "incompatible_contract",
+        ModuleCallError::TransportFailed => "transport_failed",
+        ModuleCallError::ModuleFault => "module_fault",
+    };
+    tracing::warn!(
+        method,
+        module_error = class,
+        "[dispatch] native media module call rejected"
+    );
+    fallback.to_owned()
 }
 
 /// Resolve only opaque references carried by the trusted module envelope.
@@ -360,10 +379,11 @@ async fn read_scoped_media(
             },),
         )
         .await
-        .map_err(|_| {
-            log_rejection(
-                "module_read_begin",
-                "native media could not be resolved in this turn".to_owned(),
+        .map_err(|error| {
+            log_module_call_rejection(
+                tinychannels_bus::methods::BEGIN_MEDIA_READ,
+                error,
+                "native media could not be resolved in this turn",
             )
         })?;
     let mut lease = MediaReadLease::new(client.clone(), dispatch.clone(), begin.handle.clone());
@@ -406,10 +426,11 @@ async fn read_scoped_media(
                 },),
             )
             .await
-            .map_err(|_| {
-                log_rejection(
-                    "module_read_chunk",
-                    "native media read was interrupted".to_owned(),
+            .map_err(|error| {
+                log_module_call_rejection(
+                    tinychannels_bus::methods::READ_MEDIA_CHUNK,
+                    error,
+                    "native media read was interrupted",
                 )
             })?;
         let expected_done = sequence + 1 == begin.chunk_count;
@@ -437,10 +458,13 @@ async fn read_scoped_media(
     }
     validate_actual_media_size(bytes.len(), begin.byte_count, max_bytes)
         .map_err(|error| log_rejection("module_read_final_size", error))?;
-    lease
-        .abort()
-        .await
-        .map_err(|error| log_rejection("module_read_abort", error))?;
+    lease.abort().await.map_err(|error| {
+        log_module_call_rejection(
+            tinychannels_bus::methods::ABORT_MEDIA_READ,
+            error,
+            "native media read cleanup failed",
+        )
+    })?;
     Ok(bytes)
 }
 
@@ -463,7 +487,7 @@ impl MediaReadLease {
         }
     }
 
-    async fn abort(&mut self) -> Result<(), String> {
+    async fn abort(&mut self) -> Result<(), ModuleCallError> {
         let Some(handle) = self.handle.as_ref().cloned() else {
             return Ok(());
         };
@@ -473,8 +497,7 @@ impl MediaReadLease {
                 tinychannels_bus::methods::ABORT_MEDIA_READ,
                 (MediaReadFinish(handle),),
             )
-            .await
-            .map_err(|_| "native media read cleanup failed".to_owned())?;
+            .await?;
         self.handle = None;
         Ok(())
     }
