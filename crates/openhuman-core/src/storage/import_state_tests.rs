@@ -1,8 +1,9 @@
 use super::*;
-use crate::storage::{MemoryStorage, Scope, StorageBackend};
+use crate::storage::{Scope, StorageBackend};
 use std::sync::Arc;
 use std::sync::mpsc;
 use tinystoragedrivers::CollectionSpec;
+use tinystoragedrivers_testkit::MemoryBackend;
 
 const OWNER: &str = "claims_test";
 
@@ -11,7 +12,7 @@ fn spec() -> Vec<CollectionSpec> {
 }
 
 fn repo() -> Repo {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     Repo::on(&backend, &Scope::local(), "claim-test", spec).unwrap()
 }
 
@@ -153,7 +154,7 @@ fn completion_is_an_immutable_host_owned_record_in_the_scope() {
 
 #[test]
 fn a_legacy_marker_row_is_honoured_and_removed() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     let owned = scoped.clone();
     crate::storage::block_on(async move {
