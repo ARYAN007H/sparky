@@ -37,7 +37,6 @@ use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{ProviderUsageCarry, SubagentScope, ToolFailureMap};
 use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::verify_before_finish;
-use crate::inference::turn_models::TurnChatModel;
 
 use super::ToolPolicyEnforcement;
 
@@ -82,7 +81,7 @@ pub(super) struct TurnMiddlewareInputs {
     /// This turn's memory binding: the compaction summarizer recalls under it.
     pub(super) memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
     /// The context-window summarizer's model.
-    pub(super) summarizer_model: TurnChatModel,
+    pub(super) summarizer_model: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     /// Shared `call_id -> (success, failure, elapsed_ms, output_chars)` side
     /// channel: middleware records each outcome for the bridge's
     /// `ToolCallCompleted`.
