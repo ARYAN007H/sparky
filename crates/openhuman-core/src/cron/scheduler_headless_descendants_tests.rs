@@ -108,6 +108,7 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     config.action_dir = config.workspace_dir.clone();
     config.default_model = Some("test-model".into());
     config.chat_provider = Some("omlx:test-model".into());
+    config.reliability.scheduler_retries = 0;
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace");
 
     let definitions =
@@ -125,7 +126,6 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         .definitions(definitions),
     );
     let dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core));
-    config.reliability.scheduler_retries = 0;
     let job = crate::cron::add_agent_job(
         &config,
         Some("headless child test".into()),
