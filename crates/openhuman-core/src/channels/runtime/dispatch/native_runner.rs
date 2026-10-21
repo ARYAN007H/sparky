@@ -540,6 +540,16 @@ impl Default for NativeRuntime {
     }
 }
 
+fn channel_turn_deadline(
+    message_timeout_secs: u64,
+    web_backstop: Option<std::time::Duration>,
+) -> std::time::Duration {
+    let channel_deadline = std::time::Duration::from_secs(
+        message_timeout_secs.max(tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
+    );
+    web_backstop.map_or(channel_deadline, |backstop| backstop.min(channel_deadline))
+}
+
 pub(crate) struct NativeTurnExecution {
     pub(crate) result: Result<crate::agent::bus::AgentTurnResponse, String>,
     pub(crate) delivery_succeeded: Option<bool>,
@@ -551,6 +561,7 @@ pub(crate) async fn run(
     thread_id: String,
     request_id: String,
     text: String,
+    message_timeout_secs: u64,
     trusted: Arc<crate::agent::turn_host::TrustedAgentTurn>,
 ) -> NativeTurnExecution {
     let runtime = crate::core::runtime::slot_for::<NativeRuntime>(dispatch);
@@ -565,6 +576,10 @@ pub(crate) async fn run(
         }
     };
     runtime.shared.begin_delivery_wait(&request_id);
+    let deadline = channel_turn_deadline(
+        message_timeout_secs,
+        crate::agent::session_host::turn_backstop::configured_backstop(),
+    );
     let request = TurnRequest {
         scope: ScopeKey {
             agent_id: trusted.host_agent.definition.id.clone(),
@@ -580,7 +595,7 @@ pub(crate) async fn run(
         },
         host_authored: false,
         disposition: QueueDisposition::Interrupt,
-        deadline: crate::agent::session_host::turn_backstop::configured_backstop(),
+        deadline: Some(deadline),
         idle_timeout: Some(crate::agent::turn_policy::configured_idle_window()),
     };
     let runner_result = runtime.runner.run(request).await;

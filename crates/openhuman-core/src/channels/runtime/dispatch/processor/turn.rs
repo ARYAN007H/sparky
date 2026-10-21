@@ -439,6 +439,7 @@ pub(crate) async fn process_channel_runtime_message(
                 session_key.clone(),
                 request_id,
                 enriched_message.clone(),
+                ctx.message_timeout_secs,
                 trusted,
             )
             .await
