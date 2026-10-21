@@ -237,6 +237,16 @@ pub(crate) fn turn_admission(
     has_thread: bool,
     nested_spawn_depth: Option<NestedSpawnDepth>,
 ) -> ToolAdmission {
+    #[cfg(test)]
+    if nested_spawn_depth.is_some() {
+        eprintln!(
+            "NESTED_SPAWN_TOOL_ADMISSION_TRACE depth_grant={nested_spawn_depth:?} allowlist_contains_spawn={} spawn_candidates={:?}",
+            allowed
+                .as_ref()
+                .is_none_or(|names| names.contains("spawn_subagent")),
+            candidate_spawn_tools(tool_sets),
+        );
+    }
     ToolAdmission {
         allowed: allowed.clone(),
         // A sub-agent scope on the turn forces this on in the driver.

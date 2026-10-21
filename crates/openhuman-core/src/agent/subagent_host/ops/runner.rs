@@ -25,7 +25,7 @@ use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionReg
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{validate_tier_transition, AgentTier, IterationPolicy, PromptSource};
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
-use tinytools::ToolSpec;
+use tinytools::{Tool, ToolSpec};
 use tinytools_std::file_state::with_file_state_agent_id;
 
 use super::prompt::compose_subagent_system_prompt;
@@ -283,6 +283,12 @@ pub(crate) async fn run_subagent_direct_with_native_context(
         // tool through HostOperationContext.
         //
         let mut parent_for_subagent = parent.clone();
+        // The direct-child list belongs to the agent now being run. It is not
+        // the originating parent's list: each definition's allowlist governs
+        // only that actor's own children.
+        parent_for_subagent.agent_definition_id = definition.id.clone();
+        parent_for_subagent.allowed_subagent_ids =
+            definition.allowed_subagent_ids().into_iter().collect();
         if let Some(descriptor) = options.workspace_descriptor.clone() {
             parent_for_subagent.workspace_descriptor = Some(descriptor);
         }
@@ -297,6 +303,8 @@ pub(crate) async fn run_subagent_direct_with_native_context(
                     &loaded_config,
                     native,
                     nested_spawn_depth_available,
+                    attempted_depth,
+                    max_depth,
                 ))
                 .await
             })
@@ -398,6 +406,8 @@ async fn run_typed_mode(
     config: &LoadedConfig,
     native: crate::agent::tinyagents::NativeSubagentRunContext,
     nested_spawn_depth_available: bool,
+    active_child_depth: usize,
+    max_depth: usize,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     let started = Instant::now();
 
@@ -493,8 +503,11 @@ async fn run_typed_mode(
                         if names.iter().any(|tool| tool == name)
                 ))
     };
+    let nested_spawn_ids = definition.allowed_subagent_ids();
     let nested_spawn_allowed = |name: &str| {
-        nested_spawn_depth_available && explicitly_declares_nested_spawn(name)
+        nested_spawn_depth_available
+            && !nested_spawn_ids.is_empty()
+            && explicitly_declares_nested_spawn(name)
     };
     let before = allowed_indices.len();
     allowed_indices.retain(|&i| {
@@ -544,14 +557,43 @@ async fn run_typed_mode(
         &parent.all_tools,
         child_rules.as_deref(),
     );
-    let filtered_specs: Vec<ToolSpec> = listed
+    let mut filtered_specs: Vec<ToolSpec> = listed
         .iter()
         .map(|&i| parent.all_tool_specs[i].as_ref().clone())
         .collect();
+    let nested_spawn_tool = if nested_spawn_allowed("spawn_subagent") {
+        Some(crate::agent::orchestration::tools::SpawnSubagentTool::scoped(
+            nested_spawn_ids.clone(),
+        ))
+    } else {
+        None
+    };
+    if let Some(tool) = &nested_spawn_tool {
+        if let Some(spec) = filtered_specs
+            .iter_mut()
+            .find(|spec| spec.name == "spawn_subagent")
+        {
+            *spec = tool.spec();
+        }
+    }
     let allowed_names: HashSet<String> = allowed_indices
         .iter()
         .map(|&i| parent.all_tools[i].name().to_string())
         .collect();
+    #[cfg(test)]
+    if active_child_depth > 0 {
+        eprintln!(
+            "NESTED_SPAWN_ADMISSION_TRACE agent={} active_child_depth={} max_depth={} depth_room={} explicit_spawn={} parent_ceiling_unrestricted={} parent_ceiling_contains_spawn={} final_allowlist_contains_spawn={}",
+            definition.id,
+            active_child_depth,
+            max_depth,
+            nested_spawn_depth_available,
+            explicitly_declares_nested_spawn("spawn_subagent"),
+            parent.subagent_tool_ceiling_names.is_empty(),
+            parent.subagent_tool_ceiling_names.contains("spawn_subagent"),
+            allowed_names.contains("spawn_subagent"),
+        );
+    }
     let filtered_specs = dedup_visible_tool_specs(filtered_specs);
 
     tracing::debug!(
@@ -765,13 +807,20 @@ async fn run_typed_mode(
     }
 
     let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt, failure_cause) =
+        let mut child_run_context = options
+            .run_context
+            .for_subagent(definition, config.as_ref().ok().map(AsRef::as_ref));
+        child_run_context.parent = Some(parent.clone());
+        let dynamic_tools = nested_spawn_tool
+            .map(|tool| vec![Box::new(tool) as Box<dyn Tool>])
+            .unwrap_or_default();
         super::graph::run_subagent_via_graph(
             subagent_source.clone(),
             &model,
             temperature,
             &mut history,
             parent.all_tools.clone(),
-            Vec::new(),
+            dynamic_tools,
             filtered_specs.clone(),
             allowed_names,
             definition_iter_cap(&options.run_context, definition),
@@ -781,9 +830,7 @@ async fn run_typed_mode(
             task_id,
             definition.iteration_policy == IterationPolicy::Extended,
             options.thread_id.clone(),
-            options
-                .run_context
-                .for_subagent(definition, config.as_ref().ok().map(AsRef::as_ref)),
+            child_run_context,
             options.worker_thread_id.clone(),
             parent.workspace_dir.clone(),
             workspace_descriptor.clone(),
