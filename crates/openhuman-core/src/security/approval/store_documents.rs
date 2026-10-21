@@ -31,7 +31,7 @@ use serde_json::{json, Value};
 use crate::config::Config;
 use crate::storage::documents::compare_and_swap;
 use crate::storage::local;
-use crate::storage::{block_on, DocumentStore, DocumentStoreExt, ScopedStorage, StorageError};
+use crate::storage::{block_on, DocumentStore, DocumentStoreExt, Storage, StorageError};
 use tinystoragedrivers::{
     CollectionSpec, ErrorKind, Filter, Key, Precondition, Query, Sort, Versioned,
 };
@@ -166,7 +166,7 @@ fn audit_error(error: Option<&str>) -> Option<String> {
 }
 
 impl Docs {
-    pub(super) fn new(scoped: &ScopedStorage) -> Self {
+    pub(super) fn new(scoped: &Storage) -> Self {
         Self {
             docs: Arc::clone(scoped.documents()),
         }
