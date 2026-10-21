@@ -185,11 +185,9 @@ pub(crate) async fn run_relay_turn(
             Err(error) => {
                 tracing::warn!("relayed channel runtime limits unavailable: {error}");
                 let reply = crate::channels::failure_copy::generic_failure(Some(&config));
-                let _ = tinychannels_runtime::Channel::send(
-                    channel.as_ref(),
-                    &crate::channels::SendMessage::new(&reply, &params.chat_id),
-                )
-                .await;
+                let _ = channel
+                    .send(&crate::channels::SendMessage::new(&reply, &params.chat_id))
+                    .await;
                 record(
                     &dispatch_ctx,
                     &workspace_dir,
@@ -221,11 +219,9 @@ pub(crate) async fn run_relay_turn(
                 "[channels::relay] could not build the turn"
             );
             let reply = crate::channels::failure_copy::generic_failure(Some(&config));
-            let _ = tinychannels_runtime::Channel::send(
-                channel.as_ref(),
-                &crate::channels::SendMessage::new(&reply, &params.chat_id),
-            )
-            .await;
+            let _ = channel
+                .send(&crate::channels::SendMessage::new(&reply, &params.chat_id))
+                .await;
             record(
                 &dispatch_ctx,
                 &workspace_dir,
@@ -238,8 +234,20 @@ pub(crate) async fn run_relay_turn(
         }
     };
 
+    #[cfg(test)]
     let mut channels_by_name: HashMap<String, Arc<dyn crate::channels::Channel>> = HashMap::new();
+    #[cfg(test)]
     channels_by_name.insert(params.channel.clone(), channel.clone());
+    #[cfg(not(test))]
+    let mut channels_by_name: HashMap<
+        String,
+        Arc<crate::channels::runtime::ChannelHandle>,
+    > = HashMap::new();
+    #[cfg(not(test))]
+    channels_by_name.insert(
+        params.channel.clone(),
+        Arc::new(crate::channels::runtime::ChannelHandle::Relay(channel.clone())),
+    );
     let mut runtime = runtime_context(
         &dispatch_ctx,
         &config,
@@ -272,11 +280,9 @@ pub(crate) async fn run_relay_turn(
         Err(error) => {
             tracing::warn!("relayed channel preparation failed: {error}");
             let reply = crate::channels::failure_copy::generic_failure(Some(&config));
-            let _ = tinychannels_runtime::Channel::send(
-                channel.as_ref(),
-                &crate::channels::SendMessage::new(&reply, &params.chat_id),
-            )
-            .await;
+            let _ = channel
+                .send(&crate::channels::SendMessage::new(&reply, &params.chat_id))
+                .await;
             record(
                 &dispatch_ctx,
                 &workspace_dir,
