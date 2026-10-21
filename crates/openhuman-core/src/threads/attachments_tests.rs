@@ -477,3 +477,101 @@ async fn discarding_claimed_attachment_preserves_row_owned_file() {
         .unwrap();
     assert_eq!(stored.claim, Some(bound));
 }
+
+#[tokio::test]
+async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = dir.path().join("workspace");
+    config.action_dir = dir.path().join("actions");
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let thread_id = "telegram:account-a:conversation-42";
+    let workspace = crate::agent::attachments::thread_action_dir(
+        &ctx,
+        &config,
+        &config.workspace_dir,
+        Some(thread_id),
+    )
+    .await
+    .unwrap();
+    tokio::fs::create_dir_all(&workspace).await.unwrap();
+    let repo = test_repo(&config.workspace_dir);
+
+    let pending_id = uuid::Uuid::new_v4().simple().to_string();
+    let pending = image(MediaReference {
+        opaque_id: Some(pending_id.clone()),
+        content_type: Some("image/png".into()),
+        ..Default::default()
+    });
+    let pending_path = "pending.png";
+    let pending_file = workspace.join(pending_path);
+    tokio::fs::write(&pending_file, b"pending bytes").await.unwrap();
+    insert_record(&repo, &staged_record(pending.clone(), pending_path));
+    let lease = NativeStagedLease::new(
+        ctx.clone(),
+        thread_id.into(),
+        config.clone(),
+        vec![pending.clone()],
+    );
+    let queued_clone = lease.clone();
+    drop(lease);
+    assert!(get_staged_record(&repo, &staged_doc_id(&pending_id).unwrap())
+        .unwrap()
+        .unwrap()
+        .claim
+        .is_none());
+    drop(queued_clone);
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let record = get_staged_record(&repo, &staged_doc_id(&pending_id).unwrap())
+                .unwrap()
+                .unwrap();
+            if record.claim.is_some_and(|claim| claim.canceled) {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("dropping the final queued payload clone should discard its staged ref");
+    assert!(!pending_file.exists());
+
+    let committed_id = uuid::Uuid::new_v4().simple().to_string();
+    let committed = image(MediaReference {
+        opaque_id: Some(committed_id.clone()),
+        content_type: Some("image/png".into()),
+        ..Default::default()
+    });
+    let committed_path = "committed.png";
+    let committed_file = workspace.join(committed_path);
+    tokio::fs::write(&committed_file, b"committed bytes")
+        .await
+        .unwrap();
+    insert_record(&repo, &staged_record(committed.clone(), committed_path));
+    let durable_claim = claim("user:request", committed.clone(), false);
+    claim_staged_record(
+        &repo,
+        &durable_claim.tenant,
+        thread_id,
+        &staged_doc_id(&committed_id).unwrap(),
+        &committed,
+        &durable_claim,
+    )
+    .unwrap();
+    let committed_lease = NativeStagedLease::new(
+        ctx,
+        thread_id.into(),
+        config,
+        vec![committed.clone()],
+    );
+    let queue_clone = committed_lease.clone();
+    committed_lease.mark_committed();
+    drop(committed_lease);
+    drop(queue_clone);
+    tokio::task::yield_now().await;
+    let stored = get_staged_record(&repo, &staged_doc_id(&committed_id).unwrap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.claim, Some(durable_claim));
+    assert_eq!(tokio::fs::read(committed_file).await.unwrap(), b"committed bytes");
+}
