@@ -132,7 +132,9 @@ async fn handle_linked_runtime_command(
     let prepared = crate::modules::channel_controller::prepare_inbound(
         &crate::channels::context::module_client(ctx).await,
         PrepareChannelInboundRequest {
-            source: ChannelInboundSource::Envelope {
+        source: ChannelInboundSource::Legacy {
+            message: msg.clone(),
+            envelope: Some(
                 envelope: tinychannels_bus::ChannelInboundEnvelope {
                     channel: tinychannels_bus::ChannelRef {
                         id: msg.channel.clone(),
@@ -160,8 +162,8 @@ async fn handle_linked_runtime_command(
                     }],
                     ..Default::default()
                 },
-                timestamp: msg.timestamp,
-            },
+            ),
+        },
             namespace: "main".into(),
             session_policy: Default::default(),
             preparation_mode: Default::default(),
