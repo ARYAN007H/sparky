@@ -315,14 +315,19 @@ export function validateTestOnlySourceParity({
         throw new Error("test-file paths must be unique safe Rust source paths");
       }
       filePaths.add(file.path);
-      if (file.releaseMode !== "100644" || file.candidateMode !== "100644") {
+      const newTestFile =
+        fileSetProof && file.releaseMode === null && file.releaseBlob === null;
+      if (
+        (!newTestFile && file.releaseMode !== "100644") ||
+        file.candidateMode !== "100644"
+      ) {
         throw new Error("attested test file must remain a regular non-executable file");
       }
       if (
-        ![file.releaseBlob, file.candidateBlob].every((sha) =>
-          /^[0-9a-f]{40}$/.test(sha),
-        ) ||
-        file.releaseBlob === file.candidateBlob
+        !/^[0-9a-f]{40}$/.test(file.candidateBlob) ||
+        (!newTestFile &&
+          (!/^[0-9a-f]{40}$/.test(file.releaseBlob) ||
+            file.releaseBlob === file.candidateBlob))
       ) {
         throw new Error("test-file blob pair is malformed or unchanged");
       }
@@ -369,14 +374,18 @@ export function validateTestOnlySourceParity({
     for (const file of files) {
       const releaseFile = releaseEntries.find((item) => item.path === file.path);
       const candidateFile = candidateEntries.find((item) => item.path === file.path);
+      const newTestFile =
+        fileSetProof && file.releaseMode === null && file.releaseBlob === null;
       if (
-        !releaseFile ||
+        (newTestFile
+          ? releaseFile !== undefined
+          : !releaseFile ||
+            releaseFile.mode !== file.releaseMode ||
+            releaseFile.type !== "blob" ||
+            releaseFile.oid !== file.releaseBlob) ||
         !candidateFile ||
-        releaseFile.mode !== file.releaseMode ||
         candidateFile.mode !== file.candidateMode ||
-        releaseFile.type !== "blob" ||
         candidateFile.type !== "blob" ||
-        releaseFile.oid !== file.releaseBlob ||
         candidateFile.oid !== file.candidateBlob
       ) {
         throw new Error(
