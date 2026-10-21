@@ -24,6 +24,7 @@
 
 mod common;
 mod identity;
+mod host_pipeline;
 mod prompt;
 mod runtime_dispatch;
 mod runtime_tool_calls;
