@@ -27,6 +27,13 @@ pub(super) fn requires_typed_preparation(envelope: &ChannelInboundEnvelope) -> b
     })
 }
 
+fn log_rejection(stage: &'static str, error: String) -> String {
+    // Error text can contain storage details or provider-controlled values.
+    // Keep diagnostics useful without putting those values into channel logs.
+    tracing::warn!(stage, "[dispatch] typed native media preparation rejected");
+    error
+}
+
 /// Resolve only opaque references carried by the trusted module envelope.
 /// Provider URLs and paths are never used as a filesystem or network source.
 pub(super) async fn resolve_typed_message(
@@ -135,7 +142,8 @@ pub(super) async fn resolve_typed_message(
         let mime = media
             .content_type
             .clone()
-            .ok_or_else(|| "native media has no content type".to_owned())?;
+            .ok_or_else(|| "native media has no content type".to_owned())
+            .map_err(|error| log_rejection("media_metadata", error))?;
         let bytes = read_scoped_media(
             &client,
             &module_dispatch,
@@ -173,11 +181,17 @@ pub(super) async fn resolve_typed_message(
             }
         };
         let opaque_id = media_opaque_id(&staged)
-            .ok_or_else(|| "staged native media has no host reference".to_owned())?;
+            .ok_or_else(|| "staged native media has no host reference".to_owned())
+            .map_err(|error| log_rejection("host_staging", error))?;
         let mut model_part = staged.clone();
         let model_media = match &mut model_part {
             ContentPart::Image { media, .. } | ContentPart::File { media, .. } => media,
-            _ => return Err("native staged media kind changed unexpectedly".into()),
+            _ => {
+                return Err(log_rejection(
+                    "host_staging",
+                    "native staged media kind changed unexpectedly".into(),
+                ));
+            }
         };
         model_media.path = Some(format!("openhuman-staged://{opaque_id}"));
         parts[index] = model_part;
