@@ -986,7 +986,7 @@ async fn multi_turn_state_persistence_inner() {
 
 // ─── Task 3: Subagent delegation happy path ───────────────────────────────────
 //
-// Tool surface (crates/openhuman-core/src/tools/orchestrator_tools.rs,
+// Tool surface (crates/openhuman-core/src/integrations/composio/orchestrator_actions.rs,
 //   crates/openhuman-core/src/agent_registry/agents/vision_agent/agent.toml):
 //   - vision_agent has `delegate_name = "analyze_image"`, so the
 //     orchestrator LLM sees a tool named "analyze_image" synthesised by collect_orchestrator_tools.

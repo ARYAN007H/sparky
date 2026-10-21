@@ -17,7 +17,7 @@ const USER_ID = 'e2e-tool-shell-git';
  *
  * The agent-facing `shell` and `git_operations` tools are intentionally NOT
  * exposed as JSON-RPC controllers — they are private to the agent's tool-call
- * loop (see `crates/openhuman-core/src/tools/orchestrator_tools.rs`). Driving them via the
+ * loop (see `crates/openhuman-core/src/integrations/composio/orchestrator_actions.rs`). Driving them via the
  * full chat path requires a live LLM that returns structured `tool_calls`,
  * which we cannot do under the "Mock backend mandatory; no real network"
  * constraint of #967. So this spec mirrors the established pattern from
