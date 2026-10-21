@@ -248,6 +248,8 @@ fn host_only_refuses_builtin_tools_the_model_names() {
             assert!(results.contains("read_file-host-result"), "{results}");
             assert!(results.contains("unknown tool `shell`"), "{results}");
             assert!(results.contains("unknown tool `write_file`"), "{results}");
+            drop(agent);
+            runtime.remove_agent("refuser").await.unwrap();
         })
         .await
         .expect("test task");
@@ -283,6 +285,8 @@ fn host_only_forces_read_only_access_and_sandbox() {
             );
             assert!(agent.access().turn_origin().is_none());
             assert!(agent.config().autonomy.trusted_roots.is_empty());
+            drop(agent);
+            runtime.remove_agent("readonly").await.unwrap();
         })
         .await
         .expect("test task");
