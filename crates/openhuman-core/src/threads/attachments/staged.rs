@@ -24,7 +24,11 @@ pub(super) struct StagedAttachmentClaim {
     pub(super) canceled: bool,
 }
 
-pub(crate) use native::{commit_native_channel_parts, discard_native_channel_parts, native_parts_in_committed_message, read_authorized_native_attachment, stage_native_channel_part, NativeStagedLease, ResolvedNativeAttachment};
+pub(crate) use native::{
+    commit_native_channel_parts, discard_native_channel_parts, native_parts_in_committed_message,
+    read_authorized_native_attachment, stage_native_channel_part, NativeStagedLease,
+    ResolvedNativeAttachment,
+};
 #[path = "staged/native.rs"]
 mod native;
 pub(super) use native::read_staged_file_bounded;

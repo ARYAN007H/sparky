@@ -3,10 +3,10 @@ use std::time::Duration;
 use super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
 use super::turn_activity::TurnActivity;
 use super::types::WebChatTaskResult;
+use crate::agent::queued_turn::QueuedPayload;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::turn_runner::TurnRequest;
-use crate::agent::queued_turn::QueuedPayload;
 use tokio::sync::{mpsc, watch};
 
 /// Aborts a task when dropped.
@@ -116,4 +116,3 @@ pub(super) fn spawn_heartbeat_with_interval(
         }
     })
 }
-

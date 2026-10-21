@@ -404,4 +404,3 @@ pub(crate) fn native_parts_in_committed_message(
         .cloned()
         .collect()
 }
-

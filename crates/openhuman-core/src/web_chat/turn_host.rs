@@ -48,7 +48,6 @@ use progress_helpers::{
     settle_turn_snapshot, spawn_heartbeat, spawn_heartbeat_with_interval, tap_progress, AbortOnDrop,
 };
 
-
 /// How long a finished turn waits for its progress tap to forward every event
 /// the turn queued before the terminal `chat_done`/`chat_error` is published.
 /// Bounded: a detached sub-agent can hold a sender clone and keep the channel
