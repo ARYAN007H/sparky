@@ -124,8 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // and the profile registry kept created_at in document metadata. The
     // actual disk layout and writes are supplied by the historical public
     // TSD v1 API pinned in this package.
-    let profile_scope = backend.for_scope(&Scope::new("profile:u1")?)?;
-    let docs = profile_scope.documents();
+    let user_scope = backend.for_scope(&Scope::local())?;
+    let docs = user_scope.documents();
 
     let cost = LegacyCostRecord {
         id: "cost-0001".into(),
@@ -212,7 +212,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // local scope: the profile directory itself supplied user isolation.
     // Their owners must continue to read them after the real v1-to-v2 boot
     // migration.
-    let user_scope = backend.for_scope(&Scope::local())?;
     put(
         user_scope.documents(),
         "approvals",
