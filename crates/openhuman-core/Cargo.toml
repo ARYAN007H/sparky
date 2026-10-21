@@ -479,7 +479,7 @@ tinystoragedrivers-testkit = { git = "https://github.com/senamakel/tinystoragedr
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["storage-drivers", "testkit"] }
 # Legacy TinyChannels provider/runtime fixtures remain available to tests only;
 # production channel execution uses the TinyBus module contract above.
-tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark"] }
+tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark", "imessage"] }
 tinychannels-runtime = { path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
 # The real TinyChannels module, linked into the test binary (never the product)
 # as the fixture behind `channels::module_fixture`. Default features are off so
