@@ -33,7 +33,6 @@ use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
 use tinychannels_bus::ChannelMessage;
 #[cfg(test)]
-#[cfg(test)]
 use tinychannels_runtime::context::conversation_history_key;
 
 use super::{
