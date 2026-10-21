@@ -22,8 +22,8 @@ use tinyflows_bus::schedule::types::{
     SessionTarget,
 };
 
-use crate::legacy_db::{LegacyDb, column_or};
-use crate::report::ImportReport;
+use super::legacy_db::{LegacyDb, column_or};
+use super::report::ImportReport;
 
 /// What `jobs.db` held, decoded.
 #[derive(Debug, Default)]

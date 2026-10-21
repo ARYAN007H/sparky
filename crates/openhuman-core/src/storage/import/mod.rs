@@ -59,6 +59,8 @@ pub mod sessions;
 #[cfg(feature = "legacy-import")]
 mod snapshot;
 #[cfg(feature = "legacy-import")]
+mod tinyflows_reader;
+#[cfg(feature = "legacy-import")]
 pub mod tinyflows;
 
 pub use schemas::{

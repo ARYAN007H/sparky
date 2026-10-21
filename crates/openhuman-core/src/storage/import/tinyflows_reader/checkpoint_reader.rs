@@ -10,8 +10,8 @@ use tinyflows_bus::catalog::{
     MAX_IMPORT_RECORD_PAYLOAD_BYTES,
 };
 
-use crate::flow_reader::BatchSender;
-use crate::legacy_db::LegacyDb;
+use super::flow_reader::BatchSender;
+use super::legacy_db::LegacyDb;
 
 const SQLITE_PAGE_ROWS: i64 = 8;
 

@@ -27,7 +27,7 @@ use std::sync::{LazyLock, Mutex, Weak};
 
 use anyhow::{Context, Result};
 
-use super::{marker_spec, marker_step, Outcome, Report, MARKER_OWNER};
+use super::{MARKER_OWNER, Outcome, Report, marker_spec, marker_step};
 use crate::config::Config;
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
@@ -108,7 +108,7 @@ pub(super) fn marked(
 }
 
 /// Counts the schedule reader's legacy records and logs safe problem details.
-fn counts(domain: &str, report: &tinyflows_import::ImportReport) -> (usize, usize, usize) {
+fn counts(domain: &str, report: &super::tinyflows_reader::ImportReport) -> (usize, usize, usize) {
     for problem in report.problems() {
         tracing::warn!(
             target: "openhuman::storage_import",
@@ -441,7 +441,7 @@ fn import_flows_after_migration(
             let flow_proxy = proxy.clone();
             let flow_storage = storage.clone();
             let flow_totals = Arc::clone(&totals);
-            tinyflows_import::read_legacy_flow_catalog(&dir, move |records| {
+            super::tinyflows_reader::read_legacy_flow_catalog(&dir, move |records| {
                 let proxy = flow_proxy.clone();
                 let storage = flow_storage.clone();
                 let totals = Arc::clone(&flow_totals);
@@ -464,7 +464,7 @@ fn import_flows_after_migration(
             let checkpoint_proxy = proxy.clone();
             let checkpoint_storage = storage.clone();
             let checkpoint_totals = Arc::clone(&totals);
-            tinyflows_import::read_legacy_checkpoint_batches(
+            super::tinyflows_reader::read_legacy_checkpoint_batches(
                 &dir.join("checkpoints.db"),
                 &dir.join("checkpoints"),
                 move |records: Vec<LegacyImportRecord>| {
@@ -534,7 +534,7 @@ pub fn import_cron(
         let report = crate::storage::block_on_anyhow({
             let jobs_db = jobs_db.clone();
             async move {
-                let legacy = tinyflows_import::read_legacy_cron(&jobs_db)
+                let legacy = super::tinyflows_reader::read_legacy_cron(&jobs_db)
                     .await
                     .context("read the legacy cron database")?;
                 let mut report = legacy.report;
