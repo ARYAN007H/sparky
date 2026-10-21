@@ -259,6 +259,8 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("hosted authority definitions should be initialized");
     let tmp = tempfile::tempdir().unwrap();
+    let _module_storage = crate::channels::module_fixture::install_memory_storage();
+    let channel_module = crate::channels::module_fixture::client().await;
     let server = relay_provider().await;
     let mut config = config(&tmp);
     config.modules.allow_download = false;
@@ -274,6 +276,15 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     )
     .unwrap();
     crate::config::schema::ephemeral_route::apply(&mut config, route);
+    let (timeout_secs, max_in_flight) = crate::channels::runtime::prepare_runtime_limits(
+        &channel_module,
+        config.channels_config.message_timeout_secs,
+        1,
+    )
+    .await
+    .expect("the linked TinyChannels runtime contract should be ready");
+    assert!(timeout_secs > 0);
+    assert!(max_in_flight > 0);
     let core_context = CoreContext::for_test(DomainSet::full(), None).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
             .session_agent("relay-agent"),
