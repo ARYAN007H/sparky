@@ -66,10 +66,10 @@ pub(crate) use crate::agent::message_convert::chat_message_to_message;
 #[cfg(feature = "flows")]
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
-pub(crate) use thread_reasoning::apply_requested_effort;
 pub use crate::inference::turn_models::TurnModelSource;
 pub(crate) use observability::SubagentScope;
 pub(crate) use supplemental_trace::SupplementalTrace;
+pub(crate) use thread_reasoning::apply_requested_effort;
 pub(crate) use turn_exec::TurnSpec;
 pub(crate) use turn_exec_native::NativeSubagentRunContext;
 #[cfg(test)]

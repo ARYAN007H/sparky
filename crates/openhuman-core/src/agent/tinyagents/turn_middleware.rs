@@ -180,9 +180,7 @@ pub(super) fn install_turn_middleware(
     let usage_carry = provider_usage_carry.clone();
     harness.push_model_middleware(Arc::new(
         tinyagents_harness::middleware::library::UsageCarryMiddleware::new(move |response| {
-            if let Some(usage) =
-                tinyinference_llm::usage::usage_info_from_response(response)
-            {
+            if let Some(usage) = tinyinference_llm::usage::usage_info_from_response(response) {
                 usage_carry
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())

@@ -64,17 +64,15 @@ pub(crate) fn turn_reasoning_for(
 
     let dispatch = ctx.dispatch_ctx();
     let reasoning = if let Some(thread_id) = ctx.thread_id.as_deref() {
-        crate::agent::tinyagents::thread_reasoning::store(&dispatch)
-            .reasoning_for_turn(
-                Some(&tinyagents_harness::ids::ThreadId::new(thread_id)),
-                max_output_tokens,
-            )
+        crate::agent::tinyagents::thread_reasoning::store(&dispatch).reasoning_for_turn(
+            Some(&tinyagents_harness::ids::ThreadId::new(thread_id)),
+            max_output_tokens,
+        )
     } else {
         None
     }
     .or_else(|| {
-        reasoning_for_config(config?)
-            .map(|reasoning| reasoning.with_output_room(max_output_tokens))
+        reasoning_for_config(config?).map(|reasoning| reasoning.with_output_room(max_output_tokens))
     });
 
     if let Some(reasoning) = reasoning.as_ref() {

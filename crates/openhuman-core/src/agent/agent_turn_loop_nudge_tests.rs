@@ -54,11 +54,9 @@ impl ChatModel<()> for RecordingProvider {
                 guard.remove(0)
             }
         };
-        Ok(
-            tinyinference_llm::model::response_to_model_response(
-                &response, &request,
-            ),
-        )
+        Ok(tinyinference_llm::model::response_to_model_response(
+            &response, &request,
+        ))
     }
 }
 

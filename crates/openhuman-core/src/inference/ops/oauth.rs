@@ -110,4 +110,3 @@ pub async fn inference_openai_oauth_disconnect(config: &Config) -> Result<Outcom
     }
     result
 }
-

@@ -26,10 +26,10 @@
 
 use crate::agent::session_host::OpenHumanSessionHost;
 use crate::config::AgentConfig;
-use tinyinference_llm::model::ChatResponse;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
+use tinyinference_llm::model::ChatResponse;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 use tinytools_agent::dialect::NativeToolCall;
@@ -87,11 +87,9 @@ impl ChatModel<()> for ScriptedProvider {
         } else {
             guard.remove(0)
         };
-        Ok(
-            tinyinference_llm::model::response_to_model_response(
-                &response, &request,
-            ),
-        )
+        Ok(tinyinference_llm::model::response_to_model_response(
+            &response, &request,
+        ))
     }
 }
 

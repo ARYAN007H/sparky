@@ -122,4 +122,3 @@ pub async fn inference_list_models(provider_id: &str) -> Result<Outcome<Value>, 
     }
     result
 }
-

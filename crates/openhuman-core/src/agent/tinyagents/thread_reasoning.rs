@@ -56,8 +56,10 @@ pub(crate) fn apply_requested_effort(
     {
         None
     } else {
-        Some(ReasoningEffort::parse(trimmed)
-            .ok_or_else(|| format!("unknown reasoning_effort '{trimmed}'"))?)
+        Some(
+            ReasoningEffort::parse(trimmed)
+                .ok_or_else(|| format!("unknown reasoning_effort '{trimmed}'"))?,
+        )
     };
 
     set_thread_effort(ctx, thread_id, requested);
@@ -67,4 +69,3 @@ pub(crate) fn apply_requested_effort(
 pub(crate) fn parse_reasoning_effort(raw: &str) -> Option<ReasoningEffort> {
     ReasoningEffort::parse(raw)
 }
-

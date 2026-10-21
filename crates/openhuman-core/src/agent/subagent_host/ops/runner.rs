@@ -21,8 +21,8 @@ use crate::agent::subagent_host::types::{
     SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
 };
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
-use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::tinyagents::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use tinyagents_definition::{
     validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
     SandboxMode as AgentSandboxMode,

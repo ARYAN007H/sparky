@@ -53,4 +53,3 @@ pub async fn inference_analyze_sentiment(
     }
     result
 }
-
