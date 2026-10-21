@@ -579,8 +579,15 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     )
     .await
     .expect("the configured linked Telegram module prepares");
-    assert!(module_runtime.channels().contains_key("telegram"));
-    assert!(module_runtime.module_objects().contains_key("telegram"));
+    let configured_channels = module_runtime.channels();
+    let configured_module_objects = module_runtime.module_objects();
+    let (configured_key, configured_channel) = configured_channels
+        .iter()
+        .next()
+        .expect("the Telegram config resolves one configured channel handle");
+    let configured_key = configured_key.clone();
+    let configured_channel_name = configured_channel.name().to_owned();
+    assert!(configured_module_objects.contains_key(&configured_key));
 
     let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
     let mut ctx = context(Arc::clone(&channel), channel_config.clone());
@@ -589,10 +596,10 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .message_timeout_secs = timeout;
     Arc::get_mut(&mut ctx)
         .expect("the test still owns the runtime context")
-        .channels_by_name = module_runtime.channels();
+        .channels_by_name = configured_channels;
     Arc::get_mut(&mut ctx)
         .expect("the test still owns the runtime context")
-        .module_objects = module_runtime.module_objects();
+        .module_objects = configured_module_objects;
     context_slot
         .set(Arc::downgrade(&ctx))
         .expect("module callbacks receive the live host context");
@@ -612,13 +619,13 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .inbound_envelope
         .as_ref()
         .and_then(|envelope| envelope.channel.account_id.as_deref());
-    assert_eq!(account_id, Some("telegram"));
+    assert_eq!(account_id, Some(configured_key.as_str()));
     assert_eq!(
         inbound
             .inbound_envelope
             .as_ref()
             .map(|envelope| envelope.channel.id.as_str()),
-        Some("telegram")
+        Some(configured_channel_name.as_str())
     );
 
     let _installed = InstalledResolver::new(resolver);
