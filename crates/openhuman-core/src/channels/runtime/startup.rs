@@ -293,6 +293,22 @@ impl ModuleRuntimeTestGuard {
     ) -> std::sync::Arc<std::collections::HashMap<String, std::sync::Arc<ChannelHandle>>> {
         self.0.channels()
     }
+
+    pub(crate) fn module_objects(
+        &self,
+    ) -> std::sync::Arc<
+        std::collections::HashMap<String, tinybus::module::ModuleObjectClient>,
+    > {
+        self.0.module_objects()
+    }
+
+    pub(crate) async fn start(&mut self, config: &Config) -> Result<()> {
+        self.0.start(config).await
+    }
+
+    pub(crate) async fn close(&mut self) -> Result<()> {
+        self.0.close().await
+    }
 }
 
 /// Prepare a linked TinyChannels runtime for a host policy test.
@@ -301,7 +317,24 @@ pub(crate) async fn prepare_module_runtime_for_test(
     config: std::sync::Arc<Config>,
     dispatch: tokio::sync::mpsc::Sender<crate::channels::runtime::dispatch::RuntimeChannelMessage>,
 ) -> Result<ModuleRuntimeTestGuard> {
-    let context = std::sync::Arc::new(std::sync::OnceLock::new());
+    prepare_module_runtime_for_test_in_context(
+        config,
+        std::sync::Arc::new(std::sync::OnceLock::new()),
+        dispatch,
+    )
+    .await
+}
+
+/// Prepare a linked TinyChannels runtime whose host callbacks resolve a live
+/// runtime context after the caller installs it.
+#[cfg(test)]
+pub(crate) async fn prepare_module_runtime_for_test_in_context(
+    config: std::sync::Arc<Config>,
+    context: std::sync::Arc<
+        std::sync::OnceLock<std::sync::Weak<crate::channels::context::ChannelRuntimeContext>>,
+    >,
+    dispatch: tokio::sync::mpsc::Sender<crate::channels::runtime::dispatch::RuntimeChannelMessage>,
+) -> Result<ModuleRuntimeTestGuard> {
     let runtime = module_providers::ModuleChannelRuntime::prepare(
         &crate::core::runtime::DispatchCtx::host_default(),
         config,
