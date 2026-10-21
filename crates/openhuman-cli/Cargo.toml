@@ -172,6 +172,13 @@ name = "components_e2e"
 path = "../../tests/components_e2e.rs"
 
 [[test]]
+# Boots a signed-in profile through the desktop host's storage migration and
+# reads its historical records through their owning domains.
+name = "storage_legacy_profile_boot_e2e"
+path = "../../tests/storage_legacy_profile_boot_e2e.rs"
+required-features = ["storage-sqlite", "modules", "flows"]
+
+[[test]]
 name = "embedded_server_shutdown_e2e"
 path = "../../tests/embedded_server_shutdown_e2e.rs"
 
