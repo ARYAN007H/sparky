@@ -1,7 +1,6 @@
 #![cfg(feature = "storage-sqlite")]
 
 use super::*;
-use crate::storage::Scope;
 use crate::storage::rusqlite;
 use crate::storage::test_support::{SqliteBackend, sqlite_backend};
 use crate::util::classic_transcript_fixture::write_classic;

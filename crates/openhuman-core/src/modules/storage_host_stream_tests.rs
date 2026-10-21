@@ -2,7 +2,7 @@
 
 use super::*;
 use bytes::Bytes;
-use futures_util::{StreamExt, stream};
+use futures_util::{stream, StreamExt};
 
 fn blob_body(bytes: Vec<u8>) -> BlobReader {
     Box::pin(stream::iter([Ok(Bytes::from(bytes))]))

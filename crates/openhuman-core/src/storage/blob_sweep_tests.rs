@@ -1,8 +1,8 @@
 use super::*;
+use crate::storage::Scope;
 use std::{ops::Range, sync::Arc, time::Duration};
 use tinystoragedrivers_api::{BlobStore, Storage, StorageBackend};
 use tinystoragedrivers_types::{Blob, BlobMeta, Capabilities, Result};
-use crate::storage::Scope;
 
 /// The TSD testkit memory engine uses its real clock; tests wait on the
 /// backend's observable expiry instead of mutating a process-global clock.
