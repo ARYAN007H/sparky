@@ -180,7 +180,7 @@ pub(crate) async fn run_channel_turn_via_graph(
         // Bound the model's per-call output (legacy parity — channel turns ran at
         // the standard per-turn budget).
         max_output_tokens: Some(
-            crate::agent::tinyagents::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS,
+            tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS,
         ),
         // Context middlewares: cache-align + default tool-result byte cap (the
         // channel path has no session context config to source from).

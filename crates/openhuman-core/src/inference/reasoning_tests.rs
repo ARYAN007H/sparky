@@ -245,7 +245,7 @@ fn root_turn_reasoning_reserves_output_room_with_a_budget() {
     let reasoning = turn_reasoning_for(
         &ctx,
         None,
-        Some(crate::agent::tinyagents::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS),
+        Some(tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS),
     );
     set_thread_effort(&crate::core::runtime::DispatchCtx::ambient(), thread, None);
     assert_eq!(

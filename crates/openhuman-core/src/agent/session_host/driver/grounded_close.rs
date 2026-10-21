@@ -15,7 +15,7 @@ use tinytools_agent::dialect::ToolDialect;
 
 use tinyagents_harness::middleware::wrap_harness_instruction;
 
-use crate::agent::tinyagents::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS;
+use tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use crate::agent::{
     session_host::turn_checkpoint::{
         self, build_deterministic_checkpoint, build_deterministic_final_summary_with_cause,
