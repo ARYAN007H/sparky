@@ -9,9 +9,9 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Scope, StorageBackend};
 use tinyagents_harness::observability::{DriverStatusStore, JournalMaintenanceReport};
 use tinyagents_harness::HarnessStatusStore;
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Scope, StorageBackend};
 
 /// How often the sweep wakes.
 pub const SWEEP_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
@@ -95,7 +95,10 @@ async fn maintain_scope(
     let backfill_done = match docs.get(BACKFILL_COLLECTION, &key).await? {
         None => false,
         Some(record) => {
-            let version = record.doc.get("version").and_then(serde_json::Value::as_u64);
+            let version = record
+                .doc
+                .get("version")
+                .and_then(serde_json::Value::as_u64);
             if version != Some(BACKFILL_VERSION) {
                 return Err(crate::storage::StorageError::invalid_input(format!(
                     "invalid journal backfill marker in scope {}",

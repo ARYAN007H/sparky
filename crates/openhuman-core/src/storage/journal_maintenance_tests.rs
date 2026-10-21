@@ -104,7 +104,10 @@ async fn backfill_seals_finished_runs_but_not_active_ones_and_records_itself() {
     let storage = backend.for_scope(&Scope::local()).unwrap();
     let marker = storage
         .documents()
-        .get(BACKFILL_COLLECTION, &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap())
+        .get(
+            BACKFILL_COLLECTION,
+            &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap(),
+        )
         .await
         .unwrap()
         .unwrap();
@@ -128,14 +131,24 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
         .sealed_ms
         .unwrap();
     // Inside the window: kept.
-    let early = maintain_scope(&backend, &Scope::local(), DAY_MS, sealed_at + DAY_MS as i64 / 2)
-        .await
-        .unwrap();
+    let early = maintain_scope(
+        &backend,
+        &Scope::local(),
+        DAY_MS,
+        sealed_at + DAY_MS as i64 / 2,
+    )
+    .await
+    .unwrap();
     assert_eq!(early.deleted, 0);
     // Past one day, the configured retention (not the schema's 30).
-    let late = maintain_scope(&backend, &Scope::local(), DAY_MS, sealed_at + DAY_MS as i64 + 10)
-        .await
-        .unwrap();
+    let late = maintain_scope(
+        &backend,
+        &Scope::local(),
+        DAY_MS,
+        sealed_at + DAY_MS as i64 + 10,
+    )
+    .await
+    .unwrap();
     assert_eq!(late.deleted, 1);
     let storage = backend.for_scope(&Scope::local()).unwrap();
     assert!(storage
@@ -161,9 +174,14 @@ async fn zero_retention_days_keeps_sealed_journals_forever() {
         .unwrap()
         .sealed_ms
         .unwrap();
-    let summary = maintain_scope(&backend, &Scope::local(), 0, sealed_at + 400 * DAY_MS as i64)
-        .await
-        .unwrap();
+    let summary = maintain_scope(
+        &backend,
+        &Scope::local(),
+        0,
+        sealed_at + 400 * DAY_MS as i64,
+    )
+    .await
+    .unwrap();
     assert_eq!(summary.deleted, 0);
     assert!(sealed(&backend, "run.keep").await);
 }

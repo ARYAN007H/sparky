@@ -31,7 +31,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned};
 
@@ -40,13 +40,13 @@ use super::types::{
     NotificationStatus,
 };
 use crate::config::Config;
-use crate::storage::documents::{Repo, compare_and_swap, text, update_or_insert};
+use crate::storage::documents::{compare_and_swap, text, update_or_insert, Repo};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
 #[cfg(feature = "legacy-import")]
 use super::storage_schema::legacy_collections;
 use super::storage_schema::specs;
-pub(super) use super::storage_schema::{CORE, DEDUP, NOTIFICATIONS, SETTINGS, core_id};
+pub(super) use super::storage_schema::{core_id, CORE, DEDUP, NOTIFICATIONS, SETTINGS};
 use crate::storage::schema_support::key_of;
 
 /// The `workspace` key of core notifications in the per-workspace default

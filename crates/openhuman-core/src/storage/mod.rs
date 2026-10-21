@@ -51,12 +51,12 @@ pub mod sessions;
 pub mod state_kv;
 
 pub use scope::{
-    ParsedScope, Principal, Scope, Tenant, scope_for_agent, scope_for_module, scope_for_profile,
-    tenant_scope,
+    scope_for_agent, scope_for_module, scope_for_profile, tenant_scope, ParsedScope, Principal,
+    Scope, Tenant,
 };
 
 use std::future::Future;
-use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock, mpsc};
+use std::sync::{mpsc, Arc, LazyLock, Mutex, OnceLock, RwLock};
 
 /// SQLite bindings re-exported by the storage driver crate, for the two
 /// consumers that open a SQLite file that is not a storage backend: the
@@ -187,8 +187,8 @@ impl Blocking {
     }
 }
 
-use crate::config::Config;
 use crate::config::schema::storage::redact_url;
+use crate::config::Config;
 
 /// The environment variable that overrides `[storage] url`.
 pub const STORAGE_URL_VAR: &str = "OPENHUMAN_STORAGE_URL";

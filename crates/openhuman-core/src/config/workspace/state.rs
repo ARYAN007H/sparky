@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -43,10 +43,9 @@ impl WatcherStateStore {
     pub fn open(db_path: &Path) -> Result<Self> {
         let url = format!("sqlite:{}", db_path.display());
         let config = StorageConfig::parse(&url).context("parse watcher storage URL")?;
-        let backend = crate::storage::block_on(async move {
-            tinystoragedrivers::open(&config).await
-        })
-        .context("open watcher storage backend")?;
+        let backend =
+            crate::storage::block_on(async move { tinystoragedrivers::open(&config).await })
+                .context("open watcher storage backend")?;
         Self::from_backend(backend)
     }
 

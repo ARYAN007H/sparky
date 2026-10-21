@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use chacha20poly1305::aead::{OsRng, rand_core::RngCore};
+use chacha20poly1305::aead::{rand_core::RngCore, OsRng};
 use parking_lot::Mutex;
 
 use crate::security::secret_storage::error::SecretStorageError;
@@ -47,8 +47,8 @@ pub enum MigrationOutcome {
 // belong to this process, not to an agent.
 
 /// The storage-backed secret store for this call, when one is configured.
-fn storage_secrets()
--> Result<Option<tinystoragedrivers::secrets::DocumentSecrets>, SecretStorageError> {
+fn storage_secrets(
+) -> Result<Option<tinystoragedrivers::secrets::DocumentSecrets>, SecretStorageError> {
     crate::storage::secrets::current()
         .map_err(|error| SecretStorageError::Backend(format!("storage secrets: {error}")))
 }

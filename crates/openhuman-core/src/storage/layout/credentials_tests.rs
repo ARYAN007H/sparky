@@ -1,9 +1,9 @@
 use super::*;
 use crate::security::secret_storage::{
-    MasterKeySource, SecretStorageError, clear_master_key_source, install_master_key_source,
+    clear_master_key_source, install_master_key_source, MasterKeySource, SecretStorageError,
 };
-use crate::storage::layout::test_fixtures::{Fixture, v1_profile, write};
-use crate::storage::layout::{Options, Outcome, migrate, restore};
+use crate::storage::layout::test_fixtures::{v1_profile, write, Fixture};
+use crate::storage::layout::{migrate, restore, Options, Outcome};
 use std::sync::Arc;
 use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;

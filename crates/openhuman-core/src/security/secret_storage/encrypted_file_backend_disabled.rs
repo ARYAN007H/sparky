@@ -35,8 +35,8 @@ fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
 #[path = "encrypted_file_backend/key_source.rs"]
 pub mod key_source;
 pub use key_source::{
-    MasterKeySource, clear_master_key_source, install_master_key_source,
-    installed_master_key_source,
+    clear_master_key_source, install_master_key_source, installed_master_key_source,
+    MasterKeySource,
 };
 
 /// There is no encrypted-file initialization in a build without `secret-file`.

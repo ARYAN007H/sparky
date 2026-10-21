@@ -69,20 +69,20 @@ use std::sync::Arc;
 
 use anyhow::Result;
 #[cfg(feature = "legacy-import")]
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 #[cfg(feature = "legacy-import")]
 use sha2::Digest;
 use tinystoragedrivers::CollectionSpec;
 #[cfg(feature = "legacy-import")]
 use tinystoragedrivers::{ErrorKind, Precondition};
 
-use super::StorageBackend;
 #[cfg(feature = "legacy-import")]
 use super::block_on;
 #[cfg(feature = "legacy-import")]
 use super::documents::Repo;
 #[cfg(feature = "legacy-import")]
 use super::rusqlite;
+use super::StorageBackend;
 use crate::config::Config;
 #[cfg(feature = "legacy-import")]
 use rusqlite::Connection;

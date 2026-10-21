@@ -31,9 +31,8 @@ pub(crate) use store_documents::import_source;
 pub mod types;
 
 pub use gate::{
-    APPROVAL_UNANSWERED_PHRASE, ApprovalChatContext, ApprovalError, ApprovalGate,
-    ApprovalTurnContext, FlowRunContext, is_detached_request, is_unanswered_approval_reason,
-    parse_approval_reply,
+    is_detached_request, is_unanswered_approval_reason, parse_approval_reply, ApprovalChatContext,
+    ApprovalError, ApprovalGate, ApprovalTurnContext, FlowRunContext, APPROVAL_UNANSWERED_PHRASE,
 };
 pub use redact::{redact_args, summarize_action};
 pub use schemas::all_controller_schemas as all_approval_controller_schemas;
