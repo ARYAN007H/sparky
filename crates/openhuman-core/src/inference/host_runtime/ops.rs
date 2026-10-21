@@ -13,11 +13,12 @@ mod complete_once;
 mod runtime_ops;
 mod turn_guards;
 
+pub(crate) use agent_chat::agent_chat_for_with_turn_model_source;
 pub use agent_chat::{
-    agent_chat, agent_chat_for, agent_chat_reply_for, agent_chat_simple, AgentChatEnv,
-    AgentChatReply, AgentChatTarget,
+    AgentChatEnv, AgentChatReply, AgentChatTarget, agent_chat, agent_chat_for,
+    agent_chat_reply_for, agent_chat_simple,
 };
-pub use complete_once::{complete_once, CompletionEndpoint};
+pub use complete_once::{CompletionEndpoint, complete_once};
 pub use runtime_ops::{
     local_ai_prompt, local_ai_status, local_ai_summarize, local_ai_transcribe,
     local_ai_transcribe_bytes, local_ai_tts, local_ai_vision_prompt,

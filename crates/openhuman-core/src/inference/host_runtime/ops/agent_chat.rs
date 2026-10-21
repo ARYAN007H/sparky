@@ -316,7 +316,7 @@ fn build_turn_agent(
                         OpenHumanSessionHost::from_config_with_definition(ctx, config, &definition)
                     }
                 },
-                (Some(host), Some(_)) => Err(anyhow::anyhow!(
+                (Some(_), Some(_)) => Err(anyhow::anyhow!(
                     "explicit turn model source cannot be combined with host tools"
                 )),
             }
