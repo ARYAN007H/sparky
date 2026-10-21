@@ -362,7 +362,7 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     );
 
     let registry = ProfileRegistry::cluster(backend.as_ref()).unwrap();
-    let profile = storage::block_on_anyhow(async {
+    let profile = storage::block_on_anyhow(async move {
         registry
             .get(&ProfileId::parse("u1").unwrap())
             .await
