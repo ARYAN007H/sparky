@@ -840,6 +840,7 @@ fn content_block_types(value: &Value) -> Vec<String> {
 
 fn content_has_text_block(value: &Value, expected: &str) -> bool {
     match value {
+        Value::String(text) => text.contains(expected),
         Value::Array(items) => items
             .iter()
             .any(|item| content_has_text_block(item, expected)),
@@ -859,6 +860,7 @@ fn content_has_text_block(value: &Value, expected: &str) -> bool {
 
 fn collect_text_blocks(value: &Value) -> Vec<&str> {
     match value {
+        Value::String(text) => vec![text],
         Value::Array(items) => items.iter().flat_map(collect_text_blocks).collect(),
         Value::Object(fields) => {
             let mut text = Vec::new();
