@@ -1,5 +1,5 @@
 use super::*;
-use crate::storage::{Scope, StorageBackend, test_support::memory_backend};
+use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
 
 fn keys(byte: u8) -> Arc<dyn KeyProvider> {
     Arc::new(DerivedKeys::new(Zeroizing::new([byte; 32])))
@@ -28,7 +28,12 @@ fn a_secret_round_trips_from_sync_code() {
 #[test]
 fn scopes_and_keys_keep_secrets_apart() {
     let storage = memory_backend();
-    set_blocking(&secrets_in(storage.as_ref(), "alice", 7), "user:token", b"a").unwrap();
+    set_blocking(
+        &secrets_in(storage.as_ref(), "alice", 7),
+        "user:token",
+        b"a",
+    )
+    .unwrap();
     assert!(
         get_blocking(&secrets_in(storage.as_ref(), "bob", 7), "user:token")
             .unwrap()
