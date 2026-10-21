@@ -131,6 +131,7 @@ impl ChatModel<()> for CronChildModel {
             }
             if self.child_attempts_dangerous_tool {
                 if call > 0 {
+                    eprintln!("Cron child followup messages: {:?}", request.messages);
                     self.child_dangerous_tool_denied.store(
                         request.messages.iter().any(|message| {
                             message
