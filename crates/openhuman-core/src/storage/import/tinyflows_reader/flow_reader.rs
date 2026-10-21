@@ -11,7 +11,7 @@ use tinyflows_bus::catalog::{
     MAX_IMPORT_RECORD_PAYLOAD_BYTES,
 };
 
-use super::legacy_db::{LegacyDb, column_or};
+use super::legacy_db::{column_or, LegacyDb};
 
 /// Reads legacy flow database rows and draft files as bounded ordered batches.
 ///
@@ -120,9 +120,9 @@ async fn page_rows<T, ToRecord, F, Fut>(
     what: &'static str,
     query: &str,
     decode: impl Fn(&crate::storage::rusqlite::Row<'_>) -> crate::storage::rusqlite::Result<T>
-    + Send
-    + Sync
-    + 'static,
+        + Send
+        + Sync
+        + 'static,
     to_record: ToRecord,
     batches: &mut BatchSender,
     send: &mut F,

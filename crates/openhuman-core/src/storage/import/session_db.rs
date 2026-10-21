@@ -6,9 +6,9 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::de::DeserializeOwned;
-use serde_json::{Map, Number, Value, json};
+use serde_json::{json, Map, Number, Value};
 use tinyagents_session::run_ledger::tool_effects::{ToolEffectRow, ToolEffectStatus};
 use tinyagents_session::run_ledger::{
     AgentRun, AgentTeam, AgentTeamMember, AgentTeamTask, RunEvent, RunTelemetry, WorkflowRun,
@@ -410,9 +410,7 @@ fn decode_value(value: Value, decode: Decode) -> Result<Value> {
     Ok(match decode {
         Decode::Plain => value,
         Decode::JsonOrEmpty => {
-            let raw = value
-                .as_str()
-                .context("legacy JSON column is not text")?;
+            let raw = value.as_str().context("legacy JSON column is not text")?;
             serde_json::from_str(raw).unwrap_or_else(|_| json!({}))
         }
         Decode::OptionalJson => value

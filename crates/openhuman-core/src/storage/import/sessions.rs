@@ -32,15 +32,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use tinyagents_session::DriverSessionStores;
 use tinyagents_session::port::TurnStates;
 use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{
-    CompactionMarker, DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory,
+    session_stem, CompactionMarker, DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory,
     TranscriptLocator, TranscriptMessage, TranscriptMeta, TranscriptPartial, TranscriptTurn,
-    TurnUsage, session_stem,
+    TurnUsage,
 };
 use tinyagents_session::turn_state::TurnState;
+use tinyagents_session::DriverSessionStores;
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
@@ -71,8 +71,10 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
         if !db.is_file() && !raw.is_dir() && !turns.is_dir() {
             return Ok(None);
         }
-        let claimed_backend =
-            super::super::import_state::backend_with_condition(Arc::clone(backend), condition.clone());
+        let claimed_backend = super::super::import_state::backend_with_condition(
+            Arc::clone(backend),
+            condition.clone(),
+        );
         let provider = DriverSessionStores::new(claimed_backend, Scope::local())
             .map_err(|error| anyhow::anyhow!("start the session store bridge: {error}"))?
             .recover_on_open(false);
@@ -411,8 +413,8 @@ fn decode_transcript(
     Option<serde_json::Value>,
     Vec<DisplayRecord>,
 )> {
-    let bytes = std::fs::read(path)
-        .with_context(|| format!("read transcript {}", path.display()))?;
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read transcript {}", path.display()))?;
     let mut meta = None;
     let mut tools = None;
     let mut records = Vec::new();

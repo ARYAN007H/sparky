@@ -1,7 +1,7 @@
 use super::*;
 use crate::storage::{Scope, StorageBackend};
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::Arc;
 use tinystoragedrivers::CollectionSpec;
 use tinystoragedrivers_testkit::MemoryBackend;
 
@@ -187,11 +187,10 @@ fn a_legacy_marker_row_is_honoured_and_removed() {
             .await?
         );
         assert!(!done(&owned, "storage", &step_id("storage_import", "other@x")).await?);
-        assert!(
-            docs.query_all("storage_import", &tinystoragedrivers::Query::all())
-                .await?
-                .is_empty()
-        );
+        assert!(docs
+            .query_all("storage_import", &tinystoragedrivers::Query::all())
+            .await?
+            .is_empty());
         assert_eq!(migrate_legacy_markers(&owned).await?, 0);
         assert!(
             done(
