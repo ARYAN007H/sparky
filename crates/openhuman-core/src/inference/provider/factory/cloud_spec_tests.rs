@@ -1,4 +1,5 @@
 use super::*;
+use tinyinference_llm::providers::openai::codex::OpenAiCodexRouting;
 use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
 
 fn entry(slug: &str, endpoint: &str, auth_style: AuthStyle) -> CloudProviderCreds {
@@ -87,10 +88,12 @@ fn discovery_request_carries_bearer_auth_and_pins_openrouter_sorting() {
         .unwrap()
         .expect("openrouter has a listing");
     assert_eq!(request.endpoint, "https://openrouter.ai/api/v1");
-    assert!(request
-        .headers
-        .iter()
-        .any(|(name, value)| name == "Authorization" && value == "Bearer sk-or"));
+    assert!(
+        request
+            .headers
+            .iter()
+            .any(|(name, value)| name == "Authorization" && value == "Bearer sk-or")
+    );
 }
 
 #[test]
@@ -143,18 +146,24 @@ fn discovery_request_builds_codex_oauth_listing_request() {
         "https://chatgpt.com/backend-api/codex/models?client_version=0.130.0"
     );
     assert_eq!(request.model, "gpt");
-    assert!(request
-        .headers
-        .iter()
-        .any(|(name, value)| name == "Authorization" && value == "Bearer tok"));
-    assert!(request
-        .headers
-        .iter()
-        .any(|(name, value)| name == "ChatGPT-Account-ID" && value == "account-123"));
-    assert!(request
-        .headers
-        .iter()
-        .any(|(name, value)| name == "originator" && value == "codex_cli_rs"));
+    assert!(
+        request
+            .headers
+            .iter()
+            .any(|(name, value)| name == "Authorization" && value == "Bearer tok")
+    );
+    assert!(
+        request
+            .headers
+            .iter()
+            .any(|(name, value)| name == "ChatGPT-Account-ID" && value == "account-123")
+    );
+    assert!(
+        request
+            .headers
+            .iter()
+            .any(|(name, value)| name == "originator" && value == "codex_cli_rs")
+    );
     assert!(request.headers.iter().any(|(name, value)| {
         name == "User-Agent" && value == "codex_cli_rs/0.0.0 (OpenHuman 0.64.18)"
     }));

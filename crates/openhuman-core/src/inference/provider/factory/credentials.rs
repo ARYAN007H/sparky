@@ -75,10 +75,7 @@ pub(crate) fn resolve_codex_routing(
     endpoint: &str,
     bearer_key: &str,
     bearer_is_oauth: bool,
-) -> std::result::Result<
-    tinyinference_llm::providers::openai::codex::OpenAiCodexRouting,
-    String,
-> {
+) -> std::result::Result<tinyinference_llm::providers::openai::codex::OpenAiCodexRouting, String> {
     let credentials = if slug == "openai" {
         match crate::security::credentials::openai_oauth::lookup_openai_oauth_credentials(config) {
             Ok(credentials) => credentials,
@@ -89,7 +86,9 @@ pub(crate) fn resolve_codex_routing(
                 None
             }
             Err(error) => {
-                return Err(format!("[chat-factory] openai oauth lookup failed: {error}"));
+                return Err(format!(
+                    "[chat-factory] openai oauth lookup failed: {error}"
+                ));
             }
         }
     } else {
@@ -217,4 +216,3 @@ pub fn lookup_key_for_slug(slug: &str, config: &Config) -> anyhow::Result<String
     );
     Ok(String::new())
 }
-

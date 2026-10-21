@@ -6,13 +6,13 @@
 use super::super::factory::resolve_codex_routing;
 use super::local_runtime::synthesize_local_runtime_entry;
 use tinyinference_llm::catalog::{
-    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider, list_models,
-    merge_openai_codex_model_hints, validate_openrouter_key, ModelInfo,
+    ModelInfo, append_query_param, endpoint_hosts_models_listing, is_openrouter_provider,
+    list_models, merge_openai_codex_model_hints, validate_openrouter_key,
 };
 use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::providers::openai::codex::{
-    openai_codex_client_version, openai_codex_user_agent, OpenAiCodexRouting,
     OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
+    OpenAiCodexRouting, openai_codex_client_version, openai_codex_user_agent,
 };
 
 /// Resolve the API key used to probe a provider's `/models` endpoint.

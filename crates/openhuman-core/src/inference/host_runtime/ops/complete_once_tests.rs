@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ResponseFormat;
 use tinyinference_llm::tool::ToolSchema;
@@ -107,9 +107,7 @@ async fn preserves_configured_endpoint_path_on_the_wire() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/private-path-segment/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(completion_body("ok", "stop")),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(completion_body("ok", "stop")))
         .mount(&server)
         .await;
     let endpoint = CompletionEndpoint {
@@ -123,7 +121,10 @@ async fn preserves_configured_endpoint_path_on_the_wire() {
 
     let requests = server.received_requests().await.unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].url.path(), "/private-path-segment/v1/chat/completions");
+    assert_eq!(
+        requests[0].url.path(),
+        "/private-path-segment/v1/chat/completions"
+    );
 }
 
 #[test]

@@ -83,16 +83,15 @@ pub(crate) fn model_limits_request_for(
     if resolution.entry.auth_style == AuthStyle::OpenhumanJwt {
         return None;
     }
-    let spec = super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model);
+    let spec =
+        super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model);
     let options = ProviderBuildOptions {
         auth_style: Some(resolution.entry.auth_style.into()),
         codex: Some(&resolution.codex),
         ..ProviderBuildOptions::default()
     };
-    match ProviderRegistry::new(super::cloud_spec::CloudCredentialResolver(
-        &resolution.key,
-    ))
-    .discovery_request(&spec, &options)
+    match ProviderRegistry::new(super::cloud_spec::CloudCredentialResolver(&resolution.key))
+        .discovery_request(&spec, &options)
     {
         Ok(request) => request,
         Err(error) => {
