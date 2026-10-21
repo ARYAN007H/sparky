@@ -31,7 +31,7 @@ fn model_fixture_entry() -> ChatModelEntry<ProviderContext> {
             let model = request
                 .model_override
                 .or(request.default_model)
-                .or(request.context.config.config.default_model.as_deref())
+                .or(request.context.config.default_model.as_deref())
                 .unwrap_or("test/session-fixture");
             Ok((Arc::new(SessionFixtureModel), model.to_string()))
         }),

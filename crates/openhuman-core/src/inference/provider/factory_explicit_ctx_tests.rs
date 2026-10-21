@@ -134,7 +134,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        register_catalog_in, CatalogEntry, CatalogRequest, ChatModelEntry, ProviderContext, ProviderModelMetadata,
+        register_catalog_in, CatalogEntry, ChatModelEntry, ProviderContext, ProviderModelMetadata,
     };
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
