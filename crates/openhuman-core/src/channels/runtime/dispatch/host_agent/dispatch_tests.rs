@@ -292,6 +292,20 @@ async fn provider() -> MockServer {
     server
 }
 
+async fn delayed_provider(delay: std::time::Duration) -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(answer("this response arrives after the channel deadline"))
+                .set_delay(delay),
+        )
+        .mount(&server)
+        .await;
+    server
+}
+
 /// An agent turn is a deep future; run it the way hosts do, on workers with
 /// the documented stack.
 fn on_agent_runtime(test: impl std::future::Future<Output = ()> + Send + 'static) {
@@ -401,4 +415,75 @@ async fn bound_channel_runs_its_host_agent() {
         ),
         "the read-only tool ran under the channel's origin: {origins:?}"
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
+    let _slot = host_agents::tests::lock();
+    let _bus = crate::agent::bus::use_real_agent_handler().await;
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
+    let timeout = tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
+    let server = delayed_provider(std::time::Duration::from_secs(timeout + 1)).await;
+    let tmp = tempfile::tempdir().unwrap();
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .unwrap();
+    let mut agent_config = config(&tmp, None);
+    agent_config.default_model = Some("fixture".into());
+    let route = crate::config::schema::EphemeralRoute::from_params(
+        Some(format!("{}/v1", server.uri())),
+        Some("sk-fixture".into()),
+    )
+    .unwrap();
+    crate::config::schema::ephemeral_route::apply(&mut agent_config, route);
+    let resolver: Arc<dyn HostAgentResolver> = Arc::new(OneHostAgent {
+        config: agent_config,
+        reads: Arc::new(AtomicUsize::new(0)),
+        writes: Arc::new(AtomicUsize::new(0)),
+        origins: Arc::new(Mutex::new(Vec::new())),
+    });
+    let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
+    let mut ctx = context(Arc::clone(&channel), config(&tmp, Some("teeny-chat")));
+    Arc::get_mut(&mut ctx)
+        .expect("the test owns the runtime context")
+        .message_timeout_secs = timeout;
+
+    host_agents::install(Arc::clone(&resolver));
+    let turn = tokio::spawn(process_channel_message(ctx, message("slow native turn")));
+    let mut requests = Vec::new();
+    for _ in 0..1_000 {
+        requests = server.received_requests().await.unwrap();
+        if requests
+            .iter()
+            .any(|request| request.url.path().ends_with("/chat/completions"))
+        {
+            break;
+        }
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        requests
+            .iter()
+            .any(|request| request.url.path().ends_with("/chat/completions")),
+        "the real SessionHost model request reached the delayed provider"
+    );
+
+    tokio::time::advance(std::time::Duration::from_secs(timeout)).await;
+    turn.await.expect("native channel turn task completes");
+    let sent = channel.sent.lock().unwrap().clone();
+    assert_eq!(sent.len(), 1, "the timed-out turn emits one terminal reply");
+    assert!(
+        sent[0].content.contains("time budget")
+            || sent[0].content.contains("time limit"),
+        "the response is the classified timeout notice: {sent:#?}"
+    );
+
+    tokio::time::advance(std::time::Duration::from_secs(2)).await;
+    tokio::task::yield_now().await;
+    assert_eq!(
+        channel.sent.lock().unwrap().len(),
+        1,
+        "the delayed model response cannot deliver after timeout cleanup"
+    );
+    host_agents::clear_if(&resolver);
 }
