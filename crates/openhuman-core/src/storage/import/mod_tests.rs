@@ -248,8 +248,8 @@ fn a_marker_row_an_older_build_wrote_counts_as_a_finished_import() {
 }
 
 #[cfg(feature = "storage-sqlite")]
-#[test]
-fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrection() {
+#[tokio::test(flavor = "multi_thread")]
+async fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrection() {
     use crate::profiles::{ProfileId, ProfileRegistry};
     use crate::storage::layout::{Target, legacy};
     use crate::storage::{self, Scope, scope_for_profile};
@@ -283,20 +283,15 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     // must copy the already-existing v1 profile database into the profile's
     // actual v2 `storage.db`; importing the fixture into an unrelated test
     // destination would not prove what a subsequent boot opens.
-    let migration_target = target.clone();
-    let migration_config = config.clone();
-    let migration = storage::block_on_anyhow(async move {
-        crate::storage::layout::migrate(
-            &migration_target,
-            &migration_config,
-            &crate::storage::layout::Options {
-                allow_live: true,
-                ..Default::default()
-            },
-        )
-        .await
-        .map_err(anyhow::Error::msg)
-    })
+    let migration = crate::storage::layout::migrate(
+        &target,
+        &config,
+        &crate::storage::layout::Options {
+            allow_live: true,
+            ..Default::default()
+        },
+    )
+    .await
     .unwrap();
     assert!(matches!(migration, crate::storage::layout::Outcome::Migrated(_)));
     assert!(target.storage_db().is_file(), "profile storage.db is bootable");
