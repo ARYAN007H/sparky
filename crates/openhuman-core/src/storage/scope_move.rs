@@ -15,6 +15,7 @@
 //! unsupported fidelity cases fail explicitly.
 
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -24,9 +25,7 @@ use tinystoragedrivers_types::{Capability, CollectionSpec, ErrorKind, WriteOptio
 
 use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
 use crate::storage::import::Record;
-use crate::storage::{
-    DocumentStore, DocumentStoreExt, Precondition, Scope, StorageBackend, StorageError,
-};
+use crate::storage::{Precondition, Scope, StorageBackend, StorageError};
 
 /// The ids a hashed v1 scope can be matched against.
 #[derive(Debug, Default, Clone)]

@@ -7,10 +7,14 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use tinystoragedrivers_types::QueueSpec;
 
-/// A validated version-1 queue manifest supplied by the host.
+/// An opaque, validated version-1 queue manifest supplied by the host.
+///
+/// This type is public because it appears in the public `StorageGrant` and
+/// inbound settings contracts. Its contents remain host-managed; construct it
+/// through [`QueueManifest::from_json`] so validation cannot be bypassed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct QueueManifest {
+pub struct QueueManifest {
     #[serde(default, rename = "$schema", skip_serializing_if = "Option::is_none")]
     schema: Option<String>,
     version: u32,
@@ -20,18 +24,18 @@ pub(crate) struct QueueManifest {
 /// Host policy for one queue.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct QueueDeclaration {
-    pub(crate) name: String,
+pub struct QueueDeclaration {
+    pub name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub(crate) description: String,
+    pub description: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) owner: Option<String>,
+    pub owner: Option<String>,
     #[serde(default = "default_max_attempts")]
-    pub(crate) max_attempts: u32,
+    pub max_attempts: u32,
     #[serde(default)]
-    pub(crate) dedupe_window_ms: u64,
+    pub dedupe_window_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) visibility_ms: Option<u64>,
+    pub visibility_ms: Option<u64>,
 }
 
 fn default_max_attempts() -> u32 {
@@ -40,7 +44,7 @@ fn default_max_attempts() -> u32 {
 
 impl QueueDeclaration {
     /// The storage-port queue behavior declared by this host policy.
-    pub(crate) fn spec(&self) -> QueueSpec {
+    pub fn spec(&self) -> QueueSpec {
         QueueSpec {
             max_attempts: self.max_attempts,
             dedupe_window_ms: self.dedupe_window_ms,
@@ -50,7 +54,7 @@ impl QueueDeclaration {
 
 impl QueueManifest {
     /// Parse and validate a manifest. Unknown fields and names fail closed.
-    pub(crate) fn from_json(text: &str) -> Result<Self, String> {
+    pub fn from_json(text: &str) -> Result<Self, String> {
         let mut manifest: Self = serde_json::from_str(text).map_err(|error| error.to_string())?;
         manifest.validate()?;
         manifest
@@ -60,7 +64,7 @@ impl QueueManifest {
     }
 
     /// Validate a value assembled by host code.
-    pub(crate) fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), String> {
         if self.version != 1 {
             return Err(format!(
                 "unsupported queue manifest version {}",
@@ -100,12 +104,12 @@ impl QueueManifest {
     }
 
     /// Look up a declaration by exact queue name.
-    pub(crate) fn get(&self, name: &str) -> Option<&QueueDeclaration> {
+    pub fn get(&self, name: &str) -> Option<&QueueDeclaration> {
         self.queues.iter().find(|queue| queue.name == name)
     }
 
     /// Declarations for one-time host setup.
-    pub(crate) fn queues(&self) -> &[QueueDeclaration] {
+    pub fn queues(&self) -> &[QueueDeclaration] {
         &self.queues
     }
 }
