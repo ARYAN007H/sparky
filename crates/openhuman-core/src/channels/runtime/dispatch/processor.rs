@@ -21,6 +21,9 @@ pub(crate) mod progressive;
 mod reset;
 mod turn;
 
+#[cfg(test)]
+pub(crate) use native_media::drop_media_read_lease_for_test;
+
 use crate::channels::context::ChannelRuntimeContext;
 use std::sync::Arc;
 use tinychannels_bus::{ChannelInboundEnvelope, ChannelMessage};

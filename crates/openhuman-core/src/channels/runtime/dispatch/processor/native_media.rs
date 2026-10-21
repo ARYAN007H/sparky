@@ -444,5 +444,14 @@ impl Drop for MediaReadLease {
 }
 
 #[cfg(test)]
+pub(crate) fn drop_media_read_lease_for_test(
+    client: ModuleClient,
+    dispatch: DispatchCtx,
+    handle: tinychannels_bus::MediaReadHandle,
+) {
+    drop(MediaReadLease::new(client, dispatch, handle));
+}
+
+#[cfg(test)]
 #[path = "native_media_tests.rs"]
 mod tests;
