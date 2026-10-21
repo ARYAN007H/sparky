@@ -93,6 +93,21 @@ pub(crate) async fn process_channel_runtime_message(
     let history_key = prepared.history_key;
     let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
+    tracing::debug!(
+        provider_matches_account = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .is_some_and(|account| tinychannels_bus::provider_id(account) == envelope.channel.id),
+        account_present = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .is_some_and(|account| !account.trim().is_empty()),
+        conversation_present = !envelope.conversation.id.trim().is_empty(),
+        message_present = !envelope.message_id.trim().is_empty(),
+        "prepared inbound scope for native channel turn"
+    );
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
         channel: envelope.channel.clone(),
