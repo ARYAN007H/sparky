@@ -40,6 +40,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     struct FlowChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize,
         child_calls: std::sync::atomic::AtomicUsize,
+        child_schema_names: std::sync::Mutex<Vec<Vec<String>>>,
         grandchild_calls: std::sync::atomic::AtomicUsize,
         nested_spawn_calls: std::sync::atomic::AtomicUsize,
         accepted_followups: std::sync::atomic::AtomicUsize,
@@ -82,6 +83,13 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
                 .iter()
                 .any(|message| message.text().contains(CHILD_PROMPT))
             {
+                self.child_schema_names.lock().unwrap().push(
+                    request
+                        .tools
+                        .iter()
+                        .map(|tool| tool.name.clone())
+                        .collect(),
+                );
                 let call = self
                     .child_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -148,6 +156,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     let model = std::sync::Arc::new(FlowChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
+        child_schema_names: std::sync::Mutex::new(Vec::new()),
         grandchild_calls: std::sync::atomic::AtomicUsize::new(0),
         nested_spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
@@ -207,6 +216,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
     let jobs_core = std::sync::Arc::clone(&core);
+    let core_for_journal = std::sync::Arc::clone(&core);
     let run = tokio::spawn(async move {
         crate::core::runtime::CoreContext::scope(
             core,
@@ -237,6 +247,44 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&crate::core::runtime::DispatchCtx::new(jobs_core))
     .list();
+
+    let child_runs = snapshots
+        .iter()
+        .filter(|job| job.agent == "flow_worker")
+        .map(|job| (job.status.clone(), job.subagent_run_id.clone()))
+        .collect::<Vec<_>>();
+    let diagnostic_dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(
+        &core_for_journal,
+    ));
+    let mut unknown_spawn_events = Vec::new();
+    for run_id in child_runs.iter().filter_map(|(_, run_id)| run_id.as_deref()) {
+        let events = crate::agent::tinyagents::journal::read_run_events(
+            &diagnostic_dispatch,
+            run_id,
+            0,
+        )
+        .await
+        .expect("read worker journal for the nested-spawn diagnostic");
+        unknown_spawn_events.extend(events.iter().filter_map(|observation| {
+            match &observation.event {
+                tinyagents_harness::events::AgentEvent::UnknownToolCall {
+                    requested_name,
+                    recovery,
+                    ..
+                } if requested_name == "spawn_subagent" => Some(recovery.clone()),
+                _ => None,
+            }
+        }));
+    }
+    eprintln!(
+        "NESTED_FLOW_DIAGNOSTIC child_calls={} child_spawn_schema_per_call={:?} nested_spawn_calls={} grandchild_calls={} worker_jobs={:?} unknown_spawn_recovery={:?}",
+        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model.child_schema_names.lock().unwrap(),
+        model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+        model.grandchild_calls.load(std::sync::atomic::Ordering::SeqCst),
+        child_runs,
+        unknown_spawn_events,
+    );
 
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
