@@ -359,6 +359,18 @@ pub const PACKS: &[ToolPack] = &[
     },
 ];
 
+/// Pack families that a directly callable `spawn_subagent` owner replaces for
+/// this host. This is separate from `ToolPack::owners`: a pack may give an
+/// agent a few auxiliary tools without making that agent the route for the
+/// whole family (for example, media specialists own image helpers in the
+/// coding pack, but the Master Agent still owns ordinary coding work).
+pub const DIRECT_HANDOFF_PACK_OWNERS: &[(&str, &[&str])] = &[
+    ("workflows", &["workflow_builder", "flow_discovery"]),
+    ("skills", &["skill_setup"]),
+    ("documents", &["presentation_agent"]),
+    ("media", &["image_agent", "video_agent", "vision_agent"]),
+];
+
 /// The lookup surface over [`PACKS`] handed to the generic `use_skill` tool
 /// (`tinyagents_harness_tools::skills`). `NOT_FOUND_MARKER` is the host's status
 /// vocabulary, so a "no such skill / tool" result classifies as `NotFound`.

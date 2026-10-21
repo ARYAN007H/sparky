@@ -247,8 +247,9 @@ async fn a_use_skill_denial_names_a_delegate_this_session_can_call() {
         "the denial itself must survive: {message}"
     );
     assert!(
-        message.contains("Call `spawn_subagent` instead"),
-        "the denial must name the callable owner hand-off: {message}"
+        message.contains("Call `spawn_subagent` to delegate")
+            && message.contains("owned by `workflow_builder`"),
+        "the denial must name the callable spawn tool and owning specialist: {message}"
     );
 }
 
@@ -405,7 +406,7 @@ async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
     let pack = crate::tools::toolpacks::pack("workflows").expect("workflows pack");
     let route = mw.route_for_pack(pack);
     assert!(
-        !route.contains("Call `spawn_subagent`"),
+        !route.contains("Call `spawn_subagent` to delegate"),
         "a prompt-hidden delegate must not be advertised as a direct call: {route}"
     );
     assert!(

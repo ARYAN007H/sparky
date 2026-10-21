@@ -143,9 +143,11 @@ pub fn is_withheld_from(agent_id: &str, tool: &str) -> bool {
 /// guessed at tool names, and never handed off. Closing the raw tools leaves the
 /// hand-off as the route, and the pack listing then names it (`route_sentence`).
 ///
-/// Close tools owned by specialists that this agent can reach through its
+/// Close packs whose task family this agent can reach through its
 /// `spawn_subagent` schema. The schema's agent-id enum is the same allowlist
-/// enforced during execution, so this keeps a single route to each capability.
+/// enforced during execution. The host's explicit closure-owner table is used
+/// instead of every `ToolPack::owners` entry because some agents own only
+/// auxiliary tools in a broader pack.
 pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'static str> {
     let reachable_owners: HashSet<String> = tools
         .iter()
@@ -170,9 +172,14 @@ pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'st
         .iter()
         .filter(|pack| !pack.is_owner(agent_id))
         .filter(|pack| {
-            pack.owners
+            registry::DIRECT_HANDOFF_PACK_OWNERS
                 .iter()
-                .any(|owner| reachable_owners.contains(*owner))
+                .find(|(pack_id, _)| *pack_id == pack.id)
+                .is_some_and(|(_, owners)| {
+                    owners
+                        .iter()
+                        .any(|owner| reachable_owners.contains(*owner))
+                })
         })
         .flat_map(|pack| pack.tools.iter().copied())
         .filter(|name| groups.mode_for_tool(name) == super::groups::GroupMode::Withheld)

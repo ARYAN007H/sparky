@@ -162,5 +162,9 @@ fn a_repaused_subagent_gets_the_same_injection_safe_envelope() {
             env.contains("This resumes the existing child"),
             "every pause envelope must resume the existing child (checkpointed={checkpointed}): {env}"
         );
+        assert!(
+            env.contains("do not choose a new task_key"),
+            "every pause envelope must keep the original task key (checkpointed={checkpointed}): {env}"
+        );
     }
 }

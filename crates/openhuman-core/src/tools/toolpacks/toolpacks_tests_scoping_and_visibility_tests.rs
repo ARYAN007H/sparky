@@ -334,11 +334,19 @@ fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
     let raw = registry_with_all(&[
         "skill_registry_install",
         "media_generate_image",
+        "propose_workflow",
+        "generate_presentation",
+        "edit",
         "wallet_status",
     ]);
     let spawn = crate::agent::orchestration::tools::SpawnSubagentTool::scoped(vec![
         "skill_setup".to_string(),
         "image_agent".to_string(),
+        "video_agent".to_string(),
+        "vision_agent".to_string(),
+        "workflow_builder".to_string(),
+        "flow_discovery".to_string(),
+        "presentation_agent".to_string(),
     ]);
     let tools: Vec<&dyn tinytools::Tool> = raw
         .iter()
@@ -346,8 +354,25 @@ fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
         .chain(std::iter::once(&spawn as &dyn tinytools::Tool))
         .collect();
 
-    let closed = closed_by_direct_handoff("orchestrator", &tools);
+    let core = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        None,
+    )
+    .derive_with(crate::core::runtime::ContextOverlay::new(
+        crate::config::Config::default(),
+        crate::core::runtime::DomainSet::full(),
+        super::super::ToolGroups::packed(),
+    ));
+    let closed = crate::core::runtime::CoreContext::sync_scope(core, || {
+        closed_by_direct_handoff("orchestrator", &tools)
+    });
     assert!(closed.contains(&"skill_registry_install"), "{closed:?}");
     assert!(closed.contains(&"media_generate_image"), "{closed:?}");
+    assert!(closed.contains(&"propose_workflow"), "{closed:?}");
+    assert!(closed.contains(&"generate_presentation"), "{closed:?}");
+    assert!(
+        !closed.contains(&"edit"),
+        "auxiliary coding-pack owners must not close the Master Agent's coding family: {closed:?}"
+    );
     assert!(!closed.contains(&"wallet_status"), "{closed:?}");
 }
