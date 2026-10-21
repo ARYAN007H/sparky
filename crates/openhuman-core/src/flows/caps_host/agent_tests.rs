@@ -625,6 +625,18 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
                 .map(|job| (&job.agent, job.status))
                 .collect::<Vec<_>>(),
         );
+        if run.is_finished() {
+            match run.await {
+                Ok(Ok(output)) => eprintln!(
+                    "DEPTH_CAP_ROOT_OUTCOME success output_len={} has_worker_acceptance={}",
+                    output.len(),
+                    output.contains("Accepted async sub-agent `depth_worker`")
+                ),
+                Ok(Err(error)) => eprintln!("DEPTH_CAP_ROOT_OUTCOME error={error:#}"),
+                Err(error) => eprintln!("DEPTH_CAP_ROOT_OUTCOME join_error={error}"),
+            }
+        }
+        panic!("the child reaches the scripted model within the bounded setup window");
     }
     child_started
         .expect("the child reaches the scripted model")
