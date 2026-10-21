@@ -225,7 +225,7 @@ impl DocumentTool {
         &self,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
-        ctx: &crate::core::runtime::DispatchCtx,
+        _ctx: &crate::core::runtime::DispatchCtx,
     ) -> anyhow::Result<ToolResult> {
         // The document wire contract is `deny_unknown_fields`, so the optional
         // `artifact_id` is read here (and stripped from the args before
