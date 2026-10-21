@@ -428,7 +428,11 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
         .iter()
         .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
         .unwrap();
-    assert_eq!(moved.outcome.as_ref().unwrap(), &Outcome::AlreadyDone);
+    assert_eq!(
+        moved.outcome.as_ref().unwrap(),
+        &Outcome::NoSource,
+        "a later boot must not replay the removed v1 database: {moved:?}"
+    );
     let docs = Arc::clone(
         backend
             .for_scope(&Scope::local())
