@@ -467,10 +467,11 @@ fn create_chat_model_routes_anthropic_auth_cloud_slug_to_crate_native() {
 #[test]
 fn anthropic_auth_cloud_slug_in_text_mode_keeps_the_compat_client() {
     let _guard = crate::inference::inference_test_guard();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(anthropic_entry("p_anth", "anthropic"));
+    store_fixture_cloud_key(&config, "anthropic");
     let (model, model_id) = try_create_cloud_slug_chat_model_from_string_with_native_tools(
         "chat",
         "anthropic:claude-sonnet-4-6",
@@ -493,7 +494,7 @@ fn anthropic_auth_cloud_slug_in_text_mode_keeps_the_compat_client() {
 fn configured_openhuman_jwt_slug_routes_to_managed_chat_model() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -529,7 +530,7 @@ async fn openhuman_jwt_slug_discloses_pinned_model() {
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
     let marker = "egress-jwt-pinned-marker-v1";
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -668,7 +669,7 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
 fn openhuman_jwt_slug_preserves_forced_text_mode() {
     let _guard = crate::inference::inference_test_guard();
     let native_modes = install_test_managed_provider();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -693,7 +694,7 @@ fn openhuman_jwt_slug_preserves_forced_text_mode() {
 fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(fixture_managed_entry("p_fixture"));
@@ -718,9 +719,10 @@ fn try_create_cloud_slug_flips_openai_but_declines_non_cloud() {
     let _guard = crate::inference::inference_test_guard();
     // `openai` (API-key Bearer, no codex OAuth) now flips crate-native on Chat
     // Completions — the legacy `/v1/responses` fallback is not replicated.
-    let mut openai = Config::default();
+    let (_tmp, mut openai) = isolated_config();
     openai.cloud_providers.push(openai_entry("p_oai", "openai"));
     openai.chat_provider = Some("openai:gpt-4o-mini".to_string());
+    store_fixture_cloud_key(&openai, "openai");
     let (model, model_id) =
         try_create_cloud_slug_chat_model("chat", &openai, &EgressLedger::none())
             .expect("openai should flip crate-native")
