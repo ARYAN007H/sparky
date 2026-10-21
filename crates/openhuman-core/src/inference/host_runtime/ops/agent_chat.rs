@@ -273,6 +273,7 @@ fn build_turn_agent(
     target: &AgentChatTarget<'_>,
     session_id: Option<&str>,
     temperature: Option<f64>,
+    turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
 ) -> Result<OpenHumanSessionHost, String> {
     match target {
         AgentChatTarget::Orchestrator => OpenHumanSessionHost::from_config(ctx, config),
@@ -293,7 +294,13 @@ fn build_turn_agent(
             definition, host, ..
         } => {
             let definition = definition_for_turn(definition, temperature);
-            match host {
+            match (host, turn_model_source) {
+                (None, Some((source, model))) => {
+                    OpenHumanSessionHost::from_config_with_definition_and_turn_model_source(
+                        ctx, config, &definition, source, model,
+                    )
+                }
+                (host, None) => match host {
                 Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
                     ctx,
                     config,
@@ -302,6 +309,10 @@ fn build_turn_agent(
                     session_id,
                 ),
                 None => OpenHumanSessionHost::from_config_with_definition(ctx, config, &definition),
+                },
+                (Some(host), Some(_)) => Err(anyhow::anyhow!(
+                    "explicit turn model source cannot be combined with host tools"
+                )),
             }
         }
     }
@@ -337,6 +348,24 @@ pub fn agent_chat_for<'a>(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> futures::future::BoxFuture<'a, Result<Outcome<String>, String>> {
+    agent_chat_for_with_turn_model_source(
+        config, target, message, model_override, temperature, thread_id, cwd, route, env, None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn agent_chat_for_with_turn_model_source<'a>(
+    config: &'a mut Config,
+    target: AgentChatTarget<'a>,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    thread_id: Option<String>,
+    cwd: Option<String>,
+    route: Option<crate::config::schema::EphemeralRoute>,
+    env: AgentChatEnv,
+    turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
+) -> futures::future::BoxFuture<'a, Result<Outcome<String>, String>> {
     Box::pin(agent_chat_for_inner(
         config,
         target,
@@ -347,6 +376,7 @@ pub fn agent_chat_for<'a>(
         cwd,
         route,
         env,
+        turn_model_source,
     ))
 }
 
@@ -361,8 +391,9 @@ async fn agent_chat_for_inner(
     cwd: Option<String>,
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
+    turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
 ) -> Result<Outcome<String>, String> {
-    agent_chat_reply_for(
+    agent_chat_reply_for_inner(
         config,
         target,
         message,
@@ -372,6 +403,7 @@ async fn agent_chat_for_inner(
         cwd,
         route,
         env,
+        turn_model_source,
     )
     .await
     .map(AgentChatReply::into_outcome)
@@ -390,6 +422,25 @@ pub async fn agent_chat_reply_for(
     cwd: Option<String>,
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
+) -> Result<AgentChatReply, String> {
+    agent_chat_reply_for_inner(
+        config, target, message, model_override, temperature, thread_id, cwd, route, env, None,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn agent_chat_reply_for_inner(
+    config: &mut Config,
+    target: AgentChatTarget<'_>,
+    message: &str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    thread_id: Option<String>,
+    cwd: Option<String>,
+    route: Option<crate::config::schema::EphemeralRoute>,
+    env: AgentChatEnv,
+    turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
 ) -> Result<AgentChatReply, String> {
     match target {
         AgentChatTarget::Definition {
@@ -450,14 +501,14 @@ pub async fn agent_chat_reply_for(
                 root.display()
             );
             let mut agent =
-                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)?;
+                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature, turn_model_source.clone())?;
             // Also thread it as the turn's workspace descriptor so acting tools
             // that read `ToolExecutionContext::workspace` (shell) resolve their
             // default cwd here, and so spawned sub-agents inherit the same root.
             agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(root.clone())));
             agent
         }
-        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature)?,
+        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature, turn_model_source)?,
     };
     // Thread-correct resume. `OpenHumanSessionHost::turn` would otherwise auto-load the
     // newest transcript for the agent *name*, which is another thread's

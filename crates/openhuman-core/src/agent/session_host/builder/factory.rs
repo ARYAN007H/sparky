@@ -141,6 +141,22 @@ impl OpenHumanSessionHost {
         host: Option<&super::HostTools>,
         session_id: Option<&str>,
     ) -> Result<Self> {
+        Self::build_session_agent_inner_with_turn_model_source(
+            ctx, config, agent_id, target_def, host_only, host, session_id, None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn build_session_agent_inner_with_turn_model_source(
+        ctx: &DispatchCtx,
+        config: &Config,
+        agent_id: &str,
+        target_def: Option<&crate::agent_registry::host_definition::AgentDefinition>,
+        host_only: bool,
+        host: Option<&super::HostTools>,
+        session_id: Option<&str>,
+        turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
+    ) -> Result<Self> {
         let workspace_descriptor: Option<tinytools::WorkspaceDescriptor> = None;
 
         let runtime: Arc<dyn host_runtime::RuntimeAdapter> = Arc::from(
@@ -251,16 +267,30 @@ impl OpenHumanSessionHost {
         // double-retry every transient error. Cross-route fallback is likewise
         // the crate registry `FallbackPolicy`, so `config.reliability.*` no longer
         // layers on the turn path (it still governs the non-seam provider paths).
-        let (resolved_chat_model, mut model_name) =
-            crate::inference::provider::create_chat_model_with_model_id_in(
-                ctx,
-                provider_role,
-                config,
-                config.default_temperature,
-            )?;
-        let supports_native = resolved_chat_model
-            .profile()
-            .is_none_or(|profile| profile.tool_calling);
+        let (mut model_name, supports_native) = match &turn_model_source {
+            Some((source, model_name)) => {
+                let models = source.build(
+                    model_name,
+                    target_def.map_or(config.default_temperature, |definition| definition.temperature),
+                    None,
+                    None,
+                )?;
+                (model_name.clone(), models.native_tools())
+            }
+            None => {
+                let (resolved_chat_model, model_name) =
+                    crate::inference::provider::create_chat_model_with_model_id_in(
+                        ctx,
+                        provider_role,
+                        config,
+                        config.default_temperature,
+                    )?;
+                let supports_native = resolved_chat_model
+                    .profile()
+                    .is_none_or(|profile| profile.tool_calling);
+                (model_name, supports_native)
+            }
+        };
         log::info!(
             "[session-builder] agent_id={} provider_role={} resolved_model={} supports_native_tools={}",
             agent_id,
@@ -770,7 +800,6 @@ impl OpenHumanSessionHost {
             super::host_only::session_policy(host_only, &tools, merged_host_tools.policy);
         let withheld_tool_names = merged_host_tools.withheld;
         let mut builder = OpenHumanSessionHost::builder()
-            .crate_native_provider(ctx, provider_role, Arc::clone(&base_config))
             .tools(tools)
             .synthesized_tools(delegation_tools)
             .visible_tool_names(visible)
@@ -792,6 +821,10 @@ impl OpenHumanSessionHost {
             .agent_definition_name(agent_id.to_string())
             .omit_memory_context(effective_omit_memory_context)
             .tokenjuice_compression(effective_tokenjuice_compression);
+        builder = match turn_model_source {
+            Some((source, _)) => builder.turn_model_source(source),
+            None => builder.crate_native_provider(ctx, provider_role, Arc::clone(&base_config)),
+        };
         if let Some(ps) = payload_summarizer {
             builder = builder.payload_summarizer(ps);
         }

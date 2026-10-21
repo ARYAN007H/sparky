@@ -442,4 +442,23 @@ impl OpenHumanSessionHost {
             None,
         )
     }
+
+    pub(crate) fn from_config_with_definition_and_turn_model_source(
+        ctx: &crate::core::runtime::DispatchCtx,
+        config: &Config,
+        definition: &crate::agent_registry::host_definition::AgentDefinition,
+        source: crate::agent::tinyagents::TurnModelSource,
+        model: String,
+    ) -> Result<Self> {
+        OpenHumanSessionHost::build_session_agent_inner_with_turn_model_source(
+            ctx,
+            config,
+            &definition.id,
+            Some(definition),
+            false,
+            None,
+            None,
+            Some((source, model)),
+        )
+    }
 }
