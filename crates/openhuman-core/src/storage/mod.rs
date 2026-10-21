@@ -49,7 +49,10 @@ pub mod secrets;
 pub mod sessions;
 pub mod state_kv;
 
-pub use scope::{scope_for_agent, scope_for_module, scope_for_profile, tenant_scope};
+pub use scope::{
+    scope_for_agent, scope_for_module, scope_for_profile, tenant_scope, ParsedScope, Principal,
+    Scope, Tenant,
+};
 
 use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
@@ -67,7 +70,7 @@ use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
 /// consumers are still present, so it stays.
 pub use tinystoragedrivers::sqlite::rusqlite;
 pub use tinystoragedrivers::{
-    Blocking, CollectionSpec, DocumentStore, DocumentStoreExt, MemoryStorage, Precondition, Scope,
+    Blocking, CollectionSpec, DocumentStore, DocumentStoreExt, MemoryStorage, Precondition,
     ScopedStorage, StorageBackend, StorageConfig as StorageUrl, StorageError,
 };
 
