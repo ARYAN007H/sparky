@@ -261,6 +261,8 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let tmp = tempfile::tempdir().unwrap();
     let server = relay_provider().await;
     let mut config = config(&tmp);
+    config.modules.allow_download = false;
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
     config
         .agent
         .channel_agents
