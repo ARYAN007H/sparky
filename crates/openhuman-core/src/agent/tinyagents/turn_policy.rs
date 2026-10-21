@@ -135,6 +135,24 @@ pub(crate) fn run_policy_for_provider(
     local_provider: bool,
     tool_call_cap: Option<usize>,
 ) -> RunPolicy {
+    run_policy_for_provider_with_backoff(
+        max_iterations,
+        response_cache_enabled,
+        local_provider,
+        tool_call_cap,
+        env_str("OPENHUMAN_MODEL_RETRY_BACKOFF_MS").as_deref(),
+    )
+}
+
+/// [`run_policy_for_provider`] with the retry-backoff override passed in rather
+/// than read from the process environment.
+pub(crate) fn run_policy_for_provider_with_backoff(
+    max_iterations: usize,
+    response_cache_enabled: bool,
+    local_provider: bool,
+    tool_call_cap: Option<usize>,
+    retry_backoff_ms: Option<&str>,
+) -> RunPolicy {
     let mut policy = run_policy(&TurnPolicyOptions {
         max_model_calls: max_iterations,
         max_tool_calls: tool_call_limit(max_iterations, tool_call_cap),
@@ -143,10 +161,7 @@ pub(crate) fn run_policy_for_provider(
         response_cache_enabled,
         overrides: env_overrides(),
     });
-    apply_retry_backoff_override(
-        &mut policy,
-        env_str("OPENHUMAN_MODEL_RETRY_BACKOFF_MS").as_deref(),
-    );
+    apply_retry_backoff_override(&mut policy, retry_backoff_ms);
     policy
 }
 

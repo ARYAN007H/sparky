@@ -108,14 +108,14 @@ fn hosted_openai_keeps_the_hosted_ceilings_in_the_policy() {
 
 #[test]
 fn retry_backoff_override_shrinks_the_schedule_and_ignores_junk() {
-    let production = run_policy_for(8, false).retry;
+    let production = run_policy_for_provider_with_backoff(8, false, false, None, None).retry;
     for raw in [None, Some(""), Some("0"), Some("abc"), Some("-5")] {
-        let mut policy = run_policy_for(8, false);
+        let mut policy = run_policy_for_provider_with_backoff(8, false, false, None, None);
         apply_retry_backoff_override(&mut policy, raw);
         assert_eq!(policy.retry.initial_backoff_ms, production.initial_backoff_ms, "{raw:?}");
         assert_eq!(policy.retry.max_backoff_ms, production.max_backoff_ms, "{raw:?}");
     }
-    let mut policy = run_policy_for(8, false);
+    let mut policy = run_policy_for_provider_with_backoff(8, false, false, None, None);
     apply_retry_backoff_override(&mut policy, Some(" 20 "));
     assert_eq!(policy.retry.initial_backoff_ms, 20);
     assert_eq!(policy.retry.max_backoff_ms, 200);
