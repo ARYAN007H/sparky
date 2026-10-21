@@ -114,9 +114,7 @@ pub async fn test_connection(
     .await;
     let result = match result {
         Ok(result) => Ok(result.actual_dims),
-        // Temporary characterization: the old helper collapsed construction
-        // errors into the same failure payload as invocation errors.
-        Err(ConnectionTestError::Build(error)) => Err(error.to_string()),
+        Err(ConnectionTestError::Build(error)) => return Err(error.to_string()),
         Err(ConnectionTestError::Embed(error)) => Err(error.to_string()),
     };
 
