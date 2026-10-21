@@ -269,7 +269,7 @@ mod egress_fallback_tests;
 mod explicit_ctx_tests;
 #[path = "factory_managed_ledger_tests.rs"]
 mod managed_ledger_tests;
-#[path = "factory_route_resolution_tests.rs"]
-mod route_resolution_tests;
 #[path = "factory_model_gate_tests.rs"]
 mod model_gate_tests;
+#[path = "factory_route_resolution_tests.rs"]
+mod route_resolution_tests;
