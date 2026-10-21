@@ -749,8 +749,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 #[tokio::test]
 async fn handle_runtime_command_telegram_new_uses_module_storage() {
     let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
-    let tempdir = tempfile::tempdir().unwrap();
-    let mut ctx = runtime_context(tempdir.path().to_path_buf());
+    let workspace = linked.config().workspace_dir.clone();
+    let mut ctx = runtime_context(workspace);
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
