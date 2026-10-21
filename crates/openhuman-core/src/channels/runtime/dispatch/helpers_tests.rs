@@ -32,7 +32,9 @@ async fn canceled_waiter_closes_handle_returned_by_in_flight_typing_start() {
             Ok(())
         })
     }));
-    let channel = Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::new(test_channel)));
+    let channel = Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::new(
+        test_channel,
+    )));
     let cancellation = tokio_util::sync::CancellationToken::new();
     let waiter = spawn_typing_task(
         &DispatchCtx::unbound(),
@@ -82,7 +84,9 @@ async fn typing_task_runs_under_the_handed_context_not_the_active_one() {
             Ok(None)
         })
     }));
-    let channel = Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::new(test_channel)));
+    let channel = Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::new(
+        test_channel,
+    )));
     let cancellation = tokio_util::sync::CancellationToken::new();
     // The caller's own scope is Ravi's; the typing task was handed Asha's.
     let (waiter_tx, waiter_rx) = oneshot::channel();

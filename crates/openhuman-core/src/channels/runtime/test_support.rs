@@ -369,7 +369,9 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(
         options.channel_name.clone(),
-        Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::clone(&state))),
+        Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::clone(
+            &state,
+        ))),
     );
 
     let model: Arc<dyn ChatModel<()>> = Arc::new(HarnessModel);

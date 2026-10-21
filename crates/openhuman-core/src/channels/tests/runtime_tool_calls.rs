@@ -4,16 +4,15 @@ use super::super::context::{
 };
 use super::super::runtime::process_channel_message;
 use super::common::{
-    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
-    ToolCallingModel,
+    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel, ToolCallingModel,
 };
+use crate::channels::runtime::ChannelHandle;
 use crate::channels::runtime::TestChannel;
 use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tinychannels_bus as traits;
-use crate::channels::runtime::ChannelHandle;
 use tinyinference_llm::model::ChatModel;
 
 #[tokio::test]

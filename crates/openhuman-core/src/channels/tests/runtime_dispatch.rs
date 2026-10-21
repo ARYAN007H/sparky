@@ -5,8 +5,9 @@ use super::super::runtime::test_support::{
 use super::super::runtime::{
     process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
-use super::common::{HistoryCaptureModel, use_real_agent_handler, RecordingChannel, SlowModel};
+use super::common::{use_real_agent_handler, HistoryCaptureModel, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
+use crate::channels::runtime::ChannelHandle;
 use crate::core::events::DomainEvent;
 use crate::inference::provider;
 use std::collections::HashMap;
@@ -14,7 +15,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinychannels_bus as traits;
-use crate::channels::runtime::ChannelHandle;
 use tokio::sync::Barrier;
 
 #[tokio::test]
@@ -54,7 +54,10 @@ async fn host_pipeline_sends_reaction_marker_with_inbound_thread_target() {
 
     assert_eq!(observation.sends.len(), 1, "one reaction is sent");
     assert_eq!(observation.sends[0].content, "[REACTION:👍]");
-    assert_eq!(observation.sends[0].thread_ts.as_deref(), Some("message-42"));
+    assert_eq!(
+        observation.sends[0].thread_ts.as_deref(),
+        Some("message-42")
+    );
 }
 
 #[tokio::test]
@@ -255,9 +258,15 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
 
     let calls = model_state.calls.lock().unwrap();
     assert_eq!(calls.len(), 2);
-    assert!(calls[0].iter().any(|(_, text)| text == "first thread message"));
-    assert!(calls[1].iter().any(|(_, text)| text == "second thread message"));
-    assert!(!calls[1].iter().any(|(_, text)| text == "first thread message"));
+    assert!(calls[0]
+        .iter()
+        .any(|(_, text)| text == "first thread message"));
+    assert!(calls[1]
+        .iter()
+        .any(|(_, text)| text == "second thread message"));
+    assert!(!calls[1]
+        .iter()
+        .any(|(_, text)| text == "first thread message"));
     drop(calls);
     assert_eq!(channel_state.sent_messages.lock().await.len(), 2);
 }
@@ -336,9 +345,15 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
 
     let histories = observed_histories.lock().unwrap();
     assert_eq!(histories.len(), 2);
-    assert!(histories[0].iter().any(|text| text == "first thread message"));
-    assert!(histories[1].iter().any(|text| text == "second thread message"));
-    assert!(!histories[1].iter().any(|text| text == "first thread message"));
+    assert!(histories[0]
+        .iter()
+        .any(|text| text == "first thread message"));
+    assert!(histories[1]
+        .iter()
+        .any(|text| text == "second thread message"));
+    assert!(!histories[1]
+        .iter()
+        .any(|text| text == "first thread message"));
 }
 
 #[tokio::test]

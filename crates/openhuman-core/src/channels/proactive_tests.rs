@@ -6,10 +6,7 @@ fn channel(name: &str, target: Option<&str>) -> (Arc<ChannelHandle>, Arc<TestCha
     let mut channel = TestChannel::new(name);
     channel.proactive_target = target.map(str::to_owned);
     let channel = Arc::new(channel);
-    (
-        Arc::new(ChannelHandle::Test(Arc::clone(&channel))),
-        channel,
-    )
+    (Arc::new(ChannelHandle::Test(Arc::clone(&channel))), channel)
 }
 
 fn proactive_event() -> DomainEvent {

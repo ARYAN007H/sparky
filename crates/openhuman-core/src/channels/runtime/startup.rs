@@ -41,16 +41,15 @@ pub(crate) struct TestChannel {
             dyn Fn(
                     String,
                     u64,
-                ) -> futures::future::BoxFuture<'static, anyhow::Result<Option<String>>>
+                )
+                    -> futures::future::BoxFuture<'static, anyhow::Result<Option<String>>>
                 + Send
                 + Sync,
         >,
     >,
     pub(crate) end_typing_refresh: Option<
         std::sync::Arc<
-            dyn Fn(String) -> futures::future::BoxFuture<'static, anyhow::Result<()>>
-                + Send
-                + Sync,
+            dyn Fn(String) -> futures::future::BoxFuture<'static, anyhow::Result<()>> + Send + Sync,
         >,
     >,
 }
@@ -136,7 +135,9 @@ impl ChannelHandle {
             #[cfg(test)]
             Self::Test(channel) => {
                 let _ = recipient;
-                channel.start_typing_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                channel
+                    .start_typing_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
             }
         }
@@ -155,7 +156,9 @@ impl ChannelHandle {
             #[cfg(test)]
             Self::Test(channel) => {
                 let _ = recipient;
-                channel.stop_typing_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                channel
+                    .stop_typing_calls
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
             }
         }
@@ -214,11 +217,15 @@ impl TestChannel {
     }
 
     async fn send(&self, message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
-        self.send_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.send_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if let Some(error) = &self.send_error {
             anyhow::bail!(error.clone());
         }
-        self.sent.lock().expect("test send lock").push(message.clone());
+        self.sent
+            .lock()
+            .expect("test send lock")
+            .push(message.clone());
         self.sent_messages
             .lock()
             .await

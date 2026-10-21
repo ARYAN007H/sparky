@@ -1,20 +1,19 @@
 //! Tests for the channel approval-surface and turn-state subscribers.
 
 use super::*;
+use crate::channels::runtime::{ChannelHandle, TestChannel};
 use std::path::Path;
 #[cfg(feature = "e2e-test-support")]
 use tempfile::tempdir;
-use crate::channels::runtime::{ChannelHandle, TestChannel};
 
 fn recording(name: &str) -> (Arc<ChannelHandle>, Arc<TestChannel>) {
     let channel = Arc::new(TestChannel::new(name));
-    (
-        Arc::new(ChannelHandle::Test(Arc::clone(&channel))),
-        channel,
-    )
+    (Arc::new(ChannelHandle::Test(Arc::clone(&channel))), channel)
 }
 
-fn approval_subscriber(channels: &[(&str, Arc<ChannelHandle>)]) -> ChannelApprovalSurfaceSubscriber {
+fn approval_subscriber(
+    channels: &[(&str, Arc<ChannelHandle>)],
+) -> ChannelApprovalSurfaceSubscriber {
     let map: HashMap<String, Arc<ChannelHandle>> = channels
         .iter()
         .map(|(name, channel)| ((*name).to_owned(), Arc::clone(channel)))

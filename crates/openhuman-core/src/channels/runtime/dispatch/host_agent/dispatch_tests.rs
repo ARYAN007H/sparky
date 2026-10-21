@@ -145,7 +145,13 @@ async fn an_unbound_channel_still_runs_the_orchestrator() {
 
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
-        channel.sent.lock().unwrap().iter().map(|message| message.content.clone()).collect::<Vec<_>>(),
+        channel
+            .sent
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|message| message.content.clone())
+            .collect::<Vec<_>>(),
         vec!["orchestrator answered".to_string()]
     );
 }
@@ -341,7 +347,13 @@ async fn bound_channel_runs_its_host_agent() {
     };
 
     assert_eq!(
-        channel.sent.lock().unwrap().iter().map(|message| message.content.clone()).collect::<Vec<_>>(),
+        channel
+            .sent
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|message| message.content.clone())
+            .collect::<Vec<_>>(),
         vec!["teeny says hi".to_string()],
         "the host agent's reply goes back to the chat"
     );

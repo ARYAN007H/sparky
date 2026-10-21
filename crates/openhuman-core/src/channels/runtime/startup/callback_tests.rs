@@ -76,7 +76,6 @@ impl RecordingChannel {
             }),
         })
     }
-
 }
 
 #[async_trait::async_trait]
@@ -187,11 +186,15 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     let channels: HashMap<String, Arc<super::ChannelHandle>> = HashMap::from([
         (
             other_account.name().to_owned(),
-            Arc::new(super::ChannelHandle::test(super::TestChannel::new(other_account.name()))),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                other_account.name(),
+            ))),
         ),
         (
             selected_account.name().to_owned(),
-            Arc::new(super::ChannelHandle::test(super::TestChannel::new(selected_account.name()))),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                selected_account.name(),
+            ))),
         ),
     ]);
     let progressive_channels: HashMap<String, Arc<dyn ProgressiveChannelTransport>> =
@@ -304,11 +307,15 @@ async fn native_progressive_transport_rejects_unconfigured_account_without_provi
     let channels: HashMap<String, Arc<super::ChannelHandle>> = HashMap::from([
         (
             "telegram:bot-a".into(),
-            Arc::new(super::ChannelHandle::test(super::TestChannel::new(first_account.name()))),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                first_account.name(),
+            ))),
         ),
         (
             "telegram:bot-b".into(),
-            Arc::new(super::ChannelHandle::test(super::TestChannel::new(second_account.name()))),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                second_account.name(),
+            ))),
         ),
     ]);
     let progressive_channels: HashMap<String, Arc<dyn ProgressiveChannelTransport>> =
@@ -364,7 +371,12 @@ async fn native_progressive_output_event_is_acknowledged_by_optional_host_observ
     let observer = Arc::new(RecordingOutputObserver::default());
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
     let (callback, _context) = callback_for_channels(
-        HashMap::from([("telegram:bot-b".into(), Arc::new(super::ChannelHandle::test(super::TestChannel::new("telegram:bot-b"))))]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                "telegram:bot-b",
+            ))),
+        )]),
         HashMap::from([(
             "telegram:bot-b".into(),
             adapter.clone() as Arc<dyn ProgressiveChannelTransport>,
@@ -440,7 +452,12 @@ fn output_event_request(
 async fn native_progressive_output_event_validates_scope_without_observer() {
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
     let (callback, _context) = callback_for_channels(
-        HashMap::from([("telegram:bot-b".into(), Arc::new(super::ChannelHandle::test(super::TestChannel::new("telegram:bot-b"))))]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                "telegram:bot-b",
+            ))),
+        )]),
         HashMap::from([(
             "telegram:bot-b".into(),
             adapter.clone() as Arc<dyn ProgressiveChannelTransport>,
@@ -478,7 +495,12 @@ async fn native_progressive_output_event_validates_scope_before_observer() {
     let observer = Arc::new(RecordingOutputObserver::default());
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
     let (callback, _) = callback_for_channels(
-        HashMap::from([("telegram:bot-b".into(), Arc::new(super::ChannelHandle::test(super::TestChannel::new("telegram:bot-b"))))]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                "telegram:bot-b",
+            ))),
+        )]),
         HashMap::from([(
             "telegram:bot-b".into(),
             adapter as Arc<dyn ProgressiveChannelTransport>,
@@ -503,7 +525,12 @@ async fn native_progressive_callbacks_stop_after_channel_session_cancellation() 
     let observer = Arc::new(RecordingOutputObserver::default());
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
     let (callback, _context) = callback_for_channels(
-        HashMap::from([("telegram:bot-b".into(), Arc::new(super::ChannelHandle::test(super::TestChannel::new("telegram:bot-b"))))]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                "telegram:bot-b",
+            ))),
+        )]),
         HashMap::from([(
             "telegram:bot-b".into(),
             adapter as Arc<dyn ProgressiveChannelTransport>,
@@ -527,7 +554,12 @@ async fn native_progressive_callbacks_stop_after_channel_session_cancellation() 
 async fn native_progressive_callbacks_fail_closed_after_transport_owner_drops() {
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
     let (callback, context) = callback_for_channels(
-        HashMap::from([("telegram:bot-b".into(), Arc::new(super::ChannelHandle::test(super::TestChannel::new("telegram:bot-b"))))]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            Arc::new(super::ChannelHandle::test(super::TestChannel::new(
+                "telegram:bot-b",
+            ))),
+        )]),
         HashMap::from([(
             "telegram:bot-b".into(),
             adapter.clone() as Arc<dyn ProgressiveChannelTransport>,

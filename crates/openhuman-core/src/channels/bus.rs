@@ -17,4 +17,3 @@ mod inbound_thread_id_tests;
 #[cfg(test)]
 #[path = "bus_tests.rs"]
 mod tests;
-
