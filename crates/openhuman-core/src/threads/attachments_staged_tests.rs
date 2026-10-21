@@ -206,6 +206,12 @@ async fn native_staged_lease_retries_cleanup_for_its_canceled_tombstone() {
         canceled: true,
     });
     insert_record(&repo, &record);
+    assert!(
+        read_staged_entries(&ctx, thread_id, std::slice::from_ref(&part), &config)
+            .await
+            .is_err(),
+        "a canceled reference must remain unavailable to ordinary reads"
+    );
 
     drop(NativeStagedLease::new(
         ctx,
