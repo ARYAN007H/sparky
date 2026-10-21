@@ -1,6 +1,6 @@
 use super::*;
-use tinychannels_bus::{ChannelOutboundIntent, DeliveryDurability, OutboundPayload};
 use std::sync::Arc;
+use tinychannels_bus::{ChannelOutboundIntent, DeliveryDurability, OutboundPayload};
 use tinystoragedrivers::{Scope, StorageBackend};
 
 fn entry(id: &str, at: u64) -> DeliveryQueueEntry {
@@ -148,10 +148,7 @@ async fn an_existing_module_record_is_never_overwritten() {
 async fn a_missing_file_imports_nothing_and_writes_no_marker() {
     let dir = tempfile::tempdir().unwrap();
     let rig = rig();
-    assert_eq!(
-        import(&rig, dir.path()).await.unwrap(),
-        Outcome::NoSource
-    );
+    assert_eq!(import(&rig, dir.path()).await.unwrap(), Outcome::NoSource);
     write_legacy(dir.path(), &legacy_state());
     assert!(matches!(
         import(&rig, dir.path()).await.unwrap(),

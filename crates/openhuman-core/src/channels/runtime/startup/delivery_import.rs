@@ -18,14 +18,14 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use serde_json::{json, Value};
+use crate::storage::{Scope, documents::Repo};
+use serde_json::{Value, json};
 use sha2::Digest;
 use tinychannels_bus::module_delivery::{
-    DeliveryQueueEntry, DeliveryTerminalResult, DELIVERY_PENDING_CAPACITY, DELIVERY_RECORD_BYTES,
-    DELIVERY_RESULT_CAPACITY, DELIVERY_RESULT_TTL_SECONDS,
+    DELIVERY_PENDING_CAPACITY, DELIVERY_RECORD_BYTES, DELIVERY_RESULT_CAPACITY,
+    DELIVERY_RESULT_TTL_SECONDS, DeliveryQueueEntry, DeliveryTerminalResult,
 };
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, StorageBackend};
-use crate::storage::{Scope, documents::Repo};
 
 const LOG_PREFIX: &str = "[channel-delivery-import]";
 const MODULE_ID: &str = "tinychannels";
@@ -111,9 +111,9 @@ async fn import_into(
                 std::sync::Arc::clone(backend),
                 condition.clone(),
             );
-            let scoped = claimed_backend
-                .for_scope(scope)
-                .map_err(|error| anyhow::anyhow!("open claimed module scope: {:?}", error.kind()))?;
+            let scoped = claimed_backend.for_scope(scope).map_err(|error| {
+                anyhow::anyhow!("open claimed module scope: {:?}", error.kind())
+            })?;
             crate::storage::block_on_anyhow(async move {
                 if crate::storage::import_state::host_import_done(
                     claimed_markers.scoped(),
@@ -152,7 +152,10 @@ async fn import_payload(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Outcome::NoSource),
         Err(error) => return Err(error.into()),
     };
-    anyhow::ensure!(bytes.len() as u64 <= MAX_LEGACY_BYTES, "legacy delivery file is oversized");
+    anyhow::ensure!(
+        bytes.len() as u64 <= MAX_LEGACY_BYTES,
+        "legacy delivery file is oversized"
+    );
     let legacy: LegacyState = serde_json::from_slice(&bytes)
         .map_err(|error| anyhow::anyhow!("legacy delivery file is unreadable: {error}"))?;
     let docs = scoped.documents();
@@ -193,7 +196,12 @@ async fn import_payload(
             Ok(_) => written += 1,
             Err(error)
                 if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
-            Err(error) => return Err(anyhow::anyhow!("write {collection} record: {:?}", error.kind())),
+            Err(error) => {
+                return Err(anyhow::anyhow!(
+                    "write {collection} record: {:?}",
+                    error.kind()
+                ));
+            }
         }
     }
     tracing::info!("{LOG_PREFIX} imported found={found} written={written}");

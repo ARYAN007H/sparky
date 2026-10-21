@@ -29,7 +29,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::storage::{CollectionSpec, DocumentStore, ErrorKind, Precondition, Storage, StorageBackend};
+use crate::storage::{
+    CollectionSpec, DocumentStore, ErrorKind, Precondition, Storage, StorageBackend,
+};
 use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
 use sha2::Digest;
