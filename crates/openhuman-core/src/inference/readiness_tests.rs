@@ -9,41 +9,22 @@ async fn cached_probe_serves_definitive_negative_results() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
-    let _model_override_guard =
-        crate::inference::provider::factory::test_provider_override::exclusive();
+    // Acquire the async inference guard before the synchronous provider
+    // override lock, matching the global lock order used by other fixtures.
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
     let tmp = TempDir::new().unwrap();
-    let mut config = Config {
+    let config = Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
         ..Config::default()
     };
     let hit_count = std::sync::Arc::new(AtomicUsize::new(0));
+    // The core owns no hosted provider; this scoped host registration supplies
+    // a deterministic negative probe and counts cache misses without touching
+    // a global provider or a real backend.
     let counter = hit_count.clone();
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    let app = axum::Router::new().route(
-        "/openai/v1/chat/completions",
-        axum::routing::post(move || {
-            let counter = counter.clone();
-            async move {
-                counter.fetch_add(1, Ordering::SeqCst);
-                use axum::response::IntoResponse;
-                (
-                    axum::http::StatusCode::BAD_REQUEST,
-                    axum::Json(serde_json::json!({
-                        "success": false,
-                        "error": "API key not configured for provider",
-                        "errorCode": "BAD_REQUEST"
-                    })),
-                )
-                    .into_response()
-            }
-        }),
-    );
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    config.api_url = Some(format!("http://{addr}"));
-
     let extensions = Extensions::new();
     register_chat_model_in(
         &extensions,
@@ -57,23 +38,9 @@ async fn cached_probe_serves_definitive_negative_results() {
                     "fixture-model".to_string(),
                 ))
             }),
-            probe: Some(Arc::new(|_, _, config| {
-                Box::pin(async move {
-                    let base = config.api_url.as_deref().unwrap().trim_end_matches('/');
-                    let response = reqwest::Client::new()
-                        .post(format!("{base}/openai/v1/chat/completions"))
-                        .json(&serde_json::json!({"model":"fixture-model","messages":[]}))
-                        .send()
-                        .await
-                        .map_err(|error| error.to_string())?;
-                    let status = response.status();
-                    let body = response.text().await.map_err(|error| error.to_string())?;
-                    if status.is_success() {
-                        Ok(())
-                    } else {
-                        Err(body)
-                    }
-                })
+            probe: Some(Arc::new(move |_, _, _| {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async { Err("API key not configured for provider".to_string()) })
             })),
             models: Some(ProviderModelHooks {
                 default_model: Arc::new(|| Some("fixture-model".to_string())),

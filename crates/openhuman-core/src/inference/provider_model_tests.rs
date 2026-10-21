@@ -39,7 +39,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
     let extensions = Extensions::new();
     register_chat_model_in(
         &extensions,
-        "scoped-provider",
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ChatModelEntry {
             build: Arc::new(|_| Err(anyhow::anyhow!("test factory"))),
             probe: None,
@@ -52,35 +52,112 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
                 is_raw_model: Arc::new(|model| model == "scoped/model"),
                 supports_vision: Arc::new(|_| false),
                 resolve_model: Arc::new(|_, _, _| None),
-                context_window: Arc::new(|_| None),
+                context_window: Arc::new(|model| match model {
+                    "" => Some(99_999),
+                    "scoped/model" => Some(77_777),
+                    "hint:reasoning" => Some(88_888),
+                    _ => None,
+                }),
                 default_pricing: Arc::new(|| None),
                 without_reasoning: Arc::new(|request| request),
             }),
         },
     );
+    assert_eq!(
+        crate::inference::registry::provider_default_model_for(
+            Some(&extensions),
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN
+        )
+        .as_deref(),
+        Some("scoped/model")
+    );
+    assert_eq!(
+        crate::inference::context_window::project_context_window_for_model(
+            "scoped/model",
+            Some(Some(&extensions))
+        )
+        .window,
+        Some(77_777)
+    );
+    assert_eq!(
+        crate::inference::context_window::project_context_window_for_model(
+            "hint:reasoning",
+            Some(Some(&extensions))
+        )
+        .window,
+        Some(88_888),
+        "a registered provider hook can override a workload tier alias"
+    );
+    assert_eq!(
+        crate::inference::context_window::project_context_window_for_model(
+            "   ",
+            Some(Some(&extensions))
+        )
+        .window,
+        None,
+        "blank model IDs do not query provider hooks or the catalog"
+    );
     let context = crate::core::runtime::CoreContext::for_test_with_extensions(
         crate::core::runtime::DomainSet::full(),
         None,
-        extensions,
+        extensions.clone(),
     );
 
     assert_eq!(
-        crate::inference::registry::provider_default_model("scoped-provider"),
+        crate::inference::registry::provider_default_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN
+        ),
         None
     );
     crate::core::runtime::CoreContext::sync_scope(context, || {
         assert_eq!(
-            crate::inference::registry::provider_default_model("scoped-provider").as_deref(),
+            crate::inference::context_window::project_context_window_for_model(
+                "scoped/model",
+                None
+            )
+            .window,
+            Some(77_777),
+            "the ambient projection uses the active provider registry"
+        );
+        assert_ne!(
+            crate::inference::context_window::project_context_window_for_model(
+                "scoped/model",
+                Some(None)
+            )
+            .window,
+            Some(77_777),
+            "an explicit process-only projection does not borrow ambient context"
+        );
+        let empty_extensions = Extensions::new();
+        assert_ne!(
+            crate::inference::context_window::project_context_window_for_model(
+                "scoped/model",
+                Some(Some(&empty_extensions))
+            )
+            .window,
+            Some(77_777),
+            "an explicit empty context does not borrow the ambient provider registration"
+        );
+        assert_eq!(
+            crate::inference::registry::provider_default_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN
+            )
+            .as_deref(),
             Some("scoped/model")
         );
         assert_eq!(
-            crate::inference::registry::provider_model_role("scoped-provider", "scoped-alias")
-                .as_deref(),
+            crate::inference::registry::provider_model_role(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias"
+            )
+            .as_deref(),
             Some("reasoning")
         );
     });
     assert_eq!(
-        crate::inference::registry::provider_default_model("scoped-provider"),
+        crate::inference::registry::provider_default_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN
+        ),
         None
     );
 }

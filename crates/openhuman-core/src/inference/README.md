@@ -128,23 +128,26 @@ do not each instantiate its state machine.
 
 ### Context windows
 
-The context window drives pre-dispatch trimming and the compaction trigger, so [`context_window.rs`](./context_window.rs)
-resolves it per turn in this order:
+The context window drives pre-dispatch trimming and the compaction trigger. [`context_window.rs`](./context_window.rs)
+supplies the selected route's discovery request, config override, local profile,
+catalog hint, managed-provider default, and configured CA/proxy client to
+TinyInference's route resolver. TinyInference owns discovery URL normalization,
+caching, remembered route limits, and the shared fallback order:
 
 ```text
   1. config override       model_registry[].context_window (non-zero)
-  2. provider-reported     tinyinference_llm::model::discover, cached per
-                           endpoint+model, lowered by any limit learned from
-                           a context-overflow error on that endpoint
-  3. local profile         for local runtimes
-  4. static guess          model_context::static_context_window_for_model,
-                           logged at warn once per model
+  2. provider-reported     discovered limits and learned overflow limits for
+                           the exact endpoint/model/cache identity
+  3. remembered            provider limits for the route/model identity
+  4. static/local          registered provider model metadata, managed default,
+                           workload tier, pricing catalog, model-id hint, then
+                           local profile fallback
 ```
 
 The discovery request comes from [`provider/factory/discovery.rs`](./provider/factory/discovery.rs) (`model_limits_request`), built
-from the same endpoint and credential resolution the chat factory uses. The resolved value is
-remembered, so the synchronous `context_window_for_model` (usage meters, the context breakdown)
-reports the same number the turn used. [`model_context.rs`](./model_context.rs) also answers vision capability through
+from the same endpoint and credential resolution the chat factory uses. Route-aware synchronous
+projection uses the exact discovery identity when available; model-only displays use a conservative
+route projection and cannot borrow a learned limit from an unrelated provider. [`model_context.rs`](./model_context.rs) also answers vision capability through
 `model_supports_vision` and the user's `model_registry` `vision` flag.
 
 ### Failures
