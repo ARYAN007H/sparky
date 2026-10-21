@@ -4,12 +4,12 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use tinystoragedrivers::secrets::{DerivedKeys, DocumentSecrets, SecretStore};
 use tinystoragedrivers::{
     CollectionSpec, Precondition, Scope, StorageConfig, StreamStore, WriteOptions,
 };
 use zeroize::Zeroizing;
+use tinyagents_storage_kit::Key;
 
 const PROFILE_ID: &str = "u1";
 const CREATED_AT_MS: i64 = 1_738_548_306_000;
@@ -233,43 +233,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     let thread_id = "fixture-thread";
     let incarnation = "fixture-incarnation";
-    let thread_digest = hex(&Sha256::digest(thread_id.as_bytes()));
+    let thread_key = Key::of([thread_id])?.as_str().to_owned();
     put(
         docs,
-        "conversation_threads_v1",
-        &thread_digest,
+        "conversations.threads",
+        &thread_key,
         json!({
-            "schema": 1,
+            "id": thread_id,
+            "title": "Fixture thread",
+            "is_active": true,
+            "created_ms": 1738555506000_i64,
+            "last_message_ms": 1738555507000_i64,
             "incarnation": incarnation,
             "deleted": false,
             "visible_end": 1,
-            "thread": {
-                "id": thread_id,
-                "title": "Fixture thread",
-                "isActive": true,
-                "messageCount": 1,
-                "lastMessageAt": "2025-02-03T04:05:07Z",
-                "createdAt": "2025-02-03T04:05:06Z",
-                "labels": []
-            }
+            "messages_key": null
         }),
     )
     .await?;
     user_scope
         .streams()
         .append(
-            &format!("conversation_messages_v1:{thread_digest}:{incarnation}"),
+            &format!(
+                "conversations.messages/{}",
+                Key::of([thread_id, incarnation])?.as_str()
+            ),
             json!({
-                "schema": 1,
-                "incarnation": incarnation,
-                "message": {
-                    "id": "fixture-message",
-                    "content": "historical profile message",
-                    "type": "text",
-                    "extraMetadata": null,
-                    "sender": "user",
-                    "createdAt": "2025-02-03T04:05:07Z"
-                }
+                "id": "fixture-message",
+                "content": "historical profile message",
+                "message_type": "text",
+                "extra_metadata": null,
+                "sender": "user",
+                "created_ms": 1738555507000_i64
             }),
         )
         .await?;
@@ -311,10 +306,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     println!("written {}", path.display());
     Ok(())
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 async fn put(
