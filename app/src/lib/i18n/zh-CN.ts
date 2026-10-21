@@ -1212,6 +1212,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': '加载消息失败',
   'chat.thinkingDots': '思考中...',
   'chat.status.thinkingElapsed': '思考中 · {elapsed}',
+  'chat.status.compacting': '正在总结之前的对话…',
+  'chat.status.compactingElapsed': '正在总结之前的对话 · {elapsed}',
   'chat.status.waitingApproval': '等待你的批准',
   'chat.status.waitingReview': '等待你的审阅',
   'chat.status.waitingAnswer': '等待你的回答',

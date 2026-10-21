@@ -1331,6 +1331,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'Nachrichten konnten nicht geladen werden',
   'chat.thinkingDots': 'Denken...',
   'chat.status.thinkingElapsed': 'Denkt nach · {elapsed}',
+  'chat.status.compacting': 'Der bisherige Verlauf wird zusammengefasst…',
+  'chat.status.compactingElapsed': 'Der bisherige Verlauf wird zusammengefasst · {elapsed}',
   'chat.status.waitingApproval': 'Wartet auf deine Freigabe',
   'chat.status.waitingReview': 'Wartet auf deine Prüfung',
   'chat.status.waitingAnswer': 'Wartet auf deine Antwort',

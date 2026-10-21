@@ -1290,6 +1290,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'বার্তা লোড করতে ব্যর্থ',
   'chat.thinkingDots': 'ভাবছে...',
   'chat.status.thinkingElapsed': 'ভাবছে · {elapsed}',
+  'chat.status.compacting': 'আগের কথোপকথনের সারাংশ তৈরি হচ্ছে…',
+  'chat.status.compactingElapsed': 'আগের কথোপকথনের সারাংশ তৈরি হচ্ছে · {elapsed}',
   'chat.status.waitingApproval': 'আপনার অনুমোদনের অপেক্ষায়',
   'chat.status.waitingReview': 'আপনার পর্যালোচনার অপেক্ষায়',
   'chat.status.waitingAnswer': 'আপনার উত্তরের অপেক্ষায়',

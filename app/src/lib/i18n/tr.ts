@@ -4208,6 +4208,8 @@ const messages: TranslationMap = {
   'memoryPage.import.progress': '{imported}/{total} öğe içe aktarıldı',
   // Chat status, history, and tool activity.
   'chat.status.thinkingElapsed': 'Düşünüyor · {elapsed}',
+  'chat.status.compacting': 'Önceki konuşma özetleniyor…',
+  'chat.status.compactingElapsed': 'Önceki konuşma özetleniyor · {elapsed}',
   'chat.status.waitingApproval': 'Onayınız bekleniyor',
   'chat.status.waitingReview': 'İncelemeniz bekleniyor',
   'chat.status.waitingAnswer': 'Yanıtınız bekleniyor',

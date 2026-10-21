@@ -1308,6 +1308,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'Gagal memuat pesan',
   'chat.thinkingDots': 'Berpikir...',
   'chat.status.thinkingElapsed': 'Berpikir · {elapsed}',
+  'chat.status.compacting': 'Meringkas percakapan sebelumnya…',
+  'chat.status.compactingElapsed': 'Meringkas percakapan sebelumnya · {elapsed}',
   'chat.status.waitingApproval': 'Menunggu persetujuan Anda',
   'chat.status.waitingReview': 'Menunggu tinjauan Anda',
   'chat.status.waitingAnswer': 'Menunggu jawaban Anda',

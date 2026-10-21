@@ -1278,6 +1278,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': '메시지를 불러오지 못했습니다',
   'chat.thinkingDots': '생각 중...',
   'chat.status.thinkingElapsed': '생각 중 · {elapsed}',
+  'chat.status.compacting': '이전 대화를 요약하는 중…',
+  'chat.status.compactingElapsed': '이전 대화를 요약하는 중 · {elapsed}',
   'chat.status.waitingApproval': '승인을 기다리는 중',
   'chat.status.waitingReview': '검토를 기다리는 중',
   'chat.status.waitingAnswer': '답변을 기다리는 중',
