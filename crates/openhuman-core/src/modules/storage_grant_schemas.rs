@@ -90,7 +90,7 @@ const ROWS: &[Row] = &[
     #[cfg(feature = "inbound-queues")]
     Row {
         module: tinyeventqueues::MODULE_ID,
-        owner: tinyeventqueues_bus::storage::OWNER,
+        owner: "teq",
         secrets: &[],
         queues: Some(crate::inbound::queue_grant),
     },
@@ -116,10 +116,16 @@ pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, mo
             return;
         }
     };
-    if let Err(error) = crate::storage::boot::remigrate_owner(&backend, &scope, owner).await {
+    let result = async {
+        let storage = backend.for_scope(&scope)?;
+        crate::storage::boot::prepare_scope(&storage).await
+    }
+    .await;
+    if let Err(error) = result {
         tracing::warn!(
             module = module_id,
             %error,
+            owner,
             "[storage_grant] could not migrate the imported legacy records; retried at the next import"
         );
     }

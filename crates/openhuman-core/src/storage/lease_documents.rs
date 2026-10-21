@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageBackend};
 use tinystoragedrivers_api::DocumentStore;
-use tinystoragedrivers_types::{Filter, Key, Version, Versioned, WriteCondition, WriteOptions};
+use tinystoragedrivers_types::{
+    Filter, Key, Scope as DriverScope, Version, Versioned, WriteCondition, WriteOptions,
+};
 
 use super::lease::{
     validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, CLUSTER_SCOPE, LEASE_COLLECTION,
@@ -176,14 +178,14 @@ impl DocumentLeases {
     }
 
     fn id(key: &str) -> Result<String, StorageError> {
-        Ok(Key::of([LEASE_OWNER, key])?.as_str().to_owned())
+        Ok(Key::new(format!("{LEASE_OWNER}/{key}"))?.as_str().to_owned())
     }
 
     async fn read(&self, key: &str) -> Result<Option<Versioned<LeaseBody>>, StorageError> {
         let Some(found) = self.docs.get(LEASE_COLLECTION, &Self::id(key)?).await? else {
             return Ok(None);
         };
-        let body = serde_json::from_value(found.doc).map_err(|error| {
+        let body = serde_json::from_value(found.doc.clone()).map_err(|error| {
             StorageError::backend("lease record is malformed").with_source(error)
         })?;
         Ok(Some(found.map(|_| body)))
@@ -400,7 +402,8 @@ impl LeaseStore for DocumentLeases {
 
     fn write_condition(&self, key: &str, node: &str, epoch: u64) -> Option<WriteCondition> {
         let scope = self.scope.clone()?;
-        let id = Key::of([LEASE_OWNER, key]).ok()?;
+        let id = Key::new(format!("{LEASE_OWNER}/{key}")).ok()?;
+        let scope = DriverScope::new(scope.as_str()).ok()?;
         WriteCondition::new(
             scope,
             LEASE_COLLECTION,
