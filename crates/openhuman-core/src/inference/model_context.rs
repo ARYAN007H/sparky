@@ -18,20 +18,6 @@ pub(crate) fn context_window_for_route(
     crate::inference::context_window::project_context_window("chat", provider, model, config).window
 }
 
-/// Projects static owner hints for a model without a provider route.
-pub(crate) fn static_context_window_for_model(model: &str) -> Option<u64> {
-    crate::inference::context_window::project_context_window_for_model(model, None).window
-}
-
-/// Context-aware counterpart for a dispatch with its own provider registry.
-pub(crate) fn static_context_window_for_model_in(
-    extensions: Option<&crate::core::slots::Extensions>,
-    model: &str,
-) -> Option<u64> {
-    crate::inference::context_window::project_context_window_for_model(model, Some(extensions))
-        .window
-}
-
 /// Whether the model resolved for a chat hint/agent/profile accepts image input
 /// according to the **user-configured** vision flag in `config.model_registry`.
 ///

@@ -130,7 +130,7 @@ async fn deepseek_v41_flash_uses_provider_window_not_static_128k() {
 
     // The static tables guess 128k for any `deepseek` id ...
     assert_eq!(
-        crate::inference::model_context::static_context_window_for_model(V41_FLASH),
+        crate::inference::context_window::project_context_window_for_model(V41_FLASH, None).window,
         Some(128_000)
     );
     // ... but the provider says ~1M, and the provider wins.
@@ -181,7 +181,7 @@ async fn config_override_wins_over_provider() {
     assert_eq!(resolved.window, Some(64_000));
     assert_eq!(resolved.source, WindowSource::ConfigOverride);
     assert_eq!(fetcher.call_count(), 0, "an override skips discovery");
-    assert_eq!(remembered_window("openrouter", model), None);
+    assert_eq!(resolver().remembered_window("openrouter", model), None);
     assert_eq!(
         crate::inference::model_context::context_window_for_route(
             &format!("openrouter:{model}"),
