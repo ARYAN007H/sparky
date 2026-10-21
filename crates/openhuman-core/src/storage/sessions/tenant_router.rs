@@ -13,9 +13,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tinyagents_harness::store::SchemaAdmission;
-use tinyagents_session::port::{AgentStores, SessionStoreProvider};
+use tinyagents_session::port::{AgentStorageFactory, AgentStores, SessionStoreProvider};
 use tinyagents_session::DriverSessionStores;
-use tinystoragedrivers::{Blocking, Scope, StorageBackend, StorageError};
+use tinyagents_storage_kit::{Blocking, Scope as PortScope, ScopedStorage};
+use tinystoragedrivers::{Scope, StorageBackend, StorageError};
 
 /// Session stores over one backend, routed to a per-tenant provider.
 pub struct TenantSessionStores {
@@ -32,7 +33,6 @@ impl std::fmt::Debug for TenantSessionStores {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tenants = self.tenants.lock().unwrap_or_else(PoisonError::into_inner);
         f.debug_struct("TenantSessionStores")
-            .field("driver", &self.backend.driver())
             .field("tenants", &tenants.len())
             .finish_non_exhaustive()
     }
@@ -91,10 +91,17 @@ impl TenantSessionStores {
         if let Some(provider) = tenants.get(&tenant) {
             return (Arc::clone(provider), agent);
         }
+        let backend = Arc::clone(&self.backend);
+        let factory: AgentStorageFactory = Arc::new(move |agent_id| {
+            let owner_scope = crate::storage::scope::Scope::new(tenant.as_str())?
+                .agent(agent_id)?;
+            let scope = PortScope::new(owner_scope.as_str())?;
+            let storage = backend.for_scope(&owner_scope)?;
+            Ok(ScopedStorage::new(storage, scope))
+        });
         let provider = Arc::new(
             DriverSessionStores::with_bridge_and_schema_admission(
-                Arc::clone(&self.backend),
-                tenant.clone(),
+                factory,
                 self.bridge.clone(),
                 self.admission,
             )
@@ -178,7 +185,7 @@ impl SessionStoreProvider for TenantSessionStores {
     }
 
     fn destination_key(&self) -> Option<String> {
-        Some(format!("{}://{}", self.backend.driver(), self.id))
+        Some(format!("openhuman-storage://{}", self.id))
     }
 }
 
