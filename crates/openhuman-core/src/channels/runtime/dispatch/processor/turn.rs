@@ -382,7 +382,7 @@ pub(crate) async fn process_channel_runtime_message(
             &host_dispatch,
             &host.config,
             &envelope,
-            &prepared_thread_id,
+            &canonical_session_key,
             &enriched_message,
         )
         .await

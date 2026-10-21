@@ -391,6 +391,19 @@ pub(crate) async fn commit_native_channel_parts(
     claim_staged_refs(ctx, thread_id, &config, committed_message_id, &entries).await
 }
 
+pub(crate) async fn discard_native_channel_parts(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    config: &crate::config::Config,
+    parts: &[ContentPart],
+) -> Result<(), String> {
+    if parts.is_empty() {
+        return Ok(());
+    }
+    let entries = read_staged_entries(ctx, thread_id, parts, config).await?;
+    discard_staged_entries(ctx, thread_id, config, entries).await
+}
+
 pub(crate) async fn read_authorized_native_attachment(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &crate::config::Config,

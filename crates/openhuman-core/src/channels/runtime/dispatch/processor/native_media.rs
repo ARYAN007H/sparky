@@ -86,7 +86,8 @@ pub(super) async fn resolve_typed_message(
     }
     let client = module_client(ctx).await;
     let module_dispatch = ctx.dispatch_ctx();
-    for part in &mut parts {
+    let mut media_payloads = Vec::new();
+    for (index, part) in parts.iter_mut().enumerate() {
         let (media, image, name) = match part {
             ContentPart::Image { media, .. } => (
                 media,
@@ -135,16 +136,32 @@ pub(super) async fn resolve_typed_message(
             .content_type
             .as_deref()
             .ok_or_else(|| "native media has no content type".to_owned())?;
-        let staged = crate::threads::attachments::stage_native_channel_part(
+        media_payloads.push((index, part.clone(), name, mime.to_owned(), bytes));
+    }
+    for (index, input, name, mime, bytes) in media_payloads {
+        let staged = match crate::threads::attachments::stage_native_channel_part(
             host_dispatch,
             thread_id,
             config,
-            part,
+            &input,
             &name,
-            mime,
+            &mime,
             &bytes,
         )
-        .await?;
+        .await
+        {
+            Ok(staged) => staged,
+            Err(error) => {
+                let _ = crate::threads::attachments::discard_native_channel_parts(
+                    host_dispatch,
+                    thread_id,
+                    config,
+                    &staged_parts,
+                )
+                .await;
+                return Err(error);
+            }
+        };
         let opaque_id = media_opaque_id(&staged)
             .ok_or_else(|| "staged native media has no host reference".to_owned())?;
         let mut model_part = staged.clone();
@@ -153,7 +170,7 @@ pub(super) async fn resolve_typed_message(
             _ => return Err("native staged media kind changed unexpectedly".into()),
         };
         model_media.path = Some(format!("openhuman-staged://{opaque_id}"));
-        *part = model_part;
+        parts[index] = model_part;
         staged_parts.push(staged);
     }
 
