@@ -657,12 +657,18 @@ async fn forwards_a_compaction_as_context_compacting() {
     tx.send(AgentProgress::TurnStarted).await.unwrap();
     tx.send(AgentProgress::ContextCompacting).await.unwrap();
 
-    let compacting = loop {
-        let event = recv_for_thread(&mut events, thread_id).await;
-        if event.event == "context_compacting" {
-            break event;
+    // The bus is process-global and never closes: bound the wait so a missing
+    // event fails the test instead of hanging it.
+    let compacting = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let event = recv_for_thread(&mut events, thread_id).await;
+            if event.event == "context_compacting" {
+                break event;
+            }
         }
-    };
+    })
+    .await
+    .expect("the bridge forwards ContextCompacting as context_compacting");
     assert_eq!(compacting.request_id, request_id);
     drop(tx);
 }
