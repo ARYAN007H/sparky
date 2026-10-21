@@ -223,12 +223,18 @@ fn orphan_sweep_age_is_strict_and_unknown_ages_are_retained() {
 fn orphan_sweep_refuses_empty_and_engine_owned_prefixes() {
     for prefix in ["", "_tsd/", "_tsd/sealed", "_tsd/sealed/stream/"] {
         assert_eq!(
-            validate_orphan_sweep_prefix(prefix).unwrap_err().kind(),
+            validate_orphan_sweep_prefix(prefix, 1024).unwrap_err().kind(),
             tinystoragedrivers_types::ErrorKind::InvalidInput,
             "prefix {prefix:?}"
         );
     }
-    assert!(validate_orphan_sweep_prefix("user/attachments/").is_ok());
+    assert!(validate_orphan_sweep_prefix("user/attachments/", 1024).is_ok());
+    assert_eq!(
+        validate_orphan_sweep_prefix("a longer prefix", 3)
+            .unwrap_err()
+            .kind(),
+        tinystoragedrivers_types::ErrorKind::InvalidInput
+    );
 }
 
 #[test]
@@ -247,13 +253,13 @@ fn orphan_sweep_rejects_malformed_or_nonadvancing_listing_pages() {
         next_after: Some("user/a".into()),
     };
     assert_eq!(
-        validate_orphan_sweep_page("user/", None, &page)
+        validate_orphan_sweep_page("user/", None, &page, 1024)
             .unwrap_err()
             .kind(),
         tinystoragedrivers_types::ErrorKind::Backend
     );
     assert_eq!(
-        validate_orphan_sweep_page("user/", Some("user/b"), &page)
+        validate_orphan_sweep_page("user/", Some("user/b"), &page, 1024)
             .unwrap_err()
             .kind(),
         tinystoragedrivers_types::ErrorKind::Backend

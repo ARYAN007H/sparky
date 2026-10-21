@@ -17,7 +17,7 @@ use std::time::Duration;
 use tinystoragedrivers::{Scope, StorageBackend};
 use tinystoragedrivers_api::BlobStore;
 use tinystoragedrivers_types::{
-    is_reserved_blob_key, BlobListPage, Key, Result as StorageResult, StorageError,
+    is_reserved_blob_key, BlobListPage, Result as StorageResult, StorageError,
     MAX_BLOB_LIST_PAGE_ITEMS, SEALED_BLOB_PREFIX,
 };
 
@@ -62,14 +62,14 @@ where
     F: FnMut(String) -> Fut,
     Fut: std::future::Future<Output = StorageResult<bool>>,
 {
-    validate_orphan_sweep_prefix(prefix)?;
+    validate_orphan_sweep_prefix(prefix, blobs.max_key_len())?;
     let mut after: Option<String> = None;
     let mut removed = 0_u64;
     loop {
         let page = blobs
             .list_page(prefix, after.as_deref(), MAX_BLOB_LIST_PAGE_ITEMS)
             .await?;
-        validate_orphan_sweep_page(prefix, after.as_deref(), &page)?;
+        validate_orphan_sweep_page(prefix, after.as_deref(), &page, blobs.max_key_len())?;
         for entry in page.items {
             if !orphan_age_is_eligible(entry.written_at_ms, older_than_ms)
                 || is_referenced(entry.meta.key.clone()).await?
@@ -91,9 +91,10 @@ fn orphan_age_is_eligible(written_at_ms: Option<u64>, older_than_ms: u64) -> boo
     written_at_ms.is_some_and(|written_at_ms| written_at_ms < older_than_ms)
 }
 
-fn validate_orphan_sweep_prefix(prefix: &str) -> StorageResult<()> {
-    let key = Key::new(prefix.to_owned())?;
-    if key.as_str().is_empty()
+fn validate_orphan_sweep_prefix(prefix: &str, max_key_len: usize) -> StorageResult<()> {
+    if prefix.is_empty()
+        || prefix.len() > max_key_len
+        || prefix.bytes().any(|byte| byte == 0 || byte.is_ascii_control())
         || SEALED_BLOB_PREFIX.starts_with(prefix)
         || prefix.starts_with(SEALED_BLOB_PREFIX)
         || prefix
@@ -112,6 +113,7 @@ fn validate_orphan_sweep_page(
     prefix: &str,
     after: Option<&str>,
     page: &BlobListPage,
+    max_key_len: usize,
 ) -> StorageResult<()> {
     if page.items.len() > MAX_BLOB_LIST_PAGE_ITEMS {
         return Err(StorageError::backend(
@@ -122,7 +124,9 @@ fn validate_orphan_sweep_page(
     for entry in &page.items {
         let key = entry.meta.key.as_str();
         if !key.starts_with(prefix)
-            || Key::new(key.to_owned()).is_err()
+            || key.is_empty()
+            || key.len() > max_key_len
+            || key.bytes().any(|byte| byte == 0 || byte.is_ascii_control())
             || is_reserved_blob_key(key)
             || previous.is_some_and(|previous| key <= previous)
         {
