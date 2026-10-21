@@ -183,7 +183,7 @@ pub async fn list_configured_models_from_config(
         ));
     }
 
-    let crate::inference::registry::CatalogRequest {
+    let crate::inference::registry::CatalogHostRequest {
         provider_key: api_key,
         client,
     } = catalog_request(config, Some(&entry))?;

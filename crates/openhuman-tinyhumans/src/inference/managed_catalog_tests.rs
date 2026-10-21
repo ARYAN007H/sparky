@@ -145,7 +145,7 @@ async fn managed_catalog_treats_http_401_as_signed_out_only_for_an_attached_sess
 
     let result = list_models(
         &config,
-        CatalogRequest {
+        CatalogHostRequest {
             provider_key: String::new(),
             client: reqwest::Client::new(),
         },
@@ -170,7 +170,7 @@ async fn managed_catalog_keeps_provider_key_401_as_a_provider_error() {
 
     let error = list_models(
         &config,
-        CatalogRequest {
+        CatalogHostRequest {
             provider_key: "fixture-provider-key".into(),
             client: reqwest::Client::new(),
         },
@@ -195,7 +195,7 @@ async fn managed_catalog_does_not_infer_http_status_from_error_payload_text() {
 
     let error = list_models(
         &config,
-        CatalogRequest {
+        CatalogHostRequest {
             provider_key: String::new(),
             client: reqwest::Client::new(),
         },
