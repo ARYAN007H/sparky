@@ -411,11 +411,7 @@ impl StateKv {
     /// # Errors
     ///
     /// A storage error, or whatever `body` returns.
-    pub fn import_once(
-        &self,
-        name: &str,
-        body: impl FnOnce(&StateKv) -> Result<()>,
-    ) -> Result<()> {
+    pub fn import_once(&self, name: &str, body: impl FnOnce(&StateKv) -> Result<()>) -> Result<()> {
         let key = format!("{}/{}/{name}", self.owner, self.ns);
         let step = import_state::step_id(IMPORT_KIND, &key);
         self.repo.once_per_backend(&key, || {

@@ -14,8 +14,8 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, Weak};
 
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Versioned};
 use tinystoragedrivers::WriteCondition;
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Versioned};
 
 use super::{
     block_on, current_scope, installed, DocumentStore, Scope, Storage, StorageBackend, StorageError,
@@ -204,14 +204,19 @@ impl Repo {
     /// claim-bound imports.
     pub(crate) fn conditioned(&self, condition: &WriteCondition) -> Result<Self> {
         let origin = self.origin.as_ref().ok_or_else(|| {
-            anyhow!("[{}] claim-bound storage requires an opened backend scope", self.domain)
+            anyhow!(
+                "[{}] claim-bound storage requires an opened backend scope",
+                self.domain
+            )
         })?;
         let scope = Scope::new(&origin.scope)
             .with_context(|| format!("[{}] parse the storage scope", self.domain))?;
         let scoped = origin
             .backend
             .for_scope_conditioned(&scope, condition)
-            .with_context(|| format!("[{}] bind the import claim to storage writes", self.domain))?;
+            .with_context(|| {
+                format!("[{}] bind the import claim to storage writes", self.domain)
+            })?;
         let mut repo = Self::over(&scoped, self.domain, self.collections);
         repo.origin = Some(origin.clone());
         Ok(repo)

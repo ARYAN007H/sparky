@@ -6,8 +6,8 @@ use crate::storage::fence::{FenceError, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore};
 use serde_json::json;
 use std::sync::{
-    Arc,
     atomic::{AtomicU64, Ordering},
+    Arc,
 };
 use std::time::Duration;
 use tinystoragedrivers_api::StorageBackend as _;
@@ -112,14 +112,12 @@ async fn cached_handles_enforce_local_expiry_margin_and_accept_same_epoch_renewa
         fence_error(&error),
         Some(FenceError::Expired { .. })
     ));
-    assert!(
-        storage
-            .documents()
-            .get("items", "too-late")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(storage
+        .documents()
+        .get("items", "too-late")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -162,45 +160,39 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
     // A's local clock is deliberately behind. The local precheck succeeds;
     // the driver's atomic condition is what refuses each cached-handle write.
     a.set_now(1_000);
-    assert!(
-        storage
-            .documents()
-            .put("items", "late", json!({}), Precondition::Absent)
-            .await
-            .is_err()
-    );
+    assert!(storage
+        .documents()
+        .put("items", "late", json!({}), Precondition::Absent)
+        .await
+        .is_err());
     assert!(storage.streams().append("events", json!(1)).await.is_err());
-    assert!(
-        storage
-            .blobs()
-            .put("blob", b"x".to_vec(), None)
-            .await
-            .is_err()
-    );
+    assert!(storage
+        .blobs()
+        .put("blob", b"x".to_vec(), None)
+        .await
+        .is_err());
     assert!(storage.kv().put("key", json!(1)).await.is_err());
     assert!(storage.queues().ack("work", &receipt).await.is_err());
 
     let raw = shared
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap();
-    assert!(
-        raw.documents()
-            .get("items", "late")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(raw
+        .documents()
+        .get("items", "late")
+        .await
+        .unwrap()
+        .is_none());
     assert_eq!(raw.streams().len("events").await.unwrap(), 0);
     assert!(raw.blobs().get("blob").await.unwrap().is_none());
     assert!(raw.kv().get("key").await.unwrap().is_none());
     assert_eq!(raw.queues().stats("work").await.unwrap().leased, 1);
-    assert!(
-        raw.documents()
-            .get("items", "kept")
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(raw
+        .documents()
+        .get("items", "kept")
+        .await
+        .unwrap()
+        .is_some());
 }
 
 #[tokio::test]
@@ -215,23 +207,19 @@ async fn a_manually_latched_cached_fence_refuses_mutations_before_driver_io() {
         .await
         .unwrap();
     fence.fence();
-    assert!(
-        storage
-            .documents()
-            .put("items", "late", json!({}), Precondition::Absent)
-            .await
-            .is_err()
-    );
-    assert!(
-        shared
-            .for_scope(&Scope::new("profile:alice").unwrap())
-            .unwrap()
-            .documents()
-            .get("items", "late")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(storage
+        .documents()
+        .put("items", "late", json!({}), Precondition::Absent)
+        .await
+        .is_err());
+    assert!(shared
+        .for_scope(&Scope::new("profile:alice").unwrap())
+        .unwrap()
+        .documents()
+        .get("items", "late")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]

@@ -15,8 +15,8 @@ use tinystoragedrivers::{
 };
 use tinystoragedrivers_api::DocumentStore;
 
-use super::DocumentStoreExt;
 use super::documents::Repo;
+use super::DocumentStoreExt;
 
 /// How long a claim blocks other processes before it can be taken over.
 pub const CLAIM_TTL_MS: i64 = 10 * 60 * 1000;

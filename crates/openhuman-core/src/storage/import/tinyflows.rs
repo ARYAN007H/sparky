@@ -27,7 +27,7 @@ use std::sync::{LazyLock, Mutex, Weak};
 
 use anyhow::{Context, Result};
 
-use super::{MARKER_OWNER, Outcome, Report, marker_spec, marker_step};
+use super::{marker_spec, marker_step, Outcome, Report, MARKER_OWNER};
 use crate::config::Config;
 use crate::storage::documents::Repo;
 use crate::storage::import_state;

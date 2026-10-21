@@ -1,6 +1,6 @@
 use super::*;
-use crate::storage::MemoryStorage;
 use crate::storage::rusqlite;
+use crate::storage::MemoryStorage;
 use crate::util::classic_transcript_fixture::write_classic;
 use sha2::Digest as _;
 use std::collections::BTreeMap;
