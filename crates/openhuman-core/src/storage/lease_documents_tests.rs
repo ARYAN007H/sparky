@@ -116,7 +116,7 @@ async fn bad_keys_and_corrupt_records_are_storage_errors() {
         .documents()
         .put(
             LEASE_COLLECTION,
-            tinystoragedrivers_types::Key::of([LEASE_OWNER, "k"])
+            tinystoragedrivers_types::Key::new(format!("{LEASE_OWNER}/k"))
                 .unwrap()
                 .as_str(),
             serde_json::json!({ "holder": 7 }),
@@ -169,7 +169,7 @@ async fn another_instances_grant_cannot_renew_or_release() {
 #[tokio::test]
 async fn sub_millisecond_ttl_does_not_expire_at_acquisition() {
     let storage = crate::storage::test_support::sqlite_backend().unwrap();
-    let a = DocumentLeases::cluster(&storage, "a", None, Duration::ZERO).unwrap();
+    let a = DocumentLeases::cluster(storage.backend.as_ref(), "a", None, Duration::ZERO).unwrap();
     let b = node(&storage, "b");
     let grant = a.acquire("k", 5).await.unwrap();
     assert!(grant.expires_at_ms > 5);

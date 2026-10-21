@@ -191,8 +191,9 @@ fn a_read_only_grant_may_inspect_queues_but_not_lease_or_enqueue() {
 #[test]
 fn validate_refuses_an_invalid_manifest_and_storage_layer_collections() {
     assert!(with_queues().validate().is_ok());
-    let mut broken = (*manifest()).clone();
-    broken.version = 99;
+    let mut broken = serde_json::to_value(manifest()).unwrap();
+    broken["version"] = json!(99);
+    let broken: QueueManifest = serde_json::from_value(broken).unwrap();
     let bad_manifest = StorageGrant {
         queues: Some(Arc::new(broken)),
         queue_backend: None,

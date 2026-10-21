@@ -188,7 +188,7 @@ async fn renewal_keeps_the_lease_and_a_lost_lease_fences_the_profile() {
     // Another node takes the profile over once the lease has (by its clock)
     // run out.
     let thief = crate::storage::lease::DocumentLeases::cluster(
-        backend.as_ref(),
+        backend.backend.as_ref(),
         "node-b",
         None,
         Duration::from_secs(TTL_SECS),

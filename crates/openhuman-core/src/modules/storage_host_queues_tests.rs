@@ -80,13 +80,11 @@ async fn peers() -> Peers {
     }
 }
 
-async fn queues_of(connection: &Connection, module_id: &str) -> Arc<dyn QueueStore> {
+async fn queues_of(connection: &Connection, _module_id: &str) -> Arc<dyn QueueStore> {
     let storage = tinystoragedrivers_busproxy::connect_storage(connection.clone())
         .await
         .expect("every module connects, with or without queues");
-    let scope = module_scope(None, module_id).unwrap();
-    let scoped = storage.for_scope(&scope).unwrap();
-    Arc::clone(scoped.queues())
+    Arc::clone(storage.queues())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

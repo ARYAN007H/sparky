@@ -1,7 +1,8 @@
 use super::*;
 use std::{ops::Range, sync::Arc, time::Duration};
 use tinystoragedrivers_api::{BlobStore, Storage, StorageBackend};
-use tinystoragedrivers_types::{Blob, BlobMeta, Capabilities, Result, Scope};
+use tinystoragedrivers_types::{Blob, BlobMeta, Capabilities, Result};
+use crate::storage::Scope;
 
 /// The TSD testkit memory engine uses its real clock; tests wait on the
 /// backend's observable expiry instead of mutating a process-global clock.
@@ -234,7 +235,7 @@ async fn a_hung_scope_sweep_times_out_and_counts_as_zero() {
 async fn a_hung_profile_listing_times_out_instead_of_stalling() {
     let hung = bounded_listing(
         Duration::from_millis(20),
-        std::future::pending::<Result<Vec<String>, String>>(),
+        std::future::pending::<std::result::Result<Vec<String>, String>>(),
     )
     .await;
     assert!(hung.is_none());
