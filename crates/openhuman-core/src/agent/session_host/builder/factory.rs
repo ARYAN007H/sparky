@@ -269,15 +269,7 @@ impl OpenHumanSessionHost {
         // layers on the turn path (it still governs the non-seam provider paths).
         let (mut model_name, supports_native) = match &turn_model_source {
             Some((source, model_name)) => {
-                let models = source.build(
-                    model_name,
-                    target_def.map_or(config.default_temperature, |definition| {
-                        definition.temperature
-                    }),
-                    None,
-                    None,
-                )?;
-                (model_name.clone(), models.native_tools())
+                (model_name.clone(), source.supports_native_tool_calling())
             }
             None => {
                 let (resolved_chat_model, model_name) =

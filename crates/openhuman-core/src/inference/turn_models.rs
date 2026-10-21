@@ -357,24 +357,20 @@ impl TurnModelSource {
                 .host_overrides()
                 .and_then(|local| local.model_for(&source.role))
             {
-                return custom
-                    .profile()
-                    .cloned()
-                    .unwrap_or_default()
-                    .tool_calling;
+                return custom.profile().cloned().unwrap_or_default().tool_calling;
             }
         }
         if let Some(direct) = &self.direct_model {
-            return direct
-                .profile()
-                .cloned()
-                .unwrap_or_default()
-                .tool_calling;
+            return direct.profile().cloned().unwrap_or_default().tool_calling;
         }
         if let Some(source) = &self.crate_native {
-            let provider_string = source.primary_override.as_deref().map(str::to_owned).unwrap_or_else(|| {
-                crate::inference::provider::provider_for_role(&source.role, &source.config)
-            });
+            let provider_string = source
+                .primary_override
+                .as_deref()
+                .map(str::to_owned)
+                .unwrap_or_else(|| {
+                    crate::inference::provider::provider_for_role(&source.role, &source.config)
+                });
             return !tinyinference_local::profile::is_local_provider_string(&provider_string);
         }
         false
