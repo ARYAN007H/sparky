@@ -159,7 +159,7 @@ pub(super) struct Docs(Repo);
 
 impl Docs {
     #[cfg(test)]
-    pub(super) fn over(scoped: &crate::storage::ScopedStorage) -> Self {
+    pub(super) fn over(scoped: &crate::storage::Storage) -> Self {
         Self(Repo::over(scoped, DOMAIN, collections))
     }
 
