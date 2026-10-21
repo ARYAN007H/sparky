@@ -642,16 +642,13 @@ impl Completer {
             request.timeout_ms
         );
         let wire_request = request.into_wire();
-        if let Err(message) =
-            openhuman_core::inference::host_runtime::ops::validate_complete_once_request(
-                &wire_request,
-            )
-        {
-            return Err(CoreError::Rpc {
-                method: COMPLETE,
-                message,
-            });
-        }
+        let model = endpoint.headers.iter().fold(
+            tinyinference_llm::providers::openai::OpenAiModel::new(endpoint.api_key.clone())
+                .with_base_url(endpoint.base_url.clone())
+                .with_model(model.clone()),
+            |model, (name, value)| model.with_header(name.clone(), value.clone()),
+        );
+        let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::new(model);
         let budget = self
             .budget
             .as_ref()
@@ -660,24 +657,37 @@ impl Completer {
                 call: budget.call,
             });
         // The spend ledger is an explicit argument of the call, not an ambient scope.
-        let call = openhuman_core::inference::host_runtime::ops::complete_once_controlled(
-            &endpoint,
+        let budget = budget.as_ref().map(|budget| {
+            tinyagents_harness::cost::ModelBudget::new(budget.ledger.clone(), budget.call)
+        });
+        let call = tinyagents_harness::oneshot::complete_once_controlled(
+            model,
             wire_request,
-            budget.as_ref(),
+            tinyagents_harness::oneshot::OneshotOptions { budget },
             self.observers.physical_dispatch.clone(),
             self.dispatch_admission.clone(),
         );
         let started = std::time::Instant::now();
         let response = call.await.map_err(|error| {
             let message = match error {
-                tinyagents_harness::cost::ControlledDispatchError::Admission(source) => {
+                tinyagents_harness::oneshot::CompleteOnceError::InvalidRequest(message) => {
+                    return CoreError::Rpc {
+                        method: COMPLETE,
+                        message,
+                    };
+                }
+                tinyagents_harness::oneshot::CompleteOnceError::Dispatch(
+                    tinyagents_harness::cost::ControlledDispatchError::Admission(source),
+                ) => {
                     return CoreError::DispatchAdmission {
                         method: COMPLETE,
                         source,
                         usage: None,
                     };
                 }
-                tinyagents_harness::cost::ControlledDispatchError::Model(source) => {
+                tinyagents_harness::oneshot::CompleteOnceError::Dispatch(
+                    tinyagents_harness::cost::ControlledDispatchError::Model(source),
+                ) => {
                     format!("complete_once: {source}")
                 }
             };
@@ -706,7 +716,7 @@ impl Completer {
     fn checked_endpoint(
         &self,
         request: &CompletionRequest,
-    ) -> Result<openhuman_core::inference::host_runtime::ops::CompletionEndpoint, CoreError> {
+    ) -> Result<CompletionEndpoint, CoreError> {
         let base_url = self.route.base_url.trim();
         let api_key = self.route.api_key.trim();
         if request.model.trim().is_empty() || base_url.is_empty() || api_key.is_empty() {
@@ -718,13 +728,11 @@ impl Completer {
                 endpoint: sanitize_url_for_display(base_url),
             });
         }
-        Ok(
-            openhuman_core::inference::host_runtime::ops::CompletionEndpoint {
-                base_url: base_url.to_string(),
-                api_key: api_key.to_string(),
-                headers: self.headers.clone(),
-            },
-        )
+        Ok(CompletionEndpoint {
+            base_url: base_url.to_string(),
+            api_key: api_key.to_string(),
+            headers: self.headers.clone(),
+        })
     }
 }
 
