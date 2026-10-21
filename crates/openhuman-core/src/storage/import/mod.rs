@@ -49,27 +49,43 @@
 //! with `tinyflows-import`; see [`tinyflows`].
 
 pub mod live;
+#[cfg(feature = "legacy-import")]
 mod schemas;
+#[cfg(feature = "legacy-import")]
 pub mod sessions;
+#[cfg(feature = "legacy-import")]
 mod snapshot;
+#[cfg(feature = "legacy-import")]
 pub mod tinyflows;
 
+#[cfg(feature = "legacy-import")]
 pub use schemas::{
     all_session_import_controller_schemas, all_session_import_registered_controllers,
 };
 
+#[cfg(feature = "legacy-import")]
 use std::path::Path;
+#[cfg(feature = "legacy-import")]
 use std::sync::Arc;
 
+#[cfg(feature = "legacy-import")]
 use anyhow::{anyhow, Context, Result};
+#[cfg(feature = "legacy-import")]
 use sha2::Digest;
+#[cfg(feature = "legacy-import")]
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
+#[cfg(feature = "legacy-import")]
 use super::documents::Repo;
+#[cfg(feature = "legacy-import")]
 use super::rusqlite;
+#[cfg(feature = "legacy-import")]
 use super::{block_on, StorageBackend};
+#[cfg(feature = "legacy-import")]
 use crate::config::Config;
+#[cfg(feature = "legacy-import")]
 use rusqlite::Connection;
+#[cfg(feature = "legacy-import")]
 use serde_json::Value;
 
 pub use snapshot::Snapshot;
@@ -90,6 +106,7 @@ pub struct ImportDoc {
 /// # Errors
 ///
 /// When the catalog cannot be read.
+#[cfg(feature = "legacy-import")]
 pub fn table_exists(conn: &Connection, table: &str) -> rusqlite::Result<bool> {
     conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
@@ -194,6 +211,7 @@ pub struct Report {
 }
 
 /// The legacy stores the host imports.
+#[cfg(feature = "legacy-import")]
 pub fn sources() -> Vec<Source> {
     vec![
         crate::security::approval::import_source(),
@@ -209,6 +227,7 @@ pub fn sources() -> Vec<Source> {
 ///
 /// Failures are logged and returned in the reports; none stops boot, since
 /// the legacy files are untouched and the import is retried next time.
+#[cfg(feature = "legacy-import")]
 pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: &Config) -> Vec<Report> {
     let Some(backend) = super::installed() else {
         return Vec::new();
@@ -237,6 +256,7 @@ pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: &Config) -> Ve
 
 /// Every importer, in order, over `backend` for `config`'s workspace; from
 /// synchronous code.
+#[cfg(feature = "legacy-import")]
 pub fn run_all(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report> {
     let mut reports = run_with(backend, config, &sources());
     reports.extend(tinyflows::run_with(backend, config));
@@ -245,6 +265,7 @@ pub fn run_all(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report
 }
 
 /// [`run`] over an explicit backend and source list, from synchronous code.
+#[cfg(feature = "legacy-import")]
 pub fn run_with(
     backend: &Arc<dyn StorageBackend>,
     config: &Config,
@@ -307,6 +328,7 @@ pub fn run_with(
 /// Runs `owner`'s document steps over the v1 `records`, in memory, and returns
 /// the v2 records they produce (in input order) with the collection specs to
 /// declare. A record in a collection no step reads passes through unchanged.
+#[cfg(feature = "legacy-import")]
 fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<CollectionSpec>)> {
     use tinystoragedrivers::schema::{Item, SourceRecord, StepBody};
     use tinystoragedrivers::Meta;
@@ -369,20 +391,24 @@ fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<Collec
 
 /// The marker id for `source` in `workspace`: a backend shared by several
 /// workspaces keeps one marker per workspace.
+#[cfg(feature = "legacy-import")]
 pub(crate) fn marker_id(domain: &str, workspace: &Path) -> String {
     let digest = sha2::Sha256::digest(workspace.as_os_str().as_encoded_bytes());
     format!("{domain}@{}", &hex::encode(digest)[..16])
 }
 
+#[cfg(feature = "legacy-import")]
 fn marker_spec() -> Vec<CollectionSpec> {
     Vec::new()
 }
 
 /// The `tsd.migrations` step of the import of `domain` in `workspace`.
+#[cfg(feature = "legacy-import")]
 pub(crate) fn marker_step(domain: &str, workspace: &Path) -> String {
     super::import_state::step_id(MARKER_KIND, &marker_id(domain, workspace))
 }
 
+#[cfg(feature = "legacy-import")]
 fn import_one(
     backend: &Arc<dyn StorageBackend>,
     config: &Config,
@@ -487,6 +513,6 @@ pub fn is_done(
     })?)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-import"))]
 #[path = "mod_tests.rs"]
 mod tests;
