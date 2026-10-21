@@ -165,7 +165,7 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
     let storage = backend.for_scope(&Scope::local()).unwrap();
     assert!(storage
         .streams()
-            .info(&format!("{}run.old", DriverAppendStore::JOURNAL_PREFIX))
+        .info(&format!("{}run.old", DriverAppendStore::JOURNAL_PREFIX))
         .await
         .unwrap()
         .is_none());
