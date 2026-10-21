@@ -670,7 +670,7 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
     assert!(!observed.allow_remote_fetch);
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn dispatch_replies_with_timeout_notice_when_handler_exceeds_deadline() {
     let timed_out = run_dispatch_harness(DispatchHarnessOptions {
         channel_name: "test-channel".to_string(),

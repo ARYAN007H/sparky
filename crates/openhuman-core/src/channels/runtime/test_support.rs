@@ -162,6 +162,22 @@ impl LinkedTelegramRuntime {
 pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
+        .and(path("/bottoken/getUpdates"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": []
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/bottoken/deleteWebhook"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": true
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
         .and(path("/bottoken/sendChatAction"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "ok": true,
@@ -204,10 +220,16 @@ pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
         mention_only: false,
     });
     let (dispatch, _receiver) = tokio::sync::mpsc::channel(4);
-    let runtime =
-        crate::channels::runtime::prepare_module_runtime_for_test(Arc::new(config), dispatch)
-            .await
-            .expect("linked TinyChannels runtime should prepare");
+    let mut runtime = crate::channels::runtime::prepare_module_runtime_for_test(
+        Arc::new(config.clone()),
+        dispatch,
+    )
+    .await
+    .expect("linked TinyChannels runtime should prepare");
+    runtime
+        .start(&config)
+        .await
+        .expect("mock Telegram provider should start without network access");
 
     LinkedTelegramRuntime {
         _env: env,
@@ -216,6 +238,26 @@ pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
         server,
         runtime,
     }
+}
+
+/// Bind a test runtime context to a real core context so module callbacks that
+/// clear durable channel history exercise the host reset path.
+pub(crate) fn bind_test_core_context(
+    context: &mut crate::channels::context::ChannelRuntimeContext,
+) -> Arc<crate::core::runtime::CoreContext> {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+
+    let workspace = context.workspace_dir.as_ref().clone();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    config.action_dir = workspace.clone();
+    config.config_path = workspace.join("config.toml");
+    let core = CoreContext::for_test(DomainSet::none(), Some(workspace)).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), Default::default())
+            .profile("channel-handle-test"),
+    );
+    context.core = Some(Arc::downgrade(&core));
+    core
 }
 
 #[derive(Debug, Clone)]

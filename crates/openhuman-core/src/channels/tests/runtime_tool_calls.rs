@@ -104,7 +104,7 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         crate::agent::tinyagents::TurnModelSource::from_model(fallback_provider),
     );
 
-    let runtime_ctx = Arc::new(ChannelRuntimeContext {
+    let mut runtime_ctx = ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         module_objects: Arc::new(HashMap::new()),
@@ -129,7 +129,9 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
         core: None,
-    });
+    };
+    let _core = crate::channels::runtime::test_support::bind_test_core_context(&mut runtime_ctx);
+    let runtime_ctx = Arc::new(runtime_ctx);
 
     let cmd_msg = traits::ChannelMessage {
         reply_to_id: None,

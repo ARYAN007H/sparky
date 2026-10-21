@@ -68,6 +68,50 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     }
 }
 
+async fn handle_linked_runtime_command(
+    ctx: &mut ChannelRuntimeContext,
+    msg: &ChannelMessage,
+    target_channel: Option<&Arc<ChannelHandle>>,
+    linked: &crate::channels::runtime::test_support::LinkedTelegramRuntime,
+) -> bool {
+    use tinychannels_bus::module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest};
+    use tinychannels_bus::module_remote::RemoteSessionScope;
+
+    ctx.channels_by_name = linked.channels();
+    let _core = crate::channels::runtime::test_support::bind_test_core_context(ctx);
+    let prepared = crate::modules::channel_controller::prepare_inbound(
+        &crate::channels::context::module_client(ctx).await,
+        PrepareChannelInboundRequest {
+            source: ChannelInboundSource::Legacy {
+                message: msg.clone(),
+                envelope: None,
+            },
+            namespace: "main".into(),
+            session_policy: Default::default(),
+            preparation_mode: Default::default(),
+        },
+    )
+    .await
+    .expect("linked TinyChannels should prepare the command's trusted scope");
+    let session_key = prepared.session_key.clone();
+    let scope = RemoteSessionScope {
+        channel: prepared.envelope.channel,
+        conversation: prepared.envelope.conversation,
+        session_key: session_key.clone(),
+    };
+    handle_runtime_command_with_reset(
+        ctx,
+        msg,
+        target_channel,
+        &prepared.history_key,
+        Some(scope),
+        Some(session_key),
+        &prepared.message,
+        || async { Ok(()) },
+    )
+    .await
+}
+
 #[cfg(feature = "modules")]
 async fn module_route_help_response(
     workspace_dir: &Path,
@@ -412,8 +456,8 @@ async fn failed_history_reset_does_not_apply_requested_route() {
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_status_replies_without_agent() {
-    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
-    let ctx = runtime_context(PathBuf::from("/tmp"));
+    let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
+    let mut ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
@@ -429,13 +473,7 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(
-        &ctx,
-        &msg,
-        Some(&channel),
-        &conversation_history_key(&msg),
-    )
-    .await;
+    let handled = handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await;
     assert!(handled);
 
     let sent = channel_state.sent.lock().unwrap();
@@ -450,8 +488,8 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
 
 #[tokio::test]
 async fn handle_runtime_command_without_target_channel_still_consumes_command() {
-    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
-    let ctx = runtime_context(PathBuf::from("/tmp"));
+    let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
+    let mut ctx = runtime_context(PathBuf::from("/tmp"));
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: None,
@@ -465,15 +503,14 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
         sender_name: None,
     };
 
-    let handled =
-        handle_runtime_command_if_needed(&ctx, &msg, None, &conversation_history_key(&msg)).await;
+    let handled = handle_linked_runtime_command(&mut ctx, &msg, None, &linked).await;
     assert!(handled);
 }
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_help_replies_with_remote_command_list() {
-    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
-    let ctx = runtime_context(PathBuf::from("/tmp"));
+    let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
+    let mut ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
@@ -489,13 +526,7 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(
-        &ctx,
-        &msg,
-        Some(&channel),
-        &conversation_history_key(&msg),
-    )
-    .await;
+    let handled = handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await;
     assert!(handled);
 
     let sent = channel_state.sent.lock().unwrap();
@@ -511,9 +542,9 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
-    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
+    let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let tempdir = tempfile::tempdir().unwrap();
-    let ctx = runtime_context(tempdir.path().to_path_buf());
+    let mut ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
@@ -529,13 +560,7 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(
-        &ctx,
-        &msg,
-        Some(&channel),
-        &conversation_history_key(&msg),
-    )
-    .await;
+    let handled = handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await;
     assert!(handled);
 
     let sent = channel_state.sent.lock().unwrap();
@@ -548,9 +573,9 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
-    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
+    let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let tempdir = tempfile::tempdir().unwrap();
-    let ctx = runtime_context(tempdir.path().to_path_buf());
+    let mut ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let sender_key = "telegram_alice_chat-remote";
@@ -567,15 +592,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(
-        handle_runtime_command_if_needed(
-            &ctx,
-            &new_msg,
-            Some(&channel),
-            &conversation_history_key(&new_msg)
-        )
-        .await
-    );
+    assert!(handle_linked_runtime_command(&mut ctx, &new_msg, Some(&channel), &linked).await);
     set_route_selection(
         &ctx,
         sender_key,
@@ -611,15 +628,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(
-        handle_runtime_command_if_needed(
-            &ctx,
-            &status_msg,
-            Some(&channel),
-            &conversation_history_key(&status_msg)
-        )
-        .await
-    );
+    assert!(handle_linked_runtime_command(&mut ctx, &status_msg, Some(&channel), &linked).await);
 
     let sessions_msg = ChannelMessage {
         reply_to_id: None,
@@ -633,15 +642,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(
-        handle_runtime_command_if_needed(
-            &ctx,
-            &sessions_msg,
-            Some(&channel),
-            &conversation_history_key(&sessions_msg)
-        )
-        .await
-    );
+    assert!(handle_linked_runtime_command(&mut ctx, &sessions_msg, Some(&channel), &linked).await);
 
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
@@ -666,9 +667,9 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_new_uses_module_storage() {
-    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
+    let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let tempdir = tempfile::tempdir().unwrap();
-    let ctx = runtime_context(tempdir.path().to_path_buf());
+    let mut ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
@@ -683,15 +684,7 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(
-        handle_runtime_command_if_needed(
-            &ctx,
-            &msg,
-            Some(&channel),
-            &conversation_history_key(&msg)
-        )
-        .await
-    );
+    assert!(handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await);
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(sent[0].content.contains("Started new session"));
