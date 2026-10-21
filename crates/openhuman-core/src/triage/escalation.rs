@@ -259,7 +259,7 @@ async fn dispatch_target_agent(
     let outcome = crate::inference::host_runtime::ops::agent_chat_for(
         definition,
         prompt,
-        SubagentRunOptions {
+        // SUBAGENT_OPTIONS_REMOVED
             run_context: crate::agent::tinyagents::host::OpenHumanRunContext::new()
                 .with_core(ctx.core().cloned())
                 .with_host_env(&parent_ctx.host_env)
