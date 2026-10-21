@@ -411,6 +411,7 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
         turn_id: "media-read-lease-test".into(),
     };
     let object = runtime.lease.object();
+    let bytes = vec![b'x'; tinychannels_bus::module_media::MEDIA_READ_CHUNK_BYTES + 1];
     let begin: tinychannels_bus::MediaUploadHandle = object
         .call_confidential(
             tinychannels_bus::methods::BEGIN_MEDIA_UPLOAD,
@@ -422,22 +423,34 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
                 file_name: Some("note.txt".into()),
                 duration_ms: None,
                 codec: None,
-                byte_count: 4,
+                byte_count: bytes.len(),
             },),
         )
         .await
         .expect("module accepts a scoped upload");
+    let split = tinychannels_bus::module_media::MEDIA_UPLOAD_CHUNK_BYTES;
     object
-        .call_confidential::<()>(
+        .call_confidential::<u32>(
             tinychannels_bus::methods::APPEND_MEDIA_UPLOAD_CHUNK,
             (tinychannels_bus::MediaUploadChunk {
                 handle: begin.clone(),
                 sequence: 0,
-                bytes: b"note".to_vec(),
+                bytes: bytes[..split].to_vec(),
             },),
         )
         .await
         .expect("module accepts the upload bytes");
+    object
+        .call_confidential::<u32>(
+            tinychannels_bus::methods::APPEND_MEDIA_UPLOAD_CHUNK,
+            (tinychannels_bus::MediaUploadChunk {
+                handle: begin.clone(),
+                sequence: 1,
+                bytes: bytes[split..].to_vec(),
+            },),
+        )
+        .await
+        .expect("module accepts the final upload chunk");
     let media: tinychannels_bus::MediaReference = object
         .call_confidential(
             tinychannels_bus::methods::FINISH_MEDIA_UPLOAD,
@@ -453,11 +466,22 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
                 instance: "telegram".into(),
                 scope,
                 media,
-                max_bytes: 16,
+                max_bytes: bytes.len() as u64,
             },),
         )
         .await
         .expect("module opens a scoped read handle");
+    let first_chunk: tinychannels_bus::MediaReadChunkResult = object
+        .call_confidential(
+            tinychannels_bus::methods::READ_MEDIA_CHUNK,
+            (tinychannels_bus::MediaReadChunk {
+                handle: read.handle.clone(),
+                sequence: 0,
+            },),
+        )
+        .await
+        .expect("read handle is usable before lease drop");
+    assert!(!first_chunk.done);
     let handle = read.handle.clone();
     crate::channels::runtime::dispatch::drop_media_read_lease_for_test(
         runtime.client.clone(),
@@ -472,7 +496,7 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
                     tinychannels_bus::methods::READ_MEDIA_CHUNK,
                     (tinychannels_bus::MediaReadChunk {
                         handle: handle.clone(),
-                        sequence: 0,
+                        sequence: 1,
                     },),
                 )
                 .await;
