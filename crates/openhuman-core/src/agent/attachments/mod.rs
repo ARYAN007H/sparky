@@ -367,6 +367,7 @@ pub(crate) async fn store_scoped_channel_media(
     let scope = AttachmentAccessScope {
         external_channel: false,
         workspace: Some(config.action_dir.clone()),
+        ..Default::default()
     };
     save(config, thread, name, mime, bytes, &scope).await
 }
@@ -505,6 +506,7 @@ pub(crate) async fn delegation_prompt(
     let scope = AttachmentAccessScope {
         external_channel: false,
         workspace: workspace.map(|workspace| workspace.root.clone()),
+        ..Default::default()
     };
     stage(&prompt, "delegation", &config, &scope).await
 }
@@ -543,6 +545,7 @@ pub(crate) async fn has_resolvable_image(
     let scope = AttachmentAccessScope {
         external_channel: false,
         workspace: workspace.map(|workspace| workspace.root.clone()),
+        ..Default::default()
     };
     for path in paths {
         let path = legacy::migrate_path(&config, &path, &scope)
@@ -640,6 +643,7 @@ pub(crate) async fn stage_turn(
             Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
         ),
         workspace: workspace.map(|workspace| workspace.root.clone()),
+        ..Default::default()
     };
     stage(message, thread.unwrap_or("direct"), &config, &scope).await
 }
