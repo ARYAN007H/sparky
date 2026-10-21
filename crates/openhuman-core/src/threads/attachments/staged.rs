@@ -445,6 +445,7 @@ pub(crate) async fn read_authorized_native_attachment(
     if !current_authority && !(allow_committed_history && committed_authority) {
         return Err("native attachment lacks a current or committed host grant".into());
     }
+    validate_native_attachment_policy(&record.attachment, config)?;
     let entries = vec![record.attachment.clone()];
     validate_staged_files(ctx, thread_id, config, &entries).await?;
     let entry = &record.attachment;
@@ -474,11 +475,63 @@ pub(crate) async fn read_authorized_native_attachment(
     let bytes = tokio::fs::read(path)
         .await
         .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
+    validate_native_attachment_size(&record.attachment.part, bytes.len(), config)?;
     Ok(ResolvedNativeAttachment {
         path: entry.path.clone(),
         mime,
         bytes,
     })
+}
+
+fn validate_native_attachment_policy(
+    entry: &StoredAttachment,
+    config: &crate::config::Config,
+) -> Result<(), String> {
+    let media = opaque_media(&entry.part)
+        .ok_or_else(|| "native attachment kind is invalid".to_owned())?;
+    let mime = media
+        .content_type
+        .as_deref()
+        .ok_or_else(|| "native attachment MIME is unavailable".to_owned())?;
+    let is_image = matches!(entry.part, ContentPart::Image { .. });
+    let allowed = if is_image {
+        matches!(mime, "image/png" | "image/jpeg" | "image/webp" | "image/gif")
+    } else {
+        config
+            .multimodal_files
+            .allowed_mime_types
+            .iter()
+            .any(|value| value == mime)
+    };
+    if !allowed {
+        return Err("native attachment MIME is no longer allowed".into());
+    }
+    Ok(())
+}
+
+fn validate_native_attachment_size(
+    part: &ContentPart,
+    actual_bytes: usize,
+    config: &crate::config::Config,
+) -> Result<(), String> {
+    let media = opaque_media(part)
+        .ok_or_else(|| "native attachment kind is invalid".to_owned())?;
+    let is_image = matches!(part, ContentPart::Image { .. });
+    let declared = media
+        .size_bytes
+        .and_then(|size| usize::try_from(size).ok())
+        .ok_or_else(|| "native attachment size is unavailable".to_owned())?;
+    let (image_mb, file_mb) = (
+        config.multimodal.effective_limits().1,
+        config.multimodal_files.effective_limits().1,
+    );
+    let limit = (if is_image { image_mb } else { file_mb })
+        .saturating_mul(1024 * 1024)
+        .min(tinychannels_bus::module_media::MEDIA_UPLOAD_MAX_BYTES);
+    if actual_bytes == 0 || actual_bytes != declared || actual_bytes > limit {
+        return Err("native attachment exceeds its configured byte limit".into());
+    }
+    Ok(())
 }
 
 pub(crate) fn native_parts_in_committed_message(
@@ -560,22 +613,9 @@ pub(super) async fn validate_staged_files(
             .as_deref()
             .filter(|mime| !mime.is_empty())
             .ok_or_else(|| "staged attachment MIME type is missing".to_string())?;
-        let allowed_image_mime = matches!(
-            mime,
-            "image/png" | "image/jpeg" | "image/webp" | "image/gif"
-        );
-        let allowed_file_mime = config
-            .multimodal_files
-            .allowed_mime_types
-            .iter()
-            .any(|allowed| allowed == mime);
-        if (is_image && !allowed_image_mime)
-            || (!is_image && !allowed_file_mime)
+        if (is_image && !mime.starts_with("image/"))
             || !metadata.is_file()
             || metadata.len() > (if is_image { image_mb } else { file_mb } * 1024 * 1024) as u64
-            || media
-                .size_bytes
-                .is_some_and(|size_bytes| size_bytes != metadata.len())
         {
             return Err("staged attachment exceeds configured type or size limit".into());
         }
