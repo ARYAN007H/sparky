@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::subagent_host::SubagentRunOutcome;
 use tinyagents_definition::{ModelSpec, ToolScope};
 use tinytools::Tool;
 

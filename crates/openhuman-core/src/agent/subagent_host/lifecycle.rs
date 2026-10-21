@@ -14,7 +14,7 @@ use tinyagents_harness::tool::ToolSnapshot;
 use tinyagents_orchestration::subagent::{
     ArtifactReference, PreparedSubagent, SubagentCapabilities, SubagentDriver, SubagentError,
     SubagentExecution, SubagentExecutor, SubagentIncomplete, SubagentOutcome, SubagentOutcomeKind,
-    SubagentPause, SubagentPausePersistenceDisposition, SubagentPersistence,
+    SubagentPause, SubagentPausePersistenceDisposition,
     SubagentPersistenceDisposition, SubagentPlanner, SubagentRequest, SubagentResume,
     SubagentRunResult, SubagentTaskKey, SubagentTerminalPersistenceDisposition,
 };
