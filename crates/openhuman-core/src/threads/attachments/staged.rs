@@ -24,6 +24,13 @@ pub(super) struct StagedAttachmentClaim {
     pub(super) canceled: bool,
 }
 
+pub(crate) struct ResolvedNativeAttachment {
+    pub(crate) path: String,
+    pub(crate) mime: String,
+    pub(crate) name: String,
+    pub(crate) bytes: Vec<u8>,
+}
+
 pub(super) const STAGED_DOMAIN: &str = "threads::attachments";
 pub(super) const STAGED_COLLECTION: &str = crate::threads::store::STAGED_ATTACHMENTS;
 pub(super) const STAGED_TTL_SECS: i64 = 7 * 24 * 60 * 60;
@@ -382,6 +389,79 @@ pub(crate) async fn commit_native_channel_parts(
     let entries = read_staged_entries(ctx, thread_id, parts, &config).await?;
     validate_staged_files(ctx, thread_id, &config, &entries).await?;
     claim_staged_refs(ctx, thread_id, &config, committed_message_id, &entries).await
+}
+
+pub(crate) async fn read_authorized_native_attachment(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    thread_id: &str,
+    opaque_id: &str,
+    current_parts: &[ContentPart],
+) -> Result<ResolvedNativeAttachment, String> {
+    let id = staged_doc_id(opaque_id)?;
+    let tenant = tenant_for(ctx)?;
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
+    let record = get_staged_record(&repo, &id)?
+        .ok_or_else(|| "native attachment is not registered".to_owned())?;
+    if record.tenant != tenant || record.thread_id != thread_id {
+        return Err("native attachment is outside the active session scope".into());
+    }
+    if record.claim.as_ref().is_some_and(|claim| claim.canceled) {
+        return Err("native attachment was canceled".into());
+    }
+    let current_authority = current_parts.iter().any(|part| {
+        opaque_media(part)
+            .and_then(|media| media.opaque_id.as_deref())
+            .is_some_and(|candidate| candidate == opaque_id)
+            && part == &record.attachment.part
+    });
+    let committed_authority = record.claim.as_ref().is_some_and(|claim| {
+        claim.tenant == tenant
+            && claim.thread_id == thread_id
+            && claim.part == record.attachment.part
+    });
+    if !current_authority && !committed_authority {
+        return Err("native attachment lacks a current or committed host grant".into());
+    }
+    let entries = vec![record.attachment.clone()];
+    validate_staged_files(ctx, thread_id, config, &entries).await?;
+    let entry = &record.attachment;
+    let workspace = crate::agent::attachments::thread_action_dir(
+        ctx,
+        config,
+        &config.workspace_dir,
+        Some(thread_id),
+    )
+    .await
+    .map_err(|_| "native attachment workspace is unavailable".to_owned())?;
+    let scope = crate::agent::attachments::AttachmentAccessScope {
+        external_channel: false,
+        workspace: Some(workspace),
+        thread_id: Some(thread_id.to_owned()),
+        ..Default::default()
+    };
+    let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
+        .await
+        .map_err(|_| "native attachment workspace path is invalid".to_owned())?;
+    let media = opaque_media(&entry.part)
+        .ok_or_else(|| "native attachment kind is invalid".to_owned())?;
+    let mime = media
+        .content_type
+        .clone()
+        .ok_or_else(|| "native attachment MIME is unavailable".to_owned())?;
+    let name = media
+        .file_name
+        .clone()
+        .unwrap_or_else(|| "attachment".to_owned());
+    let bytes = tokio::fs::read(path)
+        .await
+        .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
+    Ok(ResolvedNativeAttachment {
+        path: entry.path.clone(),
+        mime,
+        name,
+        bytes,
+    })
 }
 
 pub(crate) fn native_parts_in_committed_message(
