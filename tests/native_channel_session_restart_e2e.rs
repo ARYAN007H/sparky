@@ -84,7 +84,6 @@ async fn start_mock_servers() -> MockServers {
         .route("/botsession-restart-token/sendChatAction", post(ok))
         .route("/botsession-restart-token/deleteWebhook", post(ok))
         .route("/botsession-restart-token/getMe", get(get_me))
-        .route("/botsession-restart-token/getFile", post(get_voice_file))
         .route(
             "/file/botsession-restart-token/voice/input.oga",
             get(download_voice_file),
@@ -173,6 +172,17 @@ async fn get_file(State(state): State<Arc<MockState>>, Json(body): Json<Value>) 
         .get("file_id")
         .and_then(Value::as_str)
         .unwrap_or_default();
+    if file_id == "fixture-voice-file" {
+        state
+            .voice_file_requests
+            .lock()
+            .expect("voice file requests")
+            .push(file_id.to_owned());
+        return Json(json!({
+            "ok": true,
+            "result": { "file_path": "voice/input.oga", "file_size": 2575 }
+        }));
+    }
     state
         .file_requests
         .lock()
@@ -221,23 +231,6 @@ async fn auth_me() -> Json<Value> {
 
 async fn get_me() -> Json<Value> {
     Json(json!({ "ok": true, "result": { "id": 9, "is_bot": true, "username": "test_bot" } }))
-}
-
-async fn get_voice_file(
-    State(state): State<Arc<MockState>>,
-    Json(body): Json<Value>,
-) -> Json<Value> {
-    state
-        .voice_file_requests
-        .lock()
-        .expect("voice file requests")
-        .push(
-            body.get("file_id")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-        );
-    Json(json!({ "ok": true, "result": { "file_path": "voice/input.oga", "file_size": 2575 } }))
 }
 
 async fn download_voice_file(State(state): State<Arc<MockState>>) -> impl IntoResponse {
