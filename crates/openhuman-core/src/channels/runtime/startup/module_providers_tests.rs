@@ -978,7 +978,7 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
                     tinychannels_bus::methods::READ_MEDIA_CHUNK,
                     (tinychannels_bus::MediaReadChunk {
                         handle: handle.clone(),
-                        sequence: 1,
+                        sequence: 0,
                     },),
                 )
                 .await;

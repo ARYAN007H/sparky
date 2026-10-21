@@ -492,7 +492,9 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
     tokio::fs::write(&pending_file, b"pending bytes")
         .await
         .unwrap();
-    insert_record(&repo, &staged_record(pending.clone(), pending_path));
+    let mut pending_record = staged_record(pending.clone(), pending_path);
+    pending_record.thread_id = thread_id.into();
+    insert_record(&repo, &pending_record);
     let lease = NativeStagedLease::new(
         ctx.clone(),
         thread_id.into(),
@@ -535,7 +537,9 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
     tokio::fs::write(&removed_file, b"removed bytes")
         .await
         .unwrap();
-    insert_record(&repo, &staged_record(removed.clone(), removed_path));
+    let mut removed_record = staged_record(removed.clone(), removed_path);
+    removed_record.thread_id = thread_id.into();
+    insert_record(&repo, &removed_record);
     let queue_lease = NativeStagedLease::new(
         ctx.clone(),
         thread_id.into(),
@@ -595,7 +599,9 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
     tokio::fs::write(&committed_file, b"committed bytes")
         .await
         .unwrap();
-    insert_record(&repo, &staged_record(committed.clone(), committed_path));
+    let mut committed_record = staged_record(committed.clone(), committed_path);
+    committed_record.thread_id = thread_id.into();
+    insert_record(&repo, &committed_record);
     let durable_claim = claim("user:request", committed.clone(), false);
     claim_staged_record(
         &repo,
