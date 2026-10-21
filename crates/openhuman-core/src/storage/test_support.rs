@@ -2,9 +2,9 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::storage::StorageBackend;
 #[cfg(feature = "storage-sqlite")]
 use crate::storage::block_on_anyhow;
+use crate::storage::StorageBackend;
 
 /// A real TSD in-memory backend for tests that do not require conditional
 /// writes or persistence across backend instances.
