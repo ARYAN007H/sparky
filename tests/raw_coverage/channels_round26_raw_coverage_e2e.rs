@@ -149,6 +149,8 @@ async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
 }
 
 #[tokio::test]
+// This fixture intentionally exercises the v21 adapter retained for one release.
+#[allow(deprecated)]
 async fn telegram_loopback_covers_reaction_text_fallback_and_media_send_paths() {
     let _env = env_lock_async().await;
     let (base, state) = spawn_telegram_mock().await;

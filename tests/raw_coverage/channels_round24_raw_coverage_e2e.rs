@@ -10,6 +10,8 @@ use tinychannels::delivery::progressive::{
 use tinychannels::providers::email_channel::test_support as email_support;
 use tinychannels::ChannelMessage;
 
+// This fixture intentionally constructs the v21 DTO to retain compatibility coverage.
+#[allow(deprecated)]
 fn channel_message(channel: &str, reply_target: &str, content: &str) -> ChannelMessage {
     ChannelMessage {
         id: "msg-1".to_string(),
