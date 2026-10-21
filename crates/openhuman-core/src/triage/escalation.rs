@@ -254,12 +254,33 @@ async fn dispatch_target_agent(
         .get(agent_id)
         .ok_or_else(|| anyhow!("agent definition `{agent_id}` not found in registry"))?;
 
-    tracing::debug!(agent_id = %agent_id, "[triage::escalation] dispatching direct agent turn");
+    let configured_model = config
+        .configured_agent_model(agent_id, !definition.subagents.is_empty())
+        .map(str::to_owned);
+    let model_override = configured_model.or_else(|| match &definition.model {
+        tinyagents_definition::ModelSpec::Hint(role) => Some(format!("hint:{role}")),
+        tinyagents_definition::ModelSpec::Exact(model) => Some(model.clone()),
+        tinyagents_definition::ModelSpec::Inherit => Some(parent_ctx.model_name.clone()),
+    });
+
+    // Synchronous child runs strip nested delegation tools regardless of the
+    // target definition's allowlist. Keep that same authority boundary.
+    let mut direct_definition = definition.clone();
+    direct_definition
+        .disallowed_tools
+        .extend(["spawn_subagent".to_string(), "delegate_*".to_string()]);
+
+    tracing::debug!(
+        agent_id = %agent_id,
+        model = ?model_override,
+        tool_count = parent_ctx.all_tools.len(),
+        "[triage::escalation] dispatching direct agent turn"
+    );
 
     let outcome = crate::inference::host_runtime::ops::agent_chat_for(
         &mut config,
         crate::inference::host_runtime::ops::AgentChatTarget::Definition {
-            definition,
+            definition: &direct_definition,
             host: None,
             seed: None,
             usage: None,
@@ -271,7 +292,7 @@ async fn dispatch_target_agent(
         },
         prompt,
         model_override,
-        Some(definition.temperature),
+        Some(direct_definition.temperature),
         None,
         None,
         None,
@@ -281,17 +302,15 @@ async fn dispatch_target_agent(
         },
     )
     .await
-    .map_err(|e| anyhow!("run_subagent(`{agent_id}`) failed: {e}"))?;
+    .map_err(|e| anyhow!("agent_chat_for({agent_id}) failed: {e}"))?;
 
     tracing::debug!(
         agent_id = %agent_id,
-        elapsed_ms = outcome.elapsed.as_millis() as u64,
-        iterations = outcome.iterations,
-        output_chars = outcome.output.chars().count(),
-        "[triage::escalation] run_subagent completed"
+        output_chars = outcome.value.chars().count(),
+        "[triage::escalation] direct agent turn completed"
     );
 
-    Ok(outcome.output)
+    Ok(outcome.value)
 }
 
 /// What survives an acknowledged trigger, for the source it actually came from.
