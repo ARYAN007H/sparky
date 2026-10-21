@@ -155,10 +155,11 @@ pub struct MoveReport {
 ///
 /// # Errors
 ///
-/// Fails closed on non-zero stream bases, expiring blobs (the blob port cannot
-/// preserve an absolute expiry), malformed source data, or a target write
-/// error. Re-running is idempotent for documents/blobs and verifies stream
-/// prefixes before appending missing entries.
+/// Fails closed on non-zero stream bases, timestamped seals, expiring blobs
+/// (the target ports cannot preserve those source metadata fields), malformed
+/// source data, or a target write error. Re-running is idempotent for
+/// documents/blobs and verifies stream prefixes before appending missing
+/// entries.
 #[cfg(feature = "legacy-import")]
 pub async fn copy_inventory(
     backend: &Arc<dyn StorageBackend>,
@@ -196,12 +197,8 @@ pub async fn copy_inventory(
             docs.ensure_collection(&CollectionSpec::new(&row.collection))
                 .await?;
             let mut options = WriteOptions::new();
-            if row.meta.schema != 0 {
-                options.schema = row.meta.schema;
-            }
-            if row.meta.created_ms != 0 {
-                options.created_ms = Some(row.meta.created_ms);
-            }
+            options.schema = row.meta.schema;
+            options.created_ms = Some(row.meta.created_ms);
             options.expires_ms = row.meta.expires_ms;
             match docs
                 .put_with(
@@ -225,6 +222,12 @@ pub async fn copy_inventory(
                 bail!(
                     "cannot preserve non-zero base {} for legacy stream {source}/{} with the v2 append port",
                     row.base,
+                    row.name
+                );
+            }
+            if row.sealed_ms.is_some() {
+                bail!(
+                    "target stream port cannot preserve the seal timestamp for legacy stream {source}/{}",
                     row.name
                 );
             }
@@ -293,10 +296,9 @@ pub async fn copy_inventory(
 
 /// Reads an explicit SQLite source and copies its known legacy scopes.
 ///
-/// The caller should run the synchronous inventory read on a blocking worker
-/// when this function is invoked from an async runtime. MongoDB and other
-/// non-SQLite legacy sources need their own read-only inventory adapter; they
-/// are not enumerated from the v2 target backend.
+/// The synchronous inventory read runs on a blocking worker. MongoDB and
+/// other non-SQLite legacy sources need their own read-only inventory adapter;
+/// they are not enumerated from the v2 target backend.
 #[cfg(feature = "legacy-import")]
 pub async fn run_from_source(
     backend: &Arc<dyn StorageBackend>,
