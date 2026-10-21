@@ -94,21 +94,11 @@ fn handle_models(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
 }
 
 fn report_controller() -> BoundRegisteredController {
-    BoundRegisteredController::after_gate(
-        schemas("report"),
-        load_config,
-        parse_report,
-        run_report,
-    )
+    BoundRegisteredController::after_gate(schemas("report"), load_config, parse_report, run_report)
 }
 
 fn models_controller() -> BoundRegisteredController {
-    BoundRegisteredController::after_gate(
-        schemas("models"),
-        load_config,
-        parse_models,
-        run_models,
-    )
+    BoundRegisteredController::after_gate(schemas("models"), load_config, parse_models, run_models)
 }
 
 fn load_config(ctx: DispatchCtx) -> ControllerTask<Config> {
@@ -124,9 +114,7 @@ fn parse_models(params: Map<String, Value>) -> Result<bool, String> {
 }
 
 fn run_report(_ctx: DispatchCtx, config: Config, (): ()) -> ControllerFuture {
-    Box::pin(async move {
-        to_json(crate::platform::doctor::rpc::doctor_report(&config).await?)
-    })
+    Box::pin(async move { to_json(crate::platform::doctor::rpc::doctor_report(&config).await?) })
 }
 
 fn run_models(_ctx: DispatchCtx, config: Config, use_cache: bool) -> ControllerFuture {
