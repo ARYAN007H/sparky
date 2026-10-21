@@ -243,9 +243,7 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
     }
 
     // A named scope is an explicit allowlist: unless it names a spawn tool it
-    // delegates only to the sub-agents its host declares, never to the
-    // inherited built-in roster (which would otherwise come back as
-    // `delegate_*` tools the scope never listed).
+    // cannot reach the inherited built-in sub-agent roster.
     let declares_subagents = !parts.subagents.is_empty();
     if matches!(definition.tools, tinyagents_definition::ToolScope::Named(_))
         && !definition.tools.names_a_spawn_tool()

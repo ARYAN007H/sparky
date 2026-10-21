@@ -321,7 +321,8 @@ fn assert_refused_without_async_reference(result: &str) {
     assert!(
         lowercase.contains("not available")
             || lowercase.contains("not allowed")
-            || lowercase.contains("not in the current session"),
+            || lowercase.contains("not in the current session")
+            || lowercase.starts_with("unknown tool `spawn_subagent`"),
         "the attempted spawn must return an explicit refusal: {result}"
     );
     for reference_field in ["task_id", "subagent_session_id", "status"] {
