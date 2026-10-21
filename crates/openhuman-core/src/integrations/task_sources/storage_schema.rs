@@ -94,7 +94,9 @@ fn sources_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 .set("created_ms", created_ms)
                 .set_some("last_fetch_ms", last_fetch_ms)
                 .build();
-            Ok(TargetRecord::new(SOURCES, key_of(&record.id)?, body).created_ms(created_ms))
+            Ok(TargetRecord::new(SOURCES, key_of(&record.id)?, body)
+                .created_ms(created_ms)
+                .source_metadata(record.meta))
         })
         .collect()
 }
@@ -121,7 +123,8 @@ fn ingested_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 .build();
             Some(
                 TargetRecord::new(INGESTED, ingested_id(source_id, external_id), body)
-                    .created_ms(ingested_ms),
+                    .created_ms(ingested_ms)
+                    .source_metadata(record.meta),
             )
         })
         .collect())

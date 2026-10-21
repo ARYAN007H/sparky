@@ -114,7 +114,8 @@ fn integration_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 .set_some("scored_ms", time_ms(old, "scored_at"))
                 .build();
             Ok(TargetRecord::new(NOTIFICATIONS, key_of(&record.id)?, body)
-                .created_ms(record.meta.created_ms))
+                .created_ms(record.meta.created_ms)
+                .source_metadata(record.meta))
         })
         .collect()
 }
@@ -129,7 +130,8 @@ fn renamed(
             .map(|record| {
                 Ok(
                     TargetRecord::new(collection, key_of(&record.id)?, record.body)
-                        .created_ms(record.meta.created_ms),
+                        .created_ms(record.meta.created_ms)
+                        .source_metadata(record.meta),
                 )
             })
             .collect()
@@ -161,7 +163,11 @@ fn core_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                     old.get("read").and_then(Value::as_bool).unwrap_or(false),
                 )
                 .build();
-            Some(TargetRecord::new(CORE, core_id(workspace, event), body).created_ms(created_ms))
+            Some(
+                TargetRecord::new(CORE, core_id(workspace, event), body)
+                    .created_ms(created_ms)
+                    .source_metadata(record.meta),
+            )
         })
         .collect())
 }
