@@ -156,9 +156,9 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         "boot must leave the historical v1 storage.db byte-for-byte unchanged"
     );
 
-    // The desktop's root context is unscoped; profile-owned records are read
-    // through the same owners under the active profile context they belong to.
-    let workspace = profile.join("workspace");
+    // The profile's V2 workspace resolves its default backend to the exact
+    // storage.db that desktop boot just opened.
+    let workspace = profile.join("files");
     let mut config = openhuman_core::config::Config::default();
     config.config_path = profile.join("config.toml");
     config.workspace_dir = workspace.clone();
@@ -181,15 +181,9 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .build()
             .await
             .unwrap();
-            let profile_context = runtime.context().derive_with(
-                openhuman_core::core::runtime::ContextOverlay::new(
-                    config.clone(),
-                    openhuman_core::core::runtime::DomainSet::full(),
-                    openhuman_core::tools::toolpacks::ToolGroups::none(),
-                )
-                .profile("u1"),
-            );
-            openhuman_core::core::runtime::CoreContext::scope(profile_context, async {
+            openhuman_core::core::runtime::CoreContext::scope(
+                std::sync::Arc::clone(runtime.context()),
+                async {
                 let dispatch = openhuman_core::core::runtime::DispatchCtx::ambient();
                 let thread_store = openhuman_core::threads::store::ConversationStore::new(
                     dispatch,
@@ -208,7 +202,8 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
                     "approval owner did not read the v1 database record"
                 );
                 assert_eq!(approvals[0].request_id, "fixture-approval");
-            })
+                },
+            )
             .await;
         });
     })
@@ -222,7 +217,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         openhuman_core::storage::open(&url).await
     })
     .unwrap();
-    let scope = openhuman_core::storage::Scope::new("u:u1").unwrap();
+    let scope = openhuman_core::storage::Scope::local().unwrap();
     let scoped = backend.for_scope(&scope).unwrap();
     let secrets = openhuman_core::storage::secrets::over(
         &scoped,

@@ -208,10 +208,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    // Legacy profile-owned records whose public owners must continue to read
-    // them after the profile's real v1-to-v2 boot migration.
+    // Records in an existing desktop profile database use the historical
+    // local scope: the profile directory itself supplied user isolation.
+    // Their owners must continue to read them after the real v1-to-v2 boot
+    // migration.
+    let user_scope = backend.for_scope(&Scope::local()?)?;
     put(
-        profile_scope.documents(),
+        user_scope.documents(),
         "approvals",
         "fixture-approval",
         json!({
@@ -227,7 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
     put(
-        profile_scope.documents(),
+        user_scope.documents(),
         "threads_transcript_keys",
         "fixture-thread",
         json!({"transcript_key": "fixture-transcript-key"}),
@@ -252,7 +255,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     let secret_store = DocumentSecrets::new(
-        &profile_scope,
+        &user_scope,
         Arc::new(DerivedKeys::new(Zeroizing::new([0x5a; 32]))),
     );
     secret_store
