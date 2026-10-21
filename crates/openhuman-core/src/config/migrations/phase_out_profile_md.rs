@@ -51,8 +51,7 @@
 
 use anyhow::Result;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tinyagents_session::transcript::SessionTranscript;
+use std::path::Path;
 
 /// Line that opens a `PROFILE.md` block in a system prompt. Matches the
 /// output of `inject_workspace_file_capped` in `agent/prompts/mod.rs`.
@@ -91,31 +90,9 @@ pub fn run(workspace_dir: &Path) -> Result<PhaseOutStats> {
     // transcript walk so that a partial run still removes the file.
     stats.profile_md_removed = remove_workspace_profile_md(workspace_dir, &mut stats);
 
-    // The legacy JSONL transcripts are rewritten by TinyAgents' legacy
-    // maintenance walk, which owns that format and its layout (flat and
-    // `DDMMYYYY/` date-grouped). This runs before the boot-time import of
-    // the workspace, so what is imported is already clean.
-    let report = tinyagents_session::legacy::rewrite_legacy_transcripts(
-        workspace_dir,
-        strip_profile_md_in_first_system_message,
-    );
-    stats.scanned = report.scanned;
-    stats.cleaned = report.rewritten;
-    stats.skipped = report.unchanged;
-    stats.errors += report.errors;
-    if report.scanned == 0 {
-        log::info!(
-            "[migration:phase-out-profile-md] no legacy transcripts — continuing to .md sweep"
-        );
-    }
-
-    // Sweep stale `.md` companions and legacy-format transcripts that
-    // still carry a `### PROFILE.md` block. The JSONL above is the
-    // source of truth and was rewritten in-place where needed; these
-    // `.md` files are either derived views (regenerated on next
-    // session write) or legacy artifacts. Deletion is safe and lines
-    // up with the phase-out framing.
-    stats.md_companions_altered = sweep_tainted_md_companions(workspace_dir, &mut stats);
+    // Transcript JSONL and Markdown companions are immutable source
+    // evidence. The session importer applies the pure TinyAgents rewrite to
+    // transcript bytes in memory before importing them into the destination.
 
     log::info!(
         "[migration:phase-out-profile-md] complete scanned={} cleaned={} skipped={} errors={} \
@@ -242,22 +219,6 @@ fn remove_workspace_profile_md(workspace_dir: &Path, stats: &mut PhaseOutStats) 
     }
 }
 
-/// Strip a `### PROFILE.md` block from the first system message of a
-/// transcript. Returns `true` when the message was mutated.
-pub(super) fn strip_profile_md_in_first_system_message(session: &mut SessionTranscript) -> bool {
-    let Some(first) = session.messages.first_mut() else {
-        return false;
-    };
-    if first.role != "system" {
-        return false;
-    }
-    let Some(cleaned) = strip_profile_md_block(&first.content) else {
-        return false;
-    };
-    first.content = cleaned;
-    true
-}
-
 /// Strip a `### PROFILE.md` block from a string.
 ///
 /// The block is anchored on a line equal to [`PROFILE_HEADING`] and
@@ -281,7 +242,7 @@ pub(super) fn strip_profile_md_in_first_system_message(session: &mut SessionTran
 /// following it are absorbed so we don't leave a runaway gap.
 ///
 /// Returns `Some(cleaned)` when the input was mutated, otherwise `None`.
-pub(super) fn strip_profile_md_block(prompt: &str) -> Option<String> {
+pub(crate) fn strip_profile_md_block(prompt: &str) -> Option<String> {
     let lines: Vec<&str> = prompt.split('\n').collect();
 
     let start = lines
