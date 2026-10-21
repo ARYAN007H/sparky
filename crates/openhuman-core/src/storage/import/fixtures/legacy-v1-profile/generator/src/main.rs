@@ -230,7 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
     let thread_id = "fixture-thread";
-    let incarnation = "fixture-incarnation";
+    let incarnation = "6f9619ff-8b86-d011-b42d-00c04fc964ff";
     let thread_key = Key::of([thread_id])?.as_str().to_owned();
     put(
         user_scope.documents(),
