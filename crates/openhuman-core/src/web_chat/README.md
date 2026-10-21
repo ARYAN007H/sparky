@@ -1,10 +1,10 @@
 # Web chat
 
-The in-app chat (desktop and web) as a thin host. It takes a raw user
-message, runs it through the agent harness on the thread's own session, and
-ends with a reply that is stored durably and announced to the client exactly
-once. It owns the `channel.web_*` RPC namespace and the business logic behind
-the Socket.IO `chat:start` and `chat:cancel` handlers.
+The in-app chat (desktop and web) is a thin host. It accepts user text and
+typed media references, runs them through the agent harness on the thread's
+own session, and ends with a reply that is stored durably and announced to the
+client exactly once. It owns the `channel.web_*` RPC namespace and the business
+logic behind the Socket.IO `chat:start` and `chat:cancel` handlers.
 
 Two shared engines do the generic work, and this module is only what OpenHuman
 alone can supply:
@@ -15,11 +15,13 @@ alone can supply:
 | TinyChannels' compiled web projection module | The projection of canonical output events onto typed web events, with per-turn `seq` | `vendor/tinychannels/crates/tinychannels-module/`, called through `tinychannels-bus` |
 
 Hosted channel domain events are dispatched through this module's `start_chat`
-via `channels/bus/subscriber.rs`; those hosted turns share the web-chat runner
-and `WebChannelEvent` broadcast bus. Native channel listener paths still use
-their channel-specific dispatch and are a separate migration tracked by #136.
-The web event bus is consumed by Socket.IO, the JSON-RPC `/events` SSE stream,
-the TUI and the hosted channel subscriber.
+via `channels/bus/subscriber.rs`; those turns share the web-chat runner. Relay
+progressive output is projected through the same compiled web projection used
+by web chat and TUI, while the gateway keeps its separate provider-delivery
+terminal event. Native listeners retain their channel-specific ingress and
+turn dispatch, and use the shared projection when a scoped web target is
+configured. The web event bus is consumed by Socket.IO, the JSON-RPC `/events`
+SSE stream, the TUI and the hosted channel subscriber.
 
 ## How it works
 
@@ -68,10 +70,13 @@ the TUI and the hosted channel subscriber.
    core context, so two embedded agents never share a turn table.
 
 3. **Ingress** (`ingress.rs`, `WebIngress`) is the runner's `IngressPolicy`,
-   called once per stage in a fixed order. `[FILE:...]` and `[IMAGE:...]`
-   markers are staged through `agent::attachments::stage` first, so a
-   multi-megabyte base64 blob never reaches prompt-injection scanning or
-   persistence. `security::prompt_injection::enforce_prompt_input` follows; a
+   called once per stage in a fixed order. Modern media arrives as typed
+   `ContentPart` values: uploads are persisted with the user row as scoped
+   opaque references, then resolved under the trusted turn context. Queued
+   media is revalidated at execution before its row is persisted. The legacy
+   textual `[FILE:...]` and `[IMAGE:...]` marker path is retained for older
+   callers; it stages through `agent::attachments::stage` before prompt
+   scanning. `security::prompt_injection::enforce_prompt_input` follows; a
    block comes back as `StartChatError::Guardrail` with a verdict, score and
    reasons so the frontend can classify on `chat_error.error_type ==
    "guardrail"` instead of matching copy. Next, a parked chat-native approval
