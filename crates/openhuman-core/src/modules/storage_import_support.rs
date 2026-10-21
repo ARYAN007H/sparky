@@ -12,14 +12,14 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 use sha2::Digest;
-use tinystoragedrivers::{DocumentStore, ErrorKind, Precondition, ScopedStorage};
+use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
 
 /// The module's scope of the installed backend, or `None` when the process
 /// runs without a storage backend (the module is then not using this storage).
 pub(super) fn module_scope(
     ctx: &crate::core::runtime::DispatchCtx,
     module_id: &str,
-) -> Result<Option<ScopedStorage>> {
+) -> Result<Option<Storage>> {
     let Some(backend) = crate::storage::installed() else {
         return Ok(None);
     };
@@ -42,14 +42,14 @@ pub(super) fn marker_id(prefix: &str, source: &Path) -> String {
 /// collection name (`tinybox_host_import`), so a marker row an older build
 /// wrote ([`crate::storage::import_state::migrate_legacy_markers`]) answers
 /// the same question.
-pub(super) async fn already_imported(scoped: &ScopedStorage, kind: &str, id: &str) -> Result<bool> {
+pub(super) async fn already_imported(scoped: &Storage, kind: &str, id: &str) -> Result<bool> {
     crate::storage::import_state::host_import_done(scoped, kind, id)
         .await
         .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))
 }
 
 /// Records that the import of `id` finished. Marking twice is harmless.
-pub(super) async fn mark_imported(scoped: &ScopedStorage, kind: &str, id: &str) -> Result<()> {
+pub(super) async fn mark_imported(scoped: &Storage, kind: &str, id: &str) -> Result<()> {
     crate::storage::import_state::host_import_mark(scoped, kind, id)
         .await
         .map_err(|error| anyhow!("write the import state: {:?}", error.kind()))
@@ -99,7 +99,7 @@ pub(super) fn parse_jsonl(text: &str) -> (Vec<Value>, usize) {
 /// records is left alone so a retry cannot duplicate them. Returns the number
 /// appended.
 pub(super) async fn append_if_empty(
-    scoped: &ScopedStorage,
+    scoped: &Storage,
     stream: &str,
     values: Vec<Value>,
 ) -> Result<usize> {
