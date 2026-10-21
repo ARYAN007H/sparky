@@ -201,6 +201,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let mut config = openhuman_core::config::Config::default();
     config.config_path = profile.join("config.toml");
     config.workspace_dir = workspace.clone();
+    config.storage.url = Some(format!("sqlite:{}", profile.join("storage.db").display()));
     let owner_workspace = workspace.clone();
     std::thread::spawn(move || {
         let owner_runtime = tokio::runtime::Builder::new_multi_thread()
