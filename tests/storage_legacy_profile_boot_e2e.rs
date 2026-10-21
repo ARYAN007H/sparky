@@ -151,7 +151,7 @@ async fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     config.config_path = profile.join("config.toml");
     config.workspace_dir = workspace.clone();
     let owner_workspace = workspace.clone();
-    tokio::task::spawn_blocking(move || {
+    std::thread::spawn(move || {
         let owner_runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -200,7 +200,7 @@ async fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .await;
         });
     })
-    .await
+    .join()
     .unwrap();
 
     // Read the confidential record with TinyStorage's document-secret owner
