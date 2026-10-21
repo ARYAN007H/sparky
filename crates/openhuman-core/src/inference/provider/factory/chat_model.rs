@@ -638,7 +638,7 @@ pub(super) fn unresolved_chat_model_error_for(
     }
 
     #[cfg(not(test))]
-    if let Err(error) = verify_session_active(config) {
+    if let Err(error) = super::access_gates::verify_session_active(config) {
         return error;
     }
 
