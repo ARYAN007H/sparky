@@ -25,16 +25,17 @@ use std::path::Path;
 use crate::storage::{CollectionSpec, Storage};
 use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
+use tinystoragedrivers_types::WriteOptions;
 
-use super::storage_grant_schemas::tinyconnectors::{
-    MODULE_ID, PREFS_COLLECTION, TRIGGER_STREAM_PREFIX,
-};
+use super::storage_grant_schemas::tinyconnectors::MODULE_ID;
 use super::storage_import_support as support;
 use crate::core::runtime::DispatchCtx;
 
 const LOG_PREFIX: &str = "[connectors-import]";
 const PREFS_DIR: &str = "composio-user-scopes";
 const TRIGGERS_DIR: &str = "triggers";
+const PREFS_COLLECTION: &str = tinyconnectors_bus::storage::PREFS_NAMESPACE;
+const TRIGGER_STREAM_PREFIX: &str = tinyconnectors_bus::storage::STREAM_PREFIX;
 /// Host-only: not in the module's grant, so the module cannot see it.
 const MARKER_COLLECTION: &str = "tinyconnectors_host_import";
 
@@ -104,8 +105,16 @@ async fn import_into(ctx: &DispatchCtx, scoped: &Storage, state_dir: &Path) -> R
         .map_err(|error| anyhow!("declare {PREFS_COLLECTION}: {:?}", error.kind()))?;
     let mut prefs = 0usize;
     for pref in legacy.prefs {
-        let doc = json!({ "value": pref.value });
-        if support::put_absent(docs, PREFS_COLLECTION, &pref.key, doc).await? {
+        let doc = tinyconnectors_bus::storage::encode_preference(&pref.value);
+        if support::put_absent_with(
+            docs,
+            PREFS_COLLECTION,
+            &pref.key,
+            doc,
+            WriteOptions::new().schema(tinyconnectors_bus::storage::PREFS_SCHEMA_VERSION),
+        )
+        .await?
+        {
             prefs += 1;
         }
     }
