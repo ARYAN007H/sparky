@@ -165,8 +165,8 @@ fn call(name: &str, args: serde_json::Value) -> TaToolCall {
     }
 }
 
-/// The bug: the orchestrator loaded `workflows`, read `propose_workflow` off
-/// the listing, called it, and was refused. The listing must not offer it.
+/// A non-owner cannot call workflow pack tools directly; it must be sent to an
+/// owner through the same spawn route advertised by the orchestrator.
 #[tokio::test]
 async fn a_use_skill_listing_hides_what_this_session_cannot_call_and_names_the_route() {
     let mw = non_owner_middleware();
@@ -179,27 +179,17 @@ async fn a_use_skill_listing_hides_what_this_session_cannot_call_and_names_the_r
         "a non-owner must not be offered a tool the gate will refuse:\n{}",
         result_text(&result)
     );
-    // Assert the LISTING entry in its exact rendered form, not the bare name.
-    //
-    // `build_workflow` occurs in two different outputs: a rendered listing
-    // (`## \`build_workflow\``) and the route sentence used when nothing is
-    // callable (``Call `build_workflow` instead``). A bare `contains` therefore
-    // passed even when the filter had dropped every tool and the render had
-    // fallen through to its error path — i.e. it passed in the exact case this
-    // test exists to catch. A check that cannot fail reads as coverage and is
-    // worse than none.
     assert!(
-        result_text(&result).contains("## `build_workflow`"),
-        "the tool it CAN call must still be LISTED, not merely mentioned in a \
-         route sentence:\n{}",
+        result_text(&result).contains("has no tools available in this session"),
+        "the listing must not invent a workflow tool for this non-owner:\n{}",
         result_text(&result)
     );
-    // And this really is a listing, not the "nothing callable" error.
     assert!(
-        result_text(&result).starts_with("# Skill `workflows`"),
-        "expected a rendered pack listing:\n{}",
+        result_text(&result).contains("Call `spawn_subagent` instead"),
+        "the empty listing must name the callable owner hand-off:\n{}",
         result_text(&result)
     );
+    assert!(!result_text(&result).contains("## `propose_workflow`"));
 }
 
 /// The middleware renders the *disclosure* half only. A `use_skill` call that
@@ -213,7 +203,7 @@ async fn a_use_skill_call_that_names_a_tool_is_not_rendered_as_a_listing() {
     assert!(
         mw.render_skill_for_session(&call(
             USE_SKILL,
-            json!({ "skill": "workflows", "tool": "build_workflow" }),
+            json!({ "skill": "workflows", "tool": "propose_workflow" }),
         ))
         .is_none(),
         "the execution half must reach the tool, not the listing"
@@ -249,8 +239,8 @@ async fn a_use_skill_denial_names_a_delegate_this_session_can_call() {
         "the denial itself must survive: {message}"
     );
     assert!(
-        message.contains("build_workflow"),
-        "the denial must name the delegate to call instead: {message}"
+        message.contains("Call `spawn_subagent` instead"),
+        "the denial must name the callable owner hand-off: {message}"
     );
 }
 
@@ -372,21 +362,21 @@ async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
 
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![
         Box::new(RoutingFakeTool("propose_workflow")),
-        Box::new(RoutingFakeTool("build_workflow")),
+        Box::new(RoutingFakeTool("spawn_subagent")),
     ];
     append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
     bind_pack_registry(&tools);
 
-    // `build_workflow` is itself a member of the `workflows` pack, so
-    // `strip_packed_from_visible` withholds it for a non-owner — leaving the
-    // delegate prompt-hidden and therefore NOT directly callable.
+    // The spawn tool is withheld from this session, so even though its schema
+    // can reach the workflow owners it is not a callable route.
     let mut visible: std::collections::HashSet<String> =
         tools.iter().map(|t| t.name().to_string()).collect();
     strip_packed_from_visible(&mut visible, "unrelated_agent");
+    visible.remove("spawn_subagent");
     assert!(
-        !visible.contains("build_workflow"),
-        "precondition: the delegate is prompt-hidden here"
+        !visible.contains("spawn_subagent"),
+        "precondition: the owner hand-off is prompt-hidden here"
     );
 
     let session = ToolPolicyEngine::build_session(
@@ -407,8 +397,12 @@ async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
     let pack = crate::tools::toolpacks::pack("workflows").expect("workflows pack");
     let route = mw.route_for_pack(pack);
     assert!(
-        !route.contains("Call `build_workflow`"),
+        !route.contains("Call `spawn_subagent`"),
         "a prompt-hidden delegate must not be advertised as a direct call: {route}"
+    );
+    assert!(
+        route.contains("workflow_builder") || route.contains("flow_discovery"),
+        "when the spawn route is hidden, name an owning agent without claiming a callable tool: {route}"
     );
 }
 
@@ -439,7 +433,7 @@ async fn an_invented_tool_name_in_a_skill_is_not_reported_as_a_denial() {
         "an invented name must not read as a permission denial: {message}"
     );
     assert!(
-        message.contains("`build_workflow`"),
+        message.contains("Call `spawn_subagent` instead"),
         "the answer must name what this session can call in the skill: {message}"
     );
 }
