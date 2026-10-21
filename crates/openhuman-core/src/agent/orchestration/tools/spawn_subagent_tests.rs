@@ -75,16 +75,36 @@ async fn no_registry_returns_clear_error() {
 
 #[tokio::test]
 async fn unknown_agent_id_lists_available() {
-    // Force-init the global registry with builtins.
-    let _ = AgentDefinitionRegistry::init_global_builtins();
-    let tool = SpawnSubagentTool::new();
-    let result = tool
-        .execute(json!({
-            "agent_id": "totally_made_up",
-            "prompt": "x",
-        }))
-        .await
-        .unwrap();
+    // Drive the real lookup under a detached parent and its scoped registry;
+    // the ordinary Tool::execute path refuses earlier because it has no turn.
+    let workspace = tempfile::tempdir().expect("workspace");
+    let parent = super::tests::parent_context(workspace.path());
+    let (live, core) = super::tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "unknown-agent-session",
+        "unknown-agent-thread",
+    );
+    let result = crate::core::runtime::CoreContext::scope(core, async {
+        let detached = crate::agent::subagent_host::detached_subagent_parent(
+            &live,
+            "async-subagent",
+        )
+        .expect("live parent can be detached");
+        SpawnSubagentTool::new()
+            .execute_with_live_parent_context(
+                json!({
+                    "agent_id": "totally_made_up",
+                    "prompt": "x",
+                }),
+                None,
+                live.data.child(),
+                detached,
+            )
+            .await
+            .unwrap()
+    })
+    .await;
     assert!(result.is_error);
     let out = result.output();
     // Should list at least one valid built-in.
