@@ -80,12 +80,21 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
     };
     let scope = super::storage_host::current_module_scope(ctx, MODULE_ID)
         .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
+    import_into(&backend, &scope, data_dir, None).await
+}
+
+async fn import_into(
+    backend: &Arc<dyn StorageBackend>,
+    scope: &crate::storage::Scope,
+    data_dir: &Path,
+    test_keys: Option<Arc<dyn tinystoragedrivers::secrets::KeyProvider>>,
+) -> Result<Outcome> {
     let scoped = backend
-        .for_scope(&scope)
+        .for_scope(scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
     let markers = crate::storage::documents::Repo::on(
         &backend,
-        &scope,
+        scope,
         "storage::import",
         crate::storage::import_state::collection_specs,
     )?;
@@ -114,13 +123,9 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
                 condition.clone(),
             );
             let claimed_scoped = claimed_backend
-                .for_scope(&scope)
+                .for_scope(scope)
                 .map_err(|error| anyhow!("open claimed module scope: {:?}", error.kind()))?;
-            let claimed_secrets = crate::storage::secrets::over(
-                &claimed_scoped,
-                scope.clone(),
-                crate::storage::secrets::keys()?,
-            );
+            let scope = scope.clone();
             crate::storage::block_on_anyhow(async move {
                 if crate::storage::import_state::host_import_done(
                     claimed_markers.scoped(),
@@ -149,9 +154,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
                 .context("the legacy reader panicked")??;
                 let result = import_payload(
                     &claimed_scoped,
-                    &claimed_secrets,
+                    &scope,
                     legacy_servers,
                     legacy_audit,
+                    test_keys,
                 )
                 .await?;
                 crate::storage::import_state::host_import_mark(
@@ -170,9 +176,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
 
 async fn import_payload(
     scoped: &Storage,
-    secrets: &dyn SecretStore,
+    scope: &crate::storage::Scope,
     legacy_servers: Vec<LegacyServer>,
     legacy_audit: Vec<Value>,
+    test_keys: Option<Arc<dyn tinystoragedrivers::secrets::KeyProvider>>,
 ) -> Result<Outcome> {
     let docs = scoped.documents();
     for name in [SERVERS, SERVER_NAMES] {
@@ -182,6 +189,15 @@ async fn import_payload(
     }
 
     let (mut servers, mut secret_count) = (0usize, 0usize);
+    let secret_store = if legacy_servers.iter().any(|server| !server.env.is_empty()) {
+        let keys = match test_keys {
+            Some(keys) => keys,
+            None => crate::storage::secrets::keys()?,
+        };
+        Some(crate::storage::secrets::over(scoped, scope.clone(), keys))
+    } else {
+        None
+    };
     for server in legacy_servers {
         if put_absent(docs, SERVERS, &server.id, server.doc).await? {
             servers += 1;
@@ -189,6 +205,9 @@ async fn import_payload(
         put_absent(docs, SERVER_NAMES, &server.claim_id, server.claim).await?;
         if !server.env.is_empty() {
             let name = format!("{ENV_SECRET_PREFIX}{}", server.id);
+            let secrets = secret_store
+                .as_ref()
+                .expect("non-empty environment has a secret adapter");
             let present = secrets
                 .get(&name)
                 .await
