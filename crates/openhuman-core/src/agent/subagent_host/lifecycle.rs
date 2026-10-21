@@ -337,7 +337,7 @@ async fn invoke_driver_tool_with_request(
         .as_ref()
         .map(|context| context.workspace_dir.as_path())
         .unwrap_or_else(|| std::path::Path::new(""));
-    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+    let owner = parent.data.subagent_owner_scope(
         owner_workspace,
         &parent_session,
         thread_id.as_deref(),

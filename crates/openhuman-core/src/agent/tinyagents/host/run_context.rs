@@ -393,6 +393,28 @@ impl OpenHumanRunContext {
         }
     }
 
+    /// Returns the registry owner for a spawn. Headless turns retain one
+    /// root-scoped owner across native child thread identities so settlement
+    /// can see the complete descendant tree. Ordinary chat remains scoped to
+    /// the immediate parent session and thread.
+    pub(crate) fn subagent_owner_scope(
+        &self,
+        workspace: &std::path::Path,
+        parent_session: &str,
+        thread_id: Option<&str>,
+    ) -> String {
+        if self.headless_descendant_settlement {
+            if let Some(owner) = &self.headless_descendant_owner {
+                return owner.clone();
+            }
+        }
+        crate::agent::tinyagents::tool_registration::subagent_owner_key(
+            workspace,
+            parent_session,
+            thread_id,
+        )
+    }
+
     /// Pins the harness tool dialect to the one the session prompt speaks.
     #[must_use]
     pub(crate) fn with_tool_dialect(
