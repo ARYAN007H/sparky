@@ -68,6 +68,67 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
     }
 }
 
+#[test]
+fn configured_control_channel_requires_a_unique_provider_when_account_is_missing() {
+    use tinychannels_bus::module_remote::RemoteSessionScope;
+
+    let mut ctx = runtime_context(PathBuf::from("/tmp"));
+    let mut scope = RemoteSessionScope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: None,
+        },
+        conversation: tinychannels_bus::ConversationRef {
+            id: "chat-1".into(),
+            ..Default::default()
+        },
+        session_key: "session-1".into(),
+    };
+    let handle = |name: &str| Arc::new(ChannelHandle::Test(Arc::new(TestChannel::new(name))));
+
+    ctx.channels_by_name = Arc::new(HashMap::from([(
+        "telegram:bot-a".into(),
+        handle("telegram:bot-a"),
+    )]));
+    let (resolved_scope, configured) = configured_control_channel(&ctx, Some(&scope));
+    assert_eq!(
+        resolved_scope
+            .as_ref()
+            .and_then(|scope| scope.channel.account_id.as_deref()),
+        Some("telegram:bot-a")
+    );
+    assert_eq!(
+        configured.as_deref().map(|channel| channel.name.as_str()),
+        Some("telegram:bot-a")
+    );
+
+    ctx.channels_by_name = Arc::new(HashMap::from([
+        ("telegram:bot-a".into(), handle("telegram:bot-a")),
+        ("telegram:bot-b".into(), handle("telegram:bot-b")),
+    ]));
+    let (resolved_scope, configured) = configured_control_channel(&ctx, Some(&scope));
+    assert!(configured.is_none());
+    assert_eq!(
+        resolved_scope
+            .as_ref()
+            .and_then(|scope| scope.channel.account_id.as_deref()),
+        None
+    );
+
+    scope.channel.account_id = Some("telegram:bot-b".into());
+    let (resolved_scope, configured) = configured_control_channel(&ctx, Some(&scope));
+    assert_eq!(
+        resolved_scope
+            .as_ref()
+            .and_then(|scope| scope.channel.account_id.as_deref()),
+        Some("telegram:bot-b")
+    );
+    assert_eq!(
+        configured.as_deref().map(|channel| channel.name.as_str()),
+        Some("telegram:bot-b")
+    );
+}
+
 async fn handle_linked_runtime_command(
     ctx: &mut ChannelRuntimeContext,
     msg: &ChannelMessage,
@@ -674,7 +735,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     assert!(sent[0].content.contains("Started new session"));
     assert!(sent[0]
         .content
-        .contains("In-memory channel history cleared for this chat."));
+        .contains("Durable conversation history reset for this chat."));
 
     assert!(sent[1].content.contains("**Status**"));
     assert!(sent[1].content.contains("Thread: `Telegram"));
