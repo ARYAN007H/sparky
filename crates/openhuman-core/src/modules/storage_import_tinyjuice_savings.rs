@@ -69,7 +69,6 @@ where
     }
     let marker = support::marker_id("savings", file);
     let file = file.to_owned();
-    let ctx_for_read = ctx.clone();
     let result = support::with_module_claim(
         ctx,
         MODULE_ID,
@@ -77,7 +76,7 @@ where
         &marker,
         move |scoped| {
             crate::storage::block_on_anyhow(async move {
-                import_into(&ctx_for_read, &scoped, &file, adopt).await
+                import_into(&scoped, &file, adopt).await
             })
         },
     )?;
