@@ -9,7 +9,9 @@
 //! `.runs` is a sibling of the runtime skill *definitions* (`<workspace>/
 //! skills/<id>/`) so run logs never collide with a skill-id directory.
 use std::collections::HashMap;
+use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
@@ -19,13 +21,106 @@ use tokio_util::sync::CancellationToken;
 
 use crate::progress::AgentProgress;
 
-// Layout, writers-by-timestamp and readers live in `tinyskills::run_log`;
-// the host keeps event formatting, the cancel registry and the drain.
-pub use tinyskills::run_log::{
-    detect_repeated_line, find_run_log_path, read_run_log_slice, read_terminal_outcome, runs_dir,
-    scan_runs, RunLogSlice, RunOutcome, ScannedRun,
-};
-use tinyskills::run_log::{short, truncate};
+pub use tinyskills::run_log::{detect_repeated_line, RunLogSlice, RunOutcome, ScannedRun};
+use tinyskills::run_log::{parse_runs, parse_terminal_outcome, short, slice, truncate};
+
+type RunLogStore = tinyskills_drivers::StreamRunLogStore;
+
+fn run_log_store(workspace: &Path) -> anyhow::Result<RunLogStore> {
+    let opened = crate::storage::local::open("skills::run_log", workspace)?;
+    let storage = opened.scoped()?;
+    crate::storage::block_on(async move {
+        crate::storage::boot::prepare_scope(&storage).await?;
+        Ok(())
+    })?;
+    Ok(RunLogStore::new(Arc::clone(storage.streams())))
+}
+
+fn stream_id(path: &Path) -> anyhow::Result<&str> {
+    let id = path
+        .to_str()
+        .ok_or_else(|| anyhow::anyhow!("run-log stream id is not UTF-8"))?;
+    if !id.starts_with("skills.runs.") {
+        anyhow::bail!("invalid run-log stream id");
+    }
+    Ok(id)
+}
+
+fn io_error(error: impl std::fmt::Display) -> io::Error {
+    io::Error::other(error.to_string())
+}
+
+fn read_full(store: &RunLogStore, id: &str) -> Result<String, tinyskills_drivers::RunLogStoreError> {
+    let mut text = String::new();
+    let mut offset = 0;
+    loop {
+        let page = crate::storage::block_on(store.read_slice(id, offset, 64 * 1024))
+            .map_err(|error| tinyskills_drivers::RunLogStoreError::Storage(error.into()))?;
+        offset = page.offset;
+        text.push_str(&page.content);
+        if page.eof || page.bytes_read == 0 {
+            return Ok(text);
+        }
+    }
+}
+
+/// The host's old log-directory surface is retained only to build a stable
+/// opaque stream identifier; no filesystem directory is created or read.
+pub fn runs_dir(workspace: &Path) -> PathBuf {
+    workspace.join("skills").join(".runs")
+}
+
+/// Find a run's opaque stream identifier by its run id.
+pub fn find_run_log_path(workspace: &Path, run_id: &str) -> Option<PathBuf> {
+    scan_runs(workspace, None, usize::MAX)
+        .into_iter()
+        .find(|run| run.run_id == run_id)
+        .map(|run| PathBuf::from(run.stream_id))
+}
+
+/// Read the full terminal outcome for a persisted run stream.
+pub fn read_terminal_outcome(path: &Path) -> Option<RunOutcome> {
+    let id = stream_id(path).ok()?;
+    let workspace = crate::config::Config::load_or_init_sync().ok()?.workspace_dir;
+    let store = run_log_store(&workspace).ok()?;
+    let text = read_full(&store, id).ok()?;
+    parse_terminal_outcome(&text)
+}
+
+/// Scan persisted run streams, preserving the historical newest-first order.
+pub fn scan_runs(workspace: &Path, workflow_id: Option<&str>, limit: usize) -> Vec<ScannedRun> {
+    let store = match run_log_store(workspace) {
+        Ok(store) => store,
+        Err(error) => {
+            log::warn!("[skills::run_log] could not open run-log storage: {error:#}");
+            return Vec::new();
+        }
+    };
+    let entries = match crate::storage::block_on(async move { store.scan(None, usize::MAX).await }) {
+        Ok(runs) => runs
+            .into_iter()
+            .filter_map(|run| {
+                let text = read_full(&store, &run.stream_id).ok()?;
+                Some((run.stream_id, text))
+            })
+            .collect::<Vec<_>>(),
+        Err(error) => {
+            log::warn!("[skills::run_log] could not scan run logs: {error}");
+            return Vec::new();
+        }
+    };
+    parse_runs(entries, workflow_id, limit)
+}
+
+/// Read a byte-offset slice from a persisted run stream.
+pub fn read_run_log_slice(path: &Path, offset: u64, max_bytes: usize) -> io::Result<RunLogSlice> {
+    let id = stream_id(path).map_err(io_error)?;
+    let workspace = crate::config::Config::load_or_init_sync()
+        .map_err(io_error)?
+        .workspace_dir;
+    let store = run_log_store(&workspace).map_err(io_error)?;
+    crate::storage::block_on(store.read_slice(id, offset, max_bytes)).map_err(io_error)
+}
 
 /// Registry of in-flight workflow runs → their cancellation token. A run
 /// registers itself before executing and removes itself when it finishes; the
