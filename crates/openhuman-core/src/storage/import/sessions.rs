@@ -96,8 +96,9 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let ledger = provider
                 .driver_run_ledger(DEFAULT_AGENT)
                 .map_err(|error| anyhow::anyhow!("open the run ledger: {error}"))?;
-            let rows = super::session_db::SessionDatabase::read(snapshot.db())
+            let mut rows = super::session_db::SessionDatabase::read(snapshot.db())
                 .context("[sessions] read the session database snapshot")?;
+            sanitize_legacy_system_messages(&mut rows.messages);
             let batch = LegacySessionImport {
                 sessions: rows.sessions,
                 messages: rows.messages,
@@ -165,6 +166,20 @@ fn database_totals(report: &LegacyDatabaseReport) -> (usize, usize) {
         (0, 0),
         |(found, written), ImportCounts { read, imported, .. }| (found + read, written + imported),
     )
+}
+
+fn sanitize_legacy_system_messages(messages: &mut [tinyagents_session::SessionMessage]) {
+    for message in messages {
+        if message.role == "system" {
+            if let Some(cleaned) =
+                crate::config::migrations::phase_out_profile_md::strip_profile_md_block(
+                    &message.content,
+                )
+            {
+                message.content = cleaned;
+            }
+        }
+    }
 }
 
 #[derive(Default)]
