@@ -290,10 +290,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::platform::about_app::all_about_app_registered_controllers(),
     );
     // Core application shell state
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Desktop,
-        crate::desktop::app_state::all_app_state_registered_controllers(),
+        crate::desktop::app_state::all_app_state_controller_entries(),
     );
     // Composio integration controllers
     push_entries(

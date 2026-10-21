@@ -10,7 +10,8 @@ static TEST_LOCK: Mutex<()> = Mutex::new(());
 static EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
 fn staged_bound_methods() -> Vec<&'static str> {
-    let mut methods = vec!["composio.execute"];
+    let mut methods = vec!["app_state.snapshot", "app_state.update_local_state"];
+    methods.push("composio.execute");
     #[cfg(feature = "mcp")]
     methods.push("mcp_clients.registry_get");
     methods.extend(["doctor.report", "doctor.models"]);
@@ -682,3 +683,6 @@ mod encryption_controller_tests;
 
 #[path = "all_doctor_controller_tests.rs"]
 mod doctor_controller_tests;
+
+#[path = "all_app_state_controller_tests.rs"]
+mod app_state_controller_tests;
