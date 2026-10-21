@@ -111,6 +111,12 @@ it with the core stopped.
   gated on `[cron] enabled`, since it reclaims storage rather than running
   jobs). Each scope's sweep is bounded by `SCOPE_SWEEP_TIMEOUT`; a timeout
   counts as a failed sweep and is retried on the next tick.
+- `journal_maintenance`: invokes TinyAgents' `maintain_run_journals` with the
+  host's configured retention and clock. The host visits local, registered
+  profile, known agent, and compiled module scopes; the successful one-shot
+  inactive-run backfill marker is stored per scope in
+  `openhuman.journal_backfill`. Journal sealing, active-run checks, and
+  timestamp-fenced retention remain owner behavior.
 - `fence` / `fenced_backend`: lease-epoch write fencing (see
   [Write fencing](#write-fencing)).
 - `scope_for_profile(profile_id)`: the scope a SaaS profile's records live
