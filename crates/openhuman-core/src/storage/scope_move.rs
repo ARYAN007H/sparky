@@ -296,7 +296,8 @@ fn import_inventory(
                 continue;
             }
         };
-        let scope_backend = backend_for_target_scope(backend, &target_scope, known, config)?;
+        let (scope_backend, profile_guard) =
+            backend_for_target_scope(backend, &target_scope, known, config)?;
         let marker = crate::storage::documents::Repo::on(
             &scope_backend,
             &target_scope,
@@ -321,6 +322,9 @@ fn import_inventory(
             IMPORT_OWNER,
             &step,
             move |condition| {
+                // Keep the admitted profile handle alive until all copied
+                // documents, streams, blobs, and the completion marker finish.
+                let _profile_guard = profile_guard;
                 let claimed_marker = marker_for_claim.conditioned(condition)?;
                 if crate::storage::import_state::is_done(&claimed_marker, IMPORT_OWNER, &step)? {
                     return Ok(None);
@@ -329,11 +333,9 @@ fn import_inventory(
                     scope_backend_for_claim,
                     condition.clone(),
                 );
-                let copied = crate::storage::block_on_anyhow(copy_inventory(
-                    &claim_bound,
-                    &scope_known,
-                    &scope_inventory,
-                ))?;
+                let copied = crate::storage::block_on_anyhow(async move {
+                    copy_inventory(&claim_bound, &scope_known, &scope_inventory).await
+                })?;
                 crate::storage::import_state::set_done(&claimed_marker, IMPORT_OWNER, &step)?;
                 Ok(Some(copied))
             },
@@ -391,9 +393,12 @@ fn backend_for_target_scope(
     target_scope: &Scope,
     known: &Known,
     config: &crate::config::Config,
-) -> anyhow::Result<Arc<dyn StorageBackend>> {
+) -> anyhow::Result<(
+    Arc<dyn StorageBackend>,
+    Option<Arc<crate::profiles::host::Profile>>,
+)> {
     if target_scope.is_local() || target_scope.is_cluster() {
-        return Ok(Arc::clone(backend));
+        return Ok((Arc::clone(backend), None));
     }
     let parsed = target_scope.parsed()?;
     let crate::storage::Tenant::User(_) = parsed.tenant else {
@@ -415,13 +420,16 @@ fn backend_for_target_scope(
             )
         })?;
     let Some(host) = crate::profiles::host::host() else {
-        if crate::storage::layout::Target::from_config(config)
-            .is_some_and(|target| target.user_id == *original_id)
-        {
-            return Ok(Arc::clone(backend));
+        if let Some(target) = crate::storage::layout::Target::from_config(config) {
+            let expected_url = format!("sqlite:{}", target.storage_db().display());
+            if target.user_id == *original_id
+                && crate::storage::configured_url(config).as_deref() == Some(&expected_url)
+            {
+                return Ok((Arc::clone(backend), None));
+            }
         }
         anyhow::bail!(
-            "cannot copy profile scope {} without its admitted profile host",
+            "cannot copy profile scope {} without its admitted profile fence or dedicated profile database",
             target_scope.as_str()
         );
     };
@@ -431,8 +439,10 @@ fn backend_for_target_scope(
             "profile {original_id} is not currently admitted on this host; refusing scope copy"
         )
     })?;
-    host.storage_backend_for(&profile)?
-        .ok_or_else(|| anyhow::anyhow!("profile {original_id} has no captured storage backend"))
+    let scoped = host
+        .storage_backend_for(&profile)?
+        .ok_or_else(|| anyhow::anyhow!("profile {original_id} has no captured storage backend"))?;
+    Ok((scoped, Some(profile)))
 }
 
 #[cfg(feature = "legacy-import")]
