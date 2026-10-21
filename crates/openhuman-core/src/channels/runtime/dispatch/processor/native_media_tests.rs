@@ -165,3 +165,70 @@ fn scoped_media_actual_bytes_must_match_declared_and_configured_bounds() {
     assert!(validate_actual_media_size(10, 10, 9).is_err());
     assert!(validate_actual_media_size(0, 0, 10).is_err());
 }
+
+#[test]
+fn native_typed_message_keeps_context_prefix_and_interleaved_part_order() {
+    let parts = vec![
+        ContentPart::Text {
+            text: "first text".into(),
+            markdown_dialect: None,
+        },
+        ContentPart::Image {
+            media: MediaReference {
+                path: Some("openhuman-staged://image-ref".into()),
+                content_type: Some("image/png".into()),
+                ..reference()
+            },
+            caption: None,
+            alt_text: None,
+        },
+        ContentPart::Text {
+            text: "second text".into(),
+            markdown_dialect: None,
+        },
+        ContentPart::File {
+            media: MediaReference {
+                kind: MediaKind::Document,
+                path: Some("openhuman-staged://file-ref".into()),
+                content_type: Some("text/plain".into()),
+                ..reference()
+            },
+            file_name: Some("notes.txt".into()),
+            caption: None,
+        },
+    ];
+
+    let Message::User(user) = crate::agent::message_convert::user_message_from_parts(
+        "[Channel context] Telegram private chat",
+        &parts,
+    )
+    .unwrap()
+    else {
+        panic!("user message expected")
+    };
+    assert_eq!(user.content.len(), 5);
+    assert!(matches!(
+        &user.content[0],
+        tinyinference_llm::message::ContentBlock::Text(text)
+            if text == "[Channel context] Telegram private chat"
+    ));
+    assert!(matches!(
+        &user.content[1],
+        tinyinference_llm::message::ContentBlock::Text(text) if text == "first text"
+    ));
+    assert!(matches!(
+        &user.content[2],
+        tinyinference_llm::message::ContentBlock::Image(image)
+            if image.url == "openhuman-staged://image-ref"
+    ));
+    assert!(matches!(
+        &user.content[3],
+        tinyinference_llm::message::ContentBlock::Text(text) if text == "second text"
+    ));
+    assert!(matches!(
+        &user.content[4],
+        tinyinference_llm::message::ContentBlock::Document(
+            tinyinference_llm::message::MediaRef::Path { path, .. }
+        ) if path == "openhuman-staged://file-ref"
+    ));
+}
