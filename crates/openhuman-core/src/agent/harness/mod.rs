@@ -1,4 +1,4 @@
-//! Multi-agent harness — sub-agent dispatch and parent-context plumbing.
+//! Multi-agent harness support — agent definitions, turn graphs, and artifacts.
 //!
 //! The harness provides the infrastructure for an agent to delegate work to
 //! specialized sub-agents. It manages the lifecycle of these sub-agents,

@@ -77,8 +77,8 @@ turn lifecycle are in `../session_host/`; `OpenHumanSubagentHost`,
 - `crate::memory`: text
   sanitization (`artifact_offload::SanitizingRedactor` wraps `memory::safety::sanitize_text` for both artifact stores).
 - `crate::config::AgentConfig`, `crate::skills::Workflow`,
-  `crate::tools::{Tool, ToolSpec}`: runtime context carried through
-  `subagent_host::ParentExecutionContext`.
+  `crate::tools::{Tool, ToolSpec}`: inputs consumed by the session and
+  sub-agent hosts.
 
 ## Used by
 
