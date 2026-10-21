@@ -12,13 +12,13 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError, Weak};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 use tinystoragedrivers::WriteCondition;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Versioned};
 
 use super::{
-    block_on, current_scope, installed, DocumentStore, Scope, Storage, StorageBackend, StorageError,
+    DocumentStore, Scope, Storage, StorageBackend, StorageError, block_on, current_scope, installed,
 };
 
 /// Collections already declared, per process: `(backend address, scope,

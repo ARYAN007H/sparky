@@ -277,8 +277,8 @@ async fn maintain_scope(
 /// by another host. Cluster scope is intentionally excluded: harness run
 /// journals have historically been tenant/local data, not cluster data.
 #[cfg(test)]
-fn known_scopes(
-) -> Result<(Vec<Arc<crate::profiles::Profile>>, Vec<Scope>), crate::storage::StorageError> {
+fn known_scopes()
+-> Result<(Vec<Arc<crate::profiles::Profile>>, Vec<Scope>), crate::storage::StorageError> {
     let mut scopes = BTreeSet::new();
     if !crate::core::runtime::mode::is_saas() {
         scopes.insert(Scope::local());

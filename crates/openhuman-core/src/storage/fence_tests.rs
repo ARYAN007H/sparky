@@ -1,6 +1,6 @@
 use super::*;
-use crate::storage::lease::{DocumentLeases, LeaseError, LeaseGrant, LeaseRecord};
 use crate::storage::MemoryStorage;
+use crate::storage::lease::{DocumentLeases, LeaseError, LeaseGrant, LeaseRecord};
 use std::time::Duration;
 
 const TTL: Duration = Duration::from_secs(30);

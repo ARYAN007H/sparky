@@ -6,8 +6,8 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use super::{deserialize_params, to_json};
-use crate::core::all::ControllerFuture;
 use crate::core::Outcome;
+use crate::core::all::ControllerFuture;
 
 #[derive(Debug, Deserialize)]
 pub(super) struct InferenceClaudeCodeSetFullAccessParams {
@@ -55,7 +55,9 @@ pub(super) fn handle_inference_claude_code_settings(
             .map_err(|error| error.to_string())?;
         let scoped = opened.scoped().map_err(|error| error.to_string())?;
         let kv = settings::store(scoped.documents()).map_err(|error| error.to_string())?;
-        let settings = settings::load(&kv).await.map_err(|error| error.to_string())?;
+        let settings = settings::load(&kv)
+            .await
+            .map_err(|error| error.to_string())?;
         log::debug!(
             "[rpc][inference.claude_code_settings] full_access={}",
             settings.full_access

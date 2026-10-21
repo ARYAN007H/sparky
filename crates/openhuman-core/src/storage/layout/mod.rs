@@ -57,15 +57,15 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 #[cfg(feature = "legacy-import")]
-pub use run::{auto_migrate, migrate, restore, Options};
+pub use run::{Options, auto_migrate, migrate, restore};
 pub use state::{LayoutError, Step};
 #[cfg(feature = "legacy-import")]
-pub use status::{status, Status};
+pub use status::{Status, status};
 
+use crate::config::Config;
 use crate::config::schema::profile_layout::{
     PROFILE_FILES_DIR, PROFILE_STORAGE_FILE, PROFILE_WORKSPACE_DIR,
 };
-use crate::config::Config;
 
 /// Directory under the root that holds the archives.
 pub const BACKUPS_DIR: &str = "backups";

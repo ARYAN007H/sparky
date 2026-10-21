@@ -308,7 +308,9 @@ pub fn artifacts_service(
     match crate::storage::local::open("artifacts::files", workspace_dir)
         .and_then(|opened| opened.scoped())
     {
-        Ok(scoped) => service.with_file_store(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped))),
+        Ok(scoped) => {
+            service.with_file_store(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)))
+        }
         Err(error) => {
             log::warn!("[artifacts] file storage unavailable: {error:#}");
             service

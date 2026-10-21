@@ -21,7 +21,7 @@ use std::sync::{Arc, OnceLock};
 use tinystoragedrivers::secrets::{DerivedKeys, DocumentSecrets, KeyProvider};
 use zeroize::Zeroizing;
 
-use super::{current_scope, current_scoped, Scope, Storage, StorageError};
+use super::{Scope, Storage, StorageError, current_scope, current_scoped};
 
 /// The key provider every scope's secrets use, built once per process.
 pub(crate) fn keys() -> Result<Arc<dyn KeyProvider>, StorageError> {

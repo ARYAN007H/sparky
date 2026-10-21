@@ -1,10 +1,10 @@
 use super::*;
+use tinyagents_harness::HarnessStatusStore;
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
 use tinyagents_harness::observability::replay::read_run_events_page;
 use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
-use tinyagents_harness::HarnessStatusStore;
 use tinystoragedrivers_testkit::memory_backend as test_memory_backend;
 
 fn backend() -> Arc<dyn StorageBackend> {
@@ -158,12 +158,14 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
     .unwrap();
     assert_eq!(late.deleted, 1);
     let storage = backend.for_scope(&Scope::local()).unwrap();
-    assert!(storage
-        .streams()
-        .info(&format!("{JOURNAL_STREAM}/run.old"))
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        storage
+            .streams()
+            .info(&format!("{JOURNAL_STREAM}/run.old"))
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -246,14 +248,16 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
         .await
         .unwrap();
     assert_eq!(expired.deleted, 0);
-    assert!(backend
-        .for_scope(&profile_scope)
-        .unwrap()
-        .streams()
-        .info(&stream)
-        .await
-        .unwrap()
-        .is_some());
+    assert!(
+        backend
+            .for_scope(&profile_scope)
+            .unwrap()
+            .streams()
+            .info(&stream)
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -312,15 +316,16 @@ async fn captured_profile_lease_expiry_between_snapshot_and_mutation_refuses_wri
 
     let raw = backend.for_scope(&scope).unwrap();
     assert!(raw.streams().info(&stream).await.unwrap().is_some());
-    assert!(raw
-        .documents()
-        .get(
-            BACKFILL_COLLECTION,
-            &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap(),
-        )
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        raw.documents()
+            .get(
+                BACKFILL_COLLECTION,
+                &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap(),
+            )
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]

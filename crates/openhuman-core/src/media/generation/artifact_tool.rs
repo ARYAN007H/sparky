@@ -30,21 +30,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolContent, ToolPolicy, ToolResult,
     ToolRunContext, ToolScope, ToolTimeout,
 };
 use tokio::io::AsyncWriteExt;
 
-use crate::artifacts::production::Production;
 use crate::artifacts::ArtifactKind;
+use crate::artifacts::production::Production;
 use crate::security::approval::ApprovalChatContext;
 use crate::tools::host_extensions::tool_call_id;
 use tinyagents_harness::tinyinference_video::ProgressFn;
 use tinystoragedrivers_api::BlobStore;
 
-use super::progress::{video_status_observer, JobStateSlot};
+use super::progress::{JobStateSlot, video_status_observer};
 
 const FILE_REFERENCE_FIELDS: [&str; 8] = [
     "references",

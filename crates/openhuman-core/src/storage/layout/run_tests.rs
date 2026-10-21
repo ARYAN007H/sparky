@@ -1,6 +1,6 @@
 use super::*;
 use crate::storage::layout::state::STATE_FILE;
-use crate::storage::layout::test_fixtures::{fixture_docs, tree, v1_profile, write, Fixture};
+use crate::storage::layout::test_fixtures::{Fixture, fixture_docs, tree, v1_profile, write};
 
 fn opts() -> Options {
     Options::default()
@@ -107,9 +107,11 @@ fn assert_migrated(fx: &Fixture) {
     ] {
         assert!(paths.contains(&want), "{want} not archived: {paths:?}");
     }
-    assert!(!paths
-        .iter()
-        .any(|p| p.contains("mystery") || p.contains("notes.tmp")));
+    assert!(
+        !paths
+            .iter()
+            .any(|p| p.contains("mystery") || p.contains("notes.tmp"))
+    );
     // the config layer now reads it as v2
     let layout = crate::config::schema::ProfileLayout::resolve_at(profile.clone());
     assert_eq!(

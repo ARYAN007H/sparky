@@ -28,8 +28,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::state::LayoutError;
 use super::Target;
+use super::state::LayoutError;
 use crate::config::Config;
 use crate::storage::{self, StorageBackend};
 

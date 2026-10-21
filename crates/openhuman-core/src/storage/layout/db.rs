@@ -4,4 +4,4 @@
 //! the `legacy-import` feature. Layout migration code depends on this narrow
 //! wrapper and does not open or query SQLite itself.
 
-pub use crate::storage::import::layout_db::{checkpoint, copy, table_counts, Counts, DbCopy};
+pub use crate::storage::import::layout_db::{Counts, DbCopy, checkpoint, copy, table_counts};

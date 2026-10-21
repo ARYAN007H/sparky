@@ -23,7 +23,7 @@ use tokio_util::sync::CancellationToken;
 use crate::progress::AgentProgress;
 use crate::storage::StorageError;
 
-pub use tinyskills::run_log::{detect_repeated_line, RunLogSlice, RunOutcome};
+pub use tinyskills::run_log::{RunLogSlice, RunOutcome, detect_repeated_line};
 use tinyskills::run_log::{parse_runs, parse_terminal_outcome, short, truncate};
 
 type RunLogStore = tinyskills_drivers::StreamRunLogStore;

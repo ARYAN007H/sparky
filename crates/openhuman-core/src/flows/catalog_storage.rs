@@ -29,9 +29,9 @@ use tinystoragedrivers_types::{
 };
 
 use crate::config::Config;
-use crate::storage::Scope;
 use crate::core::runtime::DispatchCtx;
 use crate::modules::tinyflows as module;
+use crate::storage::Scope;
 
 /// A callback scope captured from a dispatch, with no ambient identity or
 /// backend handle retained. The workspace backend is resolved for each call.

@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 
 use anyhow::{Context, Result};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinybus::Result as BusResult;
 use tinyflows_bus::schedule::CallbackAddress;
 use tinystoragedrivers::StorageBackend;
@@ -34,8 +34,8 @@ use tinystoragedrivers_types::{
 };
 
 use crate::config::Config;
-use crate::storage::Scope;
 use crate::modules::tinyflows as module;
+use crate::storage::Scope;
 
 /// Schedule-owned collections, including the v1 sources read and retired by
 /// the module's v1-to-v2 migration.

@@ -75,15 +75,21 @@ fn identical_content_within_a_minute_is_skipped() {
     assert!(store.insert(&note("a", "slack", "hi", 0), true).unwrap());
     assert!(!store.insert(&note("b", "slack", "hi", 0), true).unwrap());
     assert!(store.insert(&note("c", "slack", "other", 0), true).unwrap());
-    assert!(store
-        .exists_recent("slack", Some("acct"), "New message", "hi")
-        .unwrap());
-    assert!(!store
-        .exists_recent("slack", None, "New message", "hi")
-        .unwrap());
-    assert!(!store
-        .exists_recent("gmail", Some("acct"), "New message", "hi")
-        .unwrap());
+    assert!(
+        store
+            .exists_recent("slack", Some("acct"), "New message", "hi")
+            .unwrap()
+    );
+    assert!(
+        !store
+            .exists_recent("slack", None, "New message", "hi")
+            .unwrap()
+    );
+    assert!(
+        !store
+            .exists_recent("gmail", Some("acct"), "New message", "hi")
+            .unwrap()
+    );
     assert_eq!(ids(&store.list(10, 0, None, None).unwrap()).len(), 2);
 }
 
@@ -105,9 +111,11 @@ fn content_older_than_the_window_is_not_a_duplicate() {
             .map(|_| ())
         })
         .unwrap();
-    assert!(!store
-        .exists_recent("slack", Some("acct"), "New message", "hi")
-        .unwrap());
+    assert!(
+        !store
+            .exists_recent("slack", Some("acct"), "New message", "hi")
+            .unwrap()
+    );
     assert!(store.insert(&note("b", "slack", "hi", 0), true).unwrap());
 }
 
@@ -116,16 +124,22 @@ fn dedup_follows_arrival_not_the_notifications_own_timestamp() {
     let store = docs();
     // A delayed event (stamped two minutes ago) and a future-dated one both
     // arrived now, so identical content right after is a duplicate either way.
-    assert!(store
-        .insert(&note("a", "slack", "late", 120), true)
-        .unwrap());
+    assert!(
+        store
+            .insert(&note("a", "slack", "late", 120), true)
+            .unwrap()
+    );
     assert!(!store.insert(&note("b", "slack", "late", 0), true).unwrap());
-    assert!(store
-        .insert(&note("c", "slack", "future", -3600), true)
-        .unwrap());
-    assert!(!store
-        .insert(&note("d", "slack", "future", 0), true)
-        .unwrap());
+    assert!(
+        store
+            .insert(&note("c", "slack", "future", -3600), true)
+            .unwrap()
+    );
+    assert!(
+        !store
+            .insert(&note("d", "slack", "future", 0), true)
+            .unwrap()
+    );
 }
 
 #[test]
@@ -135,37 +149,47 @@ fn a_failed_insert_releases_its_dedup_claim() {
         .insert(&note("taken", "slack", "first", 0), false)
         .unwrap();
     // Same id, new content: the claim succeeds, the notification put fails.
-    assert!(store
-        .insert(&note("taken", "slack", "second", 0), true)
-        .is_err());
+    assert!(
+        store
+            .insert(&note("taken", "slack", "second", 0), true)
+            .is_err()
+    );
     assert!(
         !store
             .exists_recent("slack", Some("acct"), "New message", "second")
             .unwrap(),
         "the claim was rolled back"
     );
-    assert!(store
-        .insert(&note("fresh", "slack", "second", 0), true)
-        .unwrap());
+    assert!(
+        store
+            .insert(&note("fresh", "slack", "second", 0), true)
+            .unwrap()
+    );
 }
 
 #[test]
 fn workspaces_keep_core_notifications_apart() {
     let store = docs();
-    assert!(store
-        .insert_core_notification("/workspace/a", &event("e", 1))
-        .unwrap());
-    assert!(store
-        .insert_core_notification("/workspace/b", &event("e", 2))
-        .unwrap());
+    assert!(
+        store
+            .insert_core_notification("/workspace/a", &event("e", 1))
+            .unwrap()
+    );
+    assert!(
+        store
+            .insert_core_notification("/workspace/b", &event("e", 2))
+            .unwrap()
+    );
     let a = store
         .list_core_notifications("/workspace/a", false, 10)
         .unwrap();
     assert_eq!(a.len(), 1);
     assert_eq!(a[0].timestamp_ms, 1);
-    assert!(store
-        .mark_core_notification_read("/workspace/a", "e")
-        .unwrap());
+    assert!(
+        store
+            .mark_core_notification_read("/workspace/a", "e")
+            .unwrap()
+    );
     assert_eq!(
         store
             .unread_core_notification_count("/workspace/a")
@@ -178,9 +202,11 @@ fn workspaces_keep_core_notifications_apart() {
             .unwrap(),
         1
     );
-    assert!(!store
-        .mark_core_notification_read("/workspace/c", "e")
-        .unwrap());
+    assert!(
+        !store
+            .mark_core_notification_read("/workspace/c", "e")
+            .unwrap()
+    );
 }
 
 #[test]
@@ -221,9 +247,11 @@ fn triage_status_and_score_filter() {
     assert_eq!(store.unread_count().unwrap(), 3);
     assert!(store.set_status("low", NotificationStatus::Read).unwrap());
     assert!(store.set_status("high", NotificationStatus::Acted).unwrap());
-    assert!(!store
-        .set_status("missing", NotificationStatus::Dismissed)
-        .unwrap());
+    assert!(
+        !store
+            .set_status("missing", NotificationStatus::Dismissed)
+            .unwrap()
+    );
     assert_eq!(store.unread_count().unwrap(), 1);
 
     let stats = store.stats().unwrap();
@@ -278,10 +306,12 @@ fn core_notifications_persist_once_and_mark_read() {
         ["a"]
     );
     assert_eq!(store.unread_core_notification_count(WS).unwrap(), 1);
-    assert!(store
-        .list_core_notifications(WS, false, 0)
-        .unwrap()
-        .is_empty());
+    assert!(
+        store
+            .list_core_notifications(WS, false, 0)
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -329,9 +359,10 @@ fn scopes_keep_notifications_apart() {
         .unwrap();
     let bob = docs_in(&storage, "bob");
     assert!(bob.list(10, 0, None, None).unwrap().is_empty());
-    assert!(!bob
-        .exists_recent("slack", Some("acct"), "New message", "hi")
-        .unwrap());
+    assert!(
+        !bob.exists_recent("slack", Some("acct"), "New message", "hi")
+            .unwrap()
+    );
     assert!(bob.insert(&note("a", "slack", "hi", 0), true).unwrap());
 }
 
