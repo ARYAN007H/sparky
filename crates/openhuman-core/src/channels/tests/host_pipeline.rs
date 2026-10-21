@@ -9,65 +9,6 @@ use std::sync::{Arc, Mutex};
 use tinychannels_bus as traits;
 
 #[tokio::test]
-async fn host_pipeline_preserves_inbound_thread_target_on_reply() {
-    let threaded = run_dispatch_harness(DispatchHarnessOptions {
-        channel_name: "telegram".into(),
-        thread_ts: Some("topic-99".into()),
-        response_text: Some("thread reply".into()),
-        ..Default::default()
-    })
-    .await;
-    assert_eq!(threaded.sends.len(), 1);
-    assert_eq!(threaded.sends[0].recipient, "reply");
-    assert_eq!(threaded.sends[0].thread_ts.as_deref(), Some("topic-99"));
-
-    let unthreaded = run_dispatch_harness(DispatchHarnessOptions {
-        channel_name: "telegram".into(),
-        thread_ts: None,
-        response_text: Some("plain reply".into()),
-        ..Default::default()
-    })
-    .await;
-    assert_eq!(unthreaded.sends.len(), 1);
-    assert_eq!(unthreaded.sends[0].thread_ts, None);
-}
-
-#[tokio::test]
-async fn host_pipeline_sends_reaction_marker_with_inbound_thread_target() {
-    let observation = run_dispatch_harness(DispatchHarnessOptions {
-        channel_name: "telegram".into(),
-        thread_ts: Some("message-42".into()),
-        supports_reactions: true,
-        response_text: Some("[REACTION:👍]".into()),
-        ..Default::default()
-    })
-    .await;
-
-    assert_eq!(observation.sends.len(), 1, "one reaction is sent");
-    assert_eq!(observation.sends[0].content, "[REACTION:👍]");
-    assert_eq!(
-        observation.sends[0].thread_ts.as_deref(),
-        Some("message-42")
-    );
-}
-
-#[tokio::test]
-async fn discord_host_pipeline_dispatches_reply_without_telegram_reaction() {
-    let observation = run_dispatch_harness(DispatchHarnessOptions {
-        channel_name: "discord".into(),
-        thread_ts: Some("thread-42".into()),
-        response_text: Some("hi from discord".into()),
-        ..Default::default()
-    })
-    .await;
-
-    assert_eq!(observation.sends.len(), 1);
-    assert_eq!(observation.sends[0].recipient, "reply");
-    assert!(observation.sends[0].content.contains("hi from discord"));
-    assert_eq!(observation.sends[0].thread_ts.as_deref(), Some("thread-42"));
-}
-
-#[tokio::test]
 async fn dispatch_publishes_tinychannels_inbound_envelope() {
     let observation = run_dispatch_harness(DispatchHarnessOptions {
         channel_name: "telegram".to_string(),
@@ -143,6 +84,8 @@ async fn host_dispatch_preserves_thread_reply_and_reaction_targets() {
     assert_eq!(threaded.sends.len(), 1);
     assert_eq!(threaded.sends[0].recipient, "reply");
     assert_eq!(threaded.sends[0].thread_ts.as_deref(), Some("topic-99"));
+    assert_eq!(threaded.model_calls.len(), 1);
+    assert!(threaded.model_calls[0].text.contains("hello"));
 
     let unthreaded = run_dispatch_harness(DispatchHarnessOptions {
         channel_name: "telegram".into(),
@@ -153,6 +96,8 @@ async fn host_dispatch_preserves_thread_reply_and_reaction_targets() {
     .await;
     assert_eq!(unthreaded.sends.len(), 1);
     assert_eq!(unthreaded.sends[0].thread_ts, None);
+    assert_eq!(unthreaded.model_calls.len(), 1);
+    assert!(unthreaded.model_calls[0].text.contains("hello"));
 
     let reaction = run_dispatch_harness(DispatchHarnessOptions {
         channel_name: "telegram".into(),
@@ -165,6 +110,8 @@ async fn host_dispatch_preserves_thread_reply_and_reaction_targets() {
     assert_eq!(reaction.sends.len(), 1, "one reaction is sent");
     assert_eq!(reaction.sends[0].content, "[REACTION:👍]");
     assert_eq!(reaction.sends[0].thread_ts.as_deref(), Some("message-42"));
+    assert_eq!(reaction.model_calls.len(), 1);
+    assert!(reaction.model_calls[0].text.contains("hello"));
 }
 
 #[tokio::test]
@@ -181,6 +128,8 @@ async fn discord_host_pipeline_dispatches_reply_with_thread_context() {
     assert_eq!(observation.sends[0].recipient, "reply");
     assert!(observation.sends[0].content.contains("hi from discord"));
     assert_eq!(observation.sends[0].thread_ts.as_deref(), Some("thread-42"));
+    assert_eq!(observation.model_calls.len(), 1);
+    assert!(observation.model_calls[0].text.contains("hello"));
 }
 
 #[tokio::test]
