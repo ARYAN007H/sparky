@@ -1,8 +1,8 @@
+use crate::channels::runtime::TestChannel;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
-use crate::channels::runtime::TestChannel;
 use tinyinference_llm::message::{AssistantMessage, Message};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
@@ -270,4 +270,3 @@ impl Tool for MockPriceTool {
         Ok(ToolResult::success("BTC is $65,000"))
     }
 }
-
