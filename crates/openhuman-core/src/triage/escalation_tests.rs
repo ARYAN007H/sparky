@@ -128,6 +128,23 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
             .any(|message| message.text().contains("handle this trigger inline")),
         "the target agent should receive the triage prompt"
     );
+    assert_eq!(
+        requests[0].model.as_deref(),
+        Some("triage-test-model"),
+        "the target's agentic route should reach the configured provider"
+    );
+    let tool_names: Vec<_> = requests[0]
+        .tools
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect();
+    assert!(tool_names.contains(&"memory"));
+    assert!(tool_names.contains(&"read_workspace_state"));
+    assert!(!tool_names.iter().any(|name| {
+        *name == "spawn_subagent" || name.starts_with("delegate_")
+    }));
+    assert!(!tool_names.contains(&"shell"));
+    assert!(!tool_names.contains(&"file_write"));
     drop(requests);
     let captured = events::test_events_for_external_id("esc-react-inline");
     assert!(captured.iter().any(|event| matches!(
