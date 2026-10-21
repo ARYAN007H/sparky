@@ -6,6 +6,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
+use openhuman_core::storage::DocumentStoreExt as _;
 use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;
 
@@ -173,6 +174,22 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         async move { openhuman_core::storage::open(&archive_url).await },
     )
     .expect("archived historical database must remain readable");
+    let inspect_url = format!("sqlite:{}", profile.join("storage.db").display());
+    let inspect_backend = openhuman_core::storage::block_on(async move {
+        openhuman_core::storage::open(&inspect_url).await
+    })
+    .unwrap();
+    let local_scope = openhuman_core::storage::Scope::local();
+    let local_storage = inspect_backend.for_scope(&local_scope).unwrap();
+    for collection in ["approvals", "approvals.requests", "flows_definitions", "flows.definitions"] {
+        let rows = openhuman_core::storage::block_on(async {
+            local_storage
+                .documents()
+                .query_all(collection, &tinystoragedrivers::Query::all())
+                .await
+        });
+        eprintln!("target {collection} rows: {rows:?}");
+    }
     // The profile's V2 workspace resolves its default backend to the exact
     // storage.db that desktop boot just opened.
     let workspace = profile.join("files");
