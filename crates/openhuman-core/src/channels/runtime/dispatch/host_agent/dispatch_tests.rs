@@ -503,6 +503,14 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         })))
         .mount(&provider_server)
         .await;
+    Mock::given(method("GET"))
+        .and(path("/bottoken/getMe"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": { "id": 7, "is_bot": true, "username": "fixture_bot" }
+        })))
+        .mount(&provider_server)
+        .await;
     Mock::given(method("POST"))
         .and(path("/bottoken/sendMessage"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -570,6 +578,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         silent_streaming: true,
         mention_only: false,
     });
+    channel_config.channel_voice.reply_mode = crate::config::schema::VoiceReplyMode::Never;
     let (dispatch_tx, mut dispatch_rx) = tokio::sync::mpsc::channel(4);
     let context_slot = Arc::new(std::sync::OnceLock::new());
     let mut module_runtime = crate::channels::runtime::prepare_module_runtime_for_test_in_context(
@@ -608,13 +617,10 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .await
         .expect("the configured Telegram provider starts against the mock API");
 
-    let inbound = tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        dispatch_rx.recv(),
-    )
-    .await
-    .expect("the provider delivers its mocked update")
-    .expect("the provider dispatch channel remains open");
+    let inbound = tokio::time::timeout(std::time::Duration::from_secs(10), dispatch_rx.recv())
+        .await
+        .expect("the provider delivers its mocked update")
+        .expect("the provider dispatch channel remains open");
     let account_id = inbound
         .inbound_envelope
         .as_ref()
@@ -629,7 +635,9 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     );
 
     let _installed = InstalledResolver::new(resolver);
-    let mut turn = tokio::spawn(crate::channels::runtime::dispatch::process_channel_runtime_message(ctx, inbound));
+    let mut turn = tokio::spawn(
+        crate::channels::runtime::dispatch::process_channel_runtime_message(ctx, inbound),
+    );
     tokio::select! {
         result = &mut turn => panic!(
             "channel pipeline completed before a model request: result={result:?}, sent={:#?}, provider_requests={:#?}",
