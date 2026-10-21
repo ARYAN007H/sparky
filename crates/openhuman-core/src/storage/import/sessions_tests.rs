@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::storage::rusqlite;
-use crate::storage::test_support::{SqliteBackend, sqlite_backend};
+use crate::storage::test_support::{sqlite_backend, SqliteBackend};
 use crate::util::classic_transcript_fixture::write_classic;
 use sha2::Digest as _;
 use std::collections::BTreeMap;

@@ -145,7 +145,12 @@ async fn a_document_does_not_decrypt_under_another_scope_or_master_key() {
     alice.write("default_model = \"m\"\n").await.unwrap();
 
     // Another master key fails closed.
-    let wrong_key = document_source_keyed(storage.as_ref(), "alice", &tmp.path().join("a.toml"), keys(2));
+    let wrong_key = document_source_keyed(
+        storage.as_ref(),
+        "alice",
+        &tmp.path().join("a.toml"),
+        keys(2),
+    );
     assert!(wrong_key.read().await.is_err());
 
     // Another scope's data key cannot open alice's ciphertext even when the

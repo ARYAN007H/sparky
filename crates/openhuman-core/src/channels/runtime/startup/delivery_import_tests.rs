@@ -1,7 +1,7 @@
 use super::*;
+use crate::storage::{Scope, StorageBackend};
 use std::sync::Arc;
 use tinychannels_bus::{ChannelOutboundIntent, DeliveryDurability, OutboundPayload};
-use crate::storage::{Scope, StorageBackend};
 
 fn entry(id: &str, at: u64) -> DeliveryQueueEntry {
     DeliveryQueueEntry::new(
