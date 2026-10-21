@@ -53,6 +53,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
                 supports_vision: Arc::new(|_| false),
                 resolve_model: Arc::new(|_, _, _| None),
                 context_window: Arc::new(|model| match model {
+                    "" => Some(99_999),
                     "scoped/model" => Some(77_777),
                     "hint:reasoning" => Some(88_888),
                     _ => None,
@@ -86,6 +87,15 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
         .window,
         Some(88_888),
         "a registered provider hook can override a workload tier alias"
+    );
+    assert_eq!(
+        crate::inference::context_window::project_context_window_for_model(
+            "   ",
+            Some(Some(&extensions))
+        )
+        .window,
+        None,
+        "blank model IDs do not query provider hooks or the catalog"
     );
     let context = crate::core::runtime::CoreContext::for_test_with_extensions(
         crate::core::runtime::DomainSet::full(),

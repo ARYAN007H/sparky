@@ -177,14 +177,16 @@ fn static_route_facts(
     model: &str,
     extensions: Option<Option<&crate::core::slots::Extensions>>,
 ) -> ContextWindowRouteInput {
+    let model = model.trim();
+    if model.is_empty() {
+        return ContextWindowRouteInput::default();
+    }
     let provider = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
     let provider_model_window = match extensions {
         Some(extensions) => crate::inference::registry::provider_model_context_window_for(
-            extensions,
-            provider,
-            model.trim(),
+            extensions, provider, model,
         ),
-        None => crate::inference::registry::provider_model_context_window(provider, model.trim()),
+        None => crate::inference::registry::provider_model_context_window(provider, model),
     };
     let managed_default = match extensions {
         Some(extensions) => crate::inference::registry::provider_default_model_for(
@@ -212,7 +214,7 @@ fn static_route_facts(
         }
     };
     ContextWindowRouteInput {
-        catalog_window: tinyagents_registry::pricing::lookup(model.trim())
+        catalog_window: tinyagents_registry::pricing::lookup(model)
             .map(|price| u64::from(price.context_window)),
         provider_model_window,
         managed_default,
