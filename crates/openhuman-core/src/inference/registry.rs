@@ -16,12 +16,6 @@
 
 use std::sync::Arc;
 
-use tinyinference_embeddings::EmbeddingModel;
-use tinyinference_llm::providers::overrides::{
-    BoxFuture, CatalogEntry, CatalogLimits, CatalogRequest, ChatModelEntry, ChatModelFactory,
-    ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata,
-    ProviderOverrides, ReadinessProbe,
-};
 
 use crate::config::Config;
 use crate::core::slots::{Extensions, HookSlot};
@@ -72,8 +66,9 @@ impl ProviderContext {
 }
 
 pub use tinyinference_llm::providers::overrides::{
-    ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
-    ProviderModelMetadata, ProviderOverrides, ReadinessProbe,
+    BoxFuture, CatalogEntry, CatalogLimits, CatalogRequest, ChatModelEntry, ChatModelFactory,
+    ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata,
+    ProviderOverrides, ReadinessProbe,
 };
 
 pub(crate) fn provider_overrides(extensions: Option<Extensions>) -> ProviderOverrides<ProviderContext> {
@@ -403,8 +398,8 @@ pub fn unregister_embedding(provider_id: &str) -> bool {
 }
 
 /// The registered embedding factory, if any.
-pub(crate) fn embedding(provider_id: &str) -> Option<EmbeddingFactory> {
-    EMBEDDINGS.get(provider_id)
+pub(crate) fn embedding(provider_id: &str) -> Option<EmbeddingFactory<ProviderContext>> {
+    provider_overrides(None).embedding_factory(provider_id)
 }
 
 // ---------------------------------------------------------------------------
@@ -435,14 +430,14 @@ pub fn unregister_catalog(provider_id: &str) -> bool {
 
 /// The registered catalog, if any.
 pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry<ProviderContext>> {
-    CATALOGS.get(provider_id)
+    provider_overrides(None).catalog_entry(provider_id)
 }
 
 pub(crate) fn catalog_for(
     extensions: Option<&Extensions>,
     provider_id: &str,
 ) -> Option<CatalogEntry<ProviderContext>> {
-    CATALOGS.get_for(extensions, provider_id)
+    provider_overrides(extensions.cloned()).catalog_entry(provider_id)
 }
 
 #[cfg(test)]
