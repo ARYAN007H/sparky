@@ -234,7 +234,6 @@ impl RuntimeBuilder {
                 _ => None,
             }
         };
-        };
         let core_extensions = host_seams.core_extensions.clone();
         if !inspection && self.session_store.is_none() {
             if let Some(backend) = &storage_backend {
