@@ -274,19 +274,32 @@ pub fn current_documents_for(workspace_dir: &Path) -> Option<Arc<dyn DocumentSto
 
 /// The calling tenant's durable run-status store for `workspace_dir`: the
 /// `harness_run_status` documents of its agent scope, beside its session
-/// stores. A call with no tenant gets a throwaway in-memory store.
-#[must_use]
+/// stores. Non-SaaS calls without an ambient tenant use the local default
+/// agent. SaaS calls without a tenant have no authorized store.
 pub fn status_store_for(
     workspace_dir: &Path,
-) -> tinyagents_harness::observability::DriverStatusStore {
-    let docs = current_documents_for(workspace_dir).unwrap_or_else(|| {
-        log::warn!("[session_store] no tenant; using a throwaway run-status store");
-        let scoped = MemoryStorage::new()
-            .for_scope(&tinystoragedrivers::Scope::local())
-            .expect("the memory backend binds the local scope");
-        Arc::clone(scoped.documents())
-    });
-    tinyagents_harness::observability::DriverStatusStore::new(docs)
+) -> Option<tinyagents_harness::observability::DriverStatusStore> {
+    let docs = current_documents_for(workspace_dir).or_else(|| {
+        if crate::core::runtime::is_saas() {
+            return None;
+        }
+        let backend = match crate::storage::local::backend_for(workspace_dir) {
+            Ok(backend) => backend,
+            Err(error) => {
+                log::warn!("[session_store] run-status backend unavailable: {error:#}");
+                return None;
+            }
+        };
+        let scoped = match backend.for_scope(&session_scope(super::DEFAULT_AGENT)) {
+            Ok(scoped) => scoped,
+            Err(error) => {
+                log::warn!("[session_store] local run-status scope refused: {error}");
+                return None;
+            }
+        };
+        Some(Arc::clone(scoped.documents()))
+    })?;
+    Some(tinyagents_harness::observability::DriverStatusStore::new(docs))
 }
 
 /// The calling tenant's run ledger for `workspace_dir` ([`ledger_for`]), or an
