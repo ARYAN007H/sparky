@@ -303,18 +303,17 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     let _installed =
         crate::storage::test_support::install_for_test(&destination_url, Arc::clone(&backend));
 
-    // A subsequent boot importer sees the preserved v1 source marker and
-    // does not duplicate or resurrect data in the profile database.
+    // Layout migration archives and removes the v1 source. A subsequent boot
+    // importer must not resurrect records from that old path.
     let first = run_all(&backend, &config);
     let moved = first
         .iter()
         .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
         .expect("boot importer includes legacy scope movement");
-    println!("scope migration report after profile boot: {moved:?}");
     assert_eq!(
         moved.outcome.as_ref().unwrap(),
-        &Outcome::AlreadyDone,
-        "scope migration should not repeat after layout migration: {moved:?}"
+        &Outcome::NoSource,
+        "scope migration must not replay the archived v1 database: {moved:?}"
     );
 
     let profile_scope = backend
