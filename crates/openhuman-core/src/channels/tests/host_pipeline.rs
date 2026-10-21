@@ -115,6 +115,29 @@ async fn host_dispatch_preserves_thread_reply_and_reaction_targets() {
 }
 
 #[tokio::test]
+async fn dispatch_harness_default_workspace_does_not_reuse_prior_transcript() {
+    let first = run_dispatch_harness(DispatchHarnessOptions {
+        content: "first isolated harness turn".into(),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(first.model_calls.len(), 1);
+
+    let second = run_dispatch_harness(DispatchHarnessOptions {
+        content: "second isolated harness turn".into(),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(second.model_calls.len(), 1);
+    assert!(second.model_calls[0]
+        .text
+        .contains("second isolated harness turn"));
+    assert!(!second.model_calls[0]
+        .text
+        .contains("first isolated harness turn"));
+}
+
+#[tokio::test]
 async fn discord_host_pipeline_dispatches_reply_with_thread_context() {
     let observation = run_dispatch_harness(DispatchHarnessOptions {
         channel_name: "discord".into(),
@@ -135,6 +158,8 @@ async fn discord_host_pipeline_dispatches_reply_with_thread_context() {
 #[tokio::test]
 async fn discord_host_pipeline_keeps_thread_histories_separate() {
     let _bus_guard = use_real_agent_handler().await;
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
     let workspace = tempfile::tempdir().expect("temporary Discord workspace");
     let channel_state = Arc::new(crate::channels::runtime::TestChannel::new("discord"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));

@@ -35,7 +35,7 @@ pub struct DispatchHarnessOptions {
     pub handler_error: Option<String>,
     pub handler_delay_ms: u64,
     pub timeout_secs: u64,
-    /// Workspace the runtime context reports; `None` falls back to the OS temp dir.
+    /// Workspace the runtime context reports; `None` uses an isolated temporary workspace.
     ///
     /// `pub`, like every other field here, and it has to be: integration tests
     /// under `tests/` are a separate crate, and a struct-update expression
@@ -300,6 +300,8 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     // The real agent handler and global registries are process-wide. Serialize
     // the whole harness run so concurrent tests cannot replace them mid-turn.
     let _agent_handler_guard = crate::agent::bus::use_real_agent_handler().await;
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
 
     crate::core::bus::init().await.expect("bus init");
     let mut event_rx = crate::core::bus::BUS
@@ -341,10 +343,13 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         .clone()
         .into_inner()
         .unwrap_or_else(|| ChannelSystemPrompt::fixed("system prompt"));
-    let harness_workspace_dir = options
-        .workspace_dir
-        .clone()
-        .unwrap_or_else(std::env::temp_dir);
+    let (harness_workspace_dir, _workspace_guard) = match options.workspace_dir.clone() {
+        Some(workspace) => (workspace, None),
+        None => {
+            let workspace = tempfile::tempdir().expect("temporary dispatch harness workspace");
+            (workspace.path().to_path_buf(), Some(workspace))
+        }
+    };
     let ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
