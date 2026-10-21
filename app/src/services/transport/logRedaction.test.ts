@@ -1,3 +1,4 @@
+// @vitest-environment node
 import debug from 'debug';
 import { describe, expect, it } from 'vitest';
 

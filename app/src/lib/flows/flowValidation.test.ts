@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit tests for `erroredNodeIds` (Phase 3c) — mapping graph-level validation
  * error strings back to the node ids they name, for canvas highlighting.

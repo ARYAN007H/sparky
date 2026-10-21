@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Tests for the native directory chooser wrapper (#5831).
  *

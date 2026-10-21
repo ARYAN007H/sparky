@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit tests for the boot-check service-backed transport.
  *

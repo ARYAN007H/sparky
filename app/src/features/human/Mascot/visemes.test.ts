@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { lerpViseme, REST_SMILE_PATH, visemePath, VISEMES } from './visemes';

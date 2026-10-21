@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Tests for coreProcessControl — covers changed lines 13-15, 17, 22.
  */

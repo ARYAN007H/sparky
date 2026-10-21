@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * #5156 — a `threads_create_new` that blows the 30 s RPC budget must land as a
  * recorded, displayable failure, never as an unhandled rejection.

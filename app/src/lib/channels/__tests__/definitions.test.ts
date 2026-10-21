@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { AUTH_MODE_LABELS, FALLBACK_DEFINITIONS, STATUS_STYLES } from '../definitions';

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit tests for the cron builder helper. Covers build → parse round-trips for
  * the three supported shapes (minutes / hours / daily, with and without

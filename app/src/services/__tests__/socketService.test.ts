@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit tests for socketService internals — specifically the
  * resolveCoreSocketBaseUrl() behaviour that was fixed to consult

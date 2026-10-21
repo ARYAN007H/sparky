@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit tests for `createBlankWorkflowGraph` (Phase 4a "start from scratch").
  * Locks the starter-graph shape the chooser persists: a single `manual`

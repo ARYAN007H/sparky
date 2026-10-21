@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Vitest coverage for the two new cron tauriCommand wrappers added by the
  * skills runner PR: openhumanCronRun and openhumanCronRuns.

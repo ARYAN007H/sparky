@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { AVATAR_MENU_ITEMS, NAV_TABS } from '../navConfig';

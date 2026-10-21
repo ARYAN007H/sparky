@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * The read-back prefix is a behavioural contract that spans two languages: the
  * renderer wraps a deferred answer in it, and the Rust harness recognises it to

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * LAN-vs-Tunnel race semantics for TransportManager.raceLanAndTunnel (plan.md
  * §4 P1). The sibling TransportManager.test.ts covers profile *selection* but

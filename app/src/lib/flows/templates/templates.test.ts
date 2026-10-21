@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Structural validity tests for the bundled Phase 4c templates. Mirrors the
  * exact checks `tinyflows::validate` (and therefore `openhuman.flows_validate`)

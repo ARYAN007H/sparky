@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * The shared pending-approvals poller now serves consumers with different
  * cadences, and must run at the fastest one anybody asked for.

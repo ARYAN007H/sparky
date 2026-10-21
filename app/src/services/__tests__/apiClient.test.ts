@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

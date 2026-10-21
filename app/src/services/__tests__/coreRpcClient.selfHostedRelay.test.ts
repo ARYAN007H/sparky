@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Regression tests for #3865 — connecting to a self-hosted runtime on a LAN IP
  * from the macOS desktop app.

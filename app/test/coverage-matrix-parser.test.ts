@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { parseMatrix, validateAgainstCatalog } from '../../scripts/lib/coverage-matrix-parser.mjs';
