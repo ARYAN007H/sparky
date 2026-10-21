@@ -416,8 +416,14 @@ fn run_call_command(args: &[String]) -> Result<()> {
         .build()?;
     let value = rt
         .block_on(async {
+            let dispatch = DispatchCtx::process_default();
+            let dispatch = if method == "inference.agent_chat" {
+                dispatch.with_headless_agent_chat()
+            } else {
+                dispatch
+            };
             invoke_method(
-                DispatchCtx::process_default(),
+                dispatch,
                 default_state(),
                 &method,
                 params,
