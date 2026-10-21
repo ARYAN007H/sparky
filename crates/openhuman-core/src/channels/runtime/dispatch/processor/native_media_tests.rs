@@ -103,9 +103,9 @@ fn native_audio_video_and_incomplete_voice_are_rejected_before_media_reads() {
     for transcript in [
         None,
         Some(tinychannels_bus::VoiceTranscript {
-            text: "failed transcript".into(),
+            text: "unavailable transcript".into(),
             language: None,
-            state: tinychannels_bus::VoiceTranscriptState::Failed,
+            state: tinychannels_bus::VoiceTranscriptState::Unavailable,
             source: tinychannels_bus::VoiceTranscriptSource::HostStt,
         }),
         Some(tinychannels_bus::VoiceTranscript {
