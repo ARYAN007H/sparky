@@ -419,9 +419,7 @@ pub(crate) async fn process_channel_runtime_message(
             .await
             {
                 Ok(input) => Some(Ok(input)),
-                Err(error) => {
-                    Some(Err(error))
-                }
+                Err(error) => Some(Err(error)),
             }
         } else {
             Some(Err("native media has no selected host agent".to_owned()))
