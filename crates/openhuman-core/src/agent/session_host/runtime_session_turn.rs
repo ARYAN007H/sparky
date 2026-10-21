@@ -112,7 +112,7 @@ impl OpenHumanSessionHost {
             stream: self.on_progress.is_some(),
             session: self.session.clone(),
             resume: self.turn_resume_mode(),
-            cancellation,
+            cancellation: cancellation.clone(),
             run_context: context.into_tinyagents(root_config),
             controls: Default::default(),
         };
