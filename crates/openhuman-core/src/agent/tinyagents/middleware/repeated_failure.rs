@@ -185,23 +185,13 @@ struct HaltCopy;
 
 impl FailurePolicy for HaltCopy {
     fn identical_halt_summary(&self, tool: &str, count: u32, failure_text: &str) -> String {
-        stop::halt_summary::retry_exhausted(
-            &OpenHumanCopyProvider,
-            tool,
-            count,
-            failure_text,
-        )
-        .summary
+        stop::halt_summary::retry_exhausted(&OpenHumanCopyProvider, tool, count, failure_text)
+            .summary
     }
 
     fn no_progress_halt_summary(&self, consecutive: u32, tool: &str, failure_text: &str) -> String {
-        stop::halt_summary::no_progress(
-            &OpenHumanCopyProvider,
-            consecutive,
-            tool,
-            failure_text,
-        )
-        .summary
+        stop::halt_summary::no_progress(&OpenHumanCopyProvider, consecutive, tool, failure_text)
+            .summary
     }
 }
 
