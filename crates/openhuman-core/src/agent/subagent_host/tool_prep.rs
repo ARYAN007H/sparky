@@ -140,6 +140,7 @@ pub(super) fn filter_definition_tool_indices(
     definition: &AgentDefinition,
     skill_filter: Option<&str>,
     nested_spawn_depth_available: bool,
+    parent_visible: &std::collections::HashSet<String>,
 ) -> DefinitionToolFilter {
     let nested_spawn_ids = definition.allowed_subagent_ids();
     let explicitly_declares_nested_spawn = |name: &str| {
@@ -193,6 +194,13 @@ pub(super) fn filter_definition_tool_indices(
             allowed.push(index);
         }
     }
+
+    retain_parent_visible_tool_indices(
+        &mut allowed,
+        parent_tools,
+        parent_visible,
+        nested_spawn_granted,
+    );
 
     DefinitionToolFilter {
         indices: allowed,

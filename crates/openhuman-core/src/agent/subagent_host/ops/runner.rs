@@ -484,22 +484,12 @@ async fn run_typed_mode(
             .as_deref()
             .or(definition.skill_filter.as_deref()),
         nested_spawn_depth_available,
+        &parent.subagent_tool_ceiling_names,
     );
     let mut allowed_indices = filtered_tools.indices;
     let nested_spawn_ids = filtered_tools.nested_spawn_ids;
     let nested_spawn_granted = !filtered_tools.nested_spawn_tools.is_empty();
     let can_spawn_subagent = filtered_tools.nested_spawn_tools.contains("spawn_subagent");
-
-    // A child may only narrow an explicit profile/channel ceiling, never widen
-    // it back to `all_tools`. The parent's own role-specific prompt surface is
-    // intentionally not a ceiling: coordinators delegate effectful work to
-    // specialists whose tools they do not advertise directly.
-    super::super::tool_prep::retain_parent_visible_tool_indices(
-        &mut allowed_indices,
-        &parent.all_tools,
-        &parent.subagent_tool_ceiling_names,
-        nested_spawn_granted,
-    );
 
     // Rule-withheld tools stay callable (`allowed_names`) but off the prompt.
     let child_rules = options
