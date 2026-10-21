@@ -186,9 +186,10 @@ fn one_time_work_runs_once_per_backend_and_scope_and_retries_failures() {
     };
     let first = backend();
     let repo = repo_on(&first, "once");
-    assert!(repo
-        .once_per_backend("k", || Err(anyhow::anyhow!("boom")))
-        .is_err());
+    assert!(
+        repo.once_per_backend("k", || Err(anyhow::anyhow!("boom")))
+            .is_err()
+    );
     repo.once_per_backend("k", count).unwrap();
     repo.once_per_backend("k", count).unwrap();
     assert_eq!(runs.get(), 1, "a failure is retried, a success is recorded");
