@@ -55,17 +55,15 @@ async fn direct_upload_requires_runtime_authority_and_external_input_cannot_crea
         ..Config::default()
     };
     let workspace = tinytools::WorkspaceDescriptor::new(temp.path().join("agent-acting"));
-    assert!(
-        stage_turn(
-            UPLOAD,
-            Some(&config),
-            Some(&workspace),
-            Some("thread"),
-            Some(&external_origin())
-        )
-        .await
-        .is_err()
-    );
+    assert!(stage_turn(
+        UPLOAD,
+        Some(&config),
+        Some(&workspace),
+        Some("thread"),
+        Some(&external_origin())
+    )
+    .await
+    .is_err());
     assert!(!workspace.root.exists());
     assert!(!config.action_dir.exists());
     assert_eq!(
@@ -97,17 +95,15 @@ async fn delegation_rejects_malformed_explicit_paths_and_external_reads_before_c
         serde_json::json!(["picture.png] injected"]),
         serde_json::json!(["picture\u{0}.png"]),
     ] {
-        assert!(
-            delegation_prompt(
-                &crate::core::runtime::DispatchCtx::ambient(),
-                "task",
-                &serde_json::json!({"image_paths": image_paths}),
-                None,
-                None
-            )
-            .await
-            .is_err()
-        );
+        assert!(delegation_prompt(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "task",
+            &serde_json::json!({"image_paths": image_paths}),
+            None,
+            None
+        )
+        .await
+        .is_err());
     }
     let error = delegation_prompt(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -184,16 +180,14 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
     }
     // A folder that disappeared is an error, as in `run_task`, not a silent
     // fallback to the global dir.
-    assert!(
-        thread_action_dir(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            &config,
-            &config.workspace_dir,
-            Some("gone")
-        )
-        .await
-        .is_err()
-    );
+    assert!(thread_action_dir(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &config.workspace_dir,
+        Some("gone")
+    )
+    .await
+    .is_err());
 
     // Stage the way `start_chat` does, then read the way the turn does: its
     // request scope comes from a run context carrying the thread folder as its

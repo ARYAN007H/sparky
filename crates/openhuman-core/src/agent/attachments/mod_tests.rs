@@ -14,11 +14,9 @@ async fn legacy_sidecar_rehydrates_into_an_authorized_acting_original() {
     let bytes = b"\x89PNG\r\n\x1a\noriginal";
     tokio::fs::write(&source, bytes).await.unwrap();
     let scope = AttachmentAccessScope::default();
-    assert!(
-        resolve_path(&cfg, source.to_str().unwrap(), &scope)
-            .await
-            .is_err()
-    );
+    assert!(resolve_path(&cfg, source.to_str().unwrap(), &scope)
+        .await
+        .is_err());
     let index = std::collections::HashMap::from([("legacy".into(), source.clone())]);
     let prompt = markers::rehydrate_placeholders_in_text("[Image: old #att:legacy]", &index);
     let paths = markers::parse_image_markers(&prompt).1;
@@ -171,18 +169,16 @@ async fn forbidden_acting_root_is_rejected_before_directory_creation() {
     let temp = tempfile::tempdir().unwrap();
     let mut config = config(temp.path());
     config.action_dir = temp.path().join(".ssh").join("new-workspace");
-    assert!(
-        save(
-            &config,
-            "thread",
-            "file",
-            "text/plain",
-            b"data",
-            &AttachmentAccessScope::default()
-        )
-        .await
-        .is_err()
-    );
+    assert!(save(
+        &config,
+        "thread",
+        "file",
+        "text/plain",
+        b"data",
+        &AttachmentAccessScope::default()
+    )
+    .await
+    .is_err());
     assert!(!temp.path().join(".ssh").exists());
 }
 
@@ -231,15 +227,13 @@ async fn ready_media_artifact_in_files_folder_can_be_attached() {
     tokio::fs::write(&unrelated, b"not a filed media artifact")
         .await
         .unwrap();
-    assert!(
-        resolve_path(
-            &config,
-            &unrelated.to_string_lossy(),
-            &AttachmentAccessScope::default(),
-        )
-        .await
-        .is_err()
-    );
+    assert!(resolve_path(
+        &config,
+        &unrelated.to_string_lossy(),
+        &AttachmentAccessScope::default(),
+    )
+    .await
+    .is_err());
 }
 
 #[tokio::test]
@@ -346,26 +340,22 @@ async fn hard_zero_and_count_gate_precede_reads() {
     let temp = tempfile::tempdir().unwrap();
     let mut config = config(temp.path());
     config.multimodal_files.max_files = 0;
-    assert!(
-        stage(
-            "[FILE:/missing]",
-            "thread",
-            &config,
-            &AttachmentAccessScope::default()
-        )
-        .await
-        .is_err()
-    );
-    assert!(
-        stage(
-            "[IMAGE:/missing]",
-            "thread",
-            &config,
-            &AttachmentAccessScope::default()
-        )
-        .await
-        .is_err()
-    );
+    assert!(stage(
+        "[FILE:/missing]",
+        "thread",
+        &config,
+        &AttachmentAccessScope::default()
+    )
+    .await
+    .is_err());
+    assert!(stage(
+        "[IMAGE:/missing]",
+        "thread",
+        &config,
+        &AttachmentAccessScope::default()
+    )
+    .await
+    .is_err());
     assert!(!config.action_dir.exists());
     assert!(!safe_relative_path("../escape"));
     assert!(!safe_relative_path("/absolute"));
@@ -374,27 +364,23 @@ async fn hard_zero_and_count_gate_precede_reads() {
 
 #[tokio::test]
 async fn vision_without_explicit_references_fails_before_configuration_or_inference() {
-    assert!(
-        !has_resolvable_image(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            "Describe a filename mentioned only in prose: picture.png",
-            None,
-            None
-        )
-        .await
-        .unwrap()
-    );
-    assert!(
-        delegation_prompt(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            "task",
-            &serde_json::json!({ "image_paths": [42] }),
-            None,
-            None
-        )
-        .await
-        .is_err()
-    );
+    assert!(!has_resolvable_image(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "Describe a filename mentioned only in prose: picture.png",
+        None,
+        None
+    )
+    .await
+    .unwrap());
+    assert!(delegation_prompt(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "task",
+        &serde_json::json!({ "image_paths": [42] }),
+        None,
+        None
+    )
+    .await
+    .is_err());
 }
 
 #[cfg(unix)]
@@ -406,18 +392,16 @@ async fn upload_symlink_is_rejected_without_writing_outside() {
     let outside = temp.path().join("outside");
     tokio::fs::create_dir(&outside).await.unwrap();
     std::os::unix::fs::symlink(&outside, config.action_dir.join("uploads")).unwrap();
-    assert!(
-        save(
-            &config,
-            "thread",
-            "file",
-            "application/octet-stream",
-            b"original",
-            &AttachmentAccessScope::default()
-        )
-        .await
-        .is_err()
-    );
+    assert!(save(
+        &config,
+        "thread",
+        "file",
+        "application/octet-stream",
+        b"original",
+        &AttachmentAccessScope::default()
+    )
+    .await
+    .is_err());
     assert_eq!(std::fs::read_dir(outside).unwrap().count(), 0);
 }
 

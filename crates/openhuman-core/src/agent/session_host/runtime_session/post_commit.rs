@@ -137,9 +137,9 @@ pub(super) async fn finalize_committed_turn(
     let dispatch = receipt.options.context.dispatch_ctx();
     if !receipt.options.context.native_staged_parts.is_empty() {
         if let Some(message_id) = receipt.options.context.native_message_id.as_deref() {
-            if let Some(user) = tinyagents_harness::summarization::last_user_message(
-                &receipt.outcome.history,
-            ) {
+            if let Some(user) =
+                tinyagents_harness::summarization::last_user_message(&receipt.outcome.history)
+            {
                 let committed = crate::threads::attachments::native_parts_in_committed_message(
                     &receipt.options.context.native_staged_parts,
                     user,
@@ -152,15 +152,14 @@ pub(super) async fn finalize_committed_turn(
                         .as_deref()
                         .unwrap_or_default();
                     match crate::threads::attachments::commit_native_channel_parts(
-                        &dispatch,
-                        thread_id,
-                        &committed,
-                        message_id,
+                        &dispatch, thread_id, &committed, message_id,
                     )
                     .await
                     {
                         Ok(()) => {
-                            if let Some(lease) = receipt.options.context.native_staged_lease.as_ref() {
+                            if let Some(lease) =
+                                receipt.options.context.native_staged_lease.as_ref()
+                            {
                                 lease.mark_committed();
                             }
                         }

@@ -100,7 +100,7 @@ pub(crate) fn secure_open(
 ) -> std::io::Result<std::fs::File> {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
-        FILE_NAME_NORMALIZED, GetFinalPathNameByHandleW, VOLUME_NAME_DOS,
+        GetFinalPathNameByHandleW, FILE_NAME_NORMALIZED, VOLUME_NAME_DOS,
     };
 
     use std::os::windows::ffi::OsStringExt;

@@ -198,6 +198,72 @@ fn callback_for_channels(
 }
 
 #[tokio::test]
+async fn voice_media_projection_accepts_only_durable_refs_for_the_configured_account() {
+    let channel = Arc::new(RecordingChannel::new("telegram:bot-a"));
+    let channels: HashMap<String, Arc<dyn Channel>> = HashMap::from([(
+        channel.name().to_owned(),
+        channel.clone() as Arc<dyn Channel>,
+    )]);
+    let (callback, _context) = callback_for_channels(channels, HashMap::new(), None);
+    let request = || tinychannels_bus::HostStoreVoiceMediaRequest {
+        scope: tinychannels_bus::HostVoiceScope {
+            configured_instance: "telegram:bot-a".into(),
+            channel: tinychannels_bus::ChannelRef {
+                id: "telegram".into(),
+                account_id: Some("telegram:bot-a".into()),
+            },
+            conversation: tinychannels_bus::ConversationRef {
+                kind: tinychannels_bus::ConversationKind::Dm,
+                id: "chat-42".into(),
+                ..Default::default()
+            },
+            turn_id: "telegram_42_7".into(),
+        },
+        direction: tinychannels_bus::HostVoiceMediaDirection::Inbound,
+        audio_base64: base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            vec![7; 200 * 1024],
+        ),
+        mime_type: "audio/ogg".into(),
+        codec: Some("ogg_opus".into()),
+        duration_ms: Some(1000),
+        file_name: Some("voice.ogg".into()),
+        media_reference: Some(tinychannels_bus::MediaReference {
+            opaque_id: Some("tinychannels_media_v1_fixture".into()),
+            kind: tinychannels_bus::MediaKind::Audio,
+            content_type: Some("audio/ogg".into()),
+            ..Default::default()
+        }),
+    };
+
+    let stored = callback
+        .store_voice_media(request())
+        .await
+        .expect("configured module's durable scoped ref is projected");
+    assert_eq!(
+        stored.media.opaque_id.as_deref(),
+        Some("tinychannels_media_v1_fixture")
+    );
+    assert!(stored.accessible_url.is_none());
+
+    let mut forged = request();
+    forged.scope.configured_instance = "telegram:bot-b".into();
+    forged.scope.channel.account_id = Some("telegram:bot-b".into());
+    assert!(callback.store_voice_media(forged).await.is_err());
+
+    let mut unscoped = request();
+    unscoped.media_reference.as_mut().unwrap().opaque_id = Some("external-id".into());
+    assert!(callback.store_voice_media(unscoped).await.is_err());
+
+    let mut oversized = request();
+    oversized.audio_base64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        vec![7; 8 * 1024 * 1024 + 1],
+    );
+    assert!(callback.store_voice_media(oversized).await.is_err());
+}
+
+#[tokio::test]
 async fn native_progressive_transport_dispatches_typed_content_through_configured_channel() {
     let other_account = Arc::new(RecordingChannel::new("telegram:bot-a"));
     let selected_account = Arc::new(RecordingChannel::new("telegram:bot-b"));

@@ -7,13 +7,13 @@ use std::{
 
 use async_trait::async_trait;
 use tinyagents_harness::{
-    CancellationToken,
     run_queue::RunQueue,
     turn_runner::{
         EventSink, FailureClassification, FailureClassifier, IngressDecision, IngressPolicy,
         IngressStage, QueueDisposition, ReplyStore, ScopeKey, Summarizer, TerminalEvent, TurnHost,
         TurnRequest, TurnResult, TurnRunner, TurnRunnerConfig, TurnSession, TurnSignal,
     },
+    CancellationToken,
 };
 use tokio::sync::mpsc;
 

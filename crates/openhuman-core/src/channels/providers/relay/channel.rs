@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
+use crate::web_chat::{publish_web_channel_event, publish_web_channel_event_in, WebChannelEvent};
 use tinychannels_bus::{ChannelMessage, SendMessage};
 use tinychannels_runtime::Channel;
 
@@ -84,6 +84,7 @@ impl RelayChannel {
     /// separately from the gateway and are never fabricated.
     pub(crate) fn publish_typed_reply(
         &self,
+        ctx: &crate::core::runtime::DispatchCtx,
         channel: &tinychannels_bus::ChannelRef,
         conversation: &tinychannels_bus::ConversationRef,
         turn_id: &str,
@@ -97,28 +98,31 @@ impl RelayChannel {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .push(text.to_owned());
-        publish_web_channel_event(WebChannelEvent::ChannelOutbound {
-            context: crate::web_chat::event_context(
-                self.client_id.clone(),
-                self.thread_id.clone(),
-                self.request_id.clone(),
-            ),
-            full_response: Some(text.to_owned()),
-            structured: Some(json!({
-                "kind": CHANNEL_OUTBOUND_EVENT,
-                "channel": self.channel,
-                "chat_id": conversation.id,
-                "thread_ts": conversation.thread_id,
-                "reply_to_message_id": self.reply_to,
-                "turn_id": turn_id,
-                "sequence": sequence,
-                "segment_index": segment_index,
-                "idempotency_key": idempotency_key,
-                "channel_ref": channel,
-                "conversation_ref": conversation,
-                "parts": parts,
-            })),
-        });
+        publish_web_channel_event_in(
+            ctx,
+            WebChannelEvent::ChannelOutbound {
+                context: crate::web_chat::event_context(
+                    self.client_id.clone(),
+                    self.thread_id.clone(),
+                    self.request_id.clone(),
+                ),
+                full_response: Some(text.to_owned()),
+                structured: Some(json!({
+                    "kind": CHANNEL_OUTBOUND_EVENT,
+                    "channel": self.channel,
+                    "chat_id": conversation.id,
+                    "thread_ts": conversation.thread_id,
+                    "reply_to_message_id": self.reply_to,
+                    "turn_id": turn_id,
+                    "sequence": sequence,
+                    "segment_index": segment_index,
+                    "idempotency_key": idempotency_key,
+                    "channel_ref": channel,
+                    "conversation_ref": conversation,
+                    "parts": parts,
+                })),
+            },
+        );
     }
 }
 

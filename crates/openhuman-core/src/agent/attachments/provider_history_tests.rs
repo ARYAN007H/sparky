@@ -57,31 +57,23 @@ async fn missing_historical_media_does_not_block_latest_valid_media() {
     let captured = probe.requests.lock().unwrap().clone();
     assert_eq!(captured.len(), 1);
     let history = &captured[0].messages[0];
-    assert!(
-        history
-            .text()
-            .contains("Earlier attachment omitted by history budget")
-    );
+    assert!(history
+        .text()
+        .contains("Earlier attachment omitted by history budget"));
     assert!(history.text().contains("Earlier attachment unavailable"));
     assert!(history.text().contains("deleted-prior-upload-0.png"));
     assert!(!serde_json::to_string(history).unwrap().contains("base64"));
-    assert!(
-        !serde_json::to_string(history)
-            .unwrap()
-            .contains("private-value")
-    );
-    assert!(
-        !serde_json::to_string(history)
-            .unwrap()
-            .contains("also-private")
-    );
+    assert!(!serde_json::to_string(history)
+        .unwrap()
+        .contains("private-value"));
+    assert!(!serde_json::to_string(history)
+        .unwrap()
+        .contains("also-private"));
     let durable_text = serde_json::to_string(&durable).unwrap();
     assert!(signed_urls.iter().all(|url| durable_text.contains(url)));
-    assert!(
-        serde_json::to_string(&captured[0].messages[1])
-            .unwrap()
-            .contains("data:image/png;base64,")
-    );
+    assert!(serde_json::to_string(&captured[0].messages[1])
+        .unwrap()
+        .contains("data:image/png;base64,"));
 }
 
 #[cfg(unix)]

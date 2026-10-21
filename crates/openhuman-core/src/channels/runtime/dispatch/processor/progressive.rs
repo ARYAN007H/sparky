@@ -22,6 +22,11 @@ enum ProgressiveTargetKind {
     HostedRelay {
         client: tinybus::module::ModuleClient,
         channel: std::sync::Arc<crate::channels::providers::relay::RelayChannel>,
+        ctx: crate::core::runtime::DispatchCtx,
+        config: crate::config::Config,
+        client_id: String,
+        thread_id: String,
+        request_id: String,
     },
 }
 
@@ -30,6 +35,19 @@ impl NativeProgressiveTarget {
         &self,
         turn_id: &str,
     ) -> anyhow::Result<std::sync::Arc<NativeProgressiveReply>> {
+        tracing::debug!(
+            provider_matches_account = self.channel.account_id.as_deref().is_some_and(|account| {
+                tinychannels_bus::provider_id(account) == self.channel.id
+            }),
+            account_present = self
+                .channel
+                .account_id
+                .as_deref()
+                .is_some_and(|account| !account.trim().is_empty()),
+            conversation_present = !self.conversation.id.trim().is_empty(),
+            turn_present = !turn_id.trim().is_empty(),
+            "opening native channel progressive turn"
+        );
         let lifetime = std::time::Duration::from_secs(3_660);
         let reply = match &self.kind {
             ProgressiveTargetKind::Configured(object) => {
@@ -42,13 +60,35 @@ impl NativeProgressiveTarget {
                 )
                 .await?
             }
-            ProgressiveTargetKind::HostedRelay { client, channel } => {
+            ProgressiveTargetKind::HostedRelay {
+                client,
+                channel,
+                ctx,
+                config,
+                client_id,
+                thread_id,
+                request_id,
+            } => {
+                let projection = Arc::new(
+                    crate::web_chat::Surface::new(
+                        ctx,
+                        crate::web_chat::TurnIds {
+                            client_id: client_id.clone(),
+                            thread_id: thread_id.clone(),
+                            request_id: request_id.clone(),
+                        },
+                        config.clone(),
+                    )
+                    .await,
+                );
                 let callback =
                     crate::channels::providers::relay::progressive::RelayProgressiveTransport::new(
+                        ctx.clone(),
                         Arc::clone(channel),
                         self.channel.clone(),
                         self.conversation.clone(),
                         turn_id.to_owned(),
+                        projection,
                     );
                 let runtime = crate::modules::channel_runtime::ChannelRuntimeLease::open(
                     client.clone(),
@@ -70,15 +110,24 @@ impl NativeProgressiveTarget {
 }
 
 pub(crate) fn hosted_relay_target(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &crate::config::Config,
     channel: std::sync::Arc<crate::channels::providers::relay::RelayChannel>,
     channel_ref: tinychannels_bus::channel::ChannelRef,
     conversation: tinychannels_bus::channel::ConversationRef,
+    client_id: String,
+    thread_id: String,
+    request_id: String,
 ) -> NativeProgressiveTarget {
     NativeProgressiveTarget {
         kind: ProgressiveTargetKind::HostedRelay {
             client: crate::modules::client(config.clone()),
             channel,
+            ctx: ctx.clone(),
+            config: config.clone(),
+            client_id,
+            thread_id,
+            request_id,
         },
         channel: channel_ref,
         conversation,
@@ -104,6 +153,13 @@ pub(crate) fn native_target(
         .get(account)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("native channel account is not configured"))?;
+    tracing::debug!(
+        provider_matches_account = tinychannels_bus::provider_id(account) == envelope.channel.id,
+        account_present = !account.trim().is_empty(),
+        conversation_present = !envelope.conversation.id.trim().is_empty(),
+        message_present = !envelope.message_id.trim().is_empty(),
+        "native channel progressive target resolved"
+    );
     Ok(Some(NativeProgressiveTarget {
         kind: ProgressiveTargetKind::Configured(object),
         channel: envelope.channel.clone(),

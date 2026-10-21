@@ -26,8 +26,8 @@ use crate::inference::provider::ChatResponse;
 use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
-    REASONING_EXT_KEY, message_to_display_transcript as message_to_chat_message,
-    message_to_native_transcript as message_to_native_chat_message,
+    message_to_display_transcript as message_to_chat_message,
+    message_to_native_transcript as message_to_native_chat_message, REASONING_EXT_KEY,
 };
 use tinyagents_session::transcript::TranscriptMessage;
 

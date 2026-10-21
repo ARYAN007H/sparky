@@ -88,8 +88,14 @@ impl std::fmt::Debug for QueuedPayload {
                 &self.native_message_input.is_some(),
             )
             .field("native_staged_parts", &self.native_staged_parts.len())
-            .field("has_native_staged_lease", &self.native_staged_lease.is_some())
-            .field("has_native_preparation_error", &self.native_preparation_error.is_some())
+            .field(
+                "has_native_staged_lease",
+                &self.native_staged_lease.is_some(),
+            )
+            .field(
+                "has_native_preparation_error",
+                &self.native_preparation_error.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }

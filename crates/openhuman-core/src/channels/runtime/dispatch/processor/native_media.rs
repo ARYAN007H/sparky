@@ -2,13 +2,13 @@
 
 use tinybus::module::ModuleClient;
 use tinychannels_bus::{
-    ChannelInboundEnvelope, ContentPart, HostVoiceScope, MediaKind, MediaReference,
     module_media::{MediaReadBegin, MediaReadChunk, MediaReadFinish},
+    ChannelInboundEnvelope, ContentPart, HostVoiceScope, MediaKind, MediaReference,
 };
 use tinyinference_llm::message::Message;
 
 use crate::{
-    channels::context::{ChannelRuntimeContext, module_client},
+    channels::context::{module_client, ChannelRuntimeContext},
     core::runtime::DispatchCtx,
 };
 
@@ -174,22 +174,20 @@ pub(super) async fn resolve_typed_message(
         staged_parts.push(staged);
     }
 
-    let message = match crate::agent::message_convert::user_message_from_parts(
-        channel_context,
-        &parts,
-    ) {
-        Ok(message) => message,
-        Err(error) => {
-            let _ = crate::threads::attachments::discard_native_channel_parts(
-                host_dispatch,
-                thread_id,
-                config,
-                &staged_parts,
-            )
-            .await;
-            return Err(error);
-        }
-    };
+    let message =
+        match crate::agent::message_convert::user_message_from_parts(channel_context, &parts) {
+            Ok(message) => message,
+            Err(error) => {
+                let _ = crate::threads::attachments::discard_native_channel_parts(
+                    host_dispatch,
+                    thread_id,
+                    config,
+                    &staged_parts,
+                )
+                .await;
+                return Err(error);
+            }
+        };
     Ok(Some(ResolvedNativeMessage {
         message,
         staged_parts,
@@ -307,7 +305,11 @@ fn validate_reference(
     Ok(())
 }
 
-fn validate_actual_media_size(actual: usize, declared: usize, maximum: usize) -> Result<(), String> {
+fn validate_actual_media_size(
+    actual: usize,
+    declared: usize,
+    maximum: usize,
+) -> Result<(), String> {
     if actual == 0 || actual != declared || actual > maximum || actual > MAX_MEDIA_BYTES {
         return Err("native media bytes exceed or disagree with their declared limit".into());
     }

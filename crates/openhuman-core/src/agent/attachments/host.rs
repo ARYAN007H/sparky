@@ -14,7 +14,7 @@ use std::path::Path;
 
 use tinyagents_harness::multimodal::mime::detect_file_mime;
 
-use super::{AttachmentAccessScope, save};
+use super::{save, AttachmentAccessScope};
 use crate::config::Config;
 
 /// One file a host attaches to a turn.

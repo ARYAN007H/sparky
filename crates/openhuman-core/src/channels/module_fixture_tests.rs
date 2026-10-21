@@ -166,6 +166,7 @@ async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call(
                     envelope: None,
                 },
                 namespace: "openhuman".into(),
+                preparation_mode: Default::default(),
                 session_policy: Default::default(),
                 preparation_mode: Default::default(),
             },),

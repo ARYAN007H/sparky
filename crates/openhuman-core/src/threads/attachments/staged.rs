@@ -581,18 +581,14 @@ pub(crate) async fn read_authorized_native_attachment(
     })
 }
 
-fn native_attachment_byte_limit(
-    part: &ContentPart,
-    config: &crate::config::Config,
-) -> usize {
+fn native_attachment_byte_limit(part: &ContentPart, config: &crate::config::Config) -> usize {
     let is_image = matches!(part, ContentPart::Image { .. });
     let mb = if is_image {
         config.multimodal.effective_limits().1
     } else {
         config.multimodal_files.effective_limits().1
     };
-    mb
-        .saturating_mul(1024 * 1024)
+    mb.saturating_mul(1024 * 1024)
         .min(tinychannels_bus::module_media::MEDIA_UPLOAD_MAX_BYTES)
 }
 

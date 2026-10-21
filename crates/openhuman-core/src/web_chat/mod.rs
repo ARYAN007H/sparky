@@ -39,6 +39,7 @@ mod schemas;
 mod session;
 mod suggestions;
 mod surface;
+pub(crate) use surface::{Surface, TurnIds};
 mod turn_activity;
 mod turn_close;
 mod turn_events;

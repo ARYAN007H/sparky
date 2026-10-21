@@ -13,10 +13,14 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use tinychannels::providers::telegram::TelegramChannel;
-use tinychannels::{Channel, SendMessage};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
+use tinychannels::providers::telegram::TelegramChannel;
+#[allow(
+    deprecated,
+    reason = "this fixture covers the v21 compatibility send adapter"
+)]
+use tinychannels::{Channel, SendMessage};
 
 #[derive(Default)]
 struct TelegramMockState {
@@ -145,10 +149,13 @@ fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
     static LOCK: &std::sync::OnceLock<tokio::sync::Mutex<()>> = &crate::SHARED_ENV_LOCK;
     LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock().await
+        .lock()
+        .await
 }
 
 #[tokio::test]
+// This fixture intentionally exercises the v21 adapter retained for one release.
+#[allow(deprecated)]
 async fn telegram_loopback_covers_reaction_text_fallback_and_media_send_paths() {
     let _env = env_lock_async().await;
     let (base, state) = spawn_telegram_mock().await;
