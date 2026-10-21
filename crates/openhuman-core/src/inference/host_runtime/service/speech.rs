@@ -50,7 +50,7 @@ pub async fn transcribe_with_prompt(
 
     let provider_name = effective_stt_provider(config);
     debug!("{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path}");
-    let provider = selected_stt_provider(config, &provider_name)?;
+    let provider = selected_stt_provider(config, &provider_name);
     let text = tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
         .await?;
     debug!(
@@ -73,7 +73,7 @@ pub async fn transcribe_bytes(
     extension: Option<&str>,
 ) -> Result<LocalAiSpeechResult, String> {
     let provider_name = effective_stt_provider(config);
-    let provider = selected_stt_provider(config, &provider_name)?;
+    let provider = selected_stt_provider(config, &provider_name);
     let text = tinyinference_voice::transcription::transcribe_bytes(audio, extension, &provider)
         .await?;
     service.mark_stt_ready();
@@ -86,15 +86,20 @@ pub async fn transcribe_bytes(
 fn selected_stt_provider<'a>(
     config: &'a Config,
     provider_name: &str,
-) -> Result<ConfiguredSttProvider<'a>, String> {
-    let provider =
-        create_stt_provider(provider_name, "", config).map_err(|error| error.to_string())?;
-    Ok(ConfiguredSttProvider { config, provider })
+) -> ConfiguredSttProvider<'a> {
+    let provider_name = provider_name.to_owned();
+    ConfiguredSttProvider {
+        config,
+        provider_factory: Box::new(move |config| {
+            create_stt_provider(&provider_name, "", config).map_err(|error| error.to_string())
+        }),
+    }
 }
 
 struct ConfiguredSttProvider<'a> {
     config: &'a Config,
-    provider: Box<dyn SttProvider>,
+    provider_factory:
+        Box<dyn Fn(&Config) -> Result<Box<dyn SttProvider>, String> + Send + Sync + 'a>,
 }
 
 #[async_trait::async_trait]
@@ -105,9 +110,9 @@ impl tinyinference_voice::transcription::TranscriptionProvider for ConfiguredStt
         mime_type: &str,
         file_name: &str,
     ) -> Result<String, String> {
+        let provider = (self.provider_factory)(self.config)?;
         let audio_base64 = BASE64.encode(audio);
-        let outcome = self
-            .provider
+        let outcome = provider
             .transcribe(
                 self.config,
                 &audio_base64,

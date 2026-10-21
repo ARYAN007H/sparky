@@ -50,9 +50,12 @@ async fn native_transcription_helpers_preserve_audio_metadata_for_host_stt() {
     let file_path = tmp.path().join("voice.wav");
     std::fs::write(&file_path, b"file-audio").unwrap();
     let calls = Arc::new(Mutex::new(Vec::new()));
+    let provider_calls = Arc::clone(&calls);
     let provider = ConfiguredSttProvider {
         config: &config,
-        provider: Box::new(CapturingSttProvider(Arc::clone(&calls))),
+        provider_factory: Box::new(move |_| {
+            Ok(Box::new(CapturingSttProvider(Arc::clone(&provider_calls))) as Box<dyn SttProvider>)
+        }),
     };
 
     let file_text = tinyinference_voice::transcription::transcribe_file(&file_path, &provider)
