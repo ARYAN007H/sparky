@@ -6,6 +6,53 @@ use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
+#[tokio::test]
+async fn native_turn_factory_applies_default_temperature_and_preserves_explicit_override() {
+    struct TemperatureProbe(Arc<std::sync::Mutex<Vec<Option<f64>>>>);
+
+    #[async_trait]
+    impl ChatModel<()> for TemperatureProbe {
+        async fn invoke(
+            &self,
+            _state: &(),
+            request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            self.0.lock().unwrap().push(request.temperature);
+            Ok(ModelResponse::assistant("ok"))
+        }
+    }
+
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let _override = crate::inference::provider::factory::test_provider_override::install_model(
+        Arc::new(TemperatureProbe(Arc::clone(&seen))),
+    );
+    let config = Arc::new(crate::config::Config::default());
+    let ctx = crate::core::runtime::DispatchCtx::unbound();
+    let models = TurnModelSource::new_crate_native(&ctx, "chat", config)
+        .build("hint:chat", 0.3, None, None)
+        .expect("native model set");
+
+    models
+        .primary
+        .invoke(
+            &(),
+            ModelRequest::new(vec![tinyinference_llm::message::Message::user("default")]),
+        )
+        .await
+        .expect("default request");
+    models
+        .primary
+        .invoke(
+            &(),
+            ModelRequest::new(vec![tinyinference_llm::message::Message::user("explicit")])
+                .with_temperature(0.9),
+        )
+        .await
+        .expect("explicit request");
+    assert_eq!(*seen.lock().unwrap(), vec![Some(0.3), Some(0.9)]);
+}
+
 use super::TurnModels;
 use crate::agent::tinyagents::TurnModelSource;
 use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;

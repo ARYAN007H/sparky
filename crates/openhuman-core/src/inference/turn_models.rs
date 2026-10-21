@@ -413,24 +413,39 @@ impl TurnModelSource {
         thread_id: Option<&str>,
     ) -> anyhow::Result<TurnModels> {
         if let Some(direct) = &self.direct_model {
-            let mut profile = direct.profile().cloned().unwrap_or_default();
-            if let Some(window) = context_window.filter(|window| *window > 0) {
-                profile.max_input_tokens = Some(window);
-            }
+            let profile = direct.profile().cloned();
             let provider_id = profile
-                .provider
+                .as_ref()
+                .and_then(|profile| profile.provider.clone())
                 .clone()
                 .unwrap_or_else(|| "injected".to_string());
-            let native_tools = profile.tool_calling;
-            let supports_vision = profile.modalities.image_in;
+            let native_tools = profile.as_ref().is_some_and(|profile| profile.tool_calling);
+            let supports_vision = profile
+                .as_ref()
+                .is_some_and(|profile| profile.modalities.image_in);
             let is_local =
                 crate::agent::tinyagents::turn_policy::provider_is_self_hosted(&provider_id, None);
-            let context_window = context_window.or(profile.max_input_tokens);
-            let primary: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::new(
-                ProfileOverrideModel::new(direct.clone(), profile)
-                    .with_request_model(model)
-                    .with_request_temperature(temperature),
-            );
+            let context_window = context_window.or_else(|| {
+                profile
+                    .as_ref()
+                    .and_then(|profile| profile.max_input_tokens)
+            });
+            let primary: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
+                if let Some(window) = context_window.filter(|window| *window > 0) {
+                    let mut profile = profile.unwrap_or_default();
+                    profile.max_input_tokens = Some(window);
+                    Arc::new(
+                        ProfileOverrideModel::new(direct.clone(), profile)
+                            .with_request_model(model)
+                            .with_request_temperature(temperature),
+                    )
+                } else {
+                    Arc::new(
+                        ProfileOverrideModel::new_preserving_profile(direct.clone())
+                            .with_request_model(model)
+                            .with_request_temperature(temperature),
+                    )
+                };
             let (primary, summarizer) = match &self.attachment_config {
                 Some(config) => (
                     crate::attachments::provider::wrap_injected(
@@ -512,9 +527,8 @@ impl TurnModelSource {
         thread_id: Option<&str>,
     ) -> anyhow::Result<Arc<dyn tinyinference_llm::model::ChatModel<()>>> {
         if let Some(direct) = &self.direct_model {
-            let profile = direct.profile().cloned().unwrap_or_default();
             let summarizer: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::new(
-                ProfileOverrideModel::new(direct.clone(), profile)
+                ProfileOverrideModel::new_preserving_profile(direct.clone())
                     .with_request_model(model)
                     .with_request_temperature(temperature),
             );
