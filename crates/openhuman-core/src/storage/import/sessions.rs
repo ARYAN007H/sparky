@@ -168,7 +168,7 @@ fn database_totals(report: &LegacyDatabaseReport) -> (usize, usize) {
     )
 }
 
-fn sanitize_legacy_system_messages(messages: &mut [tinyagents_session::SessionMessage]) {
+fn sanitize_legacy_system_messages(messages: &mut [tinyagents_session::types::SessionMessage]) {
     for message in messages {
         if message.role == "system" {
             if let Some(cleaned) =
