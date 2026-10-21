@@ -175,9 +175,13 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     assert_eq!(runs.len(), 1, "scheduler persisted one completed run");
     assert_eq!(runs[0].status, "ok", "agent job completed successfully");
     assert!(
-        runs[0].output.contains("headless-cron-child-result"),
+        runs[0]
+            .output
+            .as_deref()
+            .unwrap_or_default()
+            .contains("headless-cron-child-result"),
         "the persisted cron result must include its spawned child output: {}",
-        runs[0].output
+        runs[0].output.as_deref().unwrap_or_default()
     );
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
