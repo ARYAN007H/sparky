@@ -271,7 +271,9 @@ impl OpenHumanSessionHost {
             Some((source, model_name)) => {
                 let models = source.build(
                     model_name,
-                    target_def.map_or(config.default_temperature, |definition| definition.temperature),
+                    target_def.map_or(config.default_temperature, |definition| {
+                        definition.temperature
+                    }),
                     None,
                     None,
                 )?;

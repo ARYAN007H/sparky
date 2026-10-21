@@ -297,18 +297,24 @@ fn build_turn_agent(
             match (host, turn_model_source) {
                 (None, Some((source, model))) => {
                     OpenHumanSessionHost::from_config_with_definition_and_turn_model_source(
-                        ctx, config, &definition, source, model,
+                        ctx,
+                        config,
+                        &definition,
+                        source,
+                        model,
                     )
                 }
                 (host, None) => match host {
-                Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
-                    ctx,
-                    config,
-                    &definition,
-                    host,
-                    session_id,
-                ),
-                None => OpenHumanSessionHost::from_config_with_definition(ctx, config, &definition),
+                    Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
+                        ctx,
+                        config,
+                        &definition,
+                        host,
+                        session_id,
+                    ),
+                    None => {
+                        OpenHumanSessionHost::from_config_with_definition(ctx, config, &definition)
+                    }
                 },
                 (Some(host), Some(_)) => Err(anyhow::anyhow!(
                     "explicit turn model source cannot be combined with host tools"
@@ -349,7 +355,16 @@ pub fn agent_chat_for<'a>(
     env: AgentChatEnv,
 ) -> futures::future::BoxFuture<'a, Result<Outcome<String>, String>> {
     agent_chat_for_with_turn_model_source(
-        config, target, message, model_override, temperature, thread_id, cwd, route, env, None,
+        config,
+        target,
+        message,
+        model_override,
+        temperature,
+        thread_id,
+        cwd,
+        route,
+        env,
+        None,
     )
 }
 
@@ -424,7 +439,16 @@ pub async fn agent_chat_reply_for(
     env: AgentChatEnv,
 ) -> Result<AgentChatReply, String> {
     agent_chat_reply_for_inner(
-        config, target, message, model_override, temperature, thread_id, cwd, route, env, None,
+        config,
+        target,
+        message,
+        model_override,
+        temperature,
+        thread_id,
+        cwd,
+        route,
+        env,
+        None,
     )
     .await
 }
@@ -500,15 +524,28 @@ async fn agent_chat_reply_for_inner(
                 "[inference] agent_chat rooting turn tools at cwd={}",
                 root.display()
             );
-            let mut agent =
-                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature, turn_model_source.clone())?;
+            let mut agent = build_turn_agent(
+                &turn_ctx,
+                &scoped,
+                &target,
+                turn_session_id,
+                temperature,
+                turn_model_source.clone(),
+            )?;
             // Also thread it as the turn's workspace descriptor so acting tools
             // that read `ToolExecutionContext::workspace` (shell) resolve their
             // default cwd here, and so spawned sub-agents inherit the same root.
             agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(root.clone())));
             agent
         }
-        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature, turn_model_source)?,
+        None => build_turn_agent(
+            &turn_ctx,
+            config,
+            &target,
+            turn_session_id,
+            temperature,
+            turn_model_source,
+        )?,
     };
     // Thread-correct resume. `OpenHumanSessionHost::turn` would otherwise auto-load the
     // newest transcript for the agent *name*, which is another thread's

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use tinyinference_llm::model::{
     ChatModel, ModelProfile, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,
 };
-use tokio::time::{sleep, timeout, Duration};
+use tokio::time::{Duration, sleep, timeout};
 
 struct TriageReplyModel {
     requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
@@ -170,9 +170,11 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         .map(|tool| tool.name.as_str())
         .collect();
     assert!(tool_names.contains(&"read_workspace_state"));
-    assert!(!tool_names
-        .iter()
-        .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
+    assert!(
+        !tool_names
+            .iter()
+            .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") })
+    );
     assert!(!tool_names.contains(&"shell"));
     assert!(!tool_names.contains(&"file_write"));
     drop(requests);
