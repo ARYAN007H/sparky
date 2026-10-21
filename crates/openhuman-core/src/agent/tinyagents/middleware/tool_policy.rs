@@ -70,6 +70,27 @@ impl ToolPolicyMiddleware {
         tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
         channel: String,
     ) -> Self {
+        Self::build(policy, session, tool_sets, channel, true)
+    }
+
+    /// Builds the agent-configured policy middleware when the hosted security
+    /// gate already enforces the same channel session ceiling.
+    pub(crate) fn new_without_session_ceiling(
+        policy: Arc<dyn ToolCallPolicy<OpenHumanRunContext>>,
+        session: tinytools::ToolPolicySession,
+        tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
+        channel: String,
+    ) -> Self {
+        Self::build(policy, session, tool_sets, channel, false)
+    }
+
+    fn build(
+        policy: Arc<dyn ToolCallPolicy<OpenHumanRunContext>>,
+        session: tinytools::ToolPolicySession,
+        tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
+        channel: String,
+        enforce_session_ceiling: bool,
+    ) -> Self {
         let host = Arc::new(ToolPolicyHostState {
             session,
             tool_sets,
@@ -109,8 +130,11 @@ impl ToolPolicyMiddleware {
             }
         });
         let post_host = host.clone();
-        let gate = ToolPolicyGateMiddleware::new(desktop_policy)
-            .with_session_ceiling(session_ceiling)
+        let mut gate = ToolPolicyGateMiddleware::new(desktop_policy);
+        if enforce_session_ceiling {
+            gate = gate.with_session_ceiling(session_ceiling);
+        }
+        let gate = gate
             .with_denial_renderer(denial)
             .with_post_gate(Arc::new(move |_ctx, call| {
                 post_host.render_skill_for_session(call)

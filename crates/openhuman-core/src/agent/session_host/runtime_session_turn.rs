@@ -63,6 +63,7 @@ impl OpenHumanSessionHost {
             None
         };
         let mut context = OpenHumanRunContext::new().with_host_env(&host_env);
+        context.hosted_base = self.hosted_base.clone();
         context.headless_descendant_settlement = headless;
         context.untrusted_input_turn = self.untrusted_input;
         context.origin = origin.cloned();

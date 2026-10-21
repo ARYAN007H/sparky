@@ -179,7 +179,28 @@ async fn drive_turn(
     // otherwise the harness model-call cap would be zero and abort the run before
     // the first provider call.
     let max_iterations = effective_max_iterations(max_iterations);
-    let hosted_security_gate = hosted_root.is_some();
+    let native_security_gate = if hosted_root.is_none() {
+        native_subagent.as_ref().and_then(|native| {
+            run_context.hosted_base.as_ref().map(|base| {
+                let mut gate = crate::agent::tinyagents::host::OpenHumanSecurityGate::new(
+                    base.security_policy.clone(),
+                    tool_sets.clone(),
+                )
+                .with_input_screening(!run_context.untrusted_input_turn)
+                .with_approval(run_context.approval.clone())
+                .with_dispatch(run_context.dispatch_ctx())
+                .with_headless_descendant_settlement(run_context.headless_descendant_settlement);
+                if let Some(policy) = tool_policy.as_ref() {
+                    gate = gate.with_tool_policy(Arc::new(policy.session.clone()));
+                }
+                (Arc::new(gate), native.name.clone())
+            })
+        })
+    } else {
+        None
+    };
+    let is_hosted_root = hosted_root.is_some();
+    let hosted_security_gate = is_hosted_root || native_security_gate.is_some();
     let is_local = turn_models.is_local();
     // Wrap concrete routes before the invocation-local hosted resolver captures them.
     let turn_models = turn_models.with_budget(run_context.model_budget.as_ref());
@@ -228,13 +249,8 @@ async fn drive_turn(
         error_slot,
         ..
     } = turn_models;
-    let plan_models = turn_models_for_plan(
-        model,
-        primary,
-        tier_routes,
-        &error_slot,
-        hosted_security_gate,
-    );
+    let plan_models =
+        turn_models_for_plan(model, primary, tier_routes, &error_slot, is_hosted_root);
     let planner = OpenHumanTurnPlanner {
         models: plan_models.clone(),
         policy,
@@ -559,6 +575,7 @@ async fn drive_turn(
             has_route_fallback,
             dispatch: run_context.dispatch_ctx(),
             hosted_security_gate,
+            native_security_gate,
             pause_at_cap,
             run_mode: run_context.thread_id.as_deref().map(|thread_id| {
                 crate::threads::run_mode::handle_for_thread(&run_context.dispatch_ctx(), thread_id)
@@ -588,7 +605,7 @@ async fn drive_turn(
         &run_context,
         &subagent_scope,
     );
-    turn_observer::install(&mut prepared.harness, &sink, hosted_security_gate);
+    turn_observer::install(&mut prepared.harness, &sink, is_hosted_root);
 
     // Fail-closed registry validation gate (issue #4249, Workstream 10 — registry).
     // The projected `CapabilityRegistry` produced these diagnostics while the

@@ -19,7 +19,6 @@ struct CronChildModel {
     accepted_followups: std::sync::atomic::AtomicUsize,
     child_attempts_dangerous_tool: bool,
     child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool,
-    child_dangerous_tool_denied: std::sync::atomic::AtomicBool,
     child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     child_release: tokio::sync::Notify,
 }
@@ -131,15 +130,6 @@ impl ChatModel<()> for CronChildModel {
             }
             if self.child_attempts_dangerous_tool {
                 if call > 0 {
-                    eprintln!("Cron child followup messages: {:?}", request.messages);
-                    self.child_dangerous_tool_denied.store(
-                        request.messages.iter().any(|message| {
-                            message
-                                .text()
-                                .contains("Scheduled agent turns may use read-only tools only")
-                        }),
-                        std::sync::atomic::Ordering::SeqCst,
-                    );
                     return Ok(ModelResponse::assistant(
                         "headless-cron-child-returned-after-policy-denial",
                     ));
@@ -212,7 +202,6 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: false,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
-        child_dangerous_tool_denied: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
@@ -282,7 +271,6 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: false,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
-        child_dangerous_tool_denied: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
@@ -391,7 +379,6 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_attempts_dangerous_tool: true,
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
-        child_dangerous_tool_denied: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
     });
@@ -425,8 +412,8 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
     );
     assert_eq!(
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        2,
-        "the child receives the denied tool result and then completes"
+        1,
+        "the child model requested the declared destructive tool"
     );
     assert!(
         model
@@ -434,9 +421,6 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
             .load(std::sync::atomic::Ordering::SeqCst),
         "the real child model request exposed the declared destructive tool"
     );
-    assert!(model
-        .child_dangerous_tool_denied
-        .load(std::sync::atomic::Ordering::SeqCst));
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         &config.workspace_dir,
         &format!("cron:{}", job.id),
@@ -450,20 +434,31 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
     assert_eq!(jobs.len(), 1, "one native child belongs to this Cron job");
     assert_eq!(
         jobs[0].status,
-        tinyagents_orchestration::subagent::SubAgentJobStatus::Completed,
-        "the child may recover after the denied action and report the denial"
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Incomplete,
+        "the child records the policy-blocked action as an incomplete run"
     );
-    assert!(jobs[0]
-        .output
+    let child_run_id = jobs[0]
+        .subagent_run_id
         .as_deref()
-        .unwrap_or_default()
-        .contains("headless-cron-child-returned-after-policy-denial"));
+        .expect("native child records its own run id");
+    let child_events =
+        crate::agent::tinyagents::journal::read_run_events(&inspect_dispatch, child_run_id, 0)
+            .await
+            .expect("read the native child's durable tool events");
+    let denial = child_events
+        .iter()
+        .find_map(|observation| match &observation.event {
+            tinyagents_harness::events::AgentEvent::ToolCompleted {
+                tool_name,
+                error: Some(error),
+                ..
+            } if tool_name == "delete_artifact" => Some(error.as_str()),
+            _ => None,
+        })
+        .expect("the native child journal records the denied delete_artifact call");
+    assert!(denial.contains("Scheduled agent turns may use read-only tools only"));
+    assert!(!denial.contains("not found"));
     let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
     assert_eq!(runs.len(), 1);
-    assert_eq!(runs[0].status, "ok");
-    assert!(runs[0]
-        .output
-        .as_deref()
-        .unwrap_or_default()
-        .contains("headless-cron-child-returned-after-policy-denial"));
+    assert_eq!(runs[0].status, "error");
 }

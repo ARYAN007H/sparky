@@ -13,15 +13,18 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use tinyagents_harness::cache::InMemoryResponseCache;
+use tinyagents_harness::host::security_gate::{GateDecision, SecurityGate, ToolCallRequest};
 use tinyagents_harness::middleware::{
     install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
     ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
 };
 use tinyagents_harness::middleware::{
     plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
-    BudgetMiddleware, ContextCompressionMiddleware, PromptCacheGuardMiddleware,
-    RepeatProgressMiddleware, RunModeHandle, ToolPolicyMiddleware as TaToolPolicyMiddleware,
+    BudgetMiddleware, ContextCompressionMiddleware, MiddlewareToolOutcome,
+    PromptCacheGuardMiddleware, RepeatProgressMiddleware, RunModeHandle, ToolHandler,
+    ToolMiddleware, ToolPolicyMiddleware as TaToolPolicyMiddleware,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
@@ -32,6 +35,7 @@ use tinyinference_llm::model::CapabilitySet;
 
 use crate::agent::tinyagents::context_wiring::install_context_ladder;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent::tinyagents::host::OpenHumanSecurityGate;
 use crate::agent::tinyagents::middleware;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{ProviderUsageCarry, SubagentScope, ToolFailureMap};
@@ -70,6 +74,9 @@ pub(super) struct TurnMiddlewareInputs {
     /// Hosted roots authorize tools through `OpenHumanSecurityGate`; installing
     /// the legacy approval middleware as well would issue a second approval.
     pub(super) hosted_security_gate: bool,
+    /// Host gate installed at the native child's tool boundary, avoiding a
+    /// full hosted root invocation while preserving the same authorization.
+    pub(super) native_security_gate: Option<(Arc<OpenHumanSecurityGate>, String)>,
     /// Whether this run pauses gracefully at its model-call cap (issue #6014).
     /// Only such a run gets the in-loop conclusion: a run that errors at its cap
     /// instead (the channel/CLI path, which maps the stop to
@@ -139,6 +146,7 @@ pub(super) fn install_turn_middleware(
         has_route_fallback,
         dispatch,
         hosted_security_gate,
+        native_security_gate,
         pause_at_cap,
         run_mode,
         memory_turn,
@@ -515,6 +523,13 @@ pub(super) fn install_turn_middleware(
     // `ApprovalGate`, a denial short-circuits with a model-consumable result, and
     // an approved call records a terminal audit row. Replaces the inline approval
     // block that used to live in the legacy tool adapter.
+    let native_security_gate_installed = native_security_gate.is_some();
+    if let Some((gate, agent_id)) = native_security_gate {
+        harness.push_tool_middleware(Arc::new(NativeSubagentSecurityMiddleware {
+            gate,
+            agent_id,
+        }));
+    }
     if !hosted_security_gate {
         harness.push_tool_middleware(Arc::new(ApprovalGateMiddleware::new(
             "approval_security",
@@ -542,14 +557,22 @@ pub(super) fn install_turn_middleware(
         .as_ref()
         .map(|enforcement| enforcement.session.clone());
     if let Some(enforcement) = tool_policy {
-        harness.push_tool_middleware(Arc::new(
+        let middleware = if native_security_gate_installed {
+            middleware::tool_policy::ToolPolicyMiddleware::new_without_session_ceiling(
+                enforcement.policy,
+                enforcement.session,
+                tool_sets.clone(),
+                enforcement.channel,
+            )
+        } else {
             middleware::tool_policy::ToolPolicyMiddleware::new(
                 enforcement.policy,
                 enforcement.session,
                 tool_sets.clone(),
                 enforcement.channel,
-            ),
-        ));
+            )
+        };
+        harness.push_tool_middleware(Arc::new(middleware));
     }
 
     // Credential scrubbing (issue #4453): redact credential-shaped secrets out of
@@ -631,5 +654,110 @@ pub(super) fn install_turn_middleware(
         wrap_up_fired,
         compression_mw,
         prompt_cache_guard,
+    }
+}
+
+struct NativeSubagentSecurityMiddleware {
+    gate: Arc<OpenHumanSecurityGate>,
+    agent_id: String,
+}
+
+#[async_trait]
+impl ToolMiddleware<(), OpenHumanRunContext> for NativeSubagentSecurityMiddleware {
+    fn name(&self) -> &str {
+        "openhuman_security_gate"
+    }
+
+    async fn wrap_tool(
+        &self,
+        ctx: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
+        state: &(),
+        call: tinyinference_llm::tool::ToolCall,
+        next: ToolHandler<'_, (), OpenHumanRunContext>,
+    ) -> tinyagents_harness::error::Result<MiddlewareToolOutcome> {
+        let call_id = call.id.to_string();
+        let request = ToolCallRequest::new(
+            call.name.clone(),
+            call.arguments.clone(),
+            self.agent_id.clone(),
+        )
+        .with_call_id(call_id.clone());
+        let decision = match self.gate.authorize_tool(&request).await {
+            Ok(decision) => decision,
+            Err(error) => {
+                tracing::error!(tool = %call.name, %error, "native child authorization failed closed");
+                return Ok(tinytools::ToolResult::error(
+                    "Tool authorization failed because the security check could not complete.",
+                )
+                .into());
+            }
+        };
+        match decision {
+            GateDecision::Allow | GateDecision::Prompted { approved: true } => {}
+            GateDecision::Deny { reason } => {
+                return Ok(tinytools::ToolResult::error(reason).into());
+            }
+            GateDecision::Prompted { approved: false } => {
+                return Ok(tinytools::ToolResult::error("Approval was not granted.").into());
+            }
+        }
+
+        let mut audit = self
+            .gate
+            .take_audit_request_id(&call_id)
+            .map(NativeSecurityAudit::new);
+        let result = next.run(ctx, state, call).await;
+        if let Some(audit) = &mut audit {
+            match &result {
+                Ok(MiddlewareToolOutcome::Result(result)) if result.is_error => {
+                    audit.record(
+                        crate::security::approval::ExecutionOutcome::Failure,
+                        Some(result.output()),
+                    );
+                }
+                Ok(_) => audit.record(crate::security::approval::ExecutionOutcome::Success, None),
+                Err(error) => audit.record(
+                    crate::security::approval::ExecutionOutcome::Failure,
+                    Some(error.to_string()),
+                ),
+            }
+        }
+        result
+    }
+}
+
+struct NativeSecurityAudit {
+    request_id: String,
+    recorded: bool,
+}
+
+impl NativeSecurityAudit {
+    fn new(request_id: String) -> Self {
+        Self {
+            request_id,
+            recorded: false,
+        }
+    }
+
+    fn record(
+        &mut self,
+        execution: crate::security::approval::ExecutionOutcome,
+        error: Option<String>,
+    ) {
+        if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
+            gate.record_execution(&self.request_id, execution, error.as_deref());
+        }
+        self.recorded = true;
+    }
+}
+
+impl Drop for NativeSecurityAudit {
+    fn drop(&mut self) {
+        if !self.recorded {
+            self.record(
+                crate::security::approval::ExecutionOutcome::Failure,
+                Some("tool execution ended before reporting a result".to_string()),
+            );
+        }
     }
 }

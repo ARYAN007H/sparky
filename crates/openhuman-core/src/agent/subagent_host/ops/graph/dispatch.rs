@@ -199,7 +199,18 @@ pub(in super::super) async fn run_subagent_via_graph(
     // parent-ledger link; forking again here would hide nested child usage in a
     // second, unreachable ledger.
     let dispatch = run_context.dispatch_ctx();
+    let child_tool_policy = child_tool_policy(
+        run_context.tool_policy.as_ref(),
+        agent_id,
+        &allowed_names,
+        &dynamic_tools
+            .iter()
+            .chain(parent_tools.iter())
+            .map(|tool| tool.as_ref())
+            .collect::<Vec<_>>(),
+    );
     let mut child_context = run_context;
+    child_context.tool_policy = child_tool_policy.clone();
     // A parallel task may omit `thread_id`; that means inherit the parent
     // conversation, not erase it. Only an explicit task thread may replace
     // the typed carrier's inherited affinity.
@@ -248,9 +259,9 @@ pub(in super::super) async fn run_subagent_via_graph(
             mw.transcript_snapshot = Some(transcript_snapshot.clone());
             mw
         },
-        // Sub-agents gate via their own SubagentToolSource policy path, not the
-        // session `.tool_policy()`; no enforcement threaded here.
-        tool_policy: None,
+        // Preserve the parent session's channel boundary for this child. The
+        // host gate also enforces its autonomy and turn-origin rules.
+        tool_policy: child_tool_policy,
         // Sub-agent turns run tools with external effects; not a deterministic
         // internal run, so response caching stays off (safe default).
         deterministic_cacheable: false,
@@ -565,6 +576,61 @@ pub(in super::super) async fn run_subagent_via_graph(
         outcome.failure_cause,
     ))
 }
+
+/// Rebuilds the inherited channel ceiling for the child's callable tool set.
+/// A parent's `HideFromPrompt` entries describe only that parent's projection;
+/// carrying them forward would hide tools explicitly granted by the child
+/// definition. Explicit denials and approval requirements still narrow the
+/// child when they refer to tools in its resolved allowlist.
+pub(super) fn child_tool_policy(
+    parent: Option<&crate::agent::tinyagents::ToolPolicyEnforcement>,
+    child_agent_id: &str,
+    child_allowed_names: &HashSet<String>,
+    child_tools: &[&dyn Tool],
+) -> Option<crate::agent::tinyagents::ToolPolicyEnforcement> {
+    let parent = parent?;
+    let profile = &parent.session.profile;
+    let channel_permissions = [(
+        profile.channel.clone(),
+        profile.allowed_permission.to_string(),
+    )]
+    .into_iter()
+    .collect();
+    let mut session = tinytools::agent_policy::ToolPolicyEngine::build_session_from_refs(
+        child_agent_id,
+        profile.channel.clone(),
+        profile.entrypoint.clone(),
+        &channel_permissions,
+        child_tools,
+        child_allowed_names,
+    );
+
+    for name in child_allowed_names {
+        let Some(decision) = parent.session.decisions.get(name) else {
+            continue;
+        };
+        if !matches!(
+            decision.action,
+            tinytools::ToolPolicyAction::Deny | tinytools::ToolPolicyAction::RequireApproval
+        ) {
+            continue;
+        }
+        session.decisions.insert(name.clone(), decision.clone());
+        session.allowed_tool_names.remove(name);
+        session.blocked_tool_names.insert(name.clone());
+    }
+
+    Some(crate::agent::tinyagents::ToolPolicyEnforcement {
+        policy: parent.policy.clone(),
+        session,
+        channel: parent.channel.clone(),
+        agent_definition_id: child_agent_id.to_string(),
+    })
+}
+
+#[cfg(test)]
+#[path = "dispatch_policy_tests.rs"]
+mod policy_tests;
 
 fn spawn_subagent_trace_export(
     config: Option<&crate::config::Config>,
