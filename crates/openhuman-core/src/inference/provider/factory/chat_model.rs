@@ -290,7 +290,8 @@ impl ModelBuildGate for OpenHumanModelFactory<'_> {
         }
         let provider = self.provider_for(request);
         enforce_local_only_inference(&request.role, &provider)?;
-        crate::inference::provider::factory::access_gates::verify_provider_session(
+        crate::inference::provider::factory::access_gates::verify_provider_session_in(
+            self.ctx,
             self.config,
             &provider,
         )?;

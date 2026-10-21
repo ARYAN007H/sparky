@@ -20,7 +20,10 @@ pub(super) fn external_provider_label(provider: &str) -> String {
     if p == BYOK_INCOMPLETE_SENTINEL {
         return "cloud (incomplete BYOK config)".to_string();
     }
-    if p == CLAUDE_AGENT_SDK_PROVIDER || p.starts_with(CLAUDE_AGENT_SDK_PREFIX) {
+    if p == CLAUDE_AGENT_SDK_PROVIDER
+        || tinyinference_providers::route::ProviderRoute::parse(p)
+            .is_some_and(|route| matches!(route.kind(), RouteKind::ClaudeAgentSdk))
+    {
         return "Claude Agent SDK".to_string();
     }
     if p.starts_with(tinyagents_harness::providers::claude_code::PROVIDER_PREFIX) {
@@ -141,9 +144,15 @@ pub(super) fn emit_inference_egress(role: &str, provider: &str, egress: &EgressL
 pub(crate) fn provider_uses_independent_auth(provider: &str) -> bool {
     let p = provider.trim();
     tinyinference_local::profile::is_local_provider_string(p)
-        || p.starts_with(tinyagents_harness::providers::claude_code::PROVIDER_PREFIX)
         || p == CLAUDE_AGENT_SDK_PROVIDER
-        || p.starts_with(CLAUDE_AGENT_SDK_PREFIX)
+        || tinyinference_providers::route::ProviderRoute::parse(p).is_some_and(|route| {
+            matches!(
+                route.kind(),
+                RouteKind::Local(_)
+                    | RouteKind::ClaudeCode
+                    | RouteKind::ClaudeAgentSdk
+            )
+        })
 }
 
 pub(crate) fn verify_provider_session(config: &Config, provider: &str) -> anyhow::Result<()> {
@@ -152,6 +161,25 @@ pub(crate) fn verify_provider_session(config: &Config, provider: &str) -> anyhow
         return Ok(());
     }
     verify_session_active(config)
+}
+
+/// Explicit-dispatch counterpart used by model construction. Session policy
+/// follows the host context that requested the model, never a different ambient
+/// context on the current task.
+pub(crate) fn verify_provider_session_in(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    provider: &str,
+) -> anyhow::Result<()> {
+    if provider_uses_independent_auth(provider) {
+        log::debug!("[chat-factory] caller-owned runtime uses independent authentication");
+        return Ok(());
+    }
+    let requires_session = ctx
+        .resolved()
+        .map(|core| host_requires_session(core.host_kind()))
+        .unwrap_or(true);
+    verify_session_active_for_host(config, requires_session)
 }
 
 /// Verify the user has an active OpenHuman backend session.
@@ -173,7 +201,11 @@ pub(crate) fn verify_session_active(config: &Config) -> anyhow::Result<()> {
     // would mix desktop product policy into the library contract. The ambient
     // context is installed by the dispatch chokepoint; all other host kinds
     // retain the registration gate below.
-    if !current_host_requires_session() {
+    verify_session_active_for_host(config, current_host_requires_session())
+}
+
+fn verify_session_active_for_host(config: &Config, requires_session: bool) -> anyhow::Result<()> {
+    if !requires_session {
         return Ok(());
     }
     // A hosted profile on the operator's direct chat provider talks to that
