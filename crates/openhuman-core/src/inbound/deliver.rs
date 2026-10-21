@@ -173,8 +173,8 @@ fn system_now_ms() -> i64 {
 impl Deliverer {
     /// A deliverer that triages with `runner` under `ctx`, giving one triage
     /// `timeout`, and reads each lane's attempts from the configured queues.
-    #[must_use]
     /// It has no pinned sources unless given some ([`Self::with_inbound`]).
+    #[must_use]
     pub fn new(runner: Arc<dyn TriageRunner>, ctx: DispatchCtx, timeout: Duration) -> Self {
         Self::build(runner, ctx, tokio::sync::OnceCell::new_with(Some(timeout)))
             .with_inbound(InboundConfig::default())
