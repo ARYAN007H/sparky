@@ -30,7 +30,7 @@ use crate::security::turn_origin::{self, AgentTurnOrigin};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
 
-use super::harness::run_channel_turn_via_graph;
+use crate::channels::runtime::turn_driver::run_channel_turn_via_graph;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use tinyagents_definition::SandboxMode;
 use tinytools_std::file_state::with_file_state_agent_id;
