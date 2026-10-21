@@ -24,7 +24,7 @@ pub(crate) struct OpenHumanModelFactory<'a> {
 
 impl OpenHumanModelFactory<'_> {
     fn provider_for(&self, request: &ModelBuildRequest) -> String {
-        match request.purpose {
+        match &request.purpose {
             ModelPurpose::Primary | ModelPurpose::Summarization => self
                 .primary_provider
                 .map(str::to_owned)
@@ -36,7 +36,7 @@ impl OpenHumanModelFactory<'_> {
     fn injected(&self, request: &ModelBuildRequest) -> Option<Arc<dyn ChatModel<()>>> {
         let local = self.ctx.host_overrides()?;
         let route = request.route.as_deref();
-        match request.purpose {
+        match &request.purpose {
             ModelPurpose::Primary => local.model_for(&request.role),
             ModelPurpose::Summarization => local
                 .role_models
@@ -67,10 +67,14 @@ impl OpenHumanModelFactory<'_> {
             return Ok((model, route));
         }
 
-        if resolves_to_managed_backend(role, self.config)
-            || matches!(request.purpose, ModelPurpose::Primary | ModelPurpose::Summarization)
-                && provider.trim() == PROVIDER_OPENHUMAN
-        {
+        let managed = match (&request.purpose, self.primary_provider) {
+            (ModelPurpose::Primary | ModelPurpose::Summarization, Some(provider)) => {
+                let provider = provider.trim();
+                provider.is_empty() || provider == "cloud" || provider == PROVIDER_OPENHUMAN
+            }
+            _ => resolves_to_managed_backend(role, self.config),
+        };
+        if managed {
             let resolved = self.ctx.resolved();
             let extensions = resolved
                 .as_deref()
@@ -91,6 +95,10 @@ impl OpenHumanModelFactory<'_> {
             ));
         }
 
+        let resolved = self.ctx.resolved();
+        let context_extensions = resolved
+            .as_deref()
+            .map(crate::core::runtime::CoreContext::extensions);
         let (model, route_provider, resolved_model) = if let Some(result) =
             try_create_claude_agent_sdk_chat_model_from_string(role, &provider, self.config, self.egress)
         {
@@ -107,15 +115,23 @@ impl OpenHumanModelFactory<'_> {
             let provider = model.profile().and_then(|p| p.provider.clone()).unwrap_or_else(|| "local".into());
             (model, provider, resolved)
         } else if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools_for(
-            role, self.config, request.opts.native_tools, self.egress,
-            self.ctx.resolved().as_deref().map(crate::core::runtime::CoreContext::extensions),
+            role,
+            self.config,
+            request.opts.native_tools,
+            self.egress,
+            context_extensions,
         ) {
             let (model, resolved) = result?;
             let provider = provider.trim().split(':').next().unwrap_or(provider.trim()).to_owned();
             (model, provider, resolved)
         } else {
-            let extensions = self.ctx.resolved().as_deref().map(crate::core::runtime::CoreContext::extensions);
-            return Err(unresolved_chat_model_error_for(role, &provider, self.config, self.egress, extensions));
+            return Err(unresolved_chat_model_error_for(
+                role,
+                &provider,
+                self.config,
+                self.egress,
+                context_extensions,
+            ));
         };
 
         let route = ResolvedModelRoute::new(
