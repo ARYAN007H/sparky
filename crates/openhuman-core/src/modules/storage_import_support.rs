@@ -55,20 +55,38 @@ fn capture_module_storage(
     let profile = host
         .get(&id)
         .ok_or_else(|| anyhow!("caller profile is no longer open"))?;
-    if !Arc::ptr_eq(profile.context(), &caller_context) {
-        return Err(anyhow!(
-            "caller context is not the currently admitted context for profile {profile_id}"
-        ));
-    }
+    require_profile_context(profile.context(), &caller_context, &profile_id)?;
     let backend = host
         .storage_backend_for(&profile)
-        .map_err(|error| anyhow!("capture the caller profile's storage fence: {:?}", error.kind()))?
+        .map_err(|error| {
+            anyhow!(
+                "capture the caller profile's storage fence: {:?}",
+                error.kind()
+            )
+        })?
         .ok_or_else(|| anyhow!("profile storage is unavailable for this import"))?;
     Ok(Some(CapturedModuleStorage {
         backend,
         scope,
         _profile: Some(profile),
     }))
+}
+
+/// Rejects work from an old context after a profile has been reopened under a
+/// different lease. Callers must capture the backend from this same profile
+/// before starting a claim, then retain the profile for the whole operation.
+pub(super) fn require_profile_context(
+    admitted: &Arc<crate::core::runtime::CoreContext>,
+    caller: &Arc<crate::core::runtime::CoreContext>,
+    profile_id: &str,
+) -> Result<()> {
+    if Arc::ptr_eq(admitted, caller) {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "caller context is not the currently admitted context for profile {profile_id}"
+        ))
+    }
 }
 
 /// The module's scope of the installed backend, or `None` when the process

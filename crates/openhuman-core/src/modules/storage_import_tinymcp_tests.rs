@@ -265,3 +265,26 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
     .unwrap();
     assert!(!done);
 }
+
+#[test]
+fn a_context_from_before_profile_takeover_cannot_import_under_the_new_lease() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+
+    let old_context = CoreContext::for_test(DomainSet::full(), None);
+    let reopened_context = CoreContext::for_test(DomainSet::full(), None);
+    assert!(
+        super::super::storage_import_support::require_profile_context(
+            &reopened_context,
+            &reopened_context,
+            "profile-1"
+        )
+        .is_ok()
+    );
+    let error = super::super::storage_import_support::require_profile_context(
+        &reopened_context,
+        &old_context,
+        "profile-1",
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("currently admitted context"));
+}

@@ -29,9 +29,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::storage::{CollectionSpec, DocumentStore, Precondition, Storage};
 #[cfg(test)]
 use crate::storage::StorageBackend;
+use crate::storage::{CollectionSpec, DocumentStore, Precondition, Storage};
 use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
 use sha2::Digest;
@@ -122,14 +122,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
                 })
                 .await
                 .context("the legacy reader panicked")??;
-                let outcome = import_payload(&scoped, &scope, legacy_servers, legacy_audit, None)
+                let outcome =
+                    import_payload(&scoped, &scope, legacy_servers, legacy_audit, None).await?;
+                super::storage_import_support::mark_imported(&scoped, MARKER_COLLECTION, &marker)
                     .await?;
-                super::storage_import_support::mark_imported(
-                    &scoped,
-                    MARKER_COLLECTION,
-                    &marker,
-                )
-                .await?;
                 Ok(outcome)
             })
         },
