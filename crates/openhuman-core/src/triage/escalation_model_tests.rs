@@ -291,10 +291,17 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
 
     let requests = requests.lock().unwrap();
     assert_eq!(requests.len(), 1, "the model turn ran");
-    assert_eq!(requests[0].1, model_marker, "the expected model served the turn");
-    assert!(requests[0].2.messages.iter().any(|message| {
-        message.text().contains("send this trigger reply")
-    }));
+    assert_eq!(
+        requests[0].1, model_marker,
+        "the expected model served the turn"
+    );
+    assert!(
+        requests[0]
+            .2
+            .messages
+            .iter()
+            .any(|message| { message.text().contains("send this trigger reply") })
+    );
     drop(requests);
     let sentinel = "triage-direct-source-egress-sentinel";
     BUS.publish(crate::core::events::DomainEvent::ExternalTransferPending {
@@ -557,7 +564,3 @@ async fn react_dispatch_inherits_the_parent_workload_for_inherit_targets() {
             .contains("route this task with the inherited workload")
     }));
 }
-
-/// The triage parent is the shared root context with one override: nested
-/// spawns scoped to the dispatched target. Guards the #4369 collapse against
-/// drift from `build_root_parent`.
