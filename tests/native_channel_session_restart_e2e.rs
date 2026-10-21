@@ -40,7 +40,7 @@ fn native_image_png() -> &'static [u8] {
     static PNG: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
     PNG.get_or_init(|| {
         base64::engine::general_purpose::STANDARD
-            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC")
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")
             .expect("valid 1x1 PNG fixture")
     })
 }
