@@ -323,8 +323,6 @@ pub const PACKS: &[ToolPack] = &[
         id: "media",
         summary: "Images and clips: generate, or read (describe, OCR, charts, UI elements).",
         tools: &[
-            "create_image",
-            "create_video",
             "media_generate_image",
             "media_generate_video",
             "media_list_models",

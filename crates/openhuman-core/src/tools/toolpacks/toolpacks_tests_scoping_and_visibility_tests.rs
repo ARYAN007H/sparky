@@ -318,6 +318,10 @@ fn retired_specialist_aliases_are_not_packed() {
         "discover_workflows",
         "make_presentation",
         "analyze_image",
+        "create_image",
+        "create_video",
+        "review_code",
+        "plan",
     ] {
         assert!(registry::pack_for_tool(alias).is_none(), "{alias}");
         assert!(
