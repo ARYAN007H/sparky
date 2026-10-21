@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use openhuman_core::storage::DocumentStoreExt as _;
 use serde_json::{Value, json};
 use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;
