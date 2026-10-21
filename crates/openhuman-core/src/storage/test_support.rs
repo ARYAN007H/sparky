@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::storage::{StorageBackend, block_on_anyhow};
+use crate::storage::{block_on_anyhow, StorageBackend};
 
 /// A real TSD in-memory backend for tests that do not require conditional
 /// writes or persistence across backend instances.

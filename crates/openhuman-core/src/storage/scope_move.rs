@@ -431,8 +431,14 @@ fn backend_for_target_scope(
     let Some(host) = crate::profiles::host::host() else {
         if let Some(target) = crate::storage::layout::Target::from_config(config) {
             let expected_url = format!("sqlite:{}", target.storage_db().display());
+            let installed = crate::storage::installed();
+            let backend_is_installed = installed
+                .as_ref()
+                .is_some_and(|installed| Arc::ptr_eq(installed, backend));
             if target.user_id == *original_id
                 && crate::storage::configured_url(config).as_deref() == Some(&expected_url)
+                && crate::storage::installed_url().as_deref() == Some(&expected_url)
+                && backend_is_installed
             {
                 return Ok((Arc::clone(backend), None));
             }
