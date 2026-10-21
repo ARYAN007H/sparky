@@ -23,11 +23,11 @@ use std::time::{Duration, SystemTime};
 
 use openhuman_core::config::Config;
 use openhuman_core::storage::import::{self, Outcome};
-use openhuman_core::storage::{rusqlite, DocumentStoreExt, Scope, ScopedStorage, StorageBackend};
+use openhuman_core::storage::{rusqlite, DocumentStoreExt, Scope, Storage, StorageBackend};
 use sha2::Digest;
 use tinyagents_session::transcript::{session_stem, SessionRef, TranscriptMessage, TranscriptMeta};
 use tinyagents_session::turn_state::TurnState;
-use tinystoragedrivers_core::Query;
+use tinystoragedrivers::Query;
 
 // The classic-transcript fixture writer, shared with the core's unit tests.
 #[path = "../crates/openhuman-core/src/util/classic_transcript_fixture.rs"]
@@ -379,13 +379,13 @@ fn desktop_workspace(workspace: &Path) -> Fixture {
     }
 }
 
-fn module_storage(backend: &dyn StorageBackend, module: &str) -> ScopedStorage {
+fn module_storage(backend: &dyn StorageBackend, module: &str) -> Storage {
     backend
         .for_scope(&Scope::local().module(module).unwrap())
         .unwrap()
 }
 
-async fn count(scoped: &ScopedStorage, collection: &str) -> usize {
+async fn count(scoped: &Storage, collection: &str) -> usize {
     scoped
         .documents()
         .query_all(collection, &Query::all())
@@ -399,20 +399,9 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
     let docs = backend.for_scope(&Scope::local()).unwrap();
     let mut total = 0;
     // The importers write the v2 collections of the owners behind each source.
-    let owners: Vec<&str> = import::sources()
-        .iter()
-        .map(|source| source.owner)
-        .collect();
-    for schema in openhuman_core::storage::schema::owner_schemas() {
-        if !owners.contains(&schema.owner.as_str()) {
-            continue;
-        }
-        for item in &schema.items {
-            if let tinystoragedrivers_core::schema::Item::Collection { spec, .. } = item {
-                docs.documents().ensure_collection(spec).await.unwrap();
-                total += count(&docs, &spec.name).await;
-            }
-        }
+    for spec in openhuman_core::storage::schema::owner_collections().unwrap() {
+        docs.documents().ensure_collection(&spec).await.unwrap();
+        total += count(&docs, &spec.name).await;
     }
     total
 }
