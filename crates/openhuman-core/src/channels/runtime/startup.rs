@@ -13,6 +13,20 @@ mod turn_parts;
 use anyhow::Result;
 use tinybus::module::{ModuleCallError, ModuleClient};
 
+#[cfg(test)]
+type BeginTypingRefresh = std::sync::Arc<
+    dyn Fn(
+            String,
+            u64,
+        ) -> futures::future::BoxFuture<'static, anyhow::Result<Option<String>>>
+        + Send
+        + Sync,
+>;
+#[cfg(test)]
+type EndTypingRefresh = std::sync::Arc<
+    dyn Fn(String) -> futures::future::BoxFuture<'static, anyhow::Result<()>> + Send + Sync,
+>;
+
 /// Host-owned handle to a configured channel instance. Production operations
 /// are dispatched through the loaded TinyChannels module's bus object.
 #[derive(Clone)]
@@ -36,22 +50,8 @@ pub(crate) struct TestChannel {
     pub(crate) start_typing_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     pub(crate) stop_typing_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     pub(crate) send_error: Option<String>,
-    pub(crate) begin_typing_refresh: Option<
-        std::sync::Arc<
-            dyn Fn(
-                    String,
-                    u64,
-                )
-                    -> futures::future::BoxFuture<'static, anyhow::Result<Option<String>>>
-                + Send
-                + Sync,
-        >,
-    >,
-    pub(crate) end_typing_refresh: Option<
-        std::sync::Arc<
-            dyn Fn(String) -> futures::future::BoxFuture<'static, anyhow::Result<()>> + Send + Sync,
-        >,
-    >,
+    pub(crate) begin_typing_refresh: Option<BeginTypingRefresh>,
+    pub(crate) end_typing_refresh: Option<EndTypingRefresh>,
 }
 
 impl ChannelHandle {

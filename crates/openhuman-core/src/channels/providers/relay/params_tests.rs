@@ -27,7 +27,7 @@ fn the_thread_id_is_a_reserved_channel_id() {
     // reserved ID. A user cannot choose it through `threads_upsert`.
     let id = "channel:telegram/42/-100123";
     assert!(
-        crate::profiles::surface::validate_user_thread_id(&id).is_err(),
+        crate::profiles::surface::validate_user_thread_id(id).is_err(),
         "a user cannot choose it"
     );
 }

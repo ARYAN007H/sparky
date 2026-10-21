@@ -11,12 +11,12 @@ use std::sync::{Arc, Mutex};
 use tinytools::Tool;
 
 pub(crate) use tinychannels_bus::context::ChannelRouteSelection;
+#[cfg(test)]
+pub(crate) use tinychannels_bus::{CHANNEL_MESSAGE_TIMEOUT_SECS, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS};
 pub(crate) use tinychannels_bus::{
     CHANNEL_TYPING_REFRESH_INTERVAL_SECS, DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS,
     DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
 };
-#[cfg(test)]
-pub(crate) use tinychannels_bus::{CHANNEL_MESSAGE_TIMEOUT_SECS, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS};
 
 // Compatibility projection for tests that exercise route-state consumers with
 // legacy message fixtures. Runtime turns consume TinyChannels' prepared

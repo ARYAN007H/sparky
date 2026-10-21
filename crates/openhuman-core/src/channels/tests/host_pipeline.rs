@@ -196,17 +196,18 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
     process_channel_message(Arc::clone(&runtime_ctx), first).await;
     process_channel_message(runtime_ctx, second).await;
 
-    let calls = model_state.calls.lock().unwrap();
-    assert_eq!(calls.len(), 2);
-    assert!(calls[0]
-        .iter()
-        .any(|(_, text)| text == "first thread message"));
-    assert!(calls[1]
-        .iter()
-        .any(|(_, text)| text == "second thread message"));
-    assert!(!calls[1]
-        .iter()
-        .any(|(_, text)| text == "first thread message"));
-    drop(calls);
+    {
+        let calls = model_state.calls.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+        assert!(calls[0]
+            .iter()
+            .any(|(_, text)| text == "first thread message"));
+        assert!(calls[1]
+            .iter()
+            .any(|(_, text)| text == "second thread message"));
+        assert!(!calls[1]
+            .iter()
+            .any(|(_, text)| text == "first thread message"));
+    }
     assert_eq!(channel_state.sent_messages.lock().await.len(), 2);
 }
