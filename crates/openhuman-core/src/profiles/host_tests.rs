@@ -74,8 +74,12 @@ async fn inspecting_an_unprovisioned_profile_does_not_run_storage_migrations() {
         (Some(before), Some(after)) => assert!(Arc::ptr_eq(before, after)),
         _ => panic!("doctor inspection must not publish a process default context"),
     }
-    let lease_key =
-        tinystoragedrivers::Key::of([crate::storage::lease::LEASE_OWNER, id.as_str()]).unwrap();
+    let lease_key = tinystoragedrivers::Key::new(format!(
+        "{}:{}",
+        crate::storage::lease::LEASE_OWNER,
+        id.as_str()
+    ))
+    .unwrap();
     assert!(
         docs.get(crate::storage::lease::LEASE_COLLECTION, lease_key.as_str())
             .await

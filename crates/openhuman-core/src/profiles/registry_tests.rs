@@ -96,11 +96,11 @@ async fn doctor_lookup_of_an_unknown_profile_does_not_declare_cluster_schema() {
         .unwrap()
         .is_none());
 
-    assert!(docs
+    assert!(docs.documents()
         .validate_collection_spec(&registry_spec)
         .await
         .is_err());
-    assert!(docs
+    assert!(docs.documents()
         .validate_collection_spec(&lease_spec)
         .await
         .is_err());
