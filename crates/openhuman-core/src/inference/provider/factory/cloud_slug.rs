@@ -9,7 +9,6 @@ use crate::inference::provider::factory::access_gates::verify_backend_session_ac
 use crate::inference::provider::factory::access_gates::verify_session_active;
 use crate::inference::provider::fallback_diagnostics;
 use tinyinference_llm::providers::anthropic::endpoint_is_anthropic_messages;
-use tinyinference_llm::providers::openai::codex::resolve_codex_routing;
 use tinyinference_llm::providers::registry::resolve_slug_model;
 
 /// Look up a `cloud_providers` entry by slug and build the provider.
@@ -175,40 +174,8 @@ pub(super) fn resolve_cloud_slug_for<'a>(
         anyhow::bail!("{}", missing_credentials());
     }
     let bearer_is_oauth = slug == "openai" && openai_bearer_is_oauth(config);
-    let oauth_credentials = if slug == "openai" {
-        match crate::security::credentials::openai_oauth::lookup_openai_oauth_credentials(config) {
-            Ok(credentials) => credentials,
-            Err(error) if !key.trim().is_empty() => {
-                log::warn!(
-                    "[providers][openai-codex] oauth metadata unavailable; continuing with standard bearer key: {error}"
-                );
-                None
-            }
-            Err(error) => {
-                return Err(anyhow::anyhow!(
-                    "[chat-factory] openai oauth lookup failed: {error}"
-                ));
-            }
-        }
-    } else {
-        None
-    };
-    let has_oauth_credentials = oauth_credentials.is_some();
-    let account_id = oauth_credentials
-        .filter(|_| bearer_is_oauth)
-        .and_then(|credentials| credentials.account_id);
-    let using_codex_oauth = bearer_is_oauth && has_oauth_credentials;
-    let mut codex = resolve_codex_routing(
-        slug,
-        &entry.endpoint,
-        using_codex_oauth,
-        account_id.as_deref(),
-    );
-    // The owner helper normalizes standard route slashes. The provider registry
-    // previously received the configured endpoint verbatim, so preserve it.
-    if !codex.using_oauth {
-        codex.endpoint.clone_from(&entry.endpoint);
-    }
+    let codex = resolve_codex_routing(config, slug, &entry.endpoint, &key, bearer_is_oauth)
+        .map_err(anyhow::Error::msg)?;
 
     Ok(CloudSlugResolution {
         entry,

@@ -91,7 +91,6 @@ mod factory_tests;
 
 use crate::config::schema::cloud_providers::AuthStyle;
 use crate::config::Config;
-use crate::inference::provider::openai_codex::resolve_openai_codex_routing;
 use crate::security::credentials::AuthService;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
