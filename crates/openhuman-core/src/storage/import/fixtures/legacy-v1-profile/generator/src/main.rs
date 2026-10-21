@@ -4,12 +4,12 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tinyagents_storage_kit::Key;
 use tinystoragedrivers::secrets::{DerivedKeys, DocumentSecrets, SecretStore};
 use tinystoragedrivers::{
     CollectionSpec, Precondition, Scope, StorageConfig, StreamStore, WriteOptions,
 };
 use zeroize::Zeroizing;
-use tinyagents_storage_kit::Key;
 
 const PROFILE_ID: &str = "u1";
 const CREATED_AT_MS: i64 = 1_738_548_306_000;
