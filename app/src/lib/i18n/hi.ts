@@ -583,6 +583,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'लंबित डेस्कटॉप अनुमोदन लोड नहीं हो सके। फिर कोशिश करने के लिए रीफ़्रेश करें।',
   'desktop.unsupported': 'इस रनटाइम में डेस्कटॉप नियंत्रण उपलब्ध नहीं है।',
+  'desktop.unsupportedWindows':
+    'Windows पर डेस्कटॉप नियंत्रण अभी उपलब्ध नहीं है। ब्राउज़र नियंत्रण Windows पर अभी काम करता है।',
   'desktop.localOnly': 'यह सेटिंग केवल इस कंप्यूटर पर लागू होती है।',
   'desktop.permissions': 'सिस्टम अनुमतियाँ',
   'desktop.openSettings': 'सेटिंग्स खोलें',

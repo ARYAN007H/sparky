@@ -574,6 +574,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     '대기 중인 데스크톱 승인을 불러올 수 없습니다. 새로고침 후 다시 시도하세요.',
   'desktop.unsupported': '이 실행 환경에서는 데스크톱 제어를 사용할 수 없습니다.',
+  'desktop.unsupportedWindows':
+    'Windows에서는 아직 데스크톱 제어를 사용할 수 없습니다. 브라우저 제어는 현재 Windows에서 사용할 수 있습니다.',
   'desktop.localOnly': '이 설정은 이 컴퓨터에만 적용됩니다.',
   'desktop.permissions': '시스템 권한',
   'desktop.openSettings': '설정 열기',

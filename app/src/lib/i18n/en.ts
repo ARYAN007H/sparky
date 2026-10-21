@@ -540,6 +540,8 @@ const en: TranslationMap = {
   'desktop.moduleUnavailable': 'The desktop module is unavailable. Check its status and try again.',
   'desktop.pendingUnavailable': 'Could not load pending desktop approvals. Refresh to try again.',
   'desktop.unsupported': 'Desktop control is unavailable in this runtime.',
+  'desktop.unsupportedWindows':
+    "Desktop control isn't available on Windows yet. Browser Control works on Windows today.",
   'desktop.localOnly': 'This setting applies only to this computer.',
   'desktop.permissions': 'System permissions',
   'desktop.openSettings': 'Open settings',

@@ -600,6 +600,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Ausstehende Desktopfreigaben konnten nicht geladen werden. Aktualisiere die Seite und versuche es erneut.',
   'desktop.unsupported': 'Die Desktopsteuerung ist in dieser Laufzeit nicht verfügbar.',
+  'desktop.unsupportedWindows':
+    'Die Desktopsteuerung ist unter Windows noch nicht verfügbar. Die Browsersteuerung funktioniert unter Windows bereits.',
   'desktop.localOnly': 'Diese Einstellung gilt nur für diesen Computer.',
   'desktop.permissions': 'Systemberechtigungen',
   'desktop.openSettings': 'Einstellungen öffnen',

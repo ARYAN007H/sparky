@@ -570,6 +570,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'تعذر تحميل موافقات سطح المكتب المعلقة. حدّث الصفحة للمحاولة مجددًا.',
   'desktop.unsupported': 'التحكم بسطح المكتب غير متاح في بيئة التشغيل هذه.',
+  'desktop.unsupportedWindows':
+    'التحكم بسطح المكتب غير متاح على Windows بعد. يعمل التحكم بالمتصفح على Windows حاليًا.',
   'desktop.localOnly': 'ينطبق هذا الإعداد على هذا الكمبيوتر فقط.',
   'desktop.permissions': 'أذونات النظام',
   'desktop.openSettings': 'فتح الإعدادات',

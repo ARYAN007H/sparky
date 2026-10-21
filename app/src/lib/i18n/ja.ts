@@ -531,6 +531,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     '保留中のデスクトップ承認を読み込めませんでした。更新して再試行してください。',
   'desktop.unsupported': 'このランタイムではデスクトップ制御は利用できません。',
+  'desktop.unsupportedWindows':
+    'Windows ではデスクトップ制御はまだ利用できません。ブラウザ制御は Windows でも利用できます。',
   'desktop.localOnly': 'この設定はこのコンピュータにのみ適用されます。',
   'desktop.permissions': 'システム権限',
   'desktop.openSettings': '設定を開く',

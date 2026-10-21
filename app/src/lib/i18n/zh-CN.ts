@@ -546,6 +546,7 @@ const messages: TranslationMap = {
   'desktop.moduleUnavailable': '桌面模块不可用。请检查其状态并重试。',
   'desktop.pendingUnavailable': '无法加载待处理的桌面操作审批。请刷新后重试。',
   'desktop.unsupported': '此运行环境不支持桌面控制。',
+  'desktop.unsupportedWindows': 'Windows 上暂不支持桌面控制。浏览器控制目前已可在 Windows 上使用。',
   'desktop.localOnly': '此设置仅适用于这台电脑。',
   'desktop.permissions': '系统权限',
   'desktop.openSettings': '打开设置',
