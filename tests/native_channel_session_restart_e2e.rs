@@ -621,6 +621,28 @@ fn assert_model_received_file_content(request: &Value) {
     assert!(text_blocks.iter().all(|text| !text.contains(&encoded)));
 }
 
+fn assert_request_retains_native_file(request: &Value) {
+    let content = &request["messages"];
+    if let Some(document) = ["input_file", "document", "file"]
+        .into_iter()
+        .find_map(|kind| find_block_type(content, kind))
+    {
+        let encoded = serde_json::to_string(document).expect("serialize historical document");
+        assert!(encoded.contains("text/plain"));
+        let base64 = base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES);
+        assert!(
+            encoded.contains(&base64)
+                || encoded.contains(std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+            "historical typed document retains its bytes"
+        );
+    } else {
+        assert!(
+            content_has_text_block(content, std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+            "historical file is available as extracted literal text"
+        );
+    }
+}
+
 fn find_block_type<'a>(value: &'a Value, expected: &str) -> Option<&'a Value> {
     match value {
         Value::Array(items) => items
@@ -989,7 +1011,48 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         assert!(!serialized.contains("photos/native.png"));
         assert!(!serialized.contains("documents/native.txt"));
     }
+    let first_pid = core.child.id();
     core.stop();
+
+    // A new process must resolve committed native media from the same scoped
+    // claims while preparing the next text-only turn.
+    push_update(
+        &mocks.state,
+        204,
+        24,
+        "continue the conversation after native media restart",
+    );
+    let (mut restarted, restarted_rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &module_source_dir,
+        &logs.join("typed-media-restarted.log"),
+    );
+    assert_ne!(first_pid, restarted.child.id(), "media resume uses a new process");
+    wait_healthy(
+        &restarted_rpc,
+        &mut restarted,
+        &logs.join("typed-media-restarted.log"),
+    )
+    .await;
+    wait_for_completion(&mocks.state, 5).await;
+    let resumed = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .get(4)
+        .cloned()
+        .expect("post-restart text reached the model");
+    assert!(model_saw_user_text(
+        &resumed,
+        "continue the conversation after native media restart"
+    ));
+    assert!(find_block_type(&resumed["messages"], "image_url").is_some());
+    assert_request_retains_native_file(&resumed);
+    restarted.stop();
 }
 
 fn push_media_update(state: &MockState, update: Value) {
