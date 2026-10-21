@@ -1,5 +1,4 @@
 use super::*;
-use crate::storage::StorageBackend;
 use tinystoragedrivers_busproxy::{Object, StorageCall};
 
 fn endpoint() -> (DocumentsOnlyEndpoint, BusName) {
