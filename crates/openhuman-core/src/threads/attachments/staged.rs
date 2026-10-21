@@ -298,6 +298,94 @@ pub(crate) async fn stage_queued_parts(
     Ok(public)
 }
 
+/// Store bytes obtained from a trusted, scoped channel-module media read as a
+/// staged attachment. The provider reference is replaced with a fresh opaque
+/// host reference; the private workspace path remains only in this record.
+pub(crate) async fn stage_native_channel_part(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    config: &crate::config::Config,
+    input: &ContentPart,
+    name: &str,
+    mime: &str,
+    bytes: &[u8],
+) -> Result<ContentPart, String> {
+    if thread_id.trim().is_empty() || bytes.is_empty() {
+        return Err("native attachment scope and bytes must be non-empty".into());
+    }
+    let mut staged_config = config.clone();
+    staged_config.action_dir = crate::agent::attachments::thread_action_dir(
+        ctx,
+        config,
+        &config.workspace_dir,
+        Some(thread_id),
+    )
+    .await
+    .map_err(|error| format!("native attachment workspace unavailable: {error}"))?;
+    let file = crate::agent::attachments::store_scoped_channel_media(
+        &staged_config,
+        thread_id,
+        name,
+        mime,
+        bytes,
+    )
+    .await
+    .map_err(|_| "native attachment could not be staged safely".to_owned())?;
+    let mut part = input.clone();
+    let media = opaque_media_mut(&mut part)
+        .ok_or_else(|| "native attachment kind cannot be staged".to_owned())?;
+    media.opaque_id = Some(uuid::Uuid::new_v4().simple().to_string());
+    media.path = None;
+    media.url = None;
+    media.local_cache_path = None;
+    media.content_type = Some(file.mime.clone());
+    media.size_bytes = Some(file.size_bytes as u64);
+
+    let tenant = tenant_for(ctx)?;
+    let repo = staged_repo(ctx, &config.workspace_dir)?;
+    let opaque_id = opaque_media(&part)
+        .and_then(|media| media.opaque_id.as_deref())
+        .ok_or_else(|| "native attachment has no opaque reference".to_owned())?;
+    let id = staged_doc_id(opaque_id)?;
+    let manifest = StagedAttachment {
+        tenant,
+        thread_id: thread_id.to_owned(),
+        attachment: StoredAttachment {
+            part: part.clone(),
+            path: file.path,
+        },
+        expires_at: chrono::Utc::now().timestamp() + STAGED_TTL_SECS,
+        claim: None,
+    };
+    let body = serde_json::to_value(&manifest)
+        .map_err(|error| format!("serialize native attachment record: {error}"))?;
+    repo.run(|docs| async move {
+        docs.put(STAGED_COLLECTION, &id, body, Precondition::Absent)
+            .await?;
+        Ok(())
+    })
+    .map_err(|error| format!("persist native attachment record: {error}"))?;
+    Ok(part)
+}
+
+pub(crate) async fn commit_native_channel_parts(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    parts: &[ContentPart],
+    committed_message_id: &str,
+) -> Result<(), String> {
+    if parts.is_empty() {
+        return Ok(());
+    }
+    let config = ctx
+        .load_config()
+        .await
+        .map_err(|error| format!("native attachment configuration unavailable: {error}"))?;
+    let entries = read_staged_entries(ctx, thread_id, parts, &config).await?;
+    validate_staged_files(ctx, thread_id, &config, &entries).await?;
+    claim_staged_refs(ctx, thread_id, &config, committed_message_id, &entries).await
+}
+
 pub(super) async fn validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
