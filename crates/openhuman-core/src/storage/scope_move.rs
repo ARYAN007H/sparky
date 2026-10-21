@@ -15,9 +15,6 @@
 //! unsupported fidelity cases fail explicitly.
 
 use std::collections::HashSet;
-use std::path::Path;
-#[cfg(feature = "legacy-import")]
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -152,7 +149,7 @@ pub struct MoveReport {
     pub updated_times_not_restored: u64,
 }
 
-[path = "scope_move_boot.rs"]
+#[path = "scope_move_boot.rs"]
 mod boot;
 pub use boot::run_from_config;
 pub(crate) use boot::IMPORT_DOMAIN;
