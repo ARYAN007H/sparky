@@ -3,11 +3,56 @@ use crate::security::egress::EgressLedger;
 
 use crate::inference::provider::factory::cloud_slug::try_create_cloud_slug_chat_model_from_string_with_native_tools;
 
+fn isolated_config() -> (tempfile::TempDir, Config) {
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Config {
+        config_path: tmp.path().join("config.toml"),
+        workspace_dir: tmp.path().join("workspace"),
+        ..Default::default()
+    };
+    (tmp, config)
+}
+
+fn store_fixture_session(config: &Config) {
+    crate::security::credentials::AuthService::from_config(config)
+        .store_provider_token(
+            crate::security::credentials::APP_SESSION_PROVIDER,
+            "default",
+            "fixture-session-token",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated fixture session");
+}
+
+fn store_fixture_cloud_key(config: &Config, slug: &str) {
+    crate::security::credentials::AuthService::from_config(config)
+        .store_provider_token(
+            &format!("provider:{slug}"),
+            "default",
+            "sk-fixture-provider",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated provider credential");
+}
+
+fn fixture_library_dispatch() -> crate::core::runtime::DispatchCtx {
+    crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_host_kind(
+            crate::core::types::HostKind::Library,
+            crate::core::runtime::DomainSet::full(),
+            None,
+        ),
+    )
+}
+
 #[test]
 fn custom_ca_bundle_builds_a_provider_scoped_chat_client() {
     let _guard = crate::inference::inference_test_guard();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config.cloud_providers.push(openai_entry("p_team", "team"));
+    store_fixture_cloud_key(&config, "team");
     config.cloud_provider_ca_certs.insert(
         "team".into(),
         include_str!("../../util/tls/test-ca.pem").into(),
@@ -259,9 +304,12 @@ fn resolves_to_managed_backend_for_default_config_but_not_for_local() {
 fn create_chat_model_routes_managed_backend_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     install_test_managed_provider();
-    let config = Config::default();
+    let (tmp, mut config) = isolated_config();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+    store_fixture_session(&config);
     let (_model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &fixture_library_dispatch(),
         "chat",
         &config,
         0.7,
@@ -337,11 +385,12 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
     // DeepSeek is a built-in chat-completions-only Bearer provider: no
     // `/v1/responses` fallback and no codex-oauth, so it is wire-equivalent and
     // flips crate-native.
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config.cloud_providers.push(deepseek_entry("p_ds"));
     config.chat_provider = Some("deepseek:deepseek-reasoner".to_string());
+    store_fixture_cloud_key(&config, "deepseek");
     let (model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &fixture_library_dispatch(),
         "chat",
         &config,
         0.7,
@@ -360,15 +409,21 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
 #[test]
 fn explicit_cloud_provider_string_routes_to_crate_native_model() {
     let _guard = crate::inference::inference_test_guard();
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config.cloud_providers.push(deepseek_entry("p_ds"));
-    let (model, model_id) = create_chat_model_from_string_with_model_id(
-        "chat",
-        "deepseek:deepseek-reasoner",
-        &config,
-        0.7,
-    )
-    .expect("explicit cloud model must build");
+    store_fixture_cloud_key(&config, "deepseek");
+    let model_and_id = crate::core::runtime::CoreContext::sync_scope(
+        fixture_library_dispatch().resolved().expect("library context"),
+        || {
+            create_chat_model_from_string_with_model_id(
+                "chat",
+                "deepseek:deepseek-reasoner",
+                &config,
+                0.7,
+            )
+        },
+    );
+    let (model, model_id) = model_and_id.expect("explicit cloud model must build");
     assert_eq!(model_id, "deepseek-reasoner");
     assert_eq!(
         model
@@ -383,13 +438,14 @@ fn create_chat_model_routes_anthropic_auth_cloud_slug_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     // Anthropic-auth cloud slugs are always wire-equivalent (their endpoints have
     // no `/v1/responses`, so the host's dormant fallback is behavior-neutral).
-    let mut config = Config::default();
+    let (_tmp, mut config) = isolated_config();
     config
         .cloud_providers
         .push(anthropic_entry("p_anth", "anthropic"));
     config.chat_provider = Some("anthropic:claude-sonnet-4-6".to_string());
+    store_fixture_cloud_key(&config, "anthropic");
     let (model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &fixture_library_dispatch(),
         "chat",
         &config,
         0.7,
