@@ -17,18 +17,91 @@ use tinyagents_harness::middleware::{
 use tinyagents_harness::no_progress::FailurePolicy;
 use tinyagents_harness::steering::SteeringHandle;
 use tinyagents_hooks::stop::StopLatch;
+use tinyagents_hooks::stop::{self, TerminalInferenceFailureKind};
+use tinyagents_harness::turn_stop::CopyProvider;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
 use super::fetched_site::{fetch_host_scope, heuristic_text};
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-pub(crate) use crate::inference::failure_copy::user_actionable_escalation;
-use crate::inference::failure_copy::{
-    recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
-    terminal_inference_failure_kind, terminal_inference_halt_summary,
-};
+use crate::util::truncate_with_ellipsis;
 use tinyagents_harness::middleware::EphemeralInstructionMiddleware;
 use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_tool_failure;
+
+struct OpenHumanHaltCopy;
+
+impl CopyProvider for OpenHumanHaltCopy {
+    fn copy_override(&self, request: &tinyagents_harness::turn_stop::CopyRequest<'_>) -> Option<String> {
+        use tinyagents_harness::turn_stop::{CopyRequest, TurnStopCopyKey};
+
+        match request {
+            CopyRequest::ProviderConfig { .. } => Some(
+                "Stopping: the configured model/provider rejected the request (e.g. an unknown model, a non-chat/embedding model, a missing credential, or a region block) — retrying will not help. Fix the model or API key in Connections → API keys → LLM. Details:\n".to_owned(),
+            ),
+            CopyRequest::TurnStop { key: TurnStopCopyKey::ProviderConfig, .. } => Some(
+                "the configured model or provider rejected the request; check the model and API key in Connections".to_owned(),
+            ),
+            CopyRequest::TurnStop { key: TurnStopCopyKey::MissingConnection, .. } => Some(
+                "a service this needs isn't connected; connect it in Connections, then ask me to try again".to_owned(),
+            ),
+            _ => None,
+        }
+    }
+}
+
+fn user_actionable_escalation(tool: &str, error: &str) -> Option<String> {
+    let lower = error.to_lowercase();
+    let permission_or_scope_failure = lower.contains("[composio:error:insufficient_scope]")
+        || lower.contains("[composio:error:trigger_permission]")
+        || lower.contains("insufficient scope")
+        || lower.contains("insufficient authentication scopes")
+        || lower.contains("insufficient permissions")
+        || lower.contains("missing required permissions")
+        || lower.contains("permission to manage triggers");
+    if permission_or_scope_failure {
+        return None;
+    }
+    let missing_connection = lower.contains("[composio:error:composio_platform]")
+        || lower.contains("not connected")
+        || lower.contains("isn't connected")
+        || lower.contains("is not connected")
+        || lower.contains("not enabled")
+        || lower.contains("token revoked")
+        || lower.contains("connection error, try to authenticate");
+    missing_connection.then(|| {
+        format!(
+            "I can't continue without your input: the `{tool}` action needs a service that isn't \
+             connected. {}\n\nConnect it (Connections), then tell me to retry — or \
+             tell me how you'd like to proceed instead.",
+            truncate_with_ellipsis(error, 400),
+        )
+    })
+}
+
+fn terminal_inference_failure_kind(result: &str) -> Option<TerminalInferenceFailureKind> {
+    tinyagents_hooks::stop::terminal_inference_failure_kind(result)
+}
+
+fn terminal_inference_halt_summary(kind: TerminalInferenceFailureKind, tool: &str, error: &str) -> String {
+    match kind {
+        TerminalInferenceFailureKind::BudgetExhausted => {
+            stop::halt_summary::budget(&OpenHumanHaltCopy, tool, error).summary
+        }
+        TerminalInferenceFailureKind::ProviderConfig => {
+            let summary = stop::halt_summary::provider_config(&OpenHumanHaltCopy, tool, error).summary;
+            // Keep the provider settings destination in OpenHuman's copy.
+            summary.replace("Fix the model or API key, then try again.", "Fix the model or API key in Connections → API keys → LLM.")
+        }
+    }
+}
+
+fn recoverable_identical_halt_summary(tool: &str, count: u32, error: &str) -> String {
+    stop::halt_summary::retry_exhausted(&OpenHumanHaltCopy, tool, count, error).summary
+}
+
+fn recoverable_no_progress_halt_summary(consecutive: u32, tool: &str, error: &str) -> String {
+    stop::halt_summary::no_progress(&OpenHumanHaltCopy, consecutive, tool, error).summary
+}
 
 #[cfg(test)]
 use tinyagents_harness::no_progress::{
