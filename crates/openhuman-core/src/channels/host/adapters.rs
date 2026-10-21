@@ -68,7 +68,8 @@ impl ConfigAllowlistStore {
 /// Routes provider events by `domain`:
 /// - `"web"`     → the web channel's `WebChannelEvent` broadcast bus (payload
 ///   must deserialize into a `WebChannelEvent`; presentation builds that shape).
-/// - `"channel"` → the global `DomainEvent` bus for legacy provider callbacks.
+/// - `"channel"` → ignored legacy reaction callbacks. Reactions with durable
+///   message identity use the typed `channel_event` callback above instead.
 ///   Typed `channel_event` payloads use `publish_host_in` so trusted scope can
 ///   resolve and persist their exact OpenHuman message target first.
 ///
@@ -155,14 +156,6 @@ pub(super) fn channel_event_target_message_id(
     }
 }
 
-fn json_str(payload: &serde_json::Value, key: &str) -> String {
-    payload
-        .get(key)
-        .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string()
-}
-
 async fn publish_event(domain: &str, kind: &str, payload: serde_json::Value) -> anyhow::Result<()> {
     match domain {
         "web" => {
@@ -175,30 +168,9 @@ async fn publish_event(domain: &str, kind: &str, payload: serde_json::Value) -> 
             crate::web_chat::publish_web_channel_event(event);
         }
         "channel" => {
-            use crate::core::bus::BUS;
-            use crate::core::events::DomainEvent;
-            let event = match kind {
-                "reaction_received" => DomainEvent::ChannelReactionReceived {
-                    channel: json_str(&payload, "channel"),
-                    sender: json_str(&payload, "sender"),
-                    target_message_id: json_str(&payload, "target_message_id"),
-                    emoji: json_str(&payload, "emoji"),
-                },
-                "reaction_sent" => DomainEvent::ChannelReactionSent {
-                    channel: json_str(&payload, "channel"),
-                    target_message_id: json_str(&payload, "target_message_id"),
-                    emoji: json_str(&payload, "emoji"),
-                    success: payload
-                        .get("success")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false),
-                },
-                other => {
-                    tracing::warn!("{LOG_PREFIX} unmapped channel event kind: {other}");
-                    return Ok(());
-                }
-            };
-            BUS.publish(event);
+            tracing::debug!(
+                "{LOG_PREFIX} ignored legacy channel event kind without a typed target: {kind}"
+            );
         }
         other => tracing::warn!("{LOG_PREFIX} unmapped event domain: {other}"),
     }

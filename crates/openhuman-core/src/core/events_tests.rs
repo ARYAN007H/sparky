@@ -158,24 +158,6 @@ fn all_variants_have_correct_domain() {
             "channel",
         ),
         (
-            DomainEvent::ChannelReactionReceived {
-                channel: "c".into(),
-                sender: "s".into(),
-                target_message_id: "m1".into(),
-                emoji: "👍".into(),
-            },
-            "channel",
-        ),
-        (
-            DomainEvent::ChannelReactionSent {
-                channel: "c".into(),
-                target_message_id: "m1".into(),
-                emoji: "✅".into(),
-                success: true,
-            },
-            "channel",
-        ),
-        (
             DomainEvent::ChannelConnected {
                 channel: "c".into(),
             },
@@ -942,17 +924,6 @@ fn events_without_a_workspace_report_none() {
         }
         .workspace_dir(),
         None
-    );
-    assert_eq!(
-        DomainEvent::ChannelReactionReceived {
-            channel: "c".into(),
-            sender: "s".into(),
-            target_message_id: "m1".into(),
-            emoji: "👍".into(),
-        }
-        .workspace_dir(),
-        None,
-        "a channel event with no workspace field must not borrow one"
     );
 }
 
