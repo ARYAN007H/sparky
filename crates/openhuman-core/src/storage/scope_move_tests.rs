@@ -235,6 +235,10 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     let config = crate::config::Config {
         config_path,
         workspace_dir: target.files(),
+        storage: crate::config::schema::StorageConfig {
+            url: Some(destination_url.clone()),
+            ..Default::default()
+        },
         ..crate::config::Config::default()
     };
 
