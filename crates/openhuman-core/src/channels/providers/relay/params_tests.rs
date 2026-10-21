@@ -33,12 +33,6 @@ fn the_thread_id_is_a_reserved_channel_id() {
 }
 
 #[test]
-fn distinct_chats_and_senders_get_distinct_threads() {
-    assert_ne!("channel:telegram/42/-100123", "channel:telegram/42/-100124");
-    assert_ne!("channel:telegram/42/-100123", "channel:telegram/43/-100123");
-}
-
-#[test]
 fn channel_names_are_lowercase_tokens() {
     for ok in ["telegram", "imessage", "discord", "x", "a_b-1"] {
         validate_channel(ok).unwrap_or_else(|e| panic!("{ok}: {e}"));
