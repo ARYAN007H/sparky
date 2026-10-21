@@ -1,7 +1,6 @@
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::inference::host_runtime as local_runtime;
-use crate::inference::provider as providers;
 use serde_json::Value;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
@@ -191,3 +190,4 @@ pub async fn inference_diagnostics(config: &Config) -> Result<Outcome<Value>, St
 
 #[cfg(test)]
 #[path = "ops_tests.rs"]
+mod tests;
