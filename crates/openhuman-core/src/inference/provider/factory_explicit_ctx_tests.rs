@@ -252,11 +252,9 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             (
                 "context-a-hosted-slug".to_string(),
                 "context-a-hosted-slug".to_string(),
-                "context-a-hosted-slug".to_string(),
                 "https://context-a-catalog.example.test/v1".to_string()
             ),
             (
-                "context-a-hosted-slug".to_string(),
                 "context-a-hosted-slug".to_string(),
                 "context-a-hosted-slug".to_string(),
                 "https://context-a-catalog.example.test/v1".to_string()
