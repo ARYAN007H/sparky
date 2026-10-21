@@ -9,6 +9,7 @@ use tinyagents_harness::host::{
     BuildOpts, ModelBuildGate, ModelBuildRequest, ModelFactory, ModelPurpose,
 };
 use tinyinference_llm::model::{ModelRequestDefaults, ProfileOverrideModel, ResolvedModelRoute};
+use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// OpenHuman's host policy and construction adapter for a harness turn.
 ///
@@ -71,10 +72,16 @@ impl OpenHumanModelFactory<'_> {
             return Ok((model, route));
         }
 
+        let provider_route = ProviderRoute::parse(&provider);
         let managed = match (&request.purpose, self.primary_provider) {
             (ModelPurpose::Primary | ModelPurpose::Summarization, Some(provider)) => {
                 let provider = provider.trim();
-                provider.is_empty() || provider == "cloud" || provider == PROVIDER_OPENHUMAN
+                provider.is_empty()
+                    || provider == "cloud"
+                    || provider == PROVIDER_OPENHUMAN
+                    || provider_route
+                        .as_ref()
+                        .is_some_and(|route| matches!(route.kind(), RouteKind::Managed))
             }
             _ => resolves_to_managed_backend(role, self.config),
         };
@@ -103,55 +110,125 @@ impl OpenHumanModelFactory<'_> {
         let context_extensions = resolved
             .as_deref()
             .map(crate::core::runtime::CoreContext::extensions);
-        let (model, route_provider, resolved_model) = if let Some(result) =
-            prepare_claude_agent_sdk_chat_model(role, &provider, self.config)
-        {
-            let configured = result?;
+        let route = ProviderRoute::parse(&provider);
+        let (model, route_provider, resolved_model) = match route.as_ref().map(ProviderRoute::kind) {
+            Some(RouteKind::ClaudeAgentSdk) if !provider.trim().eq_ignore_ascii_case(CLAUDE_AGENT_SDK_PROVIDER) => {
+                let configured = claude_agent_sdk_model_from_string(&provider, self.config)
+                    .ok_or_else(|| unresolved_chat_model_error_for(
+                        role,
+                        &provider,
+                        self.config,
+                        self.egress,
+                        context_extensions,
+                    ))?;
             let concrete = if pin.is_empty() { configured } else { pin.to_owned() };
             emit_inference_egress(
                 role,
                 &format!("{CLAUDE_AGENT_SDK_PREFIX}{concrete}"),
                 self.egress,
             );
-            (
-                Arc::new(ClaudeAgentSdkProvider::for_model(
+                (
+                    Arc::new(ClaudeAgentSdkProvider::for_model(
                     (&self.config.claude_agent_sdk).into(),
                     concrete.clone(),
-                )) as Arc<dyn ChatModel<()>>,
-                CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
-                concrete,
-            )
-        } else if let Some(result) = build_claude_code_model(
-            role,
-            &provider,
-            self.config,
-            (!pin.is_empty()).then_some(pin),
-            self.egress,
-        ) {
-            let (model, _) = result?;
-            (model, "claude-code".to_owned(), pin.to_owned())
-        } else if let Some(result) = try_create_local_runtime_chat_model(role, self.config, self.egress) {
-            let (model, resolved) = result?;
-            let provider = model.profile().and_then(|p| p.provider.clone()).unwrap_or_else(|| "local".into());
-            (model, provider, resolved)
-        } else if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools_for(
-            role,
-            self.config,
-            request.opts.native_tools,
-            self.egress,
-            context_extensions,
-        ) {
-            let (model, resolved) = result?;
-            let provider = provider.trim().split(':').next().unwrap_or(provider.trim()).to_owned();
-            (model, provider, resolved)
-        } else {
-            return Err(unresolved_chat_model_error_for(
-                role,
-                &provider,
-                self.config,
-                self.egress,
-                context_extensions,
-            ));
+                    )) as Arc<dyn ChatModel<()>>,
+                    CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
+                    concrete,
+                )
+            }
+            _ if provider.trim().eq_ignore_ascii_case(CLAUDE_AGENT_SDK_PROVIDER) => {
+                let configured = claude_agent_sdk_model_from_string(&provider, self.config)
+                    .ok_or_else(|| unresolved_chat_model_error_for(
+                        role,
+                        &provider,
+                        self.config,
+                        self.egress,
+                        context_extensions,
+                    ))?;
+                emit_inference_egress(
+                    role,
+                    &format!("{CLAUDE_AGENT_SDK_PREFIX}{configured}"),
+                    self.egress,
+                );
+                (
+                    Arc::new(ClaudeAgentSdkProvider::for_model(
+                        (&self.config.claude_agent_sdk).into(),
+                        configured.clone(),
+                    )) as Arc<dyn ChatModel<()>>,
+                    CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
+                    configured,
+                )
+            }
+            Some(RouteKind::ClaudeCode) => {
+                let (model, resolved) = build_claude_code_model(
+                    role,
+                    &provider,
+                    self.config,
+                    (!pin.is_empty()).then_some(pin),
+                    self.egress,
+                )
+                .expect("route kind was checked")?;
+                (model, "claude-code".to_owned(), resolved)
+            }
+            Some(RouteKind::Local(_)) | None
+                if tinyinference_local::profile::kind_from_provider_string(&provider).is_some() =>
+            {
+                let local = try_create_local_runtime_chat_model_from_string(
+                    role,
+                    &provider,
+                    self.config,
+                    self.egress,
+                );
+                let (model, resolved) = match local {
+                    Some(result) => result?,
+                    None => return Err(unresolved_chat_model_error_for(
+                    role,
+                    &provider,
+                    self.config,
+                    self.egress,
+                    context_extensions,
+                    )),
+                };
+                let provider = model
+                    .profile()
+                    .and_then(|p| p.provider.clone())
+                    .unwrap_or_else(|| "local".into());
+                (model, provider, resolved)
+            }
+            Some(RouteKind::Cloud { .. }) => {
+                let cloud = try_create_cloud_slug_chat_model_from_string_with_native_tools_for(
+                    role,
+                    &provider,
+                    self.config,
+                    request.opts.native_tools,
+                    self.egress,
+                    context_extensions,
+                );
+                let (model, resolved) = match cloud {
+                    Some(result) => result?,
+                    None => return Err(unresolved_chat_model_error_for(
+                    role,
+                    &provider,
+                    self.config,
+                    self.egress,
+                    context_extensions,
+                    )),
+                };
+                let route_provider = model
+                    .profile()
+                    .and_then(|p| p.provider.clone())
+                    .unwrap_or_else(|| provider_route.as_ref().expect("parsed cloud route").provider.clone());
+                (model, route_provider, resolved)
+            }
+            _ => {
+                return Err(unresolved_chat_model_error_for(
+                    role,
+                    &provider,
+                    self.config,
+                    self.egress,
+                    context_extensions,
+                ));
+            }
         };
 
         let route = ResolvedModelRoute::new(
