@@ -11,7 +11,6 @@
 //! - [`cloud_spec`] — `CloudProviderCreds` → `ProviderSpec` → `ProviderRegistry`.
 //! - [`subprocess_providers`] — Claude Agent SDK and Claude Code CLI.
 //! - [`chat_model`] — the one-shot `create_chat_model*` entry points.
-//! - [`turn_model`] — the per-turn `create_turn_chat_model*` entry points.
 
 pub(crate) mod access_gates;
 mod chat_model;
@@ -23,7 +22,6 @@ mod local_runtime;
 mod managed_backend;
 mod routing;
 mod subprocess_providers;
-mod turn_model;
 
 pub(crate) use chat_model::{resolves_to_managed_backend, OpenHumanModelFactory};
 pub use chat_model::{
@@ -39,11 +37,6 @@ pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use managed_backend::make_openhuman_backend_model;
 pub(crate) use routing::role_uses_implicit_cloud_fallback;
 pub use routing::{provider_for_role, role_bypasses_managed_credits};
-pub(crate) use turn_model::{
-    create_turn_chat_model, create_turn_chat_model_from_string,
-    create_turn_chat_model_from_string_with_native_tools_and_route,
-    create_turn_chat_model_with_native_tools_and_route,
-};
 
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
