@@ -379,7 +379,11 @@ export function validateTestOnlySourceParity({
         releaseFile.oid !== file.releaseBlob ||
         candidateFile.oid !== file.candidateBlob
       ) {
-        throw new Error(`attested test file ${file.path} path, mode, or blob does not match the Git trees`);
+        throw new Error(
+          singleFileProof
+            ? "attested test file path, mode, or blob does not match the Git trees"
+            : `attested test file ${file.path} path, mode, or blob does not match the Git trees`,
+        );
       }
     }
     const attestedPaths = new Set(files.map(({ path }) => path));
