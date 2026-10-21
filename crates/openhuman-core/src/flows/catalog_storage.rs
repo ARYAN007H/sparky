@@ -22,9 +22,10 @@ use tinyflows_bus::catalog::{
     DocGetRequest, DocPutRequest, DocQueryRequest,
 };
 use tinystoragedrivers::StorageBackend;
-use tinystoragedrivers::{
-    Capability, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, Scope,
-    StorageError, Versioned, WriteOptions,
+use tinystoragedrivers_api::DocumentStore;
+use tinystoragedrivers_types::{
+    Capability, CollectionSpec, Filter, Page, Precondition, Query, Scope, StorageError, Versioned,
+    WriteOptions,
 };
 
 use crate::config::Config;

@@ -27,10 +27,11 @@ use anyhow::{Context, Result};
 use serde_json::{json, Value};
 use tinybus::Result as BusResult;
 use tinyflows_bus::schedule::CallbackAddress;
-use tinystoragedrivers::{
-    Capability, CollectionSpec, DocumentStore, Filter, Precondition, Query, Scope, StorageBackend,
-    StorageError, WriteOp,
+use tinystoragedrivers_api::DocumentStore;
+use tinystoragedrivers_types::{
+    Capability, CollectionSpec, Filter, Precondition, Query, Scope, StorageError, WriteOp,
 };
+use tinystoragedrivers::StorageBackend;
 
 use crate::config::Config;
 use crate::modules::tinyflows as module;
