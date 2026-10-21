@@ -337,6 +337,28 @@ async fn save(
     })
 }
 
+/// Persist bytes returned by a successful scoped channel-module media read.
+/// This bypasses marker URL/path resolution: only this internal caller can
+/// provide the bytes, and the existing workspace/security destination checks
+/// still apply.
+pub(crate) async fn store_scoped_channel_media(
+    config: &Config,
+    thread: &str,
+    name: &str,
+    mime: &str,
+    bytes: &[u8],
+) -> anyhow::Result<Attachment> {
+    const MODULE_MEDIA_MAX_BYTES: usize = 20 * 1024 * 1024;
+    if bytes.is_empty() || bytes.len() > MODULE_MEDIA_MAX_BYTES {
+        anyhow::bail!("scoped channel media exceeds its byte limit");
+    }
+    let scope = AttachmentAccessScope {
+        external_channel: false,
+        workspace: Some(config.action_dir.clone()),
+    };
+    save(config, thread, name, mime, bytes, &scope).await
+}
+
 /// Stage every original before scanning or persistence. Failure rejects the
 /// turn rather than silently discarding an accepted upload.
 pub(crate) async fn stage(
