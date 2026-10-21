@@ -455,6 +455,7 @@ async fn persist_channel_turn(
             (
                 tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
                     namespace: "main".into(),
+                    preparation_mode: Default::default(),
                     session_policy: Default::default(),
                     source: tinychannels_bus::module_inbound::ChannelInboundSource::Legacy {
                         message: ChannelMessage {

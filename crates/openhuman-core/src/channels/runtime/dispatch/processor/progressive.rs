@@ -35,6 +35,19 @@ impl NativeProgressiveTarget {
         &self,
         turn_id: &str,
     ) -> anyhow::Result<std::sync::Arc<NativeProgressiveReply>> {
+        tracing::debug!(
+            provider_matches_account = self.channel.account_id.as_deref().is_some_and(|account| {
+                tinychannels_bus::provider_id(account) == self.channel.id
+            }),
+            account_present = self
+                .channel
+                .account_id
+                .as_deref()
+                .is_some_and(|account| !account.trim().is_empty()),
+            conversation_present = !self.conversation.id.trim().is_empty(),
+            turn_present = !turn_id.trim().is_empty(),
+            "opening native channel progressive turn"
+        );
         let lifetime = std::time::Duration::from_secs(3_660);
         let reply = match &self.kind {
             ProgressiveTargetKind::Configured(object) => {
@@ -140,6 +153,13 @@ pub(crate) fn native_target(
         .get(account)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("native channel account is not configured"))?;
+    tracing::debug!(
+        provider_matches_account = tinychannels_bus::provider_id(account) == envelope.channel.id,
+        account_present = !account.trim().is_empty(),
+        conversation_present = !envelope.conversation.id.trim().is_empty(),
+        message_present = !envelope.message_id.trim().is_empty(),
+        "native channel progressive target resolved"
+    );
     Ok(Some(NativeProgressiveTarget {
         kind: ProgressiveTargetKind::Configured(object),
         channel: envelope.channel.clone(),

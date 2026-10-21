@@ -8,8 +8,11 @@ use tinychannels::delivery::progressive::{
     extract_message_id, latest_thinking_snippet, StreamingState,
 };
 use tinychannels::providers::email_channel::test_support as email_support;
+#[allow(deprecated, reason = "this fixture covers the v21 compatibility DTO")]
 use tinychannels::ChannelMessage;
 
+// This fixture intentionally constructs the v21 DTO to retain compatibility coverage.
+#[allow(deprecated)]
 fn channel_message(channel: &str, reply_target: &str, content: &str) -> ChannelMessage {
     ChannelMessage {
         id: "msg-1".to_string(),
@@ -20,6 +23,8 @@ fn channel_message(channel: &str, reply_target: &str, content: &str) -> ChannelM
         timestamp: 1,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     }
 }
 
