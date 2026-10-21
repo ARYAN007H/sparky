@@ -470,6 +470,14 @@ pub struct Config {
     #[serde(default)]
     pub memes: MemesConfig,
 
+    /// Inbound event queues (`[inbound]`); the switch is
+    /// `[components] eventqueues`.
+    #[serde(default)]
+    pub inbound: InboundConfig,
+    /// Per-conversation batching of inbound channel messages (`[inbound_debounce]`).
+    #[serde(default)]
+    pub inbound_debounce: InboundDebounceConfig,
+
     /// Per-dependency switches (`[components]`). Narrow-only; applied at the
     /// next core start.
     #[serde(default)]
@@ -525,9 +533,6 @@ pub struct Config {
 
     #[serde(default)]
     pub update: UpdateConfig,
-
-    #[serde(default)]
-    pub dictation: DictationConfig,
 
     /// Whether the user has completed the **React UI** onboarding flow.
     ///

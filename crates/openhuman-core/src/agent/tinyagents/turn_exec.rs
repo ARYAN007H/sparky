@@ -575,6 +575,10 @@ async fn drive_turn(
                 .map(|parent| {
                     crate::storage::sessions::stores_or_ephemeral(&parent.workspace_dir).kv
                 }),
+            compaction_notice: Some({
+                let bridge = bridge.clone();
+                Arc::new(move || bridge.announce_compaction())
+            }),
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {
