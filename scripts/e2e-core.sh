@@ -6,7 +6,11 @@
 # OPENHUMAN_STORAGE_URL set, so the core under test keeps everything in the
 # chosen backend instead of the per-workspace default:
 #
-#   scripts/e2e-core.sh sqlite     # sqlite:<scratch dir>
+#   scripts/e2e-core.sh [sqlite]   # sqlite:<scratch dir>
+#
+# SQLite is the only driver the host runs end to end. Per-driver conformance
+# (including MongoDB against a replica set) runs upstream in
+# tinystoragedrivers' CI.
 #
 # What runs: `tests/tinymcp_storage_smoke_e2e.rs` spawns the real `openhuman-core
 # serve` twice on one workspace with OPENHUMAN_STORAGE_URL set, loads the

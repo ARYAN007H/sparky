@@ -3,6 +3,8 @@ use crate::core::all::{
     assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
     expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs,
 };
+// Additional names from the extracted schema handler modules.
+use super::handlers::*;
 use serde_json::json;
 
 #[test]
@@ -57,6 +59,27 @@ fn flow_schema_wire_contracts_are_preserved() {
     expect_schema_output_names(&schemas("import"), &["graph", "warnings"]);
     expect_schema_output_names(&schemas("duplicate"), &["flow"]);
     assert_eq!(schemas("prune_runs").outputs[0].name, "result");
+}
+
+#[test]
+fn run_detached_schema_description_has_normal_spacing_and_input_rules() {
+    let rendered = serde_json::to_value(schemas("run_detached")).unwrap();
+    let inputs = rendered["inputs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|field| field["name"] == "inputs")
+        .unwrap();
+    let comment = inputs["comment"].as_str().unwrap();
+
+    assert!(comment.contains("graph.inputs"), "{comment}");
+    assert!(comment.contains("Validated synchronously"), "{comment}");
+    assert!(comment.contains("Distinct from `input`"), "{comment}");
+    assert!(
+        !comment.contains("                               "),
+        "the rendered schema must not contain continuation indentation: {:?}",
+        comment
+    );
 }
 
 #[test]

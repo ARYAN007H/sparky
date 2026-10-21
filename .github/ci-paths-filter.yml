@@ -237,8 +237,9 @@ install_ps1:
   - 'scripts/ci/self-hosted/**'
   - 'scripts/install.ps1'
   - 'scripts/tests/OpenHumanWindowsInstall.Tests.ps1'
-# The storage ports and the domains that sit on them (storage-sqlite lane in
-# the lane plan). The vendor tree is covered whole,
+# The storage ports and the domains that sit on them (the host runs on SQLite;
+# per-driver conformance, MongoDB included, runs in tinystoragedrivers' own
+# CI). The vendor tree is covered whole,
 # like `rust-core`: the ports and drivers are vendored, and a pointer bump
 # anywhere can change what the driver features compile.
 storage:
@@ -278,7 +279,7 @@ storage:
   - 'crates/openhuman-*/Cargo.toml'
   - 'tests/storage_*.rs'
   - 'tests/cli_storage_url_e2e.rs'
-  - 'tests/support/storage_drivers.rs'
+  - 'tests/support/storage_case.rs'
   - '.cargo/config.toml'
   - 'rust-toolchain.toml'
   - '.gitmodules'

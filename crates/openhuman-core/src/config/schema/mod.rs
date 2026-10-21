@@ -34,6 +34,7 @@ pub use storage::StorageConfig;
 pub mod profile_layout;
 pub use profile_layout::{users_dir, ProfileLayout};
 mod identity_cost;
+mod inbound_debounce;
 pub(crate) mod load;
 pub(crate) use load::config_from_toml_str;
 pub(crate) use load::source::storage_schema::storage_schema as config_storage_schema;
@@ -59,6 +60,7 @@ pub(crate) use load::resolve_config_dir_for_workspace;
 pub(crate) use load::CONFIG_OWNER_MISMATCH_MARKER;
 pub mod claude_agent_sdk;
 pub use claude_agent_sdk::ClaudeAgentSdkConfig;
+mod inbound;
 mod local_ai;
 mod memes;
 pub(crate) mod memory;
@@ -95,12 +97,14 @@ pub use dashboard::{DashboardConfig, DiagramViewerConfig, EventStreamConfig, Mod
 pub use identity_cost::{
     BudgetAction, BudgetPeriod, BudgetPolicy, BudgetScope, CostConfig, ModelPricing,
 };
+pub use inbound::InboundConfig;
+pub use inbound_debounce::{InboundDebounceConfig, InboundDebounceOverride};
 pub use local_ai::{LocalAiConfig, LocalAiUsage};
 pub use memes::MemesConfig;
 pub use memory::{
     migrate_legacy_source, MemoryAgentConfig, MemoryConfig, MemoryConversationsConfig,
-    MemoryEngineSettings, MemoryLayoutMode, MemoryRecallConfig, MemorySourceConfig,
-    MemorySourceKind, MEMORY_CORTEXDB_KEY_NAME,
+    MemoryEngineSettings, MemoryLayoutMode, MemorySourceConfig, MemorySourceKind, RecallSettings,
+    MEMORY_CORTEXDB_KEY_NAME,
 };
 pub use modules::{
     module_source_env_for, ModuleOverride, ModuleSourceMode, ModulesConfig, MODULE_SOURCE_ENV,

@@ -5,6 +5,10 @@ mod harness;
 use harness::*;
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn mcp_clients_lifecycle() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
@@ -148,6 +152,10 @@ async fn mcp_clients_lifecycle() {
 /// is how a user adds any server now — the registry is browse-only.
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn mcp_clients_declare_connect_tool_call_happy_path() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");

@@ -69,6 +69,21 @@ fn reply_remix_capability_shows_disabled_when_the_memes_component_is_off() {
 }
 
 #[test]
+fn inbound_queue_capability_shows_disabled_when_the_eventqueues_component_is_off() {
+    let cap = super::super::lookup("automation.inbound_event_queues").expect("inbound queues");
+    assert_ne!(cap.status, CapabilityStatus::Disabled);
+    assert_eq!(
+        apply_components(cap, &off("eventqueues")).status,
+        CapabilityStatus::Disabled
+    );
+    let tasks = super::super::lookup("automation.task_sources").expect("task sources");
+    assert_eq!(
+        apply_components(tasks, &off("eventqueues")).status,
+        tasks.status
+    );
+}
+
+#[test]
 fn scheduled_job_capabilities_show_disabled_when_the_tinyflows_component_is_off() {
     for id in [
         "automation.view_cron_jobs",

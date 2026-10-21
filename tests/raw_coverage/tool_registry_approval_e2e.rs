@@ -397,6 +397,10 @@ enabled = true
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn tool_registry_entries_include_connected_mcp_client_tools() {
     let mcp_server = crate::local_mcp_http::LocalMcpHttpServer::start_echo().await;
     let tmp = tempdir().expect("tempdir");
