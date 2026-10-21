@@ -23,6 +23,11 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
     ]
 }
 
+#[cfg(test)]
+pub(crate) fn encryption_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::parameter_contracts()
+}
+
 pub fn schemas(function: &str) -> ControllerSchema {
     match function {
         "encrypt_secret" => ControllerSchema {

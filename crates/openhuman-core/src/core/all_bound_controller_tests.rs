@@ -13,6 +13,7 @@ fn staged_bound_methods() -> Vec<&'static str> {
     let mut methods = vec!["composio.execute"];
     #[cfg(feature = "mcp")]
     methods.push("mcp_clients.registry_get");
+    methods.extend(["encrypt.secret", "decrypt.secret"]);
     methods.extend([
         "socket.connect",
         "socket.disconnect",
@@ -674,3 +675,6 @@ fn production_registry_binds_every_core_voice_controller_to_its_parser() {
 }
 #[path = "all_profiles_controller_tests.rs"]
 mod profiles_controller_tests;
+
+#[path = "all_encryption_controller_tests.rs"]
+mod encryption_controller_tests;

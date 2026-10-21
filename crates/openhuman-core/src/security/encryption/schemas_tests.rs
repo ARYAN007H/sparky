@@ -1,26 +1,43 @@
 use super::*;
-use crate::core::all::{
-    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
-};
+use crate::core::all::ControllerParamContract;
 
 #[test]
-fn encryption_schema_contracts_and_registration_are_preserved() {
-    assert_eq!(all_controller_schemas().len(), 2);
-    assert_eq!(all_registered_controllers().len(), 2);
-    assert_schema_controller_parity(
-        &all_controller_schemas(),
-        &all_registered_controllers(),
-        "secret",
-    );
-    for (key, namespace, function, input) in [
-        ("encrypt_secret", "encrypt", "secret", "plaintext"),
-        ("decrypt_secret", "decrypt", "secret", "ciphertext"),
-    ] {
-        let schema = schemas(key);
-        expect_schema_identity(&schema, namespace, function);
-        assert_eq!(schema.inputs.len(), 1);
-        expect_schema_fields(&schema, &[(input, Some(true))]);
-    }
+fn legacy_registered_handlers_keep_their_function_identity() {
+    let controllers = all_registered_controllers();
+    assert_eq!(controllers.len(), 2);
+    assert!(std::ptr::fn_addr_eq(
+        controllers[0].handler,
+        handle_encrypt_secret
+    ));
+    assert!(std::ptr::fn_addr_eq(
+        controllers[1].handler,
+        handle_decrypt_secret
+    ));
+}
+
+pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
+    use serde_json::json;
+
+    vec![
+        ControllerParamContract {
+            method: "encrypt.secret",
+            required: &["plaintext"],
+            optional: &[],
+            examples: vec![
+                json!({"plaintext":""}),
+                json!({"plaintext":"  keep whitespace  "}),
+            ],
+        },
+        ControllerParamContract {
+            method: "decrypt.secret",
+            required: &["ciphertext"],
+            optional: &[],
+            examples: vec![
+                json!({"ciphertext":""}),
+                json!({"ciphertext":"  keep whitespace  "}),
+            ],
+        },
+    ]
 }
 
 #[test]
