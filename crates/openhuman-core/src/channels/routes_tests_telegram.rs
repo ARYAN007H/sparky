@@ -31,7 +31,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         },
     );
 
-    let subscriber = ChannelTurnStateSubscriber::new(workspace.clone());
+    let subscriber = ChannelTurnStateSubscriber::with_config(Arc::new(linked.config().clone()));
     let event_core =
         crate::channels::runtime::test_support::bind_test_core_context(&mut ctx, linked.config());
     crate::core::runtime::CoreContext::scope(event_core, async {

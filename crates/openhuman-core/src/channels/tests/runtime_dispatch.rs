@@ -164,6 +164,9 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         &mut runtime_ctx,
         linked.config(),
     );
+    // Keep the bound core for host policy/config while selecting the injected
+    // model source below, as bespoke test hosts do.
+    runtime_ctx.config = None;
     let runtime_ctx = Arc::new(runtime_ctx);
     let configured_account = runtime_ctx
         .channels_by_name
