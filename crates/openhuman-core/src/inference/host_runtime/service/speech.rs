@@ -51,9 +51,9 @@ pub async fn transcribe_with_prompt(
     let provider_name = effective_stt_provider(config);
     debug!("{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path}");
     let provider = selected_stt_provider(config, &provider_name);
-    let text =
-        tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
-            .await?;
+    let text = tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
+        .await
+        .map_err(|error| restore_host_file_error(error, audio_path))?;
     debug!(
         "{LOG_PREFIX} configured STT complete (provider={} elapsed_ms={})",
         provider_name,
@@ -64,6 +64,16 @@ pub async fn transcribe_with_prompt(
         text,
         model_id: model_ids::effective_stt_model_id(config),
     })
+}
+
+fn restore_host_file_error(error: String, audio_path: &str) -> String {
+    if let Some(reason) = error.strip_prefix("[voice-stt] failed to read audio file: ") {
+        return format!("failed to read audio file {audio_path}: {reason}");
+    }
+    if error == "[voice-stt] audio file is empty" {
+        return format!("audio file {audio_path} is empty");
+    }
+    error
 }
 
 /// Transcribe audio bytes with the host-selected STT provider.

@@ -5,6 +5,26 @@ use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use std::sync::{Arc, Mutex};
 
+#[test]
+fn file_transcription_errors_keep_the_host_path_context() {
+    let missing = restore_host_file_error(
+        "[voice-stt] failed to read audio file: No such file or directory (os error 2)".into(),
+        "/tmp/missing.wav",
+    );
+    assert_eq!(
+        missing,
+        "failed to read audio file /tmp/missing.wav: No such file or directory (os error 2)"
+    );
+
+    let empty = restore_host_file_error("[voice-stt] audio file is empty".into(), "/tmp/empty.wav");
+    assert_eq!(empty, "audio file /tmp/empty.wav is empty");
+
+    assert_eq!(
+        restore_host_file_error("provider refused audio".into(), "/tmp/audio.wav"),
+        "provider refused audio"
+    );
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct CapturedAudio {
     bytes: Vec<u8>,
