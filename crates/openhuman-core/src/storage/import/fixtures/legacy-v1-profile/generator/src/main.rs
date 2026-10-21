@@ -213,19 +213,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // local scope: the profile directory itself supplied user isolation.
     // Their owners must continue to read them after the real v1-to-v2 boot
     // migration.
+    // This is the approvals v1 owner document from the historic schema:
+    // approvals.requests did not exist yet. The approvals owner's v2 schema
+    // migration converts these RFC3339 timestamps and collection name.
     put(
         user_scope.documents(),
-        "approvals.requests",
+        "approvals",
         "fixture-approval",
         json!({
             "tool_name": "shell",
             "action_summary": "Fixture approval",
             "args_redacted": "{}",
             "session_id": "fixture-session",
-            "created_ms": 1738555506000_i64,
-            "deadline_ms": 4070908800000_i64,
-            "pending": true,
-            "agent_id": "default"
+            "created_at": "2025-02-03T04:05:06Z",
+            "expires_at": "2099-01-01T00:00:00Z",
+            "pending": true
         }),
     )
     .await?;
@@ -266,10 +268,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
         )
         .await?;
+    // The thread owner historically keyed transcript rows by the raw thread
+    // id in `threads_transcript_keys`; its schema step rekeys this to the
+    // current owner collection and escaped id.
     put(
         user_scope.documents(),
-        "threads.transcript_keys",
-        &Key::of([thread_id])?.as_str().to_owned(),
+        "threads_transcript_keys",
+        thread_id,
         json!({"key": "fixture-transcript-key"}),
     )
     .await?;

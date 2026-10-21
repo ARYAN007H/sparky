@@ -19,14 +19,19 @@ owner models and writer transformations from `2d3e22636e^`:
   as TSD `created_ms` metadata, matching `ProfileRegistry::body_of`.
 - The isolated desktop profile database stores owner documents in the
   historical `local` scope; the profile directory itself supplied user
-  isolation. The fixture writes a pending `approvals.requests` owner record
-  and a `threads.transcript_keys` record through the historical TSD v1 writer.
+  isolation. The fixture writes an `approvals` v1 request with RFC3339
+  timestamps and a `threads_transcript_keys` record keyed by raw thread id.
+  The approvals and threads owners migrate those into their current
+  collections and ids before their public APIs read them.
 - The thread owner also has a committed thread and message in the historical
-  SQLite database. The desktop owner APIs must read all three records after
-  boot.
-- The TinyFlows catalog writes a `flows_definitions` record in the same
-  per-profile database. Desktop boot must migrate it through the TinyFlows
-  catalog owner and the public `flows_list` operation must return it.
+  SQLite database. The desktop owner APIs must read the thread, message, and
+  migrated transcript key after boot.
+- The TinyFlows catalog fixture uses its historical `flows_definitions`
+  collection with `graph_json` and RFC3339 timestamps. The catalog's schema
+  migration converts it, and the public `flows_list` operation must return it.
+- The secret uses TinyStorage's public `DocumentSecrets::set` writer against
+  the historical v1 backend, then the integration test reads it with
+  `DocumentSecrets` after desktop boot.
 - `secrets` contains an encrypted `fixture-secret` document in the same scope
   using the fixture-only master key `[0x5a; 32]`; the integration test reads it
   with TinyStorage's `DocumentSecrets` API after desktop boot.
@@ -35,8 +40,10 @@ The host E2E test copies this database to an existing profile's
 `users/u1/workspace/storage/storage.db`, boots the desktop host with layout
 auto-migration enabled, then restores the migration archive to a separate
 temporary directory, verifies the archive includes the original storage path,
-and opens its database. It reads thread messages, approvals, secrets, and
-flows from the migrated profile through their owner APIs. The focused core import test
+and opens its database. It reads thread messages and transcript key, approvals,
+secrets, and flows from the migrated profile through their owner APIs. It then
+deletes the flow, reboots the desktop host, and checks that boot does not
+resurrect the row from the archived database. The focused core import test
 continues to verify the owner schema conversions for cost, artifacts, and
 profile metadata, as well as non-resurrection after deletion.
 

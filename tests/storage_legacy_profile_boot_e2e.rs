@@ -301,6 +301,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     config.workspace_dir = workspace;
     config.storage.url = Some(format!("sqlite:{}", profile.join("storage.db").display()));
     std::thread::spawn(move || {
+        openhuman_core::storage::clear();
         let storage_url = config.storage.url.as_deref().unwrap().to_owned();
         let owner_runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
