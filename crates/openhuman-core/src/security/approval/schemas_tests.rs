@@ -119,7 +119,8 @@ fn recent_decisions_parser_keeps_optional_unsigned_limit_semantics() {
     for limit in [0, 1, u64::MAX] {
         assert_eq!(
             parse_list_recent_decisions(Map::from_iter([("limit".into(), json!(limit))])).unwrap(),
-            Some(limit)
+            Some(limit as usize),
+            "the decoder preserves the existing u64-to-usize cast without defaulting or clamping"
         );
     }
     for value in [json!(-1), json!(1.5)] {
@@ -235,6 +236,24 @@ fn preauthorize_parser_preserves_flow_and_tool_strings_without_normalizing() {
             "tool".to_owned()
         ]
     );
+    assert_eq!(
+        parse_preauthorize_flow(Map::from_iter([
+            ("flow_id".into(), json!("")),
+            ("tool_names".into(), json!([])),
+        ]))
+        .unwrap(),
+        (String::new(), Vec::new()),
+        "blank flow ids and empty batches are passed to the business layer unchanged"
+    );
+    let long_batch: Vec<_> = (0..101).map(|index| format!("tool-{index}")).collect();
+    let (flow, parsed_batch) = parse_preauthorize_flow(Map::from_iter([
+        ("flow_id".into(), json!("flow")),
+        ("tool_names".into(), json!(long_batch)),
+    ]))
+    .unwrap();
+    assert_eq!(flow, "flow");
+    assert_eq!(parsed_batch.len(), 101);
+    assert_eq!(parsed_batch[100], "tool-100");
     assert_eq!(
         parse_preauthorize_flow(Map::from_iter([("flow_id".into(), json!("flow"))])).unwrap_err(),
         "missing required param 'tool_names'"
