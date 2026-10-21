@@ -673,7 +673,6 @@ modules = [
     "dep:tinyvoice-bus",
     "dep:tinywallet-bus",
     "dep:tinystoragedrivers-bus",
-    "dep:tinystoragedrivers-client",
     "dep:tinystoragedrivers-busproxy",
     "dep:tinybus-module",
 ]
