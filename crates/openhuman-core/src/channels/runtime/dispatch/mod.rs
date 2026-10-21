@@ -21,9 +21,11 @@ pub(crate) use processor::progressive::{
 };
 
 pub(crate) use processor::{
-    process_channel_message, process_channel_runtime_message, reset_durable_channel_session,
-    run_message_dispatch_loop, RuntimeChannelMessage,
+    process_channel_runtime_message, reset_durable_channel_session, run_message_dispatch_loop,
+    RuntimeChannelMessage,
 };
+#[cfg(any(test, debug_assertions))]
+pub(crate) use processor::process_channel_message;
 
 // `channel_has_approval_surface` stays pub(crate) on processor; re-export so
 // the inline test module can reach it via `super::channel_has_approval_surface`.
