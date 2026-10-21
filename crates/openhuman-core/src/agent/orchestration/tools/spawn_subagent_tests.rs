@@ -104,6 +104,10 @@ async fn unknown_agent_id_lists_available() {
     .await;
     assert!(result.is_error);
     let out = result.output();
+    assert!(
+        out.contains("unknown agent_id 'totally_made_up'"),
+        "the request must reach scoped registry lookup: {out}"
+    );
     // Should list at least one valid built-in.
     assert!(out.contains("task_manager_agent"));
 }
