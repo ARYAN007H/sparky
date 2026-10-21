@@ -33,8 +33,16 @@ const OTHER_CHAT_TEXT: &str = "remember a separate chat history";
 const AFTER_RESET_TEXT: &str = "this starts a fresh session after new";
 const RESET_AFTER_RESTART_TEXT: &str = "continue the reset conversation after restart";
 const OTHER_AFTER_RESTART_TEXT: &str = "continue the separate chat after restart";
-const NATIVE_IMAGE_PNG: &[u8] = b"\x89PNG\r\n\x1a\nfixture-image-bytes";
 const NATIVE_FILE_BYTES: &[u8] = b"native file bytes for typed admission";
+
+fn native_image_png() -> &'static [u8] {
+    static PNG: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    PNG.get_or_init(|| {
+        base64::engine::general_purpose::STANDARD
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC")
+            .expect("valid 1x1 PNG fixture")
+    })
+}
 
 #[derive(Default)]
 struct MockState {
@@ -156,7 +164,7 @@ async fn get_file(State(state): State<Arc<MockState>>, Json(body): Json<Value>) 
         .expect("Telegram getFile requests")
         .push(file_id.to_owned());
     let (path, bytes) = match file_id {
-        "typed-image-file" => ("photos/native.png", NATIVE_IMAGE_PNG),
+        "typed-image-file" => ("photos/native.png", native_image_png()),
         "typed-document-file" => ("documents/native.txt", NATIVE_FILE_BYTES),
         _ => return Json(json!({ "ok": false, "description": "unknown mock file" })),
     };
@@ -173,7 +181,7 @@ async fn download_file(
         .expect("Telegram file downloads")
         .push(path.0.clone());
     let (content_type, bytes) = match path.0.as_str() {
-        "photos/native.png" => ("image/png", NATIVE_IMAGE_PNG),
+        "photos/native.png" => ("image/png", native_image_png()),
         "documents/native.txt" => ("text/plain", NATIVE_FILE_BYTES),
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
@@ -288,7 +296,7 @@ fn media_update(
         message["photo"] = json!([{
             "file_id": "typed-image-file",
             "file_unique_id": "typed-image-unique",
-            "file_size": NATIVE_IMAGE_PNG.len()
+            "file_size": native_image_png().len()
         }]);
     }
     if document {
@@ -851,8 +859,8 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         4,
         "each media update reaches the model once"
     );
-    assert!(model_saw_media_bytes(&requests[0], NATIVE_IMAGE_PNG));
-    assert!(model_saw_media_bytes(&requests[1], NATIVE_FILE_BYTES));
+    assert_model_received_typed_image(&requests[0]);
+    assert_model_received_file_content(&requests[1]);
     let image_mixed = serde_json::to_string(
         last_user_content(&requests[2]).expect("mixed image user message is present"),
     )
@@ -861,7 +869,7 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         .find("image caption before media")
         .expect("image caption text is present");
     let image = image_mixed
-        .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_IMAGE_PNG))
+        .find(&base64::engine::general_purpose::STANDARD.encode(native_image_png()))
         .expect("mixed image bytes reach the model");
     assert!(image_caption < image, "image part order: {image_mixed}");
 
