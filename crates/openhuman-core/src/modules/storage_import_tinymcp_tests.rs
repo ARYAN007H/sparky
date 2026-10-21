@@ -128,7 +128,6 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     // Env values only ever land in the secret, never in a document.
     assert!(!body.to_string().contains("sk-secret"));
     let stored = rig
-        .scoped
         .secrets()
         .get("mcp_client_env/srv-1")
         .await
@@ -145,8 +144,7 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
             .is_none()
     );
 
-    let audit = rig
-        .scoped
+    let audit = scoped
         .streams()
         .read_window(AUDIT_STREAM, 0, 10)
         .await
