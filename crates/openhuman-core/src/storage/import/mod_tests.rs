@@ -253,7 +253,6 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     use crate::profiles::{ProfileId, ProfileRegistry};
     use crate::storage::layout::{Target, legacy};
     use crate::storage::{self, Scope};
-    use sha2::Digest;
     use tinystoragedrivers::Query;
 
     let root = TempDir::new().unwrap();
@@ -271,7 +270,6 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     let source_db = legacy::v1_db(&target);
     std::fs::create_dir_all(source_db.parent().unwrap()).unwrap();
     std::fs::copy(&fixture, &source_db).unwrap();
-    let source_hash = sha2::Sha256::digest(std::fs::read(&source_db).unwrap());
 
     let config = Config {
         config_path,
@@ -295,6 +293,10 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     .unwrap();
     assert!(matches!(migration, crate::storage::layout::Outcome::Migrated(_)));
     assert!(target.storage_db().is_file(), "profile storage.db is bootable");
+    assert!(
+        !source_db.exists(),
+        "the archived v1 source is removed after successful migration"
+    );
 
     let destination_url = format!("sqlite:{}", target.storage_db().display());
     let destination =
@@ -413,12 +415,6 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert_eq!(secrets.len(), 1, "historical secret remains readable");
     assert_eq!(flows.len(), 1, "historical flow remains readable");
 
-    assert_eq!(
-        sha2::Sha256::digest(std::fs::read(&source_db).unwrap()),
-        source_hash,
-        "boot import must leave the v1 source bytes unchanged"
-    );
-
     let delete_scope = backend.for_scope(&Scope::local()).unwrap();
     let docs = Arc::clone(delete_scope.documents());
     storage::block_on(async move {
@@ -445,11 +441,6 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert!(
         remaining.is_empty(),
         "a deleted imported row must not return"
-    );
-    assert_eq!(
-        sha2::Sha256::digest(std::fs::read(&source_db).unwrap()),
-        source_hash,
-        "repeat boot import must still leave the v1 source bytes unchanged"
     );
 }
 
