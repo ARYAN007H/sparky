@@ -99,6 +99,10 @@ test("passes on a matching baseline and skips test files and test support helper
       { path: `${SRC}/inference/provider/catalog_listing.rs`, rule: "ambient-config" },
     ],
   );
+  const unbaselined = run(files, []);
+  assert.equal(unbaselined.status, 1, "production ambient config reads still fail");
+  assert.match(unbaselined.out, /ambient-config: crates\/openhuman-core\/src\/inference\/provider\/catalog_listing\.rs:1/);
+  assert.doesNotMatch(unbaselined.out, /model_listing_test_support\.rs/);
   const again = run(files, first.after);
   assert.equal(again.status, 0, again.out);
   assert.match(again.out, /ratchet holds \(2 /);
