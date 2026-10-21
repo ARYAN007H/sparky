@@ -184,7 +184,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     // Read the confidential record with TinyStorage's document-secret owner
     // API after the desktop boot has installed and migrated the profile DB.
     let url = format!("sqlite:{}", profile.join("storage.db").display());
-    let backend = openhuman_core::storage::block_on(async {
+    let backend = openhuman_core::storage::block_on(async move {
         openhuman_core::storage::open(&url).await
     })
     .unwrap();
