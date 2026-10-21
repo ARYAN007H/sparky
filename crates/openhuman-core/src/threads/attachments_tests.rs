@@ -517,7 +517,7 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
             let record = get_staged_record(&repo, &staged_doc_id(&pending_id).unwrap())
                 .unwrap()
                 .unwrap();
-            if record.claim.is_some_and(|claim| claim.canceled) {
+            if record.claim.is_some_and(|claim| claim.canceled) && !pending_file.exists() {
                 break;
             }
             tokio::task::yield_now().await;
