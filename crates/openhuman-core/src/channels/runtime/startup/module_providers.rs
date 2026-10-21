@@ -30,7 +30,7 @@ pub(super) struct ModuleChannelRuntime {
 }
 
 #[derive(Clone)]
-pub(super) struct ModuleChannel {
+pub(crate) struct ModuleChannel {
     pub(super) name: String,
     pub(super) object: ModuleObjectClient,
     pub(super) interaction: tinychannels_bus::ChannelInteractionInfo,

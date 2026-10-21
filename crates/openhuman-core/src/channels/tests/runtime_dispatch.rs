@@ -5,7 +5,7 @@ use super::super::runtime::test_support::{
 use super::super::runtime::{
     process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
-use super::common::{use_real_agent_handler, HistoryCaptureModel, RecordingChannel, SlowModel};
+use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::channels::runtime::ChannelHandle;
 use crate::core::events::DomainEvent;

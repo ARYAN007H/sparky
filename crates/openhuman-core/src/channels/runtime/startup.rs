@@ -83,7 +83,7 @@ impl ChannelHandle {
             Self::Module(channel) => channel.capabilities(),
             Self::Relay(_) => tinychannels_bus::ChannelCapabilities::unknown(),
             #[cfg(test)]
-            Self::Test(channel) => tinychannels_bus::ChannelCapabilities::unknown(),
+            Self::Test(_channel) => tinychannels_bus::ChannelCapabilities::unknown(),
         }
     }
 

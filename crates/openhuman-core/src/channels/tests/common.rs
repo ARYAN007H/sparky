@@ -1,6 +1,6 @@
 use crate::channels::runtime::TestChannel;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::Duration;
 use tempfile::TempDir;
 use tinyinference_llm::message::{AssistantMessage, Message};
