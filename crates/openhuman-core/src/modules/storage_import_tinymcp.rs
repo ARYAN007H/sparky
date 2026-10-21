@@ -107,6 +107,9 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
                 }
                 let clients = data_dir.join(CLIENTS_DB);
                 let audit = data_dir.join(AUDIT_DB);
+                if !clients.exists() && !audit.exists() {
+                    return Ok(Outcome::NoSource);
+                }
                 let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || {
                     let servers = if clients.exists() {
                         read_servers(&clients)?
