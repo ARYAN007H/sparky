@@ -107,8 +107,8 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
     (profile, source)
 }
 
-#[test]
-fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
+#[tokio::test(flavor = "multi_thread")]
+async fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let home = tempfile::tempdir().unwrap();
     let (profile, source) = seed_existing_profile(home.path());
     let source_bytes = std::fs::read(&source).unwrap();
