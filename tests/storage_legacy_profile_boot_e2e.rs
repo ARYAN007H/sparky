@@ -98,6 +98,7 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
     let source = workspace.join("storage/storage.db");
     std::fs::write(&source, FIXTURE).unwrap();
     let conversations = workspace.join("memory/conversations");
+    std::fs::create_dir_all(&conversations).unwrap();
     std::fs::write(conversations.join("threads.jsonl"), THREAD_LOG).unwrap();
     (profile, source)
 }

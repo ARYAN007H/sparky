@@ -266,7 +266,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parent()
         .ok_or("storage.db output must have a parent directory")?
         .join("legacy-workspace/memory/conversations");
-    let thread_id = "fixture-thread";
     std::fs::create_dir_all(conversations.join("threads"))?;
     std::fs::write(
         conversations.join("threads.jsonl"),
