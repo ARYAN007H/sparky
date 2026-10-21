@@ -706,3 +706,6 @@ mod registry_test_support;
 
 #[path = "all_bound_registry_contract_tests.rs"]
 mod registry_contract_tests;
+
+#[path = "all_keyring_consent_controller_tests.rs"]
+mod keyring_consent_controller_tests;
