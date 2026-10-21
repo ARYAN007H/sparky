@@ -109,7 +109,7 @@
 
 use async_trait::async_trait;
 use openhuman_core::agent::harness::ParentExecutionContext;
-use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};
+use openhuman_core::agent::subagent_host::{OpenHumanSubagentHost, SubagentRunOptions};
 use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
 use openhuman_core::config::AgentConfig;
 use openhuman_core::integrations::composio::tools::ComposioListToolsTool;
@@ -420,7 +420,12 @@ async fn drive_subagent() {
     // The parent is an explicit value on the run options, not ambient state.
     let mut options = SubagentRunOptions::default();
     options.run_context.parent = Some(parent);
-    let _ = run_subagent(&def, "list available gmail actions", options).await;
+    let parent = options.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("composio-stack-regression-subagent"),
+    );
+    let _ = OpenHumanSubagentHost::new(def, options)
+        .run(&parent, "list available gmail actions".into())
+        .await;
     assert_eq!(
         executions.load(std::sync::atomic::Ordering::SeqCst),
         1,

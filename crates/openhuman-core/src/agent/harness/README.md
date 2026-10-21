@@ -63,8 +63,8 @@ recency belongs to ``OpenHumanRunExt` (agent/tinyagents/host/run_context.rs)`.
 
 Adjacent public surface that lives in sibling modules, not here:
 `OpenHumanSessionHost`/`SessionHostBuilder`/`TurnOverrides` and the `Agent`
-turn lifecycle are in `../session_host/`; `run_subagent`,
-`SubagentRunOptions`, `SubagentRunError` are in `../subagent_host/`;
+turn lifecycle are in `../session_host/`; `OpenHumanSubagentHost`,
+`SubagentRunOptions`, and `SubagentRunError` are in `../subagent_host/`;
 `LastTurnUsage`/`SubagentUsageEntry` are in [`../tinyagents/host/run_context.rs`](../tinyagents/host/run_context.rs).
 
 ## Dependencies

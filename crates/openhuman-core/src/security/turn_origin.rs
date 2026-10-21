@@ -289,7 +289,7 @@ pub async fn with_inherited_origin<F: std::future::Future>(
 /// when the returned future is first polled:
 ///
 /// ```ignore
-/// tokio::spawn(turn_origin::propagate(async move { run_subagent(..).await }));
+/// tokio::spawn(turn_origin::propagate(async move { prepared_host.run(&parent, input).await }));
 /// ```
 ///
 /// Fail-closed is preserved: with no ambient origin nothing is scoped, so the

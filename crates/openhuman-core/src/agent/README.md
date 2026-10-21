@@ -188,7 +188,7 @@ The `agent_id` argument selects an allowlisted `AgentDefinition`; the same
  orchestration/tools/spawn_subagent.rs
    | read ParentExecutionContext (run context `parent`, harness/fork_context.rs)
    v
- subagent_host::run_subagent_with_parent
+   registered async sub-agent dispatcher
    | resolve definition, model, narrowed tools, narrowed prompt,
    | workspace/sandbox, SubagentScope for progress
    v
