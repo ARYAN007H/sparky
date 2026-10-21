@@ -174,14 +174,17 @@ impl Deliverer {
     /// A deliverer that triages with `runner` under `ctx`, giving one triage
     /// `timeout`, and reads each lane's attempts from the configured queues.
     #[must_use]
+    /// It has no pinned sources unless given some ([`Self::with_inbound`]).
     pub fn new(runner: Arc<dyn TriageRunner>, ctx: DispatchCtx, timeout: Duration) -> Self {
         Self::build(runner, ctx, tokio::sync::OnceCell::new_with(Some(timeout)))
+            .with_inbound(InboundConfig::default())
     }
 
     /// A deliverer whose triage timeout is `[inbound] triage_timeout_ms`, read
     /// from `ctx`'s configuration on the first callback. Loading it when the
     /// callbacks are served instead would initialise a config file on a host
-    /// that never configured one.
+    /// that never configured one. Its pinned sources (`[inbound.sources.*]`)
+    /// are read the same way.
     #[must_use]
     pub fn configured(runner: Arc<dyn TriageRunner>, ctx: DispatchCtx) -> Self {
         Self::build(runner, ctx, tokio::sync::OnceCell::new())
