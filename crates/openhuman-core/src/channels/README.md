@@ -48,7 +48,7 @@ or shell-based substitute.
 | Path | Purpose |
 | --- | --- |
 | [`mod.rs`](./mod.rs) | Feature gates and the public channel contract exports. Concrete provider exports are test-only. |
-| [`traits.rs`](./traits.rs) | Portable message and send contracts re-exported from `tinychannels-bus`. |
+| [`tinychannels-bus channel contracts`](../../../../vendor/tinychannels/crates/tinychannels-bus/src/channel/) | Portable message and typed send contracts. |
 | [`controllers/`](./controllers/) | OpenHuman `channels.*` operations and host-side backend transport adaptation. |
 | [`host/`](./host/) | Typed module callbacks, event subscribers, and remote-control host operations. |
 | [`runtime/`](./runtime/README.md) | Module lease startup, account lifetime, and the OpenHuman dispatch pipeline. |
