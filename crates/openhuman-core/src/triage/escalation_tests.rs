@@ -166,10 +166,24 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         } if external_id == "esc-react-inline" && target_agent == "trigger_reactor"
     )));
 
-    let child_lifecycle = workspace.join(".openhuman/subagent_checkpoints");
+    let child_lifecycle = runtime
+        .run_in(
+            Arc::clone(runtime.context()),
+            async {
+                crate::storage::state_kv::StateKv::open(
+                    &workspace,
+                    "subagents",
+                    "lifecycle-neutral",
+                )
+                .expect("open scoped neutral subagent lifecycle records")
+                .list::<serde_json::Value>("record/")
+            },
+        )
+        .await
+        .expect("read scoped neutral subagent lifecycle records");
     assert!(
-        !child_lifecycle.exists(),
-        "a triage one-shot turn must not persist a child subagent lifecycle"
+        child_lifecycle.is_empty(),
+        "a triage one-shot turn must not persist a child subagent lifecycle: {child_lifecycle:?}"
     );
 }
 
