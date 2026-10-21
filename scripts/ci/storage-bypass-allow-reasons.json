@@ -49,27 +49,6 @@
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7430"
   },
   {
-    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/storage/fixtures/generate-31cc.rs",
-    "rule": "json-write",
-    "site": "std::fs::write(output, serde_json::to_vec_pretty(&collections).unwrap()).unwrap();",
-    "reason": "this maintainer fixture generator writes a checked-in TSD schema snapshot to its explicit output path; it does not persist runtime task state",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/8131"
-  },
-  {
-    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/storage/fixtures/generate-v2.9.1.rs",
-    "rule": "json-write",
-    "site": "std::fs::write(output, serde_json::to_vec_pretty(&collections).unwrap()).unwrap();",
-    "reason": "this maintainer fixture generator writes a checked-in TSD schema snapshot to its explicit output path; it does not persist runtime task state",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/8131"
-  },
-  {
-    "path": "vendor/tinyagents/crates/tinyagents-session/src/run_ledger/drivers/fixtures/generate-31cc.rs",
-    "rule": "json-write",
-    "site": "std::fs::write(output, serde_json::to_vec_pretty(&collections).unwrap()).unwrap();",
-    "reason": "this maintainer fixture generator writes a checked-in TSD schema snapshot to its explicit output path; it does not persist runtime session state",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/8131"
-  },
-  {
     "path": "crates/openhuman-core/src/desktop/control/ops.rs",
     "rule": "json-write",
     "site": "let mut temporary = tempfile::NamedTempFile::new_in(parent)",

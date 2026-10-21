@@ -270,7 +270,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_scope.documents(),
         "threads.transcript_keys",
         &Key::of([thread_id])?.as_str().to_owned(),
-        json!({"transcript_key": "fixture-transcript-key"}),
+        json!({"key": "fixture-transcript-key"}),
     )
     .await?;
 
