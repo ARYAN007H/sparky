@@ -1,7 +1,9 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 use crate::profiles::doctor::DoctorProfileState;
-use crate::storage::test_support::{memory_backend, sqlite_backend};
+use crate::storage::test_support::memory_backend;
+#[cfg(feature = "storage-sqlite")]
+use crate::storage::test_support::sqlite_backend;
 use crate::storage::{CollectionSpec, Scope};
 use std::collections::BTreeMap;
 
@@ -32,6 +34,7 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<std::path::PathBuf, Vec<u8>
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn inspecting_an_unprovisioned_profile_does_not_run_storage_migrations() {
     let tmp = tempfile::tempdir().unwrap();
     let fixture = sqlite_backend().unwrap();

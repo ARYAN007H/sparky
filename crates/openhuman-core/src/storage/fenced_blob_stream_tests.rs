@@ -1,5 +1,7 @@
 //! Streaming behavior of the lease-guarded v2 blob port.
 
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
 use crate::storage::fence::{fence_error, FenceError, FenceRegistry, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseStore};
@@ -13,8 +15,13 @@ async fn guarded_blobs(
 ) -> (crate::storage::test_support::SqliteBackend, GuardedBlobs) {
     let fixture = sqlite_backend().unwrap();
     let leases = Arc::new(
-        DocumentLeases::cluster(fixture.backend.as_ref(), "node-a", None, Duration::from_secs(30))
-            .unwrap(),
+        DocumentLeases::cluster(
+            fixture.backend.as_ref(),
+            "node-a",
+            None,
+            Duration::from_secs(30),
+        )
+        .unwrap(),
     );
     let grant = leases.acquire("alice", 0).await.unwrap();
     let fence = Arc::new(LeaseFence::new(
@@ -46,17 +53,16 @@ async fn guarded_blobs(
 async fn a_live_fence_forwards_streamed_blob_writes() {
     let now = Arc::new(AtomicU64::new(1));
     let (_fixture, blobs) = guarded_blobs(Arc::clone(&now)).await;
-    let reader = Box::pin(futures::stream::iter([Ok(bytes::Bytes::from_static(b"payload"))]));
+    let reader = Box::pin(futures::stream::iter([Ok(bytes::Bytes::from_static(
+        b"payload",
+    ))]));
 
     let meta = blobs
         .put_stream("live", reader, 7, Some("text/plain"))
         .await
         .unwrap();
     assert_eq!(meta.len, 7);
-    assert_eq!(
-        blobs.get("live").await.unwrap().unwrap().bytes,
-        b"payload"
-    );
+    assert_eq!(blobs.get("live").await.unwrap().unwrap().bytes, b"payload");
 }
 
 #[tokio::test]
@@ -78,5 +84,8 @@ async fn an_expired_fence_rejects_a_stream_before_polling_it() {
         .await
         .unwrap_err();
     assert_eq!(polls.load(Ordering::SeqCst), 0);
-    assert!(matches!(fence_error(&error), Some(FenceError::Expired { .. })));
+    assert!(matches!(
+        fence_error(&error),
+        Some(FenceError::Expired { .. })
+    ));
 }

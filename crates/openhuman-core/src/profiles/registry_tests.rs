@@ -1,5 +1,7 @@
 use super::*;
-use crate::storage::test_support::{memory_backend, sqlite_backend};
+use crate::storage::test_support::memory_backend;
+#[cfg(feature = "storage-sqlite")]
+use crate::storage::test_support::sqlite_backend;
 use tinystoragedrivers_types::{CollectionSpec, Precondition, Scope};
 
 fn meta(id: &str, created_at: u64) -> ProfileMeta {
@@ -95,21 +97,25 @@ async fn doctor_lookup_of_an_unknown_profile_does_not_declare_cluster_schema() {
         .unwrap()
         .is_none());
 
-    assert!(docs.documents()
+    assert!(docs
+        .documents()
         .validate_collection_spec(&registry_spec)
         .await
         .is_err());
-    assert!(docs.documents()
+    assert!(docs
+        .documents()
         .validate_collection_spec(&lease_spec)
         .await
         .is_err());
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn doctor_lookup_does_not_migrate_legacy_profile_or_lease_records() {
     let storage = sqlite_backend().unwrap();
     let registry = ProfileRegistry::cluster(storage.backend.as_ref()).unwrap();
-    let scoped = storage.backend
+    let scoped = storage
+        .backend
         .for_scope(&Scope::new(crate::storage::lease::CLUSTER_SCOPE).unwrap())
         .unwrap();
     let docs = scoped.documents();

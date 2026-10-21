@@ -1,8 +1,12 @@
 use super::*;
+#[cfg(feature = "storage-sqlite")]
 use crate::storage::test_support::sqlite_backend;
+#[cfg(feature = "storage-sqlite")]
 use crate::storage::Scope;
 use serde_json::json;
+#[cfg(feature = "storage-sqlite")]
 use std::sync::Arc;
+#[cfg(feature = "storage-sqlite")]
 use tinystoragedrivers::{Meta, Precondition};
 
 #[test]
