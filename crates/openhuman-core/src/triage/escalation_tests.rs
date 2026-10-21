@@ -352,6 +352,95 @@ async fn react_dispatch_preserves_the_parent_model_role_for_hint_targets() {
     }));
 }
 
+#[tokio::test]
+async fn react_dispatch_inherits_the_parent_workload_for_inherit_targets() {
+    let _events_guard = test_events_guard().await;
+    let temp = tempfile::tempdir().expect("isolated triage workspace");
+    let workspace = temp.path().join("workspace");
+    let mut config = Config {
+        workspace_dir: workspace.clone(),
+        config_path: temp.path().join("config.toml"),
+        action_dir: temp.path().join("actions"),
+        ..Config::default()
+    };
+    config.default_model = Some("hint:coding".to_string());
+    let runtime_config = config.clone();
+
+    let mut definitions = AgentDefinitionRegistry::builtins_only();
+    let mut definition = definitions
+        .get("trigger_reactor")
+        .expect("built-in trigger reactor exists")
+        .clone();
+    definition.id = "triage_inherit_model_test".to_string();
+    definition.model = tinyagents_definition::ModelSpec::Inherit;
+    definitions = definitions.with_definitions([definition]);
+    let definitions = Arc::new(definitions);
+
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let builds = Arc::new(Mutex::new(Vec::new()));
+    let extensions = crate::core::slots::Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        triage_test_model(Arc::clone(&requests), Arc::clone(&builds), None),
+    );
+    let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
+        .services(crate::core::runtime::ServiceSet::none())
+        .domains(crate::core::runtime::DomainSet::none())
+        .config(config)
+        .extensions(extensions)
+        .build()
+        .await
+        .expect("isolated core runtime");
+    let context = runtime.context().derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            runtime_config,
+            crate::core::runtime::DomainSet::none(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
+    );
+    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&context));
+    let envelope = envelope("esc-inherit-workload");
+    crate::core::bus::init().await.expect("bus init");
+
+    runtime
+        .run_in(
+            context,
+            crate::security::turn_origin::with_origin(
+                crate::triage::local_trigger_origin(),
+                apply_decision(
+                    &ctx,
+                    run_with_target(
+                        TriageAction::Escalate,
+                        "triage_inherit_model_test",
+                        "route this task with the inherited workload",
+                    ),
+                    &envelope,
+                ),
+            ),
+        )
+        .await
+        .expect("escalation should complete");
+
+    let requests = requests.lock().unwrap();
+    assert_eq!(
+        requests.len(),
+        1,
+        "the inherited target should reach the model"
+    );
+    assert_eq!(
+        requests[0].0, "coding",
+        "an Inherit target must retain its parent's workload role"
+    );
+    assert_eq!(requests[0].1, crate::config::MODEL_MANAGED_DEFAULT);
+    assert!(requests[0].2.messages.iter().any(|message| {
+        message
+            .text()
+            .contains("route this task with the inherited workload")
+    }));
+}
+
 /// The triage parent is the shared root context with one override: nested
 /// spawns scoped to the dispatched target. Guards the #4369 collapse against
 /// drift from `build_root_parent`.
