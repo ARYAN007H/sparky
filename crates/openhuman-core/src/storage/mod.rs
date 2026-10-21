@@ -26,18 +26,30 @@
 
 pub mod agents;
 pub mod blob_sweep;
+pub mod boot;
 pub mod config;
 pub mod documents;
 pub mod fence;
 pub mod fenced_backend;
+mod host_importers;
 pub mod import;
-pub mod import_claim;
+pub mod import_state;
+pub mod journal_maintenance;
+pub mod layout;
 pub mod lease;
 mod lease_documents;
 mod lease_local;
 pub mod local;
 pub mod rebind;
+pub mod schema;
+pub mod schema_support;
+pub mod scope;
+pub mod scope_move;
 pub mod secrets;
+pub mod sessions;
+pub mod state_kv;
+
+pub use scope::{scope_for_agent, scope_for_module, scope_for_profile, tenant_scope};
 
 use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
@@ -162,9 +174,18 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
     );
     // Every opened backend checks the process's lease fences on write; with
     // no fence registered (every single-user host) that is a pass-through.
-    Ok(fenced_backend::wrap(
-        tinystoragedrivers::open(&parsed).await?,
-    ))
+    let backend = tinystoragedrivers::open(&parsed).await?;
+    // Schema, scope move and migrations run on the raw backend, before any
+    // lease fence exists to refuse them.
+    let report = boot::prepare_and_migrate(&backend).await?;
+    if !report.failures.is_empty() {
+        tracing::warn!(
+            target: "openhuman::storage",
+            failures = report.failures.len(),
+            "[storage] opened with unfinished migrations; they retry at the next boot"
+        );
+    }
+    Ok(fenced_backend::wrap(backend))
 }
 
 /// Makes `backend` the process's storage backend; returns the previous one.
@@ -301,12 +322,23 @@ pub fn driver_is_shared(driver: &str) -> bool {
     driver == "mongodb"
 }
 
-/// Whether a backend with this driver name makes a compare-and-swap
+/// Whether an opened backend makes a compare-and-swap
 /// (`Precondition::Version` / `Absent`) atomic across processes, which a
-/// [`lease::DocumentLeases`] needs to exclude other nodes. MongoDB and SQLite
-/// do (a database-side conditional write; SQLite's immediate transaction
-/// under the file lock); the memory driver lives in one process, and the
-/// file driver checks versions in-process only.
+/// [`lease::DocumentLeases`] needs to exclude other nodes. The driver says so
+/// itself with [`tinystoragedrivers::Capability::SharedAcrossProcesses`], and
+/// tinystoragedrivers' `conformance::run_shared` proves the claim per driver.
+pub fn backend_has_cross_process_cas(backend: &dyn StorageBackend) -> bool {
+    backend
+        .capabilities()
+        .contains(tinystoragedrivers::Capability::SharedAcrossProcesses)
+}
+
+/// The same answer from a driver name alone, for the boot guard, which judges
+/// a configured URL before anything is opened (so it has no backend to ask).
+/// It must agree with [`backend_has_cross_process_cas`]: MongoDB and SQLite
+/// claim `SharedAcrossProcesses`; the memory driver lives in one process and
+/// the file driver checks versions in-process only. A test opens a real
+/// backend per driver and pins the two together.
 pub fn driver_has_cross_process_cas(driver: &str) -> bool {
     matches!(driver, "mongodb" | "sqlite")
 }
@@ -315,29 +347,6 @@ pub fn driver_has_cross_process_cas(driver: &str) -> bool {
 /// when none is installed. See [`driver_is_shared`].
 pub fn installed_is_shared() -> bool {
     installed().is_some_and(|backend| driver_is_shared(backend.driver()))
-}
-
-/// The storage scope agent `agent_id`'s records live under — the same
-/// mapping the session store uses, so every domain agrees on it.
-pub fn scope_for_agent(agent_id: &str) -> Scope {
-    tinyagents_session::DriverSessionStores::scope_for(agent_id)
-}
-
-/// The storage scope profile `profile_id`'s records live under:
-/// `profile:<id>`, or `profile-sha256:<hex of the id>` when that is not a
-/// valid scope (too long, whitespace, control characters). Injective: a
-/// literal scope always starts with `profile:`, a hashed one never does, and
-/// two distinct profiles never share either form.
-pub fn scope_for_profile(profile_id: &str) -> Scope {
-    const PREFIX: &str = "profile:";
-    let literal = format!("{PREFIX}{profile_id}");
-    if let Ok(scope) = Scope::new(&literal) {
-        return scope;
-    }
-    use sha2::Digest;
-    let digest = sha2::Sha256::digest(profile_id.as_bytes());
-    Scope::new(format!("profile-sha256:{}", hex::encode(digest)))
-        .unwrap_or_else(|_| unreachable!("a sha256 hex scope is always valid"))
 }
 
 /// A stable key for a legacy import source (a workspace directory), for the
@@ -353,3 +362,7 @@ pub fn source_key(source: &std::path::Path) -> String {
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "host_migration_tests.rs"]
+mod host_migration_tests;

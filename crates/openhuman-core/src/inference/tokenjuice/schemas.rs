@@ -69,8 +69,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
         "detect" => ControllerSchema {
             namespace: "tokenjuice",
             function: "detect",
-            description:
-                "Detect the content kind of a blob (json/code/log/search/diff/html/plain_text).",
+            description: "Detect the content kind of a blob (json/code/log/search/diff/html/plain_text).",
             inputs: vec![
                 FieldSchema {
                     name: "content",
@@ -265,12 +264,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
 // ── Handlers ─────────────────────────────────────────────────────────
 
 /// Refuse with the typed `COMPONENT_DISABLED:juice` error while `[components]
-/// juice` is off. Read from the ambient core context (set at boot); a call with
-/// no context is on, since the set only narrows.
-fn gate() -> Result<(), String> {
-    let on = crate::core::runtime::context::CoreContext::current()
-        .is_none_or(|ctx| ctx.components().juice);
-    if on {
+/// juice` is off for the context the call runs under; a call with no context
+/// is on, since the set only narrows.
+fn gate(ctx: &DispatchCtx) -> Result<(), String> {
+    if ctx.components().juice {
         Ok(())
     } else {
         log::debug!("[tokenjuice][rpc] refused, component 'juice' disabled");
@@ -282,9 +279,9 @@ fn str_param(params: &Map<String, Value>, key: &str) -> Option<String> {
     params.get(key).and_then(Value::as_str).map(str::to_string)
 }
 
-fn handle_detect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_detect(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         let content = str_param(&params, "content").ok_or("missing 'content'")?;
         let hint = ContentHint {
             source_tool: str_param(&params, "tool_name"),
@@ -331,9 +328,9 @@ fn compress_hint_from_params(params: &Map<String, Value>) -> Result<ContentHint,
     })
 }
 
-fn handle_compress(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_compress(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         let content = str_param(&params, "content").ok_or("missing 'content'")?;
         let hint = compress_hint_from_params(&params)?;
         let res = super::compress(content, hint).await?;
@@ -350,17 +347,17 @@ fn handle_compress(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerF
     })
 }
 
-fn handle_cache_stats(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_cache_stats(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         let stats = super::cache_stats().await?;
         Ok(serde_json::json!({ "entries": stats.entries, "bytes": stats.bytes }))
     })
 }
 
-fn handle_retrieve(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_retrieve(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         let token = str_param(&params, "token").ok_or("missing 'token'")?;
         match super::retrieve(token, None).await? {
             Some(content) => Ok(serde_json::json!({ "found": true, "content": content })),
@@ -371,7 +368,7 @@ fn handle_retrieve(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerF
 
 fn handle_settings_get(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         let config = ctx
             .load_config()
             .await
@@ -384,7 +381,7 @@ fn handle_settings_get(ctx: DispatchCtx, _params: Map<String, Value>) -> Control
 
 fn handle_settings_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         // Accept either {"patch": {...}} or a bare object of fields.
         let patch = params
             .get("patch")
@@ -398,10 +395,9 @@ fn handle_settings_update(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
             .await
             .map_err(|e| format!("load config: {e}"))?;
         patch.apply(&mut config.tokenjuice);
-        config
-            .save()
-            .await
-            .map_err(|e| format!("save config: {e}"))?;
+        config.save().await.map_err(|error| {
+            crate::config::ops::config_save_error_with_context(error, "save config", true)
+        })?;
 
         // Re-install so router flags / CCR limits / threshold take effect live.
         crate::inference::tokenjuice::install_from_config(&config).await?;
@@ -414,7 +410,7 @@ fn handle_settings_update(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 
 fn handle_savings_stats(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         let cache = super::cache_stats().await?;
         let config = ctx.load_config().await.map_err(|e| e.to_string())?;
         super::install_from_config(&config).await?;
@@ -431,7 +427,7 @@ fn handle_savings_stats(ctx: DispatchCtx, _params: Map<String, Value>) -> Contro
 
 fn handle_savings_reset(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        gate()?;
+        gate(&ctx)?;
         let config = ctx.load_config().await.map_err(|e| e.to_string())?;
         super::install_from_config(&config).await?;
         super::savings::reset(&super::client(&config)).await?;

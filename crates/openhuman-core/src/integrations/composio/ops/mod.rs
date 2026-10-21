@@ -34,6 +34,10 @@ mod triggers;
 
 // ── Public re-exports (match original ops.rs public surface) ───────────────
 
+#[cfg(feature = "flows")]
+pub(crate) use connections::flow_connection_entries;
+#[cfg(all(test, feature = "flows"))]
+pub(crate) use connections::title_case_toolkit;
 pub use connections::{
     active_connection_ids, composio_authorize, composio_delete_connection,
     composio_list_connections, ComposioDeleteResult,
@@ -79,7 +83,7 @@ pub(crate) use super::connected_integrations::cache_key;
 #[cfg(test)]
 pub(crate) use super::connected_integrations::{CachedIntegrations, INTEGRATIONS_CACHE};
 #[cfg(test)]
-pub(crate) use crate::agent::prompts::ConnectedIntegration;
+pub(crate) use crate::integrations::ConnectedIntegration;
 #[cfg(test)]
 pub(crate) use std::time::{Duration, Instant};
 

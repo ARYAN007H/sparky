@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 
-use super::loader::{load_config_with_timeout, snapshot_config_json};
+use super::loader::snapshot_config_json;
 
 /// Partial update for the `[security.sandbox]` + `[runtime.docker]` blocks.
 #[derive(Debug, Clone, Default)]
@@ -105,7 +105,7 @@ pub async fn apply_sandbox_settings(
         );
     }
 
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
 
     log::debug!(
         "[config][sandbox] sandbox settings saved to {}",

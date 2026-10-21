@@ -15,6 +15,8 @@ pub use tinychannels_bus::{Channel, ChannelSendExt, SendMessage};
 #[cfg(feature = "channels")]
 pub mod bus;
 #[cfg(feature = "channels")]
+pub mod callback_slot;
+#[cfg(feature = "channels")]
 mod commands;
 #[cfg(feature = "channels")]
 pub(crate) use commands::{configured_providers, has_listener_configuration};
@@ -26,6 +28,7 @@ pub mod controllers;
 pub mod host;
 #[cfg(feature = "channels")]
 pub mod proactive;
+pub(crate) mod prompt;
 #[cfg(feature = "channels")]
 pub mod providers;
 #[cfg(feature = "channels")]
@@ -68,10 +71,6 @@ pub use providers::slack;
 #[cfg(all(feature = "channels", test))]
 pub use providers::telegram;
 #[cfg(all(feature = "channels", test))]
-pub use providers::whatsapp;
-#[cfg(all(feature = "whatsapp-web", test))]
-pub use providers::whatsapp_web;
-#[cfg(all(feature = "channels", test))]
 pub use providers::yuanbao;
 
 #[cfg(all(feature = "channels", test))]
@@ -99,24 +98,20 @@ pub use slack::SlackChannel;
 #[cfg(all(feature = "channels", test))]
 pub use telegram::TelegramChannel;
 #[cfg(all(feature = "channels", test))]
-pub use whatsapp::WhatsAppChannel;
-#[cfg(all(feature = "whatsapp-web", test))]
-pub use whatsapp_web::WhatsAppWebChannel;
-#[cfg(all(feature = "channels", test))]
 pub use yuanbao::YuanbaoChannel;
 
 #[cfg(all(feature = "channels", any(test, debug_assertions)))]
 pub use runtime::test_support;
 
 #[cfg(feature = "channels")]
+pub use commands::doctor_channels;
+#[cfg(feature = "channels")]
 // Channel system-prompt assembly lives in
-// `crate::agent::context::channels_prompt` alongside the rest of
+// `crate::channels::prompt` alongside the rest of
 // the prompt-building code. Re-exported here for callers that used the
 // old `channels::build_system_prompt` path.
 #[cfg(feature = "channels")]
-pub use crate::agent::context::channels_prompt::build_system_prompt;
-#[cfg(feature = "channels")]
-pub use commands::doctor_channels;
+pub use prompt::build_system_prompt;
 #[cfg(feature = "channels")]
 pub use runtime::start_channels;
 #[cfg(feature = "channels")]

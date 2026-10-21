@@ -38,9 +38,10 @@ pub struct WorkflowRunStarted {
 /// missing required inputs) surface as `Err(String)` *before* the spawn so
 /// callers can reject malformed invocations synchronously.
 pub async fn spawn_workflow_run_background(
+    ctx: &crate::core::runtime::DispatchCtx,
     skill_id_param: String,
     inputs_param: Option<Value>,
-    parent_origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+    parent_origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
 ) -> Result<WorkflowRunStarted, String> {
     let workspace = resolve_workspace_dir().await;
     let skill = registry::get_workflow(&workspace, &skill_id_param)
@@ -150,13 +151,14 @@ pub async fn spawn_workflow_run_background(
     // immediately. Same flow handle_skills_run used to inline — extracted
     // so the `run_workflow` agent tool can re-use it for skill chaining.
     let inherited_origin =
-        parent_origin.unwrap_or(crate::agent::turn_origin::AgentTurnOrigin::Unknown);
+        parent_origin.unwrap_or(crate::security::turn_origin::AgentTurnOrigin::Unknown);
     {
         let run_id = run_id.clone();
         let workflow_id = workflow_id.clone();
         let inputs = inputs.clone();
         let log_path = log_path.clone();
         let inherited_origin = inherited_origin.clone();
+        let ctx = ctx.clone();
         tokio::spawn(async move {
             if let Err(e) =
                 run_log::write_header(&log_path, &workflow_id, &run_id, &inputs, &task_prompt).await
@@ -183,7 +185,7 @@ pub async fn spawn_workflow_run_background(
                 config.http_request.allowed_domains = vec!["*".to_string()];
             }
             let mut agent =
-                match OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator") {
+                match OpenHumanSessionHost::from_config_for_agent(&ctx, &config, "orchestrator") {
                     Ok(a) => a,
                     Err(e) => {
                         let _ = run_log::write_footer(
@@ -237,7 +239,7 @@ pub async fn spawn_workflow_run_background(
             let result = tokio::select! {
                 biased;
                 _ = cancel_token.cancelled() => None,
-                r = crate::agent::turn_origin::with_origin(
+                r = crate::security::turn_origin::with_origin(
                     inherited_origin,
                     agent.run_single(&task_prompt),
                 ) => Some(r),

@@ -88,7 +88,12 @@ fn prose(history: &[TranscriptEntry]) -> Vec<String> {
 }
 
 pub(super) fn host_seeded_with(config: &Config, marker: &str) -> OpenHumanSessionHost {
-    let mut host = OpenHumanSessionHost::from_config_for_agent(config, "orchestrator").unwrap();
+    let mut host = OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        "orchestrator",
+    )
+    .unwrap();
     host.seed_resume_from_messages(
         vec![
             ("user".to_string(), marker.to_string()),
@@ -547,7 +552,7 @@ fn fingerprint_diff_reports_every_differing_field() {
 #[test]
 fn chat_agent_id_selects_the_web_chat_agent_and_defaults_to_the_orchestrator() {
     use super::pick_target_agent_id;
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
 
     let mut config = crate::config::Config::default();

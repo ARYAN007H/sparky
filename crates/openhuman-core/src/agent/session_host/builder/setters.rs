@@ -79,13 +79,12 @@ impl SessionHostBuilder {
     /// inject a mock they observe.
     pub fn crate_native_provider(
         mut self,
+        ctx: &crate::core::runtime::DispatchCtx,
         role: impl Into<String>,
         config: Arc<crate::config::Config>,
     ) -> Self {
         self.turn_model_source = Some(crate::agent::tinyagents::TurnModelSource::new_crate_native(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            role,
-            config,
+            ctx, role, config,
         ));
         self
     }
@@ -165,10 +164,8 @@ impl SessionHostBuilder {
         self
     }
 
-    /// Sets the global context-management configuration. Threaded
-    /// into the [`ContextManager`] constructed in [`Self::build`]. If
-    /// not set the manager is constructed with
-    /// [`ContextConfig::default`].
+    /// Sets the context middleware configuration used by this session. If
+    /// unset, [`ContextConfig::default`] applies.
     pub fn context_config(mut self, context_config: ContextConfig) -> Self {
         self.context_config = Some(context_config);
         self
@@ -234,7 +231,7 @@ impl SessionHostBuilder {
     /// Sets the post-turn hooks to be executed after each turn.
     pub fn post_turn_hooks(
         mut self,
-        hooks: Vec<Arc<dyn crate::agent::hooks::PostTurnHook>>,
+        hooks: Vec<Arc<dyn tinyagents_harness::host::LearningSink>>,
     ) -> Self {
         self.post_turn_hooks = hooks;
         self
@@ -333,7 +330,7 @@ impl SessionHostBuilder {
     /// [`OpenHumanDefinitionRegistry::with_session_definition`]: crate::agent::tinyagents::host::OpenHumanDefinitionRegistry::with_session_definition
     pub fn agent_definition(
         mut self,
-        definition: Arc<crate::agent::harness::host_definition::AgentDefinition>,
+        definition: Arc<crate::agent_registry::host_definition::AgentDefinition>,
     ) -> Self {
         self.session_definition = Some(definition);
         self

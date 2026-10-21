@@ -5,7 +5,8 @@
 
 use super::*;
 use crate::agent::orchestration::background_completions::{
-    pending_for, record_completion, router_for_workspace, TestWorkspace,
+    pending_for_ctx, record_completion, router_for_workspace, router_for_workspace_ctx,
+    TestWorkspace,
 };
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::{ContextOverlay, DomainSet};
@@ -48,19 +49,19 @@ async fn pair() -> Pair {
     let thread = unique("t");
     let session = web_session(&thread);
     for (ctx, ws, task) in [(&alice, &ws_a, "task-alice"), (&bob, &ws_b, "task-bob")] {
-        CoreContext::scope(
-            Arc::clone(ctx),
+        {
+            let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(ctx));
             record_completion(
-                &DispatchCtx::ambient(),
+                &scope_ctx,
                 ws.path(),
                 &session,
                 task,
                 "researcher",
                 "done",
                 Some(thread.clone()),
-            ),
-        )
-        .await;
+            )
+            .await
+        };
     }
     Pair {
         alice,
@@ -92,7 +93,8 @@ async fn one_profiles_busy_turn_does_not_block_anothers_thread() {
         &DispatchCtx::ambient(),
         &p.thread
     )));
-    let router_b = router_for_workspace(p.ws_b.path());
+    let bob_ctx = DispatchCtx::new(Arc::clone(&p.bob));
+    let router_b = router_for_workspace_ctx(&bob_ctx, p.ws_b.path());
     let batch = in_scope(&p.bob, || {
         claim_ready(&DispatchCtx::ambient(), &router_b, &p.thread)
     })
@@ -124,9 +126,13 @@ async fn one_profiles_busy_turn_does_not_block_anothers_thread() {
 async fn a_delivery_in_flight_for_one_profile_does_not_take_anothers_slot() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
     let p = pair().await;
+    let (alice_ctx, bob_ctx) = (
+        DispatchCtx::new(Arc::clone(&p.alice)),
+        DispatchCtx::new(Arc::clone(&p.bob)),
+    );
     let (router_a, router_b) = (
-        router_for_workspace(p.ws_a.path()),
-        router_for_workspace(p.ws_b.path()),
+        router_for_workspace_ctx(&alice_ctx, p.ws_a.path()),
+        router_for_workspace_ctx(&bob_ctx, p.ws_b.path()),
     );
 
     let held = in_scope(&p.alice, || {
@@ -171,32 +177,28 @@ async fn a_delivery_in_flight_for_one_profile_does_not_take_anothers_slot() {
         let (thread, router_bob, bob_log) = (thread.clone(), router_bob.clone(), bob_log.clone());
         let alice_log = log("alice");
         async move {
-            let retry = CoreContext::scope(
-                bob,
-                try_deliver_with(
-                    &DispatchCtx::ambient(),
-                    thread,
-                    router_bob,
-                    bob_log,
-                    |_t, _n| async { unreachable!("bob's delivery succeeds") },
-                ),
-            )
-            .await;
+            let retry = {
+                let scope_ctx = crate::core::runtime::DispatchCtx::new(bob);
+                try_deliver_with(&scope_ctx, thread, router_bob, bob_log, |_t, _n| async {
+                    unreachable!("bob's delivery succeeds")
+                })
+                .await
+            };
             assert_eq!(retry, None);
             alice_log(thread_a, notice).await
         }
     };
-    let retry = CoreContext::scope(
-        Arc::clone(&p.alice),
+    let retry = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&p.alice));
         try_deliver_with(
-            &DispatchCtx::ambient(),
+            &scope_ctx,
             p.thread.clone(),
             router_a,
             alice_deliver,
             |_t, _n| async { unreachable!("alice's delivery succeeds") },
-        ),
-    )
-    .await;
+        )
+        .await
+    };
     assert_eq!(retry, None);
 
     let delivered = delivered.lock().unwrap().clone();
@@ -205,8 +207,8 @@ async fn a_delivery_in_flight_for_one_profile_does_not_take_anothers_slot() {
     assert!(delivered[0].1.contains("task-bob") && !delivered[0].1.contains("task-alice"));
     assert_eq!(delivered[1].0, format!("alice:{}", p.thread));
     assert!(delivered[1].1.contains("task-alice") && !delivered[1].1.contains("task-bob"));
-    assert!(pending_for(p.ws_a.path(), &p.thread).is_empty());
-    assert!(pending_for(p.ws_b.path(), &p.thread).is_empty());
+    assert!(pending_for_ctx(&alice_ctx, p.ws_a.path(), &p.thread).is_empty());
+    assert!(pending_for_ctx(&bob_ctx, p.ws_b.path(), &p.thread).is_empty());
 }
 
 #[tokio::test]

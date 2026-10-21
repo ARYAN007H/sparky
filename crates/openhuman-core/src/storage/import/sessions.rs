@@ -14,11 +14,11 @@
 //!   opened read-only.
 //! - **Whose sessions.** The workspace belongs to the operator. The run
 //!   ledger and the turn states land in the operator's default agent
-//!   ([`DEFAULT_AGENT`](crate::agent::session_store::DEFAULT_AGENT)), where
+//!   ([`DEFAULT_AGENT`](crate::storage::sessions::DEFAULT_AGENT)), where
 //!   the desktop's own work resolves them. A transcript stem names the agent
 //!   definition that wrote it, but only as a digest, so each stem is matched
 //!   against the digests of the known definitions
-//!   ([`crate::agent::harness::host_definition::AgentDefinitionRegistry`]) and
+//!   ([`crate::agent_registry::host_definition::AgentDefinitionRegistry`]) and
 //!   imported into that definition's scope, which is where the session host
 //!   resumes it. A stem that matches none lands in the default agent.
 //! - **Once.** A marker (like the other domains') is written when the whole
@@ -33,16 +33,17 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tinyagents_session::legacy::{
-    import_transcripts, import_turn_states, QuiescentSource, SourceOwner,
+    import_transcripts, import_turn_states, ImportCounts, LegacyDatabaseReport, QuiescentSource,
+    SourceOwner,
 };
 use tinyagents_session::transcript::{session_stem, SessionRef};
 use tinyagents_session::DriverSessionStores;
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
-use crate::agent::session_store::DEFAULT_AGENT;
 use crate::config::Config;
-use crate::storage::StorageBackend;
+use crate::storage::sessions::DEFAULT_AGENT;
+use crate::storage::{Scope, StorageBackend};
 
 /// The marker name of the session import.
 pub const SESSIONS_DOMAIN: &str = "sessions";
@@ -67,7 +68,7 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
         if !db.is_file() && !raw.is_dir() && !turns.is_dir() {
             return Ok(None);
         }
-        let provider = DriverSessionStores::new(Arc::clone(backend))
+        let provider = DriverSessionStores::new(Arc::clone(backend), Scope::local())
             .map_err(|error| anyhow::anyhow!("start the session store bridge: {error}"))?
             .recover_on_open(false);
         let mut found = 0usize;
@@ -88,23 +89,9 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
                 Ok(ledger.import_legacy_database(&source).await)
             })?
             .context("[sessions] import sessions.db")?;
-            for counts in [
-                report.sessions,
-                report.messages,
-                report.tool_calls,
-                report.agent_runs,
-                report.telemetry,
-                report.events,
-                report.workflow_runs,
-                report.teams,
-                report.members,
-                report.tasks,
-                report.tool_effects,
-                report.entries,
-            ] {
-                found += counts.read;
-                written += counts.imported;
-            }
+            let (database_found, database_written) = database_totals(&report);
+            found += database_found;
+            written += database_written;
         }
 
         if raw.is_dir() {
@@ -128,17 +115,40 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
     })
 }
 
+/// The native importer reports source rows per stored family. FTS rows are a
+/// derived index and do not represent additional legacy records.
+fn database_totals(report: &LegacyDatabaseReport) -> (usize, usize) {
+    [
+        report.sessions,
+        report.messages,
+        report.tool_calls,
+        report.agent_runs,
+        report.telemetry,
+        report.events,
+        report.workflow_runs,
+        report.teams,
+        report.members,
+        report.tasks,
+        report.tool_effects,
+    ]
+    .into_iter()
+    .fold(
+        (0, 0),
+        |(found, written), ImportCounts { read, imported, .. }| (found + read, written + imported),
+    )
+}
+
 /// The agent definitions a stem may belong to, by the component their ids
 /// encode to in a stem.
 fn known_agents() -> HashMap<String, String> {
     let mut ids: Vec<String> =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
             .list()
             .iter()
             .map(|def| def.id.clone())
             .collect();
     if let Some(current) =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
     {
         ids.extend(current.list().iter().map(|def| def.id.clone()));
     }

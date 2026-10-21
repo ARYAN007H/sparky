@@ -9,10 +9,10 @@
 
 use crate::config::Config;
 use {
-    crate::cron, tinyflows_schedule::types::delivery_mode, tinyflows_schedule::types::CronJob,
-    tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::JobOrigin,
-    tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget,
-    tinyflows_schedule::validation, tinyflows_schedule::AgentJobSpec,
+    crate::cron, tinyflows_bus::schedule::types::delivery_mode,
+    tinyflows_bus::schedule::types::CronJob, tinyflows_bus::schedule::types::DeliveryConfig,
+    tinyflows_bus::schedule::types::JobOrigin, tinyflows_bus::schedule::types::Schedule,
+    tinyflows_bus::schedule::types::SessionTarget, tinyflows_bus::schedule::AgentJobSpec,
 };
 
 /// What an agent job creation request carries; everything defaults.
@@ -46,9 +46,9 @@ fn allowed_users_for_channel<'a>(config: &'a Config, channel: &str) -> Option<&'
 }
 
 /// Validate `delivery` at creation time: the module rules
-/// (`tinyflows_schedule::validation::validate_delivery`) plus the channel's
+/// (the module's `ValidateDelivery`) plus the channel's
 /// configured `allowed_users`, which only the host knows.
-fn validate_delivery_for_config(
+pub(crate) fn validate_delivery_for_config(
     config: &Config,
     delivery: &DeliveryConfig,
     origin: Option<&JobOrigin>,
@@ -57,7 +57,67 @@ fn validate_delivery_for_config(
         .channel
         .as_deref()
         .and_then(|channel| allowed_users_for_channel(config, channel));
-    validation::validate_delivery(delivery, origin, allowed)
+    let (delivery, origin) = (delivery.clone(), origin.cloned());
+    let allowed = allowed.map(<[String]>::to_vec);
+    cron::client::blocking(config, move |config| async move {
+        cron::client::validate_delivery(&config, &delivery, origin.as_ref(), allowed.as_deref())
+            .await
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// Validate the module's delivery shape against the origin the job will
+/// actually store, then authorize any channel destination using only a
+/// verified current turn. A persisted or request-supplied channel origin may
+/// describe routing, but it cannot prove that the caller is allowed to route
+/// there.
+pub(crate) fn validate_delivery_for_config_with_trusted_origin(
+    config: &Config,
+    delivery: &DeliveryConfig,
+    effective_origin: Option<&JobOrigin>,
+    trusted_origin: Option<&JobOrigin>,
+) -> Result<(), String> {
+    let mode = delivery.mode.trim();
+    if mode.eq_ignore_ascii_case(delivery_mode::ANNOUNCE) {
+        // Announce has an explicit destination. Let the validator's exemption
+        // see only the verified turn, never the job's mutable origin field.
+        return validate_delivery_for_config(config, delivery, trusted_origin);
+    }
+
+    validate_delivery_for_config(config, delivery, effective_origin)?;
+
+    if mode.eq_ignore_ascii_case(delivery_mode::ORIGIN) {
+        if let Some(JobOrigin::Channel {
+            channel,
+            reply_target,
+            ..
+        }) = effective_origin
+        {
+            if channel_target_matches(trusted_origin, channel, reply_target) {
+                return Ok(());
+            }
+            // Origin delivery has no explicit `channel`/`to` fields, so
+            // project its effective destination through the same module
+            // validation and host allowlist used by announce delivery.
+            let projected = DeliveryConfig {
+                mode: delivery_mode::ANNOUNCE.to_string(),
+                channel: Some(channel.clone()),
+                to: Some(reply_target.clone()),
+                best_effort: delivery.best_effort,
+            };
+            validate_delivery_for_config(config, &projected, None)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn channel_target_matches(origin: Option<&JobOrigin>, channel: &str, target: &str) -> bool {
+    matches!(origin,
+        Some(JobOrigin::Channel { channel: trusted_channel, reply_target, .. })
+            if trusted_channel.trim().eq_ignore_ascii_case(channel.trim())
+                && reply_target == target
+    )
 }
 
 /// Create an agent job from the current turn.
@@ -79,12 +139,32 @@ pub fn create_agent_job(
     } else {
         SessionTarget::Isolated
     });
-    let delivery = input
-        .delivery
-        .unwrap_or_else(|| validation::default_delivery(origin.as_ref()));
+    let delivery = match input.delivery {
+        Some(delivery) => delivery,
+        None => {
+            let origin = origin.clone();
+            cron::client::blocking(config, move |config| async move {
+                cron::client::default_delivery(&config, origin.as_ref()).await
+            })
+            .map_err(|e| e.to_string())?
+        }
+    };
 
     validate_delivery_for_config(config, &delivery, origin.as_ref())?;
-    validation::check_origin_requirements(&session_target, &delivery, origin.as_ref())?;
+    {
+        let (session_target, delivery, origin) =
+            (session_target.clone(), delivery.clone(), origin.clone());
+        cron::client::blocking(config, move |config| async move {
+            cron::client::check_origin_requirements(
+                &config,
+                &session_target,
+                &delivery,
+                origin.as_ref(),
+            )
+            .await
+        })
+        .map_err(|e| e.to_string())?;
+    }
 
     let uses_origin = matches!(session_target, SessionTarget::Current)
         || delivery

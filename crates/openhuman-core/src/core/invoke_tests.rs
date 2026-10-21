@@ -68,16 +68,16 @@ async fn gated_method_is_unknown_at_transport_even_with_malformed_params() {
 
     for params in [json!({}), json!({ "obviously_not_a_real_param_xyz": true })] {
         let ctx = CoreContext::for_test(DomainSet::harness(), None);
-        let err = CoreContext::scope(
-            ctx,
+        let err = {
+            let scope_ctx = crate::core::runtime::DispatchCtx::new(ctx);
             invoke_method(
-                DispatchCtx::ambient(),
+                scope_ctx.clone(),
                 default_state(),
                 &gated_method,
                 params.clone(),
-            ),
-        )
-        .await
+            )
+            .await
+        }
         .expect_err("gated flows method must error under harness()");
         assert!(
             err.contains("unknown method"),
@@ -274,6 +274,30 @@ async fn invoke_method_unknown_method_returns_unknown_error() {
     .await
     .expect_err("unknown methods must error");
     assert!(err.contains("unknown method"));
+}
+
+#[tokio::test]
+async fn invoke_retired_dictation_settings_method_returns_unknown_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.config_path = tmp.path().join("config.toml");
+    config.workspace_dir = tmp.path().join("workspace");
+    let ctx = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+    let err = invoke_method(
+        DispatchCtx::new(ctx),
+        default_state(),
+        "openhuman.config_get_dictation_settings",
+        json!({}),
+    )
+    .await
+    .expect_err("retired dictation settings method must be unknown");
+    assert!(
+        err.starts_with(crate::core::dispatch::UNKNOWN_METHOD_PREFIX),
+        "got: {err}"
+    );
 }
 
 #[tokio::test]

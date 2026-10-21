@@ -20,6 +20,7 @@ fn prompt_builder_assembles_sections() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
     let rendered = SystemPromptBuilder::with_defaults().build(&ctx).unwrap();
     assert!(rendered.contains("## Tools"));
@@ -46,6 +47,7 @@ fn grounding_contract_appended_to_every_build_path() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
 
     // A distinctive clause from GROUNDING_BODY — present regardless of which
@@ -134,6 +136,7 @@ fn identity_section_creates_missing_workspace_files() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
 
     let section = IdentitySection;
@@ -165,8 +168,6 @@ fn identity_section_creates_missing_workspace_files() {
         include_str!("SOUL.md"),
         "seeded SOUL.md must be the checked-in template verbatim"
     );
-
-    let _ = std::fs::remove_dir_all(workspace);
 }
 
 #[test]
@@ -211,6 +212,7 @@ fn datetime_section_is_static_grounding_rule_without_volatile_timestamp() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
 
     let rendered = DateTimeSection.build(&ctx).unwrap();
@@ -239,7 +241,7 @@ fn current_datetime_line_is_fresh_local_stamp() {
     // The per-turn stamp carries a parseable local date, IANA zone (or the
     // `UTC` fallback), a UTC offset, and the weekday — everything the model
     // needs to localize a greeting without a tool call (#3602).
-    let line = super::super::current_datetime_line(None);
+    let line = crate::prompts::current_datetime_line(None);
     let rest = line
         .strip_prefix("Current Date & Time: ")
         .unwrap_or_else(|| panic!("stamp must start with canonical prefix: {line}"));
@@ -260,7 +262,7 @@ fn current_datetime_line_is_fresh_local_stamp() {
 /// does not know falls back to the device stamp rather than echoing it.
 #[test]
 fn current_datetime_line_is_stamped_in_the_users_zone() {
-    let line = super::super::current_datetime_line(Some("Pacific/Chatham"));
+    let line = crate::prompts::current_datetime_line(Some("Pacific/Chatham"));
     let now = chrono::Utc::now().with_timezone(&chrono_tz::Pacific::Chatham);
     assert!(line.contains(" Pacific/Chatham ("), "{line}");
     assert!(
@@ -269,7 +271,7 @@ fn current_datetime_line_is_stamped_in_the_users_zone() {
     );
     assert!(line.contains(&now.format("%Y-%m-%d").to_string()), "{line}");
 
-    let line = super::super::current_datetime_line(Some("Not/AZone"));
+    let line = crate::prompts::current_datetime_line(Some("Not/AZone"));
     assert!(!line.contains("Not/AZone"), "{line}");
 }
 
@@ -295,6 +297,7 @@ fn datetime_section_appends_resolve_time_rule_only_when_tool_present() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
     let rendered_with = DateTimeSection.build(&ctx_with).unwrap();
     assert!(
@@ -448,6 +451,7 @@ fn tools_section_pformat_renders_signature_not_schema() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
 
     let rendered = ToolsSection.build(&ctx).unwrap();
@@ -502,6 +506,7 @@ fn tools_section_renders_invalid_schema_tool_without_arguments() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
 
     let rendered = ToolsSection.build(&ctx).unwrap();
@@ -567,6 +572,7 @@ fn tools_section_code_formats_render_function_signatures() {
             personality_roster: vec![],
             agents_md_global: None,
             agents_md_local: None,
+            flow_archetype_text: None,
         };
         let rendered = ToolsSection.build(&ctx).unwrap();
         assert!(
@@ -613,6 +619,7 @@ fn tools_section_uses_pformat_signature_for_text_dispatchers() {
             personality_roster: vec![],
             agents_md_global: None,
             agents_md_local: None,
+            flow_archetype_text: None,
         };
         let rendered = ToolsSection.build(&ctx).unwrap();
         assert!(
@@ -655,6 +662,7 @@ fn tools_section_json_with_an_embedded_catalogue_lists_tools_once() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
     let rendered = ToolsSection.build(&ctx).unwrap();
     assert_eq!(
@@ -683,6 +691,7 @@ fn verbatim_builder_renders_the_body_and_nothing_else() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     };
     let rendered = SystemPromptBuilder::verbatim("Review the diff.".to_string())
         .build(&ctx)

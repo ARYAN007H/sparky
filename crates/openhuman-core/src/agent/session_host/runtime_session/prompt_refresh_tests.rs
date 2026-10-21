@@ -4,9 +4,9 @@
 use super::*;
 use std::sync::Arc;
 
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{PromptContext, SystemPromptBuilder};
-use crate::agent::session_store::splice_fixture::memory_locator;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::storage::sessions::splice_fixture_tests::memory_locator;
 use tinyagents_harness::testkit::ScriptedModel;
 use tinyagents_session::transcript::TranscriptLocator;
 

@@ -78,22 +78,6 @@ Capability {
         privacy: DERIVED_TO_BACKEND,
     },
 Capability {
-        id: "voice.ptt",
-        name: "Global push-to-talk",
-        domain: "voice",
-        category: CapabilityCategory::Conversation,
-        description: "Hold a global hotkey from anywhere on the desktop to dictate into the \
-                      active chat thread. Press opens the mic, release commits the transcript, \
-                      and an always-on-top overlay shows listening/idle state without stealing \
-                      focus. Cross-platform via tauri-plugin-global-shortcut (macOS, Windows, \
-                      Linux/X11); requires microphone access and a global shortcut binding. \
-                      Optional speak_reply plays the agent's response through local TTS.",
-        how_to: "Settings → Voice → Push-to-Talk: pick a shortcut, grant microphone access, \
-                 then hold the configured hotkey from any window.",
-        status: CapabilityStatus::Beta,
-        privacy: DERIVED_TO_BACKEND,
-    },
-Capability {
         id: "voice.live_agent",
         name: "Live voice agent",
         domain: "voice",
@@ -509,7 +493,7 @@ Capability {
         category: CapabilityCategory::Intelligence,
         description:
             "Pick which embedding provider drives semantic search across your memory: \
-             managed cloud (default, Voyage-backed via api.tinyhumans.ai), OpenAI, \
+             managed cloud (default, Voyage-backed), OpenAI, \
              Cohere, local Ollama, or a custom OpenAI-compatible endpoint. API keys \
              are stored encrypted via the local keyring under `embeddings:<slug>`; \
              model name and embedding dimensions are tunable per provider. A \

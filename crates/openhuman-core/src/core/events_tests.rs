@@ -202,15 +202,7 @@ fn all_variants_have_correct_domain() {
                 job_id: "j".into(),
                 success: true,
                 output: "ok".into(),
-            },
-            "cron",
-        ),
-        (
-            DomainEvent::CronDeliveryRequested {
-                job_id: "j".into(),
-                channel: "c".into(),
-                target: "t".into(),
-                output: "o".into(),
+                tenant: None,
             },
             "cron",
         ),
@@ -343,6 +335,7 @@ fn all_variants_have_correct_domain() {
                 toolkit: "gmail".into(),
                 connection_id: "conn-1".into(),
                 connect_url: "https://backend.composio.dev/connect/abc".into(),
+                tenant: None,
             },
             "composio",
         ),
@@ -366,6 +359,7 @@ fn all_variants_have_correct_domain() {
             DomainEvent::ComposioConfigChanged {
                 mode: "direct".into(),
                 api_key_set: true,
+                tenant: None,
             },
             "composio",
         ),
@@ -783,6 +777,7 @@ fn events_outside_the_supervisor_have_no_event_log_detail() {
         job_id: "job-1".into(),
         success: true,
         output: "done".into(),
+        tenant: None,
     }
     .log_detail()
     .is_none());
@@ -922,9 +917,6 @@ fn every_workspace_bound_variant_is_reachable_through_one_accessor() {
     }
 }
 
-/// `None` here means "not bound to a workspace", which a consumer filtering
-/// by workspace must let through rather than drop. Getting this backwards
-/// would silence cron, webhook and sub-agent notifications entirely.
 #[test]
 fn events_without_a_workspace_report_none() {
     assert_eq!(
@@ -937,6 +929,7 @@ fn events_without_a_workspace_report_none() {
             job_id: "job-1".into(),
             success: true,
             output: "done".into(),
+            tenant: None,
         }
         .workspace_dir(),
         None

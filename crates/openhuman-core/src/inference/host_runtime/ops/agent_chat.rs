@@ -37,7 +37,7 @@ use super::turn_guards::{
 /// # Progress
 ///
 /// An in-process embedder hands a
-/// [`ProgressSink`](crate::agent::progress_sink::ProgressSink) through
+/// [`AgentProgress`](crate::progress::AgentProgress) channel through
 /// [`AgentChatEnv`] (see [`agent_chat_for`]); it is attached to the agent built
 /// here, so the embedder observes the turn's tool calls and deltas live instead
 /// of only its final string.
@@ -81,7 +81,7 @@ pub async fn agent_chat(
 pub struct AgentChatEnv {
     /// Live progress for the turn; `None` attaches a drain-only sink so the
     /// model calls still stream.
-    pub progress: Option<crate::agent::progress_sink::ProgressSink>,
+    pub progress: Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     /// The host environment installed on the session
     /// ([`OpenHumanSessionHost::set_host_env`]).
     pub host: crate::agent::turn_env::HostTurnEnv,
@@ -161,7 +161,7 @@ pub enum AgentChatTarget<'a> {
     /// can honour it: the other two resolve a definition the caller does not
     /// hold, so there is no agent for a host belt to belong to.
     Definition {
-        definition: &'a crate::agent::harness::host_definition::AgentDefinition,
+        definition: &'a crate::agent_registry::host_definition::AgentDefinition,
         host: Option<&'a crate::agent::HostTools>,
         /// History to seed this turn with, as `(role, content)` rows, instead
         /// of whatever the session would otherwise resume.
@@ -254,9 +254,9 @@ impl std::fmt::Debug for AgentChatTarget<'_> {
 // Definitions are reusable snapshots. A turn override belongs only to the
 // definition passed to this call's factory, which otherwise wins over Config.
 fn definition_for_turn(
-    definition: &crate::agent::harness::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
     temperature: Option<f64>,
-) -> std::borrow::Cow<'_, crate::agent::harness::host_definition::AgentDefinition> {
+) -> std::borrow::Cow<'_, crate::agent_registry::host_definition::AgentDefinition> {
     match temperature {
         Some(temperature) => {
             let mut scoped = definition.clone();
@@ -268,16 +268,17 @@ fn definition_for_turn(
 }
 
 fn build_turn_agent(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     target: &AgentChatTarget<'_>,
     session_id: Option<&str>,
     temperature: Option<f64>,
 ) -> Result<OpenHumanSessionHost, String> {
     match target {
-        AgentChatTarget::Orchestrator => OpenHumanSessionHost::from_config(config),
+        AgentChatTarget::Orchestrator => OpenHumanSessionHost::from_config(ctx, config),
         AgentChatTarget::AgentId(id) => {
             log::debug!("[inference] agent_chat building agent_id={id}");
-            OpenHumanSessionHost::from_config_for_agent(config, id)
+            OpenHumanSessionHost::from_config_for_agent(ctx, config, id)
         }
         AgentChatTarget::Definition {
             definition,
@@ -286,7 +287,7 @@ fn build_turn_agent(
             ..
         } => {
             let definition = definition_for_turn(definition, temperature);
-            OpenHumanSessionHost::from_config_host_only(config, &definition, *host, session_id)
+            OpenHumanSessionHost::from_config_host_only(ctx, config, &definition, *host, session_id)
         }
         AgentChatTarget::Definition {
             definition, host, ..
@@ -294,12 +295,13 @@ fn build_turn_agent(
             let definition = definition_for_turn(definition, temperature);
             match host {
                 Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
+                    ctx,
                     config,
                     &definition,
                     host,
                     session_id,
                 ),
-                None => OpenHumanSessionHost::from_config_with_definition(config, &definition),
+                None => OpenHumanSessionHost::from_config_with_definition(ctx, config, &definition),
             }
         }
     }
@@ -428,6 +430,8 @@ pub async fn agent_chat_reply_for(
         .map(str::trim)
         .filter(|id| !id.is_empty());
     let turn_cwd = resolve_turn_cwd(cwd)?;
+    // The turn's context: the host environment's bound one, else the task's.
+    let turn_ctx = crate::core::runtime::DispatchCtx::from_weak(env.host.core.as_ref());
     let mut agent = match turn_cwd.as_ref() {
         // Per-turn root. Building from a config clone whose `action_dir` is the
         // requested directory is what makes this a *turn-scoped* override: the
@@ -445,14 +449,15 @@ pub async fn agent_chat_reply_for(
                 "[inference] agent_chat rooting turn tools at cwd={}",
                 root.display()
             );
-            let mut agent = build_turn_agent(&scoped, &target, turn_session_id, temperature)?;
+            let mut agent =
+                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)?;
             // Also thread it as the turn's workspace descriptor so acting tools
             // that read `ToolExecutionContext::workspace` (shell) resolve their
             // default cwd here, and so spawned sub-agents inherit the same root.
             agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(root.clone())));
             agent
         }
-        None => build_turn_agent(config, &target, turn_session_id, temperature)?,
+        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature)?,
     };
     // Thread-correct resume. `OpenHumanSessionHost::turn` would otherwise auto-load the
     // newest transcript for the agent *name*, which is another thread's
@@ -484,11 +489,11 @@ pub async fn agent_chat_reply_for(
                 }
                 None => config.clone(),
             };
-            let scope = crate::agent::attachments::AttachmentAccessScope {
+            let scope = crate::attachments::AttachmentAccessScope {
                 external_channel: false,
                 workspace: turn_cwd.clone(),
             };
-            let references = crate::agent::attachments::host::stage_host(
+            let references = crate::attachments::host::stage_host(
                 attachments,
                 turn_session_id.unwrap_or("direct"),
                 &staging_config,
@@ -568,7 +573,7 @@ pub async fn agent_chat_reply_for(
         // turn fell back to unary `invoke`, so time-to-first-token equalled the
         // full completion latency. Attach a drain-only sink so the call streams;
         // the task ends when the agent drops its sender.
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<crate::agent::progress::AgentProgress>(256);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<crate::progress::AgentProgress>(256);
         tokio::spawn(async move { while rx.recv().await.is_some() {} });
         agent.set_on_progress(Some(tx));
         log::debug!(
@@ -583,8 +588,8 @@ pub async fn agent_chat_reply_for(
     // Overwriting that with `Cli` would silently discard the caller's own
     // trust statement and hand every such turn the blanket CLI allowance
     // instead of the narrower one it asked for.
-    let run = crate::agent::turn_origin::with_origin(
-        effective_agent_chat_origin(),
+    let run = crate::security::turn_origin::with_origin(
+        effective_agent_chat_origin(&turn_ctx),
         agent.run_single_with_approval(message, None, approval),
     );
     // `untrusted_input` was set on the session above; the turn's run context
@@ -623,6 +628,7 @@ pub async fn agent_chat_reply_for(
 
 /// A simplified chat interface that does not update the base configuration.
 pub async fn agent_chat_simple(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     message: &str,
     model_override: Option<String>,
@@ -661,7 +667,8 @@ pub async fn agent_chat_simple(
             .map_err(|e| e.to_string())?;
         (backend, resolved_model)
     } else {
-        providers::create_chat_model_with_model_id(
+        providers::create_chat_model_with_model_id_in(
+            ctx,
             "chat",
             &effective,
             effective.default_temperature,

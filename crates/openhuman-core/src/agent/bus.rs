@@ -20,18 +20,18 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use crate::agent::progress::AgentProgress;
-use crate::agent::turn_origin::{self, AgentTurnOrigin};
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
+use crate::progress::AgentProgress;
 use crate::security::prompt_injection::{
     enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
 };
+use crate::security::turn_origin::{self, AgentTurnOrigin};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
 
-use super::harness::host_definition::AgentDefinitionRegistry;
 use super::harness::run_channel_turn_via_graph;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use tinyagents_definition::SandboxMode;
 use tinytools_std::file_state::with_file_state_agent_id;
 
@@ -299,7 +299,7 @@ async fn handle_agent_run_turn(req: AgentTurnRequest) -> Result<AgentTurnRespons
     );
     // Memory acts as the target agent (the root when none is named) for
     // the whole channel turn.
-    let memory_identity = crate::memory::scope::MemoryIdentity::root()
+    let memory_identity = tinymemory_tools::layout::identity::Identity::root()
         .child(target_agent_id.as_deref().unwrap_or_default());
     let graph_origin = origin.clone();
     let outcome = turn_origin::with_origin(

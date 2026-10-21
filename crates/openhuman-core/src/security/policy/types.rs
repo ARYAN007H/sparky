@@ -2,6 +2,7 @@ use crate::config::PrivacyMode;
 use parking_lot::Mutex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -79,7 +80,7 @@ pub enum ToolOperation {
 #[derive(Debug)]
 pub struct ActionTracker {
     /// Timestamps of recent actions (kept within the last hour).
-    actions: Mutex<Vec<Instant>>,
+    actions: Arc<Mutex<Vec<Instant>>>,
 }
 
 impl Default for ActionTracker {
@@ -91,7 +92,7 @@ impl Default for ActionTracker {
 impl ActionTracker {
     pub fn new() -> Self {
         Self {
-            actions: Mutex::new(Vec::new()),
+            actions: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -115,13 +116,23 @@ impl ActionTracker {
         actions.retain(|t| *t > cutoff);
         actions.len()
     }
+
+    /// Shares the action history with a short-lived policy derived from this
+    /// tracker. Ordinary `Clone` intentionally snapshots history for separate
+    /// policies; live flow gates use this handle so rebuilding the tier view
+    /// does not reset one run's action budget.
+    pub(crate) fn shared_clone(&self) -> Self {
+        Self {
+            actions: Arc::clone(&self.actions),
+        }
+    }
 }
 
 impl Clone for ActionTracker {
     fn clone(&self) -> Self {
         let actions = self.actions.lock();
         Self {
-            actions: Mutex::new(actions.clone()),
+            actions: Arc::new(Mutex::new(actions.clone())),
         }
     }
 }
@@ -259,6 +270,15 @@ pub struct SecurityPolicy {
     pub block_high_risk_commands: bool,
     /// Directories outside the workspace the agent may access (read or read-write).
     pub trusted_roots: Vec<TrustedRoot>,
+    /// Exact, finalized media artifact files admitted for read-only inspection.
+    /// Shared with the media tools so file_read and image_info follow the same
+    /// per-artifact grant without trusting the whole Files directory.
+    #[doc(hidden)]
+    pub media_artifact_paths: Arc<std::sync::Mutex<HashSet<PathBuf>>>,
+    /// Configured Files roots used to resolve Ready artifact records after a
+    /// session is rebuilt.
+    #[doc(hidden)]
+    pub media_files_roots: Arc<std::sync::Mutex<Option<crate::artifacts::FileRoots>>>,
     /// Whether the agent may install OS packages via the `install_tool` tool.
     pub allow_tool_install: bool,
     /// Tool names the user has pre-approved ("Always allow"). The `ApprovalGate`
@@ -409,6 +429,8 @@ impl Default for SecurityPolicy {
             require_approval_for_medium_risk: true,
             block_high_risk_commands: true,
             trusted_roots: Vec::new(),
+            media_artifact_paths: Arc::new(std::sync::Mutex::new(HashSet::new())),
+            media_files_roots: Arc::new(std::sync::Mutex::new(None)),
             allow_tool_install: false,
             auto_approve: Vec::new(),
             auto_approve_all: false,

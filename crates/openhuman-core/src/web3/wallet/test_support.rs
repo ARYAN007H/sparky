@@ -13,7 +13,6 @@ use crate::core::runtime::DispatchCtx;
 use tempfile::TempDir;
 
 use super::ops::{setup, WalletAccount, WalletChain, WalletSetupParams, WalletSetupSource};
-use crate::config::rpc as config_rpc;
 use crate::config::test_env::EnvVarGuard;
 
 pub(crate) static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -129,7 +128,7 @@ pub(crate) async fn setup_wallet_in(
         .await?
         .value;
     setup(
-        &ctx,
+        ctx,
         WalletSetupParams {
             consent_granted: true,
             source: WalletSetupSource::Imported,

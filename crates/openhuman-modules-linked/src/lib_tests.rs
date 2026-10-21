@@ -3,12 +3,14 @@ use tinybus::broker::Broker;
 use tinybus::module::ModuleHost;
 
 /// Every registry id this crate can link, in registration order.
-const ALL_IDS: [&str; 11] = [
+const ALL_IDS: [&str; 13] = [
     "tinybox",
     "tinychannels",
     "tinycomputer",
     "tinyconnectors",
     "tinydocs",
+    "tinyeventqueues",
+    "tinyflows",
     "tinyhosts",
     "tinyjuice",
     "tinymcp",
@@ -24,6 +26,8 @@ fn enabled_ids() -> Vec<&'static str> {
         (cfg!(feature = "tinycomputer"), "tinycomputer"),
         (cfg!(feature = "tinyconnectors"), "tinyconnectors"),
         (cfg!(feature = "tinydocs"), "tinydocs"),
+        (cfg!(feature = "tinyeventqueues"), "tinyeventqueues"),
+        (cfg!(feature = "tinyflows"), "tinyflows"),
         (cfg!(feature = "tinyhosts"), "tinyhosts"),
         (cfg!(feature = "tinyjuice"), "tinyjuice"),
         (cfg!(feature = "tinymcp"), "tinymcp"),

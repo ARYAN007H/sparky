@@ -1,4 +1,6 @@
 use super::*;
+use crate::prompts::sections::*;
+use crate::prompts::*;
 use async_trait::async_trait;
 use std::collections::HashSet;
 use std::path::Path;
@@ -50,6 +52,7 @@ fn ctx_with_identity(identity: Option<UserIdentity>) -> PromptContext<'static> {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
+        flow_archetype_text: None,
     }
 }
 
@@ -75,6 +78,7 @@ fn agents_md_ctx(global: Option<String>, local: Option<String>) -> PromptContext
         personality_roster: vec![],
         agents_md_global: global,
         agents_md_local: local,
+        flow_archetype_text: None,
     }
 }
 
@@ -82,6 +86,8 @@ fn agents_md_ctx(global: Option<String>, local: Option<String>) -> PromptContext
 mod agents_md_registration_tests;
 #[path = "mod_tests_builder_sections_tests.rs"]
 mod builder_sections_tests;
+#[path = "mod_tests_composition_tests.rs"]
+mod composition_tests;
 #[path = "mod_tests_grounding_spec_check_tests.rs"]
 mod grounding_spec_check_tests;
 #[path = "mod_tests_subagent_render_tests.rs"]

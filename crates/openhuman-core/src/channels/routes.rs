@@ -88,12 +88,14 @@ impl RouteCallbacks {
         context: ChannelRuntimeContext,
         cancellation: tokio_util::sync::CancellationToken,
     ) -> Self {
+        let ctx = context.dispatch_ctx();
         Self {
-            context,
-            core_context: crate::core::runtime::CoreContext::current(),
-            tenant: crate::core::runtime::tenant::current_tenant_or_isolated(
+            core_context: ctx.resolved(),
+            tenant: crate::core::runtime::tenant::isolated_unless_tenant(
+                ctx.tenant(),
                 "channel_remote_control",
             ),
+            context,
             cancellation,
         }
     }
@@ -107,6 +109,12 @@ impl RouteCallbacks {
     ) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
         match request {
             tinychannels_bus::ChannelBackendRequest::RemoteControl(request) => {
+                // The captured context is the carrier; without one the host's
+                // default context (none in SaaS, which fails closed).
+                let dispatch_ctx = match &self.core_context {
+                    Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
+                    None => crate::core::runtime::DispatchCtx::host_default(),
+                };
                 let dispatch = async {
                     tokio::select! {
                         biased;
@@ -114,6 +122,7 @@ impl RouteCallbacks {
                             Err(tinybus::Error::failed("channel session ended"))
                         }
                         result = super::host::remote_control::dispatch_callback(
+                            &dispatch_ctx,
                             &self.context,
                             &self.tenant,
                             &self.cancellation,

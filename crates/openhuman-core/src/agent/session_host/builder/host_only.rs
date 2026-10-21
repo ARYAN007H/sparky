@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::agent::harness::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};
 use tinyinference_llm::tool::ToolCall;
@@ -42,13 +42,28 @@ use tinyagents_definition::{SandboxMode, ToolScope};
 /// host's policy and never widens it.
 pub struct HostOnlyToolPolicy {
     allowed: HashSet<String>,
-    host: Option<Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>>,
+    host: Option<
+        Arc<
+            dyn tinyagents_harness::middleware::ToolCallPolicy<
+                crate::agent::tinyagents::host::OpenHumanRunContext,
+            >,
+        >,
+    >,
 }
 
 impl HostOnlyToolPolicy {
     /// Admit exactly `allowed`, subject to `host`'s own decision.
     #[must_use]
-    pub fn new(allowed: HashSet<String>, host: Option<Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>>) -> Self {
+    pub fn new(
+        allowed: HashSet<String>,
+        host: Option<
+            Arc<
+                dyn tinyagents_harness::middleware::ToolCallPolicy<
+                    crate::agent::tinyagents::host::OpenHumanRunContext,
+                >,
+            >,
+        >,
+    ) -> Self {
         Self { allowed, host }
     }
 }
@@ -59,7 +74,11 @@ impl ToolCallPolicy<OpenHumanRunContext> for HostOnlyToolPolicy {
         "host_only"
     }
 
-    async fn check(&self, ctx: &RunContext<OpenHumanRunContext>, call: &ToolCall) -> PolicyDecision {
+    async fn check(
+        &self,
+        ctx: &RunContext<OpenHumanRunContext>,
+        call: &ToolCall,
+    ) -> PolicyDecision {
         if !self.allowed.contains(&call.name) {
             log::debug!(
                 "[agent::host_only] denied tool outside the host belt: {}",
@@ -80,7 +99,7 @@ impl ToolCallPolicy<OpenHumanRunContext> for HostOnlyToolPolicy {
 /// The visible set of a host-only belt before the host's names are merged in:
 /// explicitly zero tools (an empty set would mean "no filter").
 pub(super) fn empty_belt() -> HashSet<String> {
-    HashSet::from([crate::agent::harness::host_definition::NO_TOOLS_SENTINEL.to_string()])
+    HashSet::from([crate::agent_registry::host_definition::NO_TOOLS_SENTINEL.to_string()])
 }
 
 /// The session gate: on a host-only belt, [`HostOnlyToolPolicy`] over the
@@ -90,8 +109,20 @@ pub(super) fn empty_belt() -> HashSet<String> {
 pub(super) fn session_policy(
     host_only: bool,
     tools: &[Box<dyn tinytools::Tool>],
-    host: Option<Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>>,
-) -> Option<Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>> {
+    host: Option<
+        Arc<
+            dyn tinyagents_harness::middleware::ToolCallPolicy<
+                crate::agent::tinyagents::host::OpenHumanRunContext,
+            >,
+        >,
+    >,
+) -> Option<
+    Arc<
+        dyn tinyagents_harness::middleware::ToolCallPolicy<
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >,
+    >,
+> {
     if !host_only {
         return host;
     }
@@ -129,6 +160,7 @@ impl OpenHumanSessionHost {
     ///
     /// As [`OpenHumanSessionHost::from_config_with_definition`].
     pub fn from_config_host_only(
+        ctx: &crate::core::runtime::DispatchCtx,
         config: &Config,
         definition: &AgentDefinition,
         host: Option<&super::HostTools>,
@@ -136,6 +168,7 @@ impl OpenHumanSessionHost {
     ) -> Result<Self> {
         let definition = host_only_definition(definition);
         let mut agent = OpenHumanSessionHost::build_session_agent_inner(
+            ctx,
             config,
             &definition.id,
             Some(&definition),

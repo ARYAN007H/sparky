@@ -187,7 +187,7 @@ config.update_model_settings (JSON-RPC / CLI)
 ## RPC surface
 
 All methods are in the `config` namespace and are registered by [`core/all.rs`](../core/all.rs) through
-`all_config_registered_controllers()` under `DomainGroup::Config`. There are 41.
+`all_config_registered_controllers()` under `DomainGroup::Config`. There are 37.
 
 | Group | Methods |
 | --- | --- |
@@ -197,7 +197,6 @@ All methods are in the `config` namespace and are registered by [`core/all.rs`](
 | Privacy and search | `get_privacy_mode`, `set_privacy_mode`, `get_search_settings`, `update_search_settings` |
 | Browser | `update_browser_settings`, `set_browser_allow_all` |
 | Integrations | `get_composio_trigger_settings`, `update_composio_trigger_settings` |
-| Voice | `get_dictation_settings`, `update_dictation_settings`, `get_voice_server_settings`, `update_voice_server_settings` |
 | Onboarding and UI | `get_onboarding_completed`, `set_onboarding_completed`, `workspace_onboarding_flag_exists`, `workspace_onboarding_flag_set`, `get_analytics_settings`, `update_analytics_settings`, `get_user_timezone`, `update_user_timezone` |
 
 The `workspace` namespace (`file_read`, `file_write`, `file_reset`) is registered separately from
@@ -210,7 +209,7 @@ The `workspace` namespace (`file_read`, `file_write`, `file_reset`) is registere
   are secrets and when to encrypt or decrypt them.
 - The autonomy policy is defined here as data (`AutonomyConfig`, `[autonomy] enabled = false` by
   default) but enforced by [`crates/openhuman-core/src/security/`](../security/) (`SecurityPolicy::from_config`).
-- Hosted backend URLs and their environment overrides belong to the installed backend transport
+- Hosted backend URLs and their environment overrides belong to the host crate that registers the config enricher
   ([`crates/openhuman-tinyhumans/src/backend/url.rs`](../../../openhuman-tinyhumans/src/backend/url.rs)). `config.api_url` is only the user's stored value.
 - Credentials and sign-in are not config. The core receives a credential through `auth.set_credential`;
   login and `/auth/me` live in the host's session owner (`openhuman_tinyhumans::session`).

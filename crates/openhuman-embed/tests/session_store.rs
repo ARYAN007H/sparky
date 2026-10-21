@@ -78,7 +78,7 @@ fn a_stateless_runtime_keeps_every_conversation_in_its_session_store() {
                 .build()
                 .await
                 .expect("a stateless runtime with a store builds");
-            assert!(openhuman_core::agent::session_store::is_installed());
+            assert!(openhuman_core::storage::sessions::is_installed());
             let scratch = runtime.root_dir().to_path_buf();
 
             let spec = |id: &str| {
@@ -170,17 +170,22 @@ fn a_stateless_runtime_keeps_every_conversation_in_its_session_store() {
                 .expect("asha's storage scope")
                 .documents()
                 .query_all(
-                    tinyagents_harness::observability::DriverStatusStore::DEFAULT_COLLECTION,
+                    tinyagents_harness::observability::DriverStatusStore::COLLECTION,
                     &Default::default(),
                 )
                 .await
                 .expect("status records list");
             assert!(!runs.is_empty(), "asha's runs are recorded in her scope");
 
-            // Nothing durable reached the scratch workspace.
+            // Nothing durable reached the scratch workspace. The flow-authoring
+            // skill's files are a regenerable cache of the TinyFlows module's
+            // resources (materialized in the background from the module, never
+            // read back as state), so they do not count; the scratch workspace
+            // is removed with the runtime below.
             let written: Vec<_> = files_under(&scratch)
                 .into_iter()
                 .filter(|path| !baseline.contains(path))
+                .filter(|path| !path.starts_with("workspace/.openhuman/builtin-flow-skills"))
                 .collect();
             assert!(
                 written.is_empty(),
@@ -200,7 +205,7 @@ fn a_stateless_runtime_keeps_every_conversation_in_its_session_store() {
             drop((asha, ravi));
             drop(runtime);
             assert!(
-                !openhuman_core::agent::session_store::is_installed(),
+                !openhuman_core::storage::sessions::is_installed(),
                 "the store is removed with the runtime"
             );
             assert!(!scratch.exists(), "the scratch workspace is removed");

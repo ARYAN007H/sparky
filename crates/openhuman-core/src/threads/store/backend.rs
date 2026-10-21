@@ -91,6 +91,36 @@ fn describe(error: &ConversationError, subject: Subject<'_>) -> String {
     error.to_string()
 }
 
+/// Imports the legacy JSONL conversations under `workspace_dir` into the
+/// `local` conversation scope of an explicit `backend`, once (the same
+/// `tsd.migrations` entry [`ConversationStore`] checks). For the layout
+/// migration (`storage::layout`), which runs before any store opens the new
+/// database; the source files are only read.
+///
+/// # Errors
+///
+/// A storage failure or an unreadable legacy file; the next call retries.
+pub(crate) fn import_legacy_into(
+    backend: &Arc<dyn storage::StorageBackend>,
+    workspace_dir: &Path,
+) -> Result<(), String> {
+    let scope = Scope::local();
+    let scoped = backend
+        .for_scope(&scope)
+        .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
+    let repo = Repo::on(backend, &scope, DOMAIN, super::legacy_import::collections)
+        .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
+    let store = DriverConversationStore::new(scoped.clone());
+    let docs = Arc::clone(scoped.documents());
+    storage::block_on(async move {
+        DriverConversationStore::prepare_schema(docs.as_ref()).await?;
+        DriverConversationStore::prepare_append_schema(docs.as_ref()).await
+    })
+    .map_err(|e| format!("{LOG_PREFIX} declare the conversation schema: {e}"))?;
+    super::legacy_import::import_once(workspace_dir, &repo, &store)
+        .map_err(|e| format!("{LOG_PREFIX} legacy import: {e:#}"))
+}
+
 /// A conversation store bound to one workspace's storage backend.
 #[derive(Clone)]
 pub struct ConversationStore {
@@ -297,10 +327,34 @@ impl ConversationStore {
         Ok(deleted)
     }
 
-    /// Removes every thread.
+    /// Removes every thread and records its conversation-memory deletion in
+    /// this workspace's existing best-effort queue as each header is removed.
+    /// Queue persistence keeps its existing IO and process-crash limitations.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
+        let ctx = self.ctx.clone();
+        let workspace_dir = self.workspace_dir.clone();
         let stats = self.run("purge_threads", NONE, |s| async move {
-            s.purge_threads().await.map(ConversationPurgeStats::from)
+            let callback_ctx = ctx.clone();
+            let callback_workspace = workspace_dir.clone();
+            s.purge_threads_with_async(move |thread_id| {
+                let ctx = callback_ctx.clone();
+                let workspace_dir = callback_workspace.clone();
+                async move {
+                    // The TinyAgents callback runs inside the storage bridge.
+                    // Persist off-bridge and await each header's queue write
+                    // before the purge deletes the next one.
+                    ctx.spawn_blocking(move || {
+                        crate::memory::deletion::enqueue(
+                            &workspace_dir,
+                            crate::memory::deletion::PendingDeletion::Thread { thread_id },
+                        );
+                    })
+                    .await
+                    .expect("conversation purge deletion callback worker must complete");
+                }
+            })
+            .await
+            .map(ConversationPurgeStats::from)
         })?;
         self.forget_all_transcript_keys();
         Ok(stats)

@@ -132,6 +132,7 @@ fn effective_session_config(
 }
 
 pub(super) fn build_session_agent(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     client_id: &str,
     thread_id: &str,
@@ -151,6 +152,7 @@ pub(super) fn build_session_agent(
     );
 
     let agent_result = OpenHumanSessionHost::from_config_for_agent_session(
+        ctx,
         &effective,
         target_agent_id,
         Some(thread_id),
@@ -448,6 +450,7 @@ pub(crate) async fn checkout_session_agent(
             );
             (
                 build_session_agent(
+                    ctx,
                     config,
                     client_id,
                     thread_id,
@@ -460,6 +463,7 @@ pub(crate) async fn checkout_session_agent(
         }
         None => (
             build_session_agent(
+                ctx,
                 config,
                 client_id,
                 thread_id,
@@ -543,7 +547,7 @@ async fn bind_transcript_store(
             return;
         }
     };
-    let rule_key = crate::agent::session_store::agent_key_for(&tenant, target_agent_id);
+    let rule_key = crate::storage::sessions::agent_key_for(&tenant, target_agent_id);
     let key = crate::threads::store::bind_transcript_key(
         ctx,
         &config.workspace_dir,
@@ -555,7 +559,7 @@ async fn bind_transcript_store(
         log::info!(
             "[web-channel] thread={thread_id} keeps its recorded transcript store (chat agent changed since it was written)"
         );
-        agent.set_session_history_locator(crate::agent::session_store::transcripts_or_files(
+        agent.set_session_history_locator(crate::storage::sessions::transcripts_or_files(
             &key,
             &config.workspace_dir,
         ));

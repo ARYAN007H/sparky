@@ -36,8 +36,7 @@ use serde_json::Value;
 
 use super::contract::ToolScope;
 use super::tools::resolve_action_scope;
-use crate::agent::tinyagents::host::run_context::sandbox_mode_for_tool;
-use crate::config::rpc as config_rpc;
+use crate::agent::tinyagents::host::run_context::{dispatch_ctx_for_tool, sandbox_mode_for_tool};
 use crate::config::Config;
 use tinyagents_definition::SandboxMode;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};
@@ -52,7 +51,7 @@ pub struct ComposioActionTool {
     /// the backend-bound handle at sub-agent spawn time. Toggling
     /// `composio.mode = "direct"` mid-session invalidated other caches
     /// but left these per-action tools still routing through
-    /// `staging-api.tinyhumans.ai/agent-integrations/composio/execute`
+    /// the managed backend's composio execute route
     /// — silently bypassing the direct-mode user's personal Composio
     /// tenant. Resolving the client per call via
     /// [`resolve_composio_route`] keeps dispatch in lockstep with the
@@ -61,7 +60,7 @@ pub struct ComposioActionTool {
     ///
     /// `None` for a deferred instance synthesised for a parent session,
     /// which has no spawn-time config: it resolves the live config through
-    /// [`config_rpc::load_config_with_timeout`] on every call — the
+    /// [`DispatchCtx::load_config`] on every call — the
     /// embedder's config when one is bound, else the process-global one.
     config: Option<Arc<Config>>,
     /// Action slug as-shipped to Composio, e.g. `"GMAIL_SEND_EMAIL"`.
@@ -241,7 +240,7 @@ impl Tool for ComposioActionTool {
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
         let (config, outcome) =
-            Box::pin(self.execute_unredacted(&DispatchCtx::ambient(), args, None)).await;
+            Box::pin(self.execute_unredacted(&dispatch_ctx_for_tool(None), args, None)).await;
         super::tools::redact_composio_outcome(&config, outcome)
     }
     async fn execute_with_context(
@@ -251,7 +250,7 @@ impl Tool for ComposioActionTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let (config, outcome) = Box::pin(self.execute_unredacted(
-            &DispatchCtx::ambient(),
+            &dispatch_ctx_for_tool(context),
             args,
             sandbox_mode_for_tool(context),
         ))
@@ -315,7 +314,7 @@ impl ComposioActionTool {
         // fresh routing. Anchored to this tool's original config path rather than
         // re-resolving process-global `OPENHUMAN_WORKSPACE` (the tool is scoped to
         // the user/workspace it was created for).
-        let live_config = match self.live_config(&ctx).await {
+        let live_config = match self.live_config(ctx).await {
             Ok(c) => Box::new(c),
             Err(e) => {
                 tracing::warn!(

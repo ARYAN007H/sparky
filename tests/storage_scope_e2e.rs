@@ -8,8 +8,8 @@
 //! recorded once it is gone (a restarted process).
 //!
 //! Its own test binary because it installs a backend into the process-wide
-//! storage slot and boots a core. Each driver is its own test case
-//! (`support/storage_drivers.rs`), and the cases take turns.
+//! storage slot and boots a core. The tests take turns on the slot
+//! (`support/storage_case.rs`).
 
 use std::sync::Arc;
 
@@ -24,11 +24,10 @@ use openhuman_core::HostKind;
 #[path = "support/tinyhumans_boot.rs"]
 mod tinyhumans_boot;
 
-#[macro_use]
-#[path = "support/storage_drivers.rs"]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::Case;
+use storage_case::Case;
 
 fn job_names(config: &Config) -> Vec<String> {
     cron::list_jobs(config)
@@ -38,7 +37,9 @@ fn job_names(config: &Config) -> Vec<String> {
         .collect()
 }
 
-async fn background_work_visits_every_agent_scope(case: Case) {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn background_work_visits_every_agent_scope() {
+    let case = Case::open();
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: workspace.path().join("workspace"),
@@ -79,7 +80,12 @@ async fn background_work_visits_every_agent_scope(case: Case) {
     assert!(job_names(&config).is_empty());
 
     // Visited through the live agent context …
-    let live = for_each_scope("e2e", || async { job_names(&config) }).await;
+    let live = for_each_scope(
+        &openhuman_core::core::runtime::DispatchCtx::host_default(),
+        "e2e",
+        |_| async { job_names(&config) },
+    )
+    .await;
     assert!(
         live.contains(&(Some("agent-e2e".to_string()), vec!["agent-job".to_string()])),
         "{live:?}"
@@ -87,31 +93,40 @@ async fn background_work_visits_every_agent_scope(case: Case) {
 
     // An event naming only the job resolves to its owner, and handling it
     // there sees the job.
-    let job_id = within_agent(Some("agent-e2e"), async {
-        cron::list_jobs(&config).unwrap()[0].id.clone()
-    })
+    let job_id = within_agent(
+        &openhuman_core::core::runtime::DispatchCtx::host_default(),
+        Some("agent-e2e"),
+        async { cron::list_jobs(&config).unwrap()[0].id.clone() },
+    )
     .await
     .expect("the live agent has a context");
-    let owner = find_owner("e2e", || async {
-        Ok(cron::get_job(&config, &job_id).is_ok())
-    })
+    let owner = find_owner(
+        &openhuman_core::core::runtime::DispatchCtx::host_default(),
+        "e2e",
+        |_| async { Ok(cron::get_job(&config, &job_id).is_ok()) },
+    )
     .await;
     assert_eq!(owner, Ok(Some(Some("agent-e2e".to_string()))));
-    let missing = find_owner("e2e", || async {
-        Ok(cron::get_job(&config, "nope").is_ok())
-    })
+    let missing = find_owner(
+        &openhuman_core::core::runtime::DispatchCtx::host_default(),
+        "e2e",
+        |_| async { Ok(cron::get_job(&config, "nope").is_ok()) },
+    )
     .await;
     assert_eq!(missing, Ok(None));
 
     // … and, once the agent is gone, through the id the backend recorded.
     assert!(AgentContextRegistry::deregister("agent-e2e", &agent));
     drop(agent);
-    let recorded = for_each_scope("e2e", || async { job_names(&config) }).await;
+    let recorded = for_each_scope(
+        &openhuman_core::core::runtime::DispatchCtx::host_default(),
+        "e2e",
+        |_| async { job_names(&config) },
+    )
+    .await;
     assert!(
         recorded.contains(&(Some("agent-e2e".to_string()), vec!["agent-job".to_string()])),
         "{recorded:?}"
     );
     assert!(recorded.contains(&(None, Vec::new())), "{recorded:?}");
 }
-
-driver_cases!(async background_work_visits_every_agent_scope);

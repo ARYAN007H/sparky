@@ -27,7 +27,7 @@ pub(super) async fn workspace_dir() -> Result<PathBuf, String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TranscriptStore {
     pub workspace_dir: PathBuf,
-    /// The store key ([`agent_key_for`](crate::agent::session_store::agent_key_for)):
+    /// The store key ([`agent_key_for`](crate::storage::sessions::agent_key_for)):
     /// `<profile>~<agent>` for a SaaS profile, else the agent, else the chat agent id.
     pub key: String,
 }
@@ -38,7 +38,7 @@ impl TranscriptStore {
     pub(crate) fn locator(
         &self,
     ) -> std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
-        crate::agent::session_store::transcripts_or_files(&self.key, &self.workspace_dir)
+        crate::storage::sessions::transcripts_or_files(&self.key, &self.workspace_dir)
     }
 }
 
@@ -89,7 +89,7 @@ pub(crate) fn transcript_store_for(
     config: &Config,
     tenant: &crate::core::runtime::Tenant,
 ) -> TranscriptStore {
-    let key = crate::agent::session_store::agent_key_for(
+    let key = crate::storage::sessions::agent_key_for(
         tenant,
         &crate::web_chat::pick_target_agent_id(config),
     );
@@ -120,16 +120,20 @@ pub(crate) fn transcript_store_for(
 /// to hold.
 ///
 /// Owning the mutation *and* its cleanup in one spawned task decouples the
-/// sequence from the caller's lifetime. The ambient [`CoreContext`] is carried
-/// across explicitly: a bare `tokio::spawn` drops the `task_local` scope, and
-/// `CoreContext::current` then silently falls back to the process default —
-/// which under multi-tenant scoped dispatch is the wrong workspace.
-pub(super) async fn run_to_completion<T, F>(operation: &'static str, fut: F) -> Result<T, String>
+/// sequence from the caller's lifetime. The caller's [`CoreContext`] is moved
+/// into the task explicitly: a bare `tokio::spawn` drops the `task_local` scope,
+/// and the task would silently fall back to the process default — which under
+/// multi-tenant scoped dispatch is the wrong workspace.
+pub(super) async fn run_to_completion<T, F>(
+    dispatch: &crate::core::runtime::DispatchCtx,
+    operation: &'static str,
+    fut: F,
+) -> Result<T, String>
 where
     F: std::future::Future<Output = Result<T, String>> + Send + 'static,
     T: Send + 'static,
 {
-    let ctx = CoreContext::current();
+    let ctx = dispatch.core().cloned();
     tokio::spawn(async move {
         match ctx {
             Some(ctx) => CoreContext::scope(ctx, fut).await,

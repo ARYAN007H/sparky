@@ -99,10 +99,13 @@ pub async fn composio_set_api_key(
             .await
             .map_err(|e| format!("[composio-direct] reload config failed: {e}"))?;
         cfg_mut.composio.mode = crate::config::schema::COMPOSIO_MODE_DIRECT.into();
-        cfg_mut
-            .save()
-            .await
-            .map_err(|e| format!("[composio-direct] save config failed: {e}"))?;
+        cfg_mut.save().await.map_err(|error| {
+            crate::config::ops::config_save_error_with_context(
+                error,
+                "[composio-direct] save config failed",
+                false,
+            )
+        })?;
         "mode=direct"
     } else {
         "mode unchanged"
@@ -117,6 +120,7 @@ pub async fn composio_set_api_key(
     crate::core::bus::BUS.publish(crate::core::events::DomainEvent::ComposioConfigChanged {
         mode: effective_mode.clone(),
         api_key_set: true,
+        tenant: ctx.event_tenant(),
     });
     tracing::debug!(
         mode = %effective_mode,
@@ -148,15 +152,19 @@ pub async fn composio_clear_api_key(
         .await
         .map_err(|e| format!("[composio-direct] reload config failed: {e}"))?;
     cfg_mut.composio.mode = crate::config::schema::COMPOSIO_MODE_BACKEND.into();
-    cfg_mut
-        .save()
-        .await
-        .map_err(|e| format!("[composio-direct] save config failed: {e}"))?;
+    cfg_mut.save().await.map_err(|error| {
+        crate::config::ops::config_save_error_with_context(
+            error,
+            "[composio-direct] save config failed",
+            false,
+        )
+    })?;
     direct_auth::reset_all_direct_auth_failures();
 
     crate::core::bus::BUS.publish(crate::core::events::DomainEvent::ComposioConfigChanged {
         mode: "backend".to_string(),
         api_key_set: false,
+        tenant: ctx.event_tenant(),
     });
     tracing::debug!("[composio-cache] published ComposioConfigChanged after clear_api_key");
 

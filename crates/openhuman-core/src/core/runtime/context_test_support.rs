@@ -20,10 +20,13 @@ impl CoreContext {
             }))),
             domains,
             tool_groups: Default::default(),
+            autonomy_tier_source: AutonomyTierSource::LiveConfig,
+            autonomy_tier_ceiling: None,
             components: Default::default(),
             embedder_config: None,
+            latest_embedder_config: None,
             user_skill_roots: true,
-            backend_transport: None,
+            extensions: Default::default(),
             turn_origin: None,
             channel_thread: None,
             session_agent: None,
@@ -33,11 +36,27 @@ impl CoreContext {
         })
     }
 
-    /// Test-only: given `[components]` switches.
-    pub(crate) fn for_test_with_components(c: crate::core::runtime::ComponentSet) -> Arc<Self> {
-        let mut ctx = Arc::try_unwrap(Self::for_test(crate::core::runtime::DomainSet::full(), None))
+    /// Test-only constructor with context-local hook registrations.
+    pub(crate) fn for_test_with_extensions(
+        domains: crate::core::runtime::DomainSet,
+        workspace_dir: Option<std::path::PathBuf>,
+        extensions: crate::core::slots::Extensions,
+    ) -> Arc<CoreContext> {
+        let mut ctx = Arc::try_unwrap(Self::for_test(domains, workspace_dir))
             .ok()
             .unwrap();
+        ctx.extensions = extensions;
+        Arc::new(ctx)
+    }
+
+    /// Test-only: given `[components]` switches.
+    pub(crate) fn for_test_with_components(c: crate::core::runtime::ComponentSet) -> Arc<Self> {
+        let mut ctx = Arc::try_unwrap(Self::for_test(
+            crate::core::runtime::DomainSet::full(),
+            None,
+        ))
+        .ok()
+        .unwrap();
         ctx.components = c;
         Arc::new(ctx)
     }
@@ -56,6 +75,8 @@ impl CoreContext {
         domains: crate::core::runtime::DomainSet,
         config: crate::config::Config,
     ) -> Arc<CoreContext> {
+        let latest_embedder_config = Arc::new(std::sync::Mutex::new(config.clone()));
+        crate::config::Config::bind_context_snapshot(&latest_embedder_config);
         Arc::new(CoreContext {
             host_kind: HostKind::Cli,
             workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
@@ -63,10 +84,13 @@ impl CoreContext {
             }))),
             domains,
             tool_groups: Default::default(),
+            autonomy_tier_source: AutonomyTierSource::Captured,
+            autonomy_tier_ceiling: None,
             components: Default::default(),
             embedder_config: Some(config),
+            latest_embedder_config: Some(latest_embedder_config),
             user_skill_roots: true,
-            backend_transport: None,
+            extensions: Default::default(),
             turn_origin: None,
             channel_thread: None,
             session_agent: None,

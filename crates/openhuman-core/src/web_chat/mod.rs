@@ -27,10 +27,10 @@
 //! contract), `types.rs` (shared param/state types).
 
 mod channel_event;
+pub(crate) mod citations;
 mod egress_surface;
 mod event_bus;
 mod event_bus_channel;
-mod journal_shadow;
 mod ops;
 // Response delivery/segmentation for the web surface (folded in from the former
 // standalone `presentation` provider — it is the web channel's delivery formatter).
@@ -44,6 +44,7 @@ mod session;
 mod suggestions;
 mod turn_activity;
 mod turn_close;
+pub(crate) mod turn_guards;
 mod turn_timing;
 mod types;
 
@@ -61,6 +62,7 @@ pub use channel_event::{
     ChatSuggestion, GuardrailPayload, GuardrailReason, QueueItemPayload, SubagentProgressDetail,
     SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload, WebChannelEvent,
 };
+pub use citations::{TurnCitation, TURN_CITATION_SNIPPET_CHARS};
 pub use egress_surface::register_egress_surface_subscriber;
 pub use event_bus::{
     approval_request_event, plan_review_request_event, publish_web_channel_event,

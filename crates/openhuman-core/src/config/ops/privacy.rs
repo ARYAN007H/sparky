@@ -9,8 +9,6 @@ use crate::config::{Config, PrivacyMode};
 use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 
-use super::loader::load_config_with_timeout;
-
 /// Partial update for the `[privacy]` block. `None` leaves the mode unchanged.
 #[derive(Debug, Clone, Default)]
 pub struct PrivacySettingsPatch {
@@ -71,7 +69,7 @@ pub async fn apply_privacy_settings(
         config.privacy.mode = mode;
     }
 
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
 
     // Hot-swap the live policy so enforcement takes effect without a restart.
     // `Err` here just means no session runtime is installed yet (e.g. CLI) — the

@@ -20,6 +20,7 @@ pub const COMPONENT_DISABLED: &str = "COMPONENT_DISABLED";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ComponentSet {
     pub flows: bool,
+    pub tinyflows: bool,
     pub memes: bool,
     pub documents: bool,
     pub search: bool,
@@ -34,6 +35,7 @@ pub struct ComponentSet {
     pub channels: bool,
     pub skills: bool,
     pub voice: bool,
+    pub eventqueues: bool,
 }
 
 impl Default for ComponentSet {
@@ -52,6 +54,7 @@ impl ComponentSet {
     pub fn from_config(c: &ComponentsConfig) -> Self {
         Self {
             flows: c.flows,
+            tinyflows: c.tinyflows,
             memes: c.memes,
             documents: c.documents,
             search: c.search,
@@ -66,6 +69,7 @@ impl ComponentSet {
             channels: c.channels,
             skills: c.skills,
             voice: c.voice,
+            eventqueues: c.eventqueues,
         }
     }
 
@@ -78,6 +82,7 @@ impl ComponentSet {
     fn to_config(self) -> ComponentsConfig {
         ComponentsConfig {
             flows: self.flows,
+            tinyflows: self.tinyflows,
             memes: self.memes,
             documents: self.documents,
             search: self.search,
@@ -92,6 +97,7 @@ impl ComponentSet {
             channels: self.channels,
             skills: self.skills,
             voice: self.voice,
+            eventqueues: self.eventqueues,
         }
     }
 
@@ -139,6 +145,7 @@ impl ComponentSet {
     pub fn narrow_services(&self, host: ServiceSet) -> ServiceSet {
         let mut s = host;
         s.channels &= self.channels;
+        s.cron &= self.tinyflows;
         s.memory_queue &= self.memory;
         s.memory_sync &= self.memory;
         s.skill_catalog_refresh &= self.skills;

@@ -14,7 +14,6 @@ fn expected_memory() -> serde_json::Value {
             "query": {"type": "string", "description": "fetch: what to search for."},
             "mode": {"type": "string", "enum": ["hybrid", "keyword", "vector"], "description": "fetch: retrieval mode; only the engine's declared modes work (hybrid is always safe)."},
             "filter": {"type": "object", "description": "recall/fetch: metadata filter, e.g. {\"kinds\": [\"learning\"], \"workspace\": \"/path\", \"repo\": \"owner/name\"}."},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "recall/fetch: most results."},
             "cursor": {"type": "string", "description": "fetch: next-page cursor."},
             "refers_to": {
                 "type": "object",
@@ -38,5 +37,7 @@ fn expected_memory() -> serde_json::Value {
 #[test]
 fn memory_static_schema_matches_json_literal() {
     let tool = MemoryTool::new(std::sync::Arc::new(crate::config::Config::default()));
+    assert_eq!(MEMORY_TOOL_NAME, "memory");
+    assert_eq!(tinytools::Tool::name(&tool), "memory");
     assert_eq!(tinytools::Tool::parameters_schema(&tool), expected_memory());
 }

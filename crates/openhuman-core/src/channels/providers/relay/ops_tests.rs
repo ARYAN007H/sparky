@@ -1,8 +1,8 @@
 use super::super::channel::CHANNEL_OUTBOUND_EVENT;
 use super::*;
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
-use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+use crate::security::turn_origin::AgentTurnOrigin;
 use std::sync::Mutex;
 
 #[tokio::test]
@@ -27,18 +27,19 @@ async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
                 .unwrap()
                 .derive_channel_turn(Some(thread.clone()), None),
             async {
-                crate::agent::turn_origin::with_origin(origin, async {
+                crate::security::turn_origin::with_origin(origin, async {
                     let (child_thread, child_agent, child_origin) =
-                        crate::core::runtime::spawn_scoped(async {
-                            (
-                                CoreContext::current_channel_thread(),
-                                CoreContext::scoped()
-                                    .and_then(|ctx| ctx.session_agent().map(str::to_owned)),
-                                crate::agent::turn_origin::current(),
-                            )
-                        })
-                        .await
-                        .unwrap();
+                        crate::core::runtime::DispatchCtx::ambient()
+                            .spawn(async {
+                                (
+                                    CoreContext::current_channel_thread(),
+                                    CoreContext::scoped()
+                                        .and_then(|ctx| ctx.session_agent().map(str::to_owned)),
+                                    crate::security::turn_origin::current(),
+                                )
+                            })
+                            .await
+                            .unwrap();
                     assert_eq!(child_thread.as_deref(), Some(thread.as_str()));
                     assert_eq!(child_agent.as_deref(), Some("relay-agent"));
                     assert!(matches!(
@@ -226,31 +227,27 @@ async fn invalid_or_repeated_messages_start_no_turn() {
         ContextOverlay::new(config, DomainSet::full(), Default::default()),
     );
 
-    CoreContext::scope(ctx, async {
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(ctx);
+
         let mut bad = params("m1", "hello");
         bad.chat_id = "a/b".into();
-        let err = channel_relay_inbound(&crate::core::runtime::DispatchCtx::ambient(), bad)
+        let err = channel_relay_inbound(&scope_ctx, bad)
             .await
             .expect_err("invalid");
         assert!(err.contains("chat_id"), "{err}");
 
         let p = params("m1", "hello");
         let thread = p.thread_id();
-        store::record_inbound(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            &workspace,
-            &p,
-            &thread,
-        )
-        .await
-        .unwrap();
-        let outcome = channel_relay_inbound(&crate::core::runtime::DispatchCtx::ambient(), p)
+        store::record_inbound(&scope_ctx, &workspace, &p, &thread)
+            .await
+            .unwrap();
+        let outcome = channel_relay_inbound(&scope_ctx, p)
             .await
             .expect("duplicate is not an error");
         let value = outcome.into_cli_compatible_json().unwrap();
         let text = value.to_string();
         assert!(text.contains("\"duplicate\":true"), "{text}");
         assert!(text.contains(&thread), "{text}");
-    })
-    .await;
+    };
 }

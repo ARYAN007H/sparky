@@ -51,16 +51,7 @@ static CALLBACKS: tokio::sync::OnceCell<Result<(), String>> = tokio::sync::OnceC
 /// a host callback cannot be served. The outcome is cached: a runtime that
 /// failed to start does not start on a later call.
 pub async fn runtime() -> tinybus::Result<&'static ModuleRuntime> {
-    let started = RUNTIME.get_or_init(|| {
-        let names = RuntimeNames {
-            thread: "openhuman-module-bus".to_string(),
-            worker: "openhuman-module-worker".to_string(),
-        };
-        ModuleRuntime::start(&names, None).map_err(|error| error.to_string())
-    });
-    let runtime = started
-        .as_ref()
-        .map_err(|error| tinybus::Error::Transport(error.clone()))?;
+    let runtime = runtime_now()?;
     CALLBACKS
         .get_or_init(|| async {
             // On the module runtime, not the caller's: the callbacks serve
@@ -77,15 +68,37 @@ pub async fn runtime() -> tinybus::Result<&'static ModuleRuntime> {
     Ok(runtime)
 }
 
+/// Schedule host lifecycle cleanup without loading a module or installing callbacks.
+pub(crate) fn spawn_cleanup<F>(future: F) -> tinybus::Result<tokio::task::JoinHandle<F::Output>>
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    Ok(runtime_now()?.spawn(future))
+}
+
+fn runtime_now() -> tinybus::Result<&'static ModuleRuntime> {
+    let started = RUNTIME.get_or_init(|| {
+        let names = RuntimeNames {
+            thread: "openhuman-module-bus".to_string(),
+            worker: "openhuman-module-worker".to_string(),
+        };
+        ModuleRuntime::start(&names, None).map_err(|error| error.to_string())
+    });
+    let runtime = started
+        .as_ref()
+        .map_err(|error| tinybus::Error::Transport(error.clone()))?;
+    Ok(runtime)
+}
+
 /// Serve the host objects modules call back into, before any module loads.
 async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<()> {
     let connection = runtime.connection();
 
     // The summary callback exists for the module alone; with the component off
     // the module never loads, so nothing would call it.
-    let juice_on = crate::core::runtime::context::CoreContext::current()
-        .is_none_or(|ctx| ctx.components().juice);
-    if juice_on {
+    let host = crate::core::runtime::DispatchCtx::host_default();
+    if host.components().juice {
         super::tokenjuice_host::install(connection).await?;
     } else {
         tracing::debug!("[modules] juice component off; MlHost not served");
@@ -94,9 +107,7 @@ async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<(
     super::storage_host::install(connection, runtime.host()).await?;
     #[cfg(feature = "tinymemes")]
     {
-        let memes_on = crate::core::runtime::context::CoreContext::current()
-            .is_none_or(|ctx| ctx.components().memes);
-        if memes_on {
+        if host.components().memes {
             crate::tinymemes::service::install(connection).await?;
         } else {
             tracing::debug!("[modules] memes component off; Host callbacks not served");
@@ -104,6 +115,16 @@ async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<(
     }
     #[cfg(feature = "web3")]
     super::wallet_host::install(connection).await?;
+    // Deliver / ClassifySalience for the inbound event queues; with the
+    // component off the module never loads, so nothing would call them.
+    #[cfg(feature = "inbound-queues")]
+    {
+        if host.components().eventqueues {
+            crate::inbound::host::install(connection).await?;
+        } else {
+            tracing::debug!("[modules] eventqueues component off; inbound Host not served");
+        }
+    }
     Ok(())
 }
 
@@ -114,6 +135,27 @@ async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<(
 #[must_use]
 pub fn is_started() -> bool {
     RUNTIME.get().is_some_and(Result::is_ok)
+}
+
+/// Whether `id` is admitted and currently serving on an already-started
+/// module runtime. This is a read-only snapshot; it never starts the runtime.
+#[must_use]
+pub fn is_module_serving(id: &str) -> bool {
+    let Some(record) = crate::modules::registry::find(id) else {
+        return false;
+    };
+    let Some(Ok(runtime)) = RUNTIME.get() else {
+        return false;
+    };
+    runtime.host().list().into_iter().any(|module| {
+        module.manifest.bus_name.as_str() == record.bus_name
+            && module.manifest.object_path.as_str() == record.object_path
+            && module.enabled
+            && matches!(
+                module.state,
+                tinybus::module::ModuleState::Ready | tinybus::module::ModuleState::Serving
+            )
+    })
 }
 
 #[cfg(test)]

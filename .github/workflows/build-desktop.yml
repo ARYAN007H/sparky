@@ -136,6 +136,11 @@ jobs:
       OPENHUMAN_TELEGRAM_BOT_USERNAME: ${{ inputs.telegram_bot_username }}
       VITE_TELEGRAM_BOT_USERNAME: ${{ inputs.telegram_bot_username }}
     steps:
+      # The TinyFlows fixture tree contains paths beyond MAX_PATH. Configure
+      # Git before checkout so recursive submodule checkout can create them.
+      - name: Enable long Git paths
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
       - name: Checkout build ref
         uses: actions/checkout@v7
         with:
@@ -161,7 +166,7 @@ jobs:
         with:
           node-version: 24.x
       - name: Install Rust (rust-toolchain.toml)
-        uses: dtolnay/rust-toolchain@1.96.1
+        uses: dtolnay/rust-toolchain@1.99.1
         with:
           targets: ${{ matrix.settings.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - name: Ensure macOS cross target on the toolchain-file toolchain
@@ -527,6 +532,10 @@ jobs:
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_TAURI }}
           SENTRY_RELEASE: openhuman@${{ inputs.version }}+${{ inputs.short_sha }}
+          # Deliberate skip of `releases set-commits` (#8104): the current token
+          # gets a 403 on it. Set the repo variable SENTRY_SKIP_SET_COMMITS=0
+          # once the token can associate commits; a failure then fails the build.
+          SENTRY_SKIP_SET_COMMITS: ${{ vars.SENTRY_SKIP_SET_COMMITS || '1' }}
           VERSION: ${{ inputs.version }}
           MATRIX_TARGET: ${{ matrix.settings.target }}
           PROFILE: ${{ inputs.build_profile }}
@@ -557,6 +566,10 @@ jobs:
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_CORE }}
           SENTRY_RELEASE: openhuman@${{ inputs.version }}+${{ inputs.short_sha }}
+          # Deliberate skip of `releases set-commits` (#8104): the current token
+          # gets a 403 on it. Set the repo variable SENTRY_SKIP_SET_COMMITS=0
+          # once the token can associate commits; a failure then fails the build.
+          SENTRY_SKIP_SET_COMMITS: ${{ vars.SENTRY_SKIP_SET_COMMITS || '1' }}
           VERSION: ${{ inputs.version }}
           MATRIX_TARGET: ${{ matrix.settings.target }}
           PROFILE: ${{ inputs.build_profile }}

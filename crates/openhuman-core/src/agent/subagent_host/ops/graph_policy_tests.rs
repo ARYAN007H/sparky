@@ -129,7 +129,7 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         vec![],
         allowed,
         10,
-        None,
+        (None, None),
         None,
         "researcher",
         "task-6157",
@@ -144,6 +144,7 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         "root-session__spawn_refusal",
         "mock-channel",
         AgentTokenjuiceCompression::Off,
+        None,
         None,
     )
     .await
@@ -232,6 +233,7 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
 
     // The typed path (`TranscriptEntry::ToolResults`), used on a normal run.
     mirror_worker_thread(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &dir,
         "worker-typed",
         "researcher",
@@ -259,6 +261,7 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
 
     // The error-recovery path (`role: "tool"`), used when a run fails mid-turn.
     mirror_worker_thread_from_history(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &dir,
         "worker-recovered",
         "researcher",

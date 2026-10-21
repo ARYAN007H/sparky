@@ -6,30 +6,21 @@ use super::failure_classification::classify_agent_anyhow_for_user;
 use super::origin_context::build_run_prompt;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
-use {tinyflows_schedule::types::CronJob, tinyflows_schedule::types::SessionTarget};
+use {tinyflows_bus::schedule::types::CronJob, tinyflows_bus::schedule::types::SessionTarget};
 
 /// Recency window the morning briefing installs around its turn so Composio
 /// task-fetch tools only surface tasks created/changed in the last day. Read
 /// by the `composio_execute` handler via the run context (`OpenHumanRunExt`).
 pub(super) const MORNING_BRIEFING_TASK_RECENCY_SECS: u64 = 24 * 60 * 60;
 
-/// [`run_agent_job_for_run`] under a fresh run id.
-#[cfg(test)]
-pub(super) async fn run_agent_job(
-    config: &Config,
-    job: &CronJob,
-) -> (bool, String, Option<String>) {
-    let run_id = uuid::Uuid::new_v4().to_string();
-    run_agent_job_for_run(config, job, &run_id).await
-}
-
 pub(super) async fn run_agent_job_for_run(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
     run_id: &str,
 ) -> (bool, String, Option<String>) {
     let name = job.name.clone().unwrap_or_else(|| "cron-job".to_string());
-    let prefixed_prompt = build_run_prompt(config, job, &name).await;
+    let prefixed_prompt = build_run_prompt(ctx, config, job, &name).await;
 
     // Apply per-job model override onto a cloned Config, so the Agent
     // sees it through the normal `default_model` path without mutating
@@ -60,7 +51,7 @@ pub(super) async fn run_agent_job_for_run(
     } else {
         let agent_id = selected_agent_id;
         if let Some(registry) =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
         {
             if let Some(def) = registry.get(agent_id) {
                 tracing::debug!(
@@ -92,7 +83,8 @@ pub(super) async fn run_agent_job_for_run(
                         // discarded — `create_chat_model_with_model_id` wraps the
                         // same `create_chat_provider` resolution, so the model id is
                         // identical; temperature is irrelevant to id resolution.
-                        match crate::inference::provider::create_chat_model_with_model_id(
+                        match crate::inference::provider::create_chat_model_with_model_id_in(
+                            ctx,
                             workload,
                             &effective,
                             effective.default_temperature,
@@ -152,7 +144,7 @@ pub(super) async fn run_agent_job_for_run(
                 target = ?job.session_target,
                 "[cron] building isolated agent for scheduled job"
             );
-            match build_agent_for_cron_job(&effective, job) {
+            match build_agent_for_cron_job(ctx, &effective, job) {
                 Ok(BuiltCronAgent { mut agent, context }) => {
                     // Tag events so downstream subscribers can correlate
                     // cron-triggered turns. `cron` is the channel so the
@@ -187,7 +179,7 @@ pub(super) async fn run_agent_job_for_run(
                     // that channel's turn instead, so its external-effect
                     // tools stay gated like its creator's were.
                     let origin = crate::cron::origin::turn_origin_for_job_run(job, run_id);
-                    let turn = crate::agent::turn_origin::with_origin(
+                    let turn = crate::security::turn_origin::with_origin(
                         origin,
                         agent.run_single(&prefixed_prompt),
                     );
@@ -269,6 +261,7 @@ pub(super) struct BuiltCronAgent {
 /// Build the session a cron agent job runs: the host-registered agent named
 /// by `job.agent_id` when there is one, else the registry definition.
 pub(super) fn build_agent_for_cron_job(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
 ) -> anyhow::Result<BuiltCronAgent> {
@@ -276,10 +269,18 @@ pub(super) fn build_agent_for_cron_job(
         .agent_id
         .as_deref()
         .and_then(crate::agent::host_agents::resolve);
-    build_cron_agent(config, job, host_agent)
+    build_cron_agent(ctx, config, job, host_agent)
 }
 
+#[cfg(test)]
+#[path = "agent_run_tests.rs"]
+pub(super) mod tests;
+
+#[cfg(test)]
+pub(super) use tests::run_agent_job;
+
 fn build_cron_agent(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
     host_agent: Option<crate::agent::host_agents::HostAgent>,
@@ -304,7 +305,7 @@ fn build_cron_agent(
         });
     }
     let agent_id = job.agent_id.as_deref().unwrap_or("orchestrator");
-    match OpenHumanSessionHost::from_config_for_agent(config, agent_id) {
+    match OpenHumanSessionHost::from_config_for_agent(ctx, config, agent_id) {
         Ok(agent) => {
             tracing::debug!(
                 job_id = %job.id,
@@ -323,7 +324,7 @@ fn build_cron_agent(
                 error = %e,
                 "[cron] failed to build agent from definition; falling back to canonical orchestrator"
             );
-            OpenHumanSessionHost::from_config_for_agent(config, "orchestrator").map(|agent| {
+            OpenHumanSessionHost::from_config_for_agent(ctx, config, "orchestrator").map(|agent| {
                 BuiltCronAgent {
                     agent,
                     context: None,

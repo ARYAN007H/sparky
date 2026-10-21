@@ -684,7 +684,6 @@ const messages: TranslationMap = {
     'Inventario degli strumenti, posizione della politica, allowlist MCP e blocchi recenti',
   'devOptions.toolPolicyDiagnostics.loading': 'Caricamento…',
   'devOptions.toolPolicyDiagnostics.unavailable': 'Diagnostica non disponibile',
-  'voice.pushToTalk': 'Push to talk',
   'misc.somethingWentWrong': 'Qualcosa è andato storto',
   'misc.beta':
     'OpenHuman è in beta iniziale. Sentiti libero di condividere feedback o segnalare bug che incontri: ogni segnalazione ci aiuta a rilasciare più velocemente.',
@@ -1202,13 +1201,9 @@ const messages: TranslationMap = {
   'mnemonic.createANewWallet': 'Crea un nuovo portafoglio',
   'mnemonic.importWallet': 'Importa portafoglio',
   'team.deleting': 'Eliminazione in corso...',
-  'voice.tapToToggle': 'Tocca per attivare/disattivare',
   'voice.settingsSaved': 'Impostazioni vocali salvate.',
   'voice.failedToLoadSettings': 'Impossibile caricare le impostazioni vocali',
   'voice.failedToSaveSettings': 'Impossibile salvare le impostazioni vocali',
-  'voice.debug.alwaysOn': 'Ascolto sempre attivo',
-  'voice.debug.alwaysOnDesc':
-    'Mantieni il microfono aperto e invia automaticamente ciò che dici all’agente, senza scorciatoia. Si mette in pausa quando lo schermo è bloccato.',
   'voice.providers.saved': 'Fornitori di servizi vocali salvati.',
   'voice.providers.failedToSave': 'Impossibile salvare i provider vocali',
   'voice.mode.start': 'Avvia la chat vocale',
@@ -1274,28 +1269,6 @@ const messages: TranslationMap = {
   'voice.routing.elevenlabsVoiceIdAria': 'ID voce ElevenLabs (personalizzato)',
   'voice.routing.elevenlabsVoiceDesc':
     'Scegli una voce selezionata o incolla un ID voce personalizzato dalla tua dashboard ElevenLabs.',
-  'pttSettings.title': 'Premi per parlare',
-  'pttSettings.description':
-    'Tieni premuto un tasto per parlare con OpenHuman mentre sei in un’altra app. Al rilascio l’audio viene inviato; se «Leggi le risposte» è attivo, OpenHuman risponde a voce.',
-  'pttSettings.shortcutLabel': 'Scorciatoia',
-  'pttSettings.shortcutPlaceholder': 'Premi un tasto (es. F13)',
-  'pttSettings.shortcutUnsetHint':
-    'Premi per parlare è disattivato: scegli una scorciatoia per attivarlo.',
-  'pttSettings.speakRepliesLabel': 'Pronuncia le risposte dell’agente',
-  'pttSettings.showOverlayLabel': 'Mostra il riquadro mentre il tasto è premuto',
-  'pttSettings.errorConflictsWithDictation':
-    'Questa scorciatoia è già usata dalla dettatura. Scegli un tasto diverso.',
-  'pttSettings.errorModifierOnly':
-    'Scegli un tasto normale (es. F13): le scorciatoie con soli modificatori non funzionano per premi per parlare.',
-  'pttSettings.errorEmpty': 'Scegli un tasto da assegnare.',
-  'pttSettings.errorAccessibility':
-    'macOS richiede l’autorizzazione Accessibilità per questa scorciatoia. Apri Impostazioni di sistema → Privacy e sicurezza → Accessibilità e attiva OpenHuman.',
-  'pttSettings.errorShortcutInUse':
-    'Un’altra app utilizza già questa scorciatoia. Scegline una diversa.',
-  'pttSettings.errorUnsupportedWayland':
-    'Le sessioni Wayland non supportano ancora le scorciatoie globali in OpenHuman: passa a una sessione X11 o usa l’interruttore di dettatura nell’app.',
-  'pttOverlay.listening': 'In ascolto…',
-  'pttOverlay.idle': 'In attesa',
   'composio.triageTitle': 'Trigger delle integrazioni',
   'composio.triageDesc':
     "Quando attivo, ogni trigger Composio in arrivo passa per uno step di triage AI che classifica l'evento e può avviare azioni automatiche: un turno LLM locale per trigger. Disabilita globalmente o per singola integrazione se preferisci la revisione manuale. Se la variabile d'ambiente",
@@ -2402,10 +2375,6 @@ const messages: TranslationMap = {
   'oauth.button.loopbackTimeout':
     'Accesso scaduto: il browser non ha completato il reindirizzamento OAuth. Riprova.',
   'openhuman.team_list_teams': 'Elenco team',
-  'overlay.ariaAttention': 'Messaggio di attenzione',
-  'overlay.ariaOrb': 'Overlay OpenHuman',
-  'overlay.ariaVoiceActive': 'Input vocale attivo',
-  'overlay.orbTitle': 'Trascina per spostare · Doppio clic per ripristinare la posizione',
   'pages.settings.account.migration': 'Importa',
   'pages.settings.account.migrationDesc':
     'Migra memoria e note da OpenClaw (e presto Hermes) in questo spazio di lavoro.',
@@ -3305,27 +3274,6 @@ const messages: TranslationMap = {
   'skills.install.urlLabel': 'URL skill',
   'skills.install.urlPlaceholder': 'https://raw.githubusercontent.com/owner/repo/main/SKILL.md',
   'skills.search.placeholder': 'Segnaposto',
-  'skills.setup.voice.activation': 'Attivazione',
-  'skills.setup.voice.activeDescPrefix': 'Fn',
-  'skills.setup.voice.activeDescSuffix': 'Fn',
-  'skills.setup.voice.activeTitle': 'Voice Intelligence attivo',
-  'skills.setup.voice.customizeSettings': 'Personalizza impostazioni',
-  'skills.setup.voice.downloadSttBtn': 'Apri impostazioni voce',
-  'skills.setup.voice.enableDesc': 'Descrizione abilitazione',
-  'skills.setup.voice.hotkey': 'Tasto di scelta rapida',
-  'skills.setup.voice.startBtn': 'Avvio...',
-  'skills.setup.voice.startError': 'Avvio del server vocale fallito',
-  'skills.setup.voice.starting': 'Avvio...',
-  'skills.setup.voice.stepEnable': 'Avvia il server vocale',
-  'skills.setup.voice.stepSetup': 'Configurazione della trascrizione vocale richiesta',
-  'skills.setup.voice.stepSuccess': 'Pronto',
-  'skills.setup.voice.sttNotReady': 'Modello speech-to-text non pronto',
-  'skills.setup.voice.sttNotReadyDesc':
-    'Voice Intelligence richiede un motore di riconoscimento vocale funzionante. Scegline uno in Impostazioni › Voce.',
-  'skills.setup.voice.sttReady': 'Modello speech-to-text pronto',
-  'skills.setup.voice.sttReturnHint':
-    'Configura un motore di trascrizione vocale nelle impostazioni voce, poi torna qui per avviare la voce.',
-  'skills.setup.voice.title': 'Intelligenza vocale',
   'skills.uninstall.description':
     "Questa operazione elimina permanentemente la directory della skill e tutte le sue risorse incluse. L'agente smetterà di vederla al turno successivo.",
   'upsell.global.limitMessage': 'Aggiorna il tuo piano o ricarica i crediti per continuare',
@@ -3443,11 +3391,42 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': 'Pronto',
   'chat.artifact.failed': 'Generazione fallita',
+  'chat.artifact.savedNotShown': 'Salvato, ma non aggiornato nella cartella Files',
   'chat.artifact.download': 'Scarica',
   'chat.artifact.downloading': 'Scaricamento…',
   'chat.artifact.download_failed': 'Download fallito: {reason}',
   'chat.artifact.retry': 'Riprova',
   'chat.artifact.reveal': 'Mostra nella cartella',
+  'chat.artifact.preview': 'Anteprima',
+  'chat.artifact.notFound': 'Questo artefatto non è più disponibile.',
+  'chat.artifact.panel.close': 'Chiudi pannello',
+  'chat.artifact.panel.resize': 'Ridimensiona pannello',
+  'chat.artifact.tabs.aria': 'Artefatti aperti',
+  'chat.artifact.tab.close': 'Chiudi {title}',
+  'chat.artifact.view.aria': 'Vista',
+  'chat.artifact.view.preview': 'Anteprima',
+  'chat.artifact.view.code': 'Codice',
+  'chat.artifact.copy': 'Copia negli appunti',
+  'chat.artifact.copied': 'Copiato',
+  'chat.artifact.autosave.saved': 'Salvato',
+  'chat.artifact.autosave.pending': 'Modifiche non salvate',
+  'chat.artifact.autosave.saving': 'Salvataggio…',
+  'chat.artifact.autosave.error': 'Non salvato',
+  'chat.artifact.kind.text': 'Testo',
+  'chat.artifact.kind.markdown': 'Markdown',
+  'chat.artifact.kind.html': 'HTML',
+  'chat.artifact.kind.image': 'Immagine',
+  'chat.artifact.kind.file': 'File',
+  'chat.artifact.noPreview': 'Nessuna anteprima per questo file. Scaricalo per aprirlo.',
+  'chat.artifact.htmlPreview': 'Anteprima HTML',
+  'chat.artifact.editor': 'Sorgente dell’artefatto',
+  'chat.artifact.share': 'Condividi: carica e copia un link',
+  'chat.artifact.share.failed': 'Non condiviso: {reason}',
+  'chat.artifact.share.copied': 'Link copiato',
+  'chat.artifact.share.ready': 'Link pronto',
+  'chat.artifact.share.expires': 'scade il {date}',
+  'chat.artifact.share.copyLink': 'Copia il link completo',
+  'chat.artifact.share.copy': 'Copia',
 
   // Chat: files panel (#3024)
   'chat.files.chip.aria.one': '{count} file in questa chat',
@@ -3575,8 +3554,6 @@ const messages: TranslationMap = {
     "È stato rilevato un override OPENHUMAN_APPROVAL_GATE=0 ma è stato ignorato: l'app desktop mantiene sempre attiva la porta di approvazione.",
 
   // Run queue
-  'notch.ready': 'Pronto',
-  'notch.listening': 'Ascolto…',
 
   'orchestration.detail.stop': 'Arresta',
 
@@ -3764,7 +3741,6 @@ const messages: TranslationMap = {
   'voice.routing.testOk': 'In corso',
   'voice.routing.testFailed': 'Non riuscito',
   'voice.routing.unsaved': 'Modifiche non salvate',
-  'pttSettings.clearShortcut': 'Cancella',
   'flows.allRuns.tableTitle': 'Esecuzioni',
   'flows.allRuns.columnStatus': 'Stato',
   'flows.allRuns.columnWorkflow': 'Flusso di lavoro',
@@ -3817,7 +3793,7 @@ const messages: TranslationMap = {
   'settings.embeddings.modelCardTitle': 'Modello e dimensioni',
   'mcp.rows.searchPlaceholder': 'Cerca server...',
   'mcp.tab.section.clients': 'Clienti',
-  'voice.pageDesc': 'Motori speech, come sono instradati e push-to-talk.',
+  'voice.pageDesc': 'Motori vocali e instradamento dei provider.',
   'voice.providers.cardDesc':
     'Accendi i motori che vuoi usare. Le chiavi rimangono su questo dispositivo.',
   'voice.providers.cap.stt': 'Discorso al testo',
@@ -5136,6 +5112,12 @@ const messages: TranslationMap = {
   'conversations.tools.checkArtifacts.done': 'Artefatti verificati',
   'conversations.tools.deleteArtifact.active': "Eliminazione dell'artefatto",
   'conversations.tools.deleteArtifact.done': 'Artefatto eliminato',
+  'conversations.tools.createArtifact.active': "Creazione dell'artefatto",
+  'conversations.tools.createArtifact.done': 'Artefatto creato',
+  'conversations.tools.updateArtifact.active': "Aggiornamento dell'artefatto",
+  'conversations.tools.updateArtifact.done': 'Artefatto aggiornato',
+  'conversations.tools.shareArtifact.active': "Condivisione dell'artefatto",
+  'conversations.tools.shareArtifact.done': 'Artefatto condiviso',
   'flows.suggest.trigger.schedule': 'Pianificato',
   'flows.suggest.trigger.app_event': 'Su evento',
   'flows.suggest.trigger.manual': 'Su richiesta',

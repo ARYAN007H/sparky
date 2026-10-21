@@ -25,7 +25,8 @@ use std::time::Duration;
 
 use super::host::ProfileHost;
 use crate::core::runtime::CoreContext;
-use crate::memory::lifecycle::jobs::{self, Selection};
+use crate::memory::lifecycle::jobs;
+use tinymemory_tools::queue::Selection;
 
 /// How often the loop visits the profiles.
 pub const TICK_INTERVAL: Duration = Duration::from_secs(60);
@@ -40,8 +41,11 @@ pub struct TickReport {
 }
 
 /// Start the loop. It runs until the process exits.
-pub fn spawn(host: Arc<ProfileHost>) -> tokio::task::JoinHandle<()> {
-    crate::core::runtime::spawn_scoped(async move {
+pub fn spawn(
+    ctx: &crate::core::runtime::DispatchCtx,
+    host: Arc<ProfileHost>,
+) -> tokio::task::JoinHandle<()> {
+    ctx.spawn(async move {
         log::info!(
             "[profiles][background] started (every {}s)",
             TICK_INTERVAL.as_secs()

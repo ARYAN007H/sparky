@@ -2,8 +2,8 @@ use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
 use tinyinference_llm::tool::ToolSchema;
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::OpenHumanSessionHost;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::all;
 use crate::security::{SecurityPolicy, ToolOperation};
 
@@ -209,7 +209,9 @@ async fn enforce_act_policy(ctx: &DispatchCtx, tool_name: &str) -> Result<(), To
         .map_err(ToolCallError::InvalidParams)
 }
 
-async fn load_config_and_init_registry(ctx: &DispatchCtx) -> Result<crate::config::Config, ToolCallError> {
+async fn load_config_and_init_registry(
+    ctx: &DispatchCtx,
+) -> Result<crate::config::Config, ToolCallError> {
     let config = ctx
         .load_config()
         .await
@@ -222,14 +224,15 @@ async fn load_config_and_init_registry(ctx: &DispatchCtx) -> Result<crate::confi
     Ok(config)
 }
 
-async fn build_orchestrator_agent(ctx: &DispatchCtx) -> Result<OpenHumanSessionHost, ToolCallError> {
+async fn build_orchestrator_agent(
+    ctx: &DispatchCtx,
+) -> Result<OpenHumanSessionHost, ToolCallError> {
     let config = load_config_and_init_registry(ctx).await?;
-    let mut agent =
-        OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator").map_err(|err| {
+    let mut agent = OpenHumanSessionHost::from_config_for_agent(ctx, &config, "orchestrator")
+        .map_err(|err| {
             ToolCallError::Internal(format!("failed to build orchestrator agent: {err}"))
         })?;
-    agent.fetch_connected_integrations().await;
-    agent.refresh_delegation_tools();
+    agent.refresh_prompt_surface().await;
     Ok(agent)
 }
 
@@ -319,7 +322,10 @@ async fn list_subagents(ctx: &DispatchCtx) -> Result<Value, ToolCallError> {
     }))
 }
 
-async fn run_subagent_tool(ctx: &DispatchCtx, params: &Map<String, Value>) -> Result<Value, ToolCallError> {
+async fn run_subagent_tool(
+    ctx: &DispatchCtx,
+    params: &Map<String, Value>,
+) -> Result<Value, ToolCallError> {
     use super::super::subagent_depth;
 
     let agent_id = validated_param(params, "agent_id")?;
@@ -342,21 +348,20 @@ async fn run_subagent_tool(ctx: &DispatchCtx, params: &Map<String, Value>) -> Re
 
     let config = load_config_and_init_registry(ctx).await?;
     let mut agent =
-        OpenHumanSessionHost::from_config_for_agent(&config, agent_id).map_err(|err| {
+        OpenHumanSessionHost::from_config_for_agent(ctx, &config, agent_id).map_err(|err| {
             ToolCallError::InvalidParams(format!("failed to build agent `{agent_id}`: {err}"))
         })?;
     agent.set_event_context(
         format!("mcp:{}:{}", agent_id, uuid::Uuid::new_v4()),
         "mcp_server",
     );
-    agent.fetch_connected_integrations().await;
-    agent.refresh_delegation_tools();
+    agent.refresh_prompt_surface().await;
 
     // The MCP server surface exposes openhuman agents to remote MCP
     // clients. Treat callers as ExternalChannel — their prompt text is
     // remote-controlled and any external_effect tool the agent tries to
     // run must route through the gate's audit + TTL-deny path.
-    let origin = crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+    let origin = crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
         sender_name: None,
         channel: "mcp_server".to_string(),
         // MCP server callers don't carry a per-user identity at this
@@ -374,7 +379,7 @@ async fn run_subagent_tool(ctx: &DispatchCtx, params: &Map<String, Value>) -> Re
     // `handle_json_value` dispatch above it) keeps a small stack frame.
     let response = Box::pin(subagent_depth::scope(
         child_depth,
-        crate::agent::turn_origin::with_origin(origin, agent.run_single(prompt)),
+        crate::security::turn_origin::with_origin(origin, agent.run_single(prompt)),
     ))
     .await
     .map_err(|err| ToolCallError::Internal(format!("subagent `{agent_id}` failed: {err}")))?;

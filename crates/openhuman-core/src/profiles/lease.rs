@@ -88,6 +88,12 @@ pub(crate) fn store_for(
                 backend.driver(),
                 ttl.as_millis()
             );
+            if !crate::storage::backend_has_cross_process_cas(backend.as_ref()) {
+                log::warn!(
+                    "[profiles][lease] driver={} does not claim SharedAcrossProcesses: its leases exclude only this process",
+                    backend.driver()
+                );
+            }
             DocumentLeases::cluster(backend.as_ref(), node, endpoint, ttl)
                 .map(|leases| Arc::new(leases) as Arc<dyn LeaseStore>)
                 .map_err(|e| format!("profile leases: {e}"))
@@ -141,11 +147,25 @@ pub struct HeartbeatReport {
 /// is gone (see the module docs).
 pub async fn renew_once(host: &ProfileHost) -> HeartbeatReport {
     let mut report = HeartbeatReport::default();
-    for (id, grant) in host.grants() {
+    for (id, _) in host.grants() {
+        // Renew and store the new grant under the host gate, which every
+        // close-and-release holds: a renewal supersedes the slot's grant in
+        // the lease store, so a release that took the slot's grant between
+        // the two would carry the superseded one and fail as lost. Read the
+        // grant again under the gate, since the slot may have moved on.
+        let gate = host.gate.lock().await;
+        let Some(grant) = host.grant_of(&id) else {
+            log::debug!("[profiles][lease] profile={id} closed before its renewal");
+            continue;
+        };
         let now = now_ms();
-        match host.leases().renew(&grant, now).await {
-            Ok(renewed) => {
-                host.store_grant(&id, &grant, renewed);
+        let outcome = host.leases().renew(&grant, now).await;
+        if let Ok(renewed) = &outcome {
+            host.store_grant(&id, &grant, renewed.clone());
+        }
+        drop(gate);
+        match outcome {
+            Ok(_) => {
                 report.renewed += 1;
             }
             Err(LeaseError::Lost) => {
@@ -172,7 +192,7 @@ pub async fn renew_once(host: &ProfileHost) -> HeartbeatReport {
 /// the operator context. Runs until the process exits.
 pub fn heartbeat(host: Arc<ProfileHost>, operator: Arc<crate::core::runtime::CoreContext>) {
     let every = renew_interval(host.saas().lease_ttl());
-    let renewals = crate::core::runtime::CoreContext::scope(operator, async move {
+    crate::core::runtime::DispatchCtx::new(operator).spawn(async move {
         log::info!(
             "[profiles][lease] heartbeat started every_ms={}",
             every.as_millis()
@@ -191,7 +211,6 @@ pub fn heartbeat(host: Arc<ProfileHost>, operator: Arc<crate::core::runtime::Cor
             }
         }
     });
-    crate::core::runtime::spawn_scoped(renewals);
 }
 
 #[cfg(test)]

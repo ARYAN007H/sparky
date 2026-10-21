@@ -198,7 +198,12 @@ async fn connect_tool_validates_before_gating_in_chat_context() {
         client_id: "c-test".into(),
         request_id: None,
     };
-    let result = tool.execute_with_context(serde_json::json!({ "toolkit": "google_drive" }), tinytools::ToolCallOptions::default(), Some(&chat_tool_context(ctx)))
+    let result = tool
+        .execute_with_context(
+            serde_json::json!({ "toolkit": "google_drive" }),
+            tinytools::ToolCallOptions::default(),
+            Some(&chat_tool_context(ctx)),
+        )
         .await
         .unwrap();
     assert!(result.is_error);
@@ -333,6 +338,7 @@ fn agent_tools_are_all_removed_when_composio_is_disabled_even_if_signed_in() {
 
 #[test]
 fn agent_tools_register_when_backend_signed_in() {
+    crate::integrations::composio::test_backend_route::register();
     let tmp = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");

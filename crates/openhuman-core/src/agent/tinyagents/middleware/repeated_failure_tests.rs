@@ -1,5 +1,40 @@
 use super::*;
 
+#[tokio::test]
+async fn classified_stop_cause_survives_the_latch_cleanup_on_agent_finish() {
+    use tinyagents_harness::{context::RunConfig, middleware::AgentRun, steering::SteeringPolicy};
+
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let handle = SteeringHandle::new(SteeringPolicy::new());
+    let middleware = RepeatedToolFailureMiddleware::new(handle, 3, slot);
+    middleware.policy.stop.halt_classified(
+        "classified summary".into(),
+        "uncertain_side_effect",
+        "web_answer_tool",
+        false,
+        String::new,
+    );
+    let mut run = AgentRun::default();
+    let mut context = RunContext::new(
+        RunConfig::new("classified-stop"),
+        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+    );
+
+    middleware
+        .after_agent(&mut context, &(), &mut run)
+        .await
+        .expect("middleware cleanup succeeds");
+
+    assert_eq!(
+        run.failure_cause,
+        Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+            class: "uncertain_side_effect".into(),
+            operation: "web_answer_tool".into(),
+            summary: "classified summary".into(),
+        })
+    );
+}
+
 #[test]
 fn identical_recoverable_halt_uses_openhuman_copy() {
     let ladder = RecoverableFailureLadder::default();
@@ -52,4 +87,37 @@ fn shell_missing_app_nudge_names_the_host_not_the_desktop_target() {
     };
     assert!(generic.contains("desktop target"));
     assert!(missing_program_nudge("shell", "jq: not found").contains("not available on this host"));
+}
+
+#[test]
+fn missing_connection_copy_keeps_its_typed_stop_category_and_operation() {
+    let policy = HostFailurePolicy::new(
+        SteeringHandle::allow_all(),
+        Arc::new(std::sync::Mutex::new(None)),
+    );
+    let context = tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new("typed-stop"),
+        OpenHumanRunContext::new(),
+    );
+    let call = TaToolCall {
+        id: "call-1".into(),
+        name: "web_fetch".into(),
+        arguments: serde_json::json!({}),
+        invalid: None,
+    };
+    let cause = policy
+        .halt_cause_for_call(
+            &context,
+            FailureStopKind::NoProgress,
+            Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+                class: "repeated_failure".into(),
+                operation: "web_fetch".into(),
+                summary: "old generic wording".into(),
+            }),
+            "[composio:error:composio_platform] service is not connected",
+            &call,
+        )
+        .expect("the same actionable blocker that changes the copy changes its category");
+    assert_eq!(cause.class, "missing_connection");
+    assert_eq!(cause.operation, "web_fetch");
 }

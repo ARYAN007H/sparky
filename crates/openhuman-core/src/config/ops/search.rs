@@ -18,8 +18,6 @@ use crate::core::Outcome;
 use crate::search::providers;
 use tinysearch_bus::{parse_role, role_key, ROLES};
 
-use super::loader::load_config_with_timeout;
-
 /// Partial update of one provider.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SearchProviderPatch {
@@ -289,13 +287,14 @@ pub fn apply_search_patch(config: &mut Config, update: SearchSettingsPatch) -> R
 
 /// Validate, save, refresh the module, and return the new settings.
 pub async fn apply_search_settings(
+    ctx: &DispatchCtx,
     config: &mut Config,
     update: SearchSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     apply_search_patch(config, update)?;
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
     #[cfg(feature = "modules")]
-    crate::modules::search::refresh_loaded(config).await?;
+    crate::modules::search::refresh_loaded(ctx, config).await?;
     tracing::debug!(
         enabled = crate::search::is_active(config),
         providers = ?config.search.enabled_provider_names(),
@@ -315,7 +314,7 @@ pub async fn load_and_apply_search_settings(
     update: SearchSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     let mut config = ctx.load_config().await?;
-    apply_search_settings(&mut config, update).await
+    apply_search_settings(ctx, &mut config, update).await
 }
 
 /// The settings view: every listed provider's resolved state, the role

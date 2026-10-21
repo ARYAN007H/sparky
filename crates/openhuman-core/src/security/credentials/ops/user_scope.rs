@@ -52,7 +52,7 @@ mod tests;
 /// anonymous pre-login conversation store is purged so a fresh account never
 /// inherits demo or scratch threads from the pre-login bucket (#1157).
 /// Returns human-readable log lines for the RPC outcome.
-pub(super) fn activate_user_scope(user_id: &str) -> Result<Vec<String>, String> {
+pub(super) fn activate_user_scope(ctx: &DispatchCtx, user_id: &str) -> Result<Vec<String>, String> {
     let mut logs = Vec::new();
     if !operator_user_activation_allowed() {
         log::debug!("{LOG_PREFIX} embedder host; skipping global user activation for {user_id}");
@@ -72,9 +72,17 @@ pub(super) fn activate_user_scope(user_id: &str) -> Result<Vec<String>, String> 
         // Shares `threads::store`' process-wide mutex with
         // `list_threads` / `purge_threads` on any workspace, so purge and
         // concurrent thread RPC in this process cannot interleave.
-        let pre_ws = pre_login_user_dir(&root_dir).join("workspace");
+        // The pre-login profile's workspace follows its layout (`workspace`
+        // for v1, `files` for v2). Detection only: this must not create the
+        // profile directory as a side effect.
+        let pre_dir = pre_login_user_dir(&root_dir);
+        let pre_ws = crate::config::schema::ProfileLayout::with_version(
+            pre_dir.clone(),
+            crate::config::schema::profile_layout::LayoutVersion::detect(&pre_dir),
+        )
+        .workspace_dir;
         let pre_ws_log = pre_ws.display().to_string();
-        match conversations::purge_threads(&DispatchCtx::ambient(), pre_ws) {
+        match conversations::purge_threads(ctx, pre_ws) {
             Ok(stats) => {
                 tracing::info!(
                     pre_login_workspace = %pre_ws_log,

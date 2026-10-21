@@ -56,7 +56,7 @@ impl OpenHumanTurnPrelude {
             .map_err(|error| RuntimeError::Driver(error.to_string()))?;
         let refresh_prompt = view.resumed && self.refreshes_prompt_on_resume();
         if refresh_prompt {
-            preparation.prefix = self.current_prompt_prefix(view);
+            preparation.prefix = self.current_prompt_prefix(view).await;
         }
         self.refresh_permanent_prefix(&mut preparation, view.prefix);
         if let Some(prefix) = preparation.prefix.as_ref() {
@@ -114,7 +114,11 @@ impl OpenHumanTurnPrelude {
     ///   rendered without them would replace a complete one;
     /// - the prompt cannot be rendered: the thread goes on under the one it
     ///   has rather than failing its turn.
-    fn current_prompt_prefix(&self, view: &SessionStateView<'_>) -> Option<PrefixSnapshot> {
+    ///
+    /// It is rendered as a new session's is (`cold_prompt_prefix`), so an
+    /// unchanged prompt is offered byte for byte as recorded and writes
+    /// nothing.
+    async fn current_prompt_prefix(&self, view: &SessionStateView<'_>) -> Option<PrefixSnapshot> {
         let unknown_extent = view.prefix.messages().is_empty()
             && matches!(view.history.first(), Some(Message::System(_)));
         if unknown_extent {
@@ -139,10 +143,8 @@ impl OpenHumanTurnPrelude {
             );
             return None;
         }
-        match self.build_system_prompt_tiered() {
-            Ok(tiered) => {
-                Some(super::super::prefix_snapshot::tiered_prefix_snapshot(&tiered).refreshing())
-            }
+        match self.cold_prompt_prefix().await {
+            Ok(prefix) => Some(prefix.refreshing()),
             Err(error) => {
                 tracing::warn!(
                     thread_id = ?self.thread_id,

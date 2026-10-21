@@ -11,7 +11,7 @@ use log::{info, warn};
 use serde_json::{json, Value};
 use tokio::sync::Semaphore;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 
 use super::agent::run_voice_turn;
 use super::chat_delivery::{
@@ -236,7 +236,8 @@ pub async fn handle_voice_harness_turn(
                 return;
             }
         };
-        let outcome = run_voice_turn(&ctx, &turn_cid, &turn_messages, &turn_prompt, progress_tx).await;
+        let outcome =
+            run_voice_turn(&ctx, &turn_cid, &turn_messages, &turn_prompt, progress_tx).await;
         // Hand the result to the foreground. If it already deferred (dropped the
         // receiver at the ack deadline), the send fails and we deliver the reply
         // into the user's chat instead.

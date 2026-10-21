@@ -63,15 +63,15 @@ async fn ambient_scope_reads_the_turn_and_prefers_the_subagent() {
     // binds when there is a context to bind it on.
     let ctx =
         crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
-    let (parent, child) = crate::core::runtime::CoreContext::scope(
-        ctx,
-        crate::agent::turn_origin::with_origin(origin, async {
+    let (parent, child) = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(ctx);
+        crate::security::turn_origin::with_origin(origin, async {
             async {
                 (
-                    UsageScope::in_ctx(&DispatchCtx::ambient(), Some("openhuman"), None)
+                    UsageScope::in_ctx(&scope_ctx, Some("openhuman"), None)
                         .with_definition(Some("orchestrator")),
                     UsageScope::in_ctx(
-                        &DispatchCtx::ambient(),
+                        &scope_ctx,
                         Some("openhuman"),
                         Some(("researcher", "task-1")),
                     )
@@ -79,9 +79,9 @@ async fn ambient_scope_reads_the_turn_and_prefers_the_subagent() {
                 )
             }
             .await
-        }),
-    )
-    .await;
+        })
+        .await
+    };
     assert_eq!(parent.thread_id.as_deref(), Some("thread-9"));
     assert_eq!(parent.origin.as_deref(), Some("web_chat"));
     assert_eq!(parent.agent_id.as_deref(), Some("orchestrator"));

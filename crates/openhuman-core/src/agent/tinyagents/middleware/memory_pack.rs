@@ -1,13 +1,13 @@
 //! Host source for the harness `MemoryPackMiddleware`.
 //!
 //! The session host recalls one pack per turn before the model runs
-//! (`memory::lifecycle::hooks::pre_turn`) and parks it on the run context
+//! (`memory::lifecycle::prefetch::pre_turn`) and parks it on the run context
 //! (`OpenHumanRunContext::memory_turn`). The harness middleware adds
 //! [`TurnMemoryPack`]'s text to every model request of that turn as an
 //! ephemeral instruction, so the pack is never committed to the thread's
 //! history or the provider's cached prefix.
 
-use tinyagents_harness::middleware::MemoryPackSource;
+use tinyagents_hooks::lifecycle::MemoryPackSource;
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
@@ -28,8 +28,8 @@ impl MemoryPackSource<OpenHumanRunContext> for TurnMemoryPack {
 
 /// The harness middleware over [`TurnMemoryPack`].
 pub(crate) fn memory_pack_middleware(
-) -> tinyagents_harness::middleware::MemoryPackMiddleware<OpenHumanRunContext, TurnMemoryPack> {
-    tinyagents_harness::middleware::MemoryPackMiddleware::new(TurnMemoryPack)
+) -> tinyagents_hooks::lifecycle::MemoryPackMiddleware<OpenHumanRunContext, TurnMemoryPack> {
+    tinyagents_hooks::lifecycle::MemoryPackMiddleware::new(TurnMemoryPack)
 }
 
 #[cfg(test)]

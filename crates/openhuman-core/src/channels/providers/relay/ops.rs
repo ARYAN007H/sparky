@@ -77,7 +77,7 @@ pub async fn channel_relay_inbound(
         chars = params.text.chars().count(),
         "[channels::relay] relayed message accepted"
     );
-    crate::core::runtime::spawn_scoped(run_relay_turn(
+    ctx.spawn(run_relay_turn(
         ctx.clone(),
         config,
         params,
@@ -154,7 +154,12 @@ pub(crate) async fn run_relay_turn(
         SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir)
             .with_privacy_mode(config.privacy.mode),
     );
-    let parts = match build_channel_turn_parts(&config, &security, PromptToolDescs::Registered) {
+    let parts = match build_channel_turn_parts(
+        &dispatch_ctx,
+        &config,
+        &security,
+        PromptToolDescs::Registered,
+    ) {
         Ok(parts) => parts,
         Err(error) => {
             tracing::error!(
@@ -185,6 +190,7 @@ pub(crate) async fn run_relay_turn(
     let mut channels_by_name: HashMap<String, Arc<dyn crate::channels::Channel>> = HashMap::new();
     channels_by_name.insert(params.channel.clone(), channel.clone());
     let mut runtime = runtime_context(
+        &dispatch_ctx,
         &config,
         parts,
         Arc::new(channels_by_name),
@@ -247,7 +253,7 @@ pub(crate) async fn run_relay_turn(
     let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
     let turn = process_channel_runtime_message(ctx, runtime_message);
-    if let Some(context) = crate::core::runtime::CoreContext::scoped() {
+    if let Some(context) = dispatch_ctx.core() {
         crate::core::runtime::CoreContext::scope(
             context.derive_channel_turn(Some(thread_id.clone()), None),
             Box::pin(turn),
@@ -262,7 +268,7 @@ pub(crate) async fn run_relay_turn(
     // Idle again: deliver anything that finished while the turn ran. No
     // `AgentTurnCompleted` maps to this thread, so nothing else would.
     drop(busy);
-    crate::agent::orchestration::background_delivery::kick_delivery(&thread_id);
+    crate::agent::orchestration::background_delivery::kick_delivery(&dispatch_ctx, &thread_id);
     tracing::info!(
         channel = %params.channel,
         thread_id = %thread_id,

@@ -1,7 +1,7 @@
 use super::*;
 
-use tinyflows_schedule::types::JobType;
-use tinyflows_schedule::types::Schedule;
+use tinyflows_bus::schedule::types::JobType;
+use tinyflows_bus::schedule::types::Schedule;
 // TAURI-RUST-514 — a BYO provider insufficient-credits 402 ("requires more
 // credits") leaks from a cron-fired agent job through `last_agent_error`.
 // `is_insufficient_credits_failure` must consult the message classifier so the
@@ -332,7 +332,7 @@ async fn cron_agent_job_uses_agent_definition_tool_scope() {
     // than relied upon from another test: `install_for_tests` is
     // `Once`-guarded, so a test that omits it passes only while some
     // earlier test in the same binary happened to run first.
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("init built-in agent definitions");
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
@@ -341,8 +341,10 @@ async fn cron_agent_job_uses_agent_definition_tool_scope() {
     job.name = Some("morning_briefing".into());
     job.agent_id = Some("morning_briefing".into());
 
-    let built = build_agent_for_cron_job(&config, &job).expect("build cron agent");
-    let visible = built.agent.visible_tool_names_for_test();
+    let built =
+        build_agent_for_cron_job(&crate::core::runtime::DispatchCtx::ambient(), &config, &job)
+            .expect("build cron agent");
+    let visible = built.agent.visible_tool_specs_arc();
 
     assert!(
         !visible.is_empty(),
@@ -353,20 +355,23 @@ async fn cron_agent_job_uses_agent_definition_tool_scope() {
 /// Runs `job_id` once through the schedule runtime (claim, execute, deliver,
 /// record, complete) the way a poll would find it: due now, never retried.
 async fn run_through_scheduler(config: &Config, job_id: &str) {
-    crate::cron::store::force_next_run_for_test(
+    crate::cron::store::tests::force_next_run_for_test(
         config,
         job_id,
         Utc::now() - ChronoDuration::seconds(1),
     )
     .unwrap();
-    let job = cron::get_job(config, job_id).unwrap();
     let security = Arc::new(SecurityPolicy::from_config(
         &config.autonomy,
         &config.workspace_dir,
         &config.action_dir,
     ));
-    let mut dispatcher = JobDispatcher::new(config, &security);
-    dispatcher.dispatch(vec![job]).await.unwrap();
+    let mut dispatcher = JobDispatcher::new(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        &security,
+    );
+    dispatcher.tick(config).await.unwrap();
     dispatcher.drain().await;
 }
 
@@ -412,7 +417,7 @@ async fn scheduler_flow_runs_active_hours_job_and_reschedules_inside_window() {
         "echo active-hours-fired",
     )
     .unwrap();
-    crate::cron::store::force_next_run_for_test(
+    crate::cron::store::tests::force_next_run_for_test(
         &config,
         &job.id,
         Utc::now() - ChronoDuration::seconds(1),
@@ -425,8 +430,12 @@ async fn scheduler_flow_runs_active_hours_job_and_reschedules_inside_window() {
         &config.workspace_dir,
         &config.workspace_dir,
     ));
-    let mut dispatcher = JobDispatcher::new(&config, &security);
-    dispatcher.dispatch(vec![job.clone()]).await.unwrap();
+    let mut dispatcher = JobDispatcher::new(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &security,
+    );
+    dispatcher.tick(&config).await.unwrap();
     dispatcher.drain().await;
 
     let stored = cron::get_job(&config, &job.id).unwrap();
@@ -470,7 +479,7 @@ fn one_shot(config: &Config, command: &str, delete_after_run: bool) -> CronJob {
         cron::update_job(
             config,
             &job.id,
-            tinyflows_schedule::types::CronJobPatch {
+            tinyflows_bus::schedule::types::CronJobPatch {
                 delete_after_run: Some(true),
                 ..Default::default()
             },
@@ -528,7 +537,14 @@ async fn an_at_job_without_the_delete_flag_runs_once_and_is_never_due_again() {
     assert_eq!(updated.last_status.as_deref(), Some("ok"));
 
     // It is never due again — even at a time past its `at` instant.
-    let due = cron::due_jobs(&config, at + ChronoDuration::minutes(1)).unwrap();
+    let due = crate::cron::client::store::<Vec<CronJob>>(
+        &config,
+        tinyflows_bus::schedule::StoreOperation::Due {
+            now: at + ChronoDuration::minutes(1),
+        },
+    )
+    .await
+    .unwrap();
     assert!(
         !due.iter().any(|j| j.id == job.id),
         "disabled At job must not be re-selected by due_jobs"
@@ -551,98 +567,4 @@ async fn deliver_if_configured_skips_non_announce_mode() {
     )
     .await
     .is_ok());
-}
-
-#[tokio::test]
-async fn deliver_if_configured_publishes_event_for_announce_mode() {
-    use crate::core::events::DomainEvent;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use tinybus::EventHandler;
-
-    // Create an isolated bus for this test.
-    let bus = crate::core::bus_testing::isolated_bus().await;
-
-    let received = Arc::new(AtomicUsize::new(0));
-    let received_clone = Arc::clone(&received);
-
-    struct Counter(Arc<AtomicUsize>);
-
-    #[async_trait::async_trait]
-    impl EventHandler<DomainEvent> for Counter {
-        fn name(&self) -> &str {
-            "test::counter"
-        }
-        fn domains(&self) -> Option<&[&str]> {
-            Some(&["cron"])
-        }
-        async fn handle(&self, event: &DomainEvent) {
-            if matches!(event, DomainEvent::CronDeliveryRequested { .. }) {
-                self.0.fetch_add(1, Ordering::SeqCst);
-            }
-        }
-    }
-
-    let _handle = bus.subscribe(Arc::new(Counter(received_clone)));
-
-    // Publish directly on the test bus (bypasses the global singleton).
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp).await;
-    let mut job = test_job("echo ok");
-    job.delivery = DeliveryConfig {
-        mode: "announce".into(),
-        channel: Some("telegram".into()),
-        to: Some("chat-123".into()),
-        best_effort: true,
-    };
-
-    // Manually publish the same event deliver_if_configured would produce.
-    bus.publish(DomainEvent::CronDeliveryRequested {
-        job_id: job.id.clone(),
-        channel: "telegram".into(),
-        target: "chat-123".into(),
-        output: "hello".into(),
-    });
-
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    assert_eq!(received.load(Ordering::SeqCst), 1);
-
-    // Also verify the function itself succeeds.
-    assert!(deliver_if_configured(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        &job,
-        "hello",
-        true
-    )
-    .await
-    .is_ok());
-}
-
-#[test]
-fn is_env_assignment_true() {
-    assert!(is_env_assignment("FOO=bar"));
-    assert!(is_env_assignment("_VAR=1"));
-}
-
-#[test]
-fn is_env_assignment_false() {
-    assert!(!is_env_assignment("echo"));
-    assert!(!is_env_assignment("=bad"));
-    assert!(!is_env_assignment("123=nope"));
-    assert!(!is_env_assignment(""));
-}
-
-#[test]
-fn strip_wrapping_quotes_removes_quotes() {
-    assert_eq!(strip_wrapping_quotes("\"hello\""), "hello");
-    assert_eq!(strip_wrapping_quotes("'world'"), "world");
-    assert_eq!(strip_wrapping_quotes("noquotes"), "noquotes");
-    assert_eq!(strip_wrapping_quotes(""), "");
-}
-
-#[test]
-fn forbidden_path_argument_allows_safe_commands() {
-    let policy = SecurityPolicy::default();
-    assert!(forbidden_path_argument(&policy, "echo hello").is_none());
-    assert!(forbidden_path_argument(&policy, "date").is_none());
 }

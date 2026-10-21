@@ -1,47 +1,30 @@
-//! Cron persistence: a thin host binding of `tinyflows_drivers::schedule::CronDocuments`.
+//! Cron persistence, reached over the schedule bus contract.
 //!
-//! Jobs, run history and per-job policy live on the storage ports, in the
-//! acting agent's scope of the storage backend ([`crate::storage`]). tinyflows no
-//! longer has a SQLite store of its own: the `jobs.db` it wrote is imported
-//! once, read-only, when the backend is installed ([`crate::storage::import`]).
+//! Jobs, run history and per-job policy live in the `tinyflows` module's cron
+//! store (`CronDocuments`: validation, schedule maths, output limits, history
+//! pruning, claim generations), which persists through the acting scope's
+//! documents on the storage ports via the host's document port
+//! ([`super::documents_port`]). tinyflows no longer has a SQLite store of its
+//! own: the `jobs.db` it wrote is imported once, read-only, when the backend is
+//! installed ([`crate::storage::import`]).
 //!
-//! This module only turns the host [`Config`] into the store's limits
-//! (run-history cap, due-job batch size), so callers keep passing `&Config`.
+//! This module keeps the synchronous API the rest of the core calls. Each
+//! function applies the operator limits ([`super::limits`]) that only the host
+//! knows, then sends one typed [`StoreOperation`] through
+//! [`super::client::store_blocking`]. The host's [`Config`] supplies the store's
+//! limits (run-history cap, due-job batch size) per call.
 
 use crate::config::Config;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use tinyflows_drivers::schedule::CronDocuments;
-use tinyflows_schedule::DeliveryStatus;
-use tinyflows_schedule::{
+use tinyflows_bus::schedule::types::DeliveryStatus;
+use tinyflows_bus::schedule::types::{
     CronJob, CronJobPatch, CronRun, DeliveryConfig, JobType, Schedule, SessionTarget,
 };
+use tinyflows_bus::schedule::{AgentJobSpec, StoreOperation};
 
+use super::client::store_blocking;
 use super::limits;
-use tinyflows_schedule::AgentJobSpec;
-
-/// The cron database tinyflows used to write, imported on first use.
-pub fn legacy_db_path(config: &Config) -> std::path::PathBuf {
-    crate::storage::import::tinyflows::legacy_jobs_db(&crate::core::runtime::agent_scope_dir(
-        config,
-    ))
-}
-
-/// The cron job store for this call, in the acting agent's scope.
-pub(crate) fn documents(config: &Config) -> Result<CronDocuments> {
-    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
-    Ok(
-        CronDocuments::new(std::sync::Arc::clone(opened.scoped()?.documents()))
-            .with_limits(config.cron.max_run_history, config.scheduler.max_tasks),
-    )
-}
-
-/// Runs a document-store call from this synchronous API.
-fn run<T: Send + 'static>(
-    future: impl std::future::Future<Output = Result<T>> + Send + 'static,
-) -> Result<T> {
-    crate::storage::block_on_anyhow(future)
-}
 
 pub fn add_job(config: &Config, expression: &str, command: &str) -> Result<CronJob> {
     let schedule = Schedule::Cron {
@@ -50,9 +33,13 @@ pub fn add_job(config: &Config, expression: &str, command: &str) -> Result<CronJ
         active_hours: None,
     };
     limits::check_new(config, &JobType::Shell, &schedule, None)?;
-    let docs = documents(config)?;
-    let (expression, command) = (expression.to_string(), command.to_string());
-    run(async move { docs.add_job(&expression, &command).await })
+    store_blocking(
+        config,
+        StoreOperation::Add {
+            expression: expression.to_string(),
+            command: command.to_string(),
+        },
+    )
 }
 
 pub fn add_shell_job(
@@ -62,41 +49,17 @@ pub fn add_shell_job(
     command: &str,
 ) -> Result<CronJob> {
     limits::check_new(config, &JobType::Shell, &schedule, None)?;
-    let docs = documents(config)?;
-    let command = command.to_string();
-    run(async move { docs.add_shell_job(name, schedule, &command).await })
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn add_agent_job(
-    config: &Config,
-    name: Option<String>,
-    schedule: Schedule,
-    prompt: &str,
-    session_target: SessionTarget,
-    model: Option<String>,
-    delivery: Option<DeliveryConfig>,
-    delete_after_run: bool,
-) -> Result<CronJob> {
-    limits::check_new(config, &JobType::Agent, &schedule, delivery.as_ref())?;
-    let docs = documents(config)?;
-    let prompt = prompt.to_string();
-    run(async move {
-        docs.add_agent_job(
+    store_blocking(
+        config,
+        StoreOperation::AddShell {
             name,
             schedule,
-            &prompt,
-            session_target,
-            model,
-            delivery,
-            delete_after_run,
-        )
-        .await
-    })
+            command: command.to_string(),
+        },
+    )
 }
 
-/// Like [`add_agent_job`] but accepts an optional built-in agent definition
-/// ID and the initial enabled state.
+/// Adds an agent job with an optional built-in definition and enabled state.
 #[allow(clippy::too_many_arguments)]
 pub fn add_agent_job_with_definition(
     config: &Config,
@@ -110,23 +73,15 @@ pub fn add_agent_job_with_definition(
     agent_id: Option<String>,
     enabled: bool,
 ) -> Result<CronJob> {
-    limits::check_new(config, &JobType::Agent, &schedule, delivery.as_ref())?;
-    let docs = documents(config)?;
-    let prompt = prompt.to_string();
-    run(async move {
-        docs.add_agent_job_with_definition(
-            name,
-            schedule,
-            &prompt,
-            session_target,
-            model,
-            delivery,
-            delete_after_run,
-            agent_id,
-            enabled,
-        )
-        .await
-    })
+    let mut spec = AgentJobSpec::new(schedule, prompt);
+    spec.name = name;
+    spec.session_target = session_target;
+    spec.model = model;
+    spec.delivery = delivery;
+    spec.delete_after_run = delete_after_run;
+    spec.agent_id = agent_id;
+    spec.enabled = enabled;
+    add_agent_job_from_spec(config, spec)
 }
 
 /// Adds an agent job described by `spec`, including its origin conversation.
@@ -137,71 +92,127 @@ pub fn add_agent_job_from_spec(config: &Config, spec: AgentJobSpec) -> Result<Cr
         &spec.schedule,
         spec.delivery.as_ref(),
     )?;
-    let docs = documents(config)?;
-    run(async move { docs.add_agent_job_from_spec(spec).await })
+    store_blocking(config, StoreOperation::AddAgent { spec })
 }
 
 /// Registers (idempotently) the cron job that fires a flow's `schedule`
-/// trigger; see `CronDocuments::add_flow_schedule_job`.
+/// trigger; see the module's `add_flow` store operation.
 pub fn add_flow_schedule_job(
     config: &Config,
     flow_id: &str,
     schedule: Schedule,
 ) -> Result<CronJob> {
     limits::check_new(config, &JobType::Flow, &schedule, None)?;
-    let docs = documents(config)?;
-    let flow_id = flow_id.to_string();
-    run(async move { docs.add_flow_schedule_job(&flow_id, schedule).await })
+    store_blocking(
+        config,
+        StoreOperation::AddFlow {
+            flow_id: flow_id.to_string(),
+            schedule,
+        },
+    )
 }
 
 pub fn find_flow_schedule_job(config: &Config, flow_id: &str) -> Result<Option<CronJob>> {
-    let docs = documents(config)?;
-    let flow_id = flow_id.to_string();
-    run(async move { docs.find_flow_schedule_job(&flow_id).await })
+    store_blocking(
+        config,
+        StoreOperation::FindFlow {
+            flow_id: flow_id.to_string(),
+        },
+    )
 }
 
 pub fn list_jobs(config: &Config) -> Result<Vec<CronJob>> {
-    let docs = documents(config)?;
-    run(async move { docs.list_jobs().await })
+    store_blocking(config, StoreOperation::List)
 }
 
 pub fn get_job(config: &Config, job_id: &str) -> Result<CronJob> {
-    let docs = documents(config)?;
-    let job_id = job_id.to_string();
-    run(async move { docs.get_job(&job_id).await })
+    store_blocking(
+        config,
+        StoreOperation::Get {
+            job_id: job_id.to_string(),
+        },
+    )
 }
 
 pub fn remove_job(config: &Config, id: &str) -> Result<()> {
-    let docs = documents(config)?;
-    let owned = id.to_string();
     // The job's policy is a field of the job, so it goes with it.
-    run(async move { docs.remove_job(&owned).await })?;
-    println!("✅ Removed cron job {id}");
+    store_blocking::<serde_json::Value>(
+        config,
+        StoreOperation::Remove {
+            job_id: id.to_string(),
+        },
+    )?;
+    tracing::info!(job_id = %id, "removed cron job");
     Ok(())
 }
 
 /// Deletes every cron job in the workspace (E2E `openhuman.test_reset`).
 pub fn clear_all_jobs(config: &Config) -> Result<usize> {
-    let docs = documents(config)?;
-    run(async move { docs.clear_all_jobs().await })
+    store_blocking(config, StoreOperation::Clear)
 }
 
 /// Removes duplicate jobs sharing a `name`, keeping the one with most history.
 pub fn dedup_named_jobs(config: &Config) -> Result<usize> {
-    let docs = documents(config)?;
-    run(async move { docs.dedup_named_jobs().await })
-}
-
-pub fn due_jobs(config: &Config, now: DateTime<Utc>) -> Result<Vec<CronJob>> {
-    let docs = documents(config)?;
-    run(async move { docs.due_jobs(now).await })
+    store_blocking(config, StoreOperation::Dedup)
 }
 
 pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<CronJob> {
+    update_job_with_origin(config, job_id, patch, None)
+}
+
+/// Update a job, using only a host-verified conversation origin for delivery
+/// validation. Raw origins stored on jobs or supplied by RPC are not trusted.
+pub(crate) fn update_job_with_origin(
+    config: &Config,
+    job_id: &str,
+    mut patch: CronJobPatch,
+    trusted_origin: Option<tinyflows_bus::schedule::types::JobOrigin>,
+) -> Result<CronJob> {
     limits::check_patch(config, &patch)?;
-    let docs = documents(config)?;
-    let job_id = job_id.to_string();
-    run(async move { docs.update_job(&job_id, patch).await })
+    if patch.delivery.is_some() || patch.origin.is_some() {
+        let existing = get_job(config, job_id)?;
+        patch =
+            validate_and_complete_route_patch(config, &existing, patch, trusted_origin.as_ref())?;
+    }
+    store_blocking(
+        config,
+        StoreOperation::Update {
+            job_id: job_id.to_string(),
+            patch,
+        },
+    )
+}
+
+/// Validate routing changes against the row snapshot and return the patch to
+/// persist. Route completion is performed alongside validation so a delayed
+/// store write cannot combine the caller's route with a newer counterpart.
+fn validate_and_complete_route_patch(
+    config: &Config,
+    existing: &CronJob,
+    mut patch: CronJobPatch,
+    trusted_origin: Option<&tinyflows_bus::schedule::types::JobOrigin>,
+) -> Result<CronJobPatch> {
+    let delivery = patch
+        .delivery
+        .clone()
+        .unwrap_or_else(|| existing.delivery.clone());
+    let effective_origin = patch
+        .origin
+        .clone()
+        .unwrap_or_else(|| existing.origin.clone());
+    crate::cron::job_builder::validate_delivery_for_config_with_trusted_origin(
+        config,
+        &delivery,
+        effective_origin.as_ref(),
+        trusted_origin,
+    )
+    .map_err(anyhow::Error::msg)?;
+
+    // Persist exactly the pair that was validated. A stale write containing
+    // only one route field must not combine with a newer counterpart.
+    patch.delivery = Some(delivery);
+    patch.origin = Some(effective_origin);
+    Ok(patch)
 }
 
 pub fn record_last_run(
@@ -211,23 +222,16 @@ pub fn record_last_run(
     success: bool,
     output: &str,
 ) -> Result<()> {
-    let docs = documents(config)?;
-    let (job_id, output) = (job_id.to_string(), output.to_string());
-    run(async move {
-        docs.record_last_run(&job_id, finished_at, success, &output)
-            .await
-    })
-}
-
-pub fn reschedule_after_run(
-    config: &Config,
-    job: &CronJob,
-    success: bool,
-    output: &str,
-) -> Result<()> {
-    let docs = documents(config)?;
-    let (job, output) = (job.clone(), output.to_string());
-    run(async move { docs.reschedule_after_run(&job, success, &output).await })
+    store_blocking::<serde_json::Value>(
+        config,
+        StoreOperation::RecordLastRun {
+            job_id: job_id.to_string(),
+            finished_at,
+            success,
+            output: output.to_string(),
+        },
+    )
+    .map(|_| ())
 }
 
 pub fn record_run(
@@ -239,23 +243,16 @@ pub fn record_run(
     output: Option<&str>,
     duration_ms: i64,
 ) -> Result<()> {
-    let docs = documents(config)?;
-    let (job_id, status, output) = (
-        job_id.to_string(),
-        status.to_string(),
-        output.map(str::to_string),
-    );
-    run(async move {
-        docs.record_run(
-            &job_id,
-            started_at,
-            finished_at,
-            &status,
-            output.as_deref(),
-            duration_ms,
-        )
-        .await
-    })
+    record_run_with_delivery(
+        config,
+        job_id,
+        started_at,
+        finished_at,
+        status,
+        output,
+        duration_ms,
+        None,
+    )
 }
 
 /// [`record_run`] plus the outcome of delivering the run's result.
@@ -270,42 +267,47 @@ pub fn record_run_with_delivery(
     duration_ms: i64,
     delivery_status: Option<DeliveryStatus>,
 ) -> Result<()> {
-    let docs = documents(config)?;
-    let (job_id, status, output) = (
-        job_id.to_string(),
-        status.to_string(),
-        output.map(str::to_string),
-    );
-    run(async move {
-        docs.record_run_with_delivery(
-            &job_id,
+    store_blocking::<serde_json::Value>(
+        config,
+        StoreOperation::RecordRun {
+            job_id: job_id.to_string(),
             started_at,
             finished_at,
-            &status,
-            output.as_deref(),
+            status: status.to_string(),
+            output: output.map(str::to_string),
             duration_ms,
             delivery_status,
-        )
-        .await
-    })
+        },
+    )
+    .map(|_| ())
 }
 
 /// Removes "queued" placeholder rows so only the real result row remains.
 pub fn delete_queued_runs(config: &Config, job_id: &str) -> Result<usize> {
-    let docs = documents(config)?;
-    let job_id = job_id.to_string();
-    run(async move { docs.delete_queued_runs(&job_id).await })
+    store_blocking(
+        config,
+        StoreOperation::DeleteQueuedRuns {
+            job_id: job_id.to_string(),
+        },
+    )
 }
 
 pub fn list_runs(config: &Config, job_id: &str, limit: usize) -> Result<Vec<CronRun>> {
-    let docs = documents(config)?;
-    let job_id = job_id.to_string();
-    run(async move { docs.list_runs(&job_id, limit).await })
+    store_blocking(
+        config,
+        StoreOperation::ListRuns {
+            job_id: job_id.to_string(),
+            limit,
+        },
+    )
 }
 
 /// Moves a job's next run to `at`, which no production path can do directly
 /// (a patch reschedules from the schedule, not to a given instant). Writes the
-/// three forms the store keeps of the instant, so the due-job query sees it.
+/// instant the store keeps (`next_run_ms`), so the due-job query sees it.
+/// Legacy TinyFlows rows also carry `next_run` and `next_run_ns`; keep those
+/// representations in sync when present so the module's claim decoder sees
+/// the same deadline as the due-job query.
 #[cfg(test)]
 pub(crate) fn force_next_run_for_test(
     config: &Config,
@@ -316,21 +318,29 @@ pub(crate) fn force_next_run_for_test(
     let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
     let docs = std::sync::Arc::clone(opened.scoped()?.documents());
     let job_id = job_id.to_string();
-    run(async move {
-        let stored = docs
-            .get("cron_jobs", &job_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("no job {job_id}"))?;
-        let mut doc = stored.doc;
-        doc["next_run"] = serde_json::json!(at.to_rfc3339());
-        doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
-        doc["next_run_ns"] = serde_json::json!(at.timestamp_nanos_opt().unwrap_or(i64::MAX));
-        docs.put("cron_jobs", &job_id, doc, Precondition::None)
-            .await?;
-        Ok(())
+    crate::storage::block_on_anyhow(async move {
+        for collection in ["cron.jobs", "cron_jobs"] {
+            if let Some(stored) = docs.get(collection, &job_id).await? {
+                let mut doc = stored.doc;
+                doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
+                if doc.get("next_run").is_some() {
+                    doc["next_run"] = serde_json::json!(at.to_rfc3339());
+                }
+                if doc.get("next_run_ns").is_some() {
+                    let next_run_ns = at
+                        .timestamp_nanos_opt()
+                        .ok_or_else(|| anyhow::anyhow!("next run is outside nanosecond range"))?;
+                    doc["next_run_ns"] = serde_json::json!(next_run_ns);
+                }
+                docs.put(collection, &job_id, doc, Precondition::None)
+                    .await?;
+                return Ok(());
+            }
+        }
+        Err(anyhow::anyhow!("no job {job_id}"))
     })
 }
 
 #[cfg(test)]
 #[path = "store_tests.rs"]
-mod tests;
+pub(crate) mod tests;

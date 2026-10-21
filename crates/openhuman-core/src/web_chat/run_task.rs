@@ -4,11 +4,10 @@
 //! to a failed turn. Called from `start_chat` and `spawn_parallel_turn`
 //! (`ops/start_chat.rs`/`ops/parallel_turn.rs`) once the message has been validated.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 
 use super::ops::BudgetCorrelation;
 use super::progress_bridge::spawn_progress_bridge;
@@ -36,7 +35,7 @@ pub(crate) async fn run_chat_task(
     locale: Option<String>,
     run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
     metadata: ChatRequestMetadata,
-    origin: crate::agent::turn_origin::AgentTurnOrigin,
+    origin: crate::security::turn_origin::AgentTurnOrigin,
     // When true, run as an isolated fork: build a fresh agent seeded from the
     // thread's history-at-start and never touch the shared `THREAD_SESSIONS`
     // cache, so a concurrent same-thread (parallel) turn cannot clobber — or be
@@ -123,7 +122,7 @@ pub(crate) async fn run_chat_task(
     // policy (which grants `action_dir` as a trusted root) and its tools are
     // all built on the thread's folder.
     let thread_dir =
-        crate::threads::ops::thread_working_dir(&ctx, config.workspace_dir.clone(), thread_id)
+        crate::threads::ops::thread_working_dir(ctx, config.workspace_dir.clone(), thread_id)
             .await?;
     if let Some(dir) = &thread_dir {
         log::debug!("[web-channel] thread working folder applied thread_id={thread_id}");
@@ -164,7 +163,7 @@ pub(crate) async fn run_chat_task(
     let (progress_tx, progress_rx) = tokio::sync::mpsc::channel(256);
     // Under the web-turn guard, fold every event into the turn's activity
     // record (the idle guard's input) on its way to the bridge.
-    let progress_rx = super::turn_activity::tap(activity, progress_rx, 256);
+    let progress_rx = super::turn_activity::tap(ctx, activity, progress_rx, 256);
     // The channel is fresh here. Record the user input even if the turn fails
     // before a committed reply can emit its final TurnContent event.
     let _ = progress_tx.try_send(AgentProgress::TurnContent {
@@ -181,7 +180,7 @@ pub(crate) async fn run_chat_task(
     if let Some(dir) = thread_dir {
         agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(dir)));
     }
-    let turn_state_store = crate::agent::session_store::turn_states_for(&config.workspace_dir);
+    let turn_state_store = crate::storage::sessions::turn_states_for(&config.workspace_dir);
     // Stamp the resolved agent onto the bridge metadata so the trace exporter
     // can attribute the run (`agent.id` attr / `agent.turn:<id>` trace name).
     let mut bridge_metadata = metadata.clone();
@@ -216,7 +215,7 @@ pub(crate) async fn run_chat_task(
             // any stale budget-exhausted signal before it could mislabel a
             // later genuine empty response. See #3386.
             super::ops::clear_budget_signal(ctx, thread_id).await;
-            let citations = crate::memory::tools::take_turn_citations(ctx, thread_id);
+            let citations = crate::web_chat::citations::take_turn_citations(ctx, thread_id);
             let usage = agent.take_last_turn_usage_totals();
             Ok(WebChatTaskResult {
                 full_response: response,
@@ -293,15 +292,22 @@ pub(crate) async fn run_chat_task(
         let speak_reply = matches!(metadata.speak_reply, Some(true));
         let trimmed_response = task_result.full_response.trim();
         if speak_reply && !trimmed_response.is_empty() {
-            let opts = crate::voice::reply_speech::ReplySpeechOptions::default();
-            match crate::voice::reply_speech::synthesize_reply(
-                &config,
-                &task_result.full_response,
-                &opts,
-            )
-            .await
-            {
-                Ok(_) => log::debug!(
+            // Resolved through the voice registry by the hosted slug: the
+            // provider is registered by the hosted-backend layer, so a core
+            // with none registered logs the error and skips the spoken reply.
+            #[cfg(feature = "voice")]
+            let speech = match crate::voice::create_tts_provider("cloud", "", &config) {
+                Ok(provider) => provider
+                    .synthesize(&config, &task_result.full_response, None)
+                    .await
+                    .map(|_| ()),
+                Err(err) => Err(err.to_string()),
+            };
+            #[cfg(not(feature = "voice"))]
+            let speech: Result<(), String> =
+                Err("voice feature disabled at compile time".to_string());
+            match speech {
+                Ok(()) => log::debug!(
                     "[web_channel] reply_speech dispatched chars={} client_id={} thread_id={} request_id={}",
                     task_result.full_response.len(),
                     client_id,
@@ -316,17 +322,6 @@ pub(crate) async fn run_chat_task(
                 ),
             }
         }
-        if metadata.source.as_deref() == Some("ptt") {
-            if let Some(session_id) = metadata.session_id {
-                crate::voice::publish_ptt_transcript_committed(
-                    thread_id.to_string(),
-                    session_id,
-                    task_result.full_response.chars().count(),
-                    0,
-                    false,
-                );
-            }
-        }
     }
 
     // TinyMemes: remix the final reply (slang + memes) when the flag puts this
@@ -335,6 +330,7 @@ pub(crate) async fn run_chat_task(
     #[cfg(feature = "tinymemes")]
     if let Ok(ref mut task_result) = result {
         crate::tinymemes::remix_task_reply(
+            ctx,
             &config,
             thread_id,
             request_id,
@@ -393,7 +389,7 @@ pub(crate) async fn run_chat_task(
             tinyagents_session::turn_state::TurnLifecycle::Interrupted
         };
         let now = chrono::Utc::now().to_rfc3339();
-        if let Err(err) = crate::agent::session_store::turn_states_for(&config.workspace_dir)
+        if let Err(err) = crate::storage::sessions::turn_states_for(&config.workspace_dir)
             .settle_turn(thread_id, request_id, lifecycle, &now)
         {
             log::warn!(

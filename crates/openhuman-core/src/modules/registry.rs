@@ -40,7 +40,10 @@ mod contract_tests;
 
 mod records_computer;
 mod records_docs_wallet;
+#[cfg(feature = "inbound-queues")]
+mod records_eventqueues;
 mod records_extra;
+mod records_flows;
 mod records_mcp_connectors;
 #[cfg(feature = "tinymemes")]
 mod records_memes;
@@ -54,11 +57,14 @@ use records_computer::TINYCOMPUTER;
 use records_docs_wallet::TINYDOCS;
 #[cfg(feature = "web3")]
 use records_docs_wallet::TINYWALLET;
+#[cfg(feature = "inbound-queues")]
+use records_eventqueues::TINYEVENTQUEUES;
 #[cfg(feature = "modules")]
 use records_extra::TINYBOX;
 use records_extra::TINYCHANNELS;
 #[cfg(feature = "hosting")]
 use records_extra::TINYHOSTS;
+use records_flows::TINYFLOWS;
 use records_mcp_connectors::{TINYCONNECTORS, TINYMCP};
 #[cfg(feature = "tinymemes")]
 use records_memes::TINYMEMES;
@@ -68,8 +74,8 @@ use records_search::TINYSEARCH;
 use records_voice::TINYVOICE;
 
 /// Every module this build can load. The records whose contract crate is an
-/// optional dependency (`documents`, `web3`, `voice`, `hosting`, `tinymemes`) exist only when
-/// that gate is on; a product-feature build carries all eleven.
+/// optional dependency (`documents`, `web3`, `voice`, `hosting`, `tinymemes`, `inbound-queues`) exist
+/// only when that gate is on; a product-feature build carries all fourteen.
 pub const ALL: &[ModuleRecord] = &[
     TINYCOMPUTER,
     TINYSEARCH,
@@ -85,10 +91,13 @@ pub const ALL: &[ModuleRecord] = &[
     #[cfg(feature = "modules")]
     TINYBOX,
     TINYCHANNELS,
+    TINYFLOWS,
     #[cfg(feature = "hosting")]
     TINYHOSTS,
     #[cfg(feature = "tinymemes")]
     TINYMEMES,
+    #[cfg(feature = "inbound-queues")]
+    TINYEVENTQUEUES,
 ];
 
 /// The record for `id`, if this build knows it.
@@ -125,8 +134,10 @@ pub const COMPONENT_OF: &[(&str, &str)] = &[
     ("tinyconnectors", "connectors"),
     ("tinybox", "sandbox"),
     ("tinychannels", "channels"),
+    ("tinyflows", "tinyflows"),
     ("tinyhosts", "hosting"),
     ("tinymemes", "memes"),
+    ("tinyeventqueues", "eventqueues"),
 ];
 
 /// The `[components]` name that owns module `id`, if the table knows it.

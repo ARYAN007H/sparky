@@ -50,6 +50,7 @@ const LOG_TARGET: &str = "agent_orchestration::parent_context";
 /// Every other field is inherited verbatim from the config-built agent, so the
 /// spawned children behave exactly like a normal sub-agent dispatch.
 pub(crate) async fn build_root_parent(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     agent_definition_id: &str,
     channel: &str,
@@ -61,9 +62,9 @@ pub(crate) async fn build_root_parent(
     // engines can also be reached from contexts that only built the HTTP router
     // (e.g. the JSON-RPC e2e harness) — so init defensively here. `OnceLock`
     // makes this idempotent: a no-op when the registry is already loaded.
-    if crate::agent::harness::host_definition::AgentDefinitionRegistry::global().is_none() {
+    if crate::agent_registry::host_definition::AgentDefinitionRegistry::global().is_none() {
         if let Err(err) =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
                 &config.workspace_dir,
             )
         {
@@ -72,7 +73,7 @@ pub(crate) async fn build_root_parent(
             // the registry is *still* `None`, init genuinely failed — fail fast
             // here rather than letting every downstream `spawn_agent` fail later
             // with `NoParentContext` after orchestration state has advanced.
-            if crate::agent::harness::host_definition::AgentDefinitionRegistry::global().is_none() {
+            if crate::agent_registry::host_definition::AgentDefinitionRegistry::global().is_none() {
                 return Err(err)
                     .context("initialize AgentDefinitionRegistry for orchestration root parent");
             }
@@ -83,7 +84,7 @@ pub(crate) async fn build_root_parent(
         }
     }
 
-    let mut agent = OpenHumanSessionHost::from_config(config)
+    let mut agent = OpenHumanSessionHost::from_config(ctx, config)
         .context("build Agent from config for orchestration root parent")?;
 
     let integrations = crate::integrations::composio::fetch_connected_integrations(config).await;
@@ -142,6 +143,7 @@ pub(crate) async fn build_root_parent(
 /// when the root context can't be constructed — the caller decides how to
 /// degrade (fail the run, or fall back to an un-grounded path).
 pub(crate) async fn with_root_parent<F, Fut>(
+    ctx: &crate::core::runtime::DispatchCtx,
     parent_override: Option<ParentExecutionContext>,
     config: &Config,
     agent_definition_id: &str,
@@ -155,7 +157,9 @@ where
 {
     let parent = match parent_override {
         Some(parent) => parent,
-        None => build_root_parent(config, agent_definition_id, channel, session_prefix).await?,
+        None => {
+            build_root_parent(ctx, config, agent_definition_id, channel, session_prefix).await?
+        }
     };
     Ok(run(parent).await)
 }

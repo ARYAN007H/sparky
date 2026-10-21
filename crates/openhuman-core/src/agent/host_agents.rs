@@ -18,7 +18,7 @@
 //! agent rather than the process default. A miss changes nothing: the driver
 //! falls back to the registries exactly as before.
 //!
-//! Like the session store ([`crate::agent::session_store`]) the slot is
+//! Like the session store ([`crate::storage::sessions`]) the slot is
 //! process-wide, because OpenHuman runs one runtime per process. The
 //! installer keeps the `Arc` it installed and removes it with [`clear_if`],
 //! which never removes a replacement someone else installed later.
@@ -27,10 +27,11 @@
 //! `TrustedAutomation { Cron }` and a workflow node under its workflow
 //! origin. Resolving an agent does not change who is asking.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 
-use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::{HostTools, OpenHumanSessionHost};
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::config::Config;
 use crate::core::runtime::CoreContext;
 
@@ -48,7 +49,10 @@ pub struct HostAgent {
     /// The context every read during the agent's turn must see.
     pub context: Arc<CoreContext>,
     /// Agent-owned callbacks inherited by core-scheduled turns.
-    pub hooks: crate::agent::hooks::HookScope,
+    pub hooks: tinyagents_hooks::scope::HookScope<
+        crate::agent::tinyagents::host::OpenHumanRunContext,
+        tinyagents_harness::cost::TurnCost,
+    >,
 }
 
 impl HostAgent {
@@ -69,9 +73,11 @@ impl HostAgent {
             host_tools = self.host_tools.is_some(),
             "[host_agents] building session for host agent"
         );
+        let dispatch = DispatchCtx::new(Arc::clone(&self.context));
         let mut session = CoreContext::sync_scope(Arc::clone(&self.context), || {
-            if crate::profiles::capabilities::ProfileCapabilities::current().is_some() {
+            if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&dispatch).is_some() {
                 return OpenHumanSessionHost::from_config_host_only(
+                    &dispatch,
                     config,
                     &self.definition,
                     self.host_tools.as_ref(),
@@ -80,12 +86,17 @@ impl HostAgent {
             }
             match &self.host_tools {
                 Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
+                    &dispatch,
                     config,
                     &self.definition,
                     host,
                     session_id,
                 ),
-                None => OpenHumanSessionHost::from_config_with_definition(config, &self.definition),
+                None => OpenHumanSessionHost::from_config_with_definition(
+                    &dispatch,
+                    config,
+                    &self.definition,
+                ),
             }
         })?;
         // The agent's own callbacks ride the session explicitly: its tool and

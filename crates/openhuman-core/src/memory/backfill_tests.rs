@@ -1,10 +1,10 @@
 use super::*;
+use chrono::Utc;
 
 use std::time::Duration;
 
 use tinymemory_api::{ItemKind, MetaFilter};
 
-use crate::memory::error::{INVALID_REQUEST, MEMORY_OFF};
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::threads::store::{ConversationMessage, CreateConversationThread};
 
@@ -54,8 +54,8 @@ async fn seed_thread(workspace: &Path, thread_id: &str, messages: &[(&str, &str)
 
 async fn wait_done(config: &Config) -> BackfillView {
     for _ in 0..200 {
-        let view = status(config).await.unwrap();
-        if view.state.phase != ImportPhase::Running {
+        let view = status(&DispatchCtx::ambient(), config).await.unwrap();
+        if view.state.phase != BackfillPhase::Running {
             return view;
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
@@ -67,14 +67,26 @@ async fn wait_done(config: &Config) -> BackfillView {
 async fn refuses_without_consent_and_with_memory_off() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let error = start(&config, BackfillStartParams { consent: false })
-        .await
-        .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
-    let error = start(&config, BackfillStartParams { consent: true })
-        .await
-        .unwrap_err();
-    assert_eq!(error.code(), MEMORY_OFF);
+    let error = start(
+        &DispatchCtx::ambient(),
+        &config,
+        BackfillStartParams { consent: false },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code(), "INVALID_REQUEST");
+    let error = start(
+        &DispatchCtx::ambient(),
+        &config,
+        BackfillStartParams { consent: true },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code(), "MEMORY_OFF");
+
+    let status = status(&DispatchCtx::ambient(), &config).await.unwrap();
+    assert_eq!(status.state.phase, BackfillPhase::Idle);
+    assert_eq!((status.pending_threads, status.pending_turns), (0, 0));
 }
 
 #[tokio::test]
@@ -107,33 +119,37 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     )
     .await;
     // The lifecycle logged live-thread's second turn (user index 2).
-    let identity = MemoryIdentity::agent(MAIN_AGENT).resolve(&config);
-    crate::memory::lifecycle::hooks::pre_turn(
+    let identity = tinymemory_tools::layout::identity::Identity::agent(MAIN_AGENT)
+        .resolve(&crate::memory::scope::identity_pins(&config));
+    crate::memory::lifecycle::hooks::pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
-        crate::memory::lifecycle::hooks::PreTurnInput {
-            thread_id: "live-thread".into(),
-            turn_index: 2,
-            user_text: "After logging".into(),
-            in_prompt_from: 0,
-            at: Utc::now(),
-            resumed_after_compaction: false,
-            observed_actor: None,
-        },
+        "live-thread".into(),
+        2,
+        "After logging".into(),
+        0,
+        Utc::now(),
+        false,
+        None,
+        None,
     )
     .await;
 
-    let before = status(&config).await.unwrap();
-    assert_eq!(before.state.phase, ImportPhase::Idle);
+    let before = status(&DispatchCtx::ambient(), &config).await.unwrap();
+    assert_eq!(before.state.phase, BackfillPhase::Idle);
     assert_eq!((before.pending_threads, before.pending_turns), (2, 3));
 
-    let started = start(&config, BackfillStartParams { consent: true })
-        .await
-        .unwrap();
+    let started = start(
+        &DispatchCtx::ambient(),
+        &config,
+        BackfillStartParams { consent: true },
+    )
+    .await
+    .unwrap();
     assert_eq!(started.state.threads_total, 2);
     let done = wait_done(&config).await;
-    assert_eq!(done.state.phase, ImportPhase::Done, "{:?}", done.state);
+    assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
     assert_eq!(done.state.turns_stored, 3);
     assert_eq!(done.state.items_stored, 6);
     assert!(done.state.finished_at.is_some());
@@ -152,10 +168,211 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     );
 
     // A second run has nothing to send.
-    start(&config, BackfillStartParams { consent: true })
-        .await
-        .unwrap();
+    start(
+        &DispatchCtx::ambient(),
+        &config,
+        BackfillStartParams { consent: true },
+    )
+    .await
+    .unwrap();
     let again = wait_done(&config).await;
     assert_eq!(again.state.items_stored, 0);
     assert_eq!(stored(&engine, filter).await.len(), 6);
+}
+
+/// The reference engine, recording how long each bulk store asked to wait.
+struct WaitRecorder {
+    inner: tinymemory_api::conformance::ReferenceEngine,
+    waits: std::sync::Mutex<Vec<tinymemory_api::WaitFor>>,
+}
+
+#[async_trait::async_trait]
+impl tinymemory_api::MemoryEngine for WaitRecorder {
+    fn descriptor(&self) -> &tinymemory_api::EngineDescriptor {
+        self.inner.descriptor()
+    }
+    async fn health(&self) -> tinymemory_api::EngineHealth {
+        self.inner.health().await
+    }
+    async fn recall(
+        &self,
+        req: tinymemory_api::RecallRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::RecallAnswer> {
+        self.inner.recall(req).await
+    }
+    async fn fetch(
+        &self,
+        req: tinymemory_api::FetchRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::FetchPage> {
+        self.inner.fetch(req).await
+    }
+    async fn store(
+        &self,
+        item: tinymemory_api::StoreItem,
+    ) -> tinymemory_api::Result<tinymemory_api::StoreReceipt> {
+        self.inner.store(item).await
+    }
+    async fn store_many_with(
+        &self,
+        items: Vec<tinymemory_api::StoreItem>,
+        options: tinymemory_api::WriteOptions,
+    ) -> tinymemory_api::Result<Vec<tinymemory_api::StoreReceipt>> {
+        self.waits.lock().unwrap().push(options.wait);
+        self.inner.store_many_with(items, options).await
+    }
+    async fn forget(
+        &self,
+        target: tinymemory_api::ForgetTarget,
+    ) -> tinymemory_api::Result<tinymemory_api::ForgetReport> {
+        self.inner.forget(target).await
+    }
+    async fn list(
+        &self,
+        req: tinymemory_api::ListRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::ListPage> {
+        self.inner.list(req).await
+    }
+}
+
+#[tokio::test]
+async fn batches_are_stored_accepted_and_the_last_one_visible() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = std::sync::Arc::new(WaitRecorder {
+        inner: tinymemory_api::conformance::ReferenceEngine::new(),
+        waits: std::sync::Mutex::new(Vec::new()),
+    });
+    crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
+    seed_thread(
+        &config.workspace_dir,
+        "old-thread",
+        &[
+            ("user", "What is ownership?"),
+            ("agent", "Values have one owner."),
+            ("user", "And borrowing?"),
+            ("agent", "References without ownership."),
+        ],
+    )
+    .await;
+    seed_thread(
+        &config.workspace_dir,
+        "older-thread",
+        &[
+            ("user", "What is a lifetime?"),
+            ("agent", "How long a reference is valid."),
+        ],
+    )
+    .await;
+
+    start(
+        &DispatchCtx::ambient(),
+        &config,
+        BackfillStartParams { consent: true },
+    )
+    .await
+    .unwrap();
+    let done = wait_done(&config).await;
+    assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
+    assert_eq!(done.state.items_stored, 6);
+
+    let waits = engine.waits.lock().unwrap().clone();
+    assert_eq!(waits.len(), 2, "one batch per thread: {waits:?}");
+    let (last, earlier) = waits.split_last().expect("the backfill stores in bulk");
+    assert!(
+        earlier
+            .iter()
+            .all(|wait| *wait == tinymemory_api::WaitFor::Accepted),
+        "every batch but the last is stored accepted: {waits:?}"
+    );
+    assert_eq!(
+        *last,
+        tinymemory_api::WaitFor::Visible,
+        "the last batch waits until it is visible, so a done run is searchable"
+    );
+    let filter = MetaFilter {
+        kinds: vec![ItemKind::Conversation],
+        tags_any: vec![BACKFILL_TAG.to_string()],
+        ..MetaFilter::default()
+    };
+    assert_eq!(
+        stored(&engine.inner, filter).await.len(),
+        6,
+        "an engine without accepted writes still stores everything"
+    );
+}
+
+#[tokio::test]
+async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
+    #[derive(Clone, Copy)]
+    enum Peer {
+        Import,
+        Migration,
+    }
+
+    for (index, peer) in [Peer::Import, Peer::Migration].into_iter().enumerate() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = config_in(&tmp);
+        bind_reference(&config);
+        seed_thread(
+            &config.workspace_dir,
+            &format!("thread-{index}"),
+            &[("user", "past question"), ("agent", "past answer")],
+        )
+        .await;
+        let workspace = config.workspace_dir.clone();
+        let peer_guard = match peer {
+            Peer::Import => crate::memory::run_slots::reserve(
+                &crate::memory::run_slots::IMPORT,
+                &workspace,
+                &[
+                    &crate::memory::run_slots::BACKFILL,
+                    &crate::memory::run_slots::MIGRATION,
+                ],
+            ),
+            Peer::Migration => crate::memory::run_slots::reserve(
+                &crate::memory::run_slots::MIGRATION,
+                &workspace,
+                &[
+                    &crate::memory::run_slots::IMPORT,
+                    &crate::memory::run_slots::BACKFILL,
+                ],
+            ),
+        }
+        .expect("peer owns its driver-specific slot");
+        let blocked = start(
+            &DispatchCtx::ambient(),
+            &config,
+            BackfillStartParams { consent: true },
+        )
+        .await
+        .unwrap();
+        assert_eq!(blocked.state.phase, BackfillPhase::Idle);
+        assert_eq!((blocked.pending_threads, blocked.pending_turns), (1, 1));
+        assert!(!is_running(&workspace));
+        assert!(crate::memory::state_store::load::<BackfillFile>(
+            &workspace,
+            "conversations_backfill"
+        )
+        .unwrap()
+        .is_none());
+
+        drop(peer_guard);
+        let started = start(
+            &DispatchCtx::ambient(),
+            &config,
+            BackfillStartParams { consent: true },
+        )
+        .await
+        .unwrap();
+        assert_eq!(started.state.phase, BackfillPhase::Running);
+        let done = wait_done(&config).await;
+        assert_eq!(done.state.phase, BackfillPhase::Done, "{:?}", done.state);
+        assert_eq!(done.state.items_stored, 2);
+        assert!(crate::memory::state_store::load::<BackfillFile>(
+            &workspace,
+            "conversations_backfill"
+        )
+        .unwrap()
+        .is_some());
+    }
 }
