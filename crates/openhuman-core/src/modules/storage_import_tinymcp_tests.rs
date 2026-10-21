@@ -1,7 +1,9 @@
 use super::*;
 use crate::storage::{Scope, Storage};
-use tinystoragedrivers_api::SecretStore;
-use tinystoragedrivers_testkit::memory_storage;
+use std::sync::Arc;
+use tinystoragedrivers::StorageBackend;
+use tinystoragedrivers::secrets::{DerivedKeys, KeyProvider, SecretStore};
+use zeroize::Zeroizing;
 
 /// The first-generation schema: no `transport`, `deployment_url`, `enabled` or
 /// `catalog_managed` column, which older installs never gained.
@@ -53,13 +55,39 @@ fn legacy_dir() -> tempfile::TempDir {
 }
 
 struct Rig {
-    scoped: Storage,
+    _dir: tempfile::TempDir,
+    backend: Arc<dyn StorageBackend>,
+    scope: Scope,
 }
 
 fn rig() -> Rig {
+    let dir = tempfile::tempdir().unwrap();
+    let url = format!("sqlite:{}", dir.path().join("storage.sqlite").display());
+    let backend = crate::storage::block_on(crate::storage::open(&url)).unwrap();
     Rig {
-        scoped: memory_storage(&Scope::new("module:tinymcp@local").unwrap()),
+        _dir: dir,
+        backend,
+        scope: Scope::new("module:tinymcp@local").unwrap(),
     }
+}
+
+impl Rig {
+    fn scoped(&self) -> Storage {
+        self.backend.for_scope(&self.scope).unwrap()
+    }
+
+    fn secrets(&self) -> crate::storage::secrets::DocumentSecrets {
+        let scoped = self.scoped();
+        crate::storage::secrets::over(&scoped, self.scope.clone(), keys())
+    }
+}
+
+fn keys() -> Arc<dyn KeyProvider> {
+    Arc::new(DerivedKeys::new(Zeroizing::new([7; 32])))
+}
+
+async fn import(rig: &Rig, data_dir: &Path) -> Result<Outcome> {
+    import_into(&rig.backend, &rig.scope, data_dir, Some(keys())).await
 }
 
 fn digest(path: &Path) -> Vec<u8> {
