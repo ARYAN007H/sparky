@@ -74,7 +74,7 @@ fn an_unknown_function_gets_the_error_schema() {
 async fn run_import(workspace: Option<&std::path::Path>) -> Value {
     let configured = tempfile::TempDir::new().unwrap();
     #[cfg(feature = "storage-sqlite")]
-    crate::storage::local::use_persistent_default_for_test(configured.path());
+    crate::storage::local::use_persistent_default_for_test(&configured.path().join("workspace"));
     let _env = crate::config::test_env::EnvVarGuard::workspace_async(configured.path()).await;
     let mut params = Map::new();
     if let Some(workspace) = workspace {
