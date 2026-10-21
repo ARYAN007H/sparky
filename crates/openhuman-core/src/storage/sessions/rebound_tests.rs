@@ -120,9 +120,18 @@ fn the_provider_surface_forwards_to_the_current_backend() {
     // Binding an actor goes through the inner provider, with and without an
     // explicit schema admission mode; both agree on whether it binds.
     let other: Arc<dyn StorageBackend> = memory_backend();
-    let plain = stores.bind_actor(Arc::clone(&other)).unwrap().is_some();
+    let factory_backend = Arc::clone(&other);
+    let factory: tinyagents_session::port::AgentStorageFactory = Arc::new(move |agent_id| {
+        let scope = crate::storage::Scope::local().agent(agent_id)?;
+        let port_scope = tinyagents_session::port::Scope::new(scope.as_str())?;
+        Ok(crate::storage::sessions::ScopedStorage::new(
+            factory_backend.for_scope(&scope)?,
+            port_scope,
+        ))
+    });
+    let plain = stores.bind_actor(Arc::clone(&factory)).unwrap().is_some();
     let admitted = stores
-        .bind_actor_with_schema_admission(other, SchemaAdmission::Declare)
+        .bind_actor_with_schema_admission(factory, SchemaAdmission::Declare)
         .unwrap()
         .is_some();
     assert_eq!(plain, admitted);

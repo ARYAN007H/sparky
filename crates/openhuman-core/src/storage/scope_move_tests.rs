@@ -284,8 +284,9 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     let destination = backend
         .for_scope(&scope_for_profile("alice").agent("agent").unwrap())
         .unwrap();
-    let copied = storage::block_on(async {
-        destination
+    let copied_storage = destination.clone();
+    let copied = storage::block_on(async move {
+        copied_storage
             .documents()
             .query_all("scope_move_fixture", &Query::all())
             .await
@@ -297,8 +298,9 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
 
     // A completed scope claim prevents a later boot from resurrecting a row
     // deleted by the current owner, and the source bytes remain untouched.
-    storage::block_on(async {
-        destination
+    let delete_storage = destination.clone();
+    storage::block_on(async move {
+        delete_storage
             .documents()
             .delete("scope_move_fixture", "stable-id", Precondition::None)
             .await
@@ -310,11 +312,12 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
         .find(|report| report.domain == IMPORT_DOMAIN)
         .unwrap();
     assert_eq!(
-        outcome.outcome.unwrap(),
+        outcome.outcome.as_ref().unwrap(),
         crate::storage::import::Outcome::AlreadyDone
     );
-    let after = storage::block_on(async {
-        destination
+    let after_storage = destination.clone();
+    let after = storage::block_on(async move {
+        after_storage
             .documents()
             .query_all("scope_move_fixture", &Query::all())
             .await
@@ -341,7 +344,7 @@ fn boot_import_reports_no_source_for_a_workspace_without_legacy_storage() {
         .find(|report| report.domain == IMPORT_DOMAIN)
         .expect("scope migration is in the boot importer pipeline");
     assert_eq!(
-        report.outcome.unwrap(),
+        report.outcome.as_ref().unwrap(),
         crate::storage::import::Outcome::NoSource
     );
 }

@@ -104,7 +104,7 @@ async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch()
 
     // The host's lease store reads the moved records: alice is still held,
     // bob's released record is taken over cleanly at the next epoch.
-    let b = DocumentLeases::cluster(&backend, "node-b", None, std::time::Duration::from_secs(1))
+    let b = DocumentLeases::cluster(backend.as_ref(), "node-b", None, std::time::Duration::from_secs(1))
         .unwrap();
     let held = b.holder("alice").await.unwrap().unwrap();
     assert_eq!((held.owner.as_str(), held.epoch), ("node-a", 4));
