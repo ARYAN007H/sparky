@@ -577,11 +577,90 @@ async fn wait_for_completion(state: &MockState, count: usize) {
     }
 }
 
-fn model_saw_media_bytes(request: &Value, bytes: &[u8]) -> bool {
+fn assert_model_received_typed_image(request: &Value) {
     use base64::Engine as _;
-    last_user_content(request)
-        .and_then(|content| serde_json::to_string(content).ok())
-        .is_some_and(|body| body.contains(&base64::engine::general_purpose::STANDARD.encode(bytes)))
+    let content = last_user_content(request).expect("image user content is present");
+    let image = find_block_type(content, "image_url").expect("image is a typed image block");
+    let url = image["image_url"]["url"]
+        .as_str()
+        .expect("typed image carries a data URL");
+    let (header, data) = url
+        .split_once(',')
+        .expect("typed image data URL has a payload");
+    assert_eq!(header, "data:image/png;base64");
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .expect("image data URL payload is base64");
+    assert!(decoded.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert!(decoded.ends_with(b"IEND\xaeB`\x82"));
+}
+
+fn assert_model_received_file_content(request: &Value) {
+    let content = last_user_content(request).expect("file user content is present");
+    if let Some(document) = ["input_file", "document", "file"]
+        .into_iter()
+        .find_map(|kind| find_block_type(content, kind))
+    {
+        let encoded = serde_json::to_string(document).expect("serialize typed document");
+        assert!(encoded.contains("text/plain"), "typed file MIME: {encoded}");
+    } else {
+        assert!(
+            content_has_text_block(content, std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+            "unsupported Document input must reach the model as extracted literal text"
+        );
+    }
+    let text_blocks = collect_text_blocks(content);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES);
+    assert!(text_blocks.iter().all(|text| !text.contains(&encoded)));
+}
+
+fn find_block_type<'a>(value: &'a Value, expected: &str) -> Option<&'a Value> {
+    match value {
+        Value::Array(items) => items.iter().find_map(|item| find_block_type(item, expected)),
+        Value::Object(fields) => {
+            if fields.get("type").and_then(Value::as_str) == Some(expected) {
+                return Some(value);
+            }
+            fields.values().find_map(|item| find_block_type(item, expected))
+        }
+        _ => None,
+    }
+}
+
+fn content_has_text_block(value: &Value, expected: &str) -> bool {
+    match value {
+        Value::Array(items) => items
+            .iter()
+            .any(|item| content_has_text_block(item, expected)),
+        Value::Object(fields) => {
+            (fields.get("type").and_then(Value::as_str) == Some("text")
+                && fields
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|text| text.contains(expected)))
+                || fields
+                    .values()
+                    .any(|item| content_has_text_block(item, expected))
+        }
+        _ => false,
+    }
+}
+
+fn collect_text_blocks(value: &Value) -> Vec<&str> {
+    match value {
+        Value::Array(items) => items.iter().flat_map(collect_text_blocks).collect(),
+        Value::Object(fields) => {
+            let mut text = Vec::new();
+            if fields.get("type").and_then(Value::as_str) == Some("text") {
+                if let Some(value) = fields.get("text").and_then(Value::as_str) {
+                    text.push(value);
+                }
+            }
+            text.extend(fields.values().flat_map(collect_text_blocks));
+            text
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn last_user_content(request: &Value) -> Option<&Value> {
@@ -869,21 +948,26 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         .find("image caption before media")
         .expect("image caption text is present");
     let image = image_mixed
-        .find(&base64::engine::general_purpose::STANDARD.encode(native_image_png()))
-        .expect("mixed image bytes reach the model");
+        .find("image_url")
+        .expect("mixed image is still a typed image block");
     assert!(image_caption < image, "image part order: {image_mixed}");
 
-    let file_mixed = serde_json::to_string(
-        last_user_content(&requests[3]).expect("mixed file user message is present"),
-    )
-    .expect("serialize mixed file user content");
+    assert_model_received_file_content(&requests[3]);
+    let file_content = last_user_content(&requests[3]).expect("mixed file user message is present");
+    let file_mixed = serde_json::to_string(file_content).expect("serialize mixed file content");
     let file_caption = file_mixed
         .find("file caption before media")
         .expect("file caption text is present");
-    let file = file_mixed
-        .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES))
-        .expect("mixed file bytes reach the model");
-    assert!(file_caption < file, "file part order: {file_mixed}");
+    let typed_file = ["input_file", "document", "file"]
+        .into_iter()
+        .find_map(|kind| find_block_type(file_content, kind))
+        .and_then(|document| serde_json::to_string(document).ok())
+        .and_then(|document| file_mixed.find(&document));
+    let file_position = typed_file.or_else(|| {
+        file_mixed.find(std::str::from_utf8(NATIVE_FILE_BYTES).expect("fixture is UTF-8"))
+    });
+    let file_position = file_position.expect("file reaches model as a document or extracted text");
+    assert!(file_caption < file_position, "file part order: {file_mixed}");
     for request in &requests {
         let serialized = serde_json::to_string(request).unwrap();
         assert!(!serialized.contains("typed-image-file"));
