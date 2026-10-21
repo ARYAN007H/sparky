@@ -649,13 +649,14 @@ impl TurnModelSource {
             let provider = model
                 .profile()
                 .and_then(|profile| profile.provider.as_deref())
-                .unwrap_or("unknown");
+                .unwrap_or("unknown")
+                .to_owned();
             return Ok(crate::attachments::provider::wrap(
                 &ctx,
                 model,
                 cn.config.clone(),
                 &route.model,
-                provider,
+                &provider,
             ));
         }
         Err(anyhow::anyhow!("turn model source is missing a model"))
