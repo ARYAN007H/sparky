@@ -25,7 +25,7 @@ mod routing;
 mod subprocess_providers;
 mod turn_model;
 
-pub(crate) use chat_model::resolves_to_managed_backend;
+pub(crate) use chat_model::{resolves_to_managed_backend, OpenHumanModelFactory};
 pub use chat_model::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
