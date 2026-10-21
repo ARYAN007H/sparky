@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use log::debug;
 
 use crate::config::Config;
-use crate::voice::{create_stt_provider, effective_stt_provider};
+use crate::voice::{SttProvider, create_stt_provider, effective_stt_provider};
 use tinyinference_local::models as model_ids;
 use tinyinference_local::status::{LocalAiSpeechResult, LocalAiTtsResult};
 
@@ -48,47 +48,81 @@ pub async fn transcribe_with_prompt(
         );
     }
 
-    let path = std::path::Path::new(audio_path);
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    let mime = tinyinference_voice::mime::mime_for_extension(&ext);
-    let file_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("audio.wav")
-        .to_string();
-
     let provider_name = effective_stt_provider(config);
-    debug!(
-        "{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path} mime={mime}"
-    );
-    let bytes = tokio::fs::read(path)
-        .await
-        .map_err(|e| format!("failed to read audio file {audio_path}: {e}"))?;
-    if bytes.is_empty() {
-        return Err(format!("audio file {audio_path} is empty"));
-    }
-    let audio_base64 = BASE64.encode(&bytes);
-
-    let provider =
-        create_stt_provider(&provider_name, "", config).map_err(|error| error.to_string())?;
-    let outcome = provider
-        .transcribe(config, &audio_base64, Some(mime), Some(&file_name), None)
+    debug!("{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path}");
+    let provider = selected_stt_provider(config, &provider_name)?;
+    let text = tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
         .await?;
+    let bytes = tokio::fs::metadata(audio_path)
+        .await
+        .map(|metadata| metadata.len())
+        .unwrap_or_default();
     debug!(
         "{LOG_PREFIX} configured STT complete (provider={} bytes={} elapsed_ms={})",
-        outcome.value.provider,
-        bytes.len(),
+        provider_name,
+        bytes,
         started.elapsed().as_millis()
     );
     service.mark_stt_ready();
     Ok(LocalAiSpeechResult {
-        text: outcome.value.text,
+        text,
         model_id: model_ids::effective_stt_model_id(config),
     })
+}
+
+/// Transcribe audio bytes with the host-selected STT provider.
+pub async fn transcribe_bytes(
+    service: &LocalAiService,
+    config: &Config,
+    audio: &[u8],
+    extension: Option<&str>,
+) -> Result<LocalAiSpeechResult, String> {
+    let provider_name = effective_stt_provider(config);
+    let provider = selected_stt_provider(config, &provider_name)?;
+    let text = tinyinference_voice::transcription::transcribe_bytes(audio, extension, &provider)
+        .await?;
+    service.mark_stt_ready();
+    Ok(LocalAiSpeechResult {
+        text,
+        model_id: model_ids::effective_stt_model_id(config),
+    })
+}
+
+fn selected_stt_provider<'a>(
+    config: &'a Config,
+    provider_name: &str,
+) -> Result<ConfiguredSttProvider<'a>, String> {
+    let provider =
+        create_stt_provider(provider_name, "", config).map_err(|error| error.to_string())?;
+    Ok(ConfiguredSttProvider { config, provider })
+}
+
+struct ConfiguredSttProvider<'a> {
+    config: &'a Config,
+    provider: Box<dyn SttProvider>,
+}
+
+#[async_trait::async_trait]
+impl tinyinference_voice::transcription::TranscriptionProvider for ConfiguredSttProvider<'_> {
+    async fn transcribe(
+        &self,
+        audio: &[u8],
+        mime_type: &str,
+        file_name: &str,
+    ) -> Result<String, String> {
+        let audio_base64 = BASE64.encode(audio);
+        let outcome = self
+            .provider
+            .transcribe(
+                self.config,
+                &audio_base64,
+                Some(mime_type),
+                Some(file_name),
+                None,
+            )
+            .await?;
+        Ok(outcome.value.text)
+    }
 }
 
 pub async fn tts(
@@ -116,36 +150,14 @@ pub async fn tts(
         .await
         .map_err(|e| format!("failed to create TTS output directory: {e}"))?;
 
-    let mut child = tokio::process::Command::new(piper_bin)
-        .args([
-            "--model",
-            &model_path,
-            "--output_file",
-            &out_path.display().to_string(),
-        ])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("failed to launch piper: {e}"))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        use tokio::io::AsyncWriteExt;
-        stdin
-            .write_all(text.as_bytes())
-            .await
-            .map_err(|e| format!("failed to write text to piper stdin: {e}"))?;
-    }
-    let output = child
-        .wait_with_output()
-        .await
-        .map_err(|e| format!("failed to wait for piper: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "piper failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
+    tinyinference_voice::piper::synthesize_to_file(
+        Path::new(&piper_bin),
+        Path::new(&model_path),
+        text,
+        &out_path,
+        None,
+    )
+    .await?;
     service.mark_tts_ready();
     Ok(LocalAiTtsResult {
         output_path: out_path.display().to_string(),
