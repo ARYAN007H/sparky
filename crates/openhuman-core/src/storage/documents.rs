@@ -15,6 +15,7 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, Weak};
 use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Versioned};
+use tinystoragedrivers::WriteCondition;
 
 use super::{
     DocumentStore, Scope, Storage, StorageBackend, StorageError, block_on, current_scope, installed,
@@ -188,6 +189,32 @@ impl Repo {
     /// bind to a whole scope (`tsd.migrations`).
     pub fn scoped(&self) -> &Storage {
         &self.scoped
+    }
+
+    pub(crate) fn origin_scope(&self) -> Option<&str> {
+        self.origin.as_ref().map(|origin| origin.scope.as_str())
+    }
+
+    /// Opens the same owner scope with an additional storage-driver write
+    /// condition. The backend remains responsible for composing any host
+    /// profile fence with `condition` atomically.
+    ///
+    /// Repos made with [`Repo::over`] have no backend/scope origin and cannot
+    /// be rebound safely; callers must use an explicitly opened repo for
+    /// claim-bound imports.
+    pub(crate) fn conditioned(&self, condition: &WriteCondition) -> Result<Self> {
+        let origin = self.origin.as_ref().ok_or_else(|| {
+            anyhow!("[{}] claim-bound storage requires an opened backend scope", self.domain)
+        })?;
+        let scope = Scope::new(&origin.scope)
+            .with_context(|| format!("[{}] parse the storage scope", self.domain))?;
+        let scoped = origin
+            .backend
+            .for_scope_conditioned(&scope, condition)
+            .with_context(|| format!("[{}] bind the import claim to storage writes", self.domain))?;
+        let mut repo = Self::over(&scoped, self.domain, self.collections);
+        repo.origin = Some(origin.clone());
+        Ok(repo)
     }
 
     /// Runs `f` once per process for this repo's backend instance, scope and
