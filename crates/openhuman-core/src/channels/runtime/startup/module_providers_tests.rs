@@ -482,6 +482,17 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
         .await
         .expect("read handle is usable before lease drop");
     assert!(!first_chunk.done);
+    let replay: tinychannels_bus::MediaReadChunkResult = object
+        .call_confidential(
+            tinychannels_bus::methods::READ_MEDIA_CHUNK,
+            (tinychannels_bus::MediaReadChunk {
+                handle: read.handle.clone(),
+                sequence: 0,
+            },),
+        )
+        .await
+        .expect("the module retains the last chunk for retry before lease drop");
+    assert_eq!(replay, first_chunk);
     let handle = read.handle.clone();
     crate::channels::runtime::dispatch::drop_media_read_lease_for_test(
         runtime.client.clone(),
@@ -500,7 +511,8 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
                     },),
                 )
                 .await;
-            if chunk.is_err() {
+            if let Err(error) = chunk {
+                assert_eq!(error, tinybus::module::ModuleCallError::ModuleFault);
                 break;
             }
             tokio::task::yield_now().await;
