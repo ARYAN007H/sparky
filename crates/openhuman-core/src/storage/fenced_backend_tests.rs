@@ -193,7 +193,7 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
     assert_eq!(raw.streams().len("events").await.unwrap(), 0);
     assert!(raw.blobs().get("blob").await.unwrap().is_none());
     assert!(raw.kv().get("key").await.unwrap().is_none());
-    assert_eq!(raw.queues().stats("work").await.unwrap().in_flight, 1);
+    assert_eq!(raw.queues().stats("work").await.unwrap().leased, 1);
     assert!(
         raw.documents()
             .get("items", "kept")
