@@ -33,6 +33,8 @@ const OTHER_CHAT_TEXT: &str = "remember a separate chat history";
 const AFTER_RESET_TEXT: &str = "this starts a fresh session after new";
 const RESET_AFTER_RESTART_TEXT: &str = "continue the reset conversation after restart";
 const OTHER_AFTER_RESTART_TEXT: &str = "continue the separate chat after restart";
+const NATIVE_IMAGE_PNG: &[u8] = b"\x89PNG\r\n\x1a\nfixture-image-bytes";
+const NATIVE_FILE_BYTES: &[u8] = b"native file bytes for typed admission";
 
 #[derive(Default)]
 struct MockState {
@@ -54,6 +56,8 @@ async fn start_mock_servers() -> MockServers {
     let state = Arc::new(MockState::default());
     let telegram_app = Router::new()
         .route("/botsession-restart-token/getUpdates", post(get_updates))
+        .route("/botsession-restart-token/getFile", post(get_file))
+        .route("/file/botsession-restart-token/{*path}", get(download_file))
         .route("/botsession-restart-token/sendMessage", post(send_message))
         .route(
             "/botsession-restart-token/editMessageText",
@@ -126,6 +130,25 @@ async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Valu
         .expect("Telegram sent messages")
         .len() as i64;
     Json(json!({ "ok": true, "result": { "message_id": id, "chat": { "id": 42 } } }))
+}
+
+async fn get_file(Json(body): Json<Value>) -> Json<Value> {
+    let file_id = body.get("file_id").and_then(Value::as_str).unwrap_or_default();
+    let (path, bytes) = match file_id {
+        "typed-image-file" => ("photos/native.png", NATIVE_IMAGE_PNG),
+        "typed-document-file" => ("documents/native.txt", NATIVE_FILE_BYTES),
+        _ => return Json(json!({ "ok": false, "description": "unknown mock file" })),
+    };
+    Json(json!({ "ok": true, "result": { "file_path": path, "file_size": bytes.len() } }))
+}
+
+async fn download_file(path: axum::extract::Path<String>) -> Response {
+    let (content_type, bytes) = match path.0.as_str() {
+        "photos/native.png" => ("application/octet-stream", NATIVE_IMAGE_PNG),
+        "documents/native.txt" => ("application/octet-stream", NATIVE_FILE_BYTES),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    ([(axum::http::header::CONTENT_TYPE, content_type)], bytes.to_vec()).into_response()
 }
 
 async fn ok() -> Json<Value> {
@@ -209,6 +232,41 @@ fn push_update_for(state: &MockState, update_id: i64, message_id: i64, chat_id: 
         .lock()
         .expect("Telegram updates")
         .push_back(message_update_for(update_id, message_id, chat_id, text));
+}
+
+fn media_update(
+    update_id: i64,
+    message_id: i64,
+    image: bool,
+    document: bool,
+    text: Option<&str>,
+) -> Value {
+    let mut message = json!({
+        "message_id": message_id,
+        "date": 1_800_000_000,
+        "from": { "id": 42, "is_bot": false, "first_name": "Ada" },
+        "chat": { "id": 42, "type": "private", "first_name": "Ada" }
+    });
+    if image {
+        message["photo"] = json!([{
+            "file_id": "typed-image-file",
+            "file_unique_id": "typed-image-unique",
+            "file_size": NATIVE_IMAGE_PNG.len()
+        }]);
+    }
+    if document {
+        message["document"] = json!({
+            "file_id": "typed-document-file",
+            "file_unique_id": "typed-document-unique",
+            "file_name": "native.txt",
+            "mime_type": "text/plain",
+            "file_size": NATIVE_FILE_BYTES.len()
+        });
+    }
+    if let Some(text) = text {
+        message["text"] = json!(text);
+    }
+    json!({ "update_id": update_id, "message": message })
 }
 
 fn write_config(home: &Path, workspace: &Path, inference: &str) {
@@ -453,6 +511,12 @@ async fn wait_for_completion(state: &MockState, count: usize) {
     }
 }
 
+fn model_saw_media_bytes(request: &Value, bytes: &[u8]) -> bool {
+    use base64::Engine as _;
+    serde_json::to_string(request)
+        .is_ok_and(|body| body.contains(&base64::engine::general_purpose::STANDARD.encode(bytes)))
+}
+
 fn model_saw_user_text(request: &Value, text: &str) -> bool {
     request["messages"].as_array().is_some_and(|messages| {
         messages.iter().any(|message| {
@@ -646,4 +710,71 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     assert!(!model_saw_user_text(other_chat_request, AFTER_RESET_TEXT));
     wait_for_completion(&mocks.state, 5).await;
     second.stop();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() {
+    use base64::Engine as _;
+
+    let tmp = tempfile::tempdir().expect("temporary core home");
+    let home = std::fs::canonicalize(tmp.path()).expect("canonicalize temporary home");
+    let workspace = home.join("workspace");
+    let logs = home.join("logs");
+    std::fs::create_dir_all(&logs).expect("create logs");
+    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
+        .map(std::path::PathBuf::from)
+        .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
+    assert!(module_source_dir.join("tinychannels/modules.toml").is_file());
+
+    let mocks = start_mock_servers().await;
+    write_config(&home, &workspace, &mocks.inference);
+    let (mut core, core_rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &module_source_dir,
+        &logs.join("typed-media.log"),
+    );
+    wait_healthy(&core_rpc, &mut core, &logs.join("typed-media.log")).await;
+
+    push_media_update(&mocks.state, media_update(200, 20, true, false, None));
+    wait_for_completion(&mocks.state, 1).await;
+    push_media_update(&mocks.state, media_update(201, 21, false, true, None));
+    wait_for_completion(&mocks.state, 2).await;
+    push_media_update(
+        &mocks.state,
+        media_update(202, 22, true, true, Some("before typed media after")),
+    );
+    wait_for_completion(&mocks.state, 3).await;
+
+    let requests = mocks.state.completions.lock().expect("model requests").clone();
+    assert!(model_saw_media_bytes(&requests[0], NATIVE_IMAGE_PNG));
+    assert!(model_saw_media_bytes(&requests[1], NATIVE_FILE_BYTES));
+    let mixed = serde_json::to_string(&requests[2]).expect("serialize model request");
+    let before = mixed.find("before typed media").expect("caption text is present");
+    let image = mixed
+        .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_IMAGE_PNG))
+        .expect("mixed image bytes reach the model");
+    let file = mixed
+        .find(&base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES))
+        .expect("mixed file bytes reach the model");
+    let after = mixed.find("after").expect("trailing text is present");
+    assert!(before < image && image < file && file < after, "typed part order: {mixed}");
+    for request in &requests {
+        let serialized = serde_json::to_string(request).unwrap();
+        assert!(!serialized.contains("typed-image-file"));
+        assert!(!serialized.contains("typed-document-file"));
+        assert!(!serialized.contains("photos/native.png"));
+        assert!(!serialized.contains("documents/native.txt"));
+    }
+    core.stop();
+}
+
+fn push_media_update(state: &MockState, update: Value) {
+    state
+        .updates
+        .lock()
+        .expect("Telegram updates")
+        .push_back(update);
 }
