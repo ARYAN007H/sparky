@@ -7,6 +7,9 @@
 //! budget and the spawn-depth cap.
 
 use tinyagents_harness::runtime::RunPolicy;
+
+/// Maximum output tokens for one hosted agent model call.
+pub(crate) const AGENT_TURN_MAX_OUTPUT_TOKENS: u32 = 16_384;
 use tinyagents_harness::turn_policy::{
     local_turn_backstop_secs, run_policy, turn_wall_clock_ms, TurnPolicyOptions,
     TurnPolicyOverrides,
