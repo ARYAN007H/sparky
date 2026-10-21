@@ -98,8 +98,6 @@ pub(crate) mod storage_grant_schemas;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
 #[cfg(feature = "modules")]
-pub(crate) mod storage_queue_manifest;
-#[cfg(feature = "modules")]
 pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
 mod storage_host_linked;
@@ -119,6 +117,8 @@ mod storage_import_tinyjuice_savings;
 mod storage_import_tinymcp;
 #[cfg(all(feature = "modules", feature = "web3"))]
 mod storage_import_tinywallet;
+#[cfg(feature = "modules")]
+pub(crate) mod storage_queue_manifest;
 pub mod tinybox;
 pub(crate) mod tinyflows;
 #[cfg(feature = "modules")]

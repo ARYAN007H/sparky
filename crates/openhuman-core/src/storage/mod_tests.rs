@@ -3,7 +3,9 @@ use super::*;
 fn round_trip_through_storage_bridge() -> serde_json::Value {
     let backend: Arc<dyn StorageBackend> =
         Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
-    let storage = backend.for_scope(&Scope::new("bridge-test").unwrap()).unwrap();
+    let storage = backend
+        .for_scope(&Scope::new("bridge-test").unwrap())
+        .unwrap();
     let docs = Arc::clone(storage.documents());
     block_on(async move {
         docs.ensure_collection(&CollectionSpec::new("bridge.records"))
@@ -157,12 +159,18 @@ fn block_on_runs_a_future_from_sync_code() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn block_on_works_inside_a_current_thread_runtime() {
-    assert_eq!(round_trip_through_storage_bridge(), serde_json::json!({"value": 42}));
+    assert_eq!(
+        round_trip_through_storage_bridge(),
+        serde_json::json!({"value": 42})
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn block_on_works_inside_a_multi_thread_runtime() {
-    assert_eq!(round_trip_through_storage_bridge(), serde_json::json!({"value": 42}));
+    assert_eq!(
+        round_trip_through_storage_bridge(),
+        serde_json::json!({"value": 42})
+    );
 }
 
 #[test]

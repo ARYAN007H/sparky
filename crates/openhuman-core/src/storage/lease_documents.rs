@@ -14,10 +14,10 @@ use tinystoragedrivers::{
     Version, Versioned, WriteOptions,
 };
 
-use super::StorageError;
 use super::lease::{
-    CLUSTER_SCOPE, LEASE_COLLECTION, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, validate_key,
+    validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, CLUSTER_SCOPE, LEASE_COLLECTION,
 };
+use super::StorageError;
 
 /// The owner namespace of the host's process-placement lease documents.
 pub const LEASE_OWNER: &str = "profiles";

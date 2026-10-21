@@ -16,8 +16,8 @@ use tinyeventqueues_bus::{Lane, PipelineConfig};
 use tinystoragedrivers::QueueConfig;
 
 use crate::config::Config;
-use crate::modules::storage_queue_manifest::QueueManifest;
 use crate::modules::storage_grant_schemas::QueueGrant;
+use crate::modules::storage_queue_manifest::QueueManifest;
 
 /// The `[components]` switch that owns the inbound event queues.
 pub const COMPONENT: &str = "eventqueues";
