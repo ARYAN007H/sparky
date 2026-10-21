@@ -10,6 +10,40 @@ pub fn memory_backend() -> Arc<dyn StorageBackend> {
     Arc::new(tinystoragedrivers_testkit::MemoryBackend::new())
 }
 
+/// A temporary installation in the process storage slot, restored on drop.
+/// Use only in tests that exercise boot/import paths reading `installed_url`.
+pub struct InstalledBackendGuard {
+    previous_backend: Option<Arc<dyn StorageBackend>>,
+    previous_url: Option<String>,
+}
+
+/// Installs `backend` with its URL for a test that exercises the production
+/// boot path, restoring the previous process slot when the guard is dropped.
+pub fn install_for_test(url: &str, backend: Arc<dyn StorageBackend>) -> InstalledBackendGuard {
+    let previous_url = crate::storage::installed_url();
+    let previous_backend = crate::storage::install_for_url(url, backend);
+    InstalledBackendGuard {
+        previous_backend,
+        previous_url,
+    }
+}
+
+impl Drop for InstalledBackendGuard {
+    fn drop(&mut self) {
+        match (self.previous_backend.take(), self.previous_url.take()) {
+            (Some(backend), Some(url)) => {
+                crate::storage::install_for_url(&url, backend);
+            }
+            (Some(backend), None) => {
+                crate::storage::install(backend);
+            }
+            (None, _) => {
+                crate::storage::clear();
+            }
+        }
+    }
+}
+
 /// An on-disk SQLite backend whose temporary directory remains alive as long
 /// as the fixture is retained. Use it for persistence, conditional-write,
 /// fence, and import-claim tests; the TSD memory backend does not emulate those
