@@ -164,6 +164,7 @@ async fn cancellation_during_required_output_repair_finalizes_native_run() {
         AgentEvent::RunCompleted { run_id: completed, .. } if completed.as_str() == run_id
     )));
     let status = crate::storage::sessions::status_store_for(&workspace)
+        .expect("status store")
         .get_status(&run_id)
         .await
         .expect("status lookup")

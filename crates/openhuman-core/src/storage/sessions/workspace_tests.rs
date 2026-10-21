@@ -55,7 +55,7 @@ fn an_attachment_stash_and_artifact_blobs_bind_the_tenant_scope() {
 #[test]
 fn a_run_status_store_is_built_for_the_workspace() {
     let ws = scratch();
-    let _status = status_store_for(ws.path());
+    let _status = status_store_for(ws.path()).expect("status store");
 }
 
 #[test]

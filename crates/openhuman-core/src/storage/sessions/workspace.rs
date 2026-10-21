@@ -71,6 +71,11 @@ pub fn provider_for_workspace(workspace_dir: &Path) -> Arc<dyn SessionStoreProvi
 
 /// The provider over `workspace_dir`'s default backend, installed or not.
 pub(super) fn fallback_provider(workspace_dir: &Path) -> Arc<dyn SessionStoreProvider> {
+    if crate::core::runtime::is_saas() && crate::storage::installed().is_none() {
+        return refusing_provider(
+            "no host storage backend is installed for this SaaS session".to_owned(),
+        );
+    }
     let backend = match crate::storage::local::backend_for(workspace_dir) {
         Ok(backend) => backend,
         Err(error) => {
