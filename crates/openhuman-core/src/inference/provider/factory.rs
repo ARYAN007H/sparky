@@ -31,7 +31,7 @@ pub use chat_model::{
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
 };
 pub(crate) use credentials::openai_bearer_is_oauth;
-pub use credentials::{auth_key_for_slug, lookup_key_for_slug, redact_endpoint};
+pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
 pub(crate) use discovery::{model_limits_request, model_limits_request_for};
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use managed_backend::make_openhuman_backend_model;
@@ -102,6 +102,18 @@ use tinyinference_llm::providers::openai::codex::{
     OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
 };
 use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
+
+/// Redact a configured endpoint to its origin for host diagnostics.
+///
+/// TinyInference's sanitizer keeps URL paths for routing diagnostics, while
+/// OpenHuman endpoints may carry credentials in path segments. Keep this host
+/// log policy origin-only and never fall back to the unparsed input.
+pub fn redact_endpoint_origin(endpoint: &str) -> String {
+    let Ok(url) = url::Url::parse(endpoint.trim()) else {
+        return "<endpoint>".to_string();
+    };
+    tinyinference_core::sanitize::redact_url(&url.origin().ascii_serialization())
+}
 
 /// Sentinel meaning "use the OpenHuman backend session JWT".
 pub const PROVIDER_OPENHUMAN: &str = "openhuman";
