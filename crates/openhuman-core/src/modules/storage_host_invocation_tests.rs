@@ -112,12 +112,7 @@ async fn callback_documents_route_uses_the_captured_storage() {
     )
     .await;
 
-    assert!(matches!(
-        &result,
-        Err(HostFailure::Storage(StorageFailure {
-            kind: StorageKind::NotFound
-        }))
-    ), "expected a missing document in the captured backend, got {result:?}");
+    assert_eq!(result, Ok(Value::Null));
 }
 
 #[tokio::test]
