@@ -1,0 +1,76 @@
+//! JSON-RPC controller surface for inference operations.
+
+use crate::config::rpc as config_rpc;
+use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
+use crate::inference::host_runtime as local_runtime;
+use crate::inference::provider as providers;
+use serde_json::{json, Value};
+use tinyinference_llm::message::Message;
+use tinyinference_llm::model::ModelRequest;
+use tinyinference_llm::sentiment::{parse_sentiment_response, SentimentResult};
+use tinyinference_local::status::LocalAiStatus;
+use tracing::{debug, error, warn};
+
+const LOG_PREFIX: &str = "[inference::ops]";
+
+/// User picked a provider id (slug) that isn't registered in the cloud
+/// provider list — e.g. selecting `"ollama"` as a cloud provider when it's
+/// actually a local runtime. Matches the literal phrase emitted at
+pub async fn inference_analyze_sentiment(
+    config: &Config,
+    message: &str,
+) -> Result<Outcome<SentimentResult>, String> {
+    debug!(
+        message_len = message.len(),
+        "{LOG_PREFIX} analyze_sentiment:start"
+    );
+    if message.trim().is_empty() {
+        return Ok(Outcome::single_log(
+            SentimentResult::neutral(),
+            "empty message — neutral sentiment",
+        ));
+    }
+
+    let service = local_runtime::global(config);
+    if service.status().state != "ready" {
+        return Ok(Outcome::single_log(
+            SentimentResult::neutral(),
+            "local model not ready",
+        ));
+    }
+
+    let prompt = format!(
+        "Classify the emotion and sentiment of this user message.\n\
+         Reply with EXACTLY three words separated by spaces:\n\
+         EMOTION VALENCE CONFIDENCE\n\
+         Where EMOTION is one of: joy, sadness, anger, surprise, fear, disgust, neutral\n\
+         VALENCE is one of: positive, negative, neutral\n\
+         CONFIDENCE is a number from 0.0 to 1.0\n\n\
+         User message: {message}"
+    );
+    let runtime = crate::inference::local_runtime_config(config);
+    let Some(_permit) = crate::platform::llm_gate::wait_for_capacity().await else {
+        return Ok(Outcome::single_log(
+            SentimentResult::neutral(),
+            "local inference paused while signed out",
+        ));
+    };
+    let result = match service.prompt(&runtime, &prompt, Some(8), true).await {
+        Ok(raw) => parse_sentiment_response(&raw.trim().to_lowercase()),
+        Err(error) => {
+            debug!(%error, "{LOG_PREFIX} sentiment inference failed; returning neutral");
+            SentimentResult::neutral()
+        }
+    };
+    let result = Ok(Outcome::single_log(result, "sentiment analysis completed"));
+    match &result {
+        Ok(outcome) => {
+            debug!(valence = %outcome.value.valence, "{LOG_PREFIX} analyze_sentiment:ok")
+        }
+        Err(err) => warn!(error = %err, "{LOG_PREFIX} analyze_sentiment:error"),
+    }
+    result
+}
+
