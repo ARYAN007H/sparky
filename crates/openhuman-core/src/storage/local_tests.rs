@@ -96,11 +96,12 @@ async fn warm_sync_open_reuses_the_backend_without_entering_the_blocking_bridge(
     super::arm_test_sync_backend_entry_signal(dir.path(), entered_tx);
 
     let synchronous = backend_for(dir.path()).unwrap();
+    let bridge_entry = entered_rx.try_recv();
     super::clear_test_sync_backend_entry_signal(dir.path());
 
     assert!(Arc::ptr_eq(&warmed, &synchronous));
     assert_eq!(
-        entered_rx.try_recv(),
+        bridge_entry,
         Err(std::sync::mpsc::TryRecvError::Empty),
         "a warm backend lookup should not block the calling Tokio worker"
     );
