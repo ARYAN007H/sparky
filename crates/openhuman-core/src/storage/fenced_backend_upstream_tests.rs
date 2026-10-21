@@ -12,9 +12,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tinystoragedrivers_types::{Capabilities, Capability, CollectionSpec, ErrorKind, Precondition, Scope, Version};
 
-#[path = "fenced_blob_stream_tests.rs"]
-mod blob_stream_tests;
-
 const TTL: Duration = Duration::from_secs(30);
 const MARGIN_MS: u64 = 5_000;
 

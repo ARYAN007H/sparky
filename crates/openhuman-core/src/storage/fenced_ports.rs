@@ -375,6 +375,10 @@ impl BlobStore for GuardedBlobs {
     }
 }
 
+#[cfg(test)]
+#[path = "fenced_blob_stream_tests.rs"]
+mod blob_stream_tests;
+
 struct GuardedQueues {
     inner: Arc<dyn QueueStore>,
     fence: Arc<LeaseFence>,
