@@ -270,11 +270,13 @@ async fn dispatch_target_agent(
             attachments: &[],
         },
         prompt,
-        // SUBAGENT_OPTIONS_REMOVED
-            run_context: crate::agent::tinyagents::host::OpenHumanRunContext::new()
-                .with_core(ctx.core().cloned())
-                .with_host_env(&parent_ctx.host_env)
-                .with_parent(parent_ctx),
+        model_override,
+        Some(definition.temperature),
+        None,
+        None,
+        None,
+        crate::inference::host_runtime::ops::AgentChatEnv {
+            host: parent_ctx.host_env.clone(),
             ..Default::default()
         },
     )
