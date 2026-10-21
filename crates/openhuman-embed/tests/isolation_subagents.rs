@@ -219,8 +219,11 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .agent(
                     AgentSpec::new("host-only-lead")
                         .provider(route(&host_only_provider, "host-only-model"))
-                        .bare_prompt("You are a host-managed agent.")
-                        .definition(AgentDefinitionSpec::new().tools(ToolScopeSpec::HostOnly))
+                        .definition(
+                            AgentDefinitionSpec::new()
+                                .bare_prompt("You are a host-managed agent.")
+                                .tools(ToolScopeSpec::HostOnly),
+                        )
                         .subagents([(
                             "host_helper",
                             AgentDefinitionSpec::new()
