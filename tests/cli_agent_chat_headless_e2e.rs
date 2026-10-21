@@ -76,6 +76,19 @@ fn wait_for_mock(origin: &str, child: &mut Child, log_path: &Path) {
 }
 
 fn set_mock_behavior(origin: &str, behavior: Value) {
+    let behavior = behavior
+        .as_object()
+        .expect("mock behavior object")
+        .iter()
+        .map(|(key, value)| {
+            let value = if value.is_array() || value.is_object() {
+                Value::String(value.to_string())
+            } else {
+                value.clone()
+            };
+            (key.clone(), value)
+        })
+        .collect::<serde_json::Map<_, _>>();
     let response = reqwest::blocking::Client::new()
         .post(format!("{origin}/__admin/behavior"))
         .json(&json!({ "behavior": behavior, "mode": "replace" }))
