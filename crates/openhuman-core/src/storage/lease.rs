@@ -170,18 +170,18 @@ pub trait LeaseStore: Send + Sync {
     /// [`LeaseError::Storage`].
     async fn holder(&self, key: &str) -> Result<Option<LeaseRecord>, LeaseError>;
 
-    /// The fence a storage driver enforces for `node`'s grant on `key` at
+    /// The condition a storage driver evaluates for `node`'s grant on `key` at
     /// `epoch`, when the record lives in the storage ports at all: the
     /// record must still name `node` at `epoch`, unreleased. The driver then
     /// checks a write against the record in the same atomic step
-    /// ([`super::fence::LeaseFence::driver_fence`]). `None` (the default) for
+    /// ([`super::fence::LeaseFence::write_condition`]). `None` (the default) for
     /// stores that keep records elsewhere, such as file locks.
-    fn driver_fence(
+    fn write_condition(
         &self,
         _key: &str,
         _node: &str,
         _epoch: u64,
-    ) -> Option<tinystoragedrivers::Fence> {
+    ) -> Option<tinystoragedrivers_types::WriteCondition> {
         None
     }
 }
