@@ -41,8 +41,8 @@ pub(super) fn concurrent_turn_diagnostic(stage: usize) {
     if std::env::var_os("OH_DIAG_CONCURRENT").is_none() {
         return;
     }
-    static COUNTS: [std::sync::atomic::AtomicUsize; 5] =
-        [const { std::sync::atomic::AtomicUsize::new(0) }; 5];
+    static COUNTS: [std::sync::atomic::AtomicUsize; 14] =
+        [const { std::sync::atomic::AtomicUsize::new(0) }; 14];
     let count = COUNTS[stage].fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
     eprintln!("OpenHuman concurrent diagnostic stage={stage} count={count}");
 }
@@ -411,6 +411,7 @@ impl OpenHumanSessionHost {
                             .effective_context_window(&prelude.model_name)
                             .await
                             .unwrap_or_default();
+                        concurrent_turn_diagnostic(5);
                         options
                             .run_context
                             .data
@@ -441,12 +442,14 @@ impl OpenHumanSessionHost {
                                 origin,
                             )),
                         );
+                        concurrent_turn_diagnostic(6);
                         options.run_context.data.memory_turn = memory_turn;
                         request.input = user_message_from_text(&enriched);
                         let mut preparation =
                             prelude.prepare(new_session).await.map_err(|error| {
                                 tinyagents_runtime::RuntimeError::Driver(error.to_string())
                             })?;
+                        concurrent_turn_diagnostic(7);
                         prelude.refresh_permanent_prefix(&mut preparation, view.prefix);
                         if turn.overrides.suppress_tools {
                             // One-off tool-less turn: must not become the
@@ -496,6 +499,7 @@ impl OpenHumanSessionHost {
                             .unwrap_or_else(|poisoned| poisoned.into_inner())
                             .required_output
                             .clone();
+                        concurrent_turn_diagnostic(8);
                         Ok(preparation)
                     })
                 }
