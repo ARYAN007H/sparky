@@ -3,7 +3,7 @@
 //! Given an [`crate::agent_registry::host_definition::AgentDefinition`] and a task prompt, the
 //! runner:
 //!
-//! 1. Reads the [`super::fork_context::ParentExecutionContext`] the parent
+//! 1. Reads the [`fork_context::ParentExecutionContext`] the parent
 //!    [`crate::agent::OpenHumanSessionHost::turn`] attached to the run context
 //!    (`OpenHumanRunContext::parent`).
 //! 2. Resolves the sub-agent's model name (inherit / hint / exact).
