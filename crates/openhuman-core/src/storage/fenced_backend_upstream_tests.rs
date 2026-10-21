@@ -27,7 +27,7 @@ struct Node {
 
 impl Node {
     fn new(name: &'static str, shared: &Arc<dyn StorageBackend>) -> Self {
-        let clock = Arc::new(AtomicU64::new(0));
+        let clock = Arc::new(AtomicU64::new(crate::storage::fence::system_now_ms()));
         let reading = Arc::clone(&clock);
         let fences = Arc::new(FenceRegistry::new(move || reading.load(Ordering::SeqCst)));
         Self {
@@ -92,6 +92,7 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
         Node::new("node-b", &backend.backend),
     );
 
+    let base = a.clock.load(Ordering::SeqCst);
     a.take("alice").await;
     a.put("profile:alice", "n1").await.unwrap();
     a.put("alice~default", "n1").await.unwrap();
@@ -99,10 +100,10 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
     // Node B's clock passes A's expiry and takes the profile over. Node A's
     // clock is still early (it was paused, or runs behind): its local check
     // passes, so the stored record is what stops it.
-    b.set_clock(TTL.as_millis() as u64 + 1);
+    b.set_clock(base + TTL.as_millis() as u64 + 1);
     let stolen = b.take("alice").await;
     assert!(stolen.previous_unclean);
-    a.set_clock(1_000);
+    a.set_clock(base + 1_000);
 
     let refused = a.put("profile:alice", "n2").await.unwrap_err();
     assert!(matches!(
@@ -149,10 +150,11 @@ async fn a_paused_node_refuses_its_own_writes_once_its_grant_runs_out() {
     let backend = shared();
     let a = Node::new("node-a", &backend.backend);
     a.take("alice").await;
+    let base = a.clock.load(Ordering::SeqCst);
 
     // Nobody took over yet, but node A's renewals stopped landing: inside
     // the skew margin it already refuses, with no I/O.
-    a.set_clock(TTL.as_millis() as u64 - MARGIN_MS);
+    a.set_clock(base + TTL.as_millis() as u64 - MARGIN_MS);
     let refused = a.put("profile:alice", "n").await.unwrap_err();
     assert_eq!(
         fence_error(&refused),
@@ -164,14 +166,15 @@ async fn a_paused_node_refuses_its_own_writes_once_its_grant_runs_out() {
 async fn a_renewed_grant_keeps_admitting_writes() {
     let backend = shared();
     let a = Node::new("node-a", &backend.backend);
+    let base = a.clock.load(Ordering::SeqCst);
     let grant = a.take("alice").await;
-    a.set_clock(20_000);
-    let renewed = a.leases.renew(&grant, 20_000).await.unwrap();
+    a.set_clock(base + 20_000);
+    let renewed = a.leases.renew(&grant, base + 20_000).await.unwrap();
     a.fences
         .lookup("profile:alice")
         .unwrap()
         .renewed(renewed.expires_at_ms);
-    a.set_clock(40_000);
+    a.set_clock(base + 40_000);
     a.put("profile:alice", "n").await.unwrap();
 }
 
@@ -487,10 +490,11 @@ async fn expiring_blob_writes_are_fenced() {
         Node::new("node-a", &backend.backend),
         Node::new("node-b", &backend.backend),
     );
+    let base = a.clock.load(Ordering::SeqCst);
     a.take("alice").await;
-    b.set_clock(TTL.as_millis() as u64 + 1);
+    b.set_clock(base + TTL.as_millis() as u64 + 1);
     b.take("alice").await;
-    a.set_clock(1_000);
+    a.set_clock(base + 1_000);
 
     let session = a.scoped("alice~default");
     assert!(session
