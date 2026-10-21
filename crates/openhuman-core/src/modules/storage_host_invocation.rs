@@ -175,17 +175,16 @@ impl StorageEndpoint for DocumentsOnlyEndpoint {
                         let mut reply = self
                             .server
                             .handle(
-                            Admission::Private,
-                            Object::Documents.as_str(),
-                            call.selector,
-                            call.request,
-                        )
-                        .await
+                                Admission::Private,
+                                Object::Documents.as_str(),
+                                call.selector,
+                                call.request,
+                            )
+                            .await
                             .map_err(HostFailure::Storage)?;
                         if call.selector == "Capabilities" {
-                            if let Some(capabilities) = reply
-                                .get_mut("capabilities")
-                                .and_then(Value::as_array_mut)
+                            if let Some(capabilities) =
+                                reply.get_mut("capabilities").and_then(Value::as_array_mut)
                             {
                                 capabilities
                                     .retain(|capability| capability.as_str() != Some("watch"));
