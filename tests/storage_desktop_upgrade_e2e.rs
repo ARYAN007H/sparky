@@ -416,9 +416,13 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
 async fn import_modules(workspace: &Path) {
     use openhuman_core::modules;
     let ctx = openhuman_core::core::runtime::DispatchCtx::process_default();
-    modules::import_legacy_mcp(&ctx, workspace)
+    let mcp_import = modules::import_legacy_mcp(&ctx, workspace)
         .await
         .expect("import the legacy TinyMCP records");
+    assert!(
+        mcp_import.starts_with("Imported"),
+        "TinyMCP import should consume both legacy stores: {mcp_import}"
+    );
     modules::import_legacy_connectors(&ctx, workspace).await;
     #[cfg(feature = "web3")]
     assert!(modules::import_legacy_x402(&ctx, workspace).await);
