@@ -1,5 +1,5 @@
 use super::*;
-use std::sync::Mutex as StdMutex;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
@@ -368,4 +368,73 @@ fn config_override_ignores_zero_and_other_models() {
     assert_eq!(config_override("a", &config), None);
     assert_eq!(config_override(" b ", &config), Some(32_000));
     assert_eq!(config_override("c", &config), None);
+}
+
+#[test]
+fn model_limits_client_uses_provider_ca_and_falls_back_to_proxy() {
+    let mut config = Config::default();
+    config
+        .cloud_provider_ca_certs
+        .insert("openrouter".to_string(), "test-ca-bundle".to_string());
+    let calls = Arc::new(StdMutex::new(Vec::new()));
+    let ca_calls = calls.clone();
+    let _client = model_limits_client_with(
+        &config,
+        "openrouter:some-model",
+        move |pem, service, timeout, connect_timeout| {
+            ca_calls.lock().unwrap().push((
+                "ca".to_string(),
+                pem.to_string(),
+                service.to_string(),
+                timeout,
+                connect_timeout,
+            ));
+            Some(reqwest::Client::new())
+        },
+        |_, _, _| panic!("a usable provider CA client should be selected"),
+    );
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [("ca".to_string(), "test-ca-bundle".to_string(), MODEL_LIMITS_SERVICE.to_string(), 5, 3)]
+    );
+
+    let proxy_calls = Arc::new(StdMutex::new(Vec::new()));
+    let ca_calls = proxy_calls.clone();
+    let proxy_record = proxy_calls.clone();
+    let _client = model_limits_client_with(
+        &config,
+        "openrouter:some-model",
+        move |pem, service, timeout, connect_timeout| {
+            ca_calls.lock().unwrap().push((
+                "ca".to_string(),
+                pem.to_string(),
+                service.to_string(),
+                timeout,
+                connect_timeout,
+            ));
+            None
+        },
+        move |service, timeout, connect_timeout| {
+            proxy_record.lock().unwrap().push((
+                "proxy".to_string(),
+                service.to_string(),
+                timeout,
+                connect_timeout,
+            ));
+            reqwest::Client::new()
+        },
+    );
+    assert_eq!(
+        *proxy_calls.lock().unwrap(),
+        [
+            (
+                "ca".to_string(),
+                "test-ca-bundle".to_string(),
+                MODEL_LIMITS_SERVICE.to_string(),
+                5,
+                3
+            ),
+            ("proxy".to_string(), MODEL_LIMITS_SERVICE.to_string(), 5, 3)
+        ]
+    );
 }
