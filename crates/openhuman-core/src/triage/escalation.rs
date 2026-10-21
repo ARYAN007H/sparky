@@ -257,7 +257,18 @@ async fn dispatch_target_agent(
     tracing::debug!(agent_id = %agent_id, "[triage::escalation] dispatching direct agent turn");
 
     let outcome = crate::inference::host_runtime::ops::agent_chat_for(
-        definition,
+        &mut config,
+        crate::inference::host_runtime::ops::AgentChatTarget::Definition {
+            definition,
+            host: None,
+            seed: None,
+            usage: None,
+            host_only: false,
+            untrusted_input: false,
+            shape: None,
+            observer: None,
+            attachments: &[],
+        },
         prompt,
         // SUBAGENT_OPTIONS_REMOVED
             run_context: crate::agent::tinyagents::host::OpenHumanRunContext::new()
