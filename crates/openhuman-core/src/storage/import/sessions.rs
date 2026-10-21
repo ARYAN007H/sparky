@@ -96,8 +96,9 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let ledger = provider
                 .driver_run_ledger(DEFAULT_AGENT)
                 .map_err(|error| anyhow::anyhow!("open the run ledger: {error}"))?;
-            let rows = super::session_db::SessionDatabase::read(snapshot.db())
+            let mut rows = super::session_db::SessionDatabase::read(snapshot.db())
                 .context("[sessions] read the session database snapshot")?;
+            sanitize_legacy_system_messages(&mut rows.messages);
             let batch = LegacySessionImport {
                 sessions: rows.sessions,
                 messages: rows.messages,
@@ -165,6 +166,20 @@ fn database_totals(report: &LegacyDatabaseReport) -> (usize, usize) {
         (0, 0),
         |(found, written), ImportCounts { read, imported, .. }| (found + read, written + imported),
     )
+}
+
+fn sanitize_legacy_system_messages(messages: &mut [tinyagents_session::types::SessionMessage]) {
+    for message in messages {
+        if message.role == "system" {
+            if let Some(cleaned) =
+                crate::config::migrations::phase_out_profile_md::strip_profile_md_block(
+                    &message.content,
+                )
+            {
+                message.content = cleaned;
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -250,7 +265,18 @@ fn decode_transcript(
 )> {
     let bytes =
         std::fs::read(path).with_context(|| format!("read transcript {}", path.display()))?;
-    let decoded = decode_transcript_jsonl(&bytes)
+    let (import_bytes, _) =
+        tinyagents_session::transcript::rewrite_first_system_message_jsonl(&bytes, |content| {
+            let Some(cleaned) =
+                crate::config::migrations::phase_out_profile_md::strip_profile_md_block(content)
+            else {
+                return false;
+            };
+            *content = cleaned;
+            true
+        })
+        .with_context(|| format!("sanitize imported transcript {}", path.display()))?;
+    let decoded = decode_transcript_jsonl(&import_bytes)
         .with_context(|| format!("decode transcript {}", path.display()))?;
     Ok((
         decoded.session.meta,

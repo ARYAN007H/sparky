@@ -53,6 +53,92 @@ fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
     assert_eq!(row.message.tool_call_id.as_deref(), Some("call-1"));
 }
 
+#[test]
+fn profile_phase_out_rewrites_imported_bytes_without_mutating_legacy_source() {
+    use tinyagents_session::transcript::DisplayRecord;
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("thread.orchestrator.jsonl");
+    let prompt = "## Identity\n\nhello\n\n### PROFILE.md\n\nprivate\n\n### Tools\n\nshell\n";
+    write_classic(
+        &path,
+        &[
+            TranscriptMessage::system(prompt),
+            TranscriptMessage::user("question"),
+        ],
+        &TranscriptMeta {
+            agent_name: "Orchestrator".into(),
+            agent_id: Some("orchestrator".into()),
+            agent_type: None,
+            dispatcher: "native".into(),
+            provider: None,
+            model: None,
+            created: "2026-01-01T00:00:00Z".into(),
+            updated: "2026-01-01T00:00:00Z".into(),
+            turn_count: 1,
+            prefix_message_count: None,
+            input_tokens: 0,
+            output_tokens: 0,
+            cached_input_tokens: 0,
+            charged_amount_usd: 0.0,
+            thread_id: Some("thread".into()),
+            task_id: None,
+            session_id: None,
+            parent_session_id: None,
+        },
+    );
+    let source_before = std::fs::read(&path).unwrap();
+
+    let (_, _, records) = decode_transcript(&path).unwrap();
+
+    let DisplayRecord::Message(system) = &records[0] else {
+        panic!("expected imported system message");
+    };
+    assert!(!system.message.content.contains("PROFILE.md"));
+    assert!(!system.message.content.contains("private"));
+    assert!(system.message.content.contains("### Tools"));
+    assert_eq!(std::fs::read(&path).unwrap(), source_before);
+}
+
+#[test]
+fn profile_phase_out_sanitizes_imported_sqlite_system_rows_only() {
+    let timestamp = chrono::DateTime::from_timestamp_millis(1_700_000_000_000).unwrap();
+    let mut messages = vec![
+        tinyagents_session::types::SessionMessage {
+            id: 7,
+            session_id: "session".into(),
+            role: "system".into(),
+            content: "## Identity\n\n### PROFILE.md\n\nprivate\n\n### Tools\n\nshell".into(),
+            reasoning_content: None,
+            model: None,
+            input_tokens: None,
+            output_tokens: None,
+            cost_usd: None,
+            created_at: timestamp,
+        },
+        tinyagents_session::types::SessionMessage {
+            id: 8,
+            session_id: "session".into(),
+            role: "user".into(),
+            content: "please keep this PROFILE.md mention".into(),
+            reasoning_content: None,
+            model: None,
+            input_tokens: None,
+            output_tokens: None,
+            cost_usd: None,
+            created_at: timestamp,
+        },
+    ];
+
+    sanitize_legacy_system_messages(&mut messages);
+
+    assert_eq!(messages[0].id, 7);
+    assert!(!messages[0].content.contains("PROFILE.md"));
+    assert!(messages[0].content.contains("### Tools"));
+    assert_eq!(messages[1].id, 8);
+    assert!(messages[1].content.contains("PROFILE.md"));
+}
+
 #[cfg(unix)]
 #[test]
 fn session_file_discovery_never_follows_symlinks_outside_legacy_roots() {
