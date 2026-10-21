@@ -20,6 +20,24 @@ use crate::config::Config;
 
 const MODEL_LIMITS_SERVICE: &str = "inference.model_limits";
 
+/// Converts the local profile kind to TinyInference's route kind. The profile
+/// crate and route crate intentionally own distinct enum types.
+fn route_local_kind(
+    local_kind: Option<LocalProviderKind>,
+) -> Option<tinyinference_providers::route::LocalProviderKind> {
+    local_kind.map(|kind| match kind {
+        LocalProviderKind::Ollama => tinyinference_providers::route::LocalProviderKind::Ollama,
+        LocalProviderKind::LmStudio => {
+            tinyinference_providers::route::LocalProviderKind::LmStudio
+        }
+        LocalProviderKind::Mlx => tinyinference_providers::route::LocalProviderKind::Mlx,
+        LocalProviderKind::Omlx => tinyinference_providers::route::LocalProviderKind::Omlx,
+        LocalProviderKind::LocalOpenai => {
+            tinyinference_providers::route::LocalProviderKind::LocalOpenai
+        }
+    })
+}
+
 /// The user's explicit window for `model`, from `config.model_registry`.
 pub(crate) fn config_override(model: &str, config: &Config) -> Option<u64> {
     let model = model.trim();
@@ -78,7 +96,7 @@ async fn resolve_context_window_inner(
             .resolve_for_route_with_fetcher(
                 provider,
                 model,
-                local_kind,
+                route_local_kind(local_kind),
                 route,
                 model_limits_cache(),
                 &OfflineFetcher,
@@ -91,7 +109,7 @@ async fn resolve_context_window_inner(
             .resolve_for_route(
                 provider,
                 model,
-                local_kind,
+                route_local_kind(local_kind),
                 route,
                 model_limits_cache(),
                 || model_limits_client(config, provider),
@@ -253,7 +271,7 @@ pub(crate) fn project_context_window(
 ) -> ResolvedWindow {
     let local_kind = tinyinference_local::profile::kind_from_provider_string(provider);
     let route = route_input(role, provider, model, config, None, local_kind);
-    resolver().project_for_route(provider, model, local_kind, route)
+    resolver().project_for_route(provider, model, route_local_kind(local_kind), route)
 }
 
 /// Projects a static model-only window without borrowing remembered state from
