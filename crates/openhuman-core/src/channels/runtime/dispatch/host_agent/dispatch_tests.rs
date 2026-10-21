@@ -282,6 +282,8 @@ fn a_bound_channel_runs_its_host_agent_and_refuses_its_write_tool() {
 }
 
 async fn bound_channel_runs_its_host_agent() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
     let _bus = crate::agent::bus::use_real_agent_handler().await;
     let server = provider().await;
     let tmp = tempfile::tempdir().unwrap();
