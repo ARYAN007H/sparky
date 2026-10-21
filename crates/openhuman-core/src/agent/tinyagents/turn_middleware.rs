@@ -35,10 +35,17 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::middleware;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{ProviderUsageCarry, SubagentScope, ToolFailureMap};
-use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::verify_before_finish;
 
 use super::ToolPolicyEnforcement;
+
+struct OpenHumanCostEstimator;
+
+impl tinyagents_harness::middleware::library::CostEstimator for OpenHumanCostEstimator {
+    fn estimate(&self, model: &str, usage: &tinyinference_llm::usage::BilledUsage) -> Option<f64> {
+        crate::agent::cost::estimate_call_cost_usd(model, usage)
+    }
+}
 
 /// What the middleware stack needs to know about the turn.
 pub(super) struct TurnMiddlewareInputs {
@@ -95,6 +102,9 @@ pub(super) struct TurnMiddlewareInputs {
     /// plan-order middleware read it. `None` for a turn with no workspace or
     /// without the `todo` tool.
     pub(super) todo_store: Option<Arc<dyn tinyagents_harness::store::Store>>,
+    /// Called when the turn starts summarizing earlier conversation, so the
+    /// client can show it. `None` for a turn nobody watches.
+    pub(super) compaction_notice: Option<super::context_wiring::CompactionNotice>,
 }
 
 /// The handles the run loop reads after the drive returns.
@@ -146,6 +156,7 @@ pub(super) fn install_turn_middleware(
         provider_usage_carry,
         tool_outcome_sink,
         todo_store,
+        compaction_notice,
     } = inputs;
     let super::host::HarnessHostPolicy {
         stop_hooks,
@@ -188,14 +199,38 @@ pub(super) fn install_turn_middleware(
         }),
     ));
 
-    // Route audit capture is a typed run-context concern. The canonical
-    // TinyInference decorator attached in `turn_models` stamps the successful
-    // unary response and the streamed terminal response, and this middleware
-    // moves that metadata into the explicit OpenHuman carrier.
-    harness.push_model_middleware(Arc::new(routes::ResolvedRouteMiddleware::new(
-        provider_id,
-        model,
-    )));
+    // Native route enrichment records the canonical resolved route in this
+    // run's explicit host carrier; pricing and cost remain host-owned.
+    harness.push_model_middleware(Arc::new(
+        tinyagents_harness::middleware::library::ResolvedRouteMiddleware::new(
+            provider_id,
+            model,
+            OpenHumanCostEstimator,
+            |data: &OpenHumanRunContext, route| {
+                *data
+                    .resolved_route
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(route);
+            },
+        )
+        .with_pricing_lookup(|model| {
+            if crate::agent::cost::is_free_model(model) {
+                Some(tinyagents_harness::events::GenerationPricing {
+                    input_per_mtok_usd: Some(0.0),
+                    cached_input_per_mtok_usd: Some(0.0),
+                    output_per_mtok_usd: Some(0.0),
+                })
+            } else {
+                tinyagents_registry::pricing::lookup(model).map(|price| {
+                    tinyagents_harness::events::GenerationPricing {
+                        input_per_mtok_usd: Some(price.input_per_mtok_usd),
+                        cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
+                        output_per_mtok_usd: Some(price.output_per_mtok_usd),
+                    }
+                })
+            }
+        }),
+    ));
 
     // Per-call capability gate (issue #4249, Workstream 02.1): when the turn has
     // derivable capability needs (today: vision for a `hint:vision` turn), stamp
@@ -443,6 +478,7 @@ pub(super) fn install_turn_middleware(
         pause_at_cap && subagent_scope.is_none(),
         &tool_outcome_sink,
         memory_turn,
+        compaction_notice,
     );
     let is_subagent = subagent_scope.is_some();
     let agent_id = tool_policy.as_ref().map(|p| p.agent_definition_id.as_str());

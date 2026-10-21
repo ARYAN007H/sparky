@@ -68,9 +68,8 @@ lands on a provider with no credentials, the error says it was a background role
 instead of naming a slug the user never configured.
 
 Provider model aliases, defaults, and capabilities come from the registered provider-model hooks
-in `registry.rs`. The generic `provider_model.rs` adapter maps workload-role hints and preserves
-concrete ids without carrying a hosted catalog. The TinyAgents workload router that consumes this
-for agent turns is in [`agent/tinyagents/routes.rs`](../agent/tinyagents/routes.rs).
+in `registry.rs`. The `provider_model.rs` adapter uses TinyAgents' `WorkloadRouter` for workload
+role and hint resolution while preserving provider-owned aliases and concrete ids.
 
 One-shot callers use `create_chat_model*` in `factory/chat_model.rs`. Agent turns use the
 TinyAgents `TurnModelSet` through `TurnModelSource`, which builds the primary, workload routes,
@@ -199,7 +198,7 @@ picks the provider the same way a provider string does.
 | `auth_error_registry.rs` | Process singleton and user-facing copy over `tinyinference_providers::auth_registry::ProviderAuthErrorRegistry` (the once-per-episode latch). |
 | `failure_copy/` | `table.rs` maps a failure class to the wire `error_type`, source, retry verdict and user copy. `halt.rs` has loop-guard halt summaries. |
 | `provider/` | Model construction and provider policy. See [`provider/README.md`](provider/README.md). |
-| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
+| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: the `RouteSource` adapter for TinyAgents' `WorkloadRouter`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
 | `provider_model.rs`, `registry.rs` | Provider-neutral model hooks and caller adapters; hosted aliases, model defaults, pricing, and request metadata are registered by `openhuman-tinyhumans`. |
 | `registry.rs` | Registered provider ownership metadata; provider-neutral retry classification is supplied by TinyInference. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |

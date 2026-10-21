@@ -2,6 +2,8 @@
 //! each `tinyagents` [`AgentEvent`] onto an [`AgentProgress`] update (or a
 //! grep-friendly trace lines for events with no UI surface.
 
+use std::sync::atomic::Ordering;
+
 use tinyagents_harness::cache::CacheLayoutEvent;
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
 
@@ -16,6 +18,16 @@ impl EventListener for OpenhumanEventBridge {
             return;
         }
         match &record.event {
+            // The turn is live. The web channel turns this into `inference_start`
+            // (and starts its liveness beats and the run-ledger entry), which is
+            // how a client learns a turn began that it did not send itself — one
+            // started right after a Stop, or from another window. Only the
+            // top-level run of a parent bridge announces it, and only once.
+            AgentEvent::RunStarted { .. } => {
+                if self.scope.is_none() && !self.turn_announced.swap(true, Ordering::SeqCst) {
+                    self.send(AgentProgress::TurnStarted);
+                }
+            }
             AgentEvent::ModelStarted { .. } => {
                 let iteration = tinyagents_harness::events::advance_iteration(&self.cursor);
                 match &self.scope {
@@ -674,7 +686,7 @@ impl EventListener for OpenhumanEventBridge {
             // attempt (`RunPolicy.retry.max_attempts = 1`, pending `ReliableProvider`
             // removal) it will not fire on the live path yet, but the bridge is wired
             // for when it does. `FallbackSelected` is emitted by
-            // [`FallbackObserverMiddleware`](super::routes::FallbackObserverMiddleware)
+            // `tinyagents_harness::middleware::library::FallbackObserverMiddleware`
             // whenever the harness fails over to a sibling workload-tier route.
             AgentEvent::RetryScheduled { call_id, attempt } => {
                 tracing::info!(

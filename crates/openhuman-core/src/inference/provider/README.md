@@ -10,7 +10,7 @@ previously `providers/` (pre-consolidation single-crate layout); see
 
 ## Public surface
 
-- **Factory** ([`factory.rs`](./factory.rs) + `factory/`: `routing.rs`, `subprocess_providers.rs`, `access_gates.rs`, `chat_model.rs`, `cloud_slug.rs`, `credentials.rs`, `local_runtime.rs`, `managed_backend.rs`), `create_chat_model`,
+- **Factory** ([`factory.rs`](./factory.rs) + `factory/`: `routing.rs` (`RouteSource` host adapter), `subprocess_providers.rs`, `access_gates.rs`, `chat_model.rs`, `cloud_slug.rs`, `credentials.rs`, `local_runtime.rs`, `managed_backend.rs`), `create_chat_model`,
   `create_chat_model_from_string[_with_model_id]`,
   `create_chat_model_with_model_id`, `provider_for_role`,
   `probe_inference_readiness`, `BYOK_INCOMPLETE_SENTINEL`. Parses the
@@ -51,7 +51,7 @@ previously `providers/` (pre-consolidation single-crate layout); see
   `Config::claude_agent_sdk`, abstract tier model constants.
 - `crate::security::credentials`: auth-profile store for BYOK keys and OAuth
   tokens.
-- `crate::agent::tinyagents::{routes, host}`: workload routing and explicit run
+- `crate::agent::tinyagents::host`: explicit run
   explicit run-thread plumbing consumed while building a managed model.
 - `crate::security::live_policy` + `crate::security::egress`: Privacy-Mode
   `LocalOnly` refusal and `EgressDescriptor` emission at the factory chokepoint

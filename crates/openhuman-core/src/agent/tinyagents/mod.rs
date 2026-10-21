@@ -47,7 +47,6 @@ pub mod budget;
 pub mod payload_summarizer;
 mod policy_denial;
 pub(crate) mod reaper;
-mod routes;
 mod steering_forwarder;
 mod supplemental_trace;
 pub(crate) mod thread_reasoning;

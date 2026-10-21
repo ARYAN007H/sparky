@@ -20,7 +20,6 @@ use tinyagents_runtime::{DriverRequest, RuntimeError};
 use tinyinference_llm::model::ErrorSlotModel;
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::tool_registration::host_tool_set_builder_for_turn;
 use crate::agent::tinyagents::turn_policy::run_policy_for_provider;
 
@@ -50,7 +49,8 @@ pub(super) fn turn_run_policy(
         local_provider,
         tool_call_cap,
     );
-    let route_fallback = routes::route_fallback_policy(model);
+    let route_fallback = tinyagents_registry::WorkloadRouter::from_workload_routes("hint:vision")
+        .fallback_policy(model);
     policy.fallback = route_fallback.clone();
     // Tool discovery: the harness advertises its `tool_search` bridge over the
     // `Deferred` registrations the allowlist admits, ranked by whatever the

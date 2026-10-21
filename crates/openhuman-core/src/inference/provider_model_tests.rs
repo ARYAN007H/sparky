@@ -51,7 +51,9 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
                 is_alias: Arc::new(|model| model == "scoped-alias"),
                 is_raw_model: Arc::new(|model| model == "scoped/model"),
                 supports_vision: Arc::new(|_| false),
-                resolve_model: Arc::new(|_, _, _| None),
+                resolve_model: Arc::new(|role, _, override_model| {
+                    (override_model == Some("scoped-alias")).then(|| format!("scoped-{role}"))
+                }),
                 context_window: Arc::new(|model| match model {
                     "" => Some(99_999),
                     "scoped/model" => Some(77_777),
@@ -152,6 +154,61 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
             )
             .as_deref(),
             Some("reasoning")
+        );
+        assert_eq!(
+            role_for_provider_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias"
+            ),
+            "reasoning",
+            "the public resolver must use the ambient context registration"
+        );
+        assert_eq!(
+            role_for_provider_model_for(
+                Some(&extensions),
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias",
+            ),
+            "reasoning",
+            "an explicit context must use that context's provider hooks"
+        );
+        assert_eq!(
+            role_for_provider_model_for(
+                None,
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias",
+            ),
+            "chat",
+            "explicit process-only lookup must not borrow the ambient provider hook"
+        );
+        assert_eq!(
+            resolve_provider_model_hint(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias",
+                &Config::default(),
+            ),
+            "scoped-reasoning",
+            "the public hint resolver must preserve ambient route and model hooks"
+        );
+        assert_eq!(
+            resolve_provider_model_hint_for(
+                None,
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias",
+                &Config::default(),
+            ),
+            "scoped-alias",
+            "explicit process-only hint resolution must not borrow ambient hooks"
+        );
+        assert_eq!(
+            resolve_provider_model_hint_for(
+                Some(&extensions),
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                "scoped-alias",
+                &Config::default(),
+            ),
+            "scoped-reasoning",
+            "explicit context hint resolution must use that context's hooks"
         );
     });
     assert_eq!(
