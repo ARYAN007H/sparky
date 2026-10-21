@@ -34,6 +34,10 @@ impl OpenHumanModelFactory<'_> {
     }
 
     fn injected(&self, request: &ModelBuildRequest) -> Option<Arc<dyn ChatModel<()>>> {
+        #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+        if let Some(model) = test_provider_override::current() {
+            return Some(model);
+        }
         let local = self.ctx.host_overrides()?;
         let route = request.route.as_deref();
         match &request.purpose {
@@ -155,6 +159,36 @@ impl OpenHumanModelFactory<'_> {
     }
 }
 
+fn build_one_shot(
+    ctx: &DispatchCtx,
+    role: &str,
+    provider: Option<&str>,
+    config: &Config,
+) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
+    let egress = EgressLedger::none();
+    let factory = OpenHumanModelFactory {
+        ctx,
+        config,
+        primary_provider: provider,
+        egress: &egress,
+        thread_id: None,
+    };
+    let request = ModelBuildRequest {
+        role: role.to_owned(),
+        route: None,
+        purpose: ModelPurpose::Primary,
+        model_pin: None,
+        opts: BuildOpts {
+            native_tools: true,
+            temperature: None,
+            egress_tag: None,
+        },
+    };
+    factory.check(&request)?;
+    let (model, route) = factory.build(&request)?;
+    Ok((model, route.model))
+}
+
 impl ModelBuildGate for OpenHumanModelFactory<'_> {
     fn check(&self, request: &ModelBuildRequest) -> anyhow::Result<()> {
         // Explicit host model injection is authoritative and has no provider
@@ -225,83 +259,7 @@ pub(super) fn create_chat_model_with_model_id_inner(
     role: &str,
     config: &Config,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
-    if let Some(model) = ctx.host_overrides().and_then(|local| local.model_for(role)) {
-        return Ok((
-            model,
-            config
-                .default_model
-                .clone()
-                .unwrap_or_else(|| "host-model".into()),
-        ));
-    }
-    #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-    if let Some(model) = test_provider_override::current() {
-        return Ok((model, "mock-model".to_string()));
-    }
-    // Managed OpenHuman backend → crate-native host `ChatModel`
-    // (issue #4727 Motion B) instead of a
-    // adapted provider. A native test-model override must still win, so only
-    // take this path when no
-    // override is installed. The public wrapper supplies the construction-time
-    // default while preserving an explicit per-call `ModelRequest` temperature.
-    let test_override_active = {
-        #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-        {
-            test_provider_override::current().is_some()
-        }
-        #[cfg(not(any(test, feature = "e2e-test-support", feature = "rss-bench")))]
-        {
-            false
-        }
-    };
-    let resolved_context = ctx.resolved();
-    let extensions = resolved_context
-        .as_deref()
-        .map(crate::core::runtime::CoreContext::extensions);
-    if !test_override_active {
-        if resolves_to_managed_backend(role, config) {
-            return make_openhuman_backend_model_in(extensions, role, config);
-        }
-        if let Some(result) =
-            try_create_claude_agent_sdk_chat_model(role, config, &EgressLedger::none())
-        {
-            return result;
-        }
-        if let Some(result) =
-            try_create_claude_code_chat_model(role, config, None, &EgressLedger::none())
-        {
-            return result;
-        }
-        // Local OpenAI-compatible runtimes (Ollama / LM Studio / MLX / OMLX /
-        // local-openai) → crate-native `ChatModel` (issue #4727 Motion B) instead
-        // of a crate-adapted host provider. Cloud/BYOK/bespoke providers
-        // return `None` here and fall through to the `Provider` path below.
-        if let Some(result) =
-            try_create_local_runtime_chat_model(role, config, &EgressLedger::none())
-        {
-            return result;
-        }
-        // Wire-equivalent BYOK cloud slugs (Anthropic / None / plain-Bearer, no
-        // codex-oauth or `/v1/responses` fallback) → crate-native `ChatModel`
-        // (issue #4727 Phase 3, conservative subset). `openai`/codex, custom
-        // proxy slugs, and the managed entry return `None` and fall through.
-        if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools_for(
-            role,
-            config,
-            true,
-            &EgressLedger::none(),
-            extensions,
-        ) {
-            return result;
-        }
-    }
-    Err(unresolved_chat_model_error_for(
-        role,
-        &provider_for_role(role, config),
-        config,
-        &EgressLedger::none(),
-        extensions,
-    ))
+    build_one_shot(ctx, role, None, config)
 }
 
 /// Whether `role` resolves to the managed OpenHuman backend (vs BYOK / local /
@@ -440,68 +398,7 @@ pub(super) fn create_chat_model_from_string_with_model_id_inner(
     provider: &str,
     config: &Config,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
-    #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-    if let Some(model) = test_provider_override::current() {
-        return Ok((model, "mock-model".to_string()));
-    }
-    let test_override_active = {
-        #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-        {
-            test_provider_override::current().is_some()
-        }
-        #[cfg(not(any(test, feature = "e2e-test-support", feature = "rss-bench")))]
-        {
-            false
-        }
-    };
-    if !test_override_active {
-        let mut resolved = provider.trim().to_string();
-        if resolved.is_empty() || resolved == "cloud" {
-            resolved = resolve_primary_cloud_provider_string(config);
-        }
-        if resolved == PROVIDER_OPENHUMAN {
-            return make_openhuman_backend_model(role, config);
-        }
-        if let Some(result) = try_create_claude_agent_sdk_chat_model_from_string(
-            role,
-            &resolved,
-            config,
-            &EgressLedger::none(),
-        ) {
-            return result;
-        }
-        if let Some(result) = try_create_claude_code_chat_model_from_string(
-            role,
-            &resolved,
-            config,
-            None,
-            &EgressLedger::none(),
-        ) {
-            return result;
-        }
-        if let Some(result) = try_create_local_runtime_chat_model_from_string(
-            role,
-            &resolved,
-            config,
-            &EgressLedger::none(),
-        ) {
-            return result;
-        }
-        if let Some(result) = try_create_cloud_slug_chat_model_from_string(
-            role,
-            &resolved,
-            config,
-            &EgressLedger::none(),
-        ) {
-            return result;
-        }
-    }
-    Err(unresolved_chat_model_error(
-        role,
-        provider,
-        config,
-        &EgressLedger::none(),
-    ))
+    build_one_shot(&DispatchCtx::ambient(), role, Some(provider), config)
 }
 
 pub(super) fn with_default_temperature(
