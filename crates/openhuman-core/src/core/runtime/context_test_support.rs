@@ -13,8 +13,17 @@ impl CoreContext {
         domains: crate::core::runtime::DomainSet,
         workspace_dir: Option<std::path::PathBuf>,
     ) -> Arc<CoreContext> {
+        Self::for_test_with_host_kind(HostKind::Cli, domains, workspace_dir)
+    }
+
+    /// Test-only constructor with an explicit host policy identity.
+    pub(crate) fn for_test_with_host_kind(
+        host_kind: HostKind,
+        domains: crate::core::runtime::DomainSet,
+        workspace_dir: Option<std::path::PathBuf>,
+    ) -> Arc<CoreContext> {
         Arc::new(CoreContext {
-            host_kind: HostKind::Cli,
+            host_kind,
             workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
                 workspace_dir,
             }))),
