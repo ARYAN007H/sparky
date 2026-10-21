@@ -29,6 +29,85 @@ async fn production_harness_ceiling_is_open_and_reusable() {
     assert!(!super::HARNESS_AGENT_SLOTS.is_closed());
 }
 
+#[tokio::test]
+async fn headless_flow_agent_includes_its_spawned_child_result() {
+    use async_trait::async_trait;
+    use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
+
+    const CHILD_PROMPT: &str = "headless-flow-child-result-marker";
+
+    struct FlowChildModel;
+
+    #[async_trait]
+    impl ChatModel<()> for FlowChildModel {
+        fn profile(&self) -> Option<&ModelProfile> {
+            static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+            Some(PROFILE.get_or_init(|| ModelProfile {
+                tool_calling: true,
+                parallel_tool_calls: true,
+                ..ModelProfile::default()
+            }))
+        }
+
+        async fn invoke(
+            &self,
+            _state: &(),
+            request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            if request
+                .messages
+                .iter()
+                .any(|message| message.text().contains(CHILD_PROMPT))
+            {
+                return Ok(ModelResponse::assistant("headless-flow-child-result"));
+            }
+
+            let mut response = ModelResponse::assistant("");
+            response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                "headless-flow-spawn",
+                "spawn_subagent",
+                serde_json::json!({
+                    "agent_id": "task_manager_agent",
+                    "prompt": CHILD_PROMPT,
+                    "context": "headless flow regression",
+                    "model": "test-model"
+                }),
+            )];
+            response.finish_reason = Some("tool_calls".into());
+            Ok(response)
+        }
+    }
+
+    let _inference = crate::inference::inference_test_guard_async().await;
+    let _model = crate::inference::provider::factory::test_provider_override::install_model(
+        std::sync::Arc::new(FlowChildModel),
+    );
+    let workspace = tempfile::tempdir().expect("flow workspace");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.action_dir = workspace.path().to_path_buf();
+    config.default_model = Some("test-model".into());
+
+    let runner = super::OpenHumanAgentRunner {
+        config: std::sync::Arc::new(config),
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        approval: Default::default(),
+    };
+    let output = tinyflows::caps::AgentRunner::run_agent(
+        &runner,
+        "orchestrator",
+        serde_json::json!({"prompt": "Delegate the headless-flow-child-result-marker task."}),
+        None,
+    )
+    .await
+    .expect("headless flow agent should settle its child");
+
+    assert!(
+        output.to_string().contains("headless-flow-child-result"),
+        "the headless flow result must include its spawned child output: {output}"
+    );
+}
+
 // --- host-registered agents (agent::host_agents) ---
 
 struct FlowsHost;
