@@ -86,6 +86,7 @@ export function exempt(rel, finding) {
 function isTestFile(rel) {
   return (
     rel.endsWith("_tests.rs") ||
+    rel.endsWith("_test_support.rs") ||
     rel.includes(`${sep}test_support${sep}`) ||
     rel.includes("/test_support/")
   );

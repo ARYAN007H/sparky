@@ -28,7 +28,16 @@ const embedContractExports = new Map(
     ],
     [
       "crates/openhuman-embed/src/budget.rs",
-      ["pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};"],
+      [
+        "pub use tinyagents_harness::cost::{ControlledDispatchError, DispatchModelOptions, DispatchRefusal, DispatchRefusalReason, PhysicalDispatchAdmission, PhysicalDispatchPermit};",
+        "pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};",
+      ],
+    ],
+    [
+      "crates/openhuman-embed/src/complete.rs",
+      [
+        "pub use tinyagents_harness::observability::{PhysicalDispatchMetadata, PhysicalDispatchObserver, PhysicalDispatchOutcome, PhysicalDispatchStatus, PhysicalDispatchTerminal, PhysicalDispatchUsage};",
+      ],
     ],
     [
       "crates/openhuman-embed/src/config.rs",
@@ -662,7 +671,7 @@ for (const path of await filesUnder(
         );
       const namesTaskLocalAccessor = taskLocalAccessors.some(
         (name) =>
-          new RegExp(`\\b${escapeRegex(name)}\\s*\\(`).test(text) ||
+          new RegExp(`(?<!\\.)\\b${escapeRegex(name)}\\s*\\(`).test(text) ||
           (/\b(?:pub(?:\([^)]*\))?\s+)?use\b/.test(text) &&
             new RegExp(`\\b${escapeRegex(name)}\\b`).test(text)),
       );
