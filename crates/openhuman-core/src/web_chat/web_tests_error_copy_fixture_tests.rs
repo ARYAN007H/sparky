@@ -301,9 +301,13 @@ fn loop_guard_halt_summaries_are_byte_identical() {
         user_actionable_escalation("gmail", "insufficient scope"),
         None
     );
-    let long = "x".repeat(700);
-    let summary = stop::halt_summary::budget(&OpenHumanCopyProvider, "t", &long).summary;
-    assert!(summary.ends_with(&format!("{}\n\u{2026} [truncated]", "x".repeat(600))));
+    let at_limit = "é".repeat(600);
+    let exact = stop::halt_summary::provider_config(&OpenHumanCopyProvider, "t", &at_limit).summary;
+    assert!(exact.ends_with(&format!("Details:\n{at_limit}")));
+    let over_limit = "🦀".repeat(601);
+    let truncated =
+        stop::halt_summary::provider_config(&OpenHumanCopyProvider, "t", &over_limit).summary;
+    assert!(truncated.ends_with(&format!("{}\n\u{2026} [truncated]", "🦀".repeat(600))));
 }
 
 // ── i18n key + params (follow-up of the copy table) ─────────────────────────
