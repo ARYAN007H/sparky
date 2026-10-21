@@ -213,7 +213,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn put(
-    docs: &dyn tinystoragedrivers::DocumentStore,
+    docs: &std::sync::Arc<dyn tinystoragedrivers::DocumentStore>,
     collection: &str,
     id: &str,
     body: Value,
