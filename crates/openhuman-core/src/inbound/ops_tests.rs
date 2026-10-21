@@ -65,12 +65,22 @@ fn mentions_config(debounce_ms: u64, max_batch: u32) -> crate::config::Config {
     config
 }
 
+/// Distinct texts, so the queues' habituation does not decay later mentions.
+const TEXTS: [&str; 5] = [
+    "could you summarise the release notes for version two",
+    "my order arrived broken, what should I do next",
+    "is the conference keynote being streamed anywhere tonight",
+    "loved the podcast episode about gardening on balconies",
+    "which hiking trail near the lake would you recommend",
+];
+
 fn mention(id: &str) -> OfferParams {
+    let n: usize = id.parse().unwrap_or(0);
     serde_json::from_value(json!({
         "source": "x:mentions",
         "key": "mentions",
         "event_id": id,
-        "text": format!("hey @bot {id} {}", id.repeat(7)),
+        "text": format!("@bot {}", TEXTS[n % TEXTS.len()]),
         "payload": { "author": format!("@user{id}") },
     }))
     .unwrap()
