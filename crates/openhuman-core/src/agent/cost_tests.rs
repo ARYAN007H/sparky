@@ -11,7 +11,7 @@ fn counts(input: u64, output: u64, cached: u64) -> BilledUsage {
 fn record(turn: &mut tinyagents_harness::cost::TurnCost, model: &str, usage: &BilledUsage) {
     use tinyagents_hooks::stop::StopHookMetrics as _;
     let response = tinyinference_llm::model::response_to_model_response(
-        &crate::inference::provider::ChatResponse {
+        &tinyinference_llm::model::ChatResponse {
             text: Some("ok".into()),
             usage: Some(*usage),
             ..Default::default()

@@ -1,6 +1,6 @@
 //! OpenHuman billing adapter for TinyAgents' cap-hit checkpoint summary.
 
-use crate::inference::provider::BilledUsage;
+use tinyinference_llm::usage::BilledUsage;
 use std::sync::{Arc, Mutex};
 use tinyagents_harness::summarization::CapToolResult;
 use tinyagents_orchestration::subagent::{summarize_at_cap, CapSummaryModel};

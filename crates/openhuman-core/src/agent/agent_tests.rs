@@ -26,7 +26,7 @@
 
 use crate::agent::session_host::OpenHumanSessionHost;
 use crate::config::AgentConfig;
-use crate::inference::provider::ChatResponse;
+use tinyinference_llm::model::ChatResponse;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};

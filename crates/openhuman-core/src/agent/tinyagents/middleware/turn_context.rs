@@ -275,7 +275,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 let host_usage =
                     tinyinference_llm::usage::usage_info_from_response(response)
                         .unwrap_or(
-                            crate::inference::provider::BilledUsage::from_counts(
+                            tinyinference_llm::usage::BilledUsage::from_counts(
                                 usage.input_tokens,
                                 usage.output_tokens,
                             )

@@ -58,7 +58,7 @@ pub(crate) type ToolFailureMap = Arc<
     >,
 >;
 
-/// Shared FIFO carry of the per-call provider [`BilledUsage`](crate::inference::provider::BilledUsage)
+/// Shared FIFO carry of the per-call provider [`BilledUsage`](tinyinference_llm::usage::BilledUsage)
 /// the model adapter observed, drained by the bridge when it records that
 /// call's usage. The crate `Usage` the harness surfaces on
 /// `AgentEvent::UsageRecorded` carries only token counts, so the
@@ -71,4 +71,4 @@ pub(crate) type ToolFailureMap = Arc<
 /// that did not push, or an out-of-band usage event) degrades gracefully to a
 /// catalogue estimate.
 pub(crate) type ProviderUsageCarry =
-    Arc<Mutex<std::collections::VecDeque<crate::inference::provider::BilledUsage>>>;
+    Arc<Mutex<std::collections::VecDeque<tinyinference_llm::usage::BilledUsage>>>;

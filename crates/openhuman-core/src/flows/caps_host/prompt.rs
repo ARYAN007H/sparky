@@ -18,7 +18,7 @@ pub(crate) fn build_completion_messages(messages: &[CompletionMessage]) -> Vec<T
 }
 
 /// Maps provider usage onto the established flow completion wire shape.
-pub(crate) fn usage_to_json(usage: &Option<crate::inference::provider::BilledUsage>) -> Value {
+pub(crate) fn usage_to_json(usage: &Option<tinyinference_llm::usage::BilledUsage>) -> Value {
     match usage {
         None => Value::Null,
         Some(usage) => json!({
