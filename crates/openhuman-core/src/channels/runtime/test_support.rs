@@ -148,6 +148,12 @@ impl LinkedTelegramRuntime {
         self.runtime.channels()
     }
 
+    pub(crate) fn module_objects(
+        &self,
+    ) -> Arc<HashMap<String, tinybus::module::ModuleObjectClient>> {
+        self.runtime.module_objects()
+    }
+
     pub(crate) fn config(&self) -> &crate::config::Config {
         &self.config
     }

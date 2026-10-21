@@ -10,7 +10,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let sender_key = "telegram_alice_chat-remote";
 
     let new_msg = ChannelMessage {
-        reply_to_id: None,
+        reply_to_id: Some("42".into()),
         topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
@@ -18,7 +18,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         content: "/new".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: Some("42".into()),
+        thread_ts: None,
         sender_name: None,
     };
     assert!(handle_linked_runtime_command(&mut ctx, &new_msg, Some(&channel), &linked, None).await);
@@ -31,7 +31,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         },
     );
 
-    let subscriber = ChannelTurnStateSubscriber::with_config(Arc::new(linked.config().clone()));
+    let subscriber = ChannelTurnStateSubscriber::new(workspace.clone());
     subscriber
         .handle(&DomainEvent::ChannelMessageReceived {
             channel: "telegram".into(),
@@ -39,14 +39,14 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
             sender: "alice".into(),
             reply_target: "chat-remote".into(),
             content: "work".into(),
-            thread_ts: Some("42".into()),
+            thread_ts: None,
             inbound_envelope: None,
             workspace_dir: workspace.clone(),
         })
         .await;
 
     let status_msg = ChannelMessage {
-        reply_to_id: None,
+        reply_to_id: Some("42".into()),
         topic_id: None,
         id: "3".into(),
         sender: "alice".into(),
@@ -54,7 +54,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         content: "/status".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: Some("42".into()),
+        thread_ts: None,
         sender_name: None,
     };
     assert!(
@@ -62,7 +62,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     );
 
     let sessions_msg = ChannelMessage {
-        reply_to_id: None,
+        reply_to_id: Some("42".into()),
         topic_id: None,
         id: "4".into(),
         sender: "alice".into(),
@@ -70,7 +70,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         content: "/sessions".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: Some("42".into()),
+        thread_ts: None,
         sender_name: None,
     };
     assert!(

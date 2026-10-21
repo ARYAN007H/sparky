@@ -168,10 +168,10 @@ where
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
-    // Telegram's legacy `thread_ts` is the inbound provider message id used
-    // for reply targeting; forum topic routing is already encoded in
-    // `reply_target` and must not be reused as a reply-to id.
-    let reply_thread = msg.thread_ts.clone();
+    // The prepared envelope keeps reply authority separately from its
+    // conversation/topic reference. `SendMessage::thread_ts` is the legacy
+    // owner-adapter field that TinyChannels maps to `reply_to_id`.
+    let reply_thread = msg.reply_to_id.clone().or_else(|| msg.thread_ts.clone());
     let reply_recipient = reset_scope
         .as_ref()
         .map(|scope| scope.conversation.id.clone())
@@ -255,8 +255,8 @@ where
             return true;
         }
     };
-    if clear_history && reset_history().await.is_err() {
-        tracing::warn!("channel durable history reset failed");
+    if clear_history && let Err(error) = reset_history().await {
+        tracing::warn!(%error, "channel durable history reset failed");
         if let Some(channel) = target_channel {
             let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
             let _ = channel
