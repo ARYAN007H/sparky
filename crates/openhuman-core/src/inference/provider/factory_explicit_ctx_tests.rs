@@ -209,8 +209,12 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             Arc::new(|slug| slug == "p_hosted"),
             Arc::new(|style| style == AuthStyle::OpenhumanJwt),
         );
-        let context_a =
-            CoreContext::for_test_with_extensions(DomainSet::full(), None, a_extensions);
+        let context_a = CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            DomainSet::full(),
+            None,
+            a_extensions,
+        );
 
         let b_extensions = Extensions::new();
         crate::inference::registry::register_chat_model_in(
@@ -224,11 +228,29 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             Arc::new(move |slug| ambient_owns_auth && slug == "p_hosted"),
             Arc::new(move |style| ambient_owns_auth && style == AuthStyle::OpenhumanJwt),
         );
-        let context_b =
-            CoreContext::for_test_with_extensions(DomainSet::full(), None, b_extensions);
+        let context_b = CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            DomainSet::full(),
+            None,
+            b_extensions,
+        );
 
-        let dispatch = DispatchCtx::new(context_a);
-        let mut config = Config::default();
+        let dispatch = DispatchCtx::new(Arc::clone(&context_a));
+        let tmp = tempfile::tempdir().expect("isolated workspace");
+        let mut config = Config {
+            config_path: tmp.path().join("config.toml"),
+            workspace_dir: tmp.path().join("workspace"),
+            ..Default::default()
+        };
+        crate::security::credentials::AuthService::from_config(&config)
+            .store_provider_token(
+                crate::security::credentials::APP_SESSION_PROVIDER,
+                "default",
+                "fixture-session-token",
+                Default::default(),
+                true,
+            )
+            .expect("store isolated fixture session");
         config.chat_provider = Some("p_hosted:fixture/model-v1".to_string());
         config.cloud_providers.push(CloudProviderCreds {
             id: "p_hosted_fixture".to_string(),
@@ -267,7 +289,18 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             (one_shot, turn_response, request.endpoint)
         })
         .await;
-        outcomes.push(observed);
+        let explicit_string = CoreContext::scope(Arc::clone(&context_a), async {
+            let (model, model_id) = create_chat_model_from_string_with_model_id(
+                "chat",
+                "p_hosted:fixture/model-v1",
+                &config,
+                0.0,
+            )
+            .expect("explicit hosted cloud string builds from the ambient owner context");
+            (model_id, response(model).await)
+        })
+        .await;
+        outcomes.push((observed, explicit_string));
     }
 
     assert_eq!(
