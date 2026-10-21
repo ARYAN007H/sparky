@@ -65,7 +65,12 @@ fn keyring_consent_schema(function: &str) -> ControllerSchema {
             namespace: "keyring_consent",
             function: "decide",
             description: "Record the user's consent decision for local secret storage fallback.",
-            inputs: vec![],
+            inputs: vec![FieldSchema {
+                name: "mode",
+                ty: TypeSchema::String,
+                comment: "Either 'local_encrypted' (consent to local storage) or 'declined' (refuse local storage).",
+                required: false,
+            }],
             outputs: vec![FieldSchema {
                 name: "result",
                 ty: TypeSchema::Json,
