@@ -75,7 +75,7 @@ or immediately execute a stored command or agent prompt on the host.
 
 - `cron` domain: [`../README.md`](../README.md): job/run model, scheduler,
   delivery modes, agent-job minimum interval.
-- [`crates/openhuman-core/src/tools/impl/system/schedule.rs`](../../tools/impl/system/schedule.rs): the separate
+- [`schedule.rs`](./schedule.rs): the separate
   one-shot `schedule` tool built on `cron::add_once` / `cron::add_once_at`;
   not part of the collapse above.
 - `crates/openhuman-core/src/tools/impl/meta/collapse.rs` (module path
