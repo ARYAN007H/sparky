@@ -24,6 +24,7 @@ use tinystoragedrivers_busproxy::{
 };
 use tokio::sync::broadcast;
 
+use super::storage_grants::{self, Plan, StorageGrant};
 use crate::storage::Storage;
 
 static NEXT_INVOCATION: AtomicU64 = AtomicU64::new(1);
@@ -51,6 +52,7 @@ impl InvocationStorageBinding {
     pub(crate) async fn serve(
         runtime: &ModuleRuntime,
         module_descriptor_name: &str,
+        module_id: &str,
         storage: Storage,
     ) -> anyhow::Result<Self> {
         let expected_peer = runtime
@@ -71,10 +73,13 @@ impl InvocationStorageBinding {
             tinystoragedrivers_busproxy::INVOCATION_OBJECT_ROOT
         ))?;
         let address = StorageAddress::try_new(host, object_root)?;
+        let grant = storage_grants::declared(module_id)
+            .ok_or_else(|| anyhow::anyhow!("module has no declared storage grant"))?;
         let active = Arc::new(AtomicBool::new(true));
         let endpoint = Arc::new(DocumentsOnlyEndpoint {
             expected_peer,
             active: Arc::clone(&active),
+            grant,
             server: StorageServer::new(storage),
         });
         let served =
@@ -119,6 +124,7 @@ impl Drop for InvocationStorageBinding {
 struct DocumentsOnlyEndpoint {
     expected_peer: BusName,
     active: Arc<AtomicBool>,
+    grant: StorageGrant,
     server: StorageServer,
 }
 
@@ -152,16 +158,29 @@ impl StorageEndpoint for DocumentsOnlyEndpoint {
         // address is routing information, never proof of module identity.
         self.authorize(call.sender)?;
         match (call.object, call.selector) {
-            (Object::Documents, _) => self
-                .server
-                .handle(
-                    Admission::Private,
-                    Object::Documents.as_str(),
+            (Object::Documents, _) => {
+                let plan = storage_grants::authorize(
+                    &self.grant,
+                    Object::Documents,
                     call.selector,
-                    call.request,
+                    &call.request,
                 )
-                .await
-                .map_err(HostFailure::Storage),
+                .map_err(|denied| HostFailure::Denied(denied.label()))?;
+                match plan {
+                    Plan::Answer(reply) => Ok(reply),
+                    Plan::Forward { filter, .. } => self
+                        .server
+                        .handle(
+                            Admission::Private,
+                            Object::Documents.as_str(),
+                            call.selector,
+                            call.request,
+                        )
+                        .await
+                        .map(|reply| storage_grants::filter_reply(&self.grant, filter, reply))
+                        .map_err(HostFailure::Storage),
+                }
+            }
             (Object::Streams, "Capabilities") => Ok(json!(CapabilitiesReply::default())),
             (Object::Blobs, "Capabilities") => Ok(json!(BlobCapabilities::default())),
             (Object::Kv, "Capabilities") => Ok(json!(KvCapabilitiesReply::default())),

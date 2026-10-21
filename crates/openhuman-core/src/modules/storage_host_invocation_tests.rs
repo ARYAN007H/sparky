@@ -11,6 +11,11 @@ fn endpoint() -> (DocumentsOnlyEndpoint, BusName) {
         DocumentsOnlyEndpoint {
             expected_peer: expected_peer.clone(),
             active: Arc::new(AtomicBool::new(true)),
+            grant: crate::modules::storage_grants::StorageGrant {
+                collections: vec![crate::storage::CollectionSpec::new("juice.savings")],
+                writable: true,
+                ..crate::modules::storage_grants::StorageGrant::default()
+            },
             server: StorageServer::new(storage),
         },
         expected_peer,
@@ -109,6 +114,23 @@ async fn callback_documents_route_uses_the_captured_storage() {
             kind: StorageKind::NotFound
         }))
     ));
+}
+
+#[tokio::test]
+async fn callback_documents_route_keeps_the_module_collection_grant() {
+    let (endpoint, peer) = endpoint();
+
+    assert_eq!(
+        call(
+            &endpoint,
+            Some(&peer),
+            Object::Documents,
+            "Get",
+            json!({"collection": "another.module.collection", "document_id": "x"}),
+        )
+        .await,
+        Err(HostFailure::Denied("target-not-granted"))
+    );
 }
 
 #[tokio::test]
