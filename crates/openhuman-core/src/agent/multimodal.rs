@@ -8,20 +8,21 @@ use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+#[cfg(feature = "documents")]
 use std::time::Duration;
 
 use async_trait::async_trait;
 use reqwest::Client;
 
-use crate::config::{build_runtime_proxy_client_with_timeouts, MultimodalConfig};
+use crate::config::{MultimodalConfig, build_runtime_proxy_client_with_timeouts};
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptPart};
 
 use tinyagents_harness::multimodal::{
+    BlobAttachmentStash,
     config::ImageLimits,
     markers,
     payload::sha256_prefix,
-    resolve::{resolve_image, TextExtractor},
-    BlobAttachmentStash,
+    resolve::{TextExtractor, resolve_image},
 };
 
 /// Hard upper bound on how long the `tinydocs` module may spend extracting a
