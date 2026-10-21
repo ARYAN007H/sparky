@@ -52,7 +52,9 @@ impl ChatModel<()> for TriageReplyModel {
     }
 }
 
-fn triage_test_model(requests: Arc<Mutex<Vec<ModelRequest>>>) -> crate::inference::registry::ChatModelEntry {
+fn triage_test_model(
+    requests: Arc<Mutex<Vec<ModelRequest>>>,
+) -> crate::inference::registry::ChatModelEntry {
     crate::inference::registry::ChatModelEntry {
         build: Arc::new(move |_| {
             Ok((
@@ -140,9 +142,9 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         .collect();
     assert!(tool_names.contains(&"memory"));
     assert!(tool_names.contains(&"read_workspace_state"));
-    assert!(!tool_names.iter().any(|name| {
-        *name == "spawn_subagent" || name.starts_with("delegate_")
-    }));
+    assert!(!tool_names
+        .iter()
+        .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
     assert!(!tool_names.contains(&"shell"));
     assert!(!tool_names.contains(&"file_write"));
     drop(requests);
