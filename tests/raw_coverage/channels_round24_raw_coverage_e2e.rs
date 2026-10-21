@@ -20,6 +20,8 @@ fn channel_message(channel: &str, reply_target: &str, content: &str) -> ChannelM
         timestamp: 1,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     }
 }
 
