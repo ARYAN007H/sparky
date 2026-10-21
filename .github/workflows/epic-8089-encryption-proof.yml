@@ -77,9 +77,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf -- target/encryption-proof
           mkdir -p target/build-tmp target/encryption-proof target/debug/proof-binaries
           evidence=target/encryption-proof
           export TMPDIR="$GITHUB_WORKSPACE/target/build-tmp"
+          test "$(git rev-parse HEAD)" = 27c30153d6e2cec93b6c76198ee5db8cf1b96ecb
+          test "$(git rev-parse HEAD^{tree})" = 2a1b033abc182301dd087448db8822812462fb4b
+          test "$(git rev-parse HEAD:crates/openhuman-core/src/security/encryption/schemas.rs)" = 125bde450150e9da007e2093ec21cc7578c396dd
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git submodule status --recursive > "$evidence/submodules-before-build.txt"
+          if grep -Eq '^[+-U]' "$evidence/submodules-before-build.txt"; then
+            cat "$evidence/submodules-before-build.txt"
+            echo "recursive submodules are not at their recorded pins"
+            exit 1
+          fi
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
           {
             printf 'repository=%s\n' "$GITHUB_REPOSITORY"
             printf 'workflow_ref=%s\n' "$GITHUB_WORKFLOW_REF"
@@ -94,7 +106,6 @@ jobs:
             printf 'build_filesystem=%s\n' "$(df -Pk . | tail -n 1)"
             printf 'build_command=TMPDIR=%s CARGO_BUILD_JOBS=1 RUST_MIN_STACK=33554432 bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json\n' "$TMPDIR"
           } > "$evidence/receipt.txt"
-          git submodule status --recursive > "$evidence/submodules-before-build.txt"
 
           build_json="$evidence/build.jsonl"
           build_stderr="$evidence/build.stderr"
@@ -186,6 +197,7 @@ jobs:
           name: encryption-legacy-red-receipt
           path: target/encryption-proof/
           retention-days: 30
+          if-no-files-found: error
 
       - name: Upload matching lib-test binary
         if: success()
@@ -195,3 +207,4 @@ jobs:
           path: target/debug/proof-binaries/encryption-legacy-red
           retention-days: 1
           compression-level: 1
+          if-no-files-found: error
