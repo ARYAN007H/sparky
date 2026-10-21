@@ -153,12 +153,17 @@ async fn a_paused_node_refuses_its_own_writes_once_its_grant_runs_out() {
     let backend = shared();
     let a = Node::new("node-a", &backend.backend);
     a.take("alice").await;
+    let storage = a.scoped("profile:alice");
     let base = a.clock.load(Ordering::SeqCst);
 
     // Nobody took over yet, but node A's renewals stopped landing: inside
     // the skew margin it already refuses, with no I/O.
     a.set_clock(base + TTL.as_millis() as u64 - MARGIN_MS);
-    let refused = a.put("profile:alice", "n").await.unwrap_err();
+    let refused = storage
+        .documents()
+        .put("notes", "n", json!({}), Precondition::None)
+        .await
+        .unwrap_err();
     assert_eq!(
         fence_error(&refused),
         Some(&FenceError::Expired { epoch: 1 })
@@ -213,6 +218,7 @@ async fn a_fence_over_file_leases_admits_until_release() {
 struct PausedAfterCheck {
     inner: Arc<dyn LeaseStore>,
     thief: Arc<dyn LeaseStore>,
+    base_ms: u64,
     armed: std::sync::atomic::AtomicBool,
 }
 
@@ -250,7 +256,10 @@ impl LeaseStore for PausedAfterCheck {
     > {
         let record = self.inner.holder(key).await?;
         if self.armed.swap(false, Ordering::SeqCst) {
-            let stolen = self.thief.acquire(key, TTL.as_millis() as u64 + 1).await?;
+            let stolen = self
+                .thief
+                .acquire(key, self.base_ms + TTL.as_millis() as u64 + 1)
+                .await?;
             assert_eq!(stolen.epoch, 2);
         }
         Ok(record)
@@ -272,13 +281,15 @@ impl LeaseStore for PausedAfterCheck {
 async fn paused_holder(
     shared: &Arc<dyn StorageBackend>,
 ) -> (FencedBackend, Arc<LeaseFence>, Arc<PausedAfterCheck>) {
+    let base_ms = crate::storage::fence::system_now_ms();
     let leases = Arc::new(PausedAfterCheck {
         inner: Arc::new(DocumentLeases::cluster(shared.as_ref(), "node-a", None, TTL).unwrap()),
         thief: Arc::new(DocumentLeases::cluster(shared.as_ref(), "node-b", None, TTL).unwrap()),
+        base_ms,
         armed: std::sync::atomic::AtomicBool::new(false),
     });
-    let grant = leases.acquire("alice", 0).await.unwrap();
-    let fences = Arc::new(FenceRegistry::new(|| 1_000));
+    let grant = leases.acquire("alice", base_ms).await.unwrap();
+    let fences = Arc::new(FenceRegistry::new(move || base_ms));
     let fence = Arc::new(LeaseFence::new(
         Arc::clone(&leases) as Arc<dyn LeaseStore>,
         "alice",
