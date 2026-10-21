@@ -39,6 +39,10 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     struct FlowChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize,
         child_calls: std::sync::atomic::AtomicUsize,
+        accepted_followups: std::sync::atomic::AtomicUsize,
+        child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+        child_release: tokio::sync::Notify,
+        root_followup: tokio::sync::Notify,
     }
 
     #[async_trait]
@@ -64,6 +68,10 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
             {
                 self.child_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if let Some(started) = self.child_started.lock().unwrap().take() {
+                    let _ = started.send(());
+                }
+                self.child_release.notified().await;
                 return Ok(ModelResponse::assistant("headless-flow-child-result"));
             }
 
@@ -72,10 +80,16 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
                     .text()
                     .contains("Accepted async sub-agent `task_manager_agent`")
             }) {
+                self.accepted_followups
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.root_followup.notify_one();
                 return Ok(ModelResponse::assistant("headless-flow-root-result"));
             }
-            self.spawn_calls
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if self.spawn_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0 {
+                return Ok(ModelResponse::assistant(
+                    "headless-flow-root-finished-without-accepted-child",
+                ));
+            }
             let mut response = ModelResponse::assistant("");
             response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
                 "headless-flow-spawn",
@@ -83,6 +97,7 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
                 serde_json::json!({
                     "agent_id": "task_manager_agent",
                     "prompt": CHILD_PROMPT,
+                    "task_key": "headless-flow-child-task",
                     "context": "headless flow regression",
                     "model": "test-model"
                 }),
@@ -96,6 +111,10 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     let model = std::sync::Arc::new(FlowChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
+        accepted_followups: std::sync::atomic::AtomicUsize::new(0),
+        child_started: std::sync::Mutex::new(None),
+        child_release: tokio::sync::Notify::new(),
+        root_followup: tokio::sync::Notify::new(),
     });
     let _model = crate::inference::provider::factory::test_provider_override::install_model(
         model.clone(),
@@ -128,17 +147,34 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
         ctx: crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core)),
         approval: Default::default(),
     };
-    let output = crate::core::runtime::CoreContext::scope(
-        core,
-        Box::pin(tinyflows::caps::AgentRunner::run_agent(
-            &runner,
-            "orchestrator",
-            serde_json::json!({"prompt": "Delegate this task to the child."}),
-            None,
-        )),
-    )
-    .await
-    .expect("headless flow agent should settle its child");
+    let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
+    *model.child_started.lock().unwrap() = Some(child_started_tx);
+    let run = tokio::spawn(async move {
+        crate::core::runtime::CoreContext::scope(
+            core,
+            Box::pin(tinyflows::caps::AgentRunner::run_agent(
+                &runner,
+                "orchestrator",
+                serde_json::json!({"prompt": "Delegate this task to the child."}),
+                None,
+            )),
+        )
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx)
+        .await
+        .expect("the real detached child reaches its model")
+        .expect("child-start observation remains connected");
+    tokio::time::timeout(std::time::Duration::from_secs(5), model.root_followup.notified())
+        .await
+        .expect("the parent receives spawn acceptance and produces its final response");
+    tokio::task::yield_now().await;
+    let returned_before_child = run.is_finished();
+    model.child_release.notify_one();
+    let output = run
+        .await
+        .expect("flow runner task");
+    let output = output.expect("headless flow agent should settle its child");
 
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
@@ -149,6 +185,17 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
         1,
         "the detached child must run through the real model dispatch"
+    );
+    assert_eq!(
+        model
+            .accepted_followups
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the parent must receive the actual async spawn acceptance"
+    );
+    assert!(
+        !returned_before_child,
+        "the headless flow must remain pending after root turn until its child settles"
     );
 
     assert!(
