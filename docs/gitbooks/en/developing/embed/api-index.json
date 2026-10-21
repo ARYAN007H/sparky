@@ -86,6 +86,12 @@
     "PendingApproval",
     "PermissionFuture",
     "PermissionLevel",
+    "PhysicalDispatchMetadata",
+    "PhysicalDispatchObserver",
+    "PhysicalDispatchOutcome",
+    "PhysicalDispatchStatus",
+    "PhysicalDispatchTerminal",
+    "PhysicalDispatchUsage",
     "PickListenPortError",
     "ProfileError",
     "ProfileEvents",
@@ -240,13 +246,13 @@
       "name": "configure_core_extensions",
       "signature": "pub fn configure_core_extensions(self, configure: impl FnOnce(&Extensions)) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 418
+      "line": 433
     },
     {
       "name": "controller_extension",
       "signature": "pub fn controller_extension(mut self, extension: ControllerExtension) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 430
+      "line": 445
     },
     {
       "name": "cron",
@@ -318,7 +324,7 @@
       "name": "live_policy",
       "signature": "pub fn live_policy(mut self, policy: Arc<SecurityPolicy>) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 479
+      "line": 494
     },
     {
       "name": "max_agents",
@@ -354,7 +360,7 @@
       "name": "post_turn_hook",
       "signature": "pub fn post_turn_hook(mut self, hook: Arc<dyn LearningSink>) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 445
+      "line": 460
     },
     {
       "name": "privacy",
@@ -384,7 +390,7 @@
       "name": "server_launcher",
       "signature": "pub fn server_launcher(mut self, launcher: ServerLauncher) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 459
+      "line": 474
     },
     {
       "name": "services",
@@ -414,7 +420,7 @@
       "name": "storage",
       "signature": "pub fn storage(mut self, source: impl Into<StorageSource>) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 472
+      "line": 487
     },
     {
       "name": "token",
@@ -432,13 +438,13 @@
       "name": "tool_hook",
       "signature": "pub fn tool_hook(mut self, hook: Arc<dyn ToolHook<OpenHumanRunContext>>) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 452
+      "line": 467
     },
     {
       "name": "tool_ranker",
       "signature": "pub fn tool_ranker(mut self, ranker: Arc<dyn ToolRanker>) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
-      "line": 437
+      "line": 452
     },
     {
       "name": "tool_rules",
@@ -483,7 +489,7 @@
       "storage-file": false,
       "storage-mongodb": false,
       "storage-s3": false,
-      "storage-sqlite": true,
+      "storage-sqlite": false,
       "tinymemes": true,
       "voice": false,
       "web3": false
