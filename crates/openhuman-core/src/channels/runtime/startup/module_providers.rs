@@ -6,6 +6,7 @@ use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
 use crate::modules::channel_runtime::ChannelRuntimeLease;
 use anyhow::{Context, Result};
+#[cfg(test)]
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
@@ -20,7 +21,6 @@ use tinychannels_bus::SendMessage;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
 #[cfg(test)]
 use tinychannels_runtime::Channel;
-#[cfg(test)]
 use tokio::sync::mpsc;
 
 /// Channel objects sharing one captured config, callback object and module lease.

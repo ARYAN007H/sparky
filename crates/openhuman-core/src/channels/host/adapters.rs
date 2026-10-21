@@ -4,7 +4,6 @@
 //! voice, persistence, allowlist, and event operations.
 
 use crate::config::Config;
-use std::sync::Arc;
 
 const LOG_PREFIX: &str = "[channels_host]";
 
