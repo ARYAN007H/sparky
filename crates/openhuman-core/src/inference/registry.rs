@@ -67,7 +67,7 @@ pub type ReadinessProbe = tinyinference_llm::providers::overrides::ReadinessProb
 /// Native provider metadata specialized to OpenHuman's host context.
 pub type ProviderModelHooks = tinyinference_llm::providers::overrides::ProviderModelMetadata<ProviderContext>;
 
-fn provider_overrides(extensions: Option<Extensions>) -> tinyinference_llm::providers::overrides::ProviderOverrides<ProviderContext> {
+pub(crate) fn provider_overrides(extensions: Option<Extensions>) -> tinyinference_llm::providers::overrides::ProviderOverrides<ProviderContext> {
     tinyinference_llm::providers::overrides::ProviderOverrides::new(
         move |provider_id| CHAT_MODELS.get_for(extensions.as_ref(), provider_id),
         |_| None,
@@ -167,9 +167,7 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 /// The registered chat-model provider, if any.
 pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
     let overrides = tinyinference_llm::providers::overrides::ProviderOverrides::new(
-        |id| CHAT_MODELS.get(id),
-        |_| None,
-        |_| None,
+        |id| CHAT_MODELS.get(id), |_| None, |_| None,
     );
     overrides.chat_entry(provider_id)
 }
