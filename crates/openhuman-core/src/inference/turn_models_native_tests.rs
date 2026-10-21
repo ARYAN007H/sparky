@@ -66,7 +66,7 @@ async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_su
         None,
         extensions,
     );
-    let ctx = DispatchCtx::new(context);
+    let ctx = DispatchCtx::new(context.clone());
     let tmp = tempfile::tempdir().expect("isolated workspace");
     let config = Arc::new(managed_fixture_config(&tmp));
     let budget = ModelBudget {
@@ -344,9 +344,12 @@ async fn injected_turn_without_profile_keeps_conservative_capabilities() {
         .host_overrides(Arc::new(overrides)),
     );
     let ctx = DispatchCtx::new(context);
-    let models = TurnModelSource::new_crate_native(&ctx, "chat", Arc::new(Default::default()))
-        .build("hint:chat", 0.2, None, None)
-        .expect("profileless host-injected model builds");
+    let models = CoreContext::scope(context, async {
+        TurnModelSource::new_crate_native(&ctx, "chat", Arc::new(Default::default()))
+            .build("hint:chat", 0.2, None, None)
+            .expect("profileless host-injected model builds")
+    })
+    .await;
 
     assert_eq!(models.provider_id(), "injected");
     assert!(!models.native_tools());

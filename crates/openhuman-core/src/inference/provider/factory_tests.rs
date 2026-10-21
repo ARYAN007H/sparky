@@ -4,6 +4,24 @@ use crate::config::Config;
 use crate::security::credentials::AuthService;
 use tempfile::TempDir;
 
+fn with_library_test_context<T>(f: impl FnOnce() -> T) -> T {
+    let context = crate::core::runtime::CoreContext::for_test_with_host_kind(
+        crate::core::types::HostKind::Library,
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
+    crate::core::runtime::CoreContext::sync_scope(context, f)
+}
+
+async fn with_library_test_context_async<F: std::future::Future>(f: impl FnOnce() -> F) -> F::Output {
+    let context = crate::core::runtime::CoreContext::for_test_with_host_kind(
+        crate::core::types::HostKind::Library,
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
+    crate::core::runtime::CoreContext::scope(context, f()).await
+}
+
 struct ManagedRouteFixtureModel;
 
 #[async_trait::async_trait]
@@ -88,7 +106,9 @@ fn create_test_chat_model_from_string(
     provider: &str,
     config: &Config,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
-    create_chat_model_from_string_with_model_id(role, provider, config, 0.7)
+    with_library_test_context(|| {
+        create_chat_model_from_string_with_model_id(role, provider, config, 0.7)
+    })
 }
 
 fn create_test_local_chat_model_from_string(

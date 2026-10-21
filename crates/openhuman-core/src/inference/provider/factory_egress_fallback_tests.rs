@@ -23,12 +23,15 @@ async fn create_chat_model_managed_emits_exactly_one_egress_realpath() {
     let marker = "egress-managed-realpath-marker-v1";
     let mut config = Config::default();
     config.default_model = Some(marker.to_string());
-    let _ = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        "scratch",
-        &config,
-        0.7,
-    );
+    super::with_library_test_context_async(|| async {
+        let _ = create_chat_model_with_model_id_in(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "scratch",
+            &config,
+            0.7,
+        );
+    })
+    .await;
 
     // Bound the drain with a unique sentinel published AFTER our construction.
     let sentinel = "egress-managed-sentinel-end";
