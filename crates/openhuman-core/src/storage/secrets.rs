@@ -54,7 +54,7 @@ pub fn current() -> Result<Option<DocumentSecrets>, StorageError> {
 
 /// Secrets in `scoped` under `keys` (tests and explicit scopes).
 pub fn over(scoped: &Storage, scope: Scope, keys: Arc<dyn KeyProvider>) -> DocumentSecrets {
-    DocumentSecrets::new(scoped, scope, keys)
+    DocumentSecrets::new(scoped, scope.to_storage_scope(), keys)
 }
 
 /// Reads secret `name` from synchronous code.

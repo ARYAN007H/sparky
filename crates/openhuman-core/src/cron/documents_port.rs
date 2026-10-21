@@ -30,10 +30,11 @@ use tinyflows_bus::schedule::CallbackAddress;
 use tinystoragedrivers::StorageBackend;
 use tinystoragedrivers_api::DocumentStore;
 use tinystoragedrivers_types::{
-    Capability, CollectionSpec, Filter, Precondition, Query, Scope, StorageError, WriteOp,
+    Capability, CollectionSpec, Filter, Precondition, Query, StorageError, WriteOp,
 };
 
 use crate::config::Config;
+use crate::storage::Scope;
 use crate::modules::tinyflows as module;
 
 /// Schedule-owned collections, including the v1 sources read and retired by

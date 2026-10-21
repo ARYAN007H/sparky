@@ -379,9 +379,11 @@ pub fn scope_from(
 /// When the scope cannot be resolved ([`current_scope`]) or the backend
 /// refuses it.
 pub fn current_scoped() -> Result<Option<Storage>, StorageError> {
-    installed()
-        .map(|backend| backend.for_scope(&current_scope()?))
-        .transpose()
+    let Some(backend) = installed() else {
+        return Ok(None);
+    };
+    let scope = current_scope()?;
+    backend.for_scope(&scope.to_storage_scope()).map(Some)
 }
 
 /// Runs `future` to completion from synchronous code, on one dedicated

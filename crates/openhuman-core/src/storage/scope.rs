@@ -104,6 +104,12 @@ impl Scope {
         self.0.as_str()
     }
 
+    /// Clones the opaque driver scope for APIs that consume TSD's scope type.
+    #[must_use]
+    pub fn to_storage_scope(&self) -> tinystoragedrivers::Scope {
+        self.0.clone()
+    }
+
     /// Whether this scope is the host's local operator tenant.
     #[must_use]
     pub fn is_local(&self) -> bool {

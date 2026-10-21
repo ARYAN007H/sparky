@@ -24,11 +24,12 @@ use tinyflows_bus::catalog::{
 use tinystoragedrivers::StorageBackend;
 use tinystoragedrivers_api::DocumentStore;
 use tinystoragedrivers_types::{
-    Capability, CollectionSpec, Filter, Page, Precondition, Query, Scope, StorageError, Versioned,
+    Capability, CollectionSpec, Filter, Page, Precondition, Query, StorageError, Versioned,
     WriteOptions,
 };
 
 use crate::config::Config;
+use crate::storage::Scope;
 use crate::core::runtime::DispatchCtx;
 use crate::modules::tinyflows as module;
 
