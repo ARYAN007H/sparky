@@ -139,11 +139,11 @@ pub async fn migrate(target: &Target) -> Result<(), LayoutError> {
         .await
         .map_err(|e| LayoutError::Other(anyhow::anyhow!("schema migration: {e}")))?;
     drop(backend);
-    if let Some((scope, step, message)) = report.failures.first() {
-        return Err(LayoutError::Other(anyhow::anyhow!(
-            "schema migration failed in scope {scope} step {step}: {message}"
-        )));
-    }
+    log::debug!(
+        scopes = report.scopes,
+        collections = report.collections,
+        "[storage::layout] owner collections prepared"
+    );
     if db.is_file() {
         super::db::checkpoint(&db)?;
     }

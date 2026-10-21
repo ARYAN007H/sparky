@@ -79,7 +79,7 @@ impl WatcherStateStore {
         let path = path.to_string_lossy().into_owned();
         let key = key_for(&path);
         let kv = Arc::clone(&self.kv);
-        crate::storage::block_on(async move {
+        crate::storage::block_on_anyhow(async move {
             loop {
                 let current = kv.get(&key).await?;
                 let (mtime_secs, expected) = match current {
@@ -126,7 +126,7 @@ impl WatcherStateStore {
     /// Load every non-deleted state in stable key order.
     pub fn load_all(&self) -> Result<Vec<FileState>> {
         let kv = Arc::clone(&self.kv);
-        crate::storage::block_on(async move {
+        crate::storage::block_on_anyhow(async move {
             let mut cursor: Option<Cursor> = None;
             let mut states = Vec::new();
             loop {
