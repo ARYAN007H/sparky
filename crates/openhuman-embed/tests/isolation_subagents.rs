@@ -105,7 +105,10 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
                 .as_array()
                 .expect("provider request tools")
                 .iter()
-                .find(|tool| tool.pointer("/function/name").and_then(|v| v.as_str()) == Some("spawn_subagent"))
+                .find(|tool| {
+                    tool.pointer("/function/name").and_then(|v| v.as_str())
+                        == Some("spawn_subagent")
+                })
                 .expect("canonical spawn tool schema");
             assert_eq!(
                 spawn_spec.pointer("/function/parameters/properties/agent_id/enum"),
@@ -203,9 +206,7 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .agent(
                     AgentSpec::new("host-only-lead")
                         .provider(route(&host_only_provider, "host-only-model"))
-                        .definition(
-                            AgentDefinitionSpec::new().tools(ToolScopeSpec::HostOnly),
-                        )
+                        .definition(AgentDefinitionSpec::new().tools(ToolScopeSpec::HostOnly))
                         .subagents([(
                             "host_helper",
                             AgentDefinitionSpec::new()
@@ -220,7 +221,9 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .expect("host-only turn returns");
             let host_requests = chat_requests(&host_only_provider).await;
             assert!(!host_requests.is_empty());
-            assert!(!tool_names(&host_requests[0]).iter().any(|name| name == "spawn_subagent"));
+            assert!(!tool_names(&host_requests[0])
+                .iter()
+                .any(|name| name == "spawn_subagent"));
             assert!(host_requests
                 .iter()
                 .all(|request| !String::from_utf8_lossy(&request.body)
