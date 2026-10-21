@@ -178,10 +178,10 @@ fn to_history(
         .take_while(|message| message.id != current)
         .filter_map(|message| match message.sender.as_str() {
             "user" => Some(tinyagents_session::transcript::TranscriptMessage::user(
-                &message.content,
+                message.content.clone(),
             )),
             "assistant" => Some(tinyagents_session::transcript::TranscriptMessage::assistant(
-                &message.content,
+                message.content.clone(),
             )),
             _ => None,
         })
