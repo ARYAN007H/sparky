@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::subagent_host::{spawn_async_via_driver_tool_with_jobs, SubagentRunStatus};
 use tinyagents_harness::context::{RunDepth, current_run_depth, with_run_depth};
 
 struct BlockingSubagentCloseTool {
