@@ -23,6 +23,7 @@ fn open_fd_count() -> usize {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn workspace_fd_lifetime_is_separate_from_catalog_callback_lifetime() {
     // Warm the process-wide bus before measuring. Serving additional callback
     // objects should only add entries to that shared bus, not open a backend.
@@ -39,6 +40,7 @@ async fn workspace_fd_lifetime_is_separate_from_catalog_callback_lifetime() {
             workspace_dir: workspace.path().to_path_buf(),
             ..Config::default()
         };
+        crate::storage::local::use_persistent_default_for_test(workspace.path());
         let context = context(&config, &format!("fd-probe-{index}"));
         registrations.push(
             register(&context, &config)

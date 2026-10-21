@@ -59,7 +59,7 @@ static TEST_WORKSPACE_URLS: LazyLock<Mutex<HashMap<PathBuf, String>>> =
     LazyLock::new(Mutex::default);
 
 #[cfg(all(test, feature = "storage-sqlite"))]
-pub(super) fn use_persistent_default_for_test(workspace_dir: &Path) {
+pub(crate) fn use_persistent_default_for_test(workspace_dir: &Path) {
     TEST_WORKSPACE_URLS
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
