@@ -64,6 +64,7 @@ Migration steps:
 | collection | `channels.delivery_failed` | 2 | module |  |
 | collection | `channels.delivery_pending` | 2 | module |  |
 | collection | `channels.delivery_results` | 2 | module |  |
+| collection | `channels.media_metadata` | 1 | module |  |
 | collection | `channels.remote_bindings` | 2 | module |  |
 | collection | `channels.remote_busy` | 2 | module |  |
 | collection | `channels.remote_meta` | 2 | module |  |
@@ -75,6 +76,7 @@ Migration steps:
 | collection | `channels.whatsapp_session` | 2 | module |  |
 | collection | `channels.whatsapp_signed_prekey` | 2 | module |  |
 | collection | `channels.whatsapp_sync_key` | 2 | module |  |
+| blobs | `channels/media/` |  | module |  |
 
 Migration steps:
 
