@@ -26,6 +26,7 @@ use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
 use crate::storage::{
     DocumentStore, DocumentStoreExt, Precondition, Scope, StorageBackend, StorageError,
 };
+use crate::storage::import::Record;
 
 /// The ids a hashed v1 scope can be matched against.
 #[derive(Debug, Default, Clone)]
@@ -186,7 +187,10 @@ pub async fn copy_inventory(
     source_scopes.dedup();
     for source in source_scopes {
         let target_scope = match map_scope(source, known) {
-            Mapping::V2 => continue,
+            // `inventory` is read from a separate legacy database. A scope
+            // already in the v2 grammar keeps its identity, but its rows still
+            // need copying (and owner conversion) into the configured target.
+            Mapping::V2 => Scope::new(source)?,
             Mapping::Unknown => {
                 report.unknown.push(source.to_owned());
                 continue;
@@ -199,26 +203,46 @@ pub async fn copy_inventory(
             if row.meta.updated_ms != 0 {
                 report.updated_times_not_restored += 1;
             }
-            docs.ensure_collection(&CollectionSpec::new(&row.collection))
-                .await?;
-            let mut options = WriteOptions::new();
-            options.schema = row.meta.schema;
-            options.created_ms = Some(row.meta.created_ms);
-            options.expires_ms = row.meta.expires_ms;
-            match docs
-                .put_with(
-                    &row.collection,
-                    &row.id,
-                    row.body.clone(),
-                    Precondition::Absent,
-                    options,
-                )
-                .await
-            {
-                Ok(_) => report.documents += 1,
-                Err(error)
-                    if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
-                Err(error) => return Err(error.into()),
+            let source_record = Record {
+                collection: row.collection.clone(),
+                id: row.id.clone(),
+                doc: row.body.clone(),
+                created_ms: Some(row.meta.created_ms),
+                schema: Some(row.meta.schema),
+                expires_ms: row.meta.expires_ms,
+                updated_ms: Some(row.meta.updated_ms),
+            };
+            let (records, specs) = upgrade_legacy_scope_document(source_record)?;
+            for record in records {
+                let spec = specs
+                    .iter()
+                    .find(|spec| spec.name == record.collection)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "owner conversion emitted undeclared collection `{}`",
+                            record.collection
+                        )
+                    })?;
+                docs.ensure_collection(spec).await?;
+                let mut options = WriteOptions::new();
+                options.schema = record.schema.unwrap_or_default();
+                options.created_ms = record.created_ms;
+                options.expires_ms = record.expires_ms;
+                match docs
+                    .put_with(
+                        &record.collection,
+                        &record.id,
+                        record.doc,
+                        Precondition::Absent,
+                        options,
+                    )
+                    .await
+                {
+                    Ok(_) => report.documents += 1,
+                    Err(error)
+                        if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
+                    Err(error) => return Err(error.into()),
+                }
             }
         }
         let streams = target.streams();
@@ -297,6 +321,51 @@ pub async fn copy_inventory(
         report.moved += 1;
     }
     Ok(report)
+}
+
+/// Applies the owning domain's pure schema conversion before a legacy row is
+/// written into the target backend. Unrecognized collections retain their
+/// original body and metadata.
+#[cfg(feature = "legacy-import")]
+fn upgrade_legacy_scope_document(
+    record: crate::storage::import::Record,
+) -> anyhow::Result<(Vec<crate::storage::import::Record>, Vec<CollectionSpec>)> {
+    let collection = record.collection.as_str();
+    let (records, specs) = match collection {
+        "artifacts" | "artifact_args" | "artifact_versions" => (
+            crate::artifacts::upgrade_records(vec![record])?,
+            crate::artifacts::collection_specs(),
+        ),
+        "config" => (
+            crate::config::schema::upgrade_config_records(vec![record])?,
+            crate::config::schema::config_storage_collections(),
+        ),
+        "cost_records" => (
+            crate::platform::cost::upgrade_records(vec![record])?,
+            crate::platform::cost::collection_specs(),
+        ),
+        "profiles" => (
+            crate::profiles::upgrade_records(vec![record])?,
+            crate::profiles::collection_specs(),
+        ),
+        "leases" => (
+            crate::profiles::upgrade_lease_records(vec![record])?,
+            vec![CollectionSpec::new(crate::storage::lease::LEASE_COLLECTION)],
+        ),
+        "threads_transcript_keys" => (
+            crate::threads::store::upgrade_records(vec![record])?,
+            crate::threads::store::collection_specs(),
+        ),
+        "subagent_sessions" => (
+            crate::agent::orchestration::subagent_sessions::upgrade_records(vec![record])?,
+            crate::agent::orchestration::subagent_sessions::collection_specs(),
+        ),
+        _ => {
+            let spec = CollectionSpec::new(&record.collection);
+            (vec![record], vec![spec])
+        }
+    };
+    Ok((records, specs))
 }
 
 /// Reads an explicit SQLite source and copies its known legacy scopes.
