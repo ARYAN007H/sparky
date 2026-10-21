@@ -39,11 +39,8 @@ fn local_ai_status_snapshot(
     } else {
         None
     };
-    // `LocalAiService` is a process-wide singleton whose cached `provider`
-    // field was set at first init from whichever config it saw. After an
-    // `inference_update_local_settings` call that swaps providers
-    // (e.g. ollama → lm_studio) the cached value is stale, so we overlay
-    // the current config's provider on the status snapshot before returning.
+    // The service snapshot uses this call's configured provider, even though
+    // the process-wide service may have been initialized with another one.
     (snapshot, bootstrap_task)
 }
 

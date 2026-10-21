@@ -53,14 +53,9 @@ pub async fn transcribe_with_prompt(
     let provider = selected_stt_provider(config, &provider_name)?;
     let text = tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
         .await?;
-    let bytes = tokio::fs::metadata(audio_path)
-        .await
-        .map(|metadata| metadata.len())
-        .unwrap_or_default();
     debug!(
-        "{LOG_PREFIX} configured STT complete (provider={} bytes={} elapsed_ms={})",
+        "{LOG_PREFIX} configured STT complete (provider={} elapsed_ms={})",
         provider_name,
-        bytes,
         started.elapsed().as_millis()
     );
     service.mark_stt_ready();
