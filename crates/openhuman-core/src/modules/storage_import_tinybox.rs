@@ -2,11 +2,10 @@
 //! tinybox module's storage.
 //!
 //! A `JailRegistry` used to keep its metadata for every jail in
-//! `<base>/index.json` (the documented base is `<workspace>/jails/`). From
-//! v0.1.29 the index is one document per registry in the
-//! `tinybox_jail_index` collection of the module's own scope, with the same
-//! JSON shape, so a registry opened on the host's storage sees the jails an
-//! older install created.
+//! `<base>/index.json` (the documented base is `<workspace>/jails/`). The
+//! importer converts that registry JSON through the TinyBox bus contract and
+//! writes the current `box.jail_index` body, so a registry opened on the
+//! host's storage sees jails an older install created.
 //!
 //! * **The legacy file is never modified.** It is only read.
 //! * **Nothing is overwritten.** The document is written only when absent, so
@@ -85,9 +84,7 @@ async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {
             let collection = tinybox_bus::storage::JAIL_INDEX_COLLECTION;
             docs.ensure_collection(&CollectionSpec::new(collection))
                 .await
-                .map_err(|error| {
-                    anyhow::anyhow!("declare {collection}: {:?}", error.kind())
-                })?;
+                .map_err(|error| anyhow::anyhow!("declare {collection}: {:?}", error.kind()))?;
             let body = tinybox_bus::storage::jail_index::to_body(doc)
                 .context("convert the jail index into the current owner body")?;
             written = support::put_absent_with(

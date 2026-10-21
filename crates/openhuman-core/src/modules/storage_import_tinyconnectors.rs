@@ -11,6 +11,9 @@
 //! upgraded with preferences set (a denied write, say) must not lose them.
 //!
 //! * **Legacy files are never modified.** They are only read.
+//! * **Current owner shapes.** Preferences are encoded with the TinyConnectors
+//!   bus contract and written to its v2 collection; trigger records go to the
+//!   current owner stream prefix.
 //! * **Nothing is overwritten.** A preference document that already exists is
 //!   kept, and a day's stream that already holds records is not appended to,
 //!   so a retry cannot duplicate and records the module wrote since are never

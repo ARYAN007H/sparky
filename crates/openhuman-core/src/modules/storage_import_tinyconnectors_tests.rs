@@ -174,10 +174,10 @@ async fn records_the_module_already_wrote_are_never_replaced_or_duplicated() {
         .unwrap();
     scoped
         .streams()
-            .append(
-                "connectors.triggers/2026-10-12",
-                json!({"metadataId": "live"}),
-            )
+        .append(
+            "connectors.triggers/2026-10-12",
+            json!({"metadataId": "live"}),
+        )
         .await
         .unwrap();
 
