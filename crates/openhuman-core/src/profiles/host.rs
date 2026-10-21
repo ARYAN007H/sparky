@@ -157,6 +157,19 @@ impl ProfileHost {
         &self.node
     }
 
+    /// Profile identities known to the host, including profiles that are not
+    /// currently open. Background maintenance uses this inventory so dormant
+    /// profiles are not skipped between requests.
+    pub async fn known_profiles(&self) -> Result<Vec<String>, String> {
+        Ok(self
+            .registry
+            .list()
+            .await?
+            .into_iter()
+            .map(|profile| profile.profile_id.to_string())
+            .collect())
+    }
+
     pub(crate) fn leases(&self) -> &dyn LeaseStore {
         self.leases.as_ref()
     }

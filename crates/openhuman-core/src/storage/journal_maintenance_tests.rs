@@ -1,21 +1,14 @@
 use super::*;
-use std::sync::atomic::{AtomicU64, Ordering};
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
 use tinyagents_harness::observability::replay::read_run_events_page;
 use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
 use tinyagents_harness::HarnessStatusStore;
-use tinystoragedrivers::MemoryStorage;
+use tinystoragedrivers_testkit::memory_storage;
 
-fn backend_with_clock() -> (Arc<AtomicU64>, Arc<dyn StorageBackend>) {
-    let now = Arc::new(AtomicU64::new(1_000));
-    let clock = Arc::clone(&now);
-    let backend: Arc<dyn StorageBackend> =
-        Arc::new(MemoryStorage::with_clock(Arc::new(move || {
-            clock.load(Ordering::SeqCst)
-        })));
-    (now, backend)
+fn backend() -> Arc<dyn StorageBackend> {
+    memory_storage(&Scope::local())
 }
 
 fn journal(backend: &Arc<dyn StorageBackend>) -> StoreEventJournal<Arc<dyn AppendStore>> {
@@ -77,7 +70,7 @@ async fn pages(
 
 #[tokio::test]
 async fn a_sealed_journal_serves_the_same_pages_as_an_unsealed_one() {
-    let (_, backend) = backend_with_clock();
+    let backend = backend();
     let journal = journal(&backend);
     seed(&journal, "run.a", 7).await;
     let before = pages(&journal, "run.a").await;
@@ -88,52 +81,59 @@ async fn a_sealed_journal_serves_the_same_pages_as_an_unsealed_one() {
 
 #[tokio::test]
 async fn backfill_seals_finished_runs_but_not_active_ones_and_records_itself() {
-    let (_, backend) = backend_with_clock();
+    let backend = backend();
     let journal = journal(&backend);
     seed(&journal, "run.done", 2).await;
     seed(&journal, "run.live", 2).await;
     mark_active(&backend, "run.live").await;
 
-    assert_eq!(
-        backfill_scope(backend.as_ref(), &Scope::local())
-            .await
-            .unwrap(),
-        1
-    );
+    let report = maintain_scope(&backend, &Scope::local(), 0, 1_000)
+        .await
+        .unwrap();
+    assert_eq!(report.backfilled, 1);
     assert!(sealed(&backend, "run.done").await);
     assert!(!sealed(&backend, "run.live").await);
 
     // Recorded: a later pass does nothing, even for a run that has since ended.
     seed(&journal, "run.late", 1).await;
-    assert_eq!(
-        backfill_scope(backend.as_ref(), &Scope::local())
-            .await
-            .unwrap(),
-        0
-    );
+    let report = maintain_scope(&backend, &Scope::local(), 0, 1_000)
+        .await
+        .unwrap();
+    assert_eq!(report.backfilled, 0);
     assert!(!sealed(&backend, "run.late").await);
     let storage = backend.for_scope(&Scope::local()).unwrap();
-    assert!(Migrations::new(&storage)
-        .done(BACKFILL_OWNER, BACKFILL_STEP)
+    let marker = storage
+        .documents()
+        .get(BACKFILL_COLLECTION, &crate::storage::schema_support::key_of("inactive-journal-backfill-v1").unwrap())
         .await
-        .unwrap());
+        .unwrap()
+        .unwrap();
+    assert_eq!(marker.doc["version"], BACKFILL_VERSION);
 }
 
 #[tokio::test]
 async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
-    let (now, backend) = backend_with_clock();
+    let backend = backend();
     let journal = journal(&backend);
     seed(&journal, "run.old", 2).await;
     journal.seal_run("run.old").await.unwrap();
 
+    let storage = backend.for_scope(&Scope::local()).unwrap();
+    let sealed_at = storage
+        .streams()
+        .info("harness.journal/run.old")
+        .await
+        .unwrap()
+        .unwrap()
+        .sealed_ms
+        .unwrap();
     // Inside the window: kept.
-    let early = maintain_once(&backend, 1, 1_000 + DAY_MS as i64 / 2)
+    let early = maintain_scope(&backend, &Scope::local(), DAY_MS, sealed_at + DAY_MS as i64 / 2)
         .await
         .unwrap();
     assert_eq!(early.deleted, 0);
     // Past one day, the configured retention (not the schema's 30).
-    now.store(1_000 + DAY_MS + 10, Ordering::SeqCst);
-    let late = maintain_once(&backend, 1, 1_000 + DAY_MS as i64 + 10)
+    let late = maintain_scope(&backend, &Scope::local(), DAY_MS, sealed_at + DAY_MS as i64 + 10)
         .await
         .unwrap();
     assert_eq!(late.deleted, 1);
@@ -148,11 +148,20 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
 
 #[tokio::test]
 async fn zero_retention_days_keeps_sealed_journals_forever() {
-    let (_, backend) = backend_with_clock();
+    let backend = backend();
     let journal = journal(&backend);
     seed(&journal, "run.keep", 1).await;
     journal.seal_run("run.keep").await.unwrap();
-    let summary = maintain_once(&backend, 0, 1_000 + 400 * DAY_MS as i64)
+    let storage = backend.for_scope(&Scope::local()).unwrap();
+    let sealed_at = storage
+        .streams()
+        .info("harness.journal/run.keep")
+        .await
+        .unwrap()
+        .unwrap()
+        .sealed_ms
+        .unwrap();
+    let summary = maintain_scope(&backend, &Scope::local(), 0, sealed_at + 400 * DAY_MS as i64)
         .await
         .unwrap();
     assert_eq!(summary.deleted, 0);
