@@ -38,7 +38,7 @@ pub(crate) async fn prepare_runtime_limits(
         ChannelControlResult::RuntimeLimits {
             timeout_secs,
             max_in_flight,
-        } if timeout_secs >= tinychannels_runtime::context::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
+        } if timeout_secs >= tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
             && max_in_flight > 0 =>
         {
             Ok((timeout_secs, max_in_flight))
