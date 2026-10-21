@@ -114,17 +114,70 @@ export function findOwnershipViolations(source, filePath) {
   const normalizedPath = filePath.split(path.sep).join('/');
   const allowed = ALLOWLIST.get(normalizedPath);
   const violations = [];
+  const tokens = tokenizeUseTrees(source);
+  const importedPaths = [];
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (tokens[index].value !== 'use') continue;
+    const [paths] = readUseTree(tokens, index + 1);
+    importedPaths.push(...paths);
+  }
+
   for (const denied of DENIED_PATHS) {
     if (allowed?.has(denied.path)) continue;
-    const escapedPath = denied.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const matcher = new RegExp(`\\b${escapedPath}`, 'g');
-    for (const match of source.matchAll(matcher)) {
-      const line = source.slice(0, match.index).split('\n').length;
-      violations.push({ line, path: denied.path, reason: denied.reason });
+    const deniedSegments = denied.path.split('::').filter(Boolean);
+    for (const importedPath of importedPaths) {
+      if (deniedSegments.every((segment, index) => importedPath[index]?.value === segment)) {
+        const line = source.slice(0, importedPath[0].start).split('\n').length;
+        violations.push({ line, path: denied.path, reason: denied.reason });
+      }
     }
   }
 
   return violations.sort((left, right) => left.line - right.line || left.path.localeCompare(right.path));
+}
+
+function tokenizeUseTrees(source) {
+  const tokens = [];
+  const tokenPattern = /::|[A-Za-z_][A-Za-z0-9_]*|[{};,=*]/g;
+  for (const match of source.matchAll(tokenPattern)) {
+    tokens.push({ value: match[0], start: match.index });
+  }
+  return tokens;
+}
+
+/** Expand Rust use-tree groups into full paths, retaining source positions. */
+function readUseTree(tokens, start, prefix = []) {
+  const paths = [];
+  const segments = [];
+  let index = start;
+
+  while (index < tokens.length) {
+    const token = tokens[index];
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(token.value)) break;
+    segments.push(token);
+    index += 1;
+    if (tokens[index]?.value !== '::') break;
+    index += 1;
+    if (tokens[index]?.value === '{') break;
+  }
+
+  const fullPath = [...prefix, ...segments];
+  if (tokens[index]?.value !== '{') {
+    if (fullPath.length > 0) paths.push(fullPath);
+    return [paths, index];
+  }
+
+  index += 1;
+  while (index < tokens.length && tokens[index].value !== '}') {
+    const [nestedPaths, nextIndex] = readUseTree(tokens, index, fullPath);
+    paths.push(...nestedPaths);
+    index = nextIndex;
+    if (tokens[index]?.value === ',') index += 1;
+    else if (tokens[index]?.value !== '}') break;
+  }
+  if (tokens[index]?.value === '}') index += 1;
+  return [paths, index];
 }
 
 function listRustFiles(directory, predicate, files = []) {
