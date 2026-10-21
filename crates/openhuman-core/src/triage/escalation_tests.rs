@@ -370,7 +370,6 @@ async fn react_dispatch_inherits_the_parent_workload_for_inherit_targets() {
         .get("trigger_reactor")
         .expect("built-in trigger reactor exists")
         .clone();
-    definition.id = "triage_inherit_model_test".to_string();
     definition.model = tinyagents_definition::ModelSpec::Inherit;
     definitions = definitions.with_definitions([definition]);
     let definitions = Arc::new(definitions);
@@ -412,7 +411,7 @@ async fn react_dispatch_inherits_the_parent_workload_for_inherit_targets() {
                     &ctx,
                     run_with_target(
                         TriageAction::Escalate,
-                        "triage_inherit_model_test",
+                        "trigger_reactor",
                         "route this task with the inherited workload",
                     ),
                     &envelope,
