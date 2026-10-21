@@ -326,6 +326,13 @@ pub struct CompletionResponse {
     pub raw: Option<Value>,
 }
 
+#[derive(Clone)]
+struct CompletionEndpoint {
+    base_url: String,
+    api_key: String,
+    headers: Vec<(String, String)>,
+}
+
 impl CompletionResponse {
     fn from_wire(response: ModelResponse, format: Option<&ResponseFormat>) -> Self {
         let text = response.text();
@@ -635,9 +642,9 @@ impl Completer {
     async fn dispatch(&self, request: CompletionRequest) -> Result<CompletionResponse, CoreError> {
         let endpoint = self.checked_endpoint(&request)?;
         let format = request.response_format.clone();
-        let model = request.model.clone();
+        let model_id = request.model.clone();
         log::debug!(
-            "[embed] complete start method={COMPLETE} model={model} messages={} timeout_ms={:?}",
+            "[embed] complete start method={COMPLETE} model={model_id} messages={} timeout_ms={:?}",
             request.messages.len(),
             request.timeout_ms
         );
@@ -645,7 +652,7 @@ impl Completer {
         let model = endpoint.headers.iter().fold(
             tinyinference_llm::providers::openai::OpenAiModel::new(endpoint.api_key.clone())
                 .with_base_url(endpoint.base_url.clone())
-                .with_model(model.clone()),
+                .with_model(model_id.clone()),
             |model, (name, value)| model.with_header(name.clone(), value.clone()),
         );
         let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::new(model);
@@ -698,7 +705,7 @@ impl Completer {
                 };
             }
             log::warn!(
-                "[embed] complete failed method={COMPLETE} model={model} elapsed_ms={}",
+                "[embed] complete failed method={COMPLETE} model={model_id} elapsed_ms={}",
                 started.elapsed().as_millis()
             );
             CoreError::Rpc {
@@ -707,7 +714,7 @@ impl Completer {
             }
         })?;
         log::debug!(
-            "[embed] complete ok method={COMPLETE} model={model} elapsed_ms={}",
+            "[embed] complete ok method={COMPLETE} model={model_id} elapsed_ms={}",
             started.elapsed().as_millis()
         );
         Ok(CompletionResponse::from_wire(response, format.as_ref()))
