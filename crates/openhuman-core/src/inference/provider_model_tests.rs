@@ -52,7 +52,11 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
                 is_raw_model: Arc::new(|model| model == "scoped/model"),
                 supports_vision: Arc::new(|_| false),
                 resolve_model: Arc::new(|_, _, _| None),
-                context_window: Arc::new(|model| (model == "scoped/model").then_some(77_777)),
+                context_window: Arc::new(|model| match model {
+                    "scoped/model" => Some(77_777),
+                    "hint:reasoning" => Some(88_888),
+                    _ => None,
+                }),
                 default_pricing: Arc::new(|| None),
                 without_reasoning: Arc::new(|request| request),
             }),
@@ -67,11 +71,21 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
         Some("scoped/model")
     );
     assert_eq!(
-        crate::inference::model_context::static_context_window_for_model_in(
-            Some(&extensions),
-            "scoped/model"
-        ),
+        crate::inference::context_window::project_context_window_for_model(
+            "scoped/model",
+            Some(Some(&extensions))
+        )
+        .window,
         Some(77_777)
+    );
+    assert_eq!(
+        crate::inference::context_window::project_context_window_for_model(
+            "hint:reasoning",
+            Some(Some(&extensions))
+        )
+        .window,
+        Some(88_888),
+        "a registered provider hook can override a workload tier alias"
     );
     let context = crate::core::runtime::CoreContext::for_test_with_extensions(
         crate::core::runtime::DomainSet::full(),
@@ -86,6 +100,24 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
         None
     );
     crate::core::runtime::CoreContext::sync_scope(context, || {
+        assert_eq!(
+            crate::inference::context_window::project_context_window_for_model(
+                "scoped/model",
+                None
+            )
+            .window,
+            Some(77_777),
+            "the ambient projection uses the active provider registry"
+        );
+        assert_ne!(
+            crate::inference::context_window::project_context_window_for_model(
+                "scoped/model",
+                Some(None)
+            )
+            .window,
+            Some(77_777),
+            "an explicit process-only projection does not borrow ambient context"
+        );
         assert_eq!(
             crate::inference::registry::provider_default_model(
                 crate::inference::provider::factory::PROVIDER_OPENHUMAN

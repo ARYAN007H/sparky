@@ -139,8 +139,9 @@ caching, remembered route limits, and the shared fallback order:
   2. provider-reported     discovered limits and learned overflow limits for
                            the exact endpoint/model/cache identity
   3. remembered            provider limits for the route/model identity
-  4. static/local          managed default, workload tier, pricing catalog,
-                           model-id hint, then local profile fallback
+  4. static/local          registered provider model metadata, managed default,
+                           workload tier, pricing catalog, model-id hint, then
+                           local profile fallback
 ```
 
 The discovery request comes from [`provider/factory/discovery.rs`](./provider/factory/discovery.rs) (`model_limits_request`), built
