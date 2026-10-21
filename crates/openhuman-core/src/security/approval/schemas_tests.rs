@@ -116,11 +116,11 @@ fn recent_decisions_parser_keeps_optional_unsigned_limit_semantics() {
         parse_list_recent_decisions(Map::from_iter([("limit".into(), json!(null))])).unwrap(),
         None
     );
-    for limit in [0, 1, u64::MAX] {
+    for (limit, expected) in [(0_u64, 0_usize), (25, 25), (u64::MAX, usize::MAX)] {
         assert_eq!(
             parse_list_recent_decisions(Map::from_iter([("limit".into(), json!(limit))])).unwrap(),
-            Some(limit as usize),
-            "the decoder preserves the existing u64-to-usize cast without defaulting or clamping"
+            Some(expected),
+            "the decoder preserves the existing cast without defaulting or clamping"
         );
     }
     for value in [json!(-1), json!(1.5)] {
