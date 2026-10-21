@@ -158,6 +158,24 @@ fn all_variants_have_correct_domain() {
             "channel",
         ),
         (
+            DomainEvent::ChannelReactionReceived {
+                channel: "c".into(),
+                sender: "s".into(),
+                target_message_id: "m1".into(),
+                emoji: "👍".into(),
+            },
+            "channel",
+        ),
+        (
+            DomainEvent::ChannelReactionSent {
+                channel: "c".into(),
+                target_message_id: "m1".into(),
+                emoji: "✅".into(),
+                success: true,
+            },
+            "channel",
+        ),
+        (
             DomainEvent::ChannelConnected {
                 channel: "c".into(),
             },
@@ -763,19 +781,23 @@ fn a_long_error_is_clipped_on_a_character_boundary() {
 /// Every other variant is unchanged: no detail, so its row renders as before.
 #[test]
 fn events_outside_the_supervisor_have_no_event_log_detail() {
-    assert!(DomainEvent::CronJobCompleted {
-        job_id: "job-1".into(),
-        success: true,
-        output: "done".into(),
-    }
-    .log_detail()
-    .is_none());
-    assert!(DomainEvent::McpServerConnected {
-        server_id: "srv-1".into(),
-        tool_count: 25,
-    }
-    .log_detail()
-    .is_none());
+    assert!(
+        DomainEvent::CronJobCompleted {
+            job_id: "job-1".into(),
+            success: true,
+            output: "done".into(),
+        }
+        .log_detail()
+        .is_none()
+    );
+    assert!(
+        DomainEvent::McpServerConnected {
+            server_id: "srv-1".into(),
+            tool_count: 25,
+        }
+        .log_detail()
+        .is_none()
+    );
 }
 
 // ── workspace_dir ────────────────────────────────────────────────────────
@@ -924,6 +946,17 @@ fn events_without_a_workspace_report_none() {
         }
         .workspace_dir(),
         None
+    );
+    assert_eq!(
+        DomainEvent::ChannelReactionReceived {
+            channel: "c".into(),
+            sender: "s".into(),
+            target_message_id: "m1".into(),
+            emoji: "👍".into(),
+        }
+        .workspace_dir(),
+        None,
+        "the retired wire tombstone has no workspace field"
     );
 }
 

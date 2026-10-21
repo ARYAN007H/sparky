@@ -353,6 +353,22 @@ pub enum DomainEvent {
         /// `workspace_dir` does not match their own workspace binding.
         workspace_dir: std::path::PathBuf,
     },
+    /// Retired legacy reaction callback payload. Kept as a wire tombstone for
+    /// Events 1.x compatibility; new providers publish typed `ChannelEvent`s.
+    ChannelReactionReceived {
+        channel: String,
+        sender: String,
+        target_message_id: String,
+        emoji: String,
+    },
+    /// Retired legacy reaction callback payload. Kept as a wire tombstone for
+    /// Events 1.x compatibility; new providers publish typed `ChannelEvent`s.
+    ChannelReactionSent {
+        channel: String,
+        target_message_id: String,
+        emoji: String,
+        success: bool,
+    },
     /// A channel connected successfully.
     ChannelConnected { channel: String },
     /// A channel disconnected.
@@ -1365,6 +1381,8 @@ impl DomainEvent {
             Self::ChannelInboundMessage { .. }
             | Self::ChannelMessageReceived { .. }
             | Self::ChannelMessageProcessed { .. }
+            | Self::ChannelReactionReceived { .. }
+            | Self::ChannelReactionSent { .. }
             | Self::ChannelConnected { .. }
             | Self::ChannelDisconnected { .. } => "channel",
 
@@ -1496,6 +1514,8 @@ impl DomainEvent {
             Self::ChannelInboundMessage { .. } => "ChannelInboundMessage",
             Self::ChannelMessageReceived { .. } => "ChannelMessageReceived",
             Self::ChannelMessageProcessed { .. } => "ChannelMessageProcessed",
+            Self::ChannelReactionReceived { .. } => "ChannelReactionReceived",
+            Self::ChannelReactionSent { .. } => "ChannelReactionSent",
             Self::ChannelConnected { .. } => "ChannelConnected",
             Self::ChannelDisconnected { .. } => "ChannelDisconnected",
             Self::CronJobTriggered { .. } => "CronJobTriggered",
