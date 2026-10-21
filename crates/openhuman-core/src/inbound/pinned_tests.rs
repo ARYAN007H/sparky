@@ -73,3 +73,33 @@ async fn runs_left_running_by_a_previous_process_are_run_again() {
     // Nothing is left to resume.
     assert_eq!(pinned.resume(&DispatchCtx::host_default()), 0);
 }
+
+#[test]
+fn the_turn_events_belong_to_the_inbound_domain_and_say_what_ran() {
+    use crate::core::events::DomainEvent;
+    let completed = DomainEvent::InboundTurnCompleted {
+        source: "x:mentions".into(),
+        key: "mentions".into(),
+        turn_id: "t1".into(),
+        event_ids: vec!["1".into(), "2".into()],
+        agent_id: "teeny-mentions".into(),
+    };
+    assert_eq!(completed.domain(), "inbound");
+    assert_eq!(completed.variant_name(), "InboundTurnCompleted");
+    assert_eq!(
+        completed.log_detail().as_deref(),
+        Some("x:mentions/mentions turn t1: 2 event(s)")
+    );
+    let failed = DomainEvent::InboundTurnFailed {
+        source: "x:mentions".into(),
+        key: "mentions".into(),
+        turn_id: "t1".into(),
+        detail: "provider down".into(),
+    };
+    assert_eq!(failed.domain(), "inbound");
+    assert_eq!(failed.variant_name(), "InboundTurnFailed");
+    assert_eq!(
+        failed.log_detail().as_deref(),
+        Some("x:mentions/mentions turn t1: provider down")
+    );
+}
