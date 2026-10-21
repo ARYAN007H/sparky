@@ -220,7 +220,15 @@ fn preauthorize_parser_preserves_flow_and_tool_strings_without_normalizing() {
     ]))
     .unwrap();
     assert_eq!(flow, " flow raw ");
-    assert_eq!(tools, ["", " tool ", "tool", "tool"]);
+        assert_eq!(
+            tools,
+            vec![
+                String::new(),
+                " tool ".to_owned(),
+                "tool".to_owned(),
+                "tool".to_owned()
+            ]
+        );
     assert_eq!(
         parse_preauthorize_flow(Map::from_iter([("flow_id".into(), json!("flow"))]))
             .unwrap_err(),

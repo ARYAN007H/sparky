@@ -200,8 +200,9 @@ fn handle_list_recent_decisions(_ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-fn handle_get_gate_state(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_gate_state(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
+        parse_get_gate_state(params)?;
         let outcome = approval_rpc::approval_get_gate_state()
             .await
             .map_err(|e| e.to_string())?;
