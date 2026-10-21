@@ -732,8 +732,9 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
             .expect("typed voice provider parts")
             .iter()
             .any(|part| {
-                part["part"]["kind"] == "voice_note"
-                    && part["part"]["voiceNote"]["media"]["opaqueId"]
+                part["kind"] == "voice"
+                    && part["voice"]["kind"] == "media"
+                    && part["voice"]["media"]["opaqueId"]
                         == "media:tenant7/thread42/voice1"
             })
     );
