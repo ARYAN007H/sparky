@@ -143,7 +143,7 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
         );
     }
     assert_eq!(
-        tinystoragedrivers::primitives::Counters::new(docs)
+        tinyflows_storage::Counters::new(docs)
             .next("cron", "runs")
             .await
             .unwrap(),
