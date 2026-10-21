@@ -45,12 +45,12 @@ An assistant turn has copy, regenerate, thumbs up or down (remembered), read alo
 
 The agent can stop for four reasons, all shown inline:
 
-| Stop | What you see |
-| --- | --- |
-| Approval | A card naming the tool and a redacted one-line summary. Approve once, always allow that tool, or deny. See [Approval gate](approval-gate.md). |
-| Permission | A connector or provider needs authorizing. The card asks for exactly the fields that provider needs. |
-| Clarification | The agent asks a direct question and waits. |
-| Plan review | A proposed plan. Approve it, reject it, or ask for a revision with feedback. |
+| Stop          | What you see                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Approval      | A card naming the tool and a redacted one-line summary. Approve once, always allow that tool, or deny. See [Approval gate](approval-gate.md). |
+| Permission    | A connector or provider needs authorizing. The card asks for exactly the fields that provider needs.                                          |
+| Clarification | The agent asks a direct question and waits.                                                                                                   |
+| Plan review   | A proposed plan. Approve it, reject it, or ask for a revision with feedback.                                                                  |
 
 A background or scheduled turn has nobody to ask. Approvals raised outside a live chat collect in a deck you can decide later. Undecided requests are denied after ten minutes.
 
@@ -84,14 +84,14 @@ after reload; dictation sends text only.
 
 ## Keyboard
 
-| Shortcut | Action |
-| --- | --- |
-| `⌘K` / `⌘P` | Command palette |
-| `⌘N` | New conversation |
-| `⌘F` | Find in this conversation |
-| `⌘B` | Toggle the sidebar |
-| `⌘,` | Settings |
-| `⌘/` or `?` | Shortcut sheet |
+| Shortcut    | Action                    |
+| ----------- | ------------------------- |
+| `⌘K` / `⌘P` | Command palette           |
+| `⌘N`        | New conversation          |
+| `⌘F`        | Find in this conversation |
+| `⌘B`        | Toggle the sidebar        |
+| `⌘,`        | Settings                  |
+| `⌘/` or `?` | Shortcut sheet            |
 
 ## Not here yet
 

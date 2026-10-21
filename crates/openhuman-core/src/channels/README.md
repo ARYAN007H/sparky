@@ -50,12 +50,12 @@ or shell-based substitute.
 
 ## Layout
 
-| Path | Purpose |
-| --- | --- |
-| [`mod.rs`](./mod.rs) | Feature gates, TinyBus module setup, and host-facing channel contracts. |
-| [`tinychannels-bus channel contracts`](../../../../vendor/tinychannels/crates/tinychannels-bus/src/channel/) | Portable message and typed send contracts. |
-| [`controllers/`](./controllers/) | OpenHuman `channels.*` operations and host-side backend transport adaptation. |
-| [`host/`](./host/) | Typed module callbacks, event subscribers, and remote-control host operations. |
-| [`runtime/`](./runtime/README.md) | Module lease startup, account lifetime, and the OpenHuman dispatch pipeline. |
-| [`bus/`](./bus/) | Hosted-channel inbound and durable progressive delivery integration. |
-| [`providers/relay/`](./providers/relay/README.md) | Gateway relay RPC surface and host-side relay orchestration. |
+| Path                                                                                                         | Purpose                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [`mod.rs`](./mod.rs)                                                                                         | Feature gates, TinyBus module setup, and host-facing channel contracts.        |
+| [`tinychannels-bus channel contracts`](../../../../vendor/tinychannels/crates/tinychannels-bus/src/channel/) | Portable message and typed send contracts.                                     |
+| [`controllers/`](./controllers/)                                                                             | OpenHuman `channels.*` operations and host-side backend transport adaptation.  |
+| [`host/`](./host/)                                                                                           | Typed module callbacks, event subscribers, and remote-control host operations. |
+| [`runtime/`](./runtime/README.md)                                                                            | Module lease startup, account lifetime, and the OpenHuman dispatch pipeline.   |
+| [`bus/`](./bus/)                                                                                             | Hosted-channel inbound and durable progressive delivery integration.           |
+| [`providers/relay/`](./providers/relay/README.md)                                                            | Gateway relay RPC surface and host-side relay orchestration.                   |
