@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::Arc;
 use tinychannels_bus::{ChannelOutboundIntent, DeliveryDurability, OutboundPayload};
-use tinystoragedrivers::{Scope, StorageBackend};
+use crate::storage::{Scope, StorageBackend};
 
 fn entry(id: &str, at: u64) -> DeliveryQueueEntry {
     DeliveryQueueEntry::new(
@@ -36,7 +36,11 @@ impl Rig {
 fn rig() -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let url = format!("sqlite:{}", dir.path().join("storage.sqlite").display());
-    let backend = crate::storage::block_on(crate::storage::open(&url)).unwrap();
+    let backend = crate::storage::block_on({
+        let url = url.clone();
+        async move { crate::storage::open(&url).await }
+    })
+    .unwrap();
     Rig {
         _dir: dir,
         backend,
