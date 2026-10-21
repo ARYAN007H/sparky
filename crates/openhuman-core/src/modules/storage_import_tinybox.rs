@@ -59,9 +59,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
         return Ok(Outcome::NoSource);
     }
     let marker = support::marker_id("tinybox", &base);
-    let result = support::with_module_claim(ctx, MODULE_ID, MARKER_COLLECTION, &marker, move |scoped| {
-        crate::storage::block_on_anyhow(async move { import_into(&scoped, &base).await })
-    })?;
+    let result =
+        support::with_module_claim(ctx, MODULE_ID, MARKER_COLLECTION, &marker, move |scoped| {
+            crate::storage::block_on_anyhow(async move { import_into(&scoped, &base).await })
+        })?;
     let Some(result) = result else {
         return Ok(Outcome::NoBackend);
     };

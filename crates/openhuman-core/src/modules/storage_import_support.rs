@@ -74,22 +74,14 @@ where
                 .for_scope(&claim_scope)
                 .map_err(|error| anyhow!("open claim-bound module storage: {:?}", error.kind()))?;
             crate::storage::block_on_anyhow(async move {
-                if crate::storage::import_state::host_import_done(
-                    &scoped,
-                    &marker_kind,
-                    &marker_id,
-                )
-                .await?
+                if crate::storage::import_state::host_import_done(&scoped, &marker_kind, &marker_id)
+                    .await?
                 {
                     return Ok(ClaimedImport::AlreadyDone);
                 }
                 let result = body(scoped.clone())?;
-                crate::storage::import_state::host_import_mark(
-                    &scoped,
-                    &marker_kind,
-                    &marker_id,
-                )
-                .await?;
+                crate::storage::import_state::host_import_mark(&scoped, &marker_kind, &marker_id)
+                    .await?;
                 Ok(ClaimedImport::Imported(result))
             })
         },

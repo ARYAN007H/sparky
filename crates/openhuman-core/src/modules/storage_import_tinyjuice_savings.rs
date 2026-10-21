@@ -69,17 +69,9 @@ where
     }
     let marker = support::marker_id("savings", file);
     let file = file.to_owned();
-    let result = support::with_module_claim(
-        ctx,
-        MODULE_ID,
-        MARKER_KIND,
-        &marker,
-        move |scoped| {
-            crate::storage::block_on_anyhow(async move {
-                import_into(&scoped, &file, adopt).await
-            })
-        },
-    )?;
+    let result = support::with_module_claim(ctx, MODULE_ID, MARKER_KIND, &marker, move |scoped| {
+        crate::storage::block_on_anyhow(async move { import_into(&scoped, &file, adopt).await })
+    })?;
     let Some(result) = result else {
         return Ok(Outcome::NoBackend);
     };
