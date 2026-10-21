@@ -416,10 +416,19 @@ fn run_call_command(args: &[String]) -> Result<()> {
         .build()?;
     let value = rt
         .block_on(async {
-            let dispatch = DispatchCtx::process_default();
-            let dispatch = if crate::core::legacy_aliases::resolve_legacy(&method)
-                == crate::inference::INFERENCE_AGENT_CHAT
+            let headless_agent_chat = crate::core::legacy_aliases::resolve_legacy(&method)
+                == crate::inference::INFERENCE_AGENT_CHAT;
+            if headless_agent_chat
+                && crate::agent_registry::host_definition::AgentDefinitionRegistry::global()
+                    .is_none()
             {
+                let config = crate::config::Config::load_or_init().await?;
+                crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
+                    &config.workspace_dir,
+                )?;
+            }
+            let dispatch = DispatchCtx::process_default();
+            let dispatch = if headless_agent_chat {
                 dispatch.with_headless_agent_chat()
             } else {
                 dispatch
