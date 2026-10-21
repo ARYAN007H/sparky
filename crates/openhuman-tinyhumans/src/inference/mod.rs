@@ -28,7 +28,7 @@ use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::inference_registry::{
     register_backend_error_classifier, register_catalog, register_chat_model,
     register_config_normalizer, register_embedding, BoxFuture, ChatModelEntry, ChatModelFactory,
-    ChatModelRequest, ProviderModelHooks, ReadinessProbe, PROVIDER_OPENHUMAN,
+    ChatModelRequest, ProviderContext, ProviderModelHooks, ReadinessProbe, PROVIDER_OPENHUMAN,
 };
 use tinyinference_llm::model::ChatModel;
 
@@ -64,7 +64,7 @@ pub(crate) fn build_chat_model(
         .filter(|model| !model.is_empty())
         .map(str::to_string)
         .unwrap_or_else(|| pinned.clone());
-    let options = managed_options(request.config);
+    let options = managed_options(request.context.config);
     log::debug!(
         "[tinyhumans][inference] building managed chat model role={} model={} native_tools={} threaded={}",
         request.role,
@@ -73,7 +73,7 @@ pub(crate) fn build_chat_model(
         request.thread_id.is_some()
     );
     let model = managed_model::build_chat_model(
-        request.config.api_url.as_deref(),
+        request.context.config.api_url.as_deref(),
         &options,
         &default_model,
         request.native_tool_calling,
@@ -85,8 +85,11 @@ pub(crate) fn build_chat_model(
 
 fn readiness_probe() -> ReadinessProbe {
     Arc::new(
-        |role: String, model: String, config: Config| -> BoxFuture<Result<(), String>> {
+        |request: tinyinference_llm::providers::overrides::ReadinessRequest<ProviderContext>| -> tinyinference_llm::providers::overrides::BoxFuture<Result<(), String>> {
             Box::pin(async move {
+                let role = request.role;
+                let model = request.model;
+                let config = request.context.config;
                 log::debug!("[tinyhumans][inference] readiness probe role={role} model={model}");
                 let options = managed_options(&config);
                 let managed = match managed_model::build_chat_model(
@@ -123,7 +126,9 @@ pub(crate) fn register(_options: &InstallOptions) {
                 is_alias: Arc::new(tiers::is_alias),
                 is_raw_model: Arc::new(tiers::is_raw_model),
                 supports_vision: Arc::new(tiers::supports_vision),
-                resolve_model: Arc::new(tiers::resolve_model),
+                resolve_model: Arc::new(|role, context, model| {
+                    tiers::resolve_model(role, &context.config, model)
+                }),
                 context_window: Arc::new(tiers::context_window),
                 default_pricing: Arc::new(tiers::default_pricing),
                 without_reasoning: Arc::new(tinyinference_llm::model::without_reasoning),
