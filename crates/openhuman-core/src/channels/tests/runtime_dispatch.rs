@@ -1,12 +1,12 @@
-use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use super::super::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
 use super::super::runtime::test_support::{
-    linked_telegram_runtime, run_dispatch_harness, DispatchHarnessOptions,
+    DispatchHarnessOptions, linked_telegram_runtime, run_dispatch_harness,
 };
 use super::super::runtime::{
-    process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
+    RuntimeChannelMessage, process_channel_message, run_message_dispatch_loop,
 };
-use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
+use super::common::{RecordingChannel, SlowModel, use_real_agent_handler};
+use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
 use crate::channels::runtime::ChannelHandle;
 use crate::core::events::DomainEvent;
 use crate::inference::provider;
@@ -126,7 +126,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
 }
 
 #[tokio::test]
-async fn process_channel_message_cancels_scoped_typing_task() {
+async fn process_channel_message_sends_typing_before_the_provider_reply() {
     let _bus_guard = use_real_agent_handler().await;
     let linked = linked_telegram_runtime().await;
     let channel = linked
@@ -196,7 +196,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             .filter(|path| path.ends_with("/sendChatAction"))
             .count(),
         1,
-        "a short turn should send the immediate typing action; stop cancels the local refresher without provider I/O: {requests:?}"
+        "a short turn should send one immediate typing action; provider stop cancels the local refresher without network I/O: {requests:?}"
     );
     assert_eq!(
         requests

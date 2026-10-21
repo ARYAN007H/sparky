@@ -1,6 +1,6 @@
 use super::super::context::{
-    conversation_history_key, ChannelRouteSelection, ChannelRuntimeContext,
-    CHANNEL_MESSAGE_TIMEOUT_SECS,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRouteSelection, ChannelRuntimeContext,
+    conversation_history_key,
 };
 use super::super::runtime::process_channel_message;
 use super::super::runtime::test_support::linked_telegram_runtime;
@@ -44,7 +44,7 @@ async fn process_channel_message_executes_native_tool_calls() {
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
         provider_runtime_options: provider::ProviderRuntimeOptions::default(),
-        workspace_dir: Arc::new(_linked.config().workspace_dir.clone()),
+        workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
@@ -123,7 +123,7 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
         provider_runtime_options: provider::ProviderRuntimeOptions::default(),
-        workspace_dir: Arc::new(std::env::temp_dir()),
+        workspace_dir: Arc::new(_linked.config().workspace_dir.clone()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
