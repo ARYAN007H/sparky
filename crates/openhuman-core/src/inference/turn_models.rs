@@ -147,21 +147,36 @@ fn build_turn_models_crate(
     let provider_route = tinyinference_providers::route::ProviderRoute::parse(&configured_provider)
         .map(|route| route.provider)
         .unwrap_or_else(|| configured_provider.clone());
+    let primary_is_injected = ctx
+        .host_overrides()
+        .and_then(|overrides| overrides.model_for(role))
+        .is_some();
+    #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+    let primary_is_injected = primary_is_injected
+        || crate::inference::provider::factory::test_provider_override::current().is_some();
     let workload_requests = tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS
         .iter()
-        .map(|route| {
+        .filter_map(|route| {
             let role = crate::inference::provider_model::role_for_provider_model_for(
                 extensions,
                 &provider_route,
                 route,
             );
-            tinyagents_harness::host::ModelBuildRequest {
+            if primary_is_injected
+                && !ctx.host_overrides().is_some_and(|overrides| {
+                    overrides.role_models.contains_key(*route)
+                        || overrides.role_models.contains_key(role)
+                })
+            {
+                return None;
+            }
+            Some(tinyagents_harness::host::ModelBuildRequest {
                 role: role.to_owned(),
                 route: Some((*route).to_owned()),
                 purpose: tinyagents_harness::host::ModelPurpose::WorkloadTier((*route).to_owned()),
                 model_pin: Some((*route).to_owned()),
                 opts: opts.clone(),
-            }
+            })
         })
         .collect();
     let built = tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, role)
@@ -475,30 +490,71 @@ impl TurnModelSource {
             });
         }
         if let Some(cn) = &self.crate_native {
+            let ctx = cn.ctx();
+            let host_injected = ctx
+                .host_overrides()
+                .and_then(|overrides| overrides.model_for(&cn.role));
+            #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+            let injected = host_injected
+                .or_else(crate::inference::provider::factory::test_provider_override::current);
+            #[cfg(not(any(test, feature = "e2e-test-support", feature = "rss-bench")))]
+            let injected = host_injected;
+            let injected_profile = injected.as_ref().and_then(|model| model.profile());
             let provider_string = cn.primary_override.clone().unwrap_or_else(|| {
                 crate::inference::provider::provider_for_role(&cn.role, &cn.config)
             });
             // Tool/vision gating keeps its historical provider-name rule; only
             // the wall-clock ceilings use endpoint-aware self-hosted detection.
-            let is_local = tinyinference_local::profile::is_local_provider_string(&provider_string);
-            let self_hosted = crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
-                &provider_string,
-                crate::agent::tinyagents::turn_policy::local_openai_endpoint(&cn.config).as_deref(),
-            );
-            let provider_id = if provider_string == "openhuman"
-                || provider_string.is_empty()
-                || provider_string == "cloud"
-            {
-                "managed".to_string()
-            } else {
-                provider_string
-                    .split(':')
-                    .next()
-                    .unwrap_or(&provider_string)
-                    .to_string()
-            };
+            let (provider_id, native_tools, supports_vision, is_local, self_hosted, context_window) =
+                if let Some(profile) = injected_profile {
+                    let provider_id = profile.provider.as_deref().unwrap_or("injected").to_string();
+                    (
+                        provider_id.clone(),
+                        profile.tool_calling,
+                        profile.modalities.image_in,
+                        crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
+                            &provider_id,
+                            None,
+                        ),
+                        crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
+                            &provider_id,
+                            None,
+                        ),
+                        context_window.or(profile.max_input_tokens),
+                    )
+                } else {
+                    let is_local = tinyinference_local::profile::is_local_provider_string(
+                        &provider_string,
+                    );
+                    let self_hosted =
+                        crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
+                            &provider_string,
+                            crate::agent::tinyagents::turn_policy::local_openai_endpoint(&cn.config)
+                                .as_deref(),
+                        );
+                    let provider_id = if provider_string == "openhuman"
+                        || provider_string.is_empty()
+                        || provider_string == "cloud"
+                    {
+                        "managed".to_string()
+                    } else {
+                        provider_string
+                            .split(':')
+                            .next()
+                            .unwrap_or(&provider_string)
+                            .to_string()
+                    };
+                    (
+                        provider_id,
+                        !is_local,
+                        !is_local,
+                        is_local,
+                        self_hosted,
+                        context_window,
+                    )
+                };
             return build_turn_models_crate(
-                &cn.ctx(),
+                &ctx,
                 &cn.role,
                 &cn.config,
                 model,
@@ -506,8 +562,8 @@ impl TurnModelSource {
                 context_window,
                 cn.primary_override.as_deref(),
                 provider_id,
-                !is_local,
-                !is_local,
+                native_tools,
+                supports_vision,
                 self_hosted,
                 thread_id,
             );
