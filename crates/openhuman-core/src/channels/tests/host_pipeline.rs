@@ -260,24 +260,20 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
         let calls = model_state.calls.lock().unwrap();
         assert_eq!(calls.len(), 2);
         assert!(
-            calls[0]
-                .iter()
-                .any(|(role, text)| {
-                    role == "user"
-                        && text.contains("You are responding via the \"discord\" channel")
-                        && text.ends_with("first thread message")
-                }),
+            calls[0].iter().any(|(role, text)| {
+                role == "user"
+                    && text.contains("You are responding via the \"discord\" channel")
+                    && text.ends_with("first thread message")
+            }),
             "first model call was: {:#?}",
             calls[0]
         );
         assert!(
-            calls[1]
-                .iter()
-                .any(|(role, text)| {
-                    role == "user"
-                        && text.contains("You are responding via the \"discord\" channel")
-                        && text.ends_with("second thread message")
-                }),
+            calls[1].iter().any(|(role, text)| {
+                role == "user"
+                    && text.contains("You are responding via the \"discord\" channel")
+                    && text.ends_with("second thread message")
+            }),
             "second model call was: {:#?}",
             calls[1]
         );
