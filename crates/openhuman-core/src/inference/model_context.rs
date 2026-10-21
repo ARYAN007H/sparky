@@ -2,8 +2,8 @@
 
 /// Resolves a model-only context window using owner-provided static hints.
 ///
-/// This projection uses an empty route identity so it cannot borrow provider
-/// discovery from an unrelated endpoint. Returns `None` when no owner or
+/// This projection uses a fresh native resolver, so it cannot borrow remembered
+/// provider discovery from a route. Returns `None` when no owner or
 /// managed-provider hint is available.
 pub fn context_window_for_model(model: &str) -> Option<u64> {
     crate::inference::context_window::project_context_window_for_model(model, None).window
